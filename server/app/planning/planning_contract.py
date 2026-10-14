@@ -19,11 +19,10 @@ CONTRACT='videowizard-planning-v1'
 def require(ok, message):
     if not ok: raise ValueError(message)
 
-def definition(store=None):
-    """v2: the editing procedure (prompts, schemas) lives in the stage table under 'planning'."""
+def definition(store=None, version='1'):
+    """v2: the editing procedure (prompts, schemas) lives in the stage table under 'planning' of procedure version 1 (the only version that has it)."""
     from ..core import stage_table, _stage
-    from ..config import settings
-    return _stage(stage_table(settings().DEFAULT_PROCEDURE_VERSION), 'planning')['definition']
+    return _stage(stage_table(version), 'planning')['definition']
 
 
 def timing_fields(context):

@@ -132,7 +132,7 @@ def test_a1_three_clips_succeed(home, database, fake, gemini):
     assert u['recorded'] and u['summary']['contract_version'] == 'clip-log-v1' and u['summary']['sub_clips'] == 2 and u['summary']['by_eligibility'] == {'ELIGIBLE_AS_IS': 1, 'ELIGIBLE_WITH_CROP': 1}
     assert u['cost']['input_tokens'] == 1200 and u['summary']['descriptive_name'] == 'synthetic_test_clip' and len(u['summary']['summary_card']) == 10
     nxt = vw(home, 'next')[1]
-    assert nxt['stage'] == 'planning'
+    assert nxt['stage'] == 'options'
     with psycopg.connect(database) as c:
         assert c.execute("select count(*) from vw2_files where stage='analysis'").fetchone()[0] == 6
     assert gemini.seen_modes == ['AGENTIC'] * 3  # production setting since 14 Oct 2026 evening
@@ -248,13 +248,13 @@ def test_a16_identity_changes_with_model_only():
     assert a['analysis_key'] != b['analysis_key'] and a['identity']['model'] == 'gemini-3.8-flash'
 
 
-def test_e20_planning_refuses_clip_log_runs_until_step4(home, database, fake, gemini):
+def test_e20_version2_runs_go_to_options_not_planning(home, database, fake, gemini):
     run_until_analysis(home, database, fake, n_clips=1)
     vw(home, *START)
     drain()
-    assert vw(home, 'next')[1]['stage'] == 'planning'
+    assert vw(home, 'next')[1]['stage'] == 'options'   # procedure version 2: options/master replace planning (design/15)
     rc, out, _ = vw(home, 'planning', 'prepare', '--fps', '25', '--resolution', '64x64', '--source-audio', 'none', '--visible-speaking', 'avoid')
-    assert rc == 2 and 'step 4' in out['message']
+    assert rc == 2 and out['code'] == 'NOT_ALLOWED'
     rc, out, _ = vw(home, 'analysis', 'show', '--unit', vw(home, 'analysis', 'status')[1]['units'][0]['unit'])
     assert rc == 0 and len(out['summary']['summary_card']) == 10
 
@@ -272,7 +272,7 @@ def test_e18_policy_change_resolves_without_paid_call(home, database, fake, gemi
     u = vw(home, 'analysis', 'status')[1]['units'][0]
     assert u['summary']['by_eligibility'] == {'ELIGIBLE_AS_IS': 1, 'ELIGIBLE_A_ROLL_SPEAKER': 1} and u['cost'] is None
     assert gemini.calls == calls   # no upload, no generate
-    assert vw(home, 'next')[1]['stage'] == 'planning'
+    assert vw(home, 'next')[1]['stage'] == 'options'
 
 
 def test_a10_long_clip_uses_agentic(home, database, fake, gemini, monkeypatch):
@@ -320,5 +320,5 @@ def test_a14_exclude_one_clip(home, database, fake, gemini):
     assert nxt['stage'] == 'analysis' and nxt['units_open'] == [units[2]]
     assert vw(home, 'analysis', 'exclude', '--unit', units[2], '--note', 'shaky footage')[0] == 0
     st = vw(home, 'analysis', 'status')[1]
-    assert vw(home, 'next')[1]['stage'] == 'planning'
+    assert vw(home, 'next')[1]['stage'] == 'options'
     assert vw(home, 'view', '--stage', 'analysis')[1]['outputs'][-1]['summary']['excluded'] is True
