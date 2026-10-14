@@ -3,12 +3,16 @@
 Run: python -m pytest server/tests -q  (Docker Desktop must be running).
 """
 import hashlib
+import json
 import os
 import secrets
 import socket
 import subprocess
+import sys
+import threading
 import time
 import uuid
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -114,3 +118,56 @@ def admin(database):
 
 def rid():
     return str(uuid.uuid4())
+
+
+# ---------- plugin fixtures (shared by test_plugin and test_stages_*) ----------
+
+ROOT = Path(__file__).resolve().parents[2]
+VW = ROOT / 'plugin' / 'scripts' / 'vw.py'
+GUARD = ROOT / 'plugin' / 'hooks' / 'guard.py'
+
+
+@pytest.fixture(scope='module')
+def server(database):
+    import uvicorn
+    from app.main import app
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+    config = uvicorn.Config(app, host='127.0.0.1', port=port, log_level='warning')
+    srv = uvicorn.Server(config)
+    threading.Thread(target=srv.run, daemon=True).start()
+    for _ in range(50):
+        if srv.started:
+            break
+        time.sleep(0.1)
+    yield f'http://127.0.0.1:{port}'
+    srv.should_exit = True
+
+
+@pytest.fixture
+def home(tmp_path, server, monkeypatch):
+    """Isolated plugin home (session + machine id) and runs folder."""
+    h = tmp_path / 'home'
+    runs = tmp_path / 'runs'
+    env = {**os.environ, 'VW2_HOME': str(h), 'VW2_RUNS': str(runs), 'VW2_SERVER_URL': server}
+    return {'home': h, 'runs': runs, 'env': env}
+
+
+def vw(home, *args, stdin=None):
+    p = subprocess.run([sys.executable, str(VW), *args], env=home['env'], capture_output=True, text=True, input=stdin, timeout=60)
+    out = json.loads(p.stdout) if p.stdout.strip() else None
+    return p.returncode, out, p.stderr
+
+
+def connected(home, database, user='alice', role='Member'):
+    """Seed an approved executor session the way the connect flow would."""
+    token = secrets.token_urlsafe(32)
+    with psycopg.connect(database) as conn:
+        conn.execute("insert into vw2_sessions(token_hash,user_id,user_name,role,kind,expires_at) values (%s,%s,%s,%s,'executor', now() + interval '1 day')",
+                     (hashlib.sha256(token.encode()).hexdigest(), user, user.title(), role))
+    home['home'].mkdir(parents=True, exist_ok=True)
+    (home['home'] / 'session.json').write_text(json.dumps({'token': token, 'server': home['env']['VW2_SERVER_URL'], 'user': user}))
+    return home
+
+

@@ -280,6 +280,45 @@ def cmd_defect(a):
          'Defect filed. Tell the operator the ticket number and stop; the builder takes it from here.')
 
 
+def cmd_stage(a):
+    """Stage scripts: prepare (inputs + prompt for the model) and record (validate out/<stage>.json, record output)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import stages_text
+    m = active()
+    nxt = call('GET', f"/api/runs/{m['run_id']}/next")
+    ensure_mine(nxt, a.take_over, m['run_id'])
+    if nxt.get('stage') != a.stage:
+        emit({'action': 'refused', 'message': f"The next stage is {nxt.get('stage')!r}, not {a.stage!r}. Run `vw next`.", 'next': nxt}, 2)
+    if a.stage not in stages_text.STAGES:
+        emit({'action': 'refused', 'message': f'Stage {a.stage!r} has no script in this plugin version.'}, 2)
+    procedure = call('GET', f"/api/procedures/{nxt['version']}/{a.stage}")
+    full = call('GET', f"/api/runs/{m['run_id']}")
+    current = {o['stage']: o for o in full['outputs'] if o['unit'] is None}
+
+    def prior(stage):
+        if stage not in current:
+            emit({'action': 'refused', 'message': f'Stage {stage} has no current output; run `vw next`.'}, 2)
+        return current[stage]
+
+    ws = workspace(m['code'])
+    prepare, record = stages_text.STAGES[a.stage]
+    try:
+        if a.step == 'prepare':
+            emit({'stage': a.stage, **prepare(ws, procedure, prior)}, 0, f'{a.stage}: inputs and prompt ready; write the proposal to out/{a.stage}.json')
+        result = record(ws, procedure, prior)
+    except stages_text.Refused as exc:
+        emit({'action': 'refused', 'message': str(exc)}, 2)
+    refs = file_refs(m, result['files'], a.stage, result.get('retain', True))
+    body = {'stage': a.stage, 'files': refs, 'summary': result['summary']}
+    if a.quote:
+        body['accepted_quote'] = a.quote
+    row = write(f"/api/runs/{m['run_id']}/output", body)
+    for ref in refs:
+        m['files'] = [f for f in m['files'] if f['name'] != ref['name']] + [{**ref, 'stage': a.stage, 'action': 'retain' if result.get('retain', True) else 'upload'}]
+    save_json(manifest_path(m['code']), m)
+    emit(row, 0, f'Recorded {a.stage}; run `vw next`.')
+
+
 def cmd_pull(a):
     runs = call('GET', '/api/runs')
     run = next((r for r in runs if r['code'] == a.code), None)
@@ -331,6 +370,7 @@ def main(argv=None):
     s = sub.add_parser('revise'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--confirm'); s.set_defaults(fn=cmd_revise)
     s = sub.add_parser('decide'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--decision', required=True, choices=['retry', 'revise', 'defect', 'stop']); s.add_argument('--note'); s.set_defaults(fn=cmd_decide)
     s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
+    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     a = p.parse_args(argv)

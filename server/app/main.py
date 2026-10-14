@@ -229,6 +229,18 @@ def health():
     return {'ok': True}
 
 
+@app.get('/api/procedures/{version}/{stage}')
+def procedure(version: str, stage: str, user=User):
+    """Procedure text for the executor only: it is never written to disk by the plugin and never shown in the UI."""
+    if user['kind'] != 'executor':
+        raise Problem(403, 'EXECUTOR_ONLY', 'Procedures are available to the operator tool only.')
+    stages = core.stage_table(version)
+    if stages is None:
+        raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
+    st = core._stage(stages, stage)
+    return Response({k: st.get(k) for k in ('name', 'prompt', 'steps', 'output_shape', 'output_file', 'needs_acceptance', 'paid', 'per_unit', 'cap')})
+
+
 @app.get('/api/meta')
 def meta():
     return Response({'server_version': settings().SERVER_VERSION, 'plugin_min_version': settings().PLUGIN_MIN_VERSION, 'app_origin': settings().APP_ORIGIN})

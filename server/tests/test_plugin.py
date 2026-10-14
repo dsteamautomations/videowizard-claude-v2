@@ -14,54 +14,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-VW = ROOT / 'plugin' / 'scripts' / 'vw.py'
-GUARD = ROOT / 'plugin' / 'hooks' / 'guard.py'
-
-
-@pytest.fixture(scope='module')
-def server(database):
-    import uvicorn
-    from app.main import app
-    with socket.socket() as s:
-        s.bind(('127.0.0.1', 0))
-        port = s.getsockname()[1]
-    config = uvicorn.Config(app, host='127.0.0.1', port=port, log_level='warning')
-    srv = uvicorn.Server(config)
-    threading.Thread(target=srv.run, daemon=True).start()
-    for _ in range(50):
-        if srv.started:
-            break
-        time.sleep(0.1)
-    yield f'http://127.0.0.1:{port}'
-    srv.should_exit = True
-
-
-@pytest.fixture
-def home(tmp_path, server, monkeypatch):
-    """Isolated plugin home (session + machine id) and runs folder."""
-    h = tmp_path / 'home'
-    runs = tmp_path / 'runs'
-    env = {**os.environ, 'VW2_HOME': str(h), 'VW2_RUNS': str(runs), 'VW2_SERVER_URL': server}
-    return {'home': h, 'runs': runs, 'env': env}
-
-
-def vw(home, *args, stdin=None):
-    p = subprocess.run([sys.executable, str(VW), *args], env=home['env'], capture_output=True, text=True, input=stdin, timeout=60)
-    out = json.loads(p.stdout) if p.stdout.strip() else None
-    return p.returncode, out, p.stderr
-
-
-def connected(home, database, user='alice', role='Member'):
-    """Seed an approved executor session the way the connect flow would."""
-    token = secrets.token_urlsafe(32)
-    with psycopg.connect(database) as conn:
-        conn.execute("insert into vw2_sessions(token_hash,user_id,user_name,role,kind,expires_at) values (%s,%s,%s,%s,'executor', now() + interval '1 day')",
-                     (hashlib.sha256(token.encode()).hexdigest(), user, user.title(), role))
-    home['home'].mkdir(parents=True, exist_ok=True)
-    (home['home'] / 'session.json').write_text(json.dumps({'token': token, 'server': home['env']['VW2_SERVER_URL'], 'user': user}))
-    return home
-
+from conftest import ROOT, VW, GUARD, vw, connected, server, home  # noqa: F401
 
 START = ['start', '--title', 'T', '--client', 'C', '--version', 'test', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this']
 
@@ -97,10 +50,15 @@ def test_connect_flow_end_to_end(home, database):
     """P1 companion: `connect` polls until the browser approves."""
     proc = subprocess.Popen([sys.executable, str(VW), 'connect', '--timeout', '30', '--poll', '0.5'], env=home['env'],
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    time.sleep(2)
     from psycopg.rows import dict_row
     with psycopg.connect(database, row_factory=dict_row) as conn:
-        row = conn.execute('select id, token_hash, code from vw2_connections order by created_at desc limit 1').fetchone()
+        row = None
+        for _ in range(60):  # the subprocess registers its connection as soon as it starts; wait up to 30 s under load
+            row = conn.execute('select id, token_hash, code from vw2_connections order by created_at desc limit 1').fetchone()
+            if row:
+                break
+            time.sleep(0.5)
+        assert row, 'vw connect never registered a connection'
         conn.execute("insert into vw2_sessions(token_hash,user_id,user_name,role,kind,expires_at) values (%s,'e1','Emp','Member','executor', now() + interval '1 day')", (row['token_hash'],))
         conn.execute('update vw2_connections set approved_by=%s, approved_at=now() where id=%s', ('e1', row['id']))
     out, err = proc.communicate(timeout=40)
