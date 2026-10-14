@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Defects · VideoWizard{% endblock %}
+{% block body %}
+<h1>Defects</h1>
+{% if not defects %}<p>No defects filed.</p>{% endif %}
+<table>
+<tr><th>#</th><th>Run</th><th>Stage</th><th>Error</th><th>By</th><th>When</th><th>Status</th></tr>
+{% for d in defects %}
+<tr><td>{{ d.id }}</td><td><a href="/runs/{{ d.code }}">{{ d.code }}</a></td><td>{{ d.stage or '' }}</td><td>{{ d.error }}</td>
+<td>{{ d.by_user }}</td><td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</td><td>{{ d.status }}</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

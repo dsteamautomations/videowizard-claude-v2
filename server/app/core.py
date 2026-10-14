@@ -111,7 +111,7 @@ def declared_units(outputs, stage_name):
 
 
 def compute_next(run, stages, outputs, attempts):
-    base = {'run_id': str(run['id']), 'code': run['code'], 'version': run['procedure_version']}
+    base = {'run_id': str(run['id']), 'code': run['code'], 'version': run['procedure_version'], 'active_machine': run['active_machine']}
     if run['status'] == 'closed':
         return {**base, 'stage': None, 'actor': 'none', 'allowed': ['view']}
     done = {(o['stage'], o['unit']) for o in outputs}
@@ -254,6 +254,10 @@ def adopt(conn, user, run, version):
     if stage_table(version) is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
     return conn.execute('update vw2_runs set procedure_version=%s where id=%s returning *', (version, run['id'])).fetchone()
+
+
+def claim(conn, user, run, machine):
+    return conn.execute('update vw2_runs set active_machine=%s where id=%s returning *', (machine, run['id'])).fetchone()
 
 
 def file_defect(conn, user, run, stage, error, log_excerpt):

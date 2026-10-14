@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     DEFAULT_PROCEDURE_VERSION: str = '1'
     MAX_BODY_BYTES: int = 256 * 1024            # guard against blobs in the database; files go to storage
     MAX_QUOTE_CHARS: int = 2048
+    APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
+    CONNECT_MINUTES: int = 10
+    SERVER_VERSION: str = '0.2.0'
+    PLUGIN_MIN_VERSION: str = '0.1.0'
 
 
 @lru_cache

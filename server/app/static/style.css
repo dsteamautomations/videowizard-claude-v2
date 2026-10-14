@@ -1,0 +1,22 @@
+:root { --fg: #1a1a1a; --bg: #fff; --muted: #666; --line: #ddd; --ok: #1b6e3a; --err: #a12; }
+@media (prefers-color-scheme: dark) { :root { --fg: #eee; --bg: #151515; --muted: #999; --line: #333; } }
+body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+header a { color: inherit; text-decoration: none; }
+nav { display: flex; gap: 16px; align-items: center; }
+nav form { margin: 0; }
+main { max-width: 960px; margin: 0 auto; padding: 16px; }
+label { display: block; margin: 10px 0; }
+input { font: inherit; padding: 6px 8px; min-width: 260px; }
+button { font: inherit; padding: 6px 14px; cursor: pointer; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.error { color: var(--err); }
+.ok { color: var(--ok); }
+.muted { color: var(--muted); }
+.code { font: 700 28px/1 ui-monospace, monospace; letter-spacing: 2px; }
+.output { border: 1px solid var(--line); padding: 8px 12px; margin: 8px 0; }
+.output.stale { opacity: .6; }
+pre { white-space: pre-wrap; font-size: 13px; }
+section h2 { margin: 20px 0 6px; font-size: 18px; }
+small { color: var(--muted); font-weight: normal; }

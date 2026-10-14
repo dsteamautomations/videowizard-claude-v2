@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ run.code }} · VideoWizard{% endblock %}
+{% block body %}
+<h1>{{ run.code }} — {{ run.title }}</h1>
+<p>{{ run.client or '' }} · owner {{ run.owner_name }} · procedure {{ run.procedure_version }} · {{ run.status }}
+{% if run.active_machine %} · active on {{ run.active_machine }}{% endif %}</p>
+<p class="next">{% if next.stage %}Next: <strong>{{ next.stage }}</strong>{% if next.units_open %} ({{ next.units_open|length }} units open){% endif %}
+{% if next.actor == 'operator_decision' %} — waiting for the operator's decision{% endif %}{% else %}All stages done.{% endif %}</p>
+{% for s in stages %}
+<section>
+<h2>{{ s.name }}{% if s.paid %} <small>paid: {{ s.paid }}</small>{% endif %}</h2>
+{% set rows = by_stage[s.name] %}
+{% if not rows %}<p class="muted">No output yet.</p>{% endif %}
+{% for o in rows %}
+<div class="output {{ 'stale' if o.stale else '' }}">
+  <p><strong>{{ o.unit or 'output' }}</strong> · {{ o.created_at.strftime('%Y-%m-%d %H:%M') }} UTC{% if o.stale %} · stale{% endif %}
+  {% if o.accepted_quote %} · accepted by {{ o.accepted_by }}: “{{ o.accepted_quote }}”{% endif %}
+  {% if o.cost_cents %} · cost {{ '%.2f'|format(o.cost_cents / 100) }}{% endif %}</p>
+  {% if o.files %}<ul>{% for f in o.files %}<li>{{ f.name }} ({{ f.bytes }} bytes){% if not f.receipt %} · not uploaded{% endif %}</li>{% endfor %}</ul>{% endif %}
+  {% if o.summary %}<pre>{{ o.summary | tojson(indent=2) }}</pre>{% endif %}
+</div>
+{% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

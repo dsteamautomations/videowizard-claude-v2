@@ -4,12 +4,14 @@ from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import auth, core
+from . import auth, connect, core, web
 from .config import settings
-from .db import connect, migrate
+from .db import connect as db_connect, migrate
 from .errors import Problem
 
 
@@ -29,6 +31,8 @@ async def lifespan(_app):
 
 
 app = FastAPI(title='VideoWizard v2', default_response_class=Response, lifespan=lifespan)
+app.mount('/static', StaticFiles(directory=str(Path(__file__).resolve().parent / 'static')), name='static')
+app.include_router(web.router)
 
 
 @app.exception_handler(Problem)
@@ -37,7 +41,7 @@ def problem(request, exc: Problem):
 
 
 def db():
-    with connect() as conn:
+    with db_connect() as conn:
         yield conn
 
 
@@ -101,6 +105,19 @@ class Decide(Write):
 
 class Adopt(Write):
     version: str
+
+
+class Claim(Write):
+    machine: str = Field(min_length=1, max_length=120)
+
+
+class ConnectBegin(Strict):
+    request_id: UUID
+    token_hash: str = Field(pattern=r'^[0-9a-f]{64}$')
+
+
+class ConnectApprove(Strict):
+    code: str = Field(min_length=9, max_length=9)
 
 
 class Defect(Write):
@@ -210,3 +227,32 @@ def post_defect(run_id: UUID, body: Defect, user=User, conn=DB):
 @app.get('/health')
 def health():
     return {'ok': True}
+
+
+@app.get('/api/meta')
+def meta():
+    return Response({'server_version': settings().SERVER_VERSION, 'plugin_min_version': settings().PLUGIN_MIN_VERSION, 'app_origin': settings().APP_ORIGIN})
+
+
+# ---------- connect flow ----------
+
+@app.post('/api/connect', status_code=201)
+def connect_begin(body: ConnectBegin, conn=DB):
+    return Response(connect.begin(conn, body.request_id, body.token_hash), status_code=201)
+
+
+@app.get('/api/connect/{connection_id}')
+def connect_status(connection_id: UUID, conn=DB):
+    return Response(connect.status(conn, connection_id))
+
+
+@app.post('/api/connect/{connection_id}/approve')
+def connect_approve(connection_id: UUID, body: ConnectApprove, user=User, conn=DB):
+    return Response(connect.approve(conn, user, connection_id, body.code))
+
+
+@app.post('/api/runs/{run_id}/claim')
+def post_claim(run_id: UUID, body: Claim, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id, lock=True)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, dict(core.claim(conn, user, run, body.machine))))
+    return Response(resp, status_code=status)

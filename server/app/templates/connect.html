@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Connect operator · VideoWizard{% endblock %}
+{% block body %}
+<h1>Connect the operator</h1>
+{% if message %}<p class="{{ 'ok' if connected else 'error' }}">{{ message }}</p>{% endif %}
+{% if connected and not message %}<p class="ok">This operator is already connected.</p>{% endif %}
+{% if code %}
+<p>The operator chat is showing a code. Approve only if it matches this one:</p>
+<p class="code">{{ code }}</p>
+<form method="post">
+  <input type="hidden" name="code" value="{{ code }}">
+  <button>Approve as {{ user.name }}</button>
+</form>
+{% endif %}
+{% endblock %}

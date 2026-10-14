@@ -13,9 +13,9 @@ Disposition vocabulary (plan §5): **next** = `GET /runs/{id}/next`; **output** 
 | ID | Feature | v1 evidence (representative) | Used in runs? | v2 disposition | Slice | Test |
 |---|---|---|---|---|---|---|
 | F-01 | Employee login, who-am-I, logout; admin role gate | `main.py` `/api/auth/{login,me,logout}`; `integrations.py admin()`; `components/session-gate.tsx` | yes (all runs) | PORT; role → single `is_admin` flag | 1 | ✅ test_auth.py (3) |
-| F-02 | Operator connect flow: connector asks for a code, user approves in browser `/connect/{id}`, encrypted session (DPAPI/Keychain); connections list + revoke page | `operator.py` `/api/operator/connect*`, `/api/auth/connections*`; connector `connect/retry/abandon-pending/reset-connection`; `app/connect`, `app/connections` | yes (all operator runs) | MERGE into `/vw start` preflight (ported login, session kept in plugin). Connections page: DROP (owner agreed 14 Oct 2026) | 2 | |
+| F-02 | Operator connect flow: connector asks for a code, user approves in browser `/connect/{id}`, encrypted session (DPAPI/Keychain); connections list + revoke page | `operator.py` `/api/operator/connect*`, `/api/auth/connections*`; connector `connect/retry/abandon-pending/reset-connection`; `app/connect`, `app/connections` | yes (all operator runs) | MERGE into `/vw start` preflight (ported login, session kept in plugin). Connections page: DROP (owner agreed 14 Oct 2026) | 2 | ✅ test_web C1–C5, test_plugin connect_flow |
 | F-03 | Create run (idempotent `request_id`, VW-n code); list my runs with search + 50-page offset; run detail; revision history | `main.py` `POST/GET /api/runs`, `/history`; `app/workspace.tsx`, `app/intake/page.tsx`; connector `new`, `runs` | yes (create 8) | PORT create/list; history → REPLACE by `stage_outputs` versions | 1/3 | ✅ test_core: run_code_and_default_version, e20_e21, e17_e18 |
-| F-04 | Stage context + published procedure for the operator (run, can_edit, current/next stage, source digest, prompt); release pinned per run | `operator.py` `/api/runs/{id}/context`, `/api/instructions/{release}/{stage}`; connector `context`, `instructions`; `stages.py instruction_release` | yes | REPLACE by next + `GET /procedures/{version}/{stage}` + `runs.procedure_version`/adopt | 1 | |
+| F-04 | Stage context + published procedure for the operator (run, can_edit, current/next stage, source digest, prompt); release pinned per run | `operator.py` `/api/runs/{id}/context`, `/api/instructions/{release}/{stage}`; connector `context`, `instructions`; `stages.py instruction_release` | yes | REPLACE by next + `GET /procedures/{version}/{stage}` + `runs.procedure_version`/adopt | 1 | ✅ test_core e1 (next); test_plugin p5 (start/next) — procedure content: text-stage slice |
 | F-05 | Write safety: `expected_revision` 409 conflicts, idempotent receipts, "stage not released" guard, owner-only write, stable error codes | every write route; `store.previous()`, `errors.py`; UI "Retry same save" | yes | PORT receipts + owner check; conflicts → output versions; guard → next `actions[]`; browser retry state DROP (owner agreed 14 Oct 2026) | 1 | ✅ test_core: e2, e17_e18, e19, e20_e21 |
 | F-06 | Deactivate / reactivate a run | `workflow.py` `deactivate`,`reactivate` | never | MERGE into `POST /runs/{id}/close` + admin close/delete page | 1 | ✅ test_core: e22_e23 (close) |
 | F-07 | Intake: paste or upload source (TXT/MD/DOCX/text-PDF ≤20 MB, extraction warnings, original retained/downloadable); client directory lookup; AI cleanup proposal (removals with reasons, titles); accept | `main.py` `/upload`, `/files`, `/clients`; `workflow.py` `save_source/set_client/propose_intake/accept_intake`; `intake-0.4.0` (10 steps); `app/runs/[id]/page.tsx` | yes (upload 3, set_client 6, propose/accept 6) | Source → file in `in/`, PORT `extraction.py`; proposal → output; accept → chat acceptance; client directory DROP (owner agreed 14 Oct 2026) (plan: free text at `/vw start`) | 4 | |
@@ -52,8 +52,8 @@ Disposition vocabulary (plan §5): **next** = `GET /runs/{id}/next`; **output** 
 | F-38 | Integrations/admin page: provider key status, models, worker heartbeats, recent jobs; refresh ElevenLabs models; choose preferred model; Higgsfield and Omni connection checks; 9 algorithm-documentation endpoints | `integrations.py` (14 routes); `app/integrations/page.tsx`, `components/higgsfield-check.tsx`, `omni-check.tsx`; `worker_discovery.py` | yes (admin); algorithm docs never | DEFER key/connection checks into `/vw start` preflight; model choice, heartbeat, algorithm docs DROP (owner agreed 14 Oct 2026) | 9 | |
 | F-39 | Background workers with job lease/claim (media, voice, voice lab, analysis, planning inspector, editing inspection, references, video) | `python -m app.*_worker`, `planning_inspector.py`; `lease_until/claim_id` | yes (voice lab never) | REPLACE by one loop per provider family behind jobs; lease/claim DROP (owner agreed 14 Oct 2026) (plan §2) | 5–7 | |
 | F-40 | Procedure publishing and storage (versioned definitions per stage, prompts) ; Supabase `videowizard_*` migrations; operator package build | `backend/definitions/*.json`, `videowizard_definitions`; `supabase/migrations`; `scripts/build_operator_package.py` | yes | REPLACE by `procedures` bundle table, v2 tables, plugin release with `plugin_min_version` | 1/2 | |
-| F-41 | Browser-side stage pages (intake, brief, script, voice, voice-lab, media, analysis, first-cut, visuals, downloads) with confirm buttons, pending-request retry, light/dark toggle | `frontend/app/runs/[id]/*` (10 pages), `app/library`, `app/connections`; `session-gate.tsx` | yes | REPLACE by 5-page web UI (login, my runs, run page with Download, defects, close/delete); no approve buttons; theme toggle DROP (owner agreed 14 Oct 2026) | 3 | |
-| F-42 | Retention on close and defect filing | none in v1 | — | new in v2 (decision 4; `POST /runs/{id}/defects`, admin page) | 2/9 | ✅ test_core: e29_defect (filing); retention: slice 2 |
+| F-41 | Browser-side stage pages (intake, brief, script, voice, voice-lab, media, analysis, first-cut, visuals, downloads) with confirm buttons, pending-request retry, light/dark toggle | `frontend/app/runs/[id]/*` (10 pages), `app/library`, `app/connections`; `session-gate.tsx` | yes | REPLACE by 5-page web UI (login, my runs, run page with Download, defects, close/delete); no approve buttons; theme toggle DROP (owner agreed 14 Oct 2026) | 3 | ✅ test_web C6–C8 (login, runs, run view, defects) |
+| F-42 | Retention on close and defect filing | none in v1 | — | new in v2 (decision 4; `POST /runs/{id}/defects`, admin page) | 2/9 | ✅ test_core e29; test_plugin p5–p8 (close/retention); defects page C8 |
 
 ## 3. Summary by disposition
 
@@ -75,7 +75,7 @@ Built in v1, never recorded in any run: voice effects (F-13), voice lab (F-14), 
 
 | Row | Item | Reason |
 |---|---|---|
-| F-02 | Connections list/revoke page | Not one of the five v2 pages; logout covers one plugin session |
+| F-02 | Connections list/revoke page | ✅ test_web C1–C5, test_plugin connect_flow |
 | F-05 | Browser pending-request retry state | ✅ test_core: e2, e17_e18, e19, e20_e21 |
 | F-07 | Client directory + `set_client` | Plan takes client as trusted free text; only needed if F-16 survives |
 | F-08/F-09/F-11 | Draft saves (brief, script, voice) | No drafts in v2; revise reopens; used 0/1/4 times |
@@ -88,7 +88,7 @@ Built in v1, never recorded in any run: voice effects (F-13), voice lab (F-14), 
 | F-35 | Editable graphics (native + assembly text layers) | Never used |
 | F-38 | Preferred-model setting, worker heartbeat, 9 algorithm-doc endpoints | One constant; defects cover stuck jobs; docs live in `design/` |
 | F-39 | Job lease/claim | Plan §2 excludes lease timers; one worker per family |
-| F-41 | Light/dark toggle | Cosmetic; CSS `prefers-color-scheme` may suffice |
+| F-41 | Light/dark toggle | ✅ test_web C6–C8 (login, runs, run view, defects) |
 
 ## 5. Gaps the v2 API list (plan §5) does not yet cover
 

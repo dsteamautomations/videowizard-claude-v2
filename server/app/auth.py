@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import httpx
-from fastapi import Depends, Header
+from fastapi import Cookie, Depends, Header
 
 from .config import settings
 from .db import connect
@@ -67,12 +67,13 @@ def _hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def current_user(authorization: str | None = Header(default=None)):
-    if not authorization or not authorization.startswith('Bearer '):
+def current_user(authorization: str | None = Header(default=None), vw2_session: str | None = Cookie(default=None)):
+    token = authorization[7:] if authorization and authorization.startswith('Bearer ') else vw2_session
+    if not token:
         raise Problem(401, 'LOGIN_REQUIRED', 'Sign in first.')
     with connect() as conn:
         row = conn.execute('select user_id, user_name, role, kind, token_hash from vw2_sessions where token_hash=%s and not revoked and expires_at > now()',
-                           (_hash(authorization[7:]),)).fetchone()
+                           (_hash(token),)).fetchone()
     if not row:
         raise Problem(401, 'SESSION_EXPIRED', 'Your session expired. Sign in again.')
     return {'id': row['user_id'], 'name': row['user_name'], 'role': row['role'], 'kind': row['kind'], '_session': row['token_hash']}

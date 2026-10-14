@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Runs · VideoWizard{% endblock %}
+{% block body %}
+<h1>{{ 'All runs' if user.role == 'Admin' else 'My runs' }}</h1>
+{% if not runs %}<p>No runs yet. Start one from the operator chat.</p>{% endif %}
+<table>
+<tr><th>Code</th><th>Title</th><th>Client</th><th>Owner</th><th>Version</th><th>Status</th><th>Created</th></tr>
+{% for r in runs %}
+<tr><td><a href="/runs/{{ r.code }}">{{ r.code }}</a></td><td>{{ r.title }}</td><td>{{ r.client or '' }}</td><td>{{ r.owner_name }}</td>
+<td>{{ r.procedure_version }}</td><td>{{ r.status }}</td><td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

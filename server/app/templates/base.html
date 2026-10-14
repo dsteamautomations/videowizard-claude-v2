@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}VideoWizard{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a href="/runs"><strong>VideoWizard</strong></a>
+  {% if user %}
+  <nav>
+    <a href="/runs">Runs</a>
+    {% if user.role == 'Admin' %}<a href="/defects">Defects</a>{% endif %}
+    <form method="post" action="/logout"><button>Sign out {{ user.name }}</button></form>
+  </nav>
+  {% endif %}
+</header>
+<main>
+{% block body %}{% endblock %}
+</main>
+</body>
+</html>
