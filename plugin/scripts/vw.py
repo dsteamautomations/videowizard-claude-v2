@@ -316,7 +316,14 @@ def cmd_stage(a):
             result = record(ws, procedure, prior)
     except stages_text.Refused as exc:
         emit({'action': 'refused', 'message': str(exc)}, 2)
-    refs = file_refs(m, result['files'], a.stage, result.get('retain', True)) + result.get('stored', [])
+    if result.get('upload'):  # stage files the server needs later (brief, script, media list, voice.json) go to storage
+        ws_out = workspace(m['code'])
+        refs = [upload_file(m, a.stage, ws_out / f, hashlib.sha256((ws_out / f).read_bytes()).hexdigest(), (ws_out / f).stat().st_size) for f in result['files']]
+        for r in refs:  # keep the local copy on close as well as the stored one
+            m['files'] = [{**f, 'action': 'retain'} if f.get('key') == r['key'] else f for f in m['files']]
+    else:
+        refs = file_refs(m, result['files'], a.stage, result.get('retain', True))
+    refs = refs + result.get('stored', [])
     body = {'stage': a.stage, 'files': refs, 'summary': result['summary']}
     if a.quote:
         body['accepted_quote'] = a.quote
@@ -413,6 +420,28 @@ def cmd_voice(a):
              'Fetched. Give the operator the file to listen to, ask for approval, then `vw stage voice record --quote`.')
 
 
+def cmd_analysis(a):
+    m = active()
+    run = m['run_id']
+    if a.what == 'start':
+        missing = [q for q, ok in (('May camera audio be used in the film? (--camera-audio allowed|excluded)', a.camera_audio),
+                                   ('What kind of film is this? (--film-type "…")', a.film_type)) if not ok]
+        if missing:
+            emit({'action': 'ask_operator', 'questions': missing + ['Should the model listen to the clips\' audio to understand them? (--understand-audio yes|no, default yes)', 'Any clip to leave out? (--exclude <name>, repeatable)']}, 2)
+        body = {'camera_audio': a.camera_audio, 'understand_audio': a.understand_audio != 'no', 'film_type': a.film_type, 'exclude': a.exclude or [], 'again': a.again}
+        emit(write(f'/api/runs/{run}/analysis/start', body), 0, 'Analysis started: one paid Gemini 4 Argon request per clip. Tell the operator; poll with `vw analysis status`.')
+    if a.what == 'status':
+        st = call('GET', f'/api/runs/{run}/analysis')
+        c = st['counts']
+        emit(st, 0, 'Analysis: ' + ', '.join(f'{v} {k}' for k, v in sorted(c.items())))
+    if a.what == 'show':
+        st = call('GET', f'/api/runs/{run}/analysis')
+        u = next((x for x in st['units'] if x['unit'] == a.unit), None)
+        emit(u or {'action': 'refused', 'message': f'No clip {a.unit}.'}, 0 if u else 2)
+    if a.what in ('retry', 'recover', 'resolve', 'exclude'):
+        emit(write(f'/api/runs/{run}/analysis/{a.unit}/{a.what}', {'note': a.note or ''}))
+
+
 def cmd_pull(a):
     runs = call('GET', '/api/runs')
     run = next((r for r in runs if r['code'] == a.code), None)
@@ -471,6 +500,9 @@ def main(argv=None):
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
     s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')
     s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note'); s.set_defaults(fn=cmd_voice)
+    s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude'])
+    s.add_argument('--camera-audio', choices=['allowed', 'excluded']); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
+    s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.set_defaults(fn=cmd_analysis)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     a = p.parse_args(argv)

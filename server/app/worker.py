@@ -136,14 +136,19 @@ def recover_voice(job, provider=None):
 
 
 def tick():
+    """One pass over every provider family: voice, then analysis. Returns True when anything was processed."""
+    busy = False
     with connect() as conn:
         job = jobs.claim(conn, 'elevenlabs')
-    if not job:
-        return False
-    status, result, error, cost, retry_in = process_voice(job)
-    with connect() as conn:
-        finalize_voice(conn, job, status, result, error, cost, retry_in)
-    return True
+    if job:
+        status, result, error, cost, retry_in = process_voice(job)
+        with connect() as conn:
+            finalize_voice(conn, job, status, result, error, cost, retry_in)
+        busy = True
+    from . import analysis_jobs
+    if analysis_jobs.tick():
+        busy = True
+    return busy
 
 
 def main():

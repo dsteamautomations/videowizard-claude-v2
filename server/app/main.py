@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import auth, connect, core, elevenlabs, files, jobs, web, worker
+from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, web, worker
 from .config import settings
 from .db import connect as db_connect, migrate
 from .errors import Problem
@@ -102,6 +102,18 @@ class Job(Write):
 
 
 class Resolve(Write):
+    note: str | None = None
+
+
+class AnalysisStart(Write):
+    camera_audio: Literal['allowed', 'excluded']
+    understand_audio: bool = True
+    film_type: str = ''
+    exclude: list[str] = []
+    again: bool = False
+
+
+class Note(Write):
     note: str | None = None
 
 
@@ -348,6 +360,51 @@ def resolve_job(run_id: UUID, job_id: UUID, body: Resolve, user=User, conn=DB):
         raise Problem(409, 'NOT_ALLOWED', 'Only an unresolved job can be set aside.')
     conn.execute("update vw2_jobs set status='failed', error=%s, lease_until=null, updated_at=now() where id=%s", ('Set aside by operator: ' + (body.note or ''), job_id))
     return Response({'id': str(job_id), 'status': 'failed'})
+
+
+# ---------- analysis ----------
+
+def _analysis_run(conn, user, run_id, stage_check=True):
+    run = core.load_run(conn, user, run_id, lock=True)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    if stage_check:
+        nxt = core.next_for(conn, run)
+        if nxt['stage'] != 'analysis':
+            raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not 'analysis'.", next=nxt)
+    return run
+
+
+@app.post('/api/runs/{run_id}/analysis/start', status_code=201)
+def analysis_start(run_id: UUID, body: AnalysisStart, user=User, conn=DB):
+    run = _analysis_run(conn, user, run_id)
+    outputs = core.current_outputs(conn, run['id'])
+    policy = {'camera_audio': body.camera_audio, 'understand_audio': body.understand_audio, 'film_type': body.film_type, 'exclude': body.exclude}
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, analysis_jobs.start(conn, user, run, outputs, policy, body.again)))
+    return Response(resp, status_code=status)
+
+
+@app.get('/api/runs/{run_id}/analysis')
+def analysis_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(analysis_jobs.status(conn, run, core.current_outputs(conn, run['id'])))
+
+
+@app.post('/api/runs/{run_id}/analysis/{unit}/{action}')
+def analysis_control(run_id: UUID, unit: str, action: Literal['retry', 'recover', 'resolve', 'exclude'], body: Note, user=User, conn=DB):
+    run = _analysis_run(conn, user, run_id)
+    fn = {'retry': lambda: analysis_jobs.retry(conn, user, run, unit, body.note), 'recover': lambda: analysis_jobs.recover(conn, user, run, unit),
+          'resolve': lambda: analysis_jobs.resolve(conn, user, run, unit, body.note), 'exclude': lambda: dict(analysis_jobs.exclude(conn, user, run, unit, body.note))}[action]
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, fn()))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/jobs/{job_id}/release')
+def job_release(job_id: UUID, body: Write, user=User, conn=DB):
+    if not core.is_admin(user):
+        raise Problem(404, 'NOT_FOUND', 'Not found.')
+    analysis_jobs.release(conn, job_id)
+    return Response({'id': str(job_id), 'released': True})
 
 
 @app.get('/health')

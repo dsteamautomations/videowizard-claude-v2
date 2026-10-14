@@ -61,7 +61,7 @@ def media_record(ws, procedure, prior, upload):
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
     summary = {'clips': [{k: c[k] for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio')} for c in clips],
                'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1)}
-    return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True}
+    return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}
 
 
 # ---------- voice ----------
@@ -91,4 +91,4 @@ def voice_record(ws, procedure, prior, fetched):
     stored = [{'name': 'narration.mp3', 'key': res['audio_key'], 'sha256': res['sha256'], 'bytes': res['bytes'], 'location': 'storage', 'receipt': True},
               {'name': 'timing.json', 'key': res['timing_key'], 'sha256': res['timing_sha256'], 'bytes': res['timing_bytes'], 'location': 'storage', 'receipt': True}]
     summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest']}
-    return {'files': ['out/voice.json'], 'stored': stored, 'summary': summary, 'retain': True}
+    return {'files': ['out/voice.json'], 'stored': stored, 'summary': summary, 'retain': True, 'upload': True}

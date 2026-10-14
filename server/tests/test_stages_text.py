@@ -42,7 +42,7 @@ def test_t7_intake_brief_script_end_to_end(home, database):
                                              {'line': 7, 'kind': 'section_label', 'why': 'label'}, {'line': 8, 'kind': 'visual_note', 'why': 'seen not said'}],
                                   'titles': ['Earth Blocks - Documentary Explainer', 'Pressed Earth - Explainer'], 'notes': 'removed plan lines', 'client': 'VK Nardep'})
     rc, out, err = vw(home, 'stage', 'intake', 'record', '--quote', 'yes, approved')
-    assert rc == 0, err
+    assert rc == 0, (out, err)
     assert out['summary']['title'] == 'Earth Blocks - Documentary Explainer' and out['summary']['client'] == 'VK Nardep'
     cleaned = (ws / 'out' / 'source.txt').read_text(encoding='utf-8')
     assert 'Scene 1' not in cleaned and 'Duration' not in cleaned and 'Close-up' not in cleaned

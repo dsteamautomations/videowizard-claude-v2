@@ -106,7 +106,7 @@ def intake_record(ws, procedure, prior):
     (ws / 'out' / ('original' + original.suffix.lower())).write_bytes(original.read_bytes())
     summary = {'title': titles[0].strip(), 'titles': [t.strip() for t in titles], 'client': data['client'].strip(), 'notes': data.get('notes', ''),
                'removed_lines': len(data.get('remove', [])), 'warnings': src['warnings'], 'source_digest': digest(cleaned)}
-    return {'files': ['out/source.txt', 'out/original' + original.suffix.lower(), 'out/intake.json'], 'summary': summary, 'retain': True}
+    return {'files': ['out/source.txt', 'out/original' + original.suffix.lower(), 'out/intake.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
 # ---------- brief ----------
@@ -124,7 +124,7 @@ def brief_record(ws, procedure, prior):
     intake = prior('intake')
     body = {k: data.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}
     summary = {**body, 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True))}
-    return {'files': ['out/brief.json'], 'summary': summary, 'retain': True}
+    return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
 # ---------- script ----------
@@ -150,7 +150,7 @@ def script_record(ws, procedure, prior):
     summary = {'content_digest': data['content_digest'], 'passages': len(passages), 'characters': len(text),
                'source_intake': intake['summary']['source_digest'], 'source_brief': brief['summary']['content_digest'],
                'assessment': data.get('assessment', ''), 'changes': len(data.get('changes') or [])}
-    return {'files': ['out/script.json'], 'summary': summary, 'retain': True}
+    return {'files': ['out/script.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
 STAGES = {'intake': (intake_prepare, intake_record), 'brief': (brief_prepare, brief_record), 'script': (script_prepare, script_record)}

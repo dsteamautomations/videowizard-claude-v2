@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     STORAGE_LOCAL_DIR: str = ''
     MEDIA_MAX_BYTES: int = 200 * 1024 * 1024
     ELEVENLABS_API_KEY: SecretStr = SecretStr('')
+    GEMINI_API_KEY: SecretStr = SecretStr('')
+    ANALYSIS_DEADLINE_SECONDS: int = 1800
     FFPROBE_EXECUTABLE: str = 'ffprobe'
     FFMPEG_EXECUTABLE: str = 'ffmpeg'
 

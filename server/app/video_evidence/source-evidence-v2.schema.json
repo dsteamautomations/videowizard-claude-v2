@@ -1,0 +1,979 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "source-evidence-v2",
+  "description": "Compact first-pass evidence for the downstream Codex agent. Arrays may be empty; grouped coverage and explicit scope omissions are not exhaustive transcription/OCR. Observations, inference and provisional ideas remain separate.",
+  "type": "object",
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "enum": [
+        "source-evidence-v2"
+      ]
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "script_id": {
+      "type": "string"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    }
+  },
+  "required": [
+    "contract_version",
+    "request_id",
+    "script_id",
+    "sources"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "properties": {
+        "start_s": {
+          "type": "number"
+        },
+        "end_s": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "start_s",
+        "end_s"
+      ],
+      "additionalProperties": false
+    },
+    "evidence_ref": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "type": "string"
+        },
+        "window_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "collection": {
+          "type": "string",
+          "enum": [
+            "entities",
+            "speech",
+            "visual_events",
+            "visible_text",
+            "interpretations"
+          ]
+        },
+        "item_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_id",
+        "window_id",
+        "collection",
+        "item_id"
+      ],
+      "additionalProperties": false
+    },
+    "visual_coverage": {
+      "type": "object",
+      "properties": {
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "reviewed",
+            "unreviewed",
+            "inaccessible"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "interval",
+        "status",
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "audio_coverage": {
+      "type": "object",
+      "properties": {
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "speech",
+            "omitted_background_speech",
+            "silence",
+            "non_speech",
+            "unintelligible",
+            "inaccessible",
+            "no_track",
+            "not_applicable"
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "interval",
+        "state",
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "visual": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/visual_coverage"
+          }
+        },
+        "audio": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/audio_coverage"
+          }
+        }
+      },
+      "required": [
+        "visual",
+        "audio"
+      ],
+      "additionalProperties": false
+    },
+    "scope_omission": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "enum": [
+            "speech",
+            "visible_text",
+            "visual_details"
+          ]
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "interval",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "entity": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "object",
+            "speaker",
+            "other"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "uncertainty"
+      ],
+      "additionalProperties": false
+    },
+    "speech": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speaker_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "language": {
+          "type": "string"
+        },
+        "original_text": {
+          "type": "string"
+        },
+        "english_translation": {
+          "type": "string"
+        },
+        "transcription_status": {
+          "type": "string",
+          "enum": [
+            "clear",
+            "partial",
+            "unintelligible"
+          ]
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "interval",
+        "speaker_id",
+        "language",
+        "original_text",
+        "english_translation",
+        "transcription_status",
+        "uncertainty"
+      ],
+      "additionalProperties": false
+    },
+    "visual_event": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "actor_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "object_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "context_result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "camera_framing": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "interval",
+        "label",
+        "description",
+        "actor_ids",
+        "object_ids",
+        "context_result",
+        "camera_framing",
+        "uncertainty"
+      ],
+      "additionalProperties": false
+    },
+    "visible_text": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "location": {
+          "type": "string"
+        },
+        "original_text": {
+          "type": "string"
+        },
+        "english_translation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "legibility": {
+          "type": "string",
+          "enum": [
+            "clear",
+            "partial",
+            "unreadable"
+          ]
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "interval",
+        "location",
+        "original_text",
+        "english_translation",
+        "legibility",
+        "uncertainty"
+      ],
+      "additionalProperties": false
+    },
+    "interpretation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "claim": {
+          "type": "string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "claim",
+        "evidence_refs",
+        "uncertainty"
+      ],
+      "additionalProperties": false
+    },
+    "idea_details": {
+      "type": "object",
+      "properties": {
+        "comparison_scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alternative_refs": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alternative_interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "must_keep_setup": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visible_result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "story_role": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "opening",
+                "explanation",
+                "payoff",
+                "other"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sound_type": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "spoken_bite",
+                "natural_sound"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "useful_content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "relationship": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "match",
+                "complement",
+                "alternative",
+                "contrast"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intended_explanation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing_asset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "asset_status": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "planned_not_created"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "editorial_idea": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "best_take",
+            "action_span",
+            "story_moment",
+            "source_audio",
+            "script_use",
+            "future_visual"
+          ]
+        },
+        "passage_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_ref"
+          }
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "details": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/idea_details"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "passage_ids",
+        "evidence_refs",
+        "interval",
+        "reason",
+        "uncertainty",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "visual_slot": {
+      "type": "object",
+      "properties": {
+        "slot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passage_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "intended_kind": {
+          "type": "string",
+          "enum": [
+            "recorded_video",
+            "supplied_still",
+            "generated_video",
+            "image_placeholder",
+            "blank",
+            "undecided"
+          ]
+        },
+        "asset_status": {
+          "type": "string"
+        },
+        "asset_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "user_supplied",
+            "agent_proposal"
+          ]
+        },
+        "preserve_reservation": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "prerequisite": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "slot_id",
+        "passage_ids",
+        "intended_kind",
+        "asset_status",
+        "asset_ref",
+        "origin",
+        "preserve_reservation",
+        "reason",
+        "prerequisite",
+        "uncertainty"
+      ],
+      "additionalProperties": false
+    },
+    "unresolved": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "field": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "interval",
+        "field",
+        "issue"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "source_id": {
+          "type": "string"
+        },
+        "window_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "media_kind": {
+          "type": "string",
+          "enum": [
+            "video",
+            "image"
+          ]
+        },
+        "clock": {
+          "type": "string",
+          "enum": [
+            "original_source_seconds",
+            "not_applicable"
+          ]
+        },
+        "requested_interval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "review_status": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "partial",
+            "inaccessible"
+          ]
+        },
+        "coverage": {
+          "$ref": "#/$defs/coverage"
+        },
+        "scope_omissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scope_omission"
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entity"
+          }
+        },
+        "speech": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/speech"
+          }
+        },
+        "visual_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/visual_event"
+          }
+        },
+        "visible_text": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/visible_text"
+          }
+        },
+        "interpretations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/interpretation"
+          }
+        },
+        "editorial_ideas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/editorial_idea"
+          }
+        },
+        "visual_slot_guidance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/visual_slot"
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unresolved"
+          }
+        }
+      },
+      "required": [
+        "source_id",
+        "window_id",
+        "media_kind",
+        "clock",
+        "requested_interval",
+        "review_status",
+        "coverage",
+        "scope_omissions",
+        "entities",
+        "speech",
+        "visual_events",
+        "visible_text",
+        "interpretations",
+        "editorial_ideas",
+        "visual_slot_guidance",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
