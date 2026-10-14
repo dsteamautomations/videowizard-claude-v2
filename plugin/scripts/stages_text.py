@@ -124,8 +124,18 @@ def brief_record(ws, procedure, prior):
     data = read_proposal(ws, 'brief')
     need_text(data, ['purpose', 'audience', 'message', 'tone', 'ending'], 'brief')
     intake = prior('intake')
+    questions = data.get('questions') or []
+    answers = data.get('answers') or {}
+    if not isinstance(questions, list) or not isinstance(answers, dict):
+        raise Refused('out/brief.json: `questions` is a list and `answers` a map of question id → the operator\'s exact words.')
+    for q in questions:
+        if not isinstance(q, dict) or not str(q.get('id', '')).strip():
+            raise Refused('out/brief.json: every question needs an id.')
+        if q.get('required') and not str(answers.get(q['id'], '')).strip():
+            raise Refused(f"out/brief.json: question {q['id']} is required; ask the operator and store their exact answer in `answers`.")
     body = {k: data.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}
-    summary = {**body, 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True))}
+    body['answers'] = {k: str(v) for k, v in answers.items()}
+    summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True))}
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
@@ -142,6 +152,9 @@ def script_prepare(ws, procedure, prior):
 def script_record(ws, procedure, prior):
     data = read_proposal(ws, 'script')
     need_text(data, ['spoken_text'], 'script')
+    for c in data.get('changes') or []:
+        if not isinstance(c, dict) or set(c) - {'before', 'after', 'reason'} or not str(c.get('reason', '')).strip():
+            raise Refused('out/script.json: each change is {before, after, reason} with exact excerpts and a reason.')
     intake, brief = prior('intake'), prior('brief')
     text = data['spoken_text'].replace('\r\n', '\n').strip() + '\n'
     passages = paragraphs(text)

@@ -8,6 +8,7 @@ Stage scripts (later slices) call `output`; this file holds only the generic run
 import argparse
 import hashlib
 import json
+import re
 import os
 import secrets
 import shutil
@@ -395,6 +396,14 @@ def cmd_voice(a):
         text = a.excerpt if a.what == 'audition' else script.get('spoken_text')
         if not text:
             emit({'action': 'refused', 'message': 'No text: auditions need --excerpt; narration needs out/script.json.'}, 2)
+        if a.what == 'audition':
+            spoken = script.get('spoken_text') or ''
+            found = re.search(r'\s+'.join(re.escape(t) for t in text.split()), spoken) if text.split() else None
+            if not found:
+                emit({'action': 'refused', 'message': 'The audition excerpt must be one contiguous passage of the accepted script (out/script.json).'}, 2)
+            text = found.group()
+            if not 1 <= len(a.voice) <= 6:
+                emit({'action': 'refused', 'message': 'Audition one to six voices per batch.'}, 2)
         settings_ = json.loads(a.settings) if a.settings else None
         rows = []
         for voice in (a.voice if a.what == 'audition' else a.voice[:1]):

@@ -58,14 +58,23 @@ def test_t7_intake_brief_script_end_to_end(home, database):
     assert rc == 0 and 'keeps the carbon' in out['inputs']['script'] and out['inputs']['title'] == 'Pressed Earth - Explainer'
     write_proposal(ws, 'brief', {'purpose': 'Understand why earth blocks matter', 'audience': 'self-builders (recommendation)', 'message': 'Pressed, not fired',
                                  'tone': 'calm', 'ending': 'invite to visit the yard', 'constraints': '', 'reasons': {'audience': 'subject suggests it'}, 'questions': []})
+    # a required question without the operator's answer blocks record; the answer is stored verbatim
+    proposal = json.loads((ws / 'out' / 'brief.json').read_text(encoding='utf-8'))
+    proposal['questions'] = [{'id': 'q1', 'question': 'Sales ending or awareness only?', 'why': 'changes the ending', 'recommendation': 'awareness', 'required': True}]
+    write_proposal(ws, 'brief', proposal)
+    rc, out, _ = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
+    assert rc == 2 and 'q1' in out['message']
+    proposal['answers'] = {'q1': 'awareness only, no sales'}
+    write_proposal(ws, 'brief', proposal)
     rc, out, err = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
-    assert rc == 0, err
+    assert rc == 0, (out, err)
+    assert out['summary']['answers'] == {'q1': 'awareness only, no sales'} and out['summary']['questions'] == 1
     assert vw(home, 'next')[1]['stage'] == 'script'
 
     rc, out, err = vw(home, 'stage', 'script', 'prepare')
     assert rc == 0 and out['inputs']['brief']['message'] == 'Pressed, not fired' and 'keeps the carbon' in out['inputs']['script']
     write_proposal(ws, 'script', {'spoken_text': 'Earth blocks are made from the soil beneath our feet.\n\nEach block is pressed, not fired.',
-                                  'notes': '', 'assessment': 'fits', 'changes': [{'what': 'dropped the carbon clause', 'why': 'brief tone'}]})
+                                  'notes': '', 'assessment': 'fits', 'changes': [{'before': 'keeps the carbon', 'after': 'keeps the carbon in the ground', 'reason': 'brief tone'}]})
     rc, out, err = vw(home, 'stage', 'script', 'record', '--quote', 'approved')
     assert rc == 0, err
     assert out['summary']['passages'] == 2 and len(out['summary']['content_digest']) == 64

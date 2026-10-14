@@ -101,6 +101,10 @@ def test_v1_auditions_then_narration_then_record(home, database, fake):
     rc, out, err = vw(home, 'voice', 'catalog', '--accent', 'indian')
     assert rc == 0 and [v['name'] for v in out['voices']] == ['Asha', 'Ravi']
     assert vw(home, 'voice', 'preview', '--voice', 'v1')[1]['url'].startswith('https://')
+    rc, out, _ = vw(home, 'voice', 'audition', '--voice', 'v1', '--excerpt', 'Blocks of mud are pressed.')  # not in the accepted script
+    assert rc == 2 and 'contiguous' in out['message']
+    rc, out, _ = vw(home, 'voice', 'audition', *[x for v in ('v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7') for x in ('--voice', v)], '--excerpt', 'Earth blocks are pressed.')
+    assert rc == 2 and 'six' in out['message']
     rc, out, err = vw(home, 'voice', 'audition', '--voice', 'v1', '--voice', 'v2', '--excerpt', 'Earth blocks are pressed.')
     assert rc == 0 and len(out['jobs']) == 2, err
     drain()
