@@ -1,0 +1,776 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "3d74d102a3a4ccb31951c1a3662371e1",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "bde4541933cbeb9c",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 9.6
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 9.6
+            },
+            "status": "reviewed",
+            "note": "Continuous high-angle panning shot across a partially built L-shaped brick wall corner on sandy ground, inspected at sampled video frames across the full 9.6-second window; exact native frame-by-frame inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 9.6
+            },
+            "state": "non_speech",
+            "note": "Ambient outdoor site sounds, footsteps on sand, and a brief metallic handling sound when the straightedge bar is lowered; no speech present."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.6
+          },
+          "reason": "No readable text or numbers appear on the bricks, tools, or site background."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Low L-shaped brick wall with top course laid on edge creating internal cavities",
+          "uncertainty": "Exact mortar mix proportions, brick manufacturing method (such as whether wire-cut), and crushing strength are not visually verifiable from appearance alone."
+        },
+        {
+          "id": "ent_worker",
+          "kind": "person",
+          "label": "Construction worker in dark trousers and sandals",
+          "uncertainty": "Only the lower legs, feet, and hands are visible entering the upper frame from 04.0s onward; upper body and face remain out of frame."
+        },
+        {
+          "id": "ent_straightedge",
+          "kind": "object",
+          "label": "Long silver metal straightedge / levelling bar",
+          "uncertainty": "Whether the bar incorporates a spirit level vial or is purely a rectangular aluminium box-section straightedge is not visible."
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Pointed masonry trowel lying on the sandy ground",
+          "uncertainty": null
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.6
+          },
+          "label": "Panning reveal of brick-on-edge cavity course and corner followed by worker placing straightedge across top course",
+          "description": "From 00.0s to 04.0s, a high-angle camera pans slowly from right to left along a low brick wall built on sandy soil, showing a corner junction on the right and a top course of red bricks laid on edge in parallel pairs separated by crosswise header bricks, leaving open rectangular vertical cavities between them with no mortar applied yet to the vertical joints of the top course. Grey mortar is visible in the lower courses and spilled along the sandy base. Around 04.0s, as the camera continues panning left toward the left corner junction, a worker's feet in sandals and dark trousers walk into the upper left background near a pointed trowel lying on the ground (04.0s–07.0s). From 07.0s to 09.6s, the worker bends down and uses both hands to lower a long silver metal straightedge bar horizontally onto the top edge of the unmortared brick-on-edge course to check or align the course; the camera pans slightly left to show the left corner of the L-shaped wall while the worker's hands remain holding and adjusting the bar until the clip ends at 09.6s.",
+          "actor_ids": [
+            "ent_worker"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_straightedge",
+            "ent_trowel"
+          ],
+          "context_result": "The open internal cavities and staggered header-stretcher arrangement of the brick-on-edge course between two corners are clearly shown, and the straightedge rests along the top course while still held by the worker at clip end.",
+          "camera_framing": "High-angle medium close-up panning steadily from the right corner junction leftward to the left corner junction.",
+          "uncertainty": "The top course of bricks on edge has no mortar in its vertical joints yet (appearing dry-placed or only bedded below prior to full jointing), and the clip cuts off at 09.6s while the worker is still holding the straightedge on the wall."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "interp_01",
+          "category": "process_identification",
+          "claim": "The wall demonstrates the geometry of Rat-Trap Bond masonry, with bricks placed on edge in parallel stretcher pairs and cross headers forming internal rectangular cavities and L-shaped corner junctions.",
+          "evidence_refs": [
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "While the brick-on-edge cavity geometry is directly visible, the top course lacks vertical joint mortar at this stage, and thermal insulation or structural strength properties are inferred from script and background knowledge rather than measured in the video."
+        },
+        {
+          "id": "interp_02",
+          "category": "workmanship_action",
+          "claim": "The worker placing a long metal straightedge across the top brick-on-edge course illustrates checking level and alignment during construction.",
+          "evidence_refs": [
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_worker"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_straightedge"
+            }
+          ],
+          "uncertainty": "The clip ends at 09.6s while the worker is still holding the straightedge against the bricks, so the outcome of any alignment adjustment is not shown."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "idea_best_take_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4
+          },
+          "reason": "The opening 00.0s–04.0s span of ve_01 provides a clean, unobstructed high-angle pan across the brick-on-edge top course and right-hand corner before the worker's feet enter the background at 04.0s, clearly showing the parallel bricks on edge and hollow rectangular cavities.",
+          "uncertainty": "The vertical joints of the top course do not yet have mortar applied, and the camera is continuously panning leftward rather than locked off.",
+          "details": {
+            "comparison_scope": "Compared against the later 04.0s–09.6s portion of the same single continuous shot in bde4541933cbeb9c.",
+            "alternative_refs": [
+              {
+                "source_id": "bde4541933cbeb9c",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              },
+              {
+                "source_id": "bde4541933cbeb9c",
+                "window_id": "full",
+                "collection": "interpretations",
+                "item_id": "interp_02"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 6.8,
+              "end_s": 9.6
+            },
+            "must_keep_setup": null,
+            "visible_result": "Clear overhead/high-angle view of the hollow cavities between pairs of bricks laid on edge.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_action_span_01",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_02"
+            }
+          ],
+          "interval": {
+            "start_s": 6.8,
+            "end_s": 9.6
+          },
+          "reason": "Captures the worker lowering and resting the metal straightedge across the top brick-on-edge course in ve_01 while the pan reveals the left corner junction.",
+          "uncertainty": "The action is still in progress at 09.6s when the recording ends, with the worker's hands still holding the bar.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Include from about 06.8s so the straightedge is seen entering from above and being lowered onto the bricks rather than appearing abruptly mid-contact.",
+            "visible_result": "The straightedge rests horizontally along the top edge of the brick course across multiple cavities while held by the worker's hands.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_story_moment_01",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4
+          },
+          "reason": "Directly shows the defining geometry of Rat-Trap Bond—bricks placed on edge forming a distinct pattern with hollow internal cavities and clean cavities free of fallen mortar—as well as a corner junction.",
+          "uncertainty": "The top course appears dry-laid or not yet pointed in its vertical joints, so it illustrates the spatial arrangement of bricks and cavities rather than a finished mortared top course.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "High-angle view looking directly down into the open rectangular cavities between parallel edge-laid bricks.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_script_use_01",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            },
+            {
+              "source_id": "bde4541933cbeb9c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_02"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.6
+          },
+          "reason": "Provides direct visual coverage for script clauses in P001 describing bricks placed on edge creating hollow cavities, forming a distinct pattern as each course is completed, wall corners/junctions, and illustrative coverage for maintaining alignment and level with a straightedge.",
+          "uncertainty": "Does not prove unseen thermal performance, percentage brick savings, or crushing strength figures mentioned elsewhere in P001.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": "Can be split into 00.0s–04.0s for cavity/pattern/corner explanation and 06.8s–09.6s for checking alignment and level.",
+            "relationship": "match",
+            "intended_explanation": "Shows how bricks on edge create hollow internal pockets at a wall corner and how a straightedge is used across the course.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unres_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.6
+          },
+          "field": "top_course_mortar_state",
+          "issue": "The top course of bricks on edge has open vertical gaps without mortar between the bricks, making it uncertain whether the bricks are dry-stacked for demonstration/alignment before laying or bedded only on the bottom mortar bed prior to filling vertical joints."
+        },
+        {
+          "id": "unres_02",
+          "interval": {
+            "start_s": 9.6,
+            "end_s": 9.6
+          },
+          "field": "straightedge_action_completion",
+          "issue": "The video ends at 09.6s while the worker's hands are still holding the metal straightedge on the top course, so completion of the levelling check or any subsequent brick adjustment is cut off."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 9.6-second clip (bde4541933cbeb9c) consists of one single continuous camera take (ve_01) with no camera resets or repeated attempts. Within this continuous panning shot, there are two distinct editorial phases: first, from 00.0s to 04.0s, an unobstructed high-angle pan from right to left across the brick-on-edge top course and right-hand corner junction (claim_01, claim_02); second, from 04.0s to 09.6s, the worker walks into the upper background (04.0s–07.0s, claim_05) and lowers a long metal straightedge across the top course (07.0s–09.6s, claim_03) as the camera reaches the left corner junction.",
+    "crop_guidance": "No specific output aspect ratio override was supplied in the brief, so assuming standard landscape delivery, the essential visual subject throughout ve_01 is the brick wall occupying the middle and lower thirds of the frame and, from 07.0s to 09.6s, the worker's hands and metal straightedge along the upper edge of the wall. Between 04.0s and 07.0s, the worker's lower legs and sandals walk into the top-left background while a trowel lies near the top-left edge; if using the earlier 00.0s–04.0s span, no person intrudes at all, whereas if extending slightly past 04.0s for a longer cavity pan, a slight zoom/crop excluding the top 20% of the frame could hide the walking feet in the background, though that same upper region must be preserved if using 06.8s–09.6s so the worker's hands and straightedge are not cut off. No crop has been technically verified.",
+    "clean_handles": "Interval: 0.0–4.0; classification: settled; beginning observation: 0.0s high-angle view of the right corner and brick-on-edge top course with the wall stationary while the camera pans slowly left; middle observation: 2.0s camera continues panning left across the stationary brick-on-edge cavities with no person in frame; end observation: 4.0s camera pans left just before the worker's sandal and trousers enter the upper-left background; relevant action stopped: the relevant subject (the brick wall ent_wall in ve_01) is inactive from the start across 0.0s–4.0s while only the camera pans smoothly leftward, before the worker enters at 4.0s; uncertainty: approximate boundary around 4.0s where the worker's foot begins entering the top-left edge; links: ve_01, claim_01, claim_02; editorial use: preserves a clean 4.0-second pan showing the brick-on-edge cavity geometry and right corner without background feet walking in. Interval: 4.0–7.0; classification: active preparation; beginning observation: 4.0s worker's foot in a sandal steps into the upper-left background behind the wall near a trowel on the ground; middle observation: 5.5s worker's lower legs stand and shift position behind the wall as the camera pans left; end observation: 7.0s worker's hands and the long silver straightedge descend from the top edge of the frame toward the top brick course; relevant action stopped: relevant preparation continues throughout as the worker steps into position and brings the straightedge down toward the wall; uncertainty: worker's upper body is out of frame above the top edge; links: ve_01, claim_05; editorial use: provides lead-in movement if an editor wants to see the worker approach before placing the straightedge, though 4.0s–6.8s is mostly walking feet and can be trimmed. Interval: 6.8–9.6; classification: active release; beginning observation: 6.8s worker's hands begin lowering the metal straightedge into view above the wall; middle observation: 8.0s straightedge makes contact along the top brick-on-edge course while held by both hands as the camera pans left to the left corner; end observation: 9.6s worker's hands still hold and steady the straightedge along the top course at clip end; relevant action stopped: manipulation and holding of the straightedge on the wall continue right through the end of the recording at 9.6s with no settled pause after release; uncertainty: recording cuts off at 9.6s (capped at attached window end, so no post-9.6s footage is available to inspect); links: ve_01, claim_03; editorial use: preserves the entry and placement of the straightedge across the brick course and the reveal of the left corner junction.",
+    "continuity": "Throughout ve_01 (00.0s–09.6s), the camera executes a continuous right-to-left pan (so stationary wall features move from left to right across the screen). At 00.0s, the right-hand corner of the L-shaped brick wall is on the right side of the frame and the top brick-on-edge course lacks vertical mortar joints (claim_01, claim_02). At 04.0s, the right corner moves toward the right edge as the worker's feet enter the upper-left background (claim_05). At 06.8s–07.0s, the worker's hands lower the silver metal straightedge from the top of the frame onto the top course of bricks. By 08.0s–09.6s, the left-hand corner of the L-shaped wall enters the left side of the frame while the worker's two hands remain holding the horizontal straightedge along the top of the right-to-left wall run until the clip ends at 09.6s (claim_03). Editors cutting between 00.0s–04.0s and 06.8s–09.6s should note the jump in the leftward pan position and the sudden appearance of the worker's legs and straightedge.",
+    "preview_frames": "01.0s: Clear high-angle view of the right corner junction and three pairs of bricks laid on edge with open vertical cavities between cross headers (ve_01, claim_01, claim_02). 03.5s: Wide view along the straight run of the brick-on-edge course showing the repeating hollow cavities and lower mortared courses just before the worker enters the background (ve_01, claim_01). 08.5s: Worker's hands holding the long metal straightedge horizontally along the top brick-on-edge course with the left corner junction visible on the left side of the frame (ve_01, claim_02, claim_03).",
+    "speech_action_links": "No speech is present in the attached source audio (00.0s–09.6s contains only ambient outdoor noise and tool/footstep sounds), and source camera audio is excluded from final output by policy.",
+    "shorter_explanations": "Instead of using the entire 9.6-second clip (which includes 4.0s–6.8s where only the worker's lower legs walk around in the background behind the wall), an editor can use two tighter segments from ve_01: first, 00.0s–04.0s (4.0s duration) to show the unobstructed brick-on-edge cavity structure and right corner (claim_01, claim_02); second, 06.8s–09.6s (2.8s duration) to show the worker lowering and holding the straightedge along the top course while revealing the left corner (claim_02, claim_03). Summing the 4.0s segment (4.0 - 0.0 = 4.0s) and the 2.8s segment (9.6 - 6.8 = 2.8s) gives 6.8s total edited material with no overlap (4.0s + 2.8s = 6.8s), omitting the 2.8s intermediate walking span (6.8 - 4.0 = 2.8s). The longer 9.6s version only adds the uninterrupted camera pan across the middle of the wall and the worker's approach on foot; both the full and shortened versions retain the qualification that the top course lacks vertical joint mortar and the straightedge check is still in progress when the clip ends at 09.6s.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 00.0s–04.0s of ve_01 as a clear high-angle visual demonstration of bricks laid on their edge in pairs separated by cross bricks to leave open rectangular cavities inside the wall thickness (noting that only the top open course is visible from above and its vertical joints are not yet mortared)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 00.0s–04.0s of ve_01 to show the alternating header-and-stretcher-on-edge pattern and the resulting internal cavities along the top course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners",
+          "claim_id": "claim_02",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 00.0s–02.0s (right corner) or 07.5s–09.6s (left corner) of ve_01 to show the L-shaped corner junctions of the brick-on-edge wall."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding.",
+          "claim_id": "claim_04",
+          "support_classification": "illustrative",
+          "editorial_use": "Use 06.8s–09.6s of ve_01 where the worker places the long metal straightedge across the top brick course to illustrate checking alignment and level during construction, keeping in mind that the check is still underway at 09.6s and the top course vertical joints are unmortared."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.",
+          "claim_id": "claim_06",
+          "support_classification": "illustrative",
+          "editorial_use": "The open cavities visible in 00.0s–04.0s of ve_01 are clean and free of fallen mortar droppings, which can visually illustrate the concept of open cavities, though vertical mortar has not yet been applied to the top course and thermal insulation is not directly measurable in the video."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this production uses a mixed-media plan where future generated video may be used for later gap filling (marked planned_not_created, as no generated asset currently exists and automatic media generation is disabled), recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented. For audio, original camera sound was inspected for intake (containing only non-speech site ambience and tool handling), and the output policy excludes source camera audio from the final edit, so no source_audio editorial recommendations are proposed.",
+    "unavailable": "No spoken dialogue or visible text/OCR exists in bde4541933cbeb9c, so speech_action_links has no utterances to link and source_audio ideas are omitted per the excluded output audio policy. No passage-level visual slot reservations were supplied in the brief."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "The top course of the brick wall consists of red bricks placed on their edge in parallel pairs separated by crosswise header bricks, forming a repeating pattern with open rectangular cavities inside the wall.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 9.6,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: In ve_01 from 00.0s to 09.6s, the high-angle camera looks down into the top course of ent_wall, showing parallel pairs of bricks on edge alternating with cross headers and hollow rectangular spaces between them."
+        }
+      ],
+      "limits": "Only the top open course's internal cavities are directly visible from above (so continuity of cavities down through the lower courses is not directly seen), and the vertical joints between the bricks of the top course do not have mortar in them yet."
+    },
+    {
+      "id": "claim_02",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The low brick wall includes two 90-degree L-shaped corner junctions, with the right corner visible at 00.0s–04.0s and the left corner visible at 07.5s–09.6s as the camera pans left.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 9.6,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ve_01 at 00.5s, the right-hand L-shaped corner return of ent_wall is visible on the right side of the frame."
+        },
+        {
+          "time_s": 8.5,
+          "cue": "visual: In ve_01 at 08.5s, the leftward pan reveals the left-hand L-shaped corner return of ent_wall on the left side of the frame."
+        }
+      ],
+      "limits": "The top course bricks at the corners do not yet have mortar filling their vertical joints."
+    },
+    {
+      "id": "claim_03",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From approximately 06.8s to 09.6s, a worker's hands lower and hold a long silver metal straightedge bar horizontally along the top edge of the brick-on-edge course.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 6.8,
+      "end_s": 9.6,
+      "cues": [
+        {
+          "time_s": 7,
+          "cue": "visual: In ve_01 around 07.0s, ent_worker's two hands lower ent_straightedge onto the top bricks of ent_wall and keep holding it in place through 09.6s."
+        }
+      ],
+      "limits": "The recording ends at 09.6s while the worker is still holding the bar on the wall, and it is not visible whether the bar has an integrated spirit level bubble."
+    },
+    {
+      "id": "claim_04",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The worker placing the long metal straightedge across the top brick-on-edge course illustrates checking the alignment and level of the masonry course during construction.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 6.8,
+      "end_s": 9.6,
+      "cues": [
+        {
+          "time_s": 8,
+          "cue": "visual: In ve_01 at 08.0s, ent_worker holds the flat edge of ent_straightedge horizontally across the tops of multiple edge-laid bricks on ent_wall."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Throughout construction, attention is given to maintaining alignment, level, and proper bonding.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Masons place a straightedge or spirit level across a newly placed course of bricks to check that the top edges lie in a straight, level plane."
+        }
+      ],
+      "limits": "Whether the tool includes a spirit-level vial or is used solely as a straightedge is not visible, the top course vertical joints are unmortared, and the check is still in progress when the clip ends at 09.6s."
+    },
+    {
+      "id": "claim_05",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 04.0s and 07.0s, a worker's feet in sandals and dark trousers walk into the upper-left background behind the wall near a masonry trowel lying on the sandy ground before the worker bends to place the straightedge.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 4,
+      "end_s": 7,
+      "cues": [
+        {
+          "time_s": 5,
+          "cue": "visual: In ve_01 at 05.0s, ent_worker's lower legs and sandals are visible stepping on the sandy ground behind ent_wall next to ent_trowel."
+        }
+      ],
+      "limits": "Only the worker's lower legs and feet are inside the frame during 04.0s–06.8s before the hands and straightedge descend from the top edge."
+    },
+    {
+      "id": "claim_06",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The open rectangular cavities between the bricks on edge in the top course are visually clean and free of mortar droppings, which can illustrate the script's point about keeping cavities clear to preserve insulating properties.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 9.6,
+      "cues": [
+        {
+          "time_s": 2,
+          "cue": "visual: In ve_01 at 02.0s, the hollow pockets between the pairs of edge-laid bricks in ent_wall are open and clear of fallen mortar."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.'"
+        }
+      ],
+      "limits": "The vertical joints of the top brick-on-edge course have not been mortared yet (when mortar droppings would most likely fall in), and thermal insulation performance cannot be visually measured."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Low L-shaped red brick wall with lower courses mortared in grey mortar and the top course laid on edge in parallel pairs separated by crosswise headers, leaving open internal cavities.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 9.6
+      },
+      "uncertainty": "The vertical joints of the top course have no mortar applied yet."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Dry tan sandy ground surrounding the base of the brick wall, with loose grey mortar crumbs fallen along the base of the brickwork and scattered dry leaves and sparse weeds in the background.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 9.6
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "Worker wears dark grey/black trousers and open dark sandals while walking on the sandy site.",
+      "entity_ids": [
+        "ent_worker"
+      ],
+      "interval": {
+        "start_s": 4,
+        "end_s": 9.6
+      },
+      "uncertainty": "Only the worker's lower legs, feet, and hands are visible inside the camera frame."
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_straightedge"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A pointed masonry trowel rests on the sandy ground behind the wall (visible 04.0s–07.5s) and a long rectangular silver metal straightedge bar is lowered onto the top brick course by the worker (07.0s–09.6s).",
+      "entity_ids": [
+        "ent_straightedge",
+        "ent_trowel"
+      ],
+      "interval": {
+        "start_s": 4,
+        "end_s": 9.6
+      },
+      "uncertainty": "Whether the silver metal bar has a built-in spirit level vial is not visible."
+    },
+    {
+      "id": "wm_05",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "material_state",
+      "observation": "The red clay bricks have rough, slightly uneven surfaces and edges with occasional chipped corners, and dark grey wet/damp mortar is present in the horizontal bed joints and lower vertical joints, with excess mortar droppings along the ground.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 9.6
+      },
+      "uncertainty": "Exact brick manufacturing process and compressive strength cannot be determined visually."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "elim_01",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "top_course_mortar_and_completion",
+      "kind": "ambiguous",
+      "limitation": "The vertical joints between the bricks of the top brick-on-edge course have no mortar in them, so this clip does not establish whether the top course is temporarily dry-laid for alignment/demonstration or awaiting vertical joint filling.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 9.6
+      }
+    },
+    {
+      "id": "elim_02",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "brick_strength_and_thermal_performance",
+      "kind": "not_established",
+      "limitation": "Visual appearance of the bricks and cavities in this clip cannot establish the bricks' crushing strength (e.g., 20, 35, or 75 kg/cm²), whether they are wire-cut, percentage material savings, or measured thermal insulation performance.",
+      "interval": null
+    },
+    {
+      "id": "elim_03",
+      "evidence_refs": [
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_straightedge"
+        },
+        {
+          "source_id": "bde4541933cbeb9c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "worker_identity_and_levelling_outcome",
+      "kind": "not_visible",
+      "limitation": "The worker's upper body and face remain out of frame above the top edge throughout 04.0s–09.6s, and the recording cuts off at 09.6s while the worker is still holding the straightedge on the wall, leaving the final result of the alignment check unshown.",
+      "interval": {
+        "start_s": 4,
+        "end_s": 9.6
+      }
+    }
+  ],
+  "descriptive_name": "pan_across_brick_on_edge_cavity_wall_and_straightedge_check"
+}

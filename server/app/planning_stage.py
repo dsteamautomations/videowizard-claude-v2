@@ -16,7 +16,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import core, jobs
+from . import core, jobs, voice_timing
 from .errors import Problem
 from .planning import edit_clarification as clar
 from .planning import planning_contract as contract
@@ -111,8 +111,10 @@ def build_inputs(conn, store, run, outputs, settings):
     timing = _file(store, voice_o, 'timing.json')
     narration = next(f for f in voice_o['files'] if f['name'] == 'narration.mp3')
     media = _file(store, media_o, 'media.json')
-    if not (timing.get('script_characters_match') and timing.get('words') and timing.get('audio', {}).get('duration_s')):
-        raise Problem(409, 'NARRATION_TIMING', 'Narration timing is incomplete (characters must match the accepted script); narrate again.')
+    try:
+        voice_timing.check_words(timing)
+    except ValueError as exc:
+        raise Problem(409, 'NARRATION_TIMING', str(exc))
     analyses = []
     excluded = []
     for o in outputs:

@@ -1,0 +1,822 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "9ae61c6f8e89578c6b564f5822c4c0ad",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "37d6e9613f69095a",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 26.88
+            },
+            "status": "reviewed",
+            "note": "Continuous low-angle close-up of a mason pouring wet grey mortar onto a row of bricks laid on edge and spreading it across the top and into vertical joints with a trowel."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 26.0
+            },
+            "state": "non_speech",
+            "note": "Natural construction sounds of wet mortar pouring, scraping, and trowel tapping against bricks and metal pan."
+          },
+          {
+            "interval": {
+              "start_s": 26.0,
+              "end_s": 26.88
+            },
+            "state": "omitted_background_speech",
+            "note": "Brief, faint background utterance at the very end of the clip, cut off by the recording end and unrelated to the narration."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 26.0,
+            "end_s": 26.88
+          },
+          "reason": "Brief off-screen background speech fragment at clip tail omitted as non-substantive site chatter; camera audio is also excluded by output policy."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 26.88
+          },
+          "reason": "No readable text or numbers are present in the scene."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Mason (lower body, legs in grey trousers and sandals, and hands/arms visible)",
+          "uncertainty": "Head and upper torso are outside the top of the frame throughout the clip."
+        },
+        {
+          "id": "ent_brick_course",
+          "kind": "object",
+          "label": "Course of red clay bricks laid on edge with vertical gaps between headers",
+          "uncertainty": "Internal cavities behind the front face are mostly obscured by the low camera angle and the mortar piled on top."
+        },
+        {
+          "id": "ent_mortar",
+          "kind": "object",
+          "label": "Wet grey mortar mix",
+          "uncertainty": "Exact mix proportions and cement-to-sand ratio are not visually verifiable."
+        },
+        {
+          "id": "ent_pan",
+          "kind": "object",
+          "label": "Metal mortar pan (head pan / tasla)",
+          "uncertainty": "Only the rim and underside are briefly visible at the top left during the initial pour."
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Pointed masonry trowel with wooden handle",
+          "uncertainty": null
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01_pour_mortar",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 2.2
+          },
+          "label": "Pouring mortar onto brick-on-edge course",
+          "description": "At the start of the clip, wet grey mortar is already mounds along the right and center sections of a row of red bricks placed on edge. From 0.0s to 1.1s, the mason's hands tilt a metal mortar pan at the upper left of the frame, dumping a fresh clump of wet mortar onto the left side of the brick course. From 1.1s to 2.2s, the mason lifts the pan out of the frame to the upper left and steps his right leg slightly to screen left behind the wall.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_brick_course",
+            "ent_mortar",
+            "ent_pan"
+          ],
+          "context_result": "The top edge of the visible brick course is covered with heaps of wet grey mortar from left to right.",
+          "camera_framing": "Static low-angle close-up at ground level, framing the row of bricks horizontally across the lower third and the mason's legs in the background.",
+          "uncertainty": "The start of the pouring action across the right side of the wall occurred before 0.0s."
+        },
+        {
+          "id": "ve_02_spread_and_pack_mortar",
+          "interval": {
+            "start_s": 2.2,
+            "end_s": 26.88
+          },
+          "label": "Spreading mortar and packing vertical joints with trowel",
+          "description": "At 2.2s, the mason brings his right hand holding a pointed masonry trowel into the frame from the upper left. Between 2.8s and 4.3s, he briefly reaches behind the bricks to the ground to pick up or adjust tool/material, then begins working along the top of the brick course from left to right. From 4.3s to 14.5s, he uses the trowel blade to spread the heaped mortar across the left-side bricks and slice/push mortar downward into the vertical joints between the bricks. From 14.5s to 18.0s, he uses his left hand alongside the trowel to guide and pack mortar into a central vertical joint so it does not spill excessively. From 18.0s to 26.88s, he continues working rightward across the remaining bricks with the trowel, chopping and smoothing the mortar bed and filling vertical gaps until the clip ends mid-action at 26.88s.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_brick_course",
+            "ent_mortar",
+            "ent_trowel"
+          ],
+          "context_result": "The loose heaps of mortar are progressively leveled into a continuous mortar bed along the top of the brick-on-edge course, with vertical joints between the visible bricks packed with mortar; some excess mortar crumbs fall onto the sandy ground in front.",
+          "camera_framing": "Static low-angle close-up; at 25.4s to 26.88s there is a slight downward camera tilt/jostle as the mason works near the right edge of the frame.",
+          "uncertainty": "Because the camera is positioned low in front of the bricks rather than looking down from above, the interior hollow cavities of the rat-trap bond are not directly visible, so it is not possible to visually verify how much mortar falls into the internal cavities versus stays on the bed."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01_mortar_bed_prep",
+          "category": "process_stage",
+          "claim": "The mason is applying and spreading cement mortar along a completed course of bricks laid on edge and packing the vertical joints in preparation for laying the next course in Rat-Trap Bond construction.",
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_pour_mortar"
+            },
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            }
+          ],
+          "uncertainty": "While the bricks are clearly laid on edge in a row with regular vertical joints characteristic of Rat-Trap Bond masonry, the low frontal angle hides the parallel rear wythe and internal cavities, and the cement composition of the mortar is inferred from standard masonry practice and script context."
+        },
+        {
+          "id": "int_02_careful_joint_packing",
+          "category": "workmanship_technique",
+          "claim": "The mason's two-handed action between 14.5s and 18.0s—using his left hand to cup and guide the wet mortar while slicing it with the trowel—illustrates careful workmanship to pack vertical joints and control mortar placement.",
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            }
+          ],
+          "uncertainty": "Whether this specific gesture is intended to prevent mortar from dropping into the internal cavity or simply to fill the front vertical joint neatly cannot be proven from the frontal camera angle alone."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01_best_take_trowel_work",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            },
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01_mortar_bed_prep"
+            }
+          ],
+          "interval": {
+            "start_s": 4.3,
+            "end_s": 25.0
+          },
+          "reason": "This continuous span shows clear, rhythmic left-to-right trowel work spreading mortar and packing vertical joints across the bricks on edge (ve_02_spread_and_pack_mortar), avoiding the brief awkward reach behind the wall at 2.8s–4.3s and stopping before the slight camera jostle after 25.4s.",
+          "uncertainty": "Action is ongoing at both ends of this sub-span; there is no fully settled pause inside the clip.",
+          "details": {
+            "comparison_scope": "Compared against the opening pan-pour (0.0s–2.2s), which starts mid-pour, and the tail (25.0s–26.88s), which has a slight camera dip.",
+            "alternative_refs": [
+              {
+                "source_id": "37d6e9613f69095a",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01_pour_mortar"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 14.5
+            },
+            "must_keep_setup": "Include 4.3s–6.0s where the trowel first slices into the left-hand mortar mound to establish the spreading action.",
+            "visible_result": "By 25.0s, the left and center sections of the brick-on-edge row have a leveled mortar bed and packed vertical joints.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02_action_span_two_handed_pack",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            },
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02_careful_joint_packing"
+            }
+          ],
+          "interval": {
+            "start_s": 13.0,
+            "end_s": 22.0
+          },
+          "reason": "Captures a self-contained, visually expressive sub-action within ve_02_spread_and_pack_mortar where the mason uses both his left hand and the trowel to carefully pack mortar into a central vertical joint and then smooths the adjacent bed.",
+          "uncertainty": "The mason's trowel work continues immediately before 13.0s and after 22.0s as part of the same left-to-right pass.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Keep 13.0s–15.0s as the mason finishes the fourth joint and brings his left hand down to support the mortar at the fifth joint.",
+            "visible_result": "The central vertical joints are packed full of mortar and the top bed across the middle bricks is leveled by 22.0s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03_story_moment_construction_process",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_pour_mortar"
+            },
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            },
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01_mortar_bed_prep"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 25.0
+          },
+          "reason": "Strong close-up B-roll for the construction-process section of P001 explaining how cement mortar is applied, bricks are laid on edge, and care is taken during workmanship.",
+          "uncertainty": "Does not show guide strings or the interior cavities directly.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Close-up texture of red bricks standing on edge and tactile trowel work spreading mortar across the course.",
+            "relationship": "complement",
+            "intended_explanation": "Illustrates the practical masonry stage of applying mortar over a brick-on-edge course and carefully filling joints.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04_script_use_prevent_mortar_falling",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            },
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02_careful_joint_packing"
+            }
+          ],
+          "interval": {
+            "start_s": 14.5,
+            "end_s": 25.0
+          },
+          "reason": "Can be used illustratively over the P001 lines 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall. Quality workmanship at every stage is essential for achieving the desired performance.'",
+          "uncertainty": "Illustrative match: the camera angle is low and frontal, so the internal cavities are not visible and the footage shows mortar being packed and controlled on the top and front joints rather than directly showing an open cavity being kept clear.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Mason using hand and trowel together to control mortar placement on the brick-on-edge course.",
+            "relationship": "complement",
+            "intended_explanation": "Visualizes careful mortar handling and quality workmanship during course preparation.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_05_future_visual_cavity_protection",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "37d6e9613f69095a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_spread_and_pack_mortar"
+            }
+          ],
+          "interval": null,
+          "reason": "Because this low-angle shot (ve_02_spread_and_pack_mortar) hides the internal hollow cavities behind the front row of bricks, if no other recorded clip in the collection shows an overhead view of the cavities while mortar is applied, a top-down or cutaway diagram/animation could clarify how cavities are kept free of mortar.",
+          "uncertainty": "Other recorded clips in the collection may already provide a high-angle view of the cavities; check the rest of the collection before commissioning a generated asset.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Show the parallel wythes of bricks on edge and the rectangular internal air cavities from above so the viewer sees how mortar is placed only on the brick edges without dropping into the cavity.",
+            "missing_asset": "Clean 3D cutaway diagram or high-angle instructional graphic showing Rat-Trap Bond internal cavities remaining clear during mortar bed application.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "37d6e9613f69095a",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No exact passage-level visual slot reservations were supplied in the media brief. This recorded clip provides strong close-up B-roll for P001 passages describing bricks laid on edge, mortar application, and careful workmanship.",
+          "prerequisite": null,
+          "uncertainty": "Final slot assignment depends on what other clips in the 46-clip collection cover."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_01_cavity_visibility",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 26.88
+          },
+          "field": "visual_events",
+          "issue": "Low ground-level camera angle shows only the front face and top edge of the brick row; whether a second parallel row and internal hollow cavities are already formed behind this row cannot be seen directly in this clip."
+        },
+        {
+          "id": "unres_02_tail_speech",
+          "interval": {
+            "start_s": 26.0,
+            "end_s": 26.88
+          },
+          "field": "speech",
+          "issue": "Faint off-screen voice at 26.0s–26.88s is cut off by the end of the recording and is too brief/muffled to transcribe reliably."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This clip contains one continuous, uninterrupted filming take (0.0s–26.88s) showing two successive physical stages of the same masonry operation rather than repeated takes: first, finishing the pouring of wet mortar from a metal pan onto the left side of the brick-on-edge row (ve_01_pour_mortar, 0.0s–2.2s); second, a single continuous left-to-right pass with a trowel spreading the mortar bed and packing the vertical joints between bricks (ve_02_spread_and_pack_mortar, 2.2s–26.88s). Within the trowel stage, each brick joint represents a successive step along the wall rather than a repeated take of the same joint.",
+    "crop_guidance": "For standard horizontal (16:9) delivery, the full frame works well as composed, with the row of red bricks on edge running cleanly across the lower third of the frame. If cropping for vertical (9:16) or square (1:1) formats, preserve the lower half of the image containing the brick course, the mortar bed, and the mason's hands and trowel; because the mason works progressively from screen left (around 4.3s) to screen right (around 26.88s), a tight vertical crop would require a slow pan from left to right to keep the active trowel and hands in frame. No distracting talking faces or background intrusions appear, as only the mason's trousered legs and sandy ground are in the background.",
+    "clean_handles": "Interval: 0.0–2.2; classification: active preparation; beginning observation: 0.0s mason's hands tilt the metal mortar pan at upper left as mortar falls onto the left bricks; middle observation: 1.1s last clump of mortar drops from pan onto the brick row; end observation: 2.2s pan is lifted out of frame at upper left and right hand enters with trowel; relevant action stopped: pouring from the pan stops by 1.5s and the pan clears the frame by 2.2s, while the transition to troweling continues immediately; uncertainty: the pour is already underway at 0.0s so there is no pre-pour static handle; links: ve_01_pour_mortar and ce_01_pour_mortar; editorial use: provides an active opening establishing how the mortar mounds were placed on the bricks before troweling begins. Interval: 2.2–4.3; classification: active preparation; beginning observation: 2.2s mason's right hand holding the trowel enters from upper left; middle observation: 3.3s mason reaches down behind the brick row with his hand; end observation: 4.3s mason positions the trowel blade on the left mortar mound to begin spreading; relevant action stopped: preparatory reaching stops at 4.3s as active mortar spreading begins; uncertainty: exact object touched behind the bricks at 3.3s is occluded by the brick row and mortar; links: ve_02_spread_and_pack_mortar and ce_02_trowel_spread; editorial use: serves as an active lead-in to the main left-to-right troweling action if cutting in before the first trowel stroke. Interval: 24.5–26.88; classification: active release; beginning observation: 24.5s mason slices and smooths mortar on the rightmost bricks in frame; middle observation: 25.8s camera dips slightly while the trowel taps the top mortar bed on the right; end observation: 26.88s clip ends while the mason's trowel is still moving across the right-hand mortar bed; relevant action stopped: none, the troweling action continues through the end of the recording at 26.88s and no settled post-action pause exists; uncertainty: slight camera movement after 25.4s makes the final 1.4s less steady as a lead-out handle; links: ve_02_spread_and_pack_mortar and ce_02_trowel_spread; editorial use: provides the completion of the mortar bed across the visible row of bricks, though editors may prefer to cut out around 25.0s before the camera jostle.",
+    "continuity": "At clip entry (0.0s, ve_01_pour_mortar), mortar is already piled on the center and right sections of the brick-on-edge course while the metal pan is mid-pour at the upper left; cutting in at 0.0s starts mid-action. At 4.3s (ve_02_spread_and_pack_mortar), the pan is gone, the mason stands straddling the background in grey trousers, and the trowel begins working at the far left of the brick row and moves steadily from screen left to screen right through 26.88s. Because the mortar state changes visibly from loose, high mounds (at 0.0s–4.3s) to a flattened bed with filled vertical joints (by 25.0s), any cut within this clip must respect the left-to-right progression of smoothed mortar.",
+    "preview_frames": "0.5s: Shows the metal pan pouring fresh wet mortar onto the left side of the red bricks laid on edge (ve_01_pour_mortar). 8.0s: Shows the pointed trowel slicing mortar downward into a vertical joint on the left side of the brick row (ve_02_spread_and_pack_mortar). 16.5s: Shows the mason using both his left hand and the trowel together to carefully pack and hold mortar in a central vertical joint (ve_02_spread_and_pack_mortar). 24.5s: Shows the nearly completed, leveled mortar bed across the row of bricks on edge as the trowel finishes the right side (ve_02_spread_and_pack_mortar).",
+    "speech_action_links": "No intelligible on-camera or instructional speech occurs in this clip; only a faint, cut-off background utterance occurs at 26.0s–26.88s (unres_02_tail_speech), which has no established link to the visual action. In addition, the output audio policy excludes camera audio ('output': 'excluded'), so source sound will not be used in the final edit.",
+    "shorter_explanations": "Instead of using the full 26.88s clip, an editor can use a single continuous 10.5s excerpt from 13.0s to 23.5s (calculation: 23.5s - 13.0s = 10.5s, single continuous span with no overlaps or transitions) from ve_02_spread_and_pack_mortar (supported by ce_02_trowel_spread and ce_03_two_handed_joint_pack). This shortened span retains the clear setup of the unspread mortar mounds on the right half of the brick course, the two-handed joint-packing technique in the center (14.5s–18.0s), and the visible partial result of a smoothed mortar bed and packed vertical joints across the left and center bricks, while omitting the opening pan pour (0.0s–2.2s), the reach behind the wall (2.8s–4.3s), the repetitive early left-side troweling (4.3s–13.0s), and the slight camera jostle at the tail (25.4s–26.88s). Alternatively, a two-segment condensed sequence of 0.0s–2.0s (2.0s pour from ve_01_pour_mortar) plus 14.5s–22.5s (8.0s two-handed packing and spreading from ve_02_spread_and_pack_mortar) yields a 10.0s sequence (calculation: 2.0s + 8.0s = 10.0s with a straight cut and no overlap) that shows both dumping the mortar and neatly packing the joints, though the jump in mortar state on the left bricks between 2.0s and 14.5s would be visible if not separated by another angle.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "ce_04_bricks_on_edge",
+          "support_classification": "directly_seen",
+          "editorial_use": "Provides a clear ground-level close-up of a row of red bricks standing on their narrow edge rather than laid flat."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "A cement mortar mix is prepared",
+          "claim_id": "ce_05_mortar_mix_illustrative",
+          "support_classification": "illustrative",
+          "editorial_use": "Shows prepared wet grey mortar being poured from a pan and spread onto the bricks, illustrating the use of the mortar mix (though mixing itself and cement composition are not directly shown)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.",
+          "claim_id": "ce_06_cavity_care_illustrative",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates careful mortar handling as the mason uses his left hand and trowel together to pack joints and control mortar spills, though the internal wall cavities and thermal properties are not visible from this low frontal angle."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Quality workmanship at every stage is essential for achieving the desired performance.",
+          "claim_id": "ce_06_cavity_care_illustrative",
+          "support_classification": "illustrative",
+          "editorial_use": "Visually supports the theme of attentive craftsmanship through close-up manual joint packing and mortar bed leveling."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this workflow uses a mixed-media plan where future generated video may be used for later gap filling, recorded footage is not forced into every script passage, and any supplied reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied ('planned_visual_slots_status': 'exact_passage_level_reservations_not_supplied'). Any suggested generated visuals are strictly marked as 'planned_not_created' leads and not existing assets. The source audio policy specifies 'intake': 'include_original_sound' and 'output': 'excluded', so original camera audio was inspected for intake evidence, but camera audio is muted for output and no source_audio editorial ideas are proposed.",
+    "unavailable": "No source_audio ideas are proposed because the output audio policy excludes camera audio ('output': 'excluded') and no intelligible instructional speech is present. No settled lead-in or lead-out handles exist in this clip because the mason is already pouring mortar at 0.0s and is still actively troweling when the recording ends at 26.88s. Full frame-by-frame native inspection is not established beyond the reviewed video stream; no readable visible text exists in the clip."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_01_pour_mortar",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 0.0s to 2.2s, the mason tilts a metal pan at the upper left to finish pouring wet grey mortar onto the left section of a row of red bricks laid on edge, then lifts the pan out of frame.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 2.2,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ve_01_pour_mortar at 0.5s, wet grey mortar falls from the tilted metal pan (ent_pan) onto the left bricks of the brick-on-edge course (ent_brick_course)."
+        },
+        {
+          "time_s": 2.0,
+          "cue": "visual: In ve_01_pour_mortar at 2.0s, the mason lifts ent_pan upward and out of the top-left frame."
+        }
+      ],
+      "limits": "The pouring action on the center and right sections of the brick course occurred prior to 0.0s."
+    },
+    {
+      "id": "ce_02_trowel_spread",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/visual_events/1/context_result",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 2.2s to 26.88s, the mason brings a pointed trowel into frame, briefly reaches behind the bricks between 2.8s and 4.3s, and then works continuously from left to right (4.3s–26.88s) spreading the mortar mounds into a level bed and pushing mortar into the vertical joints between the bricks on edge, with a slight downward camera jostle occurring between 25.4s and 26.88s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 2.2,
+      "end_s": 26.88,
+      "cues": [
+        {
+          "time_s": 2.5,
+          "cue": "visual: In ve_02_spread_and_pack_mortar at 2.5s, the mason's right hand enters with the pointed trowel (ent_trowel)."
+        },
+        {
+          "time_s": 8.0,
+          "cue": "visual: In ve_02_spread_and_pack_mortar at 8.0s, the trowel slices mortar downward into the left vertical joints of ent_brick_course."
+        },
+        {
+          "time_s": 25.8,
+          "cue": "visual: In ve_02_spread_and_pack_mortar at 25.8s, the camera framing dips slightly downward while the mason trowels the right-hand side of the brick course."
+        }
+      ],
+      "limits": "The action is still underway when the clip ends at 26.88s; what the mason touches behind the bricks at 2.8s–4.3s is hidden behind the brick row."
+    },
+    {
+      "id": "ce_03_two_handed_joint_pack",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 14.5s and 18.0s, the mason uses his left hand alongside the trowel to cup, guide, and pack wet mortar into a central vertical joint between the bricks on edge.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 14.5,
+      "end_s": 18.0,
+      "cues": [
+        {
+          "time_s": 16.5,
+          "cue": "visual: In ve_02_spread_and_pack_mortar at 16.5s, the mason's left hand is held against the front/top of the central vertical joint while the right hand uses ent_trowel to press mortar into the gap."
+        }
+      ],
+      "limits": "Only the front and top of the joint are visible; the rear side of the joint and internal cavity behind the brick face are not visible."
+    },
+    {
+      "id": "ce_04_bricks_on_edge",
+      "target_paths": [
+        "/sources/0/entities/1/label",
+        "/sources/0/interpretations/0/claim",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "A row of red bricks is positioned standing on their narrow edge with regular vertical gaps between them, directly matching the brick-on-edge orientation described in the script.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 26.88,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: Throughout ve_01_pour_mortar and ve_02_spread_and_pack_mortar (e.g., at 1.0s), eleven red bricks (ent_brick_course) are visible across the foreground standing vertically on their narrow edges rather than lying flat."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry places bricks on their edge.'"
+        }
+      ],
+      "limits": "Because the camera is at ground level in front of the row, the parallel rear row of bricks and the enclosed hollow cavities of the full Rat-Trap Bond wall are obscured."
+    },
+    {
+      "id": "ce_05_mortar_mix_illustrative",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "The wet grey mortar poured and spread onto the brick course illustrates the prepared cement mortar mix used in the masonry process.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 26.88,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ve_01_pour_mortar at 0.5s, wet grey mortar (ent_mortar) is poured from a metal pan onto the bricks."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'A cement mortar mix is prepared, and guide strings are fixed to maintain straight and uniform walls.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Wet grey masonry mortar applied with a trowel onto brickwork in Indian construction is standard cement-sand mortar."
+        }
+      ],
+      "limits": "The act of mixing the mortar is not shown in this clip, its exact cement-to-sand ratio cannot be verified visually, and no guide strings are visible in this frame."
+    },
+    {
+      "id": "ce_06_cavity_care_illustrative",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/2",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The mason's controlled trowel work and two-handed packing of mortar into the joints (14.5s–25.0s) illustratively support the script's statements about taking care with mortar placement and maintaining quality workmanship.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 14.5,
+      "end_s": 25.0,
+      "cues": [
+        {
+          "time_s": 16.5,
+          "cue": "visual: In ve_02_spread_and_pack_mortar at 16.5s, the mason cups his left hand around the joint while packing mortar with ent_trowel, controlling spillage."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall. Quality workmanship at every stage is essential for achieving the desired performance.'"
+        }
+      ],
+      "limits": "Because the internal wall cavities are hidden behind the front row of bricks from this low camera angle, the clip cannot directly prove that no mortar fell into an internal cavity or measure thermal performance."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01_wardrobe_trousers_sandals",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_spread_and_pack_mortar"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The mason wears loose dark-grey woven trousers and open dark sandals/flip-flops while working on the ground.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      },
+      "uncertainty": "Upper-body clothing is outside the top of the frame."
+    },
+    {
+      "id": "wm_02_tools_trowel_and_pan",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_pan"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_pour_mortar"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_spread_and_pack_mortar"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A curved metal mortar pan (tasla) is used to dump mortar, and a small pointed steel masonry trowel with a turned wooden handle is used to spread and pack the mortar.",
+      "entity_ids": [
+        "ent_pan",
+        "ent_trowel"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03_material_bricks_and_mortar",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_course"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Reddish-orange fired clay bricks with slightly rough, sandy faces and sharp edges are set on edge directly on a sandy surface, topped with coarse, wet grey mortar.",
+      "entity_ids": [
+        "ent_brick_course",
+        "ent_mortar"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      },
+      "uncertainty": "Crushing strength and whether the bricks are wire-cut or hand-moulded cannot be verified from visual appearance alone."
+    },
+    {
+      "id": "wm_04_environment_sandy_site",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_pour_mortar"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_spread_and_pack_mortar"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor site in bright daylight with tan sandy soil in the foreground, sparse green weeds, dry fallen leaves, a tree trunk at the upper left, and long wooden/metal straightedges or planks lying on the ground behind the mason's legs.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      },
+      "uncertainty": "The wider building site or surrounding structures are outside the tight low-angle frame."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01_internal_cavities_occluded",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_course"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_spread_and_pack_mortar"
+        }
+      ],
+      "subject": "Internal hollow cavities of the Rat-Trap Bond wall",
+      "kind": "not_visible",
+      "limitation": "Because the camera is positioned at ground level directly in front of the brick row, any parallel rear brick row and internal hollow cavities are occluded by the front bricks and mortar bed; this clip alone cannot show whether mortar drops into an internal cavity.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      }
+    },
+    {
+      "id": "el_02_mason_identity_face",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        }
+      ],
+      "subject": "Mason's face and upper torso",
+      "kind": "not_visible",
+      "limitation": "The framing cuts off above the mason's knees/waist, so the mason's face, headgear, and upper-body wardrobe are not visible in this clip.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.88
+      }
+    },
+    {
+      "id": "el_03_material_strength_and_specs",
+      "evidence_refs": [
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_course"
+        },
+        {
+          "source_id": "37d6e9613f69095a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar"
+        }
+      ],
+      "subject": "Brick crushing strength, brick savings percentage, and mortar mix ratio",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the bricks and mortar cannot establish quantitative claims from the script such as 20/35/75 kg/cm2 crushing strength, 25% brick reduction, thermal performance, or seven-day curing duration.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "mason_pouring_and_troweling_mortar_on_bricks_on_edge_closeup"
+}

@@ -18,7 +18,7 @@ from .db import connect
 from .elevenlabs import ElevenLabs, identifier
 from .errors import Problem
 from .storage import storage
-from .voice_timing import decode_response, inspect_audio, timing_evidence
+from .voice_timing import check_words, clamp_words, decode_response, inspect_audio, timing_evidence
 
 ALIGNMENT_TOLERANCE_S = 1.0  # MP3 frame padding: the provider's last character may end a little after the decoded duration
 
@@ -74,9 +74,7 @@ def process_voice(job, provider=None, store=None):
         if timed:
             timing = timing_evidence(snap, meta.get('alignments') or {})
             timing['audio'] = inspect_audio(audio_path)
-            timing['alignment_overshoot_s'] = round(max(0.0, timing['last_character_end_s'] - timing['audio']['duration_s']), 3)
-            if timing['alignment_overshoot_s'] > ALIGNMENT_TOLERANCE_S:
-                raise ValueError('Alignment exceeds the decoded recording duration.')
+            check_words(clamp_words(timing, ALIGNMENT_TOLERANCE_S))
             timing_key = key.removesuffix('.mp3') + '.timing.json'
             timing_data = json.dumps(timing, ensure_ascii=False).encode('utf-8')
             store.put(timing_key, timing_data, 'application/json')
@@ -157,6 +155,21 @@ def tick():
 
 
 def main():
+    n = settings().WORKERS
+    if n > 1 and os.environ.get('VW2_WORKER_CHILD') != '1':
+        import subprocess, sys
+        children = [subprocess.Popen([sys.executable, '-m', 'app.worker'], env={**os.environ, 'VW2_WORKER_CHILD': '1'}) for _ in range(n - 1)]
+        print(f'started {n} workers', flush=True)
+        try:
+            loop()
+        finally:
+            for c in children:
+                c.terminate()
+        return
+    loop()
+
+
+def loop():
     failures = 0
     while True:
         try:

@@ -1,0 +1,734 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "74add8a4921547b375f9ac2f68ae8053",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "6c7451d2aaffe416",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 4.8
+            },
+            "status": "reviewed",
+            "note": "Continuous low-angle exterior view of a partially built red-brick wall and corner junction with a worker bending behind the wall. Inspected via sampled frames and continuous playback; native frame-by-frame or full-pixel verification is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 0.5
+            },
+            "state": "non_speech",
+            "note": "Outdoor ambient site sound before speech begins."
+          },
+          {
+            "interval": {
+              "start_s": 0.5,
+              "end_s": 4.8
+            },
+            "state": "speech",
+            "note": "Clear Tamil conversation between the visible worker behind the brick wall and an off-screen speaker about selecting a brick."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.8
+          },
+          "reason": "No legible text, signage, or markings are visible in the frame."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_worker",
+          "kind": "person",
+          "label": "Adult male worker in beige short-sleeved collared shirt and dark trousers behind the brick wall",
+          "uncertainty": "His hands and lower legs are occluded behind the brick wall throughout the clip."
+        },
+        {
+          "id": "ent_offscreen_speaker",
+          "kind": "speaker",
+          "label": "Off-screen conversational partner responding in Tamil",
+          "uncertainty": "Never visible in frame."
+        },
+        {
+          "id": "ent_brick_wall",
+          "kind": "object",
+          "label": "Partially built red clay brick wall with corners, junctions, and grey mortar joints",
+          "uncertainty": "The exact internal cavity geometry cannot be seen from this low side angle because the top of the wall is above the camera lens height."
+        },
+        {
+          "id": "ent_straightedge",
+          "kind": "object",
+          "label": "Long silver-colored metal straightedge or leveling bar lying flat on the sandy ground in the foreground",
+          "uncertainty": "Exact tool type (e.g., aluminum screed bar or straightedge) is inferred from appearance."
+        }
+      ],
+      "speech": [
+        {
+          "id": "sp_01",
+          "interval": {
+            "start_s": 0.5,
+            "end_s": 2.3
+          },
+          "speaker_id": "ent_worker",
+          "language": "ta",
+          "original_text": "இந்த ஒரு கல்லுக்கு இதை எடுத்துக்கலாம்.",
+          "english_translation": "For this one brick, we can take this.",
+          "transcription_status": "clear",
+          "uncertainty": "The exact brick he is touching or selecting is occluded behind the wall."
+        },
+        {
+          "id": "sp_02",
+          "interval": {
+            "start_s": 2.3,
+            "end_s": 3.4
+          },
+          "speaker_id": "ent_offscreen_speaker",
+          "language": "ta",
+          "original_text": "ஆ சரி சரி.",
+          "english_translation": "Ah, okay, okay.",
+          "transcription_status": "clear",
+          "uncertainty": null
+        },
+        {
+          "id": "sp_03",
+          "interval": {
+            "start_s": 3.4,
+            "end_s": 4.8
+          },
+          "speaker_id": "ent_worker",
+          "language": "ta",
+          "original_text": "இதை எடுத்துக்கலாம், இப்படி",
+          "english_translation": "We can take this, like this",
+          "transcription_status": "clear",
+          "uncertainty": "Utterance is cut off at the end of the clip as he remains bent behind the wall."
+        }
+      ],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.8
+          },
+          "label": "Worker bends behind low brick-on-edge wall junction while speaking and gesturing behind the wall",
+          "description": "In an outdoor setting with green trees in the background and sandy soil in the foreground, a low red-brick wall with an L-shaped corner/junction stands in the midground. Bricks are laid on edge with grey mortar in the joints, and excess wet mortar rests along the base on the ground. A long silver metal bar lies across the foreground dirt. At 0.0s, the adult male worker (ent_worker) is standing bent forward behind the central brick corner with his head partly above the top frame edge. By 0.6s, he bends lower so his head and face are fully in frame, looking down behind the wall while speaking (sp_01) and reaching with his arms behind the brickwork (hands occluded). Around 1.8s to 2.5s, he turns his head to look toward screen left while speaking and listening to the off-screen reply (sp_02). From 2.6s to 3.4s, he looks back down behind the wall. From 3.5s to 4.8s, he looks up toward screen left again while speaking (sp_03) and shifts slightly toward screen left behind the wall.",
+          "actor_ids": [
+            "ent_worker"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_straightedge"
+          ],
+          "context_result": "The brick wall structure remains unchanged in visible courses throughout the 4.8s clip; whatever brick or tool the worker touches behind the wall remains hidden from the camera.",
+          "camera_framing": "Static low-angle medium-wide shot from ground level; no camera pan, tilt, or zoom.",
+          "uncertainty": "Because the camera is positioned low in front of the wall, the worker's hands and the specific brick he refers to in speech are completely occluded behind the masonry."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "interp_01",
+          "category": "masonry_technique",
+          "claim": "The visible wall structure shows bricks laid on their narrow edge in alternating stretchers and headers (shiners and rowlocks) with grey mortar joints and an L-shaped corner/wall junction, consistent with Rat-Trap Bond masonry under construction.",
+          "evidence_refs": [
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_wall"
+            }
+          ],
+          "uncertainty": "While the external brick-on-edge pattern and staggered vertical joints are directly visible, the internal hollow cavities are hidden from this low exterior camera angle."
+        },
+        {
+          "id": "interp_02",
+          "category": "worker_activity",
+          "claim": "The worker behind the wall is discussing and selecting a brick behind the wall with an off-screen colleague or crew member during active site work or demonstration setup.",
+          "evidence_refs": [
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_01"
+            },
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_02"
+            },
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_03"
+            }
+          ],
+          "uncertainty": "The exact brick and hand action are occluded behind the wall, and the worker looks off-camera left while speaking, giving the shot the appearance of a conversational coordination moment rather than a clean brick-laying action."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ed_01",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.6,
+            "end_s": 3.4
+          },
+          "reason": "Provides a low-angle exterior view of bricks laid on edge with staggered vertical joints and a corner/junction detail (ve_01, clm_01, clm_02), which can illustrate script clauses in P001 about placing bricks on their edge, staggered vertical joints, or wall junctions/corners. However, because the worker is visibly talking toward someone off-screen left and his hands are hidden behind the wall (clm_03), this clip is best used only briefly as secondary B-roll or cropped tightly on the brickwork if cleaner demonstration shots exist in the collection.",
+          "uncertainty": "Internal cavities are not visible from this angle, and the worker's visible talking and off-camera glances between 1.8s and 4.8s may distract if used uncropped.",
+          "details": {
+            "comparison_scope": "Within attached 4.8s clip only.",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Start after 0.6s so the worker's head is no longer cut off by the top frame edge (or crop solely to the lower brick wall).",
+            "visible_result": "Completed courses of brick-on-edge masonry with visible mortar joints and corner bonding.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Low-angle detail of brick-on-edge courses, staggered joints, and a wall corner/junction.",
+            "relationship": "complement",
+            "intended_explanation": "Illustrates the exterior pattern of bricks laid on edge, staggered vertical joints, and corner/wall junction geometry described in P001.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_02",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.6,
+            "end_s": 1.8
+          },
+          "reason": "If keeping the full uncropped frame with the worker visible, 0.6s–1.8s (or the brief look-down from 2.6s–3.4s) is the cleanest sub-span inside ve_01 because the worker's head is fully inside the frame and he is looking down at the work behind the wall rather than looking off-screen left to converse (clm_03).",
+          "uncertainty": "At 1.2s–1.8s his mouth is still moving slightly as he speaks (sp_01), and the sub-span is very short (1.2 seconds).",
+          "details": {
+            "comparison_scope": "Single continuous shot in 6c7451d2aaffe416 (0.0s–4.8s).",
+            "alternative_refs": [
+              {
+                "source_id": "6c7451d2aaffe416",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 2.6,
+              "end_s": 3.4
+            },
+            "must_keep_setup": "Worker bent over looking down at the wall corner.",
+            "visible_result": "Focused posture over the brick-on-edge corner junction before he turns to look off-camera.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Brief moment of worker looking down at the masonry without off-camera eye contact.",
+            "relationship": "match",
+            "intended_explanation": "Shows careful site work at a brick-on-edge wall corner.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_03",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.8
+          },
+          "reason": "If cropped to the lower two-thirds of the frame to exclude the talking worker entirely, the entire 4.8s static shot of the brick-on-edge corner junction (ve_01, clm_01, clm_02) is stable and usable as a static architectural detail shot.",
+          "uncertainty": "Cropping into the lower portion reduces spatial resolution and depends on whether the worker's dark trousers/arms behind the wall remain distracting.",
+          "details": {
+            "comparison_scope": "Full 4.8s window of 6c7451d2aaffe416.",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Static low-angle view of the four-course brick-on-edge wall and corner.",
+            "visible_result": "Clear view of bricks on edge, staggered vertical mortar joints, and corner detail.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Static detail of brick-on-edge wall courses and junction.",
+            "relationship": "match",
+            "intended_explanation": "Shows the exposed brick pattern, staggered vertical joints, and corner construction.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_04",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c7451d2aaffe416",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": null,
+          "reason": "Because this low-angle shot (ve_01) cannot show the internal hollow cavities or the thermal barrier effect described in P001 ('Because of the hollow cavities, the wall acts as a natural thermal barrier. Less heat enters the building...'), an undecided slot in P001 could use a future generated diagram or cutaway animation showing heat arrows blocked by the air cavity inside a Rat-Trap Bond wall.",
+          "uncertainty": "This is a provisional proposal for an undecided slot; other clips in the 46-source collection may already show top-down views of the physical cavities, though thermal heat flow itself is invisible to regular cameras.",
+          "details": {
+            "comparison_scope": "Script P001 thermal barrier explanation versus attached clip 6c7451d2aaffe416.",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Visualizes how continuous hollow air cavities inside brick-on-edge masonry reduce heat transfer into the building.",
+            "missing_asset": "Clean 3D cross-section or animated diagram of a Rat-Trap Bond brick wall with bricks on edge, internal air pockets, and directional heat arrows illustrating thermal insulation.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "undecided",
+          "asset_status": "planned_not_created",
+          "asset_ref": null,
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No exact passage-level visual slot reservations were supplied in the media brief. For the thermal insulation or crushing-strength specification clauses in P001 that cannot be directly seen in this low-angle site clip, a generated explanatory graphic or recorded top-down cavity shot from elsewhere in the collection may be used.",
+          "prerequisite": "Check other clips in the collection for top-down cavity views first; generate a thermal/strength graphic only if needed for undecided explanatory passages.",
+          "uncertainty": "Exact passage-level slot reservations were not supplied in this request."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.8
+          },
+          "field": "visual_details",
+          "issue": "The worker's hands and the specific brick he is handling behind the wall are occluded by the foreground masonry throughout the clip."
+        },
+        {
+          "id": "unres_02",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.8
+          },
+          "field": "visual_details",
+          "issue": "The internal hollow cavities of the Rat-Trap Bond wall are not visible from this low ground-level camera angle."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 4.8-second clip (0.0s–4.8s, ve_01) consists of a single continuous camera take with no camera resets or repeated physical cycles. Inside this single span, the worker behind the brick wall bends down into clearer view by 0.6s, reaches behind the wall (hands occluded) while speaking to an off-camera person from 0.5s to 2.3s (sp_01, clm_03), looks off-camera left from 1.8s to 2.5s while receiving a reply (sp_02), looks back down behind the wall from 2.6s to 3.4s, and then looks off-camera left again while speaking from 3.4s to 4.8s (sp_03). It appears to be a between-action site coordination or brick-selection moment rather than a completed brick-laying demonstration.",
+    "crop_guidance": "For a standard horizontal output aspect ratio, the essential visual subject is the four-course red brick-on-edge wall with its corner junction and staggered mortar joints occupying the lower-middle horizontal band of the frame (ve_01, clm_01, clm_02). The worker behind the wall (ent_worker) talks visibly and looks off-screen left at 1.8s–2.5s and 3.5s–4.8s while his hands remain completely hidden behind the bricks (clm_03). A tighter crop focused on the foreground brick wall and corner junction (excluding the upper portion of the frame where the worker's head and torso appear, and optionally trimming the bottom silver straightedge bar if undesired) would eliminate the distracting talking face and off-camera glances without hiding any visible hand/tool action, since the hands are already occluded behind the wall. This crop suggestion is an approximate editorial lead and has not been technically verified for resolution loss.",
+    "clean_handles": "Interval: 0.0–0.6; classification: active preparation; beginning observation: 0.0s worker is bending forward behind the central brick corner with the top of his head cut off by the upper frame edge in ve_01; middle observation: 0.3s worker continues lowering his torso and head behind the brick wall; end observation: 0.6s worker's head is fully within the frame looking down behind the wall as he begins speaking; relevant action stopped: torso-lowering entry into frame completes around 0.6s, though occluded arm reaching and speech continue immediately; uncertainty: hands are hidden behind the brick wall throughout; links: ve_01 and clm_03; editorial use: lead-in where the worker settles into a bent posture behind the wall before his main look-down span. Interval: 0.6–1.8; classification: active preparation; beginning observation: 0.6s worker is bent behind the wall looking down at the occluded work area while speaking in ve_01; middle observation: 1.2s worker remains looking down behind the wall while speaking and shifting his arms slightly behind the bricks; end observation: 1.8s worker begins turning his head toward screen left to address the off-screen person; relevant action stopped: downward gaze toward the work area ends around 1.8s when he turns his head toward screen left, while speech continues until 2.3s; uncertainty: exact hand manipulation behind the wall is not visible; links: ve_01 and clm_03; editorial use: preserves the cleanest uncropped segment where the worker looks down at the brickwork rather than off-camera. Interval: 2.6–3.4; classification: active preparation; beginning observation: 2.6s worker turns his head back from screen left to look down behind the brick corner in ve_01; middle observation: 3.0s worker looks directly down behind the brick wall with his mouth closed during the pause after the off-screen speaker's reply; end observation: 3.4s worker begins lifting his head and speaking again toward screen left; relevant action stopped: off-screen head turn and worker speech are paused across 2.6s–3.4s, though subtle shoulder/arm adjustment behind the wall continues; uncertainty: brief 0.8s span with occluded hands behind the wall; links: ve_01 and clm_03; editorial use: provides a short quiet visual window where the worker is not speaking or looking off-camera. Interval: 3.4–4.8; classification: active release; beginning observation: 3.4s worker begins speaking again and lifting his gaze toward screen left in ve_01; middle observation: 4.1s worker looks off-screen left while speaking and shifting his torso slightly toward screen left behind the wall; end observation: 4.8s recording cuts off mid-utterance and mid-posture shift behind the wall; relevant action stopped: action does not stop before the clip ends at 4.8s; uncertainty: recording ends at 4.8s so no post-4.8s footage exists to inspect; links: ve_01 and clm_03; editorial use: unusable as a clean uncropped tail handle because the worker is actively talking off-camera when the file ends, unless the frame is cropped solely to the static brick wall (clm_01).",
+    "continuity": "Throughout 0.0s–4.8s (ve_01), the foreground four-course red brick-on-edge wall with its projecting central corner and the silver straightedge bar on the sandy ground remain completely static in state and position (clm_01, clm_02). The worker (ent_worker) stands behind the wall slightly right of center; at 0.0s his head is partly above the top frame edge, by 0.6s he bends down into frame looking downward, at 1.8s–2.5s he turns his head toward screen left, at 2.6s–3.4s he looks down at the occluded space behind the wall, and from 3.5s–4.8s he looks toward screen left again while shifting his torso slightly toward screen left (clm_03). Because no bricks are visibly added or mortared on the visible courses during this clip, the wall state at entry (0.0s) and exit (4.8s) is identical.",
+    "preview_frames": "0.2s (ve_01): shows the initial framing where the worker's head is partially cut off at the top edge above the four-course brick-on-edge wall and foreground metal straightedge. 1.2s (ve_01): shows the worker bent cleanly in frame looking down behind the brick corner junction while the staggered brick-on-edge courses and mortar joints are clearly lit. 2.1s (ve_01): shows the worker looking toward screen left while speaking to the off-camera person, illustrating why the uncropped upper frame looks like a candid site conversation. 3.0s (ve_01): shows the brief quiet interval where the worker looks back down behind the brick corner with his mouth closed.",
+    "speech_action_links": "From 0.5s to 2.3s (sp_01, 'For this one brick, we can take this'), the worker (ent_worker) bends behind the wall in ve_01 looking down until 1.8s and then looking toward screen left while reaching behind the wall (clm_03, clm_04); the demonstrative phrases 'this one brick' ('இந்த ஒரு கல்லுக்கு') and 'this' ('இதை') refer to a brick or spot behind the wall that is visually occluded from the camera. From 2.3s to 3.4s (sp_02, 'Ah, okay, okay'), the off-screen speaker (ent_offscreen_speaker) replies in agreement while the worker turns his gaze back down behind the wall at 2.6s (clm_05). From 3.4s to 4.8s (sp_03, 'We can take this, like this'), the worker looks toward screen left again while shifting slightly left behind the wall (clm_03, clm_04), with the physical demonstration of 'like this' ('இப்படி') remaining hidden behind the brickwork and cut off at 4.8s. Because the output audio policy excludes camera audio, these utterances are analyzed for intake context only and are not recommended as audible sound bites.",
+    "shorter_explanations": "If using the uncropped frame from ve_01 to illustrate site work on a brick-on-edge corner junction (clm_01, clm_02, clm_03), retain either the 0.6s–1.8s span (1.2s duration: 1.8 - 0.6 = 1.2s) or the 2.6s–3.4s span (0.8s duration: 3.4 - 2.6 = 0.8s), omitting 0.0s–0.6s (where the worker's head is partly out of frame) and omitting 1.8s–2.6s and 3.4s–4.8s (where he looks off-camera left to converse). Both shorter spans preserve the visible setup and result—a mason working attentively at a partially built brick-on-edge corner junction—while the longer 4.8s version only adds off-camera conversational glances without revealing any additional masonry progress since his hands remain occluded behind the wall.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "clm_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use ve_01 (either cropped to the brickwork across 0.0s–4.8s or trimmed to 0.6s–1.8s / 2.6s–3.4s) to directly show red bricks laid on their narrow edge with mortar joints in a wall under construction."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "clm_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the staggered vertical mortar joints across four courses of brick-on-edge masonry in ve_01; note that while the staggered joint geometry is directly seen, the resulting structural strength and stability are inferred properties."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "clm_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates a brick-on-edge wall corner/junction with a worker attending to it in ve_01, while keeping explicit that the worker's exact hand action behind the wall is occluded."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "I acknowledge the mixed-media workflow plan: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots_status is exact_passage_level_reservations_not_supplied), so none are invented. Any suggested generated visual is marked as planned_not_created and is a provisional proposal rather than an existing asset or authorization to generate media. I also acknowledge that the source audio policy includes original sound for intake analysis but excludes camera audio from the output timeline, so spoken Tamil dialogue in this clip is transcribed and linked for context without proposing source-audio playback.",
+    "unavailable": "Source audio recommendations (source_audio in editorial_ideas) are omitted because the output audio policy excludes original camera sound. Readable visible text (visible_text) is empty because no signage, writing, or numbers appear in the frame. Post-4.8s inspection context is unavailable because the attached source file ends at 4.8s."
+  },
+  "claim_evidence": [
+    {
+      "id": "clm_01",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "Across 0.0s–4.8s, the foreground wall shows four courses of red bricks laid on their narrow edge with staggered vertical grey mortar joints and an L-shaped corner/junction.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 1.2,
+          "cue": "visual: In ve_01 (ent_brick_wall), four courses of red clay bricks are visibly resting on their narrow edges with alternating header and stretcher faces and staggered vertical mortar joints."
+        }
+      ],
+      "limits": "The internal hollow cavities of the wall are not visible from this low ground-level exterior camera angle, and structural strength or thermal performance cannot be directly measured from the visual appearance."
+    },
+    {
+      "id": "clm_02",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The visible brick-on-edge structure and corner junction in ve_01 illustrate the external bonding geometry and corner/junction detailing of Rat-Trap Bond masonry described in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 1.2,
+          "cue": "visual: In ve_01, bricks are laid on edge in an L-shaped corner/junction with staggered vertical mortar joints."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry places bricks on their edge' and 'Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Alternating on-edge stretchers (shiners) and headers (rowlocks) at a wall corner are characteristic of Rat-Trap Bond masonry construction."
+        }
+      ],
+      "limits": "Internal cavities behind the outer brick faces and the worker's hands behind the wall are occluded from this camera position."
+    },
+    {
+      "id": "clm_03",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/speech_action_links",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "In ve_01, the worker behind the wall bends his head fully into frame by 0.6s, looks down behind the wall during 0.6s–1.8s and 2.6s–3.4s, and looks toward screen left while speaking at 1.8s–2.5s and 3.4s–4.8s, with his hands occluded behind the brick wall throughout.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 0.2,
+          "cue": "visual: In ve_01, the worker's head is partially cut off by the top frame edge as he bends behind the brick corner."
+        },
+        {
+          "time_s": 1.2,
+          "cue": "visual: In ve_01, the worker's head is fully in frame looking down behind the wall while his arms reach behind the bricks."
+        },
+        {
+          "time_s": 2.1,
+          "cue": "visual: In ve_01, the worker turns his head toward screen left while talking."
+        },
+        {
+          "time_s": 3.0,
+          "cue": "visual: In ve_01, the worker looks back down behind the wall with his mouth closed."
+        },
+        {
+          "time_s": 4.1,
+          "cue": "visual: In ve_01, the worker looks toward screen left again while talking and shifting slightly toward screen left."
+        }
+      ],
+      "limits": "What the worker's hands are touching or doing behind the wall is completely hidden by the foreground brickwork."
+    },
+    {
+      "id": "clm_04",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "The worker states in Tamil across 0.5s–2.3s ('For this one brick, we can take this') and 3.4s–4.8s ('We can take this, like this') that a particular brick can be used in a certain way.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 0.5,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "source_speech: In sp_01 (0.5s–2.3s), ent_worker says 'இந்த ஒரு கல்லுக்கு இதை எடுத்துக்கலாம்.' ('For this one brick, we can take this.')"
+        },
+        {
+          "time_s": 3.4,
+          "cue": "source_speech: In sp_03 (3.4s–4.8s), ent_worker says 'இதை எடுத்துக்கலாம், இப்படி' ('We can take this, like this')."
+        }
+      ],
+      "limits": "Because the worker's hands and the referenced brick are behind the wall, the exact brick and orientation he refers to cannot be visually confirmed."
+    },
+    {
+      "id": "clm_05",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "From 2.3s to 3.4s, an off-screen speaker responds in Tamil ('Ah, okay, okay') acknowledging the worker's statement.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 2.3,
+      "end_s": 3.4,
+      "cues": [
+        {
+          "time_s": 2.3,
+          "cue": "source_speech: In sp_02 (2.3s–3.4s), ent_offscreen_speaker says 'ஆ சரி சரி.' ('Ah, okay, okay.')"
+        }
+      ],
+      "limits": "The off-screen speaker is never visible in the video."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker"
+        },
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The visible adult male worker wears a light beige short-sleeved collared shirt with a pen clipped in the left chest pocket and dark grey/black trousers.",
+      "entity_ids": [
+        "ent_worker"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      },
+      "uncertainty": "Footwear and lower legs are occluded behind the brick wall."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Four courses of red-orange clay bricks are laid on their narrow edge with unplastered grey mortar joints and squeezed-out mortar droppings along the base on sandy soil.",
+      "entity_ids": [
+        "ent_brick_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_straightedge"
+        },
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A long rectangular silver-colored metal bar or straightedge lies flat across the sandy ground in the foreground in front of the brick wall.",
+      "entity_ids": [
+        "ent_straightedge"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      },
+      "uncertainty": "Both ends of the metal bar extend outside the left and right edges of the frame."
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "The work area is outdoors on bare sandy brown earth backed by green leafy trees and tree trunks in bright daylight.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Worker's hands and selected brick behind the wall",
+      "kind": "not_visible",
+      "limitation": "Because the camera is positioned at ground level in front of the four-course brick wall, the worker's hands and the specific brick or surface he touches behind the wall are occluded throughout 0.0s–4.8s.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      }
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Internal hollow cavities of the brick-on-edge wall",
+      "kind": "not_visible",
+      "limitation": "The low exterior camera angle looks at the side faces of the four brick courses and cannot see over the top of the wall into the internal hollow cavities.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.8
+      }
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "6c7451d2aaffe416",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        }
+      ],
+      "subject": "Brick crushing strength, thermal insulation performance, and percentage of material savings",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the brickwork in this clip does not establish measured brick crushing strength (e.g., 20, 35, or 75 kg/sq cm), thermal resistance, or percentage of brick consumption reduction.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "worker_speaking_behind_low_brick_on_edge_wall_corner"
+}

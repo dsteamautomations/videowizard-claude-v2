@@ -1,0 +1,801 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "7d4a5ec4a35717a3f3c62fbcabc4f746",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "89e63d1c9a303b74",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 31.68
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 31.68
+            },
+            "status": "reviewed",
+            "note": "Static low-angle medium shot of a corner section of an L-shaped red-brick wall under construction on an outdoor sandy site, with green cylindrical tanks and brick stacks in the background. Sampled across the full window; native frame-by-frame inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 16.5
+            },
+            "state": "non_speech",
+            "note": "Outdoor ambient sound, footsteps, brick handling, and a brief metallic clink around 14–15s as the mason returns with a plumb bob."
+          },
+          {
+            "interval": {
+              "start_s": 16.5,
+              "end_s": 31.68
+            },
+            "state": "omitted_background_speech",
+            "note": "Quiet, indistinct off-camera background conversation in an Indian language (likely Tamil) between bystanders or co-workers while the mason checks the wall with a plumb bob; omitted as low-volume, partially unintelligible background chatter not directed to camera."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 16.5,
+            "end_s": 31.68
+          },
+          "reason": "Distant, low-volume background conversation is partially unintelligible and does not provide clear process narration or camera-directed explanation."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 31.68
+          },
+          "reason": "No readable text or numbers are visible in the scene; faint recessed frog/stamp indentations on some bricks are illegible."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Primary mason in light-coloured collared shirt, dark grey trousers, and sandals, wearing a lapel microphone clipped to his shirt",
+          "uncertainty": "His full head is frequently cropped at the top of the frame; his professional role as a mason is inferred from his actions."
+        },
+        {
+          "id": "ent_coworker",
+          "kind": "person",
+          "label": "Second worker in light shirt and grey trousers walking through the background",
+          "uncertainty": "Only lower body and torso are visible between 16.8s and 31.68s."
+        },
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Low L-shaped corner section of a red-brick wall laid with bricks on edge and visible internal cavities",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_plumb_bob",
+          "kind": "object",
+          "label": "Plumb bob on a string with a square wooden/spacer block",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_green_tanks",
+          "kind": "object",
+          "label": "Row of green cylindrical tanks/digesters in the background",
+          "uncertainty": "Exact function of the green cylindrical structures is not established from visual evidence alone."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01_place_corner_brick",
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "label": "Mason picks up a brick and sets it on edge onto mortar at the wall corner",
+          "description": "From 0.0s to 1.2s, the primary mason (ent_mason) reaches to the left wing of the low L-shaped brick wall (ent_wall), picks up a loose red brick, and lifts it over a bed of grey mortar on the third course near the corner junction. From 1.2s to 4.3s, he places the brick on edge onto the mortar bed, creating an open rectangular cavity alongside the adjacent brick on the right wing, and presses and adjusts its alignment with both hands. From 4.3s to 5.2s, he releases the brick and straightens up.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_wall"
+          ],
+          "context_result": "The brick rests on edge in position on the third course at the corner junction, with a visible hollow cavity between parallel header/stretcher courses.",
+          "camera_framing": "Static low-angle medium shot framed on the brick wall corner; the mason's head is cropped out at the top edge.",
+          "uncertainty": null
+        },
+        {
+          "id": "ve_02_walk_away_and_return",
+          "interval": {
+            "start_s": 5.2,
+            "end_s": 15.2
+          },
+          "label": "Mason walks off screen left, leaving wall unattended, then returns from left carrying a plumb bob and straightedge",
+          "description": "From 5.2s to 7.5s, the mason (ent_mason) walks behind the wall toward screen left and exits the frame at 7.5s. From 7.5s to 11.4s, the frame shows only the static brick corner (ent_wall), background brick stacks, and green cylindrical tanks (ent_green_tanks) with no people visible. At 11.4s, the mason re-enters from the foreground left carrying a long metallic bar/straightedge and a plumb bob (ent_plumb_bob), walks across to the right side of the wall, sets the long bar down on the ground at the right around 14.0s–14.8s, and steps behind the right wing of the wall holding the plumb bob.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_plumb_bob",
+            "ent_green_tanks"
+          ],
+          "context_result": "Mason is positioned at the right end of the brick wall holding the plumb bob ready to check verticality; the long straightedge rests on the ground to the right.",
+          "camera_framing": "Static low-angle medium shot; mason briefly crosses close to the left foreground at 11.4s–13.5s before moving behind the right side of the wall.",
+          "uncertainty": null
+        },
+        {
+          "id": "ve_03_plumb_check_and_adjust",
+          "interval": {
+            "start_s": 15.2,
+            "end_s": 31.68
+          },
+          "label": "Mason checks vertical alignment of the corner brickwork with a plumb bob and adjusts the newly laid brick",
+          "description": "From 15.2s to 20.3s, the mason (ent_mason) holds the plumb bob string and wooden block against the outer right face of the corner brickwork (ent_wall) to check verticality, then nudges the top brick slightly while a second worker (ent_coworker) walks into the background from right to left and bends down near the left wing. From 20.3s to 22.8s, the mason moves the plumb bob to the inner face of the newly laid brick on edge (laid in ve_01_place_corner_brick), suspending the bob down alongside the lower courses. From 22.8s to 25.5s, he uses both hands to slightly shift and rock the brick on edge into vertical alignment. From 25.5s to 27.6s, he re-applies the plumb bob spacer block against the top edge of that brick to re-check plumb. From 27.6s through the end of the clip at 31.68s, he holds and presses the brick steady with both hands while looking down at the plumb line, as the second worker walks back and forth in the background.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_coworker"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_plumb_bob"
+          ],
+          "context_result": "The mason is still holding the brick and plumb bob in position as the clip ends at 31.68s; final release after the second plumb check is cut off by the end of the recording.",
+          "camera_framing": "Static low-angle medium shot; mason's face is partially visible as he bends low over the wall, while the co-worker's legs cross in the left background.",
+          "uncertainty": "The clip ends at 31.68s while the mason's hands are still resting on the brick, so the completion and release of this final adjustment are not shown."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01_rat_trap_bond_laying",
+          "category": "construction_technique",
+          "claim": "The mason is demonstrating Rat-Trap Bond masonry construction by laying red bricks on their edge to form a double-wythe wall with internal hollow cavities and staggered vertical joints at a corner junction.",
+          "evidence_refs": [
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_place_corner_brick"
+            },
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "While the brick-on-edge geometry and internal cavities are directly visible, the structural performance, thermal insulation effect, and material-saving percentages described in the script are inferred properties rather than directly measured in the video."
+        },
+        {
+          "id": "int_02_plumb_alignment_check",
+          "category": "quality_control",
+          "claim": "The mason uses a traditional plumb bob to check the vertical alignment (plumb) of the brick-on-edge courses at the corner junction and manually adjusts the freshly laid brick on its mortar bed to ensure straight, vertical walls.",
+          "evidence_refs": [
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_plumb_check_and_adjust"
+            },
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_plumb_bob"
+            }
+          ],
+          "uncertainty": "Exact vertical tolerance achieved is not measurable from the camera angle, and the final release of the brick is cut off at 31.68s."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01_action_place_brick",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_place_corner_brick"
+            },
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "reason": "Clean, self-contained 5.2-second action showing the mason picking up a brick and laying it on edge onto mortar at the corner, clearly revealing the hollow cavity inside the wall.",
+          "uncertainty": "Starts with the mason already reaching for the brick at 0.0s, so there is no inactive pre-roll before the reach.",
+          "details": {
+            "comparison_scope": "Within source 89e63d1c9a303b74",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Keep from 0.0s–1.2s where the mason lifts the brick toward the mortar bed so the placement action reads clearly.",
+            "visible_result": "By 4.3s–5.2s the brick is seated on edge forming a clear rectangular cavity at the corner, and the mason releases his hands.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Directly shows bricks placed on their edge creating continuous hollow cavities within the wall.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02_static_wall_cutaway",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_walk_away_and_return"
+            },
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": {
+            "start_s": 7.5,
+            "end_s": 11.4
+          },
+          "reason": "Unobstructed 3.9-second static shot of the partially built Rat-Trap Bond corner with no workers in frame, ideal as a clean detail cutaway showing the brick-on-edge arrangement, staggered joints, and hollow cavities.",
+          "uncertainty": "At 11.4s the mason re-enters abruptly in the close left foreground, so any edit using this as a static detail shot must cut out before 11.4s.",
+          "details": {
+            "comparison_scope": "Within source 89e63d1c9a303b74",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Enter at or after 7.5s once the mason's leg has completely exited screen left.",
+            "visible_result": "Clear static view of the L-shaped brick-on-edge corner and internal cavities through 11.3s.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Shows the distinct pattern and hollow cavities of Rat-Trap Bond without human motion obstructing the view.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03_action_plumb_check",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_plumb_check_and_adjust"
+            },
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02_plumb_alignment_check"
+            }
+          ],
+          "interval": {
+            "start_s": 15.2,
+            "end_s": 28.5
+          },
+          "reason": "Strongest process demonstration in this clip for maintaining alignment and plumb at corners: shows the mason checking the outer corner face with a plumb bob, checking the newly laid brick on edge, adjusting the brick with both hands, and re-checking with the plumb bob.",
+          "uncertainty": "A second worker walks through the left background from 16.8s onward, which adds slight background distraction; the mason's hands remain on the brick through 31.68s.",
+          "details": {
+            "comparison_scope": "Within source 89e63d1c9a303b74",
+            "alternative_refs": [
+              {
+                "source_id": "89e63d1c9a303b74",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_03_plumb_check_and_adjust"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 20.3,
+              "end_s": 28.5
+            },
+            "must_keep_setup": "Keep the plumb bob placement against the brick face (either from 15.2s for both checks or 20.3s for the inner brick check) so the tool and purpose are clear.",
+            "visible_result": "The plumb bob hangs vertically beside the brick course while the mason adjusts and steadies the brick into alignment.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Directly illustrates attention to alignment, plumb, quality workmanship, and corner detailing.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04_future_visual_thermal_diagram",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "89e63d1c9a303b74",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": null,
+          "reason": "While this recorded clip clearly shows the physical hollow cavities in the brickwork, it cannot visually show heat transfer or the 25% brick-saving comparison; an animated diagram or generated visual later could illustrate heat-flow resistance across the air cavity if desired.",
+          "uncertainty": "Optional future asset; exact passage-level visual slot reservations were not supplied in this request.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Visualise how the trapped air cavity inside a Rat-Trap Bond wall acts as a thermal barrier reducing heat transfer into the building.",
+            "missing_asset": "Clean instructional graphic or generated cross-section animation showing solar heat arrows blocked/slowed by the internal air cavities of a Rat-Trap Bond wall.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "undecided",
+          "asset_status": "exact_passage_level_reservations_not_supplied",
+          "asset_ref": "89e63d1c9a303b74",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No passage-level slot reservations were supplied in the media brief. This recorded clip provides strong real-world B-roll for the passages on laying bricks on edge, creating hollow cavities, maintaining alignment/level/plumb, and corner detailing, while abstract claims (such as thermal barrier physics or crushing-strength figures) remain open for graphics or other assets.",
+          "prerequisite": null,
+          "uncertainty": "Final passage assignment depends on the rest of the media collection and editorial assembly."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_01_end_cutoff",
+          "interval": {
+            "start_s": 31.0,
+            "end_s": 31.68
+          },
+          "field": "visual_details",
+          "issue": "The recording ends at 31.68s while the mason is still holding the corner brick and plumb bob during his final adjustment, so the completion and release of that action are not captured."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This clip contains one continuous, unedited camera take (0.0s–31.68s) showing two successive stages of a single demonstration on the same corner wall (ent_wall), separated by a brief off-screen walk to fetch tools: Stage 1 (0.0s–5.2s, ve_01_place_corner_brick, claim_01) shows the mason placing a red brick on edge onto mortar at the corner; an intervening fetch gap (5.2s–15.2s, ve_02_walk_away_and_return, claim_02, claim_03) occurs as he walks off left and returns with a straightedge and plumb bob; Stage 2 (15.2s–31.68s, ve_03_plumb_check_and_adjust, claim_04) shows him checking vertical alignment with the plumb bob on two faces of the corner, adjusting the brick with both hands, and re-checking plumb. Within Stage 2, the two plumb checks (outer corner at 15.2s–20.3s and inner newly laid brick at 20.3s–27.6s) are successive checks on adjacent bricks rather than failed repeated camera takes.",
+    "crop_guidance": "For standard horizontal widescreen delivery, the full frame preserves the L-shaped brick wall corner (ent_wall) in the lower-centre/left foreground and the mason's hands, brick, and plumb bob (ent_plumb_bob) in the centre-right. Because the camera is framed low on the masonry, the mason's head is already partially or fully cropped out at the top edge during standing moments, and his lapel microphone is visible on his shirt chest when he bends down (16.0s–31.68s). During 16.8s–31.68s (ve_03_plumb_check_and_adjust), a second worker (ent_coworker) walks into the left background behind the wall. A modest zoom-in / tighter crop toward the lower-right/centre quadrant during 20.3s–28.5s could reduce the visibility of the background co-worker on the left and the mason's lapel mic near the top edge while keeping the mason's hands, the plumb bob, and the corner brickwork clear, though any crop would need verification during final editing.",
+    "clean_handles": "Interval: 0.0–5.2; classification: active preparation; beginning observation: 0.0s mason's right hand is already touching and lifting the brick from the left wing of the wall (ve_01_place_corner_brick); middle observation: 2.5s mason sets the brick on edge onto the mortar bed and adjusts it with both hands; end observation: 5.0s mason releases his hands from the positioned brick and straightens his torso; relevant action stopped: brick placement and hand contact stop around 4.3s–5.0s, followed immediately by the mason stepping away toward screen left after 5.2s; uncertainty: no inactive pre-roll exists before 0.0s because the clip starts mid-reach; links: ve_01_place_corner_brick and claim_01; editorial use: preserves the complete brick-on-edge placement action and visible cavity result from pickup to hand release. Interval: 7.5–11.4; classification: settled; beginning observation: 7.5s mason's trailing leg finishes exiting screen left, leaving the L-shaped brick wall corner and background stacks completely still and unoccupied (ve_02_walk_away_and_return); middle observation: 9.5s static, unobstructed view of the brick-on-edge courses, mortar joints, and hollow cavities with no human movement in frame; end observation: 11.3s wall remains undisturbed just before the mason's leg and straightedge enter the left foreground at 11.4s; relevant action stopped: the brick-wall subject is inactive across the entire 7.5s–11.4s span after the mason exits screen left at 7.5s, until he re-enters at 11.4s (inspected through 12.4s where his legs and straightedge cross the foreground); uncertainty: none identified; links: ve_02_walk_away_and_return and claim_02; editorial use: provides a clean, static 3.9s cutaway or hold handle of the Rat-Trap Bond wall structure and cavities without worker movement. Interval: 27.6–31.68; classification: active release; beginning observation: 27.6s mason finishes lifting the plumb bob spacer block off the brick edge and places both hands back onto the top of the brick (ve_03_plumb_check_and_adjust); middle observation: 29.5s mason holds and steadies the brick on edge with both hands while holding the coiled plumb line; end observation: 31.68s recording ends while the mason's hands are still pressing on the brick and the background co-worker stands at the left; relevant action stopped: the active plumb-bob measurement swing stops around 27.6s, but manual holding/steadying of the brick continues through the end of the file at 31.68s (no further footage available after 31.68s window end); uncertainty: final release of the brick is cut off by the end of the source recording; links: ve_03_plumb_check_and_adjust and claim_04; editorial use: provides a steady holding tail after the plumb check where the mason's hands remain relatively still on the brick for a clean outgoing cut before 31.68s.",
+    "continuity": "At 0.0s (ve_01_place_corner_brick, claim_01), the mason stands behind the corner of the L-shaped wall, leaning left to pick up a brick. At 5.2s–7.5s (ve_02_walk_away_and_return, claim_03), he walks behind the wall from centre-right toward screen left and exits left at 7.5s. Between 7.5s and 11.4s (claim_02), no actors are in frame and the newly placed third-course brick sits on edge at the corner. At 11.4s–14.8s (ve_02_walk_away_and_return, claim_03), the mason enters close to the camera from screen left, walks left-to-right across the foreground carrying a straightedge and plumb bob, lays the straightedge on the ground at screen right, and steps behind the right wing of the wall. From 15.2s to 31.68s (ve_03_plumb_check_and_adjust, claim_04), the mason remains bent over the corner on the right side of the frame checking and holding the brick, while a second worker enters from the background right around 16.8s, walks right-to-left behind the wall, bends at the left wing (18.5s–25.0s), walks left-to-right (25.5s–28.5s), and walks back right-to-left (29.0s–31.68s). Editors cutting between 0.0s–5.2s and 20.3s–28.5s should note that the second worker is absent in the first span and present in the left background in the second span, and the plumb bob is in the mason's hands only after 11.4s.",
+    "preview_frames": "2.8s (ve_01_place_corner_brick): mason's hands placing the red brick on edge onto the mortar bed at the corner, clearly showing the hollow rectangular cavity inside the wall. 9.5s (ve_02_walk_away_and_return): unobstructed static view of the L-shaped Rat-Trap Bond brick wall corner, staggered vertical joints, and internal cavities with no workers in frame. 16.5s (ve_03_plumb_check_and_adjust): mason holding the plumb bob suspended along the outer corner face of the brick wall to check vertical alignment. 21.8s (ve_03_plumb_check_and_adjust): mason holding the plumb bob against the inner face of the newly laid brick on edge on the third course.",
+    "speech_action_links": "No intelligible foreground speech or process explanation occurs in this clip; only quiet, indistinct off-camera background conversation is heard between 16.5s and 31.68s during ve_03_plumb_check_and_adjust, and the output audio policy excludes source audio.",
+    "shorter_explanations": "To show both laying a brick on edge and checking its alignment without the 10-second tool-fetching gap (5.2s–15.2s), an editor can use a two-part sequence: Segment 1 from 0.5s to 4.8s (4.3s duration, from ve_01_place_corner_brick, claim_01) showing the mason lifting and setting the brick on edge to form the cavity, followed by a cut to Segment 2 from 20.3s to 28.5s (8.2s duration, from ve_03_plumb_check_and_adjust, claim_04) showing the mason checking that exact brick with a plumb bob, adjusting its position with both hands, and re-checking plumb. The combined edited duration is 4.3s + 8.2s = 12.5s (assuming a straight cut with no overlap). This omits the 5.2s–15.2s walk-off/return (ve_02_walk_away_and_return, claim_02, claim_03) and the first outer-corner plumb check (15.2s–20.3s), while preserving the complete setup and visible result of laying the brick on edge and verifying its alignment. A longer version retaining 15.2s–20.3s adds a second plumb check on the outer corner face, and retaining 7.5s–11.4s provides an unobstructed static view of the wall cavities.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0s–5.2s (ve_01_place_corner_brick) or the static cutaway at 7.5s–11.4s (ve_02_walk_away_and_return, claim_02) to directly show bricks laid on edge forming hollow cavities inside the double-wythe wall."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the mason carefully laying a brick on edge onto mortar to continue the course and form the internal cavity pattern."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "claim_04",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 15.2s–28.5s (ve_03_plumb_check_and_adjust) to directly show the mason checking vertical alignment with a plumb bob, adjusting the brick on edge, and maintaining staggered vertical joints across courses."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "claim_05",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the script's explanation that staggered vertical joints and careful alignment ensure structural strength and stability, while recognizing that long-term structural strength is an engineering property not directly measured in the clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "claim_06",
+          "support_classification": "illustrative",
+          "editorial_use": "Both the brick placement (0.0s–5.2s) and plumb-bob checking (15.2s–28.5s) take place at a 90-degree L-shaped wall corner, making this clip strong illustrative coverage for special attention at corners and junctions."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged mixed-media workflow: future generated video may be used for later gap filling (no generated asset currently exists, and any suggestions are labelled planned_not_created without authorizing automatic media generation), recorded footage does not need to be forced into every script passage, and supplied reservations must be preserved when present. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots_status is exact_passage_level_reservations_not_supplied), so no passage-level reservations are invented. Acknowledged source audio policy: original camera sound was inspected for intake (intake: include_original_sound), and because output camera audio is muted/excluded (output: excluded), no actionable source_audio recommendations are proposed.",
+    "unavailable": "No intelligible foreground speech or readable visible text exists in this source. No source_audio editorial ideas are returned because the output audio policy excludes camera audio."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "From 0.0s to 5.2s, the mason picks up a red brick from the left wing of the L-shaped wall, places it on its narrow edge onto a bed of mortar on the third course at the corner junction, adjusts its position with both hands, and releases it at 4.3s–5.2s, leaving a visible rectangular hollow cavity between the parallel bricks on edge.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.2,
+      "cues": [
+        {
+          "time_s": 1.2,
+          "cue": "visual: In ve_01_place_corner_brick, the mason lifts a brick and positions it on edge over grey mortar on the third course near the corner."
+        },
+        {
+          "time_s": 3.0,
+          "cue": "visual: In ve_01_place_corner_brick, the brick rests on its edge parallel to the adjacent brick, forming a visible hollow cavity inside the wall width, with staggered vertical joints across courses."
+        },
+        {
+          "time_s": 4.8,
+          "cue": "visual: In ve_01_place_corner_brick, the mason removes both hands from the brick and straightens up."
+        }
+      ],
+      "limits": "The clip begins at 0.0s with the mason's hand already touching the brick, so prior mortar spreading is already completed before the recording starts."
+    },
+    {
+      "id": "claim_02",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 7.5s to 11.4s, after the mason exits screen left and before he re-enters, the partially constructed L-shaped brick-on-edge wall corner and its hollow cavities remain completely stationary and unobstructed with no people in the frame.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 7.5,
+      "end_s": 11.4,
+      "cues": [
+        {
+          "time_s": 7.5,
+          "cue": "visual: In ve_02_walk_away_and_return, the mason's leg finishes exiting the left edge of the frame."
+        },
+        {
+          "time_s": 9.5,
+          "cue": "visual: In ve_02_walk_away_and_return, the frame shows only the static L-shaped brick wall (ent_wall), background brick stacks, and green cylindrical tanks."
+        },
+        {
+          "time_s": 11.4,
+          "cue": "visual: In ve_02_walk_away_and_return, the mason's trouser leg and a long straightedge bar re-enter at the lower-left foreground."
+        }
+      ],
+      "limits": "The static unobstructed state ends abruptly at 11.4s when the mason and straightedge cross the left foreground."
+    },
+    {
+      "id": "claim_03",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/additional_analysis/attempts",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 5.2s and 7.5s the mason walks behind the wall and exits screen left, and between 11.4s and 15.2s he re-enters from screen left carrying a straightedge bar and a plumb bob, places the straightedge on the ground at screen right, and steps up to the right corner of the wall with the plumb bob.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 5.2,
+      "end_s": 15.2,
+      "cues": [
+        {
+          "time_s": 6.0,
+          "cue": "visual: In ve_02_walk_away_and_return, the mason walks right-to-left behind the wall toward the left edge of the frame."
+        },
+        {
+          "time_s": 12.8,
+          "cue": "visual: In ve_02_walk_away_and_return, the mason walks left-to-right across the foreground holding a plumb bob in his left hand and a long bar in his right hand."
+        },
+        {
+          "time_s": 14.5,
+          "cue": "visual: In ve_02_walk_away_and_return, the long straightedge bar is laid on the ground at the right side of the wall as the mason uncoils the plumb bob."
+        }
+      ],
+      "limits": "Where the mason retrieved the tools off-screen between 7.5s and 11.4s is outside the camera view."
+    },
+    {
+      "id": "claim_04",
+      "target_paths": [
+        "/sources/0/visual_events/2/description",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "From 15.2s to 31.68s, the mason uses a plumb bob on a string with a spacer block to check vertical alignment on the outer corner face (15.2s–20.3s) and inner newly laid brick on edge (20.3s–22.8s), manually adjusts the brick on edge with both hands (22.8s–25.5s), re-checks it with the plumb bob (25.5s–27.6s), and holds the brick steady with both hands through 31.68s while the brick courses show staggered vertical joints.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 15.2,
+      "end_s": 31.68,
+      "cues": [
+        {
+          "time_s": 16.5,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason holds the plumb bob spacer block against the top right corner brick with the metal weight hanging alongside the lower courses."
+        },
+        {
+          "time_s": 21.8,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason holds the plumb bob against the inner face of the third-course brick he laid earlier."
+        },
+        {
+          "time_s": 24.0,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason grips the brick on edge with both hands and shifts its alignment slightly on the mortar bed."
+        },
+        {
+          "time_s": 26.5,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason places the plumb bob spacer block back against the brick face to re-verify vertical alignment."
+        },
+        {
+          "time_s": 30.0,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason's hands hold the top of the brick steady through the end of the clip at 31.68s."
+        }
+      ],
+      "limits": "The recording ends at 31.68s while the mason's hands are still resting on the brick, so his final hand release after the adjustment is not captured."
+    },
+    {
+      "id": "claim_05",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The visible brick-on-edge bonding pattern with staggered vertical joints and plumb-bob alignment checks illustrates the construction practices described in the script as ensuring wall strength and stability.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 31.68,
+      "cues": [
+        {
+          "time_s": 9.5,
+          "cue": "visual: In ve_02_walk_away_and_return (ent_wall), alternating header/stretcher bricks on edge show staggered vertical mortar joints between the first, second, and third courses."
+        },
+        {
+          "time_s": 21.8,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason checks vertical alignment of the course with a plumb bob."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Staggering vertical head joints and keeping courses plumb are standard masonry practices to distribute loads and prevent verticalplanes of weakness."
+        }
+      ],
+      "limits": "The video shows the physical geometry and plumb-checking procedure on a three-course demonstration wall, but does not measure load-bearing capacity or structural strength."
+    },
+    {
+      "id": "claim_06",
+      "target_paths": [
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "Because the mason is laying and plumbing bricks specifically at a 90-degree L-shaped wall return, the footage illustrates the careful detailing and alignment required at wall corners and junctions.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 31.68,
+      "cues": [
+        {
+          "time_s": 3.0,
+          "cue": "visual: In ve_01_place_corner_brick, the brick is laid on edge right at the 90-degree corner return of the L-shaped wall (ent_wall)."
+        },
+        {
+          "time_s": 16.5,
+          "cue": "visual: In ve_03_plumb_check_and_adjust, the mason checks plumb on both the outer corner brick and the adjacent inner corner brick."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.'"
+        }
+      ],
+      "limits": "Shows a single L-shaped corner junction on a low demonstration wall; T-junctions or partition wall connections are not shown in this clip."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01_mason_wardrobe",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03_plumb_check_and_adjust"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The primary mason wears a short-sleeved light-tan button-down shirt with a pen in the chest pocket and a black wired lapel microphone clipped to the placket, dark grey trousers, and open-toed dark sandals.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 31.68
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02_brick_wall_material_state",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_place_corner_brick"
+        }
+      ],
+      "category": "material_state",
+      "observation": "The low L-shaped wall is built from reddish-orange fired clay bricks laid on edge in three courses with wet, dark-grey mortar joints and loose mortar droppings along the sandy ground at the base.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 31.68
+      },
+      "uncertainty": "Faint recessed frog markings are visible on the vertical faces of several bricks, but any characters inside the frogs are illegible."
+    },
+    {
+      "id": "wm_03_plumb_bob_tool",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_plumb_bob"
+        },
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03_plumb_check_and_adjust"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A conical metal plumb bob suspended on a white cord passing through a square light-coloured spacer block is used to check verticality of the brickwork, and a long metallic straightedge bar rests on the ground to the right.",
+      "entity_ids": [
+        "ent_plumb_bob"
+      ],
+      "interval": {
+        "start_s": 11.4,
+        "end_s": 31.68
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04_site_environment",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_green_tanks"
+        },
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_walk_away_and_return"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor construction yard with sandy soil, sparse grass weeds, two neat dry-stacked piles of bricks, green trees, a reddish-brown building wall in the right background, and several large green cylindrical tanks with black domes/pipes in the left background.",
+      "entity_ids": [
+        "ent_green_tanks"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 31.68
+      },
+      "uncertainty": "The exact function of the green cylindrical tanks in the background is not established."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01_brick_strength_and_type",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Brick crushing strength and manufacturing method",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the red bricks in the wall shows recessed frogs on several faces (characteristic of moulded bricks rather than flat wire-cut bricks) and cannot establish their compressive crushing strength in kg/cm².",
+      "interval": null
+    },
+    {
+      "id": "el_02_thermal_and_cost_performance",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Thermal insulation performance and percentage of brick savings",
+      "kind": "not_established",
+      "limitation": "The clip directly shows the hollow cavities created by laying bricks on edge, but cannot empirically measure heat transfer reduction or the 25% material-saving figure stated in the script.",
+      "interval": null
+    },
+    {
+      "id": "el_03_final_release_cutoff",
+      "evidence_refs": [
+        {
+          "source_id": "89e63d1c9a303b74",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03_plumb_check_and_adjust"
+        }
+      ],
+      "subject": "Completion and release of the final brick adjustment",
+      "kind": "not_visible",
+      "limitation": "The recording terminates at 31.68s while the mason still has both hands pressing on the top brick, so the completion and hand release of that final adjustment are not visible.",
+      "interval": {
+        "start_s": 27.6,
+        "end_s": 31.68
+      }
+    }
+  ],
+  "descriptive_name": "mason_laying_brick_on_edge_and_checking_plumb_at_corner"
+}

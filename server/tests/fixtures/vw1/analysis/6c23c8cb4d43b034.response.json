@@ -1,0 +1,942 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "56d92522386b655e1b6a6ddc13a21841",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "6c23c8cb4d43b034",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 32.64
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 32.64
+            },
+            "status": "reviewed",
+            "note": "Continuous tripod medium-close shot of two workers laying bricks on edge at an L-shaped wall corner on sandy outdoor ground. Sampling at 1-second keyframes plus audio inspection; exact sub-second native frame boundaries are approximate."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 32.64
+            },
+            "state": "non_speech",
+            "note": "Ambient outdoor site sounds, brick handling clinks, wind/mic rustle, and brief quiet vocal grunts/murmurs around 04.0-09.0s with no clear intelligible speech."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 4.0,
+            "end_s": 9.0
+          },
+          "reason": "Faint, low-volume vocal murmurs or effort sounds during brick placement are not intelligible words and do not convey transcribable verbal statements."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 32.64
+          },
+          "reason": "No readable text, numbers, or signage appear in the frame; shallow frog/stamp impressions on some bricks are indistinct."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_worker_left",
+          "kind": "person",
+          "label": "Assistant/mason on left wearing striped long-sleeved shirt, grey trousers, sandals, wristwatch, gold ring, and red wrist thread",
+          "uncertainty": "Exact role (mason vs helper) is not explicitly stated; he supplies bricks early in the clip and returns at the end with a straightedge board."
+        },
+        {
+          "id": "ent_worker_right",
+          "kind": "person",
+          "label": "Mason on right wearing short-sleeved top, dark grey trousers, and sandals",
+          "uncertainty": "Upper torso and face remain outside the top of the frame throughout the clip."
+        },
+        {
+          "id": "ent_brick_wall",
+          "kind": "object",
+          "label": "Low L-shaped demonstration brick wall corner laid on edge with grey mortar bed and hollow internal cavities",
+          "uncertainty": "Mortar mix ratio and brick manufacturing type (handmade/kiln vs wire-cut) are not verifiable from visual inspection alone."
+        },
+        {
+          "id": "ent_bricks",
+          "kind": "object",
+          "label": "Reddish-orange clay bricks with slightly rough, irregular edges and shallow indented frogs",
+          "uncertainty": "Crushing strength and firing quality cannot be measured visually."
+        },
+        {
+          "id": "ent_mortar_pan",
+          "kind": "object",
+          "label": "Round metal mortar pan (tasla/ghamela) resting on the ground behind the wall corner",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_straightedge",
+          "kind": "object",
+          "label": "Long light-colored wooden or metal straightedge leveling bar",
+          "uncertainty": "Exact material (painted wood vs aluminum box section) is slightly ambiguous in brief appearance at 30.5-32.64s."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01_corner_setup_and_supply",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 10.5
+          },
+          "label": "Supplying and positioning bricks on edge at wall corner",
+          "description": "In a static medium-close high-angle shot of an L-shaped brick wall corner on sandy soil, ent_worker_left picks up standing red clay bricks (ent_bricks) from the left foreground and places two bricks onto the grey mortar bed of the left wall leg (around 01.0-03.0s and 05.0-09.5s) while ent_worker_right adjusts bricks laid on edge along the corner junction. At 09.5-10.5s, ent_worker_left releases the brick on the left mortar bed and steps back toward the left edge of the frame.",
+          "actor_ids": [
+            "ent_worker_left",
+            "ent_worker_right"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_mortar_pan"
+          ],
+          "context_result": "Bricks are positioned on their narrow edge atop the mortar bed on both legs of the corner, with rectangular hollow cavities visible between parallel stretchers and transverse headers.",
+          "camera_framing": "Static tripod medium-close high-angle framing focused on the L-shaped brick corner; workers' heads are cropped out above the frame.",
+          "uncertainty": "Thebrick placed on the left mortar bed by ent_worker_left at 06.0-09.5s rests at the corner awaiting final alignment."
+        },
+        {
+          "id": "ve_02_aligning_right_leg",
+          "interval": {
+            "start_s": 10.5,
+            "end_s": 21.5
+          },
+          "label": "Aligning bricks on edge along the right wall leg",
+          "description": "While ent_worker_left walks behind ent_worker_right from left to right (13.0-16.0s) and exits right, ent_worker_right leans over the right leg of ent_brick_wall and uses both hands to adjust, tap, and align the parallel bricks on edge and cross headers along the right wall course, checking the outer face alignment with his right hand through 21.0s.",
+          "actor_ids": [
+            "ent_worker_left",
+            "ent_worker_right"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_mortar_pan"
+          ],
+          "context_result": "The bricks along the right leg of the corner course are aligned on edge forming alternating parallel pairs and cross headers with visible interior cavities.",
+          "camera_framing": "Static tripod medium-close shot.",
+          "uncertainty": "No plumb bob, spirit level, or guide string is used during this hand-alignment stage."
+        },
+        {
+          "id": "ve_03_placing_outer_corner_brick",
+          "interval": {
+            "start_s": 21.5,
+            "end_s": 30.0
+          },
+          "label": "Picking up and setting the outer corner brick on edge",
+          "description": "At 21.5-22.5s, ent_worker_right reaches down behind the wall to pick up a brick (ent_bricks) from the ground, lifts it over the corner at 23.0s, and sets it on edge onto the mortar bed on the outer corner face alongside the previously placed brick (23.5-26.5s), creating a paired cavity module at the corner. At 26.5-27.5s, ent_worker_right releases his hands and steps away to the right, leaving the brick wall corner unobstructed for a brief moment around 29.0s before walking past the background right at 29.0-30.0s.",
+          "actor_ids": [
+            "ent_worker_right"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_mortar_pan"
+          ],
+          "context_result": "The corner module now displays a completed pair of bricks laid on edge with a clear hollow cavity between them and staggered joints over the course below.",
+          "camera_framing": "Static tripod medium-close shot.",
+          "uncertainty": null
+        },
+        {
+          "id": "ve_04_checking_alignment_with_straightedge",
+          "interval": {
+            "start_s": 30.0,
+            "end_s": 32.64
+          },
+          "label": "Placing straightedge bar along the top of the brick course",
+          "description": "At 30.0-31.0s, ent_worker_left enters from the right side carrying a long light-colored straightedge bar (ent_straightedge) and lays it flat along the top edge of the newly placed bricks on the right leg of ent_brick_wall (31.0-32.64s), bending down into the upper-right frame to hold and check the course line as the clip ends.",
+          "actor_ids": [
+            "ent_worker_left"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_straightedge",
+            "ent_mortar_pan"
+          ],
+          "context_result": "The straightedge bar rests along the top edge of the brick-on-edge course to check alignment or level, but the clip ends at 32.64s before the check is finished.",
+          "camera_framing": "Static tripod medium-close shot; ent_worker_left's head and shoulders enter the upper-right quadrant at 31.5-32.64s.",
+          "uncertainty": "Clip cuts off at 32.64s while ent_worker_left is still holding the straightedge against the bricks."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "interp_01_rat_trap_bond_laying",
+          "category": "construction_technique",
+          "claim": "The workers are demonstrating Rat-Trap Bond masonry construction by laying red clay bricks on their narrow edge in parallel pairs and cross headers over a mortar bed, forming internal hollow cavities within the wall and staggering vertical joints at an L-shaped corner.",
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_corner_setup_and_supply"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_aligning_right_leg"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_placing_outer_corner_brick"
+            }
+          ],
+          "uncertainty": "Dry-stacking on parts of the right leg versus full mortar bedding: the left leg has a thick visible wet mortar bed, whereas the upper course on the right leg appears partially dry-placed or lightly bedded during this demonstration."
+        },
+        {
+          "id": "interp_02_alignment_check",
+          "category": "workmanship_quality_control",
+          "claim": "Placing the long straightedge bar across the top of the brick-on-edge course at 30.5-32.64s demonstrates checking the alignment and level of the masonry course.",
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_04_checking_alignment_with_straightedge"
+            }
+          ],
+          "uncertainty": "The action is cut off at the end of the file (32.64s) before any further adjustment or completion of the check is shown."
+        },
+        {
+          "id": "interp_03_brick_characteristics",
+          "category": "material_appearance",
+          "claim": "The bricks used in this demonstration are traditional molded clay bricks with somewhat rough, uneven faces and chipped edges rather than precision smooth wire-cut bricks.",
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_bricks"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_corner_setup_and_supply"
+            }
+          ],
+          "uncertainty": "Visual texture shows rough molded surfaces, which contrasts with the script's mention of neat wire-cut bricks if used over that specific line."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "idea_01_best_take_corner_brick_placement",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_placing_outer_corner_brick"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": {
+            "start_s": 21.5,
+            "end_s": 29.5
+          },
+          "reason": "Cleanest, most self-contained single-actor demonstration in the clip (ve_03_placing_outer_corner_brick, claim_03): ent_worker_right picks up a single brick, places it on edge onto the mortar bed at the corner to complete a hollow cavity pair, and steps back at 27.5-29.5s to leave an unobstructed view of the Rat-Trap Bond pattern and internal cavities, without the background walk-through that occurs in ve_02_aligning_right_leg.",
+          "uncertainty": "Right leg bricks appear mostly dry-arranged for demonstration while the left corner leg has wet mortar.",
+          "details": {
+            "comparison_scope": "Compared against 00.0-10.5s (ve_01_corner_setup_and_supply) where two workers' hands overlap and the left brick is repositioned twice, and 10.5-21.5s (ve_02_aligning_right_leg) where ent_worker_left walks across the background at 13.0-16.0s.",
+            "alternative_refs": [
+              {
+                "source_id": "6c23c8cb4d43b034",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01_corner_setup_and_supply"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 10.5
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_02_action_span_corner_module_completion",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_placing_outer_corner_brick"
+            }
+          ],
+          "interval": {
+            "start_s": 21.5,
+            "end_s": 29.5
+          },
+          "reason": "Complete physical action cycle (ve_03_placing_outer_corner_brick, claim_03) showing a brick picked up from the ground, laid on edge on the mortar bed at the corner, adjusted into position, and released to reveal the hollow cavity.",
+          "uncertainty": "Leaving later than 30.0s introduces ent_worker_left entering from the right with the straightedge bar (ve_04_checking_alignment_with_straightedge).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "21.5-23.5s where ent_worker_right reaches down, lifts the brick, and brings it to the corner mortar bed showing the open single-brick edge before the cavity pair is closed.",
+            "visible_result": "26.5-29.5s where hands release the brick and step away, clearly exposing the completed two-brick cavity module on edge and the L-shaped corner pattern.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_03_script_use_bricks_on_edge_and_cavities",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_corner_setup_and_supply"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_placing_outer_corner_brick"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 29.5
+          },
+          "reason": "Directly shows bricks being placed on their edge in a distinctive alternating header-stretcher pattern that creates continuous hollow cavities inside the wall and staggered vertical joints across courses (claim_01, claim_02, claim_03, claim_05).",
+          "uncertainty": "Does not show conventional flat brickwork for side-by-side comparison, nor does it show guide strings or mortar-droppings prevention techniques beyond ordinary careful placement.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Matches script clauses explaining that Rat-Trap Bond Masonry places bricks on their edge, creates hollow cavities within the wall, forms a distinct pattern as each course is completed, and covers wall junctions/corners.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_04_script_use_alignment_and_level",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_aligning_right_leg"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_04_checking_alignment_with_straightedge"
+            },
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_02_alignment_check"
+            }
+          ],
+          "interval": {
+            "start_s": 10.5,
+            "end_s": 32.64
+          },
+          "reason": "Shows hand-alignment of bricks along the course (10.5-21.0s, claim_02) and placing a straightedge bar along the top of the course (30.0-32.64s, claim_04) to illustrate maintaining alignment, level, and proper bonding.",
+          "uncertainty": "The straightedge check at 30.0-32.64s is cut off at the end of the recording before completion.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Supports the script passage on maintaining alignment, level, and proper bonding throughout construction.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_05_story_moment_corner_junction_detail",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03_placing_outer_corner_brick"
+            }
+          ],
+          "interval": {
+            "start_s": 21.5,
+            "end_s": 29.5
+          },
+          "reason": "Provides a clear close-up explanatory view of an L-shaped wall corner junction being assembled on edge (ve_03_placing_outer_corner_brick, claim_03, claim_05), suitable either for the core brick-laying explanation or the later clause on special attention at wall junctions and corners.",
+          "uncertainty": null,
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_06_future_visual_thermal_and_strength_graphics",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6c23c8cb4d43b034",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": null,
+          "reason": "While this clip clearly shows physical brick-on-edge placement and hollow cavities (claim_01, claim_03), unseen conceptual or quantitative claims in P001 (such as heat transfer across hollow cavities, 25% brick savings, and minimum crushing strength figures of 20, 35, and 75 kg/cm² for 1, 2, and 3 storeys) cannot be directly observed in live masonry footage and would benefit from a planned graphic or generated visual if not covered by other collection assets.",
+          "uncertainty": "Other clips in the 46-source collection may already provide graphics or demonstrations for some of these points.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Illustrate thermal barrier effect of internal air cavities and building-height crushing-strength requirements (20 / 35 / 75 kg/cm²).",
+            "missing_asset": "Animated diagram or clean graphic overlay showing heat-flow reduction through the Rat-Trap Bond air cavity and a 1-to-3 storey brick crushing-strength chart.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "6c23c8cb4d43b034",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "Exact passage-level visual slot reservations were not supplied in the brief. This recorded video strongly covers the brick-laying on edge, hollow cavity formation, alignment checking, and corner detailing portions of P001, while leaving quantitative/conceptual clauses open for other collection clips or future generated visuals.",
+          "prerequisite": null,
+          "uncertainty": "No user-supplied slot reservations exist to constrain which exact sentences of P001 use recorded footage versus generated visuals."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_01_end_cutoff",
+          "interval": {
+            "start_s": 30.0,
+            "end_s": 32.64
+          },
+          "field": "visual_events",
+          "issue": "The straightedge alignment check (ve_04_checking_alignment_with_straightedge) is still in progress when the source file ends at 32.64s."
+        },
+        {
+          "id": "unres_02_mortar_bedding_right_leg",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 32.64
+          },
+          "field": "interpretations",
+          "issue": "While wet cement mortar is clearly spread on the left wall leg, the bricks being adjusted on the right wall leg appear to sit without a visible fresh mortar bed under their top course, suggesting part of the corner may be dry-stacked for demonstration purposes."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 32.64-second clip is a single continuous camera take without camera resets, comprising four successive physical stages of a single demonstration at an L-shaped brick wall corner: (1) 00.0–10.5s (ve_01_corner_setup_and_supply, claim_01), where ent_worker_left supplies two bricks from the left foreground stack onto the mortar bed of the left wall leg (repositioning the brick once between 02.0s and 09.5s) while ent_worker_right adjusts corner bricks; (2) 10.5–21.5s (ve_02_aligning_right_leg, claim_02), where ent_worker_right aligns and taps the bricks on edge along the right leg while ent_worker_left walks across the background from left to right (13.0–16.0s); (3) 21.5–30.0s (ve_03_placing_outer_corner_brick, claim_03), where ent_worker_right picks up a single brick from behind the wall and sets it on edge at the outer corner to complete the paired cavity module, then steps clear at 27.5–29.5s; and (4) 30.0–32.64s (ve_04_checking_alignment_with_straightedge, claim_04), where ent_worker_left returns from the right with a long straightedge bar and places it along the top of the right-leg brick course before the clip cuts off at 32.64s.",
+    "crop_guidance": "The source is framed in landscape widescreen (16:9 aspect ratio) as a static medium-close shot centered on the L-shaped brick corner in the lower and middle thirds of the frame. No talking faces appear during 00.0–31.0s because both workers' bodies are cropped below the shoulders/chest. At 31.5–32.64s (ve_04_checking_alignment_with_straightedge), ent_worker_left bends down and his head/hair enters the upper-right quadrant while holding the straightedge. If maintaining a standard 16:9 landscape output, the full frame preserves the brick supply stack on the left, the L-shaped corner cavity pattern in the center, and the right-leg alignment action. If cropping tighter or reframing to vertical/square, preserve the central-to-lower region containing the L-shaped brick corner and mortar bed; note that ent_worker_left's brick pickup at 00.0–09.5s reaches the far-left edge and ent_worker_right's hand alignment at 15.0–21.0s reaches the far-right edge. No crop has been technically verified.",
+    "clean_handles": "Interval: 0.0–2.0s; classification: active preparation; beginning observation: 0.0s ent_worker_left's hands hold a vertical brick on the left stack while ent_worker_right's hands hold a corner brick on edge; middle observation: 1.0s ent_worker_left lifts a red clay brick toward the mortar bed while ent_worker_right steadies the corner brick; end observation: 2.0s ent_worker_left places the brick onto the mortar bed alongside the corner; relevant action stopped: brick lifting and corner adjustment continue throughout this opening span; uncertainty: clip begins with both workers already in motion so no pre-action settled pause exists at 0.0s; links: ve_01_corner_setup_and_supply and claim_01; editorial use: provides an active opening lead-in for the two-person brick-supply and corner-laying sequence. Interval: 9.5–11.5s; classification: active release; beginning observation: 9.5s ent_worker_left releases his hands from the newly placed brick on the left mortar bed while ent_worker_right withdraws his hands slightly above the corner; middle observation: 10.0s both workers' hands are raised clear of the bricks as ent_worker_left steps back toward the left edge; end observation: 11.0s ent_worker_right reaches both hands back down onto the right-leg bricks to begin aligning them; relevant action stopped: ent_worker_left's brick placement stops at 9.5s, with a brief ~1-second hand-clearance transition around 10.0s before ent_worker_right starts the next alignment stage at 11.0s; uncertainty: approximate 1-second transition window between stages rather than a prolonged stationary pause; links: ve_01_corner_setup_and_supply, ve_02_aligning_right_leg, claim_01, and claim_02; editorial use: useful edit point separating the two-person brick-supply stage from the single-person right-leg alignment stage. Interval: 21.5–23.5s; classification: active preparation; beginning observation: 21.5s ent_worker_right bends down and reaches behind the wall corner toward a brick on the ground; middle observation: 22.5s ent_worker_right grasps and lifts the brick upward; end observation: 23.5s ent_worker_right positions the brick in both hands directly above the left corner mortar bed; relevant action stopped: lifting and positioning continue into the placement action at 24.0s; uncertainty: none identified; links: ve_03_placing_outer_corner_brick and claim_03; editorial use: clean active lead-in preserving the complete pickup setup for setting the outer corner brick on edge. Interval: 26.5–29.5s; classification: active release; beginning observation: 26.5s ent_worker_right finishes tapping the outer corner brick on edge and lifts his hands off the brick; middle observation: 28.0s ent_worker_right straightens up and steps back toward the upper right, leaving the L-shaped brick wall corner completely unobstructed; end observation: 29.5s the brick wall corner remains stationary and clear in the foreground while ent_worker_right's legs walk past the background right; relevant action stopped: brick manipulation stops completely at 26.5s and the foreground brickwork remains undisturbed through 29.5s, though ent_worker_right's legs continue walking out in the background; uncertainty: background foot movement continues at 28.0–29.5s before ent_worker_left enters with the straightedge at 30.0s; links: ve_03_placing_outer_corner_brick and claim_03; editorial use: strongest lead-out handle in the clip, preserving the completed corner cavity module and giving a clear 3-second view of the finished Rat-Trap Bond corner pattern before cutting out.",
+    "continuity": "Throughout 00.0–32.64s, the camera framing is completely static on a tripod. At candidate entry 00.0s (ve_01_corner_setup_and_supply), two workers are already active: ent_worker_left on screen left and ent_worker_right at center-right, with wet mortar on the left leg of the L-shaped corner and one inner brick already sitting on edge at the corner vertex. Between 05.0s and 09.5s (ve_01_corner_setup_and_supply), a second brick is added onto the left mortar bed. Between 13.0s and 16.0s (ve_02_aligning_right_leg), ent_worker_left walks across the background from left to right. At candidate entry 21.5s (ve_03_placing_outer_corner_brick), only ent_worker_right is in frame, reaching down behind the corner; between 23.5s and 26.5s he adds the outer corner brick to pair with the inner corner brick, creating a closed hollow cavity module at the corner that was not present prior to 23.5s (so shots from 00.0–21.5s cannot be cut after 23.5–32.64s without showing the corner brick disappearing). At candidate exit 29.0–29.5s (ve_03_placing_outer_corner_brick), ent_worker_right steps away to screen right, leaving the brickwork clear. At 30.0–32.64s (ve_04_checking_alignment_with_straightedge), ent_worker_left enters from screen right placing the long white/light straightedge bar across the right leg of the wall; this action is still underway at 32.64s.",
+    "preview_frames": "02.0s (ve_01_corner_setup_and_supply): Shows both workers' hands in frame as ent_worker_left places a brick on edge onto the mortar bed at the corner while hollow cavities in the lower course are clearly visible. 14.0s (ve_02_aligning_right_leg): Shows ent_worker_right using both hands to align the parallel brick-on-edge course along the right wall leg, with ent_worker_left's legs walking across the background. 25.0s (ve_03_placing_outer_corner_brick): Shows ent_worker_right setting the outer corner brick on edge onto the mortar bed to form the paired hollow cavity at the L-shaped corner junction. 29.0s (ve_03_placing_outer_corner_brick): Shows an unobstructed view of the completed L-shaped Rat-Trap Bond corner course with hollow internal cavities and staggered vertical joints after the mason's hands have stepped clear. 31.5s (ve_04_checking_alignment_with_straightedge): Shows ent_worker_left holding the long straightedge leveling bar along the top edge of the brick course.",
+    "speech_action_links": "No intelligible speech is present in this source (audio consists only of ambient site sounds and faint, non-transcribable vocal murmurs/grunts around 04.0–09.0s), and camera audio is excluded from final output per source_audio_policy.",
+    "shorter_explanations": "Instead of playing the entire 32.64-second clip, an economical 8.0-second sequence from 21.5–29.5s (ve_03_placing_outer_corner_brick, claim_03; duration calculation: 29.5s - 21.5s = 8.0s with no overlaps or transitions) retains the complete setup of lifting a brick (21.5–23.5s), the core action of laying it on edge onto the mortar bed at the corner junction (23.5–26.5s), and the clear visible result of the completed hollow-cavity corner module after the mason steps back (26.5–29.5s). This shorter selection omits the earlier hesitant double-placement on the left leg (00.0–10.5s, ve_01_corner_setup_and_supply), the background walk-through distraction during right-leg hand alignment (10.5–21.5s, ve_02_aligning_right_leg), and the incomplete straightedge check that gets cut off at the end of the file (30.0–32.64s, ve_04_checking_alignment_with_straightedge). If a longer two-part sequence is desired to also show alignment checking, pairing 21.5–29.5s (8.0s, ve_03_placing_outer_corner_brick) with 30.0–32.5s (2.5s, ve_04_checking_alignment_with_straightedge) yields 10.5s total (8.0s + 2.5s = 10.5s), adding the visible straightedge check while keeping in mind that the straightedge action remains partial/uncompleted at 32.64s.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 00.0–10.5s (ve_01_corner_setup_and_supply) or 21.5–29.5s (ve_03_placing_outer_corner_brick) to directly show masons setting red clay bricks on their narrow edge rather than flat."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the rectangular hollow cavities formed between the parallel stretchers and cross headers laid on edge in the wall course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "claim_03",
+          "support_classification": "directly_seen",
+          "editorial_use": "Best matched by 21.5–29.5s (ve_03_placing_outer_corner_brick), where the mason carefully places the outer corner brick on edge and steps back to reveal the distinct alternating header-stretcher cavity pattern."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "claim_02",
+          "support_classification": "directly_seen",
+          "editorial_use": "10.5–21.5s (ve_02_aligning_right_leg) directly shows hand-adjusting alignment along the right wall course, with staggered vertical joints visible between the lower and upper courses; structural strength and stability themselves remain engineering properties not measured in the clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding.",
+          "claim_id": "claim_04",
+          "support_classification": "illustrative",
+          "editorial_use": "30.0–32.64s (ve_04_checking_alignment_with_straightedge) illustrates checking course alignment/level by placing a long straightedge bar along the top of the bricks, though the check is still in progress when the clip ends at 32.64s."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "claim_05",
+          "support_classification": "illustrative",
+          "editorial_use": "00.0–29.5s illustrates building and aligning an L-shaped wall corner in Rat-Trap Bond masonry, visually grounding the script's reference to corners and junctions."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this workflow uses a mixed-media plan where future generated video may be used for gaps, recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots_status is exact_passage_level_reservations_not_supplied), so none are invented. Proposed future visuals are marked planned_not_created and do not represent existing assets or authorization to generate media. Camera audio was inspected for intake (containing only ambient site noises and unintelligible murmurs) and is excluded from the final output per source_audio_policy (output: excluded), so no source_audio editorial ideas are proposed.",
+    "unavailable": "No intelligible source speech or readable visible text exists in this video clip, and source_audio suggestions are omitted because the output audio policy excludes camera audio."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/script_support/claims/0/editorial_use",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "Between 00.0s and 10.5s, two workers position red clay bricks on their narrow edge atop a mortar bed at an L-shaped wall corner, forming rectangular hollow cavities between parallel edge-laid bricks and cross headers.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 10.5,
+      "cues": [
+        {
+          "time_s": 2.0,
+          "cue": "visual: in ve_01_corner_setup_and_supply, ent_worker_left places a brick on edge onto the wet grey mortar bed on the left leg while ent_worker_right steadies the corner brick on edge, with hollow rectangular cavities visible in the course."
+        },
+        {
+          "time_s": 6.0,
+          "cue": "visual: in ve_01_corner_setup_and_supply, ent_worker_left lifts a second brick from the stack and sets it on edge onto the mortar bed at the corner."
+        }
+      ],
+      "limits": "Shows physical brick-on-edge placement and visible hollow cavities in a low demonstration wall, but does not measure thermal insulation performance or percentage of brick savings."
+    },
+    {
+      "id": "claim_02",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/visual_events/1/context_result",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/script_support/claims/3/editorial_use"
+      ],
+      "claim": "Between 10.5s and 21.5s, the mason on the right uses both hands to adjust and align the course of bricks laid on edge along the right wall leg, with staggered vertical joints visible relative to the lower course.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 10.5,
+      "end_s": 21.5,
+      "cues": [
+        {
+          "time_s": 14.0,
+          "cue": "visual: in ve_02_aligning_right_leg, ent_worker_right adjusts the parallel and cross bricks on edge with both hands while staggered vertical joints are visible in the lower course."
+        },
+        {
+          "time_s": 18.0,
+          "cue": "visual: in ve_02_aligning_right_leg, ent_worker_right runs his right hand along the outer face of the right-leg bricks to align them."
+        }
+      ],
+      "limits": "Hand alignment is directly visible, whereas the upper course on the right leg appears partially dry-laid without a visible fresh mortar bed, and structural strength or stability cannot be measured visually."
+    },
+    {
+      "id": "claim_03",
+      "target_paths": [
+        "/sources/0/visual_events/2/description",
+        "/sources/0/visual_events/2/context_result",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2/editorial_use"
+      ],
+      "claim": "Between 21.5s and 29.5s, the mason picks up a brick from behind the wall (21.5–23.5s), sets it on edge onto the mortar bed at the outer corner to complete a paired hollow-cavity module (23.5–26.5s), and steps back leaving an unobstructed view of the completed corner course (26.5–29.5s).",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 21.5,
+      "end_s": 29.5,
+      "cues": [
+        {
+          "time_s": 22.5,
+          "cue": "visual: in ve_03_placing_outer_corner_brick, ent_worker_right lifts a red brick from the ground behind the corner."
+        },
+        {
+          "time_s": 25.0,
+          "cue": "visual: in ve_03_placing_outer_corner_brick, ent_worker_right places the brick on edge onto the mortar bed at the outer corner face, forming a rectangular cavity with the inner corner brick."
+        },
+        {
+          "time_s": 28.5,
+          "cue": "visual: in ve_03_placing_outer_corner_brick, ent_worker_right has released the brick and stepped back, leaving the L-shaped brick-on-edge corner and its internal cavities unobstructed in the foreground."
+        }
+      ],
+      "limits": "Directly shows completing the corner cavity module on edge; background legs of ent_worker_right remain visible walking right at 28.0–29.5s."
+    },
+    {
+      "id": "claim_04",
+      "target_paths": [
+        "/sources/0/visual_events/3/description",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/4/editorial_use"
+      ],
+      "claim": "Between 30.0s and 32.64s, the worker on the left places a long straightedge bar along the top edge of the brick-on-edge course to check course alignment or level.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 30.0,
+      "end_s": 32.64,
+      "cues": [
+        {
+          "time_s": 31.0,
+          "cue": "visual: in ve_04_checking_alignment_with_straightedge, ent_worker_left lowers ent_straightedge along the top face of the right-leg brick course."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Throughout construction, attention is given to maintaining alignment, level, and proper bonding.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: masons place a straightedge rule along the top or face of a newly laid brick course to check straightness and level."
+        }
+      ],
+      "limits": "The clip cuts off at 32.64s while the worker is still holding the straightedge against the bricks, so the completion or result of the alignment check is not shown."
+    },
+    {
+      "id": "claim_05",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/script_support/claims/5/editorial_use"
+      ],
+      "claim": "The masonry work in 00.0–29.5s demonstrates detailing an L-shaped wall corner in Rat-Trap Bond masonry by interlocking cross headers and paired edge-laid stretchers at the corner junction.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 29.5,
+      "cues": [
+        {
+          "time_s": 28.5,
+          "cue": "visual: in ve_03_placing_outer_corner_brick, the two perpendicular wall legs meet at a 90-degree corner with paired bricks on edge and staggered joints."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond corners require specific header/stretcher arrangement on edge to close the corner cavity and maintain bond stagger across perpendicular wall legs."
+        }
+      ],
+      "limits": "Illustrates corner brick arrangement on a low demonstration mock-up; does not show full-height wall junctions, T-junction partition connections, or window-sill courses."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01_worker_left_wardrobe",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker_left"
+        },
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_corner_setup_and_supply"
+        },
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_04_checking_alignment_with_straightedge"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The worker on the left wears a light-colored vertical-striped long-sleeved button shirt with a dark pen/object in the chest pocket, grey trousers, open leather sandals, a metal link wristwatch on his left wrist, a red thread bracelet on his right wrist, and a gold-colored ring on his right ring finger.",
+      "entity_ids": [
+        "ent_worker_left"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 32.64
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02_worker_right_wardrobe",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker_right"
+        },
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_aligning_right_leg"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The mason on the right wears dark grey trousers, open thong sandals with a red/grey strap detail, and a light-colored short-sleeved shirt (only the lower hem and bare forearms are visible in frame).",
+      "entity_ids": [
+        "ent_worker_right"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 30.0
+      },
+      "uncertainty": "Upper shirt and head remain outside the top of the frame."
+    },
+    {
+      "id": "wm_03_bricks_material_state",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bricks"
+        },
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_corner_setup_and_supply"
+        }
+      ],
+      "category": "material_state",
+      "observation": "The bricks are reddish-orange molded clay bricks with sandy, slightly rough textures, rounded/chipped corners, some yellowish-tan or darkened firing patches on the ends, and shallow indented frogs on one broad face.",
+      "entity_ids": [
+        "ent_bricks",
+        "ent_brick_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 32.64
+      },
+      "uncertainty": "Indistinct marks inside the brick frogs are not legible."
+    },
+    {
+      "id": "wm_04_tools_and_props",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar_pan"
+        },
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_straightedge"
+        },
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_04_checking_alignment_with_straightedge"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A round shallow metal mortar pan (tasla) with grey mortar residue sits on the ground behind the wall corner alongside a partially occluded red-handled tool, and a long rectangular white/light-colored straightedge bar is used at 30.5–32.64s.",
+      "entity_ids": [
+        "ent_mortar_pan",
+        "ent_straightedge"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 32.64
+      },
+      "uncertainty": "The red-handled tool behind the brick pile is mostly hidden by the bricks, and the exact material of the straightedge bar (painted wood vs metal) is not certain."
+    },
+    {
+      "id": "wm_05_ground_environment",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_corner_setup_and_supply"
+        }
+      ],
+      "category": "environment",
+      "observation": "The work takes place outdoors in bright sunlight on bare brownish-orange sandy soil with scattered small green weeds, fallen dry leaves, and a tree trunk base at the upper-right edge.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 32.64
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "lim_01_brick_strength_and_wirecut_type",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bricks"
+        }
+      ],
+      "subject": "Brick crushing strength and manufacturing specification",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the bricks cannot establish their compressive crushing strength (e.g., 20, 35, or 75 kg/cm²), and their rough, frog-indented surfaces appear to be conventional molded bricks rather than smooth wire-cut bricks.",
+      "interval": null
+    },
+    {
+      "id": "lim_02_thermal_and_cost_performance",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        }
+      ],
+      "subject": "Thermal insulation, 25% material savings, and multi-storey structural capacity",
+      "kind": "not_established",
+      "limitation": "While the hollow cavities and brick-on-edge pattern are directly visible, this clip cannot measure or prove indoor thermal reduction, percentage of brick/mortar savings, or structural load capacity up to three storeys.",
+      "interval": null
+    },
+    {
+      "id": "lim_03_straightedge_completion",
+      "evidence_refs": [
+        {
+          "source_id": "6c23c8cb4d43b034",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_04_checking_alignment_with_straightedge"
+        }
+      ],
+      "subject": "Completion of straightedge alignment check",
+      "kind": "not_visible",
+      "limitation": "The video ends at 32.64s while the worker is still holding the straightedge bar on top of the brick course, so the outcome of the check is not shown.",
+      "interval": {
+        "start_s": 30.0,
+        "end_s": 32.64
+      }
+    },
+    {
+      "id": "lim_04_other_construction_stages",
+      "evidence_refs": [],
+      "subject": "Plinth preparation, guide strings, window sill course, pointing, and 7-day water curing",
+      "kind": "not_visible",
+      "limitation": "This clip shows only brick laying and straightedge alignment on a low corner course; plinth cleaning/moistening, fixed guide strings, window-sill courses, joint pointing, and water curing are not visible in this source.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "two_masons_laying_bricks_on_edge_at_wall_corner"
+}

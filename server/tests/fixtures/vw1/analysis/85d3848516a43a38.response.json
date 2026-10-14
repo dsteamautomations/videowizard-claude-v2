@@ -1,0 +1,784 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "3079f2d5bd3c7e3cfe98db764279fe46",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "85d3848516a43a38",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 11.050667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 11.050667
+            },
+            "status": "reviewed",
+            "note": "Continuous high-angle pan across a low brick-on-edge demonstration wall corner and T-junction on bare ground."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 3.0
+            },
+            "state": "speech",
+            "note": "Off-screen Speaker 1 trailing remark in Tamil."
+          },
+          {
+            "interval": {
+              "start_s": 3.0,
+              "end_s": 4.2
+            },
+            "state": "non_speech",
+            "note": "Brief ambient outdoor pause between utterances."
+          },
+          {
+            "interval": {
+              "start_s": 4.2,
+              "end_s": 11.050667
+            },
+            "state": "speech",
+            "note": "Off-screen Speaker 1 asks about the benefit of this construction and off-screen Speaker 2 replies in Tamil about cooling, cut off at the clip end."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 11.050667
+          },
+          "reason": "No readable text, signage, labels or numbers are visible on the bricks, tools or ground."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Low brick-on-edge masonry wall with L-corners, T-junction and hollow internal cavities",
+          "uncertainty": "Exact brick dimensions, compressive strength and mortar mix ratio are not visually measurable."
+        },
+        {
+          "id": "ent_pan_trowel",
+          "kind": "object",
+          "label": "Metal mortar pan (tasla) with a red-handled pointing trowel resting inside on the ground",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_spk1",
+          "kind": "speaker",
+          "label": "Off-screen male questioner speaking Tamil",
+          "uncertainty": "Speaker is never visible in frame."
+        },
+        {
+          "id": "ent_spk2",
+          "kind": "speaker",
+          "label": "Off-screen male respondent speaking Tamil",
+          "uncertainty": "Speaker is never visible in frame."
+        }
+      ],
+      "speech": [
+        {
+          "id": "sp_01",
+          "interval": {
+            "start_s": 0.3,
+            "end_s": 2.8
+          },
+          "speaker_id": "ent_spk1",
+          "language": "ta",
+          "original_text": "அந்த மாதிரி இதெல்லாம் கொஞ்சம்...",
+          "english_translation": "Things like that, a little...",
+          "transcription_status": "partial",
+          "uncertainty": "Low-volume trailing conversational fragment at clip start."
+        },
+        {
+          "id": "sp_02",
+          "interval": {
+            "start_s": 4.2,
+            "end_s": 7.6
+          },
+          "speaker_id": "ent_spk1",
+          "language": "ta",
+          "original_text": "வேற இந்த மாதிரியான கட்டுமானத்துக்கு என்ன, என்ன பயன்?",
+          "english_translation": "What other benefit is there to this kind of construction?",
+          "transcription_status": "clear",
+          "uncertainty": null
+        },
+        {
+          "id": "sp_03",
+          "interval": {
+            "start_s": 7.6,
+            "end_s": 11.050667
+          },
+          "speaker_id": "ent_spk2",
+          "language": "ta",
+          "original_text": "இதுதான். இது இதுதான், கூலிங் தான். கூலிங் மெயின்...",
+          "english_translation": "This is it. This is it, cooling only. Cooling is the main...",
+          "transcription_status": "partial",
+          "uncertainty": "Final word is cut off by the end of the recording at 11.050667s."
+        }
+      ],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 11.050667
+          },
+          "label": "High-angle pan right and hold across brick-on-edge wall corners, T-junction and hollow cavities",
+          "description": "From 0.0s to about 2.2s, the camera holds in a high-angle close view looking down at the left L-corner and a central T-junction of a low, multi-course red-brick wall built on sandy ground, showing bricks laid on edge with rectangular hollow vertical cavities between parallel stretchers and cross-headers, and wet grey mortar dabbed along the top edges and capped over the T-junction. From about 2.2s to 7.8s, the camera pans smoothly to the right along the top of the wall past the mortar-capped T-junction, revealing a metal mortar pan containing a red-handled trowel on the ground beyond the wall at about 3.2s, and continuing to a right-hand L-corner with exposed hollow cavities. From about 7.8s to 11.050667s, the camera settles and holds on the right section of the wall, showing the T-junction at the left edge, two rectangular hollow cavities along the top course in the middle, the right L-corner, and the mortar pan and trowel on the ground above.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_wall",
+            "ent_pan_trowel"
+          ],
+          "context_result": "Clearly reveals the three-dimensional geometry of bricks laid on edge, the continuous hollow cavities inside the wall, and the bonding layout at two corners and an intersecting partition T-junction.",
+          "camera_framing": "High-angle medium close-up, panning right from ~2.2s to ~7.8s and holding steady at the start (0.0s–2.2s) and end (7.8s–11.050667s).",
+          "uncertainty": "No active bricklaying occurs in this clip; the mortar is fresh/wet, indicating recently completed courses."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "construction_technique",
+          "claim": "The low brick wall is constructed in Rat-Trap Bond masonry, with bricks placed on their narrow edge to form an internal row of hollow rectangular cavities bridged by header bricks, and demonstrates corner and partition-wall T-junction detailing.",
+          "evidence_refs": [
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "Whether this low structure on bare soil is a training/demonstration mock-up rather than a full building foundation is inferred from its small footprint and lack of a prepared masonry plinth."
+        },
+        {
+          "id": "int_02",
+          "category": "thermal_property_claim",
+          "claim": "In response to a question about the benefit of this type of construction, the off-screen respondent states that cooling is the main benefit, which aligns with the script's explanation that the hollow cavities act as a thermal barrier.",
+          "evidence_refs": [
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_02"
+            },
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_03"
+            },
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "uncertainty": "Thermal performance is a spoken claim by the off-screen speaker and a script concept; temperature reduction is not physically measured in the video."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 11.050667
+          },
+          "reason": "Single continuous camera move (ve_01, supported by claims ce_01, ce_02, ce_03) that cleanly shows the defining geometry of Rat-Trap Bond: bricks on edge, internal hollow cavities, and both L-corners and a central T-junction. If a shorter static shot is preferred over the full pan, either the opening hold (0.0s–2.2s) or the closing hold (7.8s–11.050667s) works as a standalone cutaway.",
+          "uncertainty": "No mortar bed cleaning or plinth preparation is shown; some excess mortar rests on the top edges and inside the base.",
+          "details": {
+            "comparison_scope": "Single continuous take within source 85d3848516a43a38; comparing full pan (0.0s–11.050667s) against the settled end hold (7.8s–11.050667s).",
+            "alternative_refs": [
+              {
+                "source_id": "85d3848516a43a38",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 7.8,
+              "end_s": 11.050667
+            },
+            "must_keep_setup": "Start at 0.0s to include the left L-corner before the rightward pan begins at ~2.2s.",
+            "visible_result": "Reveals the full U-shaped layout with the central T-junction, right L-corner, open vertical cavities, and masonry tools on the ground by 7.8s–11.050667s.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Directly shows bricks placed on edge creating hollow cavities and shows corner and partition T-junction detailing.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 7.8
+          },
+          "reason": "Strong explanatory B-roll for P001 when the narration introduces Rat-Trap Bond placing bricks on their edge to create hollow cavities, or later in P001 when discussing wall junctions, corners, and connections with partition walls (ve_01, claims ce_01, ce_02, ce_04, ce_07).",
+          "uncertainty": "The cavities are only a few courses deep in this low structure, so "
+        ,
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Opening frame at 0.0s showing the left corner and open cavity pockets.",
+            "visible_result": "Pan across the central T-junction to the right corner by 7.8s.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Visualizes bricks on edge, internal cavities, and corner/partition junctions.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "85d3848516a43a38",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02"
+            }
+          ],
+          "interval": null,
+          "reason": "While ve_01 shows the physical hollow cavities from above (ce_01) and the off-screen speaker mentions cooling (sp_03, ce_05), a camera shot cannot directly show heat transfer or the 20/35/75 kg/cm² crushing-strength thresholds for 1-, 2-, and 3-storey buildings in P001. A clean animated diagram or graphic overlay could complement this live-action shot.",
+          "uncertainty": "Optional editorial enhancement; exact passage-level visual slot reservations were not supplied.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Illustrate thermal insulation arrows across the hollow brick cavity or display the 1-, 2-, and 3-storey brick crushing-strength requirements (20, 35, and 75 kg/cm²).",
+            "missing_asset": "Animated cross-section graphic showing heat reflection/trapping in the air cavity and/or typographic callout of crushing-strength standards by building height.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unres_01",
+          "interval": {
+            "start_s": 7.6,
+            "end_s": 11.050667
+          },
+          "field": "speech",
+          "issue": "Speaker 2's explanation about cooling ('கூலிங் மெயின்...') is cut off mid-sentence by the end of the file at 11.050667s."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 11.050667-second clip consists of a single continuous camera take (ve_01, 0.0s–11.050667s) with no repeated filming attempts, camera resets, or active human manipulation. It comprises three camera-movement stages over the static brickwork (ce_01, ce_02, ce_03): an initial high-angle hold on the left corner and central T-junction from 0.0s to about 2.2s, a smooth pan right along the wall from about 2.2s to 7.8s, and a settled high-angle hold on the T-junction, right-hand cavities, right corner, and mortar pan from about 7.8s to 11.050667s.",
+    "crop_guidance": "The full frame is clean and free of talking faces, bystanders, or edge intrusions throughout ve_01 (0.0s–11.050667s). Preserve the central and lower-middle portion of the frame where the brick-on-edge courses, hollow cavities, L-corners, and T-junction pass through during the rightward pan (ce_01, ce_02, ce_03). In the second half of the clip (3.2s–11.050667s), keeping the upper-middle quadrant preserves the mortar pan and red-handled trowel on the ground as useful masonry context, though tight cropping into the brickwork cavities is also possible without cutting off any active hands.",
+    "clean_handles": "Interval: 0.0–2.2; classification: settled; beginning observation: 0.0s high-angle view of the stationary brick-on-edge left corner and T-junction with no human actors present and the camera held steady; middle observation: 1.1s same stationary left corner and T-junction with the camera remaining still; end observation: 2.2s stationary brickwork just before the camera begins panning right; relevant action stopped: the masonry structure is inactive from the start of the clip with no human subject present, and camera panning has not yet begun; uncertainty: none identified; links: ve_01, ce_01; editorial use: provides a clean 2.2-second static opening handle or standalone cutaway of the left corner and central T-junction before the rightward camera pan starts. Interval: 7.8–11.050667; classification: settled; beginning observation: 7.8s high-angle view of the stationary right section of the brick-on-edge wall, right corner, T-junction, and mortar pan as the rightward camera pan finishes; middle observation: 9.4s stationary brickwork and mortar pan held in a steady frame; end observation: 11.050667s same stationary right wall section and mortar pan at the end of the recording; relevant action stopped: the masonry subject is inactive from the start and the rightward camera pan (2.2s–7.8s) has stopped by ~7.8s; uncertainty: recording ends at 11.050667s so no footage beyond 11.050667s exists to inspect; links: ve_01, ce_03; editorial use: provides a clean ~3.25-second settled tail handle or standalone static shot of the hollow cavities, right corner, and tools after the pan completes.",
+    "continuity": "Throughout ve_01 (0.0s–11.050667s), no workers or hands are in frame and the physical state of the brick-on-edge wall and wet mortar does not change (ce_01, ce_02, ce_03). At entry (0.0s–2.2s), the camera holds on the left L-corner (lower-left to upper-center-left) and the central T-junction (center-right). Between ~2.2s and ~7.8s, the camera pans left-to-right across the wall, causing the brickwork and the mortar pan with its red-handled trowel (entering from the right edge around 3.2s) to move right-to-left across the screen. At exit (7.8s–11.050667s), the camera holds steady with the T-junction near the lower-left, the right L-corner at the lower-right, and the mortar pan resting on the sandy ground in the upper-left-center.",
+    "preview_frames": "1.0s (ve_01, ce_01): Shows the initial static high-angle view of the left L-corner, bricks laid on edge, open rectangular cavities, and the central T-junction capped with mortar. 5.5s (ve_01, ce_02): Mid-pan view centered on the mortar-capped T-junction with open cavities on both sides and the mortar pan with the red-handled trowel on the ground above. 9.0s (ve_01, ce_03): Settled end view showing the right section of the wall, two clear rectangular hollow cavities between bricks on edge, the right L-corner, and the mortar pan and trowel.",
+    "speech_action_links": "During ve_01, off-screen Speaker 1 asks at 4.2s–7.6s (sp_02) what other benefit this kind of construction ('இந்த மாதிரியான கட்டுமானத்துக்கு') has, referring to the Rat-Trap Bond brick-on-edge wall being panned across in the video (ce_02, ce_05). Off-screen Speaker 2 replies at 7.6s–11.050667s (sp_03) 'இதுதான். இது இதுதான், கூலிங் தான். கூலிங் மெயின்...' ('This is it... cooling only. Cooling is the main...'), linking the visible hollow-cavity brickwork (ve_01, ce_03) to thermal cooling as an explanatory spoken claim (ce_05). Because the output audio policy excludes source camera audio, this dialogue is used for intake context only and should not be played in the edited output.",
+    "shorter_explanations": "If the full 11.050667-second shot (ve_01) is too long for a single narration clause, three economical options preserve honest visuals without distorting the outcome: (1) Use 0.0s–7.8s (duration 7.8s; ce_01, ce_02) to retain the opening hold on the left corner and the complete rightward pan across the T-junction to the right corner, omitting 7.8s–11.050667s which only adds a longer static hold at the end. (2) Use 1.5s–8.5s (duration 7.0s; ce_01, ce_02, ce_03) to retain a 0.7s lead-in hold on the left corner, the full 5.6s pan across the T-junction and cavities, and a 0.7s settled hold on the right corner, omitting the longer static tails at both ends. (3) For a brief static insert (~3.25s), use 7.8s–11.050667s (ce_03) alone, which clearly displays the hollow cavities, T-junction edge, right corner, and masonry tools without camera movement, omitting the left corner shown in 0.0s–7.8s.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "ce_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use the opening static view (0.0s–2.2s of ve_01) to directly show red bricks laid on their narrow edge with open rectangular hollow cavities between them."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "ce_02",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use the rightward camera pan (2.2s–7.8s of ve_01) to trace the continuous row of hollow cavities and brick-on-edge courses along the length of the wall."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "ce_03",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use the settled closing frame (7.8s–11.050667s of ve_01) as a steady close-up showing two distinct rectangular hollow cavities framed by bricks on edge."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Because of the hollow cavities, the wall acts as a natural thermal barrier. Less heat enters the building, making indoor spaces cooler and more comfortable.",
+          "claim_id": "ce_05",
+          "support_classification": "spoken_claim",
+          "editorial_use": "Confirms for intake context that the on-site respondent (sp_03) identifies 'cooling' as the main benefit of the visible hollow-cavity wall, matching the script's thermal comfort explanation (though camera audio is muted in output and thermal performance is not visually measured)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Because of the hollow cavities, the wall acts as a natural thermal barrier. Less heat enters the building, making indoor spaces cooler and more comfortable.",
+          "claim_id": "ce_06",
+          "support_classification": "illustrative",
+          "editorial_use": "Use the high-angle view into the trapped air pockets inside the brickwork (ve_01) to visually illustrate the physical cavities that the script explains act as a thermal barrier, while recognizing that heat transfer itself is invisible."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "ce_04",
+          "support_classification": "illustrative",
+          "editorial_use": "Use ve_01 to show the completed multi-course rat-trap pattern of alternating stretchers on edge and cross-headers forming internal cavities, noting that active bricklaying is not shown in this clip and the wall is only a few courses high."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "ce_07",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use the pan across the left L-corner, central T-junction (partition connection), and right L-corner (ve_01, 0.0s–11.050667s) to directly show how bricks on edge meet at corners and wall intersections."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: This project uses a mixed-media plan where future generated video may be used for later gap filling, recorded footage does not need to be forced into every script passage, and any supplied slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so no reservations are invented. Any suggested generated visual (such as ei_03) is marked planned_not_created and is a proposal for Codex rather than an existing asset or authorization to generate media. Also acknowledged: the source audio policy includes original camera sound for intake analysis (used to transcribe sp_01–sp_03) but excludes source audio from the final output, so no source_audio editorial ideas or playable dialogue recommendations are made.",
+    "unavailable": "Active bricklaying, plinth cleaning/moistening, guide-string alignment, pointing, and water curing are not present in this clip (which shows an already-laid low demonstration wall with static tools nearby). In addition, physical measurements of brick crushing strength (20, 35, or 75 kg/cm²), 25% material savings, and thermal heat flow cannot be visually established from the footage alone. Regarding G07 inspection scope: this analysis reviewed the attached 11.050667-second video stream and its audio track across the full window, but native frame-by-frame exhaustive decoding or external instrument verification is not established."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "From 0.0s to about 2.2s, the camera holds steady in a high-angle view showing the left L-corner and central T-junction of a low red-brick wall where bricks are laid on their narrow edge with hollow vertical cavities between parallel stretchers and cross-headers, and wet grey mortar rests on the top edges.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 2.2,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ve_01 at 0.0s, high-angle frame shows the left L-corner of the brick-on-edge wall with open internal cavities and the mortar-capped T-junction to the right."
+        },
+        {
+          "time_s": 2.2,
+          "cue": "visual: In ve_01 at 2.2s, the same left corner and T-junction remain stationary just before rightward camera panning begins."
+        }
+      ],
+      "limits": "Timestamp 2.2s is the approximate transition where the camera begins panning right; brick dimensions and mortar composition are not measurable."
+    },
+    {
+      "id": "ce_02",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/speech_action_links",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "From about 2.2s to 7.8s, the camera pans smoothly to the right along the top of the brick-on-edge wall past the central mortar-capped T-junction to a right-hand L-corner, revealing continuous hollow cavities inside the wall and a metal mortar pan containing a red-handled trowel on the sandy ground behind the wall from about 3.2s onward.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 2.2,
+      "end_s": 7.8,
+      "cues": [
+        {
+          "time_s": 2.2,
+          "cue": "visual: In ve_01 at ~2.2s, the camera begins panning right from the left corner toward the central T-junction."
+        },
+        {
+          "time_s": 3.2,
+          "cue": "visual: In ve_01 at ~3.2s, the metal mortar pan (ent_pan_trowel) with a red-handled trowel inside enters the upper-right frame on the ground."
+        },
+        {
+          "time_s": 5.5,
+          "cue": "visual: In ve_01 at 5.5s, the central T-junction capped with mortar and adjacent hollow brick-on-edge cavities are centered in frame."
+        },
+        {
+          "time_s": 7.8,
+          "cue": "visual: In ve_01 at ~7.8s, the rightward pan reaches the right L-corner and comes to a stop."
+        }
+      ],
+      "limits": "Pan start (~2.2s) and stop (~7.8s) are approximate transition times; no human actor is visible."
+    },
+    {
+      "id": "ce_03",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/speech_action_links",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "From about 7.8s to 11.050667s, the camera holds steady on the right portion of the brick-on-edge wall, showing the T-junction at the lower-left, two rectangular hollow cavities in the top course, the right L-corner, and the stationary mortar pan and trowel on the ground.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 7.8,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 7.8,
+          "cue": "visual: In ve_01 at ~7.8s, rightward camera movement ceases on the right wall section and corner."
+        },
+        {
+          "time_s": 9.0,
+          "cue": "visual: In ve_01 at 9.0s, steady high-angle frame displays two open rectangular cavities between bricks on edge, the right corner, and ent_pan_trowel."
+        },
+        {
+          "time_s": 11.050667,
+          "cue": "visual: In ve_01 at 11.050667s, the frame remains settled on the same right corner and cavities until the clip ends."
+        }
+      ],
+      "limits": "The clip ends at 11.050667s, so no footage exists after 11.050667s."
+    },
+    {
+      "id": "ce_04",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/5"
+      ],
+      "claim": "The visible brickwork pattern in ve_01—alternating parallel stretcher bricks laid on edge and perpendicular header bricks creating a row of internal hollow pockets across multiple courses—is an example of Rat-Trap Bond masonry.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: In ve_01 at 1.0s, courses of red bricks laid on edge with cross-headers and hollow internal cavities are visible."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Unlike conventional brickwork, where bricks are laid flat, Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond is defined in masonry practice as a double-wythe-equivalent bond of bricks laid on edge in a modular shiner-and-rowlock (stretcher-and-header on edge) pattern leaving internal vertical cavities."
+        }
+      ],
+      "limits": "The clip shows only a low, partially built demonstration wall on bare soil without active laying of each course or a full-height wall."
+    },
+    {
+      "id": "ce_05",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/speech_action_links",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "When off-screen Speaker 1 asks at 4.2s–7.6s what other benefit this kind of construction has, off-screen Speaker 2 states at 7.6s–11.050667s that cooling is the main benefit ('கூலிங் தான். கூலிங் மெயின்...').",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 4.2,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 4.2,
+          "cue": "source_speech: In sp_02 (4.2s–7.6s), ent_spk1 asks 'வேற இந்த மாதிரியான கட்டுமானத்துக்கு என்ன, என்ன பயன்?' ('What other benefit is there to this kind of construction?')."
+        },
+        {
+          "time_s": 7.6,
+          "cue": "source_speech: In sp_03 (7.6s–11.050667s), ent_spk2 replies 'இதுதான். இது இதுதான், கூலிங் தான். கூலிங் மெயின்...' ('This is it. This is it, cooling only. Cooling is the main...')."
+        }
+      ],
+      "limits": "This is a spoken claim by an off-screen speaker whose sentence is cut off at 11.050667s; it does not physically measure temperature or thermal resistance, and camera audio is excluded from output."
+    },
+    {
+      "id": "ce_06",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The visible hollow air cavities enclosed between the bricks on edge in ve_01 (0.0s–11.050667s) illustrate the physical cavity structure that P001 describes as acting as a natural thermal barrier to keep indoor spaces cooler.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 9.0,
+          "cue": "visual: In ve_01 at 9.0s, open rectangular air cavities are clearly visible between the inner and outer brick-on-edge faces."
+        },
+        {
+          "time_s": 7.6,
+          "cue": "source_speech: In sp_03 (7.6s–11.050667s), ent_spk2 identifies 'கூலிங் தான்' ('cooling only') as the benefit."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Because of the hollow cavities, the wall acts as a natural thermal barrier. Less heat enters the building, making indoor spaces cooler and more comfortable.'"
+        }
+      ],
+      "limits": "Illustrative connection only: thermal insulation and indoor temperature differences are not directly visible or measured in this outdoor demonstration wall."
+    },
+    {
+      "id": "ce_07",
+      "target_paths": [
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/6"
+      ],
+      "claim": "Across 0.0s–11.050667s, ve_01 directly shows two 90-degree L-corners (left corner at 0.0s–3.5s, right corner at 5.5s–11.050667s) and a central T-junction where an intersecting partition wall joins the main brick-on-edge wall (0.0s–11.050667s).",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: In ve_01 at 1.0s, the left 90-degree corner and the central intersecting T-junction are visible."
+        },
+        {
+          "time_s": 5.5,
+          "cue": "visual: In ve_01 at 5.5s, the central T-junction and the right 90-degree corner are both visible in frame."
+        }
+      ],
+      "limits": "The top of the T-junction is covered with a patch of wet mortar, partially obscuring the underlying brick arrangement right at the intersection top, and structural integrity is not tested."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Low unplastered red-brick wall built in a brick-on-edge cavity bond (3 to 4 courses high) featuring two 90-degree L-corners and a central T-junction.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 11.050667
+      },
+      "uncertainty": "Appears to be a low demonstration or training structure built directly on bare earth rather than a full building on a masonry plinth."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Fresh, wet dark-grey cement mortar applied along the top edges of the bricks on edge, capped in a flat patch over the T-junction, and spilled in small amounts along the inner base of the wall.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 11.050667
+      },
+      "uncertainty": "Exact cement-to-sand ratio and moisture content are not visually determinable."
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_pan_trowel"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "Round metal mortar pan (tasla) coated with grey mortar residue containing a pointed masonry trowel with a red handle, resting on the ground next to the wall.",
+      "entity_ids": [
+        "ent_pan_trowel"
+      ],
+      "interval": {
+        "start_s": 3.2,
+        "end_s": 11.050667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Dry reddish-brown sandy soil ground in bright outdoor sunlight with dappled tree shadows and scattered dry leaves and twigs.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 11.050667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Brick crushing strength, manufacturing method, and percentage of material savings",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the red bricks and cavities in ve_01 cannot establish whether the bricks are wire-cut or hand-moulded, what their crushing strength is (e.g., 20, 35, or 75 kg/cm²), or the exact percentage of brick and mortar reduction.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 11.050667
+      }
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Thermal insulation performance",
+      "kind": "not_established",
+      "limitation": "While the hollow cavities are directly visible and off-screen Speaker 2 claims 'cooling' as the main benefit (sp_03), actual heat transfer reduction or indoor cooling performance is not measured or directly visible in this outdoor clip.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 11.050667
+      }
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "85d3848516a43a38",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Active masonry construction steps (plinth preparation, string lines, bricklaying, pointing, and curing)",
+      "kind": "not_visible",
+      "limitation": "No workers, active bricklaying, plinth cleaning/wetting, guide strings, joint pointing, or water curing are visible in this clip, and some loose mortar is visible along the inner base and top of the wall.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "high_angle_pan_brick_on_edge_cavity_wall_corners_t_junction"
+}

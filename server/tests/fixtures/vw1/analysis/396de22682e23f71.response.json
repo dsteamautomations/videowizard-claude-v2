@@ -1,0 +1,826 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "b4ff3c768febec846755429f8f4f6238",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "396de22682e23f71",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 6.72
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 6.72
+            },
+            "status": "reviewed",
+            "note": "Reviewed at sampled intervals across the full 6.72-second attached window; native frame-by-frame inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 5.8
+            },
+            "state": "non_speech",
+            "note": "Quiet outdoor ambient sound and faint site noise with no intelligible foreground speech."
+          },
+          {
+            "interval": {
+              "start_s": 5.8,
+              "end_s": 6.72
+            },
+            "state": "omitted_background_speech",
+            "note": "Faint, indistinct background conversation off-camera at the end of the clip, omitted as irrelevant background site chatter."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 5.8,
+            "end_s": 6.72
+          },
+          "reason": "Faint off-camera background conversation near the end of the recording has no discernible bearing on the masonry demonstration and is omitted."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 6.72
+          },
+          "reason": "No readable text or numbers appear on the bricks, ground, or background in this window."
+        },
+        {
+          "field": "visual_details",
+          "interval": {
+            "start_s": 0,
+            "end_s": 6.72
+          },
+          "reason": "Minor background foliage movement and distant parked objects or figures in the trees are omitted as non-consequential to the masonry demonstration."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_brick_wall",
+          "kind": "object",
+          "label": "low corner demonstration wall of red-orange bricks laid on edge with grey mortar",
+          "uncertainty": "Exact brick manufacturing type (such as wire-cut) and compressive strength cannot be verified visually; internal cavities are enclosed by the top course and not directly visible in this low-angle exterior view."
+        },
+        {
+          "id": "ent_standing_person",
+          "kind": "person",
+          "label": "standing person behind the brick wall wearing dark grey trousers and a light beige short-sleeved shirt",
+          "uncertainty": "The person's head and upper chest remain above the top edge of the frame throughout the clip, so their identity and role (mason, supervisor, or bystander) are not visually established."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_pan_left_corner_wall",
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "label": "low-angle leftward camera movement across a low brick-on-edge corner wall",
+          "description": "From a low ground-level angle on sandy soil, the camera pans/tracks smoothly to screen left across a low, freshly mortared red-orange brick demonstration wall featuring a right-angle corner and intersecting junction. The bricks are laid on their narrow edge in alternating header and stretcher positions with grey mortar joints and excess grey mortar droppings resting along the sandy base. Behind the wall, the lower body and right arm of ent_standing_person (in dark grey trousers and beige shirt) stand nearly motionless near a tree trunk against green foliage.",
+          "actor_ids": [
+            "ent_standing_person"
+          ],
+          "object_ids": [
+            "ent_brick_wall"
+          ],
+          "context_result": "Clearly reveals the exterior alternating header-and-stretcher brick-on-edge bond pattern, staggered vertical joints across three courses above a base course, and the 90-degree corner/junction geometry of the low sample wall.",
+          "camera_framing": "Low-angle medium close-up tracking/panning left across the brickwork from right to left.",
+          "uncertainty": "The internal hollow cavities inside the wall are not visible from this low side angle because the top course encloses the wall and the camera remains below the top edge."
+        },
+        {
+          "id": "ve_tilt_up_end_of_pan",
+          "interval": {
+            "start_s": 5.2,
+            "end_s": 6.72
+          },
+          "label": "camera tilts up at the end of the leftward pan, losing focus on foreground wall and framing headless torso",
+          "description": "At approximately 5.2 seconds, as the leftward pan reaches the left end of the low brick wall, the camera tilts upward and shifts left. The foreground brick corner drops toward the bottom edge of the frame and goes slightly soft in focus while the background trees and the torso and both arms of ent_standing_person (still cut off below the neck) become more prominent on the right side of the frame.",
+          "actor_ids": [
+            "ent_standing_person"
+          ],
+          "object_ids": [
+            "ent_brick_wall"
+          ],
+          "context_result": "Awkward camera operator finish/reset that shifts attention away from the brickwork onto background trees and a headless torso.",
+          "camera_framing": "Low-angle medium shot tilting upward from the low wall toward background trees and a headless standing person.",
+          "uncertainty": "Approximate transition boundary between the steady horizontal pan and the upward tilt is between 5.0s and 5.3s."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_rat_trap_bond_pattern",
+          "category": "masonry_technique",
+          "claim": "The low sample wall (ent_brick_wall) demonstrates Rat-Trap Bond masonry laid on edge with alternating headers and stretchers, staggered vertical joints, and a corner/wall junction.",
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            },
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_wall"
+            }
+          ],
+          "uncertainty": "While the exterior brick-on-edge bond pattern and corner detailing match Rat-Trap Bond masonry, the internal hollow cavities are enclosed and not directly visible from this low angle, and structural properties cannot be measured visually."
+        },
+        {
+          "id": "int_unpointed_fresh_mortar",
+          "category": "construction_stage",
+          "claim": "The masonry in ent_brick_wall appears freshly laid and not yet cleaned or pointed, as indicated by dark grey wet-looking mortar joints and loose mortar droppings along the base on the sandy ground.",
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            },
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_wall"
+            }
+          ],
+          "uncertainty": "Exact elapsed time since laying and mortar mix proportions are not visually verifiable."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_best_take_pan",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            },
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_rat_trap_bond_pattern"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "reason": "The 0.0–5.2s span (ve_pan_left_corner_wall) provides a smooth, well-focused low-angle leftward camera movement showcasing the brick-on-edge bond pattern and corner junction before the camera tilts up awkwardly at 5.2–6.72s (ve_tilt_up_end_of_pan).",
+          "uncertainty": "A headless person in trousers and shirt remains visible behind the wall throughout the shot, and internal cavities are not visible from this angle.",
+          "details": {
+            "comparison_scope": "Single continuous camera movement within 396de22682e23f71; comparing the main 0.0–5.2s pan against the tighter 2.5–5.2s left-corner segment.",
+            "alternative_refs": [
+              {
+                "source_id": "396de22682e23f71",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_pan_left_corner_wall"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 2.5,
+              "end_s": 5.2
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_action_span_wall_reveal",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "reason": "Preserves the complete horizontal leftward camera reveal from the right junction/corner across the middle section to the left corner end of the low brick-on-edge wall (ve_pan_left_corner_wall), cutting before the upward camera tilt at 5.2s (ve_tilt_up_end_of_pan).",
+          "uncertainty": "Camera movement is already underway or starting immediately at 0.0s, and cutting at 5.2s stops on a moving pan just before the upward tilt.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Start near 0.0s to include the right-hand protruding corner/junction of the brick wall.",
+            "visible_result": "Full horizontal scan across the brick-on-edge courses, staggered vertical joints, and left-hand corner before the upward tilt at 5.2s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_script_use_bricks_on_edge_pattern",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            },
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_rat_trap_bond_pattern"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "reason": "Directly shows bricks placed on their narrow edge forming a distinct alternating header-stretcher pattern and staggered vertical joints across completed courses (ve_pan_left_corner_wall), matching P001 descriptions of bricks laid on edge, distinct pattern formation, and staggered vertical joints.",
+          "uncertainty": "Does not show the active laying process or the internal hollow cavities inside the wall; structural strength and stability are inferred/illustrative rather than visually measured.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Close low-angle view of bricks laid on edge with alternating headers and stretchers and staggered vertical joints.",
+            "relationship": "match",
+            "intended_explanation": "Illustrates how Rat-Trap Bond places bricks on their edge in a distinct course pattern with staggered vertical joints.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_script_use_junctions_corners",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            },
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_rat_trap_bond_pattern"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.2
+          },
+          "reason": "Provides a clear close-up visual of wall junctions and 90-degree corners built in brick-on-edge masonry (ve_pan_left_corner_wall), making it a strong visual match for the P001 sentence on special attention at wall junctions and corners.",
+          "uncertainty": "The wall is a low demonstration mock-up on sandy soil rather than a full-height building wall, and long-term structural performance is not directly observable.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Right-angle corner and intersecting wall junction detailing in brick-on-edge masonry.",
+            "relationship": "match",
+            "intended_explanation": "Shows how bricks on edge are arranged and bonded at corners and wall junctions.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_future_visual_thermal_cavity_diagram",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "396de22682e23f71",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_pan_left_corner_wall"
+            }
+          ],
+          "interval": null,
+          "reason": "Because this low-angle exterior shot (ve_pan_left_corner_wall) only shows the closed outer face of the brick-on-edge wall and cannot show internal hollow cavities or heat-transfer reduction, an animated cross-section or graphic overlay is a useful optional complement if other recorded clips in the collection do not already show open top cavities.",
+          "uncertainty": "Marked as planned_not_created; assumes thermal barrier behavior from script and general masonry principles rather than site measurement.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Visualise the continuous internal hollow air cavities inside the brick-on-edge wall acting as a thermal barrier reducing heat flow.",
+            "missing_asset": "Clean graphic cutaway or generated 3D diagram showing heat arrows blocked by the air pockets inside a Rat-Trap Bond wall.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "396de22682e23f71",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No passage-level slot reservations were supplied in the media brief. This recorded clip (0.0–5.2s) is well-suited as B-roll for P001 passages describing bricks laid on edge, staggered vertical joints, or wall junctions and corners.",
+          "prerequisite": "Trim out the final upward camera tilt after 5.2s; optionally apply a slight vertical crop if the headless standing person in the background is distracting.",
+          "uncertainty": "Does not show internal hollow cavities or active bricklaying; other clips in the collection may provide top-down cavity views."
+        },
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "generated_video",
+          "asset_status": "planned_not_created",
+          "asset_ref": null,
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "Optional future generated visual proposal for the thermal insulation and 25% material-saving claims in P001, which cannot be directly seen from exterior brickwork footage alone.",
+          "prerequisite": "Only needed if the editing agent wants a cutaway diagram to complement recorded masonry shots; no generated asset currently exists.",
+          "uncertainty": "Conceptual proposal only; exact passage-level reservations were not supplied."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_person_identity",
+          "interval": {
+            "start_s": 0,
+            "end_s": 6.72
+          },
+          "field": "entities",
+          "issue": "The standing person behind the wall (ent_standing_person) is framed from the chest/shoulders down throughout the clip, leaving their face and specific role unestablished."
+        },
+        {
+          "id": "unres_background_speech",
+          "interval": {
+            "start_s": 5.8,
+            "end_s": 6.72
+          },
+          "field": "speech",
+          "issue": "Faint off-camera voices at the very end of the clip are too quiet and indistinct to transcribe and appear to be incidental background site chatter."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 6.72-second clip consists of a single continuous camera take with no repeated physical demonstration attempts. From 0.0s to approximately 5.2s (ve_pan_left_corner_wall, claim_pan_left_wall), the camera performs a smooth, low-angle leftward pan/track across a completed low demonstration wall of bricks laid on edge (ent_brick_wall). Between approximately 5.2s and 6.72s (ve_tilt_up_end_of_pan, claim_tilt_up_end), the camera operator finishes the horizontal scan and tilts upward toward the background trees and the headless torso of the person standing behind the wall (ent_standing_person). Editorially, 0.0–5.2s is the usable camera pass, while 5.2–6.72s is an unusable operator finish/reset at the end of the shot.",
+    "crop_guidance": "For standard 16:9 delivery, the full frame from 0.0s to 5.2s (ve_pan_left_corner_wall) keeps the low brick-on-edge wall (ent_brick_wall) clearly centred in the lower two-thirds of the image. However, the waist, trousers, shirt, and hanging hand of a headless standing person (ent_standing_person, claim_standing_person_partial) occupy the upper-left to upper-right background behind the wall. If the editing agent wishes to reduce the distraction of the headless torso during 2.0–5.2s, a slight zoom/crop into the lower-left/centre region preserving the lower 70–75% of the frame height can emphasize the brickwork and sandy plinth while pushing most of the person's upper torso out of view, though his dark grey trouser legs directly behind the top brick course cannot be completely excluded without cropping into the top course of bricks. Any crop has not been technically verified for final resolution clearance.",
+    "clean_handles": "Interval: 0.0–5.2s; classification: settled; beginning observation: at 0.0s the brick wall (ent_brick_wall) is completely stationary in the foreground while the camera begins its leftward pan and the standing person (ent_standing_person) is motionless in the background; middle observation: at 2.5s the brick wall remains motionless as the leftward camera pan reveals the middle and left wall sections and the background person stands still; end observation: at 5.2s the leftward horizontal pan reaches the left corner of the stationary brick wall just before the camera starts tilting upward; relevant action stopped: no physical masonry manipulation occurs in this clip—the primary subject (ent_brick_wall) is inactive from the start across 0.0–5.2s while the camera executes a smooth leftward pan; uncertainty: inspection through 6.2s–6.72s shows that immediately after 5.2s the camera tilts upward and loses focus on the foreground wall (ve_tilt_up_end_of_pan), and the boundary between horizontal pan and upward tilt is approximate around 5.0–5.3s; links: ve_pan_left_corner_wall and claim_pan_left_wall; editorial use: preserves the full clean horizontal camera reveal across the corner junction and staggered brick-on-edge courses while excluding the awkward upward camera tilt after 5.2s.",
+    "continuity": "At candidate entry (0.0s, ve_pan_left_corner_wall, claim_pan_left_wall), the camera is already positioned at ground level looking at the right-hand protruding corner/junction of the low red-orange brick wall (ent_brick_wall) and moving smoothly toward screen left (so the wall passes from screen left toward screen right across the frame). The brickwork is already laid in four visible tiers (a base course plus three courses on edge) with fresh dark grey mortar and loose mortar droppings on the sandy ground (claim_fresh_mortar_state). At candidate exit (5.2s, ve_pan_left_corner_wall), the camera reaches the left end corner of the low wall while still panning slightly left; exiting after 5.2s enters ve_tilt_up_end_of_pan (claim_tilt_up_end), where the camera tilts sharply upward toward the background trees and the headless torso of ent_standing_person (inspected through the clip end at 6.72s). Do not cut after 5.2s if smooth horizontal motion continuity and sharp foreground brick focus are desired.",
+    "preview_frames": "1. 0.5s (ve_pan_left_corner_wall, claim_pan_left_wall): Shows the protruding 90-degree corner and intersecting junction of the brick-on-edge wall in the left-centre foreground with alternating headers and stretchers clearly lit. 2. 2.5s (ve_pan_left_corner_wall, claim_pan_left_wall): Shows the transition from the protruding right corner to the recessed middle and left wall courses, clearly displaying staggered vertical mortar joints and bricks laid on edge. 3. 4.8s (ve_pan_left_corner_wall, claim_pan_left_wall): Shows the left-hand corner return and full horizontal run of the low brick wall just before the upward camera tilt begins. 4. 6.2s (ve_tilt_up_end_of_pan, claim_tilt_up_end): Shows the upward tilt onto the headless torso of ent_standing_person and background trees with the foreground wall dropping out of frame and softening in focus, illustrating why the shot should be trimmed before ~5.2s.",
+    "speech_action_links": "No intelligible foreground speech occurs in this clip (0.0–5.8s is quiet ambient outdoor sound, and 5.8–6.72s contains only faint, omitted background chatter during the end-of-shot camera tilt). Therefore, there are no spoken claims or deictic phrases to link to visual actions, and camera audio is excluded from final output per policy.",
+    "shorter_explanations": "For a full horizontal showcase of both the protruding right junction and the left corner return, use the single span 0.0–5.2s (ve_pan_left_corner_wall, claim_pan_left_wall), which has a duration of 5.2s (5.2 - 0.0 = 5.2s) and omits the 1.52s upward camera tilt at 5.2–6.72s (ve_tilt_up_end_of_pan, claim_tilt_up_end). If a tighter 2.7s B-roll insert is needed (for example, to cover a single short clause about staggered vertical joints or corner detailing), use 2.5–5.2s (5.2 - 2.5 = 2.7s), which retains the clear view of the recessed corner, alternating brick-on-edge courses, and left end corner while omitting the initial 0.0–2.5s pass across the right-hand protruding corner.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge",
+          "claim_id": "claim_pan_left_wall",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0–5.2s (ve_pan_left_corner_wall) as direct visual B-roll showing red-orange bricks laid on their narrow edge in courses with mortar."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This arrangement creates continuous hollow cavities within the wall",
+          "claim_id": "claim_rat_trap_bond_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Use 0.0–5.2s (ve_pan_left_corner_wall) as an illustrative exterior view of the alternating header-and-stretcher Rat-Trap Bond geometry that encloses internal cavities, noting that the hollow cavities themselves are hidden inside the wall from this low angle."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "As each course is completed, a distinct pattern is formed",
+          "claim_id": "claim_pan_left_wall",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0–5.2s (ve_pan_left_corner_wall) to directly show the completed courses of bricks on edge forming the alternating header-and-stretcher surface pattern."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability",
+          "claim_id": "claim_pan_left_wall",
+          "support_classification": "directly_seen",
+          "editorial_use": "Supports the first part of the clause ('Vertical joints are staggered') by directly showing staggered vertical mortar joints between courses in 0.0–5.2s (ve_pan_left_corner_wall)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "to ensure strength and stability",
+          "claim_id": "claim_structural_strength_illustrative",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the structural purpose of staggered joints and corner bonding in 0.0–5.2s (ve_pan_left_corner_wall), while recognizing that structural strength and stability are engineering properties not measured in the video."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls",
+          "claim_id": "claim_pan_left_wall",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0–5.2s (ve_pan_left_corner_wall) to directly show a 90-degree corner and intersecting wall junction constructed with bricks on edge."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "We acknowledge the mixed-media workflow plan: future generated video may be used for later gap filling, recorded footage is not forced into every script passage, and any supplied slot reservations must be preserved. In this request, exact passage-level planned visual slots were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented. Proposed future visuals are strictly marked planned_not_created and do not represent existing assets or authorization to generate media automatically. We also acknowledge the source audio policy: original sound was inspected for intake (finding only ambient noise and faint end-of-clip background chatter), and because output camera audio is excluded, no source_audio editorial recommendations are proposed.",
+    "unavailable": "No relevant foreground speech (speech is empty) and no readable visible text (visible_text is empty) occur in this source window. No source_audio editorial ideas are proposed because output camera audio is excluded by policy, and no intelligible demonstration speech exists in the clip."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_pan_left_wall",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/entities/0/label",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0/editorial_use",
+        "/additional_analysis/script_support/claims/2/editorial_use",
+        "/additional_analysis/script_support/claims/3/editorial_use",
+        "/additional_analysis/script_support/claims/5/editorial_use"
+      ],
+      "claim": "From 0.0s to 5.2s, a low-angle camera pans/tracks smoothly to screen left across a stationary, low demonstration wall of red-orange bricks laid on their narrow edge with grey mortar, revealing a protruding right-hand corner/junction, alternating header and stretcher courses with staggered vertical mortar joints, and a left-hand 90-degree corner.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.2,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ve_pan_left_corner_wall, the camera frames the protruding right-hand corner and intersecting wall junction of ent_brick_wall with bricks laid on edge in alternating headers and stretchers."
+        },
+        {
+          "time_s": 2.5,
+          "cue": "visual: In ve_pan_left_corner_wall, as the camera tracks left, the recessed wall section and staggered vertical mortar joints across three brick-on-edge courses above the base course are clearly visible."
+        },
+        {
+          "time_s": 4.8,
+          "cue": "visual: In ve_pan_left_corner_wall, the camera reaches the left-hand 90-degree corner return of ent_brick_wall on the sandy ground."
+        }
+      ],
+      "limits": "The internal hollow cavities inside the wall are enclosed by the top course and are not directly visible from this low exterior camera angle; brick manufacturing method and compressive strength cannot be visually measured."
+    },
+    {
+      "id": "claim_tilt_up_end",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/visual_events/1/context_result",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between approximately 5.2s and 6.72s, the camera tilts upward at the end of its leftward pan, causing the foreground brick corner to drop toward the bottom of the frame and soften in focus while background trees and the headless torso of a standing person become prominent.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 5.2,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 5.2,
+          "cue": "visual: In ve_tilt_up_end_of_pan, the horizontal leftward scan begins tilting upward near the left end of ent_brick_wall."
+        },
+        {
+          "time_s": 6.2,
+          "cue": "visual: In ve_tilt_up_end_of_pan, the foreground brick top course is near the bottom frame edge and slightly out of focus while the beige shirt and dark trousers of ent_standing_person and background trees fill the frame."
+        }
+      ],
+      "limits": "The transition from horizontal pan to upward tilt is gradual between roughly 5.0s and 5.3s."
+    },
+    {
+      "id": "claim_standing_person_partial",
+      "target_paths": [
+        "/sources/0/entities/1/label",
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/1/description",
+        "/additional_analysis/crop_guidance"
+      ],
+      "claim": "A person wearing dark grey trousers and a light beige short-sleeved shirt stands behind the brick wall throughout 0.0–6.72s, with their head and upper chest cut off by the top edge of the frame.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 1,
+          "cue": "visual: In ve_pan_left_corner_wall, the dark grey trousers and right hand of ent_standing_person are visible behind the protruding brick corner."
+        },
+        {
+          "time_s": 6,
+          "cue": "visual: In ve_tilt_up_end_of_pan, the beige short-sleeved shirt, dark grey trousers, and both arms of ent_standing_person are visible on the right side of the frame, still cut off below the neck."
+        }
+      ],
+      "limits": "Because the person's face is never in frame and they perform no masonry action during the clip, their identity and site role are not established."
+    },
+    {
+      "id": "claim_rat_trap_bond_inference",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "The visible alternating header-and-stretcher brick-on-edge arrangement of the sample wall (ent_brick_wall) illustrates the Rat-Trap Bond masonry geometry described in the script as creating continuous hollow cavities within the wall, even though the enclosed internal cavities are not directly visible from this low exterior angle.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.2,
+      "cues": [
+        {
+          "time_s": 2.5,
+          "cue": "visual: In ve_pan_left_corner_wall, ent_brick_wall displays bricks laid on edge in alternating header (crosswise) and stretcher (lengthwise) positions across completed courses."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Unlike conventional brickwork, where bricks are laid flat, Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: In Rat-Trap Bond masonry, spacing parallel brick-on-edge stretchers with perpendicular headers creates internal air pockets between the stretchers."
+        }
+      ],
+      "limits": "The top course covers the wall and the low camera angle cannot look down into or inside the wall, so the internal cavities and their continuity or cleanliness from mortar droppings are not visually confirmed in this clip."
+    },
+    {
+      "id": "claim_structural_strength_illustrative",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/4/editorial_use"
+      ],
+      "claim": "The visible staggered vertical joints and bonded corner/junction courses in 0.0–5.2s (ve_pan_left_corner_wall) illustrate the masonry detailing that the script links to wall strength and stability, without visually proving measured structural strength.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.2,
+      "cues": [
+        {
+          "time_s": 2.5,
+          "cue": "visual: In ve_pan_left_corner_wall, vertical mortar joints are staggered from course to course across the corner and straight runs of ent_brick_wall."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Vertical joints are staggered to ensure strength and stability' and 'Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.'"
+        }
+      ],
+      "limits": "Structural load capacity, crushing strength, and long-term durability cannot be established from visual inspection of a low sample wall."
+    },
+    {
+      "id": "claim_fresh_mortar_state",
+      "target_paths": [
+        "/sources/0/interpretations/1/claim",
+        "/additional_analysis/continuity"
+      ],
+      "claim": "The sample wall (ent_brick_wall) appears recently mortared and unpointed, with rough dark grey mortar joints and loose grey mortar droppings resting along the sandy ground at the base of the bricks.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.2,
+      "cues": [
+        {
+          "time_s": 1.5,
+          "cue": "visual: In ve_pan_left_corner_wall, dark grey unsmoothed mortar protrudes slightly from joints and loose grey mortar crumbs lie on the sandy soil along the base of ent_brick_wall."
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Freshly laid masonry before pointing or cleanup typically exhibits damp dark grey cement mortar joints and fallen mortar droppings along the plinth/base."
+        }
+      ],
+      "limits": "Exact time elapsed since bricklaying, moisture content, curing status, and cement-sand mix ratio cannot be verified visually."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_brick_wall_architecture",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_pan_left_corner_wall"
+        }
+      ],
+      "category": "architecture",
+      "observation": "A low freestanding demonstration corner wall built directly on sandy soil using red-orange rectangular bricks laid on edge in four visible tiers (one base course and three brick-on-edge courses) with a 90-degree corner and intersecting junction.",
+      "entity_ids": [
+        "ent_brick_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 6.72
+      },
+      "uncertainty": "Whether the lowest partially buried course rests on a prepared sub-base below the loose sand is not visible."
+    },
+    {
+      "id": "wm_mortar_material_state",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_pan_left_corner_wall"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Dark grey mortar fills the horizontal bed joints and vertical head joints between the red-orange bricks in an unpointed, rough-struck state, with loose grey mortar droppings scattered along the base of the wall on the sand.",
+      "entity_ids": [
+        "ent_brick_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 5.2
+      },
+      "uncertainty": "Exact moisture level and mortar composition cannot be determined visually."
+    },
+    {
+      "id": "wm_person_wardrobe",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_standing_person"
+        },
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_tilt_up_end_of_pan"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The standing person behind the wall wears pleated dark grey trousers and an untucked, button-front, light beige short-sleeved shirt.",
+      "entity_ids": [
+        "ent_standing_person"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 6.72
+      },
+      "uncertainty": "Footwear and headwear (if any) are hidden behind the brick wall or outside the top of the frame."
+    },
+    {
+      "id": "wm_outdoor_environment",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_pan_left_corner_wall"
+        },
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_tilt_up_end_of_pan"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor tree-shaded site with light brown sandy ground in the foreground and dense green leafy trees, trunks, and pink-flowering shrubs in the background under daylight.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 6.72
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_internal_cavities_not_visible",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_pan_left_corner_wall"
+        }
+      ],
+      "subject": "Internal hollow cavities inside the Rat-Trap Bond brick wall",
+      "kind": "not_visible",
+      "limitation": "Because the camera stays at a low ground-level angle below the top course of bricks and the top course covers the wall, the interior hollow cavities and whether mortar fell inside them cannot be seen in this clip.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 6.72
+      }
+    },
+    {
+      "id": "el_brick_strength_and_manufacture",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        }
+      ],
+      "subject": "Brick crushing strength, wire-cut manufacture, and thermal/structural performance",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the exterior brick faces cannot establish whether the bricks are wire-cut or hand-moulded, their compressive strength in kg/cm², percentage of material savings, or thermal insulation performance.",
+      "interval": null
+    },
+    {
+      "id": "el_person_identity_not_visible",
+      "evidence_refs": [
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_standing_person"
+        },
+        {
+          "source_id": "396de22682e23f71",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_tilt_up_end_of_pan"
+        }
+      ],
+      "subject": "Identity and role of the standing person behind the wall",
+      "kind": "not_visible",
+      "limitation": "The person's head and face remain outside the top edge of the frame throughout the entire 6.72-second window, and they do not handle tools or bricks during the shot.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 6.72
+      }
+    }
+  ],
+  "descriptive_name": "low_angle_pan_left_brick_on_edge_corner_wall"
+}

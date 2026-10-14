@@ -1,0 +1,498 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "b9777201733dfcadc7107fcdd9f80cd3",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "af951a169f4f500f",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 5.290667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 5.290667
+            },
+            "status": "reviewed",
+            "note": "Continuous high-angle close-up of an L-shaped brick wall corner with dry-laid bricks on the top course."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 0.5
+            },
+            "state": "speech",
+            "note": "Off-screen male voice speaking briefly at the start of the clip."
+          },
+          {
+            "interval": {
+              "start_s": 0.5,
+              "end_s": 3.5
+            },
+            "state": "non_speech",
+            "note": "Quiet outdoor ambient sound."
+          },
+          {
+            "interval": {
+              "start_s": 3.5,
+              "end_s": 5.290667
+            },
+            "state": "speech",
+            "note": "Off-screen male voice speaking in Tamil, cut off at the end of the recording."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.290667
+          },
+          "reason": "No readable text, numbers, or frog stamps are visible on the bricks or ground."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_brick_corner",
+          "kind": "object",
+          "label": "L-shaped brick wall corner with bricks on edge",
+          "uncertainty": "Whether this is a test mock-up on bare soil or part of a permanent structure is not visible."
+        },
+        {
+          "id": "ent_bats",
+          "kind": "object",
+          "label": "Small brick bat/closer piece placed vertically inside the corner cavity",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_speaker_1",
+          "kind": "speaker",
+          "label": "Off-screen male speaker",
+          "uncertainty": "Identity and role on site are not visually established."
+        }
+      ],
+      "speech": [
+        {
+          "id": "sp_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 0.5
+          },
+          "speaker_id": "ent_speaker_1",
+          "language": "ta",
+          "original_text": "அதுல",
+          "english_translation": "In that",
+          "transcription_status": "partial",
+          "uncertainty": "Clipped at the very beginning of the recording; exact preceding context is missing."
+        },
+        {
+          "id": "sp_02",
+          "interval": {
+            "start_s": 3.5,
+            "end_s": 5.290667
+          },
+          "speaker_id": "ent_speaker_1",
+          "language": "ta",
+          "original_text": "மீதி இப்பதான் ஒரு சைடு",
+          "english_translation": "The rest, just now one side...",
+          "transcription_status": "partial",
+          "uncertainty": "Utterance is cut off by the end of the video file."
+        }
+      ],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.290667
+          },
+          "label": "Static view of L-shaped brick-on-edge corner course",
+          "description": "High-angle handheld close-up looking down at the 90-degree corner junction of a low brick wall built over bare sandy soil. Lower courses are bedded in grey mortar with some loose mortar droppings visible on the soil inside the inner corner. The top course consists of red clay bricks placed on their narrow edge without mortar (dry-laid), arranged in parallel pairs with cross-bricks (headers/stretchers) creating rectangular vertical cavities between them. At the corner junction, a small cut brick piece (bat/closer) stands vertically in the gap between the bricks, and three broken brick bats rest on the sandy soil in the upper left background. The camera holds a nearly steady framing with slight handheld drift throughout.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_brick_corner",
+            "ent_bats"
+          ],
+          "context_result": "Shows the geometric layout of bricks on edge, internal cavities, and a small closer piece at a corner junction before mortar is applied to the top course.",
+          "camera_framing": "High-angle close-up, handheld with minimal drift.",
+          "uncertainty": "The top course has no visible mortar between the bricks, indicating a dry-laid trial or demonstration layout rather than a finished mortared course."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "construction_technique",
+          "claim": "The dry-laid top course on the mortared lower courses demonstrates the geometric arrangement of Rat-Trap Bond masonry at a 90-degree corner junction, showing bricks placed on edge to form internal cavities and the use of a small cut closer brick (bat) to maintain the bond pattern around the corner.",
+          "evidence_refs": [
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_corner"
+            },
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_bats"
+            }
+          ],
+          "uncertainty": "Because the top course is dry-laid without mortar and the bricks show rough, uneven edges rather than clean wire-cut faces, this serves as an illustrative layout of corner geometry and cavities rather than a completed, mortared structural corner or an example of neat wire-cut bricks."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.290667
+          },
+          "reason": "Single continuous static shot (ve_01) with steady framing across the entire 5.29s clip; any sub-span provides the same clear top-down view of the brick-on-edge corner geometry and internal cavities.",
+          "uncertainty": "Top course is dry-laid without mortar, and loose mortar droppings are visible on the ground inside the corner.",
+          "details": {
+            "comparison_scope": "single_continuous_shot_in_attached_source",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Clear view of bricks laid on edge forming hollow cavities and a corner junction arrangement.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "af951a169f4f500f",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.5,
+            "end_s": 5.0
+          },
+          "reason": "Strong explanatory B-roll for the script clauses describing how Rat-Trap Bond places bricks on their edge to create hollow cavities inside the wall, or later when discussing special attention at wall junctions and corners.",
+          "uncertainty": "The top course is unmortared (dry-laid), so it illustrates the geometric arrangement rather than completed mortared bonding.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Full corner framing showing both legs of the L-junction and internal cavities.",
+            "visible_result": "Bricks standing on edge with rectangular hollow spaces between them and a corner closer piece.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Top-down visual of brick-on-edge cavity geometry and corner detailing.",
+            "relationship": "match",
+            "intended_explanation": "Shows how placing bricks on edge leaves hollow cavities inside the wall and how a corner junction is arranged.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unr_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.290667
+          },
+          "field": "speech",
+          "issue": "Off-screen Tamil utterances at the start and end of the clip are cut off by the recording boundaries, leaving their full sentence context incomplete."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "There is just one continuous static camera take across the entire 5.290667s window (ve_01, claim_01) with no on-screen human action, repeated physical cycles, or camera resets.",
+    "crop_guidance": "Preserve the central L-shaped brick corner assembly (ent_brick_corner, ent_bats in ve_01) occupying the middle and lower-right regions of the frame so both legs of the corner, the bricks on edge, and the internal cavities remain clearly readable. A slight zoom or crop excluding the upper-left corner could remove the scattered broken brick bats and dry leaves on the soil, as well as the loose mortar droppings at the bottom-center inside the corner, if a cleaner diagram-like framing is desired; however, those background elements are stationary and not highly distracting. No hands or tools enter the frame during the clip.",
+    "clean_handles": "Interval: 0.0–5.290667; classification: settled; beginning observation: 0.0s shows the static L-shaped brick wall corner with dry-laid bricks on edge on the top course and no human actors present; middle observation: 2.6s shows the same stationary brick corner with negligible handheld camera drift; end observation: 5.290667s shows the same stationary brick corner at the end of the recording; relevant action stopped: the brick corner subject (ent_brick_corner, ent_bats) is inactive from the start with no hands or tools moving in frame across the entire span; uncertainty: none identified; links: ve_01 and claim_01; editorial use: provides a clean, stable 5.29s B-roll shot that can be entered or exited at any point to illustrate brick-on-edge orientation, internal cavities, or corner junction layout.",
+    "continuity": "Throughout 0.0–5.290667s (ve_01, claim_01), the L-shaped brick corner is stationary in a high-angle close-up with no actors or tools in frame. The lower courses are mortared (with mortar droppings visible on the soil inside the inner corner), while the top course of bricks on edge is dry-laid without mortar. If cutting this clip adjacent to active bricklaying shots from the broader collection, note that the top course here is unmortared; using it before mortaring or as a general cutaway avoids a mortar-state continuity jump.",
+    "preview_frames": "1.0s (ve_01, claim_01): Clear high-angle view of the L-shaped brick-on-edge corner showing the parallel brick arrangement, internal rectangular cavities, and small vertical closer brick piece at the junction. 4.0s (ve_01, claim_01): Nearly identical stable framing later in the clip, confirming minimal handheld drift across the duration.",
+    "speech_action_links": "Off-screen Tamil speech occurs at 0.0–0.5s (sp_01, claim_03) and 3.5–5.290667s (sp_02, claim_04) over the static shot of the brick corner (ve_01). Because no speaker or pointing gesture is visible in frame and both utterances are clipped by the recording boundaries, the exact physical referent of 'In that' and 'The rest, just now one side...' is uncertain, though likely referring to the brick course being laid on site. Per the output audio policy, source camera audio is excluded from the final output, so this speech will be muted.",
+    "shorter_explanations": "Because the entire 5.290667s clip (ve_01, claim_01) is a static close-up of an inactive brick corner with no progression of action, any shorter sub-span (such as 1.0–3.5s, duration 2.5s calculated as 3.5s minus 1.0s with no transitions) retains the exact same visual setup and result—showing the bricks on edge, internal hollow cavities, and dry-laid corner closer arrangement—while omitting the rest of the identical static hold.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows red clay bricks positioned on their narrow edge along the top course of a wall corner (ve_01)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the rectangular hollow cavities formed between the parallel edge-laid bricks on the top course (ve_01), though continuity through the full wall depth is only seen at the top open course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "claim_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the distinct alternating header/stretcher brick-on-edge pattern and internal cavities of a course (ve_01), with the qualification that the top course shown here is dry-laid without mortar rather than a completed mortared course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "claim_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates how a 90-degree corner junction is arranged in Rat-Trap Bond using a small cut brick piece (closer/bat) to maintain the cavity bond pattern around the corner (ve_01), though the top course is shown dry-laid without mortar."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: the mixed-media plan allows future generated video for later gap filling, recorded footage is not forced into every script passage, and supplied reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots_status is exact_passage_level_reservations_not_supplied), so none are invented. Any future generated visual suggestions would be marked planned_not_created. Original camera sound was reviewed for intake evidence, and we acknowledge that source audio is excluded from the final output timeline.",
+    "unavailable": "No human actors, tools, visible text, or multi-stage physical actions occur in this clip. No source_audio editorial ideas are proposed because the output audio policy excludes source camera sound."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "From 0.0s to 5.290667s, the camera holds a static high-angle close-up of an inactive L-shaped brick wall corner built over sandy soil, where lower courses are bedded in grey mortar and the top course consists of red bricks placed on their narrow edge without mortar, forming rectangular hollow cavities between parallel bricks and incorporating a small vertical cut brick piece at the corner.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.290667,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: At 0.0s in ve_01, top-down close-up shows an L-shaped brick wall corner with mortared lower courses and a dry-laid top course of bricks on edge creating internal cavities."
+        },
+        {
+          "time_s": 5.290667,
+          "cue": "visual: Through 5.290667s in ve_01, the brick corner remains completely stationary with no hands or tools entering the frame."
+        }
+      ],
+      "limits": "The top course is dry-laid without mortar, and whether this wall sits on a permanent plinth or directly on bare soil as a demonstration mock-up cannot be established from this close-up."
+    },
+    {
+      "id": "claim_02",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/2",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The dry-laid brick-on-edge top course and small cut brick piece at the 90-degree junction illustrate the geometric bonding pattern, internal cavities, and corner detailing of Rat-Trap Bond masonry described in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.290667,
+      "cues": [
+        {
+          "time_s": 1,
+          "cue": "visual: In ve_01 (around 1.0s), bricks on the top course are arranged on edge in parallel pairs with cross-bricks and a small vertical bat at the 90-degree corner."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Unlike conventional brickwork, where bricks are laid flat, Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall' and 'Certain locations require special attention, particularly wall junctions, corners'."
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: In Rat-Trap Bond masonry, bricks are laid on edge in a shiners-and-rowlocks (stretcher/header on edge) pattern creating internal cavities, and three-quarter or quarter bats/closers are used at corner junctions to maintain the bond."
+        }
+      ],
+      "limits": "Because the top course has no mortar, it illustrates the dry layout geometry rather than a completed, structurally bonded and mortared corner course."
+    },
+    {
+      "id": "claim_03",
+      "target_paths": [
+        "/sources/0/speech/0/english_translation",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "An off-screen speaker utters the partial Tamil word 'அதுல' ('In that') between 0.0s and 0.5s.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 0.5,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "source_speech: In sp_01 (0.0–0.5s), off-screen voice says 'அதுல' ('In that')."
+        }
+      ],
+      "limits": "The utterance is clipped at the start of the recording, and the speaker and exact referent are off-screen."
+    },
+    {
+      "id": "claim_04",
+      "target_paths": [
+        "/sources/0/speech/1/english_translation",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "An off-screen speaker says in Tamil 'மீதி இப்பதான் ஒரு சைடு' ('The rest, just now one side...') between 3.5s and 5.290667s.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 3.5,
+      "end_s": 5.290667,
+      "cues": [
+        {
+          "time_s": 3.5,
+          "cue": "source_speech: In sp_02 (3.5–5.290667s), off-screen voice says 'மீதி இப்பதான் ஒரு சைடு' ('The rest, just now one side...')."
+        }
+      ],
+      "limits": "The utterance is cut off by the end of the recording, and the speaker is not visible."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "af951a169f4f500f",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "af951a169f4f500f",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_corner"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Red clay bricks with rough, slightly irregular edges and textured surfaces are laid on edge without mortar on the top course, over lower courses bedded in grey mortar.",
+      "entity_ids": [
+        "ent_brick_corner"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 5.290667
+      },
+      "uncertainty": "Compressive strength and firing quality of the bricks cannot be determined visually."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "af951a169f4f500f",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Bare light-brown sandy soil surrounds the brickwork in dappled outdoor daylight, with a few dry leaves, three broken brick bats in the upper-left background, and grey mortar droppings on the soil inside the wall corner.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 5.290667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "af951a169f4f500f",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "af951a169f4f500f",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_corner"
+        }
+      ],
+      "subject": "Mortar bonding on the top course",
+      "kind": "not_established",
+      "limitation": "The top course of bricks on edge is dry-laid without mortar, so this clip does not show completed mortar bed or vertical joint bonding on the uppermost course.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 5.290667
+      }
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "af951a169f4f500f",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Brick crushing strength, material savings percentage, and thermal performance",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the brickwork cannot establish quantitative brick crushing strength (e.g., 20, 35, or 75 kg/cm²), percentage reduction in brick consumption, or thermal insulation performance.",
+      "interval": null
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [],
+      "subject": "Inspection granularity",
+      "kind": "not_established",
+      "limitation": "While the clip was reviewed across its full 5.290667s duration under high media resolution settings, exhaustive native frame-by-frame inspection is not established by the review mechanism.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "dry_laid_brick_on_edge_corner_closeup"
+}

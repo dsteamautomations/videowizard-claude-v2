@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: SecretStr = SecretStr('')
     GEMINI_API_KEY: SecretStr = SecretStr('')
     OPENAI_API_KEY: SecretStr = SecretStr('')
+    WORKERS: int = 3  # one process per concurrent job; the server caps analysis at 3 anyway
     HF_API_KEY: SecretStr = SecretStr('')
     ANALYSIS_DEADLINE_SECONDS: int = 1800
     FFPROBE_EXECUTABLE: str = 'ffprobe'

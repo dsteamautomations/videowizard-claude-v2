@@ -1,0 +1,571 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "ee19618c9e297aafbcff08b8947d3b5a",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "c94c846220bf45ff",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 4.8
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 4.8
+            },
+            "status": "reviewed",
+            "note": "Continuous exterior camera movement along a finished exposed brick wall and arched porch structure with trees and dirt yard in the background. Reviewed via sampled frames at 1 fps across the 4.8-second window; exact native frame rate and pixel dimensions were not supplied in metadata."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 4.8
+            },
+            "state": "silence",
+            "note": "Audio track is present in metadata, but contains complete silence or near-inaudible ambient floor with no speech or distinct environmental sounds."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.8
+          },
+          "reason": "No readable text, signage, or numbers appear in the frame."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_brick_building",
+          "kind": "object",
+          "label": "Completed building exterior with exposed reddish-terracotta brickwork, recessed mortar joints, decorative bottle-set arch, perforated brick screen, and stepped corbelled porch arch",
+          "uncertainty": "Exact building function, total number of storeys, and whether the internal wall structure uses hollow cavities cannot be verified from the finished exterior surface alone."
+        },
+        {
+          "id": "ent_bottle_arch",
+          "kind": "object",
+          "label": "Circular or arched wall feature on the lower left with green glass bottles embedded radially in red-painted masonry",
+          "uncertainty": "Only the upper-right quadrant of the feature is visible before it exits frame left."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ev_exterior_wall_push",
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.8
+          },
+          "label": "Slow forward camera movement along finished exposed brick wall and arched entrance porch",
+          "description": "The camera moves slowly forward along an angled exterior wall of a finished building constructed with exposed, unpainted light-reddish terracotta bricks and neat recessed mortar joints. In the lower left foreground from 0.0s to about 2.5s, a deep-red painted brick arch frames a decorative circular opening containing green glass bottles set radially into the masonry, which gradually exits the left edge of the frame as the camera advances. The main wall shows alternating long and short brick faces consistent with brick-on-edge bonding, along with a diagonal pattern of small rectangular ventilation openings near the upper middle. To the right, a deeper-red painted brick porch or entrance structure features a curved barrel-vaulted roof and a stepped corbelled brick arch over entrance steps. Beyond the porch on the right, a bare dirt yard with fallen leaves, a low grey-and-red masonry bench, a circular concrete well or planter ring, and green trees are visible.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_brick_building",
+            "ent_bottle_arch"
+          ],
+          "context_result": "Shows a finished, unplastered brick building exterior with clean recessed pointing and architectural detailing.",
+          "camera_framing": "Medium-wide angled exterior shot moving slowly forward (dolly/gimbal push-in) parallel to the wall.",
+          "uncertainty": "Because the wall is completely finished and enclosed, internal hollow cavities and exact brick crushing strength cannot be observed directly."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_rat_trap_exterior",
+          "category": "construction_technique",
+          "claim": "The finished exterior wall exhibits alternating stretcher and header-like brick faces laid on edge with neat recessed pointing and no exterior plaster, illustrating the completed appearance of a Rat-Trap Bond masonry building.",
+          "evidence_refs": [
+            {
+              "source_id": "c94c846220bf45ff",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_exterior_wall_push"
+            },
+            {
+              "source_id": "c94c846220bf45ff",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_building"
+            }
+          ],
+          "uncertainty": "While the alternating pattern and brick proportions match Rat-Trap Bond masonry, the internal cavity is enclosed and not directly visible in this exterior shot."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "idea_best_take_exterior",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "c94c846220bf45ff",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_exterior_wall_push"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.8
+          },
+          "reason": "Single continuous, smooth gimbal/dolly push along the finished exposed brickwork (`ev_exterior_wall_push`, `ce_exposed_brick_appearance`); the entire 4.8-second clip is stable and usable without camera resets.",
+          "uncertainty": "None regarding stability; internal cavities are unseen (`ce_completed_building_illustration`).",
+          "details": {
+            "comparison_scope": "Single continuous shot within this 4.8s source window; no alternative takes exist in this clip.",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Finished unplastered brick wall with recessed pointing and stepped corbelled porch arch.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_script_exposed_attractive",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "c94c846220bf45ff",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_exterior_wall_push"
+            },
+            {
+              "source_id": "c94c846220bf45ff",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_rat_trap_exterior"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.8
+          },
+          "reason": "Directly shows an unplastered, exposed brick wall with an attractive alternating pattern, perforated ventilation openings, and a corbelled brick arch (`ev_exterior_wall_push`, `ce_exposed_brick_appearance`), supporting the script claim that plastering is often unnecessary and pointing enhances appearance (`ce_pointing_appearance`, `ce_plaster_savings_inference`).",
+          "uncertainty": "Cost savings and weather resistance over time are inferred from the script rather than measured in the clip (`ce_plaster_savings_inference`, `ce_pointing_weather_inference`).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Clean exposed brick facade with recessed mortar pointing and decorative arches.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Visualizes how finished Rat-Trap Bond walls look attractive without exterior plaster and with neat pointing.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_story_opening_or_payoff",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "c94c846220bf45ff",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_exterior_wall_push"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.8
+          },
+          "reason": "Works well as an architectural showcase shot (`ev_exterior_wall_push`) either early in P001 when introducing completed buildings in India (`ce_completed_building_illustration`) or near the end of P001 as a concluding payoff showing a finished sustainable home (`ce_sustainable_home_payoff`).",
+          "uncertainty": "The shot shows only one building exterior, so it illustrates rather than proves widespread adoption across thousands of buildings in India (`ce_completed_building_illustration`).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Start at 0.0s if the editor wants to include the decorative green-bottle arch in the foreground left, or enter around 2.0s to focus purely on the brick wall and stepped porch arch.",
+            "visible_result": "Completed brick building exterior in a wooded setting.",
+            "story_role": "payoff",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Shows a finished architectural application of the masonry technique.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": []
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "There is just one continuous filming attempt across the 4.8-second clip (`ev_exterior_wall_push`, 0.0–4.8s). The camera executes a single, smooth forward push along the exterior brick wall without resets, stops, or repeated actions.",
+    "crop_guidance": "No specific output aspect ratio is forced in the constraints, though standard horizontal delivery preserves the full composition of `ev_exterior_wall_push` (0.0–4.8s): the foreground bottle arch on the left (0.0–2.5s), the angled brick wall with ventilation openings in the center, and the stepped corbelled brick porch arch and yard on the right. If cropping to a tighter or vertical aspect ratio, centering on the junction between the main textured wall and the stepped red corbelled porch arch (center-right of frame) preserves the clearest view of the alternating brick courses and architectural detailing (`ce_exposed_brick_appearance`). There are no talking faces, workers, or distracting edge intrusions to exclude.",
+    "clean_handles": "Interval: 0.0–4.8s; classification: settled; beginning observation: 0.0s static finished brick wall, bottle-set arch in lower-left foreground, and corbelled porch arch on right as the camera begins moving slowly forward; middle observation: 2.4s the bottle-set arch exits frame left while the camera continues its smooth forward move along the exposed brick wall and perforated vents; end observation: 4.8s the camera reaches a closer medium view of the brick wall texture and the stepped corbelled porch arch with the yard behind it; relevant action stopped: the architectural subject (`ent_brick_building`) is inactive from the start with no human activity, while gentle forward camera movement continues throughout the entire 4.8s span; uncertainty: none identified regarding subject stability, though the clip ends while the camera is still drifting slowly forward; links: ev_exterior_wall_push, ce_exposed_brick_appearance; editorial use: provides a clean, stable architectural B-roll span from start to finish where any sub-span can be cut smoothly depending on whether the editor wants the foreground bottle arch (0.0–2.5s) or just the main brick wall and porch arch (2.0–4.8s).",
+    "continuity": "Throughout `ev_exterior_wall_push` (0.0–4.8s), the building subject (`ent_brick_building`) is stationary while the camera moves slowly forward from left-to-right depth along the wall plane (`ce_exposed_brick_appearance`). At candidate entry 0.0s, the red-painted arch with radially embedded green glass bottles (`ent_bottle_arch`) occupies the lower-left foreground. Between 1.5s and 2.8s, this foreground arch passes out of the left frame edge. From 2.8s to candidate exit 4.8s, only the unpainted terracotta brick wall (left/center), the red-painted stepped corbelled porch arch (right), and the dirt yard with trees (far right background) remain in view. An editor cutting into or out of this shot should match the slow forward camera motion rather than cutting directly to a conflicting rapid pan.",
+    "preview_frames": "0.0s shows the widest framing of `ev_exterior_wall_push`, including the decorative green-bottle arch (`ent_bottle_arch`) in the lower-left foreground alongside the exposed brick wall and stepped porch arch (`ce_exposed_brick_appearance`). 2.0s shows the transition moment in `ev_exterior_wall_push` as the foreground arch is nearly out of frame and the diagonal perforated ventilation openings and mortar joints on the main wall are prominent (`ce_pointing_appearance`). 4.0s shows a closer, clean architectural view in `ev_exterior_wall_push` of the alternating brick courses and the stepped corbelled brick arch of the porch without the foreground bottle arch (`ce_exposed_brick_appearance`).",
+    "speech_action_links": "No speech is present in the source audio track (0.0–4.8s is silent), and the output audio policy excludes source camera audio, so there are no speech-to-action links.",
+    "shorter_explanations": "Because `ev_exterior_wall_push` (0.0–4.8s) is a single 4.8-second B-roll camera move over a static finished building (`ce_exposed_brick_appearance`), no multi-stage process condensation is needed. However, if a shorter 2.0-second architectural cut is desired without the foreground bottle arch, the editor can use 2.5–4.5s (2.0s duration = 4.5s - 2.5s, no transitions), which retains the clear view of the exposed brickwork, recessed pointing (`ce_pointing_appearance`), and stepped corbelled porch arch while omitting the initial pass past the circular bottle window (0.0–2.5s). A longer use of the full 0.0–4.8s clip adds the decorative bottle-arch feature and a longer, more unhurried camera push.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive",
+          "claim_id": "ce_exposed_brick_appearance",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the finished, unplastered exterior brick wall with an orderly alternating brick pattern, diagonal ventilation holes, and a stepped corbelled arch (`ev_exterior_wall_push`, 0.0–4.8s)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "plastering is often unnecessary, creating additional savings.",
+          "claim_id": "ce_plaster_savings_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates a completed building facade left unplastered (`ev_exterior_wall_push`, 0.0–4.8s) to accompany the narration about omitting plaster, while keeping the financial cost savings as an unmeasured narrative claim."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the brickwork often remains exposed, pointing is carried out to enhance appearance",
+          "claim_id": "ce_pointing_appearance",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows neat, recessed mortar joints (pointing) between the exposed bricks on the finished exterior wall (`ev_exterior_wall_push`, 0.0–4.8s), demonstrating the clean visual appearance described in the script."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "and weather resistance.",
+          "claim_id": "ce_pointing_weather_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Provides visual coverage of the finished pointed exterior wall (`ev_exterior_wall_push`, 0.0–4.8s) while the narrator explains the weather-resistance benefit, which cannot be physically measured from the short clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.",
+          "claim_id": "ce_completed_building_illustration",
+          "support_classification": "illustrative",
+          "editorial_use": "Serves as an illustrative example of a completed brick building (`ev_exterior_wall_push`, 0.0–4.8s) when the narration discusses real-world adoption, without independently proving the internal cavity structure or the nationwide count of thousands of buildings."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "this technology offers a practical pathway toward sustainable housing.",
+          "claim_id": "ce_sustainable_home_payoff",
+          "support_classification": "illustrative",
+          "editorial_use": "Works as a calm concluding payoff shot (`ev_exterior_wall_push`, 0.0–4.8s) showing a finished, attractive brick building set among trees to close the documentary."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "This analysis follows the mixed-media workflow: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (`planned_visual_slots` is empty and status is `exact_passage_level_reservations_not_supplied`), so none are invented. Any future visual suggestions would be marked `planned_not_created`. For audio, the original source sound track was inspected for intake (and found to be silent across 0.0–4.8s), and the output policy (`excluded`) is respected by omitting any `source_audio` editorial recommendations.",
+    "unavailable": "No source speech (`speech`) or readable on-screen text (`visible_text`) is present in this 4.8-second exterior architectural shot. Consequently, `speech_action_links` has no spoken utterances to link, and `source_audio` recommendations are omitted both due to silent audio and the `excluded` output audio policy."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_exposed_brick_appearance",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "The exterior wall of the completed building is unplastered, displaying exposed reddish-terracotta bricks laid in an alternating pattern with diagonal perforated ventilation openings, a bottle-set arch on the lower left, and a red-painted stepped corbelled brick porch arch on the right as the camera moves slowly forward.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: In `ev_exterior_wall_push` at 0.0s, the unpainted reddish brick wall, diagonal ventilation gaps, lower-left bottle arch (`ent_bottle_arch`), and right-side red corbelled porch arch (`ent_brick_building`) are clearly visible."
+        },
+        {
+          "time_s": 4.8,
+          "cue": "visual: Through 4.8s in `ev_exterior_wall_push`, the camera completes a smooth forward push along the exposed brick surface."
+        }
+      ],
+      "limits": "Because the wall is finished and enclosed, internal hollow cavities, exact brick dimensions, and structural strength cannot be directly observed from the exterior surface."
+    },
+    {
+      "id": "ce_pointing_appearance",
+      "target_paths": [
+        "/sources/0/entities/0/label",
+        "/sources/0/visual_events/0/description",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The exposed exterior brickwork features neat, recessed mortar joints (pointing) along the horizontal and vertical courses.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 2,
+          "cue": "visual: In `ev_exterior_wall_push` around 2.0s–4.8s, the angled perspective along `ent_brick_building` highlights clean, uniform recessed grooves in the mortar bed and vertical joints between the exposed bricks."
+        }
+      ],
+      "limits": "The clip shows the finished pointed joints but does not show the active process of a mason carrying out the pointing work."
+    },
+    {
+      "id": "ce_plaster_savings_inference",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/1/uncertainty",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "The unplastered, exposed brick facade illustrates the script's explanation that leaving the attractive brick pattern exposed makes exterior plastering unnecessary and creates cost savings.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: `ev_exterior_wall_push` (0.0–4.8s) shows a completed building exterior (`ent_brick_building`) finished without plaster."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.'"
+        }
+      ],
+      "limits": "Visual evidence confirms the absence of exterior plaster on this wall, but financial savings are a narrative claim from the script and are not measured in the footage."
+    },
+    {
+      "id": "ce_pointing_weather_inference",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/uncertainty",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The finished pointed mortar joints on the exterior brick wall illustrate the script's statement that pointing is carried out on exposed brickwork to enhance weather resistance.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 2,
+          "cue": "visual: `ev_exterior_wall_push` (0.0–4.8s) shows recessed mortar pointing on the exterior wall of `ent_brick_building`."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.'"
+        }
+      ],
+      "limits": "Long-term weather resistance cannot be observed or tested in a 4.8-second clip."
+    },
+    {
+      "id": "ce_completed_building_illustration",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/uncertainty",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/2/uncertainty",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The finished brick building exterior with brick-on-edge course proportions illustrates a completed Rat-Trap Bond masonry structure in use, supporting the script's discussion of buildings constructed with this technology.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: `ev_exterior_wall_push` (0.0–4.8s) shows a finished building (`ent_brick_building`) whose wall courses display alternating stretcher and header-like faces laid on edge."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Developed as a cost-effective construction technology, Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond walls laid with bricks on edge exhibit alternating shiner (long face on edge) and rowlock (short end on edge) headers on the exterior surface."
+        }
+      ],
+      "limits": "Because the wall is completed and closed, the internal hollow cavities cannot be seen directly, and a single building does not independently verify the script's figure of thousands of buildings across India."
+    },
+    {
+      "id": "ce_sustainable_home_payoff",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/5"
+      ],
+      "claim": "The calm exterior shot of the completed exposed-brick building surrounded by trees serves as an illustrative visual payoff for the script's concluding summary on sustainable housing.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.8,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: `ev_exterior_wall_push` (0.0–4.8s) shows a completed, neat exposed-brick building (`ent_brick_building`) in a leafy outdoor setting."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'this technology offers a practical pathway toward sustainable housing.'"
+        }
+      ],
+      "limits": "Environmental footprint, thermal comfort, and resource conservation are narrative conclusions in the script rather than directly measurable properties in this exterior shot."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_exposed_brick_architecture",
+      "evidence_refs": [
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_exterior_wall_push"
+        },
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_building"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Unplastered exterior wall built with light-reddish terracotta bricks laid on edge with recessed mortar joints, diagonal rectangular ventilation slots, and a deeper-red painted stepped corbelled brick arch forming a barrel-vaulted entrance porch.",
+      "entity_ids": [
+        "ent_brick_building"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 4.8
+      },
+      "uncertainty": "Internal wall cavity structure is enclosed and not visible."
+    },
+    {
+      "id": "wm_bottle_arch_detail",
+      "evidence_refs": [
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_exterior_wall_push"
+        },
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bottle_arch"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Decorative circular or arched wall opening on the lower left framed by deep-red painted bricks and filled with green glass bottles embedded radially into red masonry.",
+      "entity_ids": [
+        "ent_bottle_arch"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 2.8
+      },
+      "uncertainty": "Only part of the circular opening is in frame before exiting left."
+    },
+    {
+      "id": "wm_yard_environment",
+      "evidence_refs": [
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_exterior_wall_push"
+        }
+      ],
+      "category": "environment",
+      "observation": "Unpaved reddish-brown dirt yard scattered with dry leaves, bordered by green trees, a small grey-and-red masonry bench outside the porch steps, and a circular concrete ring structure in the background.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 4.8
+      },
+      "uncertainty": "Exact geographic location and whether the circular background structure is a well or planter cannot be determined from the visual alone."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "lim_internal_cavities_unseen",
+      "evidence_refs": [
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_exterior_wall_push"
+        },
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_building"
+        }
+      ],
+      "subject": "Internal hollow cavities and mortar cleanliness inside the wall",
+      "kind": "not_visible",
+      "limitation": "Because the building is already constructed and the exterior wall is closed, the internal hollow cavities of the Rat-Trap Bond and whether mortar was prevented from falling into them cannot be seen in this clip.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 4.8
+      }
+    },
+    {
+      "id": "lim_material_strength_and_thermal_performance",
+      "evidence_refs": [
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_building"
+        }
+      ],
+      "subject": "Brick crushing strength, percentage of brick savings, curing duration, and indoor thermal performance",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the finished exterior wall does not establish the crushing strength of the bricks (e.g., 20, 35, or 75 kg/cm²), the exact percentage of material saved, how many days the wall was cured, or the indoor temperature reduction.",
+      "interval": null
+    },
+    {
+      "id": "lim_building_height_storeys",
+      "evidence_refs": [
+        {
+          "source_id": "c94c846220bf45ff",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_exterior_wall_push"
+        }
+      ],
+      "subject": "Total building height and number of storeys",
+      "kind": "not_visible",
+      "limitation": "The camera framing shows only the ground-level wall and entrance porch arch; the upper roofline and total number of storeys of the building are outside the top of the frame.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 4.8
+      }
+    }
+  ],
+  "descriptive_name": "exposed_red_brick_wall_corbelled_arch_exterior_push"
+}

@@ -1,0 +1,593 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "89a18670d9803c495bdf89db238b92ea",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "83188fdf3fa7003a",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 6.250667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 6.250667
+            },
+            "status": "reviewed",
+            "note": "Continuous exterior view of a finished brick corner wall and arched decorative feature, reviewed via sampled video frames across the 6.250667-second clip."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 6.250667
+            },
+            "state": "non_speech",
+            "note": "Quiet outdoor ambient sound with bird chirps and faint background noise; no speech present."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.250667
+          },
+          "reason": "No readable text or numbers are visible in the scene."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Completed exterior brick corner wall with pinkish-terracotta painted or colour-washed finish and recessed mortar joints",
+          "uncertainty": "Whether the brick course arrangement is internally hollow Rat-Trap Bond cannot be confirmed by direct interior view because the wall is completed and sealed, though the alternating long stretcher and short header faces on edge match the exterior pattern of rat-trap bond."
+        },
+        {
+          "id": "ent_arch_feature",
+          "kind": "object",
+          "label": "Red-painted arched wall recess or window feature incorporating embedded green and dark glass bottles",
+          "uncertainty": "Only the left portion of the arched feature is in frame; its full width and interior function are not visible."
+        },
+        {
+          "id": "ent_left_pole",
+          "kind": "object",
+          "label": "Vertical grey cylindrical pole or pipe intruding along the far left frame edge",
+          "uncertainty": "Exact function of the pole or pipe is not established from the partial edge view."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_001",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.250667
+          },
+          "label": "Slow upward-tilting exterior view of a completed brick corner wall and bottle-inlay arch",
+          "description": "The camera holds a close-medium oblique view of the exterior corner of a completed single-storey or low-rise brick building (`ent_wall`) set beside unpaved earth and green trees on the left. The brickwork shows alternating rectangular stretcher and narrower header faces painted or washed in a uniform light terracotta-pink colour, with neat recessed mortar joints and a stone or rubble plinth visible at the very bottom left base at 0.0s. To the right of the corner is a deep red-painted brick arch framing a decorative panel (`ent_arch_feature`) embedded with green and dark glass bottles arranged radially at the top and vertically below. Across 0.0s to 6.250667s, the camera slowly tilts upward and drifts slightly leftward, causing the bottom plinth and lower bottle row to exit the bottom of the frame while bringing more of the upper stepped red window hoods/eaves on the left wall and upper courses into view. Simultaneously, a vertical grey pole (`ent_left_pole`) enters and widens along the far left edge of the frame from roughly 0.5s onward.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_wall",
+            "ent_arch_feature",
+            "ent_left_pole"
+          ],
+          "context_result": "Shows a finished, weather-protected, unplastered brick building exterior with decorative architectural detailing and neat recessed pointing.",
+          "camera_framing": "Medium-close oblique angle on building corner; slow continuous upward tilt with slight leftward drift that introduces a vertical grey pole intrusion on the left frame edge.",
+          "uncertainty": "Internal wall cavities are enclosed and not directly visible; whether the pink surface finish is paint or a lime/colour wash after pointing is not visually distinguishable."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_001",
+          "category": "construction_technique",
+          "claim": "The completed exterior wall (`ent_wall`) in `ve_001` exhibits the characteristic alternating header-and-stretcher brick-on-edge surface bond of Rat-Trap Bond Masonry left unplastered with neat recessed mortar joints, illustrating how the finished brickwork pattern is visually attractive without full cement plastering and after pointing.",
+          "evidence_refs": [
+            {
+              "source_id": "83188fdf3fa7003a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            },
+            {
+              "source_id": "83188fdf3fa7003a",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "Because the wall is already finished and enclosed, internal hollow cavities, brick crushing strength, and the active pointing process are not directly visible; the surface has also received a terracotta-pink paint or colour wash."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_001",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "83188fdf3fa7003a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            },
+            {
+              "source_id": "83188fdf3fa7003a",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_001"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.250667
+          },
+          "reason": "Single continuous exterior shot (`ve_001`, claims `ce_001`, `ce_002`, `ce_003`) showing a completed building corner with exposed brick-on-edge bond pattern, neat recessed mortar joints, and decorative bottle-inlay arch (`ent_arch_feature`). Note that a grey pole (`ent_left_pole`, claim `ce_002`) intrudes increasingly on the far left edge after ~0.5s; using the earlier portion (0.0s–2.5s) or applying a slight right-favouring crop avoids or minimizes the pole intrusion.",
+          "uncertainty": "Internal cavities and construction steps are not visible in this completed building exterior.",
+          "details": {
+            "comparison_scope": "single_take_in_attached_source",
+            "alternative_refs": [
+              {
+                "source_id": "83188fdf3fa7003a",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_001"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 2.5
+            },
+            "must_keep_setup": "Clear view of the corner brick bond pattern and adjacent red arched bottle feature.",
+            "visible_result": "Completed, unplastered brick wall exterior with neatly recessed joints and colour-washed finish.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Finished architectural appearance of exposed brick-on-edge masonry.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_002",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "83188fdf3fa7003a",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            },
+            {
+              "source_id": "83188fdf3fa7003a",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_001"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.250667
+          },
+          "reason": "Strong illustrative B-roll for P001 clauses describing completed buildings across India (`ce_004`), the visually attractive exposed brick pattern that makes plastering unnecessary (`ce_005`), neat corner/junction finishing (`ce_006`), and the finished weather-resistant appearance after pointing (`ce_007`), or as a closing payoff shot of a sustainable finished home (`ce_008`).",
+          "uncertainty": "The wall is painted or colour-washed terracotta pink over the unplastered bricks, and only the completed result is seen, not the active construction or pointing work.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Corner perspective showing both walls meeting at the corner and the decorative arch on the right.",
+            "visible_result": "Neat, attractive finished brick wall without flat plaster coating.",
+            "story_role": "payoff",
+            "sound_type": null,
+            "useful_content": "Completed architectural aesthetic of rat-trap bond brickwork.",
+            "relationship": "match",
+            "intended_explanation": "Illustrates the finished aesthetic and durability of exposed brickwork.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unr_001",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.250667
+          },
+          "field": "ent_wall",
+          "issue": "Because the wall is completed and painted/colour-washed, internal hollow cavities and the exact brick manufacturing method (e.g. wire-cut vs hand-moulded) cannot be verified from this exterior view alone."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 6.250667-second source clip contains a single continuous exterior camera shot (`ve_001`, 0.0s–6.250667s, claims `ce_001`, `ce_002`) with no repeated takes, camera resets, or human demonstration actions. The camera performs a slow continuous upward tilt with a slight leftward drift across the corner of a completed brick building (`ent_wall`).",
+    "crop_guidance": "For standard horizontal output, the essential visual content is the brick corner in the centre (`ent_wall`) and the red arched bottle-inlay feature (`ent_arch_feature`) on the right (`ve_001`, claim `ce_001`). Beginning around 0.5s and becoming more prominent through 6.250667s, a vertical grey pole or pipe (`ent_left_pole`, claim `ce_002`) intrudes along the far left frame edge. A slight crop inward from the left edge (approximately 5–8% of frame width) and a proportional vertical trim cleanly excludes `ent_left_pole` while preserving the full garden foliage context on the left, the central corner brickwork, and the decorative arch on the right. No talking faces or other distractions are present.",
+    "clean_handles": "Interval: 0.0–6.250667; classification: settled; beginning observation: 0.0s shows the stationary completed brick corner wall (`ent_wall`) and decorative bottle arch (`ent_arch_feature`) in `ve_001` with the camera beginning a slow upward tilt; middle observation: 3.0s shows the same stationary brick corner and arch in `ve_001` as the slow camera tilt continues upward and the grey pole (`ent_left_pole`) is visible on the far left edge; end observation: 6.250667s shows the upper portion of the stationary brick corner, stepped window eaves on the left wall, and upper arch in `ve_001` as the slow upward camera tilt reaches the end of the file; relevant action stopped: the relevant subject (`ent_wall` and `ent_arch_feature`) is an inanimate completed building that is inactive from the start across the entire 0.0s–6.250667s span, while slow upward camera movement and slight breeze in background foliage continue throughout; uncertainty: none identified regarding subject stillness, though camera tilt is continuous and the recording ends at 6.250667s; links: `ve_001`, `ce_001`, `ce_002`; editorial use: provides a flexible 6.25-second exterior B-roll shot where any sub-span can be excerpted to illustrate a finished unplastered brick building corner.",
+    "continuity": "Throughout `ve_001` (0.0s–6.250667s, claims `ce_001`, `ce_002`), the completed brick corner (`ent_wall`) remains centred-left with the red bottle-inlay arch (`ent_arch_feature`) on the right and green trees/earth in the left background. At candidate entry 0.0s, the stone plinth at the base of the left wall and three horizontal rows of embedded bottles in the arch are visible, and the far left frame edge is nearly clear. As the camera tilts slowly upward and drifts slightly left toward candidate exit 6.250667s, the plinth and bottom row of bottles exit the bottom frame edge, the red stepped window overhangs along the left wall become more prominent in the upper left, and the vertical grey pole (`ent_left_pole`) occupies a wider strip along the far left edge.",
+    "preview_frames": "0.2s (`ve_001`, claim `ce_001`): shows the fullest view of the lower brick courses, the base plinth on the left, and all three vertical tiers of embedded glass bottles in the right-hand arch (`ent_arch_feature`) before the grey pole (`ent_left_pole`) significantly intrudes on the left edge. 3.0s (`ve_001`, claims `ce_001`, `ce_002`): shows the mid-tilt framing of the brick-on-edge corner pattern (`ent_wall`) and the radial bottle arch, with the grey pole visible along the far left margin. 6.0s (`ve_001`, claims `ce_001`, `ce_002`): shows the highest angle of the corner wall and the stepped red architectural eaves along the left side of the building.",
+    "speech_action_links": "No speech is present in the attached source audio (0.0s–6.250667s is quiet outdoor ambient sound only), and the output camera-audio policy excludes source sound.",
+    "shorter_explanations": "Because `ve_001` (0.0s–6.250667s, claims `ce_001`, `ce_002`) is a single slow camera tilt on a stationary building exterior rather than a multi-stage physical demonstration, an economical excerpt of 0.0s–2.5s (2.5s duration: 2.5 - 0.0 = 2.5s, with no transitions) retains the clearest view of the corner brick bond pattern (`ent_wall`) and the full bottle-inlay arch (`ent_arch_feature`) while minimizing the leftward drift into the grey foreground pole (`ent_left_pole`). Keeping the full 0.0s–6.250667s span (6.250667s duration) adds the upward tilt revealing the upper courses and stepped red window eaves on the left wall, at the cost of greater left-edge pole intrusion.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.",
+          "claim_id": "ce_004",
+          "support_classification": "illustrative",
+          "editorial_use": "Uses `ve_001` (0.0s–6.250667s) as an illustrative example of a completed building constructed with brick-on-edge masonry (`ent_wall`), without proving total building counts or nationwide geographic distribution from this single structure."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.",
+          "claim_id": "ce_005",
+          "support_classification": "illustrative",
+          "editorial_use": "Directly shows in `ve_001` an unplastered exterior wall (`ent_wall`) where the brick-on-edge pattern and recessed mortar joints remain visible as a decorative architectural finish (here painted or colour-washed pink alongside a decorative bottle arch `ent_arch_feature`), illustrating how leaving the brick pattern unplastered provides an attractive facade while cost savings remain a script claim."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "ce_006",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates a neatly bonded exterior wall corner (`ent_wall`) and adjacent arched opening (`ent_arch_feature`) in `ve_001`, showing the finished external appearance of a corner junction while the internal structural bonding details remain enclosed."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.",
+          "claim_id": "ce_007",
+          "support_classification": "illustrative",
+          "editorial_use": "Shows in `ve_001` the finished, neatly recessed mortar joints between the bricks (`ent_wall`), illustrating the appearance of pointed unplastered brickwork after completion, though the active pointing work and long-term weather performance are not directly observed."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry demonstrates how intelligent design can achieve more with less.",
+          "claim_id": "ce_008",
+          "support_classification": "illustrative",
+          "editorial_use": "Provides a strong closing or summary visual in `ve_001` showing the finished brick wall (`ent_wall`) paired with recycled glass bottles embedded in the decorative arch (`ent_arch_feature`), visually reinforcing resource-conscious architectural design."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "This analysis respects the mixed-media workflow plan: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (`planned_visual_slots` is empty with status `exact_passage_level_reservations_not_supplied`), so none are invented. Any future-visual ideas remain labelled `planned_not_created`. Original camera sound was inspected for intake (containing only quiet outdoor ambient sound and bird calls with no speech) while acknowledging that the output audio policy excludes source camera audio (`output: excluded`), so no `source_audio` editorial ideas are proposed.",
+    "unavailable": "Active construction processes, mortar mixing, brick laying, internal wall cavities, curing, and spoken explanations are unavailable in this clip because `ve_001` shows only a silent exterior view of an already completed building corner. Inspection coverage note (G07): visual analysis is based on sampled frames across the 6.250667-second window alongside full audio track inspection; exhaustive native frame-by-frame inspection is not established."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_001",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/entities/0/label",
+        "/sources/0/entities/1/label",
+        "/sources/0/editorial_ideas/0/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Across 0.0s to 6.250667s (`ve_001`), the video shows the exterior corner of a completed brick building (`ent_wall`) with alternating stretcher and header brick faces painted or colour-washed pinkish-terracotta and recessed mortar joints, next to a red-painted brick arch (`ent_arch_feature`) inlaid with green and dark glass bottles on the right and green foliage over unpaved ground on the left.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In `ve_001` at 0.0s, the corner of `ent_wall` is centred with alternating long and short brick faces, a stone base plinth at bottom left, and the bottle-inlaid red arch `ent_arch_feature` on the right."
+        },
+        {
+          "time_s": 6.250667,
+          "cue": "visual: In `ve_001` through 6.250667s, the same brick corner and red arch remain in view as the camera tilts slowly upward."
+        }
+      ],
+      "limits": "Because the wall is completed and surface-coated in terracotta-pink, the interior wall structure and exact brick composition are not visible."
+    },
+    {
+      "id": "ce_002",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/camera_framing",
+        "/sources/0/entities/2/label",
+        "/sources/0/editorial_ideas/0/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "During `ve_001` (0.0s to 6.250667s), the camera tilts slowly upward and drifts slightly leftward, causing a vertical grey cylindrical pole or pipe (`ent_left_pole`) to enter and widen along the far left frame edge from roughly 0.5s through 6.250667s while the bottom plinth exits the bottom of the frame.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: At 0.0s in `ve_001`, only a tiny sliver at the top-left corner hints at `ent_left_pole`, and the lower plinth is visible."
+        },
+        {
+          "time_s": 3.0,
+          "cue": "visual: By 3.0s in `ve_001`, `ent_left_pole` forms a distinct vertical grey band along the entire left frame edge as the camera tilts upward."
+        },
+        {
+          "time_s": 6.0,
+          "cue": "visual: By 6.0s in `ve_001`, the camera has tilted higher up the corner wall and `ent_left_pole` occupies a wider strip on the left edge."
+        }
+      ],
+      "limits": "Timestamps for the gradual camera drift and edge intrusion are approximate across sampled frames."
+    },
+    {
+      "id": "ce_003",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason"
+      ],
+      "claim": "The alternating narrow header and longer stretcher brick-on-edge course pattern visible on the exterior of `ent_wall` in `ve_001` matches the external bonding geometry of Rat-Trap Bond Masonry finished with recessed pointing and a colour wash rather than flat plaster.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.2,
+          "cue": "visual: In `ve_001` at 0.2s, bricks in `ent_wall` are set on edge in courses of alternating short headers and long stretchers with deeply recessed mortar joints."
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond Masonry is laid with bricks on edge in an alternating header-and-stretcher bond that produces this specific external course geometry."
+        }
+      ],
+      "limits": "Because the wall is completed and enclosed, internal hollow cavities cannot be directly observed in this shot."
+    },
+    {
+      "id": "ce_004",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/0/editorial_use"
+      ],
+      "claim": "The completed brick building exterior (`ent_wall`) in `ve_001` (0.0s–6.250667s) illustrates a finished structure built with brick-on-edge masonry for the script clause 'Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.'",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.2,
+          "cue": "visual: `ve_001` shows a completed, standing brick building exterior (`ent_wall`) with brick-on-edge bonding."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.'"
+        }
+      ],
+      "limits": "A single building exterior illustrates finished adoption but does not independently prove the quantity ('thousands of buildings') or nationwide distribution."
+    },
+    {
+      "id": "ce_005",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "The unplastered brick-on-edge facade (`ent_wall`) with neat recessed joints and colour wash in `ve_001` (0.0s–6.250667s) illustrates the script clause 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.'",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.2,
+          "cue": "visual: In `ve_001`, the brick courses and recessed mortar joints of `ent_wall` remain unplastered as the finished exterior texture, coated only with a pink paint or colour wash."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.'"
+        }
+      ],
+      "limits": "The brick pattern is left unplastered (though painted/colour-washed pink), and financial savings are a narrative claim not measurable from the image."
+    },
+    {
+      "id": "ce_006",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/2/editorial_use"
+      ],
+      "claim": "The tightly interlocked 90-degree exterior brick corner (`ent_wall`) and adjacent arched opening (`ent_arch_feature`) in `ve_001` (0.0s–6.250667s) illustrate the finished external detailing of corners and junctions for the script clause 'Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.'",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 3.0,
+          "cue": "visual: `ve_001` centres on the plumb 90-degree exterior corner of `ent_wall` showing staggered bonding across courses and the adjoining red brick arch `ent_arch_feature`."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.'"
+        }
+      ],
+      "limits": "Only the completed exterior corner is visible; internal tie bricks, partition wall connections, and active laying at the corner are not shown."
+    },
+    {
+      "id": "ce_007",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/3/editorial_use"
+      ],
+      "claim": "The deeply recessed, clean mortar joints visible between the bricks of `ent_wall` in `ve_001` (0.0s–6.250667s) illustrate the finished result of pointing described in the script clause 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.'",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.2,
+          "cue": "visual: In `ve_001`, every horizontal bed joint and vertical head joint on `ent_wall` is uniformly recessed and cleanly finished."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.'"
+        }
+      ],
+      "limits": "Shows the completed pointed joint appearance after painting/colour-washing, not the active pointing process or measured weather resistance."
+    },
+    {
+      "id": "ce_008",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/4/editorial_use"
+      ],
+      "claim": "The combination of brick-on-edge masonry (`ent_wall`) and reused glass bottles embedded in the decorative arch (`ent_arch_feature`) in `ve_001` (0.0s–6.250667s) illustrates resource-conscious construction for the script clause 'Rat-Trap Bond Masonry demonstrates how intelligent design can achieve more with less.'",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.250667,
+      "cues": [
+        {
+          "time_s": 0.2,
+          "cue": "visual: `ve_001` displays both the brick-on-edge wall `ent_wall` and the decorative window/arch panel `ent_arch_feature` constructed with embedded glass bottles."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry demonstrates how intelligent design can achieve more with less.'"
+        }
+      ],
+      "limits": "Illustrative visual payoff; quantitative material savings are not directly measured in the shot."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_001",
+      "evidence_refs": [
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        },
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Exterior building corner built with bricks laid on edge in an alternating stretcher-and-header bond, finished with recessed mortar joints, a pinkish-terracotta surface coat, and stepped red window hoods/eaves along the left wall.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.250667
+      },
+      "uncertainty": "Whether the terracotta-pink finish is paint or lime/pigment wash is not visually distinguishable."
+    },
+    {
+      "id": "wm_002",
+      "evidence_refs": [
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        },
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_arch_feature"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Deep red-painted brick arch framing a decorative wall panel inlaid with whole and cut green and dark glass bottles arranged radially in the upper arch and vertically in lower tiers.",
+      "entity_ids": [
+        "ent_arch_feature"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.250667
+      },
+      "uncertainty": "Only the left portion of the arched panel is inside the camera frame."
+    },
+    {
+      "id": "wm_003",
+      "evidence_refs": [
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "category": "environment",
+      "observation": "Unpaved reddish-brown earth ground beside the building with dark-leaved ornamental shrubs in the foreground and green broad-leaved trees in the background under diffuse daylight.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.250667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_001",
+      "evidence_refs": [
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        },
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Internal hollow cavities and structural properties of the wall",
+      "kind": "not_visible",
+      "limitation": "Because `ent_wall` is a completed, enclosed exterior wall, internal hollow cavities, mortar cleanliness inside cavities, and brick crushing strength cannot be directly observed in this clip.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.250667
+      }
+    },
+    {
+      "id": "el_002",
+      "evidence_refs": [
+        {
+          "source_id": "83188fdf3fa7003a",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "subject": "Active masonry construction, pointing, and curing processes",
+      "kind": "not_visible",
+      "limitation": "This clip shows only the finished building exterior; active plinth preparation, brick laying, pointing execution, and water curing are not visible.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "pink_brick_corner_wall_and_bottle_arch_tilt"
+}

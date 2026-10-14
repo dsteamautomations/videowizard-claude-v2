@@ -157,6 +157,7 @@ def test_v2c_alignment_padding_tolerated_and_failed_job_reprocessed_from_journal
     from app.storage import storage
     timing = json.loads(storage().get(job['result']['timing_key']).decode('utf-8'))
     assert 0.1 < timing['alignment_overshoot_s'] < 1.0 and timing['script_characters_match']
+    assert timing['words_clamped'] >= 1 and all(w['end_s'] <= timing['audio']['duration_s'] for w in timing['words'])
     # a job that failed validation keeps its paid response; recover re-processes it without a second synthesis
     fake.mode = 'timing_bad'
     assert vw(home, 'voice', 'narrate', '--voice', 'v2')[0] == 0
@@ -169,6 +170,30 @@ def test_v2c_alignment_padding_tolerated_and_failed_job_reprocessed_from_journal
     drain()
     assert next(j for j in vw(home, 'voice', 'jobs')[1] if j['id'] == bad['id'])['status'] == 'failed'  # still over tolerance
     assert len([c for c in fake.calls if c[0] == 'POST']) == posts  # and not paid again
+
+
+def test_v2d_real_vw1_timing_clamped_once_and_accepted_by_planning_rule():
+    """Defect 2 (14 Oct 2026): the real VW-1 narration ends 0.16 s after the decoded MP3; planning refused it. The producer's clamp
+    makes the file valid for every reader; applying it twice changes nothing; a word entirely inside the padding still orders."""
+    from copy import deepcopy
+    from pathlib import Path
+    from app.voice_timing import check_words, clamp_words
+    raw = json.loads((Path(__file__).parent / 'fixtures' / 'vw1' / 'voice' / '328d22ee-427f-4586-9d63-3018bd9a27e7.timing.json').read_text(encoding='utf-8'))
+    assert raw['words'][-1]['end_s'] > raw['audio']['duration_s']
+    with pytest.raises(ValueError):
+        check_words(deepcopy(raw))
+    once = check_words(clamp_words(deepcopy(raw), 1.0))
+    assert once['words_clamped'] == 1 and once['alignment_overshoot_s'] == 0.16 and once['words'][-1]['end_s'] == once['audio']['duration_s']
+    twice = check_words(clamp_words(deepcopy(once), 1.0))
+    assert twice['words'] == once['words'] and twice['words_clamped'] == 0
+    # a whole word inside the padding
+    deep = deepcopy(raw); deep['words'][-1]['start_s'] = raw['audio']['duration_s'] + 0.05
+    fixed = check_words(clamp_words(deep, 1.0))
+    assert fixed['words'][-1]['start_s'] < fixed['words'][-1]['end_s'] == fixed['audio']['duration_s']
+    # beyond the tolerance: refused, nothing clamped
+    far = deepcopy(raw); far['last_character_end_s'] = raw['audio']['duration_s'] + 1.5
+    with pytest.raises(ValueError):
+        clamp_words(far, 1.0)
 
 
 def test_v2b_audition_recovered_from_history(home, database, fake):

@@ -1,0 +1,3218 @@
+[
+ {
+  "stage": "intake",
+  "unit": null,
+  "summary": {
+   "notes": "Removed document title, overall and per-scene durations, scene headings, 'Visuals'/'Narration' labels and all bulleted visual notes. Every narration sentence kept unchanged.",
+   "title": "Rat-Trap Bond Masonry - Documentary Explainer",
+   "client": "VK Nardep",
+   "titles": [
+    "Rat-Trap Bond Masonry - Documentary Explainer",
+    "Rat-Trap Bond Brickwork - Construction Technique Guide",
+    "Building Cooler Homes with Fewer Bricks - Rat-Trap Bond"
+   ],
+   "warnings": [],
+   "removed_lines": 78,
+   "source_digest": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/intake/source.txt",
+    "name": "source.txt",
+    "bytes": 4805,
+    "sha256": "e17597524fc6884a84fe94115b796320cb9d1fd934963aeed2dc1a5e7f93de12",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/intake/original.txt",
+    "name": "original.txt",
+    "bytes": 7254,
+    "sha256": "9a70e5ab0650ba1286ea4466d6da7a7ac6e4eee1c3254b47099c485dfdefefdc",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/intake/intake.json",
+    "name": "intake.json",
+    "bytes": 5945,
+    "sha256": "f5793e89ebdc3d36366c2b0e41b35e258d4c7ebb870ffea4c4b6706ff78af6fb",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": "Rat-Trap Bond Masonry - Documentary Explainer\nscript approved"
+ },
+ {
+  "stage": "brief",
+  "unit": null,
+  "summary": {
+   "tone": "Calm, instructional documentary voice: plain, confident, evidence-led. Explain rather than sell; claims are stated as practical facts with their conditions attached ('when constructed properly', 'bricks should'). Respectful of craftsmanship and site work. No hype, no marketing superlatives, no humour.",
+   "ending": "Awareness and conviction, no sales call to action. The film closes on the script's own summary - building more with less by using materials wisely - leaving the viewer persuaded the technique is sensible and worth adopting or asking for. No wording change recommended.",
+   "answers": {},
+   "message": "Laying bricks on edge instead of flat leaves hollow cavities that make a wall cheaper, cooler and greener while staying as strong as conventional brickwork - provided the bricks are good enough for the building's height and the work is done carefully.",
+   "purpose": "The viewer understands what Rat-Trap Bond Masonry is, why it works (bricks on edge create insulating cavities that cut brick use by about a quarter without losing strength), and what it takes to build it correctly: brick quality matched to building height, careful laying, junction detailing, pointing and curing. They leave convinced it is a credible, practical option for affordable housing and know the conditions under which it is safe.",
+   "audience": "Recommendation: people who decide how a small building gets built in India - self-builders and house owners planning a home, site engineers and masons, and staff of housing or rural-development organisations. Assumes basic familiarity with brick construction (plinth, mortar, course, plumb) but no engineering background; the script explains the technique from first principles while quoting crushing-strength figures, so it suits both lay owners and technical staff.",
+   "questions": 0,
+   "constraints": "",
+   "source_intake": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+   "content_digest": "d444739e172c8ee60e2a9ab8d54382888d6598b4ea732c4a4501fa85424a4f56"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/brief/brief.json",
+    "name": "brief.json",
+    "bytes": 3304,
+    "sha256": "5b857b47030e9e6355d5c1e4a5bde8b99ea0d739d584a3e1cf8ed4d8dc8107b1",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": "Yes brief approved"
+ },
+ {
+  "stage": "script",
+  "unit": null,
+  "summary": {
+   "changes": 0,
+   "passages": 1,
+   "assessment": "The intake wording already fits all five Brief decisions. Purpose: it explains, justifies, then instructs. Audience: terms like plinth, course and crushing strength are used but each step is explained in plain words, so lay owners and technical staff can both follow. Message: the fewer-bricks / same-strength / cooler trade-off is stated with its conditions (brick strength by storey, workmanship). Tone: neutral, evidence-led, no promotional language. Ending: the closing summary has no sales call, matching the approved awareness ending. No factual inconsistency found between sentences; the 25 percent saving, three-storey limit and crushing-strength figures are supplied claims, not verified. No wording change is recommended; the script can proceed unchanged.",
+   "characters": 4766,
+   "source_brief": "d444739e172c8ee60e2a9ab8d54382888d6598b4ea732c4a4501fa85424a4f56",
+   "source_intake": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+   "content_digest": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/script/script.json",
+    "name": "script.json",
+    "bytes": 10611,
+    "sha256": "3a36798a98055bbe0758e720eed34b42a01eaf1ea949054bc793633955e6008c",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": "approve this wording as the spoken scrip - yes approved"
+ },
+ {
+  "stage": "voice",
+  "unit": null,
+  "summary": {
+   "cost": {
+    "model": "eleven_v4",
+    "characters": 2097
+   },
+   "name": "UD - Narrator",
+   "job_id": "328d22ee-427f-4586-9d63-3018bd9a27e7",
+   "model_id": "eleven_v4",
+   "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75
+   },
+   "voice_id": "Rr3HT8xllxaRdjMZxGBa",
+   "duration_s": 304.88,
+   "source_script": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+   "content_digest": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/voice/voice.json",
+    "name": "voice.json",
+    "bytes": 328,
+    "sha256": "5d5de660e92d8e3995414d10709ec0e3c0ee919cdd8b831350d750d3a5696c8f",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/voice/328d22ee-427f-4586-9d63-3018bd9a27e7.mp3",
+    "name": "narration.mp3",
+    "bytes": 4879299,
+    "sha256": "8646a2a5df6e264ac74b4a1682024fca27c4b446b469161f264fd16afbc849b8",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/voice/328d22ee-427f-4586-9d63-3018bd9a27e7.timing.json",
+    "name": "timing.json",
+    "bytes": 294000,
+    "sha256": "f4c03147964c0b3c492b9aad102b63c8939fbfb944b4b594a436de4f860ec765",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": "Yes i accept this narration as the final voice"
+ },
+ {
+  "stage": "media",
+  "unit": null,
+  "summary": {
+   "clips": [
+    {
+     "id": "06dea1fd48ab8d67",
+     "name": "C0032_02881492.mp4",
+     "bytes": 2726853,
+     "sha256": "06dea1fd48ab8d673d351fdca93e21904ed173a5a1d167864619d27bbb2a1ffe",
+     "has_audio": true,
+     "duration_s": 3.84
+    },
+    {
+     "id": "58406eeebad022db",
+     "name": "C0065_02730556.mp4",
+     "bytes": 23134949,
+     "sha256": "58406eeebad022db7a89b12e2b73fbb39aa2861d299819d8fb163ba63a7c19ab",
+     "has_audio": true,
+     "duration_s": 25.450667
+    },
+    {
+     "id": "62d836cca85dfaf7",
+     "name": "C0081_02743972.mp4",
+     "bytes": 8584686,
+     "sha256": "62d836cca85dfaf7a2094d750455341d78d3dc154f3af52665d0ec71933157b7",
+     "has_audio": true,
+     "duration_s": 9.6
+    },
+    {
+     "id": "37d6e9613f69095a",
+     "name": "C0085_02747380.mp4",
+     "bytes": 34456801,
+     "sha256": "37d6e9613f69095a7ec106053dfa83d1ca1cb606e1b94c065067bb5a307a28af",
+     "has_audio": true,
+     "duration_s": 26.88
+    },
+    {
+     "id": "c916a7b16df4e8b1",
+     "name": "C0088_02751604.mp4",
+     "bytes": 28389545,
+     "sha256": "c916a7b16df4e8b1f66689bdeff2634e5b200420307dad1c24df5d47dddcf72b",
+     "has_audio": true,
+     "duration_s": 28.330667
+    },
+    {
+     "id": "20dd79acf0504a6b",
+     "name": "C0089_02753020.mp4",
+     "bytes": 62725514,
+     "sha256": "20dd79acf0504a6bd3177e6171377ec070a25b842228218cf1944ba83681ab66",
+     "has_audio": true,
+     "duration_s": 40.32
+    },
+    {
+     "id": "15694574b6b0757b",
+     "name": "C0091_02755996.mp4",
+     "bytes": 33667343,
+     "sha256": "15694574b6b0757ba23b10ad51825fa9c557ad07c212771ec447081b6c2691bd",
+     "has_audio": true,
+     "duration_s": 24.96
+    },
+    {
+     "id": "6c23c8cb4d43b034",
+     "name": "C0092_02757244.mp4",
+     "bytes": 36188300,
+     "sha256": "6c23c8cb4d43b0340ba10ce8b1dc1c6cbc0a1c9c8648279c71b883aa4e4a1c65",
+     "has_audio": true,
+     "duration_s": 32.64
+    },
+    {
+     "id": "8b989f41efb32685",
+     "name": "C0093_02758876.mp4",
+     "bytes": 26206156,
+     "sha256": "8b989f41efb32685a2cede4cf3de6b086bc373c760de1275495fd15bee65474d",
+     "has_audio": true,
+     "duration_s": 26.410667
+    },
+    {
+     "id": "00111c8c2dbf4235",
+     "name": "C0095_02761036.mp4",
+     "bytes": 17343662,
+     "sha256": "00111c8c2dbf4235277127319a8a2180bfb9da2157919d2f26a3155f18c292a8",
+     "has_audio": true,
+     "duration_s": 17.770667
+    },
+    {
+     "id": "1404425cf0c085eb",
+     "name": "C0097_02763220.mp4",
+     "bytes": 40228959,
+     "sha256": "1404425cf0c085eb62461bf7718c01eacb30fe20eb0add4c6d607911a78e0657",
+     "has_audio": true,
+     "duration_s": 46.570667
+    },
+    {
+     "id": "89e63d1c9a303b74",
+     "name": "C0099_02766196.mp4",
+     "bytes": 29467280,
+     "sha256": "89e63d1c9a303b74bb62ed723e74a9fb8770462da6f9f71eb3e0d492a298fd91",
+     "has_audio": true,
+     "duration_s": 31.68
+    },
+    {
+     "id": "eac05ce0f036a133",
+     "name": "C0100_02767780.mp4",
+     "bytes": 10956774,
+     "sha256": "eac05ce0f036a1339af5e2f090606f077bad398a1230366f24194c15a390e801",
+     "has_audio": true,
+     "duration_s": 9.6
+    },
+    {
+     "id": "b4184ef52b53f8e9",
+     "name": "C0102_02769436.mp4",
+     "bytes": 5410825,
+     "sha256": "b4184ef52b53f8e9717536cc4f88d0051c8c1b48a8031d06fcadf31de9ca0074",
+     "has_audio": true,
+     "duration_s": 6.72
+    },
+    {
+     "id": "e5de3cc29659dbae",
+     "name": "C0104_02772676.mp4",
+     "bytes": 79577506,
+     "sha256": "e5de3cc29659dbae6749c7d0687dec2595adf6d40e9766b9f3d21b9eeb56141d",
+     "has_audio": true,
+     "duration_s": 95.04
+    },
+    {
+     "id": "4a3f8acc7e57897c",
+     "name": "C0105_02777428.mp4",
+     "bytes": 8782357,
+     "sha256": "4a3f8acc7e57897c808b11c6f88d5288822a8bb05d30ba2aecc3ebb57c312263",
+     "has_audio": true,
+     "duration_s": 12.48
+    },
+    {
+     "id": "af951a169f4f500f",
+     "name": "C0107_02778412.mp4",
+     "bytes": 6400835,
+     "sha256": "af951a169f4f500f2c980735196960a4ef04ba3bf01407adab0cf1bfdd0ed639",
+     "has_audio": true,
+     "duration_s": 5.290667
+    },
+    {
+     "id": "bde4541933cbeb9c",
+     "name": "C0108_02778676.mp4",
+     "bytes": 9700829,
+     "sha256": "bde4541933cbeb9c299da482b141719af446ea97bf5c45ae24cfa57f3d679eb2",
+     "has_audio": true,
+     "duration_s": 9.6
+    },
+    {
+     "id": "194ee239c156362f",
+     "name": "C0109_02779156.mp4",
+     "bytes": 16426743,
+     "sha256": "194ee239c156362fd1ced8ac2d08a2b5fa6ddfda93b9558c66551487afb6d174",
+     "has_audio": true,
+     "duration_s": 9.6
+    },
+    {
+     "id": "f632685cb779dfca",
+     "name": "C0111_02779732.mp4",
+     "bytes": 15037186,
+     "sha256": "f632685cb779dfcabeafbb5ffdb8211134b7eb13bf2598a7caa01d9a59cea0f6",
+     "has_audio": true,
+     "duration_s": 10.56
+    },
+    {
+     "id": "9ac32ade617aa64b",
+     "name": "C0112_02780260.mp4",
+     "bytes": 27173737,
+     "sha256": "9ac32ade617aa64b23b71ca1e0611e8abdb12234dd117482254401dc2ea03dc5",
+     "has_audio": true,
+     "duration_s": 25.92
+    },
+    {
+     "id": "f9c75daccd71f0f2",
+     "name": "C0113_02781556.mp4",
+     "bytes": 17971679,
+     "sha256": "f9c75daccd71f0f2f1a635faef64fde79a48d0e81373b48b14fc4d822a954b06",
+     "has_audio": true,
+     "duration_s": 12.970667
+    },
+    {
+     "id": "a0d773a77ff5ca28",
+     "name": "C0114_02782204.mp4",
+     "bytes": 11331488,
+     "sha256": "a0d773a77ff5ca288536c0735106a452bdbc034ebe3297510f23518338f17a32",
+     "has_audio": true,
+     "duration_s": 8.170667
+    },
+    {
+     "id": "295ba0420ed3b064",
+     "name": "C0115_02782612.mp4",
+     "bytes": 8243242,
+     "sha256": "295ba0420ed3b06480aaa3d1d773d6f42db013c90d6f0dc67f2cab0c813b5130",
+     "has_audio": true,
+     "duration_s": 5.76
+    },
+    {
+     "id": "69ea4672ae4cb794",
+     "name": "C0116_02782900.mp4",
+     "bytes": 5419351,
+     "sha256": "69ea4672ae4cb794e3beacb0e48accd1ec406737fc0aab01a4b5ad79cdc2c4a3",
+     "has_audio": true,
+     "duration_s": 4.8
+    },
+    {
+     "id": "d8d68967c21efc5e",
+     "name": "C0119_02785252.mp4",
+     "bytes": 30764477,
+     "sha256": "d8d68967c21efc5e77134b7ed7963b8902c73e33c98149cc0f42b3c613eb7b53",
+     "has_audio": true,
+     "duration_s": 26.88
+    },
+    {
+     "id": "e05531f75f4ae7bb",
+     "name": "C0120_02786596.mp4",
+     "bytes": 26448283,
+     "sha256": "e05531f75f4ae7bbe16cdda069cf7c1c0f3da0132fa534e40620b988ff661a93",
+     "has_audio": true,
+     "duration_s": 19.2
+    },
+    {
+     "id": "5ebe3c677ccd416c",
+     "name": "C0122_02788948.mp4",
+     "bytes": 58590340,
+     "sha256": "5ebe3c677ccd416c71b01ea4a74efc11ae79e3dc4c526fa557f65b21a2604545",
+     "has_audio": true,
+     "duration_s": 51.84
+    },
+    {
+     "id": "6463f57986b7b84e",
+     "name": "C0124_02791708.mp4",
+     "bytes": 11595493,
+     "sha256": "6463f57986b7b84e0533a34ce500ecce6d7883ea0fe8064257266f7f0bb49279",
+     "has_audio": true,
+     "duration_s": 11.050667
+    },
+    {
+     "id": "6d74ff5dd953d222",
+     "name": "C0126_02792764.mp4",
+     "bytes": 9966092,
+     "sha256": "6d74ff5dd953d222d3dd51cecac33c09b0e47bd0e9f7773527731055a60204ae",
+     "has_audio": true,
+     "duration_s": 9.130667
+    },
+    {
+     "id": "6c7451d2aaffe416",
+     "name": "C0128_02794180.mp4",
+     "bytes": 7501764,
+     "sha256": "6c7451d2aaffe416a06b78bb8fe383327edf63746b87a5661ec8a3bd7e015395",
+     "has_audio": true,
+     "duration_s": 4.8
+    },
+    {
+     "id": "396de22682e23f71",
+     "name": "C0129_02794420.mp4",
+     "bytes": 14589903,
+     "sha256": "396de22682e23f71b2f3ade11f86773b8922a5fbef8def8da29f514fd2e0223c",
+     "has_audio": true,
+     "duration_s": 6.72
+    },
+    {
+     "id": "8b2e39ef7ee2ca3b",
+     "name": "C0130_02794756.mp4",
+     "bytes": 10505999,
+     "sha256": "8b2e39ef7ee2ca3b5eab4cd4b3a2e457786eeed81b023d17185248a0541bb2bd",
+     "has_audio": true,
+     "duration_s": 9.130667
+    },
+    {
+     "id": "85d3848516a43a38",
+     "name": "C0131_02795212.mp4",
+     "bytes": 10615280,
+     "sha256": "85d3848516a43a3829161f1cc14e36d648801131a40724cb0a37ac46bd7e5c3c",
+     "has_audio": true,
+     "duration_s": 11.050667
+    },
+    {
+     "id": "e0cad4cb3a79a622",
+     "name": "C0134_02797372.mp4",
+     "bytes": 34585448,
+     "sha256": "e0cad4cb3a79a622ecc1e19c80c5fa468464d4fe2837f1fa9ff356152ffeddf0",
+     "has_audio": true,
+     "duration_s": 16.810667
+    },
+    {
+     "id": "2652bcbbb1ffc0df",
+     "name": "C0135_02798212.mp4",
+     "bytes": 25739517,
+     "sha256": "2652bcbbb1ffc0df878fb39a15d69e24ef2dc5b68705e8814f141c7ff147f3cb",
+     "has_audio": true,
+     "duration_s": 17.770667
+    },
+    {
+     "id": "5d72a4d6f839a841",
+     "name": "C0136_02799100.mp4",
+     "bytes": 18382232,
+     "sha256": "5d72a4d6f839a841404461532fc082329b075ebe07fc0583ddcb79120ff6c9a5",
+     "has_audio": true,
+     "duration_s": 10.56
+    },
+    {
+     "id": "c94c846220bf45ff",
+     "name": "C0138_02799940.mp4",
+     "bytes": 3266981,
+     "sha256": "c94c846220bf45ff026413477d3341b6c83fc9ca682c34097f5d51d0c5a4b373",
+     "has_audio": true,
+     "duration_s": 4.8
+    },
+    {
+     "id": "33d5daa609365812",
+     "name": "C0139_02800180.mp4",
+     "bytes": 3397951,
+     "sha256": "33d5daa60936581297800c8ff192fa8056de44e0e514ccad2d37d8eea7a235bb",
+     "has_audio": true,
+     "duration_s": 4.330667
+    },
+    {
+     "id": "83188fdf3fa7003a",
+     "name": "C0140_02800396.mp4",
+     "bytes": 6735277,
+     "sha256": "83188fdf3fa7003a6f5dd347c67bae19bdbdc23873112f84703b3d52e289af65",
+     "has_audio": true,
+     "duration_s": 6.250667
+    },
+    {
+     "id": "3fcf307156dd6ee3",
+     "name": "C0202_02858956.mp4",
+     "bytes": 6904537,
+     "sha256": "3fcf307156dd6ee3c90257388a8011a1e966e2a1fbf1e39e5640fec76d1fab0c",
+     "has_audio": true,
+     "duration_s": 6.250667
+    },
+    {
+     "id": "c8d08404e8cdcfcc",
+     "name": "C0207_02860228.mp4",
+     "bytes": 4291628,
+     "sha256": "c8d08404e8cdcfcc6110a46af0b79ecdea07aaf93bbc7a59282399a6d8d63d28",
+     "has_audio": true,
+     "duration_s": 7.210667
+    },
+    {
+     "id": "738105e9b2d82b0d",
+     "name": "C0209_02861020.mp4",
+     "bytes": 15178263,
+     "sha256": "738105e9b2d82b0d40e2b6b4053fee3608bf7e27b2209b43d22d19497dc9e3e9",
+     "has_audio": true,
+     "duration_s": 5.76
+    },
+    {
+     "id": "f7b6e6385e7a0901",
+     "name": "C0288_03064924.mp4",
+     "bytes": 32596693,
+     "sha256": "f7b6e6385e7a0901643aa6f85b327bcbfa7441e8b511ab2ff30d22f478fea4d0",
+     "has_audio": true,
+     "duration_s": 12.010667
+    },
+    {
+     "id": "b4dadc55afd13cc6",
+     "name": "C0293_03067588.mp4",
+     "bytes": 7052148,
+     "sha256": "b4dadc55afd13cc66293b933b274af88d4a9b6ce7b601ac4dc807baaaadc2b83",
+     "has_audio": true,
+     "duration_s": 9.130667
+    },
+    {
+     "id": "a16fb52d2d1d8245",
+     "name": "DJI_20241219103046_0091_D00000000_00000000.mp4",
+     "bytes": 14645905,
+     "sha256": "a16fb52d2d1d8245ffa3f94fb2479b903c5c5b87bfa0114d0fac3f0bda6b4f86",
+     "has_audio": true,
+     "duration_s": 21.013333
+    }
+   ],
+   "units": {
+    "analysis": [
+     "06dea1fd48ab8d67",
+     "58406eeebad022db",
+     "62d836cca85dfaf7",
+     "37d6e9613f69095a",
+     "c916a7b16df4e8b1",
+     "20dd79acf0504a6b",
+     "15694574b6b0757b",
+     "6c23c8cb4d43b034",
+     "8b989f41efb32685",
+     "00111c8c2dbf4235",
+     "1404425cf0c085eb",
+     "89e63d1c9a303b74",
+     "eac05ce0f036a133",
+     "b4184ef52b53f8e9",
+     "e5de3cc29659dbae",
+     "4a3f8acc7e57897c",
+     "af951a169f4f500f",
+     "bde4541933cbeb9c",
+     "194ee239c156362f",
+     "f632685cb779dfca",
+     "9ac32ade617aa64b",
+     "f9c75daccd71f0f2",
+     "a0d773a77ff5ca28",
+     "295ba0420ed3b064",
+     "69ea4672ae4cb794",
+     "d8d68967c21efc5e",
+     "e05531f75f4ae7bb",
+     "5ebe3c677ccd416c",
+     "6463f57986b7b84e",
+     "6d74ff5dd953d222",
+     "6c7451d2aaffe416",
+     "396de22682e23f71",
+     "8b2e39ef7ee2ca3b",
+     "85d3848516a43a38",
+     "e0cad4cb3a79a622",
+     "2652bcbbb1ffc0df",
+     "5d72a4d6f839a841",
+     "c94c846220bf45ff",
+     "33d5daa609365812",
+     "83188fdf3fa7003a",
+     "3fcf307156dd6ee3",
+     "c8d08404e8cdcfcc",
+     "738105e9b2d82b0d",
+     "f7b6e6385e7a0901",
+     "b4dadc55afd13cc6",
+     "a16fb52d2d1d8245"
+    ]
+   },
+   "total_duration_s": 802.7
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/media.json",
+    "name": "media.json",
+    "bytes": 14163,
+    "sha256": "3490dd94539c0ad0e6ee35cfcfff33578d88b7d17093dac2df14ab779eb72718",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0032_02881492.mp4",
+    "name": "C0032_02881492.mp4",
+    "bytes": 2726853,
+    "sha256": "06dea1fd48ab8d673d351fdca93e21904ed173a5a1d167864619d27bbb2a1ffe",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0065_02730556.mp4",
+    "name": "C0065_02730556.mp4",
+    "bytes": 23134949,
+    "sha256": "58406eeebad022db7a89b12e2b73fbb39aa2861d299819d8fb163ba63a7c19ab",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0081_02743972.mp4",
+    "name": "C0081_02743972.mp4",
+    "bytes": 8584686,
+    "sha256": "62d836cca85dfaf7a2094d750455341d78d3dc154f3af52665d0ec71933157b7",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0085_02747380.mp4",
+    "name": "C0085_02747380.mp4",
+    "bytes": 34456801,
+    "sha256": "37d6e9613f69095a7ec106053dfa83d1ca1cb606e1b94c065067bb5a307a28af",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0088_02751604.mp4",
+    "name": "C0088_02751604.mp4",
+    "bytes": 28389545,
+    "sha256": "c916a7b16df4e8b1f66689bdeff2634e5b200420307dad1c24df5d47dddcf72b",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0089_02753020.mp4",
+    "name": "C0089_02753020.mp4",
+    "bytes": 62725514,
+    "sha256": "20dd79acf0504a6bd3177e6171377ec070a25b842228218cf1944ba83681ab66",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0091_02755996.mp4",
+    "name": "C0091_02755996.mp4",
+    "bytes": 33667343,
+    "sha256": "15694574b6b0757ba23b10ad51825fa9c557ad07c212771ec447081b6c2691bd",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0092_02757244.mp4",
+    "name": "C0092_02757244.mp4",
+    "bytes": 36188300,
+    "sha256": "6c23c8cb4d43b0340ba10ce8b1dc1c6cbc0a1c9c8648279c71b883aa4e4a1c65",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0093_02758876.mp4",
+    "name": "C0093_02758876.mp4",
+    "bytes": 26206156,
+    "sha256": "8b989f41efb32685a2cede4cf3de6b086bc373c760de1275495fd15bee65474d",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0095_02761036.mp4",
+    "name": "C0095_02761036.mp4",
+    "bytes": 17343662,
+    "sha256": "00111c8c2dbf4235277127319a8a2180bfb9da2157919d2f26a3155f18c292a8",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0097_02763220.mp4",
+    "name": "C0097_02763220.mp4",
+    "bytes": 40228959,
+    "sha256": "1404425cf0c085eb62461bf7718c01eacb30fe20eb0add4c6d607911a78e0657",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0099_02766196.mp4",
+    "name": "C0099_02766196.mp4",
+    "bytes": 29467280,
+    "sha256": "89e63d1c9a303b74bb62ed723e74a9fb8770462da6f9f71eb3e0d492a298fd91",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0100_02767780.mp4",
+    "name": "C0100_02767780.mp4",
+    "bytes": 10956774,
+    "sha256": "eac05ce0f036a1339af5e2f090606f077bad398a1230366f24194c15a390e801",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0102_02769436.mp4",
+    "name": "C0102_02769436.mp4",
+    "bytes": 5410825,
+    "sha256": "b4184ef52b53f8e9717536cc4f88d0051c8c1b48a8031d06fcadf31de9ca0074",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0104_02772676.mp4",
+    "name": "C0104_02772676.mp4",
+    "bytes": 79577506,
+    "sha256": "e5de3cc29659dbae6749c7d0687dec2595adf6d40e9766b9f3d21b9eeb56141d",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0105_02777428.mp4",
+    "name": "C0105_02777428.mp4",
+    "bytes": 8782357,
+    "sha256": "4a3f8acc7e57897c808b11c6f88d5288822a8bb05d30ba2aecc3ebb57c312263",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0107_02778412.mp4",
+    "name": "C0107_02778412.mp4",
+    "bytes": 6400835,
+    "sha256": "af951a169f4f500f2c980735196960a4ef04ba3bf01407adab0cf1bfdd0ed639",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0108_02778676.mp4",
+    "name": "C0108_02778676.mp4",
+    "bytes": 9700829,
+    "sha256": "bde4541933cbeb9c299da482b141719af446ea97bf5c45ae24cfa57f3d679eb2",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0109_02779156.mp4",
+    "name": "C0109_02779156.mp4",
+    "bytes": 16426743,
+    "sha256": "194ee239c156362fd1ced8ac2d08a2b5fa6ddfda93b9558c66551487afb6d174",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0111_02779732.mp4",
+    "name": "C0111_02779732.mp4",
+    "bytes": 15037186,
+    "sha256": "f632685cb779dfcabeafbb5ffdb8211134b7eb13bf2598a7caa01d9a59cea0f6",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0112_02780260.mp4",
+    "name": "C0112_02780260.mp4",
+    "bytes": 27173737,
+    "sha256": "9ac32ade617aa64b23b71ca1e0611e8abdb12234dd117482254401dc2ea03dc5",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0113_02781556.mp4",
+    "name": "C0113_02781556.mp4",
+    "bytes": 17971679,
+    "sha256": "f9c75daccd71f0f2f1a635faef64fde79a48d0e81373b48b14fc4d822a954b06",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0114_02782204.mp4",
+    "name": "C0114_02782204.mp4",
+    "bytes": 11331488,
+    "sha256": "a0d773a77ff5ca288536c0735106a452bdbc034ebe3297510f23518338f17a32",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0115_02782612.mp4",
+    "name": "C0115_02782612.mp4",
+    "bytes": 8243242,
+    "sha256": "295ba0420ed3b06480aaa3d1d773d6f42db013c90d6f0dc67f2cab0c813b5130",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0116_02782900.mp4",
+    "name": "C0116_02782900.mp4",
+    "bytes": 5419351,
+    "sha256": "69ea4672ae4cb794e3beacb0e48accd1ec406737fc0aab01a4b5ad79cdc2c4a3",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0119_02785252.mp4",
+    "name": "C0119_02785252.mp4",
+    "bytes": 30764477,
+    "sha256": "d8d68967c21efc5e77134b7ed7963b8902c73e33c98149cc0f42b3c613eb7b53",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0120_02786596.mp4",
+    "name": "C0120_02786596.mp4",
+    "bytes": 26448283,
+    "sha256": "e05531f75f4ae7bbe16cdda069cf7c1c0f3da0132fa534e40620b988ff661a93",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0122_02788948.mp4",
+    "name": "C0122_02788948.mp4",
+    "bytes": 58590340,
+    "sha256": "5ebe3c677ccd416c71b01ea4a74efc11ae79e3dc4c526fa557f65b21a2604545",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0124_02791708.mp4",
+    "name": "C0124_02791708.mp4",
+    "bytes": 11595493,
+    "sha256": "6463f57986b7b84e0533a34ce500ecce6d7883ea0fe8064257266f7f0bb49279",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0126_02792764.mp4",
+    "name": "C0126_02792764.mp4",
+    "bytes": 9966092,
+    "sha256": "6d74ff5dd953d222d3dd51cecac33c09b0e47bd0e9f7773527731055a60204ae",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0128_02794180.mp4",
+    "name": "C0128_02794180.mp4",
+    "bytes": 7501764,
+    "sha256": "6c7451d2aaffe416a06b78bb8fe383327edf63746b87a5661ec8a3bd7e015395",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0129_02794420.mp4",
+    "name": "C0129_02794420.mp4",
+    "bytes": 14589903,
+    "sha256": "396de22682e23f71b2f3ade11f86773b8922a5fbef8def8da29f514fd2e0223c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0130_02794756.mp4",
+    "name": "C0130_02794756.mp4",
+    "bytes": 10505999,
+    "sha256": "8b2e39ef7ee2ca3b5eab4cd4b3a2e457786eeed81b023d17185248a0541bb2bd",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0131_02795212.mp4",
+    "name": "C0131_02795212.mp4",
+    "bytes": 10615280,
+    "sha256": "85d3848516a43a3829161f1cc14e36d648801131a40724cb0a37ac46bd7e5c3c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0134_02797372.mp4",
+    "name": "C0134_02797372.mp4",
+    "bytes": 34585448,
+    "sha256": "e0cad4cb3a79a622ecc1e19c80c5fa468464d4fe2837f1fa9ff356152ffeddf0",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0135_02798212.mp4",
+    "name": "C0135_02798212.mp4",
+    "bytes": 25739517,
+    "sha256": "2652bcbbb1ffc0df878fb39a15d69e24ef2dc5b68705e8814f141c7ff147f3cb",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0136_02799100.mp4",
+    "name": "C0136_02799100.mp4",
+    "bytes": 18382232,
+    "sha256": "5d72a4d6f839a841404461532fc082329b075ebe07fc0583ddcb79120ff6c9a5",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0138_02799940.mp4",
+    "name": "C0138_02799940.mp4",
+    "bytes": 3266981,
+    "sha256": "c94c846220bf45ff026413477d3341b6c83fc9ca682c34097f5d51d0c5a4b373",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0139_02800180.mp4",
+    "name": "C0139_02800180.mp4",
+    "bytes": 3397951,
+    "sha256": "33d5daa60936581297800c8ff192fa8056de44e0e514ccad2d37d8eea7a235bb",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0140_02800396.mp4",
+    "name": "C0140_02800396.mp4",
+    "bytes": 6735277,
+    "sha256": "83188fdf3fa7003a6f5dd347c67bae19bdbdc23873112f84703b3d52e289af65",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0202_02858956.mp4",
+    "name": "C0202_02858956.mp4",
+    "bytes": 6904537,
+    "sha256": "3fcf307156dd6ee3c90257388a8011a1e966e2a1fbf1e39e5640fec76d1fab0c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0207_02860228.mp4",
+    "name": "C0207_02860228.mp4",
+    "bytes": 4291628,
+    "sha256": "c8d08404e8cdcfcc6110a46af0b79ecdea07aaf93bbc7a59282399a6d8d63d28",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0209_02861020.mp4",
+    "name": "C0209_02861020.mp4",
+    "bytes": 15178263,
+    "sha256": "738105e9b2d82b0d40e2b6b4053fee3608bf7e27b2209b43d22d19497dc9e3e9",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0288_03064924.mp4",
+    "name": "C0288_03064924.mp4",
+    "bytes": 32596693,
+    "sha256": "f7b6e6385e7a0901643aa6f85b327bcbfa7441e8b511ab2ff30d22f478fea4d0",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/C0293_03067588.mp4",
+    "name": "C0293_03067588.mp4",
+    "bytes": 7052148,
+    "sha256": "b4dadc55afd13cc66293b933b274af88d4a9b6ce7b601ac4dc807baaaadc2b83",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/media/DJI_20241219103046_0091_D00000000_00000000.mp4",
+    "name": "DJI_20241219103046_0091_D00000000_00000000.mp4",
+    "bytes": 14645905,
+    "sha256": "a16fb52d2d1d8245ffa3f94fb2479b903c5c5b87bfa0114d0fac3f0bda6b4f86",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": "1. Is this the complete and correct clip list to upload and record for the run? YES \n2. camera audio in these clips be allowed - No."
+ },
+ {
+  "stage": "analysis",
+  "unit": "06dea1fd48ab8d67",
+  "summary": {
+   "clip": {
+    "id": "06dea1fd48ab8d67",
+    "name": "C0032_02881492.mp4",
+    "duration_s": 3.84
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22251,
+    "output_tokens": 6217,
+    "elapsed_seconds": 77.531,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "439c7048-723f-40b8-9d9b-ef3490940911",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "upward_view_exposed_brick_ceiling_and_white_lattice_arch"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/06dea1fd48ab8d67.response.json",
+    "name": "06dea1fd48ab8d67.response.json",
+    "bytes": 23819,
+    "sha256": "fba8d822f291f3233c894cf5336aa180495b175626bbc07cf90773eb292d7a7f",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/06dea1fd48ab8d67.evidence.json",
+    "name": "06dea1fd48ab8d67.evidence.json",
+    "bytes": 21836,
+    "sha256": "578442fdd5d1b1e2e052f5f3ad0ce97b07952666200c79ff4308dc3f82758abb",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "58406eeebad022db",
+  "summary": {
+   "clip": {
+    "id": "58406eeebad022db",
+    "name": "C0065_02730556.mp4",
+    "duration_s": 25.450667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 28635,
+    "output_tokens": 13349,
+    "elapsed_seconds": 145.125,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "0234d5b3-900f-4fa6-a472-f853644e6b98",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visible_text": 3,
+    "visual_events": 3,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 8,
+   "identity_errors": [],
+   "descriptive_name": "indoor_exhibition_wall_rat_trap_bond_and_housing_posters_pan"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/58406eeebad022db.response.json",
+    "name": "58406eeebad022db.response.json",
+    "bytes": 48585,
+    "sha256": "e99ba77e1be9a8ab1ddc8b7e9b03796a6adedff93898d9327df58621f440255f",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/58406eeebad022db.evidence.json",
+    "name": "58406eeebad022db.evidence.json",
+    "bytes": 36863,
+    "sha256": "7cbf21447f6811a7fd9d7f6dd2750f252fffb0e001b79b64570c9b41886bc5b9",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "62d836cca85dfaf7",
+  "summary": {
+   "clip": {
+    "id": "62d836cca85dfaf7",
+    "name": "C0081_02743972.mp4",
+    "duration_s": 9.6
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24065,
+    "output_tokens": 13052,
+    "elapsed_seconds": 150.375,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "ce0c2e1c-5fcc-4f07-b442-84d49078ae84",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "pan_across_row_of_bricks_on_edge_on_sand"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/62d836cca85dfaf7.response.json",
+    "name": "62d836cca85dfaf7.response.json",
+    "bytes": 48344,
+    "sha256": "8fe45cf63a0fd3f0b84f2a04686f4f2435626868a3b234eb952662e69494d7b5",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/62d836cca85dfaf7.evidence.json",
+    "name": "62d836cca85dfaf7.evidence.json",
+    "bytes": 43005,
+    "sha256": "04893192f7f5c1d0addab99989d7f5e695c76ec304dfad3cff1792abf81a307f",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "37d6e9613f69095a",
+  "summary": {
+   "clip": {
+    "id": "37d6e9613f69095a",
+    "name": "C0085_02747380.mp4",
+    "duration_s": 26.88
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 29239,
+    "output_tokens": 12493,
+    "elapsed_seconds": 141.125,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "7f39ce99-f09c-4336-ac58-0d9bbab66312",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 5,
+    "visual_events": 2,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 2,
+   "identity_errors": [],
+   "descriptive_name": "mason_pouring_and_troweling_mortar_on_bricks_on_edge_closeup"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/37d6e9613f69095a.response.json",
+    "name": "37d6e9613f69095a.response.json",
+    "bytes": 44447,
+    "sha256": "015cead67589a2e84680920e1f16f5baa57f09ab07b2298128cfa4cdb46d41c0",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/37d6e9613f69095a.evidence.json",
+    "name": "37d6e9613f69095a.evidence.json",
+    "bytes": 38440,
+    "sha256": "4d38fbfe34d879e279b410e11a8ee7d3f8ba94469497cd6d945b10fa77df5128",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "c916a7b16df4e8b1",
+  "summary": {
+   "clip": {
+    "id": "c916a7b16df4e8b1",
+    "name": "C0088_02751604.mp4",
+    "duration_s": 28.330667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 29546,
+    "output_tokens": 13855,
+    "elapsed_seconds": 151.484,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "47f9e8a0-a6fc-454e-a319-f05965fe2bc0",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 8,
+    "visual_events": 4,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_laying_corner_bricks_on_edge_with_helper"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/c916a7b16df4e8b1.response.json",
+    "name": "c916a7b16df4e8b1.response.json",
+    "bytes": 49126,
+    "sha256": "b387e52ed740c614a89cf220a43b7d55c29fbd6577b735298c9a12d1503ccf23",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/c916a7b16df4e8b1.evidence.json",
+    "name": "c916a7b16df4e8b1.evidence.json",
+    "bytes": 43977,
+    "sha256": "9e8a5a0296a420dc69d3564db6fc6976bbc3ac3b44ff0f67195006513ed1fa4b",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "20dd79acf0504a6b",
+  "summary": {
+   "clip": {
+    "id": "20dd79acf0504a6b",
+    "name": "C0089_02753020.mp4",
+    "duration_s": 40.32
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 33170,
+    "output_tokens": 14506,
+    "elapsed_seconds": 159.141,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "88b212ad-b0c7-4809-955b-887d92248c0e",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 7,
+    "visual_events": 3,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 1,
+   "identity_errors": [],
+   "descriptive_name": "two_masons_laying_brick_on_edge_corner_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/20dd79acf0504a6b.response.json",
+    "name": "20dd79acf0504a6b.response.json",
+    "bytes": 50709,
+    "sha256": "1abb38b13db05e86e6a3f52fb633080bb1cc136aabe0d380532c000334955cbd",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/20dd79acf0504a6b.evidence.json",
+    "name": "20dd79acf0504a6b.evidence.json",
+    "bytes": 45470,
+    "sha256": "8b2f6c9ed8fc0a74029b02db41527169186f011444412fd3cfc238082ec72544",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "15694574b6b0757b",
+  "summary": {
+   "clip": {
+    "id": "15694574b6b0757b",
+    "name": "C0091_02755996.mp4",
+    "duration_s": 24.96
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 28634,
+    "output_tokens": 14093,
+    "elapsed_seconds": 155.406,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "c2d33edc-bf8b-43da-aaf3-4b05742ba45d",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 5,
+    "visual_events": 3,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 3,
+   "identity_errors": [],
+   "descriptive_name": "closeup_laying_bricks_on_edge_rat_trap_bond_course"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/15694574b6b0757b.response.json",
+    "name": "15694574b6b0757b.response.json",
+    "bytes": 48250,
+    "sha256": "a6047732a5e1f51adf8f7e976b29eed9bd4e3be0c8c340332eeafd35410946d2",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/15694574b6b0757b.evidence.json",
+    "name": "15694574b6b0757b.evidence.json",
+    "bytes": 40744,
+    "sha256": "3a380551a43cedf78b286e260a35d9c3c4f8c522783f8bd2c7e6c92471e04c75",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "6c23c8cb4d43b034",
+  "summary": {
+   "clip": {
+    "id": "6c23c8cb4d43b034",
+    "name": "C0092_02757244.mp4",
+    "duration_s": 32.64
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 31049,
+    "output_tokens": 15333,
+    "elapsed_seconds": 171.109,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "ca4a3632-f102-4c29-9da1-ab1d53d91e55",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 6,
+    "visual_events": 4,
+    "editorial_ideas": 6,
+    "interpretations": 3
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "two_masons_laying_bricks_on_edge_at_wall_corner"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6c23c8cb4d43b034.response.json",
+    "name": "6c23c8cb4d43b034.response.json",
+    "bytes": 54618,
+    "sha256": "87eb699827574106298fcf6fb04809c084fe0da16ee62f437f4a4e8d032dd5cd",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6c23c8cb4d43b034.evidence.json",
+    "name": "6c23c8cb4d43b034.evidence.json",
+    "bytes": 49071,
+    "sha256": "a19f770ab11aa874021ce002e5f33777b6141dbb01a30a8f96bad5d41ded5f2d",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "8b989f41efb32685",
+  "summary": {
+   "clip": {
+    "id": "8b989f41efb32685",
+    "name": "C0093_02758876.mp4",
+    "duration_s": 26.410667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 28939,
+    "output_tokens": 12184,
+    "elapsed_seconds": 134.531,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "c3cee9c7-78fa-4aaa-b7c9-f5bb9fa5dcb5",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 4,
+    "visual_events": 2,
+    "editorial_ideas": 5,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_aligning_bricks_on_edge_with_metal_straightedge"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/8b989f41efb32685.response.json",
+    "name": "8b989f41efb32685.response.json",
+    "bytes": 43961,
+    "sha256": "a2998b4266e5012e3ab5726d8dcfa617b5e82ae517ab37fa5c91e984f11c9c04",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/8b989f41efb32685.evidence.json",
+    "name": "8b989f41efb32685.evidence.json",
+    "bytes": 39062,
+    "sha256": "96b95da9365cb348108a00c360a9fd9e279be0c3b34761738e7c1ed5f44dd9e7",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "00111c8c2dbf4235",
+  "summary": {
+   "clip": {
+    "id": "00111c8c2dbf4235",
+    "name": "C0095_02761036.mp4",
+    "duration_s": 17.770667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 26516,
+    "output_tokens": 13718,
+    "elapsed_seconds": 186.235,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "b2e3c99a-3565-4996-afb2-2e8238cca5f4",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 7,
+    "visual_events": 2,
+    "editorial_ideas": 3,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "masons-check-plumb-and-straightedge-alignment-brick-on-edge-corner"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/00111c8c2dbf4235.response.json",
+    "name": "00111c8c2dbf4235.response.json",
+    "bytes": 47402,
+    "sha256": "5a48b39d016fc37e29fe8024b1f8c7772037218ffd5dc8f1c0dca9d1fe0d06ae",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/00111c8c2dbf4235.evidence.json",
+    "name": "00111c8c2dbf4235.evidence.json",
+    "bytes": 42264,
+    "sha256": "e363d94cd7451a18b287a641ccae270abe13e82812f49477d4d0a7b4e8be857c",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "1404425cf0c085eb",
+  "summary": {
+   "clip": {
+    "id": "1404425cf0c085eb",
+    "name": "C0097_02763220.mp4",
+    "duration_s": 46.570667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 35297,
+    "output_tokens": 11992,
+    "elapsed_seconds": 141.516,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "5bc5418e-8bde-4491-b651-b36d1d0455fb",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 5,
+    "visual_events": 2,
+    "editorial_ideas": 6,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_laying_corner_brick_on_edge_and_spreading_mortar_rat_trap_bond"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/1404425cf0c085eb.response.json",
+    "name": "1404425cf0c085eb.response.json",
+    "bytes": 43022,
+    "sha256": "6c23591e88e4405eb5d2bf23ef35f1f324d5cab76c42628284939fbb277e08d3",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/1404425cf0c085eb.evidence.json",
+    "name": "1404425cf0c085eb.evidence.json",
+    "bytes": 38049,
+    "sha256": "2c0775f33b8132991df8e8548e9a19ed49813ac96d1daf6a6a9d7243e1d47214",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "89e63d1c9a303b74",
+  "summary": {
+   "clip": {
+    "id": "89e63d1c9a303b74",
+    "name": "C0099_02766196.mp4",
+    "duration_s": 31.68
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 30747,
+    "output_tokens": 13286,
+    "elapsed_seconds": 153.813,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "5798dbed-d4b7-4274-a3b6-160fd8ce5bff",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 5,
+    "visual_events": 3,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_laying_brick_on_edge_and_checking_plumb_at_corner"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/89e63d1c9a303b74.response.json",
+    "name": "89e63d1c9a303b74.response.json",
+    "bytes": 47587,
+    "sha256": "729057de904cb7413e27f29bb5f4c9c910fcded84e1a2cb912b9ad21943acca2",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/89e63d1c9a303b74.evidence.json",
+    "name": "89e63d1c9a303b74.evidence.json",
+    "bytes": 42772,
+    "sha256": "38dbf72cfda6091f55567a768dff1b38015c348322993d7a56e9e63ad1da6089",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "eac05ce0f036a133",
+  "summary": {
+   "clip": {
+    "id": "eac05ce0f036a133",
+    "name": "C0100_02767780.mp4",
+    "duration_s": 9.6
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24071,
+    "output_tokens": 11474,
+    "elapsed_seconds": 182.062,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "78c58c55-5f89-45e1-877a-e529a62bb7db",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 7,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_applying_mortar_on_edge_laid_brick_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/eac05ce0f036a133.response.json",
+    "name": "eac05ce0f036a133.response.json",
+    "bytes": 41969,
+    "sha256": "eb1c2c663d30254ba841dffbe25adf221a67aa06617035ba2da932853cc0dd2e",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/eac05ce0f036a133.evidence.json",
+    "name": "eac05ce0f036a133.evidence.json",
+    "bytes": 37488,
+    "sha256": "1d173ade43dd671e7fd8478d83130762cd44ce6c384ecc618b4e1eca37917153",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "b4184ef52b53f8e9",
+  "summary": {
+   "clip": {
+    "id": "b4184ef52b53f8e9",
+    "name": "C0102_02769436.mp4",
+    "duration_s": 6.72
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23165,
+    "output_tokens": 15645,
+    "elapsed_seconds": 178.734,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "3bc4aac7-3cbe-49c6-8d4f-d8f8be0b9772",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 9,
+    "visual_events": 1,
+    "editorial_ideas": 5,
+    "interpretations": 1
+   },
+   "excluded_rows": 4,
+   "identity_errors": [],
+   "descriptive_name": "mason_laying_brick_on_edge_pointing_cavity_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/b4184ef52b53f8e9.response.json",
+    "name": "b4184ef52b53f8e9.response.json",
+    "bytes": 56720,
+    "sha256": "220f4dc28e028f7367eb1b6ead6c60999e4bd4cb4662d5f27d2c68f79ca98eed",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/b4184ef52b53f8e9.evidence.json",
+    "name": "b4184ef52b53f8e9.evidence.json",
+    "bytes": 48119,
+    "sha256": "b273468ee5ef680dd72787d70b39dc014ccb122feb9caa8722264518f8a039d4",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "4a3f8acc7e57897c",
+  "summary": {
+   "clip": {
+    "id": "4a3f8acc7e57897c",
+    "name": "C0105_02777428.mp4",
+    "duration_s": 12.48
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24691,
+    "output_tokens": 13680,
+    "elapsed_seconds": 178.891,
+    "thinking_tokens": 854
+   },
+   "gaps": 1,
+   "job_id": "247dea33-4fb5-439b-a111-e670244b393b",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 1,
+    "entities": 4,
+    "visual_events": 3,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "worker_checking_brick_on_edge_corner_with_plumb_bob"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/4a3f8acc7e57897c.response.json",
+    "name": "4a3f8acc7e57897c.response.json",
+    "bytes": 49910,
+    "sha256": "8742a27bee5ca592cbfa140d4d9b28f0ba84425b90d333f8e74d322c99c7a93f",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/4a3f8acc7e57897c.evidence.json",
+    "name": "4a3f8acc7e57897c.evidence.json",
+    "bytes": 44584,
+    "sha256": "0c525cd98422c6a2dce744a9e62fd677d99a2dc43ec1d385b6142e0307ec077b",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "af951a169f4f500f",
+  "summary": {
+   "clip": {
+    "id": "af951a169f4f500f",
+    "name": "C0107_02778412.mp4",
+    "duration_s": 5.290667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22576,
+    "output_tokens": 6921,
+    "elapsed_seconds": 86.187,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "889adca8-2717-4be6-a437-a08f6a329ff7",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 4,
+   "identity_errors": [],
+   "descriptive_name": "dry_laid_brick_on_edge_corner_closeup"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/af951a169f4f500f.response.json",
+    "name": "af951a169f4f500f.response.json",
+    "bytes": 25249,
+    "sha256": "402f8680c7431eb454df5eba998e2aa4c93625b9f9a88611d7c5466aeffccf30",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/af951a169f4f500f.evidence.json",
+    "name": "af951a169f4f500f.evidence.json",
+    "bytes": 21050,
+    "sha256": "2965584097dbc2eb8e82e9e371d6b0be7a0fe464053d818e69f79850e919fde2",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "e5de3cc29659dbae",
+  "summary": {
+   "clip": {
+    "id": "e5de3cc29659dbae",
+    "name": "C0104_02772676.mp4",
+    "duration_s": 95.04
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 49836,
+    "output_tokens": 21237,
+    "elapsed_seconds": 275.656,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "aee20314-6fbb-4f51-820a-46847c34cac4",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 2,
+    "entities": 8,
+    "visual_events": 6,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 14,
+   "identity_errors": [],
+   "descriptive_name": "mason_laying_red_bricks_on_edge_with_mortar_low_angle"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/e5de3cc29659dbae.response.json",
+    "name": "e5de3cc29659dbae.response.json",
+    "bytes": 76195,
+    "sha256": "4037b3fcfeb6c1fe8bccefee1b5a4b67e78d4a6e8c60d0f9c4854d3fc4320fe6",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/e5de3cc29659dbae.evidence.json",
+    "name": "e5de3cc29659dbae.evidence.json",
+    "bytes": 57369,
+    "sha256": "2dbe55119fa8bce4860a8adaa033c388e4420be99a585c30b5b02a0330851d77",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "bde4541933cbeb9c",
+  "summary": {
+   "clip": {
+    "id": "bde4541933cbeb9c",
+    "name": "C0108_02778676.mp4",
+    "duration_s": 9.6
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24061,
+    "output_tokens": 11436,
+    "elapsed_seconds": 128.61,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "905e8303-cbfc-4876-bc95-93958bf087ef",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 4,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "pan_across_brick_on_edge_cavity_wall_and_straightedge_check"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/bde4541933cbeb9c.response.json",
+    "name": "bde4541933cbeb9c.response.json",
+    "bytes": 41417,
+    "sha256": "50339841714b79d21347b2e2c05b9bca9b6ce39d4ff6d8c263aef870b850fd0a",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/bde4541933cbeb9c.evidence.json",
+    "name": "bde4541933cbeb9c.evidence.json",
+    "bytes": 36397,
+    "sha256": "12cb3597f0ab870fe469178da5b075354a33c63ffe2042d977b1b8132c4e59cb",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "194ee239c156362f",
+  "summary": {
+   "clip": {
+    "id": "194ee239c156362f",
+    "name": "C0109_02779156.mp4",
+    "duration_s": 9.6
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24069,
+    "output_tokens": 11272,
+    "elapsed_seconds": 125.157,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "b335aadb-196f-4806-affe-f74847864868",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 6,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "worker_placing_red_bricks_on_edge_low_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/194ee239c156362f.response.json",
+    "name": "194ee239c156362f.response.json",
+    "bytes": 40280,
+    "sha256": "9833e4388ea5114196769d9f8ecfddbd47e1ba376720cea09d939eacb6d84756",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/194ee239c156362f.evidence.json",
+    "name": "194ee239c156362f.evidence.json",
+    "bytes": 35950,
+    "sha256": "8d69c99986dd134a9601839409764f7c6c55a7394046fe09e3e0798efbb8de58",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "f632685cb779dfca",
+  "summary": {
+   "clip": {
+    "id": "f632685cb779dfca",
+    "name": "C0111_02779732.mp4",
+    "duration_s": 10.56
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24369,
+    "output_tokens": 13196,
+    "elapsed_seconds": 146.969,
+    "thinking_tokens": null
+   },
+   "gaps": 3,
+   "job_id": "5e3bf436-3132-4cae-b197-b8a2389f2bc1",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 1,
+    "entities": 7,
+    "visual_events": 3,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 1,
+   "identity_errors": [],
+   "descriptive_name": "low-brick-on-edge-wall-worker-walks-left-camera-tilt-up"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/f632685cb779dfca.response.json",
+    "name": "f632685cb779dfca.response.json",
+    "bytes": 47358,
+    "sha256": "3a8155ee5f1db252329005bc183e8d67b8f0dd9da6f38652348ce71b1088e1d3",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/f632685cb779dfca.evidence.json",
+    "name": "f632685cb779dfca.evidence.json",
+    "bytes": 41364,
+    "sha256": "7b569dd356389b3c291d5162f3094ee75e6e77ddf3a408ee69eb07791991c3b3",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "9ac32ade617aa64b",
+  "summary": {
+   "clip": {
+    "id": "9ac32ade617aa64b",
+    "name": "C0112_02780260.mp4",
+    "duration_s": 25.92
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 28921,
+    "output_tokens": 14104,
+    "elapsed_seconds": 157.547,
+    "thinking_tokens": null
+   },
+   "gaps": 3,
+   "job_id": "b6d646d9-f76e-4306-859b-5dc1ea58ae13",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 5,
+    "visual_events": 3,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 4,
+   "identity_errors": [],
+   "descriptive_name": "two_masons_applying_mortar_brick_on_edge_cavity_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/9ac32ade617aa64b.response.json",
+    "name": "9ac32ade617aa64b.response.json",
+    "bytes": 50599,
+    "sha256": "b32e12342e2c6439614ee49ac89845a1b6ca5078cae4116df263709cbec4803d",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/9ac32ade617aa64b.evidence.json",
+    "name": "9ac32ade617aa64b.evidence.json",
+    "bytes": 42412,
+    "sha256": "3b44ed9226eba1f22d05847fd5d05089d29090810b7bad2887fa9332a6283661",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "f9c75daccd71f0f2",
+  "summary": {
+   "clip": {
+    "id": "f9c75daccd71f0f2",
+    "name": "C0113_02781556.mp4",
+    "duration_s": 12.970667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 25002,
+    "output_tokens": 14697,
+    "elapsed_seconds": 163.109,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "72469190-da76-4195-b52c-3836626000bf",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 1,
+    "entities": 6,
+    "visual_events": 2,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 4,
+   "identity_errors": [],
+   "descriptive_name": "worker_sweeping_excess_mortar_from_low_brick_on_edge_wall_corner"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/f9c75daccd71f0f2.response.json",
+    "name": "f9c75daccd71f0f2.response.json",
+    "bytes": 53210,
+    "sha256": "4c18c06f9e7a2a1ad1a4f2e27ce97320c6f6ad003c3f299e694f44b2eb03a097",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/f9c75daccd71f0f2.evidence.json",
+    "name": "f9c75daccd71f0f2.evidence.json",
+    "bytes": 44884,
+    "sha256": "a6cda3a7cc8c8cddcb44fa26b05455d9238b0a5b0b46dbd3df60d0fa21a79dab",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "295ba0420ed3b064",
+  "summary": {
+   "clip": {
+    "id": "295ba0420ed3b064",
+    "name": "C0115_02782612.mp4",
+    "duration_s": 5.76
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22864,
+    "output_tokens": 8184,
+    "elapsed_seconds": 95.64,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "6864cf36-9a13-4fa1-ab41-18d5512f8ee2",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "overhead_tracking_brick_on_edge_cavity_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/295ba0420ed3b064.response.json",
+    "name": "295ba0420ed3b064.response.json",
+    "bytes": 29765,
+    "sha256": "0d88f41c9d57bbd6eaa7839a47e86e6324bac5e66d6aefe5fa9121bb2f9d0581",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/295ba0420ed3b064.evidence.json",
+    "name": "295ba0420ed3b064.evidence.json",
+    "bytes": 26236,
+    "sha256": "fec0992cc1c257ab9616e89933de1f930fe0bc6a248f90e00f57d6dfa5ecf35c",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "a0d773a77ff5ca28",
+  "summary": {
+   "clip": {
+    "id": "a0d773a77ff5ca28",
+    "name": "C0114_02782204.mp4",
+    "duration_s": 8.170667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23492,
+    "output_tokens": 12007,
+    "elapsed_seconds": 131.86,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "3c36290e-ed42-4f6c-899a-ab0acb703f54",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "overhead_brick_on_edge_wall_course_cavities"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/a0d773a77ff5ca28.response.json",
+    "name": "a0d773a77ff5ca28.response.json",
+    "bytes": 43091,
+    "sha256": "ba6b6dbbc662b12159b82745195146c61e11c564d304c53be457624a8f8e0d8c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/a0d773a77ff5ca28.evidence.json",
+    "name": "a0d773a77ff5ca28.evidence.json",
+    "bytes": 37898,
+    "sha256": "4de7096e7d0dc39140878592523a2b3b8073e5913c468c74bbec7e0415033486",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "69ea4672ae4cb794",
+  "summary": {
+   "clip": {
+    "id": "69ea4672ae4cb794",
+    "name": "C0116_02782900.mp4",
+    "duration_s": 4.8
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22549,
+    "output_tokens": 10318,
+    "elapsed_seconds": 171.328,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "5f68b337-4a98-4330-b1ab-a1bea39fbe12",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 4,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 2,
+   "identity_errors": [],
+   "descriptive_name": "closeup_brick_on_edge_wall_cavities_and_mortar_bed"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/69ea4672ae4cb794.response.json",
+    "name": "69ea4672ae4cb794.response.json",
+    "bytes": 37982,
+    "sha256": "1ba0a8cda2472e3126838c80e576fa6501f692d13ab466ff87c5be0713c40876",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/69ea4672ae4cb794.evidence.json",
+    "name": "69ea4672ae4cb794.evidence.json",
+    "bytes": 32334,
+    "sha256": "f0f64b6a50273c54c92fb5df2b37bd7c6aa4ef784f51c81b7b9ae79729060d2f",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "e05531f75f4ae7bb",
+  "summary": {
+   "clip": {
+    "id": "e05531f75f4ae7bb",
+    "name": "C0120_02786596.mp4",
+    "duration_s": 19.2
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 26810,
+    "output_tokens": 15102,
+    "elapsed_seconds": 161.328,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "c7e444f6-bc72-401b-b1bd-5821c7171375",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 3,
+    "entities": 8,
+    "visual_events": 2,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_spreading_mortar_on_edge_bricks_and_trimming_brick"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/e05531f75f4ae7bb.response.json",
+    "name": "e05531f75f4ae7bb.response.json",
+    "bytes": 53329,
+    "sha256": "ee9d22c35a9efafe07e10d768731aeac18e3f60b50b81ff46a4d07589817b8fb",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/e05531f75f4ae7bb.evidence.json",
+    "name": "e05531f75f4ae7bb.evidence.json",
+    "bytes": 47897,
+    "sha256": "4dc66bb44136c69e0616cb383b8d6fcb5f0d55afe44af9cd639928289508fc9c",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "d8d68967c21efc5e",
+  "summary": {
+   "clip": {
+    "id": "d8d68967c21efc5e",
+    "name": "C0119_02785252.mp4",
+    "duration_s": 26.88
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 29236,
+    "output_tokens": 17016,
+    "elapsed_seconds": 195.375,
+    "thinking_tokens": null
+   },
+   "gaps": 3,
+   "job_id": "06ab6c69-358e-453b-8306-8cf0a349bc89",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 6,
+    "visual_events": 4,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 5,
+   "identity_errors": [],
+   "descriptive_name": "mason_pouring_and_trowelling_mortar_on_upright_bricks_beside_cavity_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/d8d68967c21efc5e.response.json",
+    "name": "d8d68967c21efc5e.response.json",
+    "bytes": 60696,
+    "sha256": "05b9d081f58bc4b32398b02924d9b547c71047e70ebdb7fc83bcd01c7a6dc30f",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/d8d68967c21efc5e.evidence.json",
+    "name": "d8d68967c21efc5e.evidence.json",
+    "bytes": 51702,
+    "sha256": "f7467d1e29ff1696cc6bb7d6ffadb2dc54b0600edbae237157be8b64c8d85470",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "5ebe3c677ccd416c",
+  "summary": {
+   "clip": {
+    "id": "5ebe3c677ccd416c",
+    "name": "C0122_02788948.mp4",
+    "duration_s": 51.84
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 36803,
+    "output_tokens": 14851,
+    "elapsed_seconds": 182.328,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "d42ecf5d-a071-4a2d-aa93-dee0f0194cea",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 8,
+    "visual_events": 4,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 3,
+   "identity_errors": [],
+   "descriptive_name": "mason_building_brick_on_edge_cavity_wall_junction"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/5ebe3c677ccd416c.response.json",
+    "name": "5ebe3c677ccd416c.response.json",
+    "bytes": 52280,
+    "sha256": "ac0d4fdcb018e767a9ec70c2fad4bb1ed3247acc12137fcb4bc265c8bfa39a0a",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/5ebe3c677ccd416c.evidence.json",
+    "name": "5ebe3c677ccd416c.evidence.json",
+    "bytes": 44302,
+    "sha256": "3210c3872df5b760b92d0b6bc6aaeac9b456c2c510aeded3b9b56e6e46bcca26",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "6463f57986b7b84e",
+  "summary": {
+   "clip": {
+    "id": "6463f57986b7b84e",
+    "name": "C0124_02791708.mp4",
+    "duration_s": 11.050667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24405,
+    "output_tokens": 13558,
+    "elapsed_seconds": 143.719,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "e9d92e48-8d6f-4721-9cfe-4999948eba41",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 6,
+    "visual_events": 2,
+    "editorial_ideas": 5,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_laying_brick_on_edge_at_wall_junction"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6463f57986b7b84e.response.json",
+    "name": "6463f57986b7b84e.response.json",
+    "bytes": 48485,
+    "sha256": "2e7960869200bb36ad9571134b17f897dcb47da05dc2bdfa0effea95b4edc2cd",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6463f57986b7b84e.evidence.json",
+    "name": "6463f57986b7b84e.evidence.json",
+    "bytes": 43290,
+    "sha256": "752709545e82879320237795ef6a6bc13c178b8ddc33bf0d85980bcc9ae148b9",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "6d74ff5dd953d222",
+  "summary": {
+   "clip": {
+    "id": "6d74ff5dd953d222",
+    "name": "C0126_02792764.mp4",
+    "duration_s": 9.130667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23790,
+    "output_tokens": 13502,
+    "elapsed_seconds": 150.11,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "29aa31e8-1bee-457c-ab56-755a64401eb9",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 5,
+    "visual_events": 3,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "mason_aligning_brick_on_edge_wall_corner_with_wooden_straightedge"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6d74ff5dd953d222.response.json",
+    "name": "6d74ff5dd953d222.response.json",
+    "bytes": 49676,
+    "sha256": "b7fe3b23df504fe8e583ff54f85023c44007ac77a53fe383b5081117e8440b3c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6d74ff5dd953d222.evidence.json",
+    "name": "6d74ff5dd953d222.evidence.json",
+    "bytes": 44128,
+    "sha256": "0fd5a99a4d15ba39492dc2220ab4a2919f3fbf5493af1886cde9746a171794bc",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "6c7451d2aaffe416",
+  "summary": {
+   "clip": {
+    "id": "6c7451d2aaffe416",
+    "name": "C0128_02794180.mp4",
+    "duration_s": 4.8
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22554,
+    "output_tokens": 11219,
+    "elapsed_seconds": 129.75,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "6f9baf86-f1ab-4a50-8121-0066b17c0312",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 3,
+    "entities": 4,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "worker_speaking_behind_low_brick_on_edge_wall_corner"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6c7451d2aaffe416.response.json",
+    "name": "6c7451d2aaffe416.response.json",
+    "bytes": 41219,
+    "sha256": "a8f781c6769e438f06134e416e7661002bad96e1ea08b74ea8040fdfa7ecac04",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/6c7451d2aaffe416.evidence.json",
+    "name": "6c7451d2aaffe416.evidence.json",
+    "bytes": 36824,
+    "sha256": "078021d8d0ce48323a005f4b338c594af26590c75754a894c193ddc9883f4124",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "396de22682e23f71",
+  "summary": {
+   "clip": {
+    "id": "396de22682e23f71",
+    "name": "C0129_02794420.mp4",
+    "duration_s": 6.72
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23166,
+    "output_tokens": 12136,
+    "elapsed_seconds": 134.234,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "60649f7b-6a62-4f39-976b-448f94cde1ad",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 2,
+    "visual_events": 2,
+    "editorial_ideas": 5,
+    "interpretations": 2
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "low_angle_pan_left_brick_on_edge_corner_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/396de22682e23f71.response.json",
+    "name": "396de22682e23f71.response.json",
+    "bytes": 45379,
+    "sha256": "43bc9dcb588c376b00a98d4f1ca8a4d2cd3576016eeda187c875af7e435e15cf",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/396de22682e23f71.evidence.json",
+    "name": "396de22682e23f71.evidence.json",
+    "bytes": 39906,
+    "sha256": "722e603197fe9809e3b858bfc21340517acf76cfee4e2a986ec3dd496aea8ef1",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "8b2e39ef7ee2ca3b",
+  "summary": {
+   "clip": {
+    "id": "8b2e39ef7ee2ca3b",
+    "name": "C0130_02794756.mp4",
+    "duration_s": 9.130667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23789,
+    "output_tokens": 13244,
+    "elapsed_seconds": 152.797,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "037b6055-ce0c-4149-b277-779d85835b8a",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 2,
+    "entities": 4,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 2
+   },
+   "excluded_rows": 8,
+   "identity_errors": [],
+   "descriptive_name": "high_angle_pan_brick_on_edge_cavity_wall_junction_trowel"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/8b2e39ef7ee2ca3b.response.json",
+    "name": "8b2e39ef7ee2ca3b.response.json",
+    "bytes": 49186,
+    "sha256": "0a12e42ae4af013556226a10e3e21fb851991553d3d9f2827828c68ab12cba5b",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/8b2e39ef7ee2ca3b.evidence.json",
+    "name": "8b2e39ef7ee2ca3b.evidence.json",
+    "bytes": 37837,
+    "sha256": "6efc69b106c593bab94eb9b35ee4669e07c8f78c61141e85701b1a3cc4f8dc26",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "85d3848516a43a38",
+  "summary": {
+   "clip": {
+    "id": "85d3848516a43a38",
+    "name": "C0131_02795212.mp4",
+    "duration_s": 11.050667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24407,
+    "output_tokens": 12255,
+    "elapsed_seconds": 132.578,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "b90dca10-17c0-47cd-aa44-1dcaa9906c49",
+   "status": "retained",
+   "usable_rows": {
+    "speech": 1,
+    "entities": 4,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 8,
+   "identity_errors": [],
+   "descriptive_name": "high_angle_pan_brick_on_edge_cavity_wall_corners_t_junction"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/85d3848516a43a38.response.json",
+    "name": "85d3848516a43a38.response.json",
+    "bytes": 42690,
+    "sha256": "7cd0f84b790e7c6fbb0c183ae12114b7d3b185a44a70907f58e8daa9659e71a2",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/85d3848516a43a38.evidence.json",
+    "name": "85d3848516a43a38.evidence.json",
+    "bytes": 31898,
+    "sha256": "1d4ac2955cf9a8768c1f070385c1509a8a6fd55aef9bb3a1ec10ca24f0561403",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "e0cad4cb3a79a622",
+  "summary": {
+   "clip": {
+    "id": "e0cad4cb3a79a622",
+    "name": "C0134_02797372.mp4",
+    "duration_s": 16.810667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 26208,
+    "output_tokens": 11124,
+    "elapsed_seconds": 131.656,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "9ffc1bd1-1d3e-4773-ae42-f0c6f5cdecec",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 4,
+    "visible_text": 1,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 2,
+   "identity_errors": [],
+   "descriptive_name": "completed_two_storey_exposed_red_brick_building_takshashila_exterior_track"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/e0cad4cb3a79a622.response.json",
+    "name": "e0cad4cb3a79a622.response.json",
+    "bytes": 40968,
+    "sha256": "daa8d7c68059e26b3847b395e5ecfaba30485263946168802f264dc6ee8e1eed",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/e0cad4cb3a79a622.evidence.json",
+    "name": "e0cad4cb3a79a622.evidence.json",
+    "bytes": 35836,
+    "sha256": "81ed41c1d4bd3737036459b4ac6d872229434d214ac1c52cbb4ea88462c9167d",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "2652bcbbb1ffc0df",
+  "summary": {
+   "clip": {
+    "id": "2652bcbbb1ffc0df",
+    "name": "C0135_02798212.mp4",
+    "duration_s": 17.770667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 26505,
+    "output_tokens": 10461,
+    "elapsed_seconds": 130.469,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "9a5b38a7-62a9-4ce1-b985-994a38a71131",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 2,
+    "visible_text": 1,
+    "visual_events": 1,
+    "editorial_ideas": 3,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "two_storey_exposed_brick_building_takshashila_exterior_pan"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/2652bcbbb1ffc0df.response.json",
+    "name": "2652bcbbb1ffc0df.response.json",
+    "bytes": 38892,
+    "sha256": "ea8cc8fc9f1cd0f6f71c77a1cbb16904384f4eb31d40912cbc3d7828e9f8b6f8",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/2652bcbbb1ffc0df.evidence.json",
+    "name": "2652bcbbb1ffc0df.evidence.json",
+    "bytes": 34554,
+    "sha256": "ebe54113147daa3ace87778c3f3749c606df50f921c52ae78c5ad2ca2ed0673b",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "5d72a4d6f839a841",
+  "summary": {
+   "clip": {
+    "id": "5d72a4d6f839a841",
+    "name": "C0136_02799100.mp4",
+    "duration_s": 10.56
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24378,
+    "output_tokens": 10379,
+    "elapsed_seconds": 116.672,
+    "thinking_tokens": null
+   },
+   "gaps": 0,
+   "job_id": "1c180f44-9319-4fc6-bfe5-6abfd8c5912f",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visible_text": 1,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 3,
+   "identity_errors": [],
+   "descriptive_name": "red_brick_building_takshashila_exterior_pullback"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/5d72a4d6f839a841.response.json",
+    "name": "5d72a4d6f839a841.response.json",
+    "bytes": 37421,
+    "sha256": "1ac608450f49959b3cce4679378b448f69b835e06987d97c8ff222cce78c7950",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/5d72a4d6f839a841.evidence.json",
+    "name": "5d72a4d6f839a841.evidence.json",
+    "bytes": 31809,
+    "sha256": "859966290ed17445f04a9cc9791c654f695c9d0ac34f479c5b8ac47659d7752a",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "c94c846220bf45ff",
+  "summary": {
+   "clip": {
+    "id": "c94c846220bf45ff",
+    "name": "C0138_02799940.mp4",
+    "duration_s": 4.8
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22560,
+    "output_tokens": 8414,
+    "elapsed_seconds": 105.922,
+    "thinking_tokens": null
+   },
+   "gaps": 0,
+   "job_id": "0dc52dbd-4372-4a73-8c08-8f3a5fde5a51",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 2,
+    "visual_events": 1,
+    "editorial_ideas": 3,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "exposed_red_brick_wall_corbelled_arch_exterior_push"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/c94c846220bf45ff.response.json",
+    "name": "c94c846220bf45ff.response.json",
+    "bytes": 32356,
+    "sha256": "6b831843ce91b0764aa7e6482d92e91e04a10411117bfa9ce8a8a88c192b0216",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/c94c846220bf45ff.evidence.json",
+    "name": "c94c846220bf45ff.evidence.json",
+    "bytes": 28989,
+    "sha256": "8c2f2f0521384156e6ed6242705576b821b2c065c7d75bc1e019692559533959",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "33d5daa609365812",
+  "summary": {
+   "clip": {
+    "id": "33d5daa609365812",
+    "name": "C0139_02800180.mp4",
+    "duration_s": 4.330667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22271,
+    "output_tokens": 8507,
+    "elapsed_seconds": 99.547,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "45271aec-e971-43b5-a12e-f468115ab57a",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "red_brick_building_exterior_arch_and_bottle_wall"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/33d5daa609365812.response.json",
+    "name": "33d5daa609365812.response.json",
+    "bytes": 31492,
+    "sha256": "cc21814d0d38932298c6fe404a81aeb7d39b8c0afd78a19c5b94f9dd9e9c5e86",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/33d5daa609365812.evidence.json",
+    "name": "33d5daa609365812.evidence.json",
+    "bytes": 27989,
+    "sha256": "4af7c436f2b5f6e5120a4aef23444554fcf7c73fcd4b4ae61be2ef29ceb69c95",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "83188fdf3fa7003a",
+  "summary": {
+   "clip": {
+    "id": "83188fdf3fa7003a",
+    "name": "C0140_02800396.mp4",
+    "duration_s": 6.250667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22876,
+    "output_tokens": 9408,
+    "elapsed_seconds": 108.36,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "13ca8d5c-1d08-4ae0-83b3-de7bbebe592d",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "pink_brick_corner_wall_and_bottle_arch_tilt"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/83188fdf3fa7003a.response.json",
+    "name": "83188fdf3fa7003a.response.json",
+    "bytes": 34349,
+    "sha256": "a6bcd3cad6f9a15d45c528ca2b235ec33197633df30c849584093abe32ddfd5c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/83188fdf3fa7003a.evidence.json",
+    "name": "83188fdf3fa7003a.evidence.json",
+    "bytes": 30774,
+    "sha256": "f2a0032089964b120298fb25dd907d5ebcf113960624a516c3eba9960c6bbf08",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "3fcf307156dd6ee3",
+  "summary": {
+   "clip": {
+    "id": "3fcf307156dd6ee3",
+    "name": "C0202_02858956.mp4",
+    "duration_s": 6.250667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22870,
+    "output_tokens": 9089,
+    "elapsed_seconds": 111.125,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "65c1bcb8-74e6-474e-94ab-5e8e0660d489",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 1,
+    "visual_events": 1,
+    "editorial_ideas": 3,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "completed_brick_building_arched_lattice_facade_push_in"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/3fcf307156dd6ee3.response.json",
+    "name": "3fcf307156dd6ee3.response.json",
+    "bytes": 33689,
+    "sha256": "01da1ced46fc8cdef06dd725e3383487665eaa51537c4891b68b8a127c08bdee",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/3fcf307156dd6ee3.evidence.json",
+    "name": "3fcf307156dd6ee3.evidence.json",
+    "bytes": 29833,
+    "sha256": "04691ca20c640413eea4e1eb9a45ebdbb58d74e7608a9a3ebea24e747c6e3597",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "c8d08404e8cdcfcc",
+  "summary": {
+   "clip": {
+    "id": "c8d08404e8cdcfcc",
+    "name": "C0207_02860228.mp4",
+    "duration_s": 7.210667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23177,
+    "output_tokens": 10255,
+    "elapsed_seconds": 112.968,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "37f135e4-d0fb-4579-be15-ce73ee28c65d",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 3,
+   "identity_errors": [],
+   "descriptive_name": "painted_brick_arched_entrance_with_bottle_grilles"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/c8d08404e8cdcfcc.response.json",
+    "name": "c8d08404e8cdcfcc.response.json",
+    "bytes": 37979,
+    "sha256": "c39f153bc0f9324d8abc82cb07cfe2351ea705aa8d025c4d93da1995e1c5f04c",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/c8d08404e8cdcfcc.evidence.json",
+    "name": "c8d08404e8cdcfcc.evidence.json",
+    "bytes": 32758,
+    "sha256": "9e5870df68299f1db91d23bb5b80b66a769a4c83337a421d3001501d0eec17b1",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "738105e9b2d82b0d",
+  "summary": {
+   "clip": {
+    "id": "738105e9b2d82b0d",
+    "name": "C0209_02861020.mp4",
+    "duration_s": 5.76
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 22869,
+    "output_tokens": 11032,
+    "elapsed_seconds": 121.688,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "c0e74e5e-6635-4716-8f8a-652289e4e7aa",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visible_text": 1,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "red_brick_vaulted_building_exterior_nachiketa_sign"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/738105e9b2d82b0d.response.json",
+    "name": "738105e9b2d82b0d.response.json",
+    "bytes": 39903,
+    "sha256": "925d8a3de9cee5c6ec87e933e05d37b3fefa87e41d657d71dcb30bb6b74c2f72",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/738105e9b2d82b0d.evidence.json",
+    "name": "738105e9b2d82b0d.evidence.json",
+    "bytes": 35359,
+    "sha256": "fffac4119030822cdd871345c0240ab34a7a4c89c175e1ab449cdfa1f9414085",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "b4dadc55afd13cc6",
+  "summary": {
+   "clip": {
+    "id": "b4dadc55afd13cc6",
+    "name": "C0293_03067588.mp4",
+    "duration_s": 9.130667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 23776,
+    "output_tokens": 8797,
+    "elapsed_seconds": 105.281,
+    "thinking_tokens": null
+   },
+   "gaps": 2,
+   "job_id": "bdee7904-bd9b-4418-a70a-331508a42875",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 4,
+   "identity_errors": [],
+   "descriptive_name": "curved_exposed_masonry_wall_arched_window_tilt_down"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/b4dadc55afd13cc6.response.json",
+    "name": "b4dadc55afd13cc6.response.json",
+    "bytes": 33183,
+    "sha256": "7fe67a9dc758140157f5babe6a3f2037c0fae64c658397fa81ac0d7491a494c5",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/b4dadc55afd13cc6.evidence.json",
+    "name": "b4dadc55afd13cc6.evidence.json",
+    "bytes": 27589,
+    "sha256": "bafb82d644c1fe9f232470b4b8159fc9b31dd552a48e4677cfb3f7403f000c64",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "f7b6e6385e7a0901",
+  "summary": {
+   "clip": {
+    "id": "f7b6e6385e7a0901",
+    "name": "C0288_03064924.mp4",
+    "duration_s": 12.010667
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 24706,
+    "output_tokens": 11219,
+    "elapsed_seconds": 130.954,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "b769f383-0ebe-4d40-8003-58826964de04",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 4,
+    "visual_events": 1,
+    "editorial_ideas": 4,
+    "interpretations": 1
+   },
+   "excluded_rows": 3,
+   "identity_errors": [],
+   "descriptive_name": "circular_exposed_brick_building_exterior_tracking_shot"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/f7b6e6385e7a0901.response.json",
+    "name": "f7b6e6385e7a0901.response.json",
+    "bytes": 41703,
+    "sha256": "2d2f45f14ce2c8429201d15fa8eac64f2ccfd0a6fcb62e11d141bc74dbea7d92",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/f7b6e6385e7a0901.evidence.json",
+    "name": "f7b6e6385e7a0901.evidence.json",
+    "bytes": 36009,
+    "sha256": "80cca94e56ee7ad464db78a3bdd611a1fc19cfc427160a78651c372c6e9732f0",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ },
+ {
+  "stage": "analysis",
+  "unit": "a16fb52d2d1d8245",
+  "summary": {
+   "clip": {
+    "id": "a16fb52d2d1d8245",
+    "name": "DJI_20241219103046_0091_D00000000_00000000.mp4",
+    "duration_s": 21.013333
+   },
+   "cost": {
+    "model": "gemini-4-argon",
+    "input_tokens": 27431,
+    "output_tokens": 8175,
+    "elapsed_seconds": 89.391,
+    "thinking_tokens": null
+   },
+   "gaps": 1,
+   "job_id": "4023a74f-c03a-4699-9b76-a4bfd2b92ebf",
+   "status": "retained",
+   "usable_rows": {
+    "entities": 3,
+    "visual_events": 1,
+    "editorial_ideas": 2,
+    "interpretations": 1
+   },
+   "excluded_rows": 0,
+   "identity_errors": [],
+   "descriptive_name": "aerial_top_down_pyramidal_tiled_roof_complex_in_trees"
+  },
+  "files": [
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/a16fb52d2d1d8245.response.json",
+    "name": "a16fb52d2d1d8245.response.json",
+    "bytes": 30717,
+    "sha256": "22d2336b7091f20a38675e71c4444dc9ef68fc30904563a26b57697ba1420ef7",
+    "receipt": true,
+    "location": "storage"
+   },
+   {
+    "key": "30559496-0ddf-4915-9b0c-8f622464a5b4/analysis/a16fb52d2d1d8245.evidence.json",
+    "name": "a16fb52d2d1d8245.evidence.json",
+    "bytes": 27594,
+    "sha256": "fe174273fd33f41669e42a2c429eb0fa83667af84c9cd4ce13c4b61d88f74f97",
+    "receipt": true,
+    "location": "storage"
+   }
+  ],
+  "accepted_quote": null
+ }
+]

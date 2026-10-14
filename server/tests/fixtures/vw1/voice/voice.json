@@ -1,0 +1,12 @@
+{
+ "job_id": "328d22ee-427f-4586-9d63-3018bd9a27e7",
+ "voice_id": "Rr3HT8xllxaRdjMZxGBa",
+ "name": "UD - Narrator",
+ "model_id": "eleven_v4",
+ "settings": {
+  "stability": 0.5,
+  "similarity_boost": 0.75
+ },
+ "duration_s": 304.88,
+ "source_script": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6"
+}

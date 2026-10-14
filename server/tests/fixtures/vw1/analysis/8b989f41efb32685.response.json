@@ -1,0 +1,786 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "def35d59dd92ba4e93d9e8ae681d31e3",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "8b989f41efb32685",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 26.410667
+            },
+            "status": "reviewed",
+            "note": "Continuous locked-off medium-close shot of a mason aligning bricks on edge using a metal straightedge along a low brick wall on sandy ground. Sampled across the window; native frame-by-frame review is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 26.410667
+            },
+            "state": "non_speech",
+            "note": "Natural site sounds: metal straightedge scraping and tapping against bricks, brick handling, and faint ambient outdoor noise. No intelligible speech."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 26.410667
+          },
+          "reason": "Faint, worn markings or residues on the metal straightedge are illegible and incidental to the masonry action."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Mason in beige short-sleeved collared shirt, grey trousers, and dark sandals",
+          "uncertainty": "Mostly torso, arms, legs, and feet are visible; partial face with moustache enters the top of the frame briefly around 23.5s–24.5s."
+        },
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Low red-brick wall laid on edge in a double-wythe pattern with internal hollow cavities and grey mortar",
+          "uncertainty": "Two courses are visible above the sandy ground; exact foundation depth, mortar mix ratio, and brick manufacturing method or crushing strength are not visually verifiable."
+        },
+        {
+          "id": "ent_straightedge",
+          "kind": "object",
+          "label": "Long silver-grey metal straightedge or box-section levelling bar",
+          "uncertainty": "Used as an alignment guide against the side and top edge of the brick course; whether it contains spirit-level vials is not visible."
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Masonry trowel with wooden handle resting on the ground near the mason's left foot",
+          "uncertainty": "Remains unused on the ground throughout the clip."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01_side_align",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 8.2
+          },
+          "label": "Aligning outer wythe against straightedge held on lower side",
+          "description": "In a locked-off high-angle medium-close shot, ent_mason bends over ent_wall, holding ent_straightedge with his left hand against the outer right side of the wall while using his right hand to adjust bricks laid on edge in the upper course (0.0s–6.0s). From 6.0s to 8.2s, he grips ent_straightedge with both hands, slides it briefly along the side face of the bricks, and lifts it upward.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_straightedge",
+            "ent_trowel"
+          ],
+          "context_result": "The outer row of bricks on edge is adjusted against the side bar before the mason repositions the tool to the top edge.",
+          "camera_framing": "Static high-angle medium-close shot looking diagonally along the low brick wall from upper left to lower right.",
+          "uncertainty": "The clip begins with the mason already in motion holding the straightedge in place."
+        },
+        {
+          "id": "ve_02_top_edge_align",
+          "interval": {
+            "start_s": 8.2,
+            "end_s": 26.410667
+          },
+          "label": "Placing straightedge along top outer edge and aligning bricks and headers",
+          "description": "ent_mason lifts ent_straightedge and places it along the top outer right edge of the upper course of ent_wall (8.2s–11.5s). While holding ent_straightedge steady with his right hand, he uses his left hand to adjust individual stretcher and header bricks on edge along the course from upper-left toward lower-right to bring them flush with the straightedge, leaving distinct rectangular hollow cavities visible between the bricks (11.5s–23.8s). Around 23.5s–24.5s, his partial face briefly enters the top of the frame as he leans down. At 24.5s–25.3s, his left hand releases the bricks and lifts slightly while his right hand continues holding ent_straightedge against the wall until the clip ends at 26.410667s.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_straightedge",
+            "ent_trowel"
+          ],
+          "context_result": "The upper course of bricks on edge is aligned flush along the straightedge, clearly displaying the alternating stretcher and header arrangement and internal hollow cavities.",
+          "camera_framing": "Static high-angle medium-close shot.",
+          "uncertainty": "The mason's right hand is still holding the straightedge against the wall when the recording cuts off at 26.410667s."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "interp_rat_trap_bond",
+          "category": "construction_technique",
+          "claim": "The masonry shown is Rat-Trap Bond construction, where bricks are laid on edge in parallel stretcher and cross header positions to form a wall with continuous internal hollow cavities, and the mason is using a metal straightedge to check and adjust course alignment and level.",
+          "evidence_refs": [
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_side_align"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_top_edge_align"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_straightedge"
+            }
+          ],
+          "uncertainty": "The brick-on-edge geometry, internal cavities, and alignment action are directly visible; identification of the named bond system and its thermal/material-saving properties draws on script context and construction background knowledge."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "idea_best_take_top_align",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_top_edge_align"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_rat_trap_bond"
+            }
+          ],
+          "interval": {
+            "start_s": 8.2,
+            "end_s": 25.5
+          },
+          "reason": "Strongest portion of the clip (ve_02_top_edge_align): clearly shows the mason placing the metal straightedge along the top outer edge of the brick-on-edge course and systematically adjusting stretcher and header bricks by hand while the internal hollow cavities remain prominent in the foreground.",
+          "uncertainty": "The mason's partial face briefly dips into the top edge of the frame around 23.5s–24.5s, and his right hand still holds the straightedge at the end of the interval.",
+          "details": {
+            "comparison_scope": "Compared against the earlier 0.0s–8.2s stage (ve_01_side_align) within this same clip.",
+            "alternative_refs": [
+              {
+                "source_id": "8b989f41efb32685",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01_side_align"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 8.2
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_action_span_top_align",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_top_edge_align"
+            }
+          ],
+          "interval": {
+            "start_s": 8.2,
+            "end_s": 25.5
+          },
+          "reason": "Captures the complete top-edge alignment cycle (ve_02_top_edge_align) from lifting and seating the straightedge on the upper edge through hand-adjusting the bricks down the line to releasing the left hand.",
+          "uncertainty": "The right hand continues holding the straightedge against the bricks through 26.410667s.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "8.2s–11.5s: lifting the metal straightedge and seating it along the top outer edge of the brick-on-edge course.",
+            "visible_result": "11.5s–25.5s: bricks along the upper course are adjusted flush with the straightedge with hollow cavities clearly visible, ending as the mason's left hand releases the brick at ~24.5s–25.5s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_story_alignment",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_top_edge_align"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_rat_trap_bond"
+            }
+          ],
+          "interval": {
+            "start_s": 9.5,
+            "end_s": 23.5
+          },
+          "reason": "Directly illustrates the explanation in P001 of maintaining alignment, level, and proper bonding while bricks are laid on edge with hollow cavities inside the wall.",
+          "uncertainty": "Ending around 23.5s avoids the brief moment (23.5s–24.5s) when the mason's partial face enters the top of the frame.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_script_use_edge_cavities",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01_side_align"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02_top_edge_align"
+            },
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 26.410667
+          },
+          "reason": "Provides clear close-up B-roll for P001 passages describing bricks placed on their edge, continuous hollow cavities within the wall, staggered joints, and careful workmanship maintaining alignment and level.",
+          "uncertainty": "Does not show mortar mixing, guide strings, plinth wetting, window sills, pointing, or water curing mentioned elsewhere in P001.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": "Close view of brick-on-edge course, internal hollow cavities, and manual alignment against a metal straightedge.",
+            "relationship": "match",
+            "intended_explanation": "Shows how bricks on edge form hollow cavities and how alignment is checked with a straightedge.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_future_visual_strength_thermal",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "8b989f41efb32685",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "interval": null,
+          "reason": "While this recorded clip shows the physical cavities and alignment work, P001 also explains invisible thermal-barrier behaviour, 25% brick savings, and specific brick crushing-strength requirements by building height (20, 35, and 75 kg/cm² for 1, 2, and 3 storeys) that cannot be seen directly in site footage.",
+          "uncertainty": "Provisional suggestion for undecided passages; no generated asset currently exists.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Illustrate heat transfer reduction across the hollow cavity and compare required brick crushing strengths (20, 35, 75 kg/cm²) across 1-, 2-, and 3-storey buildings.",
+            "missing_asset": "Clean instructional diagram or generated visual overlay showing thermal insulation across the cavity and crushing-strength figures by storey height.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "8b989f41efb32685",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No exact passage-level visual slot reservations were supplied in the brief. This recorded clip is well suited for P001 clauses covering bricks laid on edge, hollow cavities, and maintaining alignment, level, and bonding.",
+          "prerequisite": null,
+          "uncertainty": "Other passages in P001 (e.g., crushing-strength figures, thermal barrier physics, plinth preparation, curing) may be better served by other recorded clips in the collection or planned_not_created graphics."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_guide_string_vs_bar",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 26.410667
+          },
+          "field": "visual_events",
+          "issue": "Script P001 mentions fixing 'guide strings' to maintain straight walls and maintaining 'alignment, level, and proper bonding'; in this clip, the mason uses a rigid metal straightedge bar rather than a string line."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This clip contains one continuous, uninterrupted filming take (0.0s–26.410667s) with a static camera and no camera resets. Within this single take, the mason performs two successive process stages on the same section of brick-on-edge wall: first (ve_01_side_align, 0.0s–8.2s), holding the metal straightedge against the lower outer side of the bricks while adjusting the upper course (linked to claim_side_align); second (ve_02_top_edge_align, 8.2s–26.410667s), lifting and placing the straightedge along the top outer edge of the upper course and adjusting stretcher and header bricks flush against it (linked to claim_reposition_bar and claim_top_align). The second stage (8.2s–25.5s) is editorially stronger because the placement of the bar and the alignment of the bricks and cavities are much clearer.",
+    "crop_guidance": "In the native horizontal frame, the essential action—the brick-on-edge wall (ent_wall), internal hollow cavities, metal straightedge (ent_straightedge), and the mason's hands (ent_mason)—occupies the lower-left through centre-right region of the frame. Around 23.5s–24.5s in ve_02_top_edge_align, the mason's partial face (nose, moustache, forehead) briefly dips into the top-centre edge of the frame. If a tighter crop or vertical/square reframe is needed, focusing on the central and lower-left portion of the frame preserves the wall cavities, straightedge, and both hands while excluding the partial face intrusion at the top edge; however, any crop must remain wide enough from upper-left to lower-right to keep both hands in view as the mason reaches from the upper-left bricks (around 12.5s–16.0s) down toward the lower-right bricks (around 20.5s–23.8s). No crop has been technically verified.",
+    "clean_handles": "Interval: 0.0–8.2; classification: active preparation; beginning observation: 0.0s mason's left hand holds the metal straightedge against the lower side of the brick wall while his right hand adjusts a foreground brick on edge; middle observation: 4.5s mason's right hand taps and adjusts a middle brick on edge while the left hand steadies the straightedge; end observation: 8.2s mason lifts the metal straightedge upward off the side of the wall with both hands; relevant action stopped: side-alignment adjustment stops around 6.0s as the mason transitions to lifting and repositioning the straightedge through 8.2s; uncertainty: clip starts with action already in progress at 0.0s; links: ve_01_side_align and claim_side_align; editorial use: provides active lead-in showing side alignment and tool repositioning before the main top-edge alignment sequence. Interval: 8.2–11.5; classification: active preparation; beginning observation: 8.2s mason lifts the metal straightedge above the brick course with both hands; middle observation: 9.8s mason lowers the straightedge onto the top outer right edge of the brick-on-edge course; end observation: 11.5s mason's right hand steadies the straightedge on the top edge while his left hand prepares to adjust individual bricks; relevant action stopped: repositioning of the straightedge stops at ~11.5s as hand adjustment of individual bricks begins; uncertainty: approximate transition boundary around 11.5s between seating the bar and adjusting individual bricks; links: ve_02_top_edge_align and claim_reposition_bar; editorial use: preserves the essential setup of placing the straightedge along the top edge of the wall. Interval: 24.5–26.410667; classification: active release; beginning observation: 24.5s mason's left hand finishes pressing the lower-right brick flush against the straightedge and begins to lift away; middle observation: 25.3s mason's left hand is raised clear of the bricks in mid-air while his right hand continues holding the straightedge against the wall; end observation: 26.410667s mason's right hand still holds the straightedge in place against the aligned brick course as the clip ends; relevant action stopped: left-hand brick adjustment stops around 24.5s–25.3s, but right-hand holding of the straightedge and slight body movement continue until the recording cuts off at 26.410667s; uncertainty: recording ends at 26.410667s before the straightedge is removed or the mason steps back into a fully settled pause; links: ve_02_top_edge_align and claim_end_release; editorial use: provides a clean lead-out after the final brick adjustment where the left hand clears the work and the aligned brick-on-edge course is clearly visible.",
+    "continuity": "At candidate entry 0.0s (ve_01_side_align), the mason stands on the right side of the frame bending left over the wall, with the wall running diagonally from upper-left to lower-right, two brick-on-edge courses laid, the trowel resting untouched on the ground by his left foot, and the straightedge held low against the outer right face of the wall. At candidate entry 8.2s–9.5s (ve_02_top_edge_align), the mason lifts the straightedge with both hands from the right side and places it onto the top outer right edge of the upper brick course. From 11.5s to 24.5s, his right hand holds the straightedge near the centre-right while his left hand moves progressively down the wall from upper-left (12.5s–18.5s) toward lower-right (19.0s–24.5s) adjusting bricks. At candidate exit 23.5s, his left hand is adjusting the foreground brick just before his partial face enters the top of the frame (23.5s–24.5s). At candidate exit 25.3s–26.410667s, his left hand has released the bricks and lifted away while his right hand remains holding the straightedge on the top edge of the wall.",
+    "preview_frames": "2.5s (ve_01_side_align): shows the initial stage with the straightedge held low against the side of the wall while the mason's right hand adjusts a foreground brick on edge and hollow cavities are visible. 10.5s (ve_02_top_edge_align): shows the mason seating the metal straightedge along the top outer edge of the upper brick-on-edge course with both hands. 17.5s (ve_02_top_edge_align): shows the mason holding the straightedge with his right hand while his left hand adjusts a cross header brick between two hollow cavities in the upper course. 25.3s (ve_02_top_edge_align): shows the completed alignment state as the mason's left hand releases and lifts away from the aligned brick course while the right hand steadies the straightedge.",
+    "speech_action_links": "No speech is present in this source video (0.0s–26.410667s contains only natural non-speech masonry sounds, and output camera audio is excluded by policy), so there are no spoken utterances to link to visual actions.",
+    "shorter_explanations": "For a concise explanatory B-roll cut of alignment and level checking in ve_02_top_edge_align (supporting claim_reposition_bar and claim_top_align), use the single span 9.0s–23.5s (duration: 23.5s - 9.0s = 14.5s, with no internal transitions). This retains the essential setup of lowering the straightedge onto the top outer edge of the brick course (9.0s–11.5s), the main action of hand-adjusting both header and stretcher bricks along the course with hollow cavities clearly visible (11.5s–23.5s), and the visible result of bricks brought flush against the bar, while omitting the earlier side-bar stage (0.0s–8.2s) and cutting just before the mason's partial face dips into the top of the frame (23.5s–24.5s). If an even tighter cut is needed, 9.5s–19.0s (duration: 19.0s - 9.5s = 9.5s) shows the bar placement and adjustment of the upper-left and middle bricks, whereas the longer 8.2s–25.5s span (duration: 25.5s - 8.2s = 17.3s) adds the full lift of the bar at the start and the final foreground brick adjustment and left-hand release at the end (claim_end_release).",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "claim_bricks_on_edge_cavities",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use any portion of 0.0s–26.410667s as direct visual proof of bricks laid on their narrow edge in two parallel wythes with cross headers forming rectangular hollow cavities inside the wall."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "claim_bricks_on_edge_cavities",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the completed course pattern of alternating stretchers and headers on edge with internal cavities."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "claim_top_align",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 8.2s–25.5s (or 9.0s–23.5s) to directly show the mason checking and adjusting brick alignment and level along the course with a metal straightedge and staggered joints between courses."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Quality workmanship at every stage is essential for achieving the desired performance.",
+          "claim_id": "claim_workmanship_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates careful workmanship through the mason's methodical hand adjustment of each brick against the straightedge, though long-term structural or thermal performance is not measurable from the clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.",
+          "claim_id": "claim_cavity_cleanliness_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates open, unobstructed cavities between the bricks on edge during alignment, though active mortar-droppings prevention and thermal insulation performance are inferred rather than directly measured."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Mixed-media workflow acknowledged: future generated video (labelled planned_not_created) may be used for later gap filling, recorded footage is not forced into every script passage, and no exact passage-level visual slot reservations were supplied in this request (so none are invented, and any supplied reservations would be preserved). Original camera audio was inspected for intake (containing only non-speech masonry/tool sounds) and is excluded from the output per source_audio_policy, so no source_audio editorial ideas are proposed.",
+    "unavailable": "speech and speech_action_links: No intelligible speech occurs in this source video. source_audio editorial ideas: Omitted because output audio policy excludes source camera audio. Settled clean handles: Neither the beginning nor the end of the clip reaches a fully settled pause because the mason is already adjusting bricks at 0.0s and still holds the straightedge against the wall at 26.410667s."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_bricks_on_edge_cavities",
+      "target_paths": [
+        "/sources/0/entities/1/label",
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/0/editorial_use",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "Red bricks are laid on their narrow edge in two courses with alternating stretcher and cross-header positions and staggered vertical joints, forming a wall with open rectangular hollow cavities between the bricks.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 26.410667,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ent_wall across ve_01_side_align and ve_02_top_edge_align (0.0s–26.410667s), two courses of red bricks are visibly resting on their narrow edges with grey mortar joints and open rectangular cavities down the centre of the wall."
+        }
+      ],
+      "limits": "Internal depth of the cavities below the visible courses, exact mortar composition, and brick crushing strength cannot be determined visually."
+    },
+    {
+      "id": "claim_side_align",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/details/comparison_scope",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity"
+      ],
+      "claim": "From 0.0s to 8.2s, the mason holds the metal straightedge against the lower outer side of the wall while adjusting bricks on edge in the upper course, then grips the straightedge with both hands and lifts it upward.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 8.2,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: ve_01_side_align shows ent_mason holding ent_straightedge with his left hand against the lower right side of ent_wall while his right hand adjusts bricks (0.0s–6.0s), then sliding and lifting the bar with both hands (6.0s–8.2s)."
+        }
+      ],
+      "limits": "The action is already underway at 0.0s when the clip begins."
+    },
+    {
+      "id": "claim_reposition_bar",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/1/details/must_keep_setup",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between approximately 8.2s and 11.5s, the mason lifts the metal straightedge and seats it along the top outer right edge of the upper brick-on-edge course.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 8.2,
+      "end_s": 11.5,
+      "cues": [
+        {
+          "time_s": 8.2,
+          "cue": "visual: In ve_02_top_edge_align (8.2s–11.5s), ent_mason lifts ent_straightedge with both hands and lowers it flush along the top outer edge of the upper brick course."
+        }
+      ],
+      "limits": "The transition from seating the bar with both hands to adjusting individual bricks with the left hand occurs gradually around 11.0s–11.5s."
+    },
+    {
+      "id": "claim_top_align",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2/editorial_use"
+      ],
+      "claim": "From 8.2s to 25.5s, the mason places the metal straightedge along the top outer edge of the upper course and, while holding it steady with his right hand, uses his left hand to adjust individual stretcher and header bricks on edge from upper-left toward lower-right so they align flush with the straightedge.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 8.2,
+      "end_s": 25.5,
+      "cues": [
+        {
+          "time_s": 11.5,
+          "cue": "visual: In ve_02_top_edge_align (11.5s–24.5s), ent_mason holds ent_straightedge on the top outer edge with his right hand while his left hand adjusts bricks along the course at ~12.5s–16.0s (upper-left), ~16.5s–19.0s (middle header/stretcher), and ~19.5s–24.5s (lower-right foreground)."
+        }
+      ],
+      "limits": "Whether the straightedge contains a spirit level vial or is used purely for linear alignment and evenness is not visually verifiable; the mason's partial face briefly enters the top of the frame around 23.5s–24.5s."
+    },
+    {
+      "id": "claim_end_release",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/1/details/visible_result",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From approximately 24.5s to 26.410667s, the mason's left hand finishes adjusting the foreground brick and lifts away from the wall, while his right hand continues holding the straightedge against the aligned bricks until the clip ends.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 24.5,
+      "end_s": 26.410667,
+      "cues": [
+        {
+          "time_s": 24.5,
+          "cue": "visual: In ve_02_top_edge_align (24.5s–26.410667s), ent_mason lifts his left hand clear of the foreground brick around 24.5s–25.3s while his right hand remains holding ent_straightedge against the wall through the end of the file at 26.410667s."
+        }
+      ],
+      "limits": "Inspected through the end of the attached window at 26.410667s; no footage exists after 26.410667s to show the removal of the straightedge."
+    },
+    {
+      "id": "claim_workmanship_inference",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/additional_analysis/script_support/claims/3/editorial_use"
+      ],
+      "claim": "The mason's methodical adjustment of each brick on edge against a metal straightedge illustrates the careful workmanship required in Rat-Trap Bond Masonry to maintain alignment and bonding.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 26.410667,
+      "cues": [
+        {
+          "time_s": 11.5,
+          "cue": "visual: ve_02_top_edge_align shows ent_mason checking and adjusting each brick along the course against ent_straightedge."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Throughout construction, attention is given to maintaining alignment, level, and proper bonding' and 'Quality workmanship at every stage is essential for achieving the desired performance.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Using a straightedge bar to bring individual bricks flush in each course is standard masonry practice for keeping wythes straight and even."
+        }
+      ],
+      "limits": "Illustrates careful alignment technique, but structural strength and long-term durability of the completed building are not measurable from this clip."
+    },
+    {
+      "id": "claim_cavity_cleanliness_inference",
+      "target_paths": [
+        "/additional_analysis/script_support/claims/4/editorial_use"
+      ],
+      "claim": "The open, unobstructed cavities visible between the bricks on edge during alignment illustrate the script's point that internal cavities are kept open to preserve insulating properties.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 26.410667,
+      "cues": [
+        {
+          "time_s": 17.5,
+          "cue": "visual: In ve_02_top_edge_align, the rectangular cavities between the stretchers and headers in ent_wall are visibly open and not filled with mortar."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.'"
+        }
+      ],
+      "limits": "The bottom interior of the cavities is in shadow and mortar laying is not shown in this clip, so active mortar-droppings prevention and thermal insulation performance cannot be directly verified."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_wardrobe_mason",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The mason wears a beige short-sleeved collared shirt (with a pen or small object partially visible in the chest pocket around 24s), dark grey tailored trousers, and dark open sandals/flip-flops.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      },
+      "uncertainty": "Upper torso and partial face are only briefly visible around 23.5s–24.5s."
+    },
+    {
+      "id": "wm_arch_rat_trap_wall",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_top_edge_align"
+        }
+      ],
+      "category": "architecture",
+      "observation": "A low brick wall with a corner turn at the upper left, constructed of red clay bricks laid on edge in two visible courses with grey mortar and rectangular internal hollow cavities.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_tools_masonry",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_straightedge"
+        },
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A long silver-grey rectangular metal straightedge bar used by hand to align the brick course, and a metal-bladed masonry trowel with a wooden handle lying on the ground near the mason's left foot.",
+      "entity_ids": [
+        "ent_straightedge",
+        "ent_trowel"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_env_sandy_ground",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01_side_align"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor site with dry, sunlit sandy soil, scattered whole and broken red bricks, small clumps of spilled grey mortar along the base of the wall, and sparse dry grass/weeds.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_material_fresh_mortar",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02_top_edge_align"
+        }
+      ],
+      "category": "material_state",
+      "observation": "The dark grey mortar bedding beneath the upper course of bricks is still fresh and pliable enough that the mason can shift and level individual bricks by hand pressure, with crumbly mortar droppings visible on the sand beside the lower course.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "lim_brick_strength_and_type",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Brick crushing strength and manufacturing type",
+      "kind": "not_established",
+      "limitation": "Visual appearance of the red bricks does not establish their measured crushing strength (e.g., 20, 35, or 75 kg/cm²) or confirm whether they are wire-cut or hand-moulded.",
+      "interval": null
+    },
+    {
+      "id": "lim_thermal_and_material_savings",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Thermal insulation performance and percentage of brick savings",
+      "kind": "not_established",
+      "limitation": "While the hollow cavities are directly visible, this clip cannot measure thermal transfer reduction or verify the 25% material-saving figure stated in the script.",
+      "interval": null
+    },
+    {
+      "id": "lim_other_construction_stages",
+      "evidence_refs": [],
+      "subject": "Plinth wetting, mortar mixing, guide strings, sill courses, pointing, and curing",
+      "kind": "not_visible",
+      "limitation": "This clip shows only straightedge alignment of a low brick-on-edge course; plinth cleaning/moistening, mortar preparation, string lines, window sill courses, pointing, and seven-day water curing are not visible in this source.",
+      "interval": null
+    },
+    {
+      "id": "lim_mason_identity",
+      "evidence_refs": [
+        {
+          "source_id": "8b989f41efb32685",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        }
+      ],
+      "subject": "Full face and identity of the mason",
+      "kind": "not_visible",
+      "limitation": "The camera is framed on the low wall and the mason's arms and legs; only the lower part of his forehead, nose, and moustache briefly enters the top of the frame around 23.5s–24.5s.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 26.410667
+      }
+    }
+  ],
+  "descriptive_name": "mason_aligning_bricks_on_edge_with_metal_straightedge"
+}

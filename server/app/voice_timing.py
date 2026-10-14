@@ -65,6 +65,38 @@ def validate_alignment(value):
     return ''.join(chars)
 
 
+def clamp_words(timing, tolerance_s):
+    """MP3 frame padding lets the provider's last characters end a little after the decoded audio. Within the tolerance,
+    pull affected word times back to the audio length and record it; beyond it, refuse. Idempotent."""
+    duration = timing['audio']['duration_s']
+    overshoot = round(max(0.0, timing['last_character_end_s'] - duration), 3)
+    if overshoot > tolerance_s:
+        raise ValueError('Alignment exceeds the decoded recording duration.')
+    clamped = 0
+    for w in timing['words']:
+        if w['end_s'] > duration:
+            w['end_s'] = duration
+            w['start_s'] = min(w['start_s'], round(duration - 0.01, 3))
+            clamped += 1
+    timing['alignment_overshoot_s'] = overshoot
+    timing['words_clamped'] = clamped
+    return timing
+
+
+def check_words(timing):
+    """The one rule for narration timing words, used by the producer (worker) and every reader (planning)."""
+    duration = timing.get('audio', {}).get('duration_s')
+    words = timing.get('words') or []
+    if not timing.get('script_characters_match') or not words or not duration:
+        raise ValueError('Narration timing is incomplete (characters must match the accepted script); narrate again.')
+    cursor = 0
+    for w in words:
+        if not (cursor <= w['start_s'] < w['end_s'] <= duration):
+            raise ValueError(f"Narration word {w['id']} {w['text']!r} has out-of-order or out-of-range timing.")
+        cursor = w['end_s']
+    return timing
+
+
 def timing_evidence(snapshot, alignments):
     raw = validate_alignment(alignments.get('alignment'))
     if alignments.get('normalized_alignment') is not None:

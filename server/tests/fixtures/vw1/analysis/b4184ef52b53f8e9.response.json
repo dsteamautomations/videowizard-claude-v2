@@ -1,0 +1,983 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "e8ad97657bc09cbd0b9c7285f7fbaf46",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "b4184ef52b53f8e9",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 6.72
+            },
+            "status": "reviewed",
+            "note": "Full clip reviewed visually via sampled frames and continuous playback inspection; native-resolution pixel-by-pixel or exhaustive native-frame inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 5.0
+            },
+            "state": "omitted_background_speech",
+            "note": "Quiet site ambience, brick handling sounds, and brief low-volume Tamil on-site coordination phrases ('ஆமா', 'நல்லா வை') omitted from formal speech records or kept as non-narrative site coordination."
+          },
+          {
+            "interval": {
+              "start_s": 5.0,
+              "end_s": 6.72
+            },
+            "state": "speech",
+            "note": "Clear Tamil instructional utterance from an off-screen speaker starting a demonstration explanation, cut off by the end of the clip."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 5.0
+          },
+          "reason": "Brief, low-volume on-site coordination murmurs in Tamil between workers/crew around 0.9s–2.6s do not provide substantive process explanation and are omitted as incidental background speech."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.72
+          },
+          "reason": "Distant circular wall emblem/signage on the background building is out of focus and too small to read; omitted from readable text records."
+        },
+        {
+          "field": "visual_details",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.72
+          },
+          "reason": "Individual loose bricks, minor mortar crumbs, and distant background yard clutter are grouped rather than enumerated individually."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Mason in tan shirt and dark trousers laying bricks",
+          "uncertainty": "Head is cropped out of the top of the frame throughout the clip."
+        },
+        {
+          "id": "ent_helper",
+          "kind": "person",
+          "label": "Helper on left in light shirt and dark trousers holding a round metal mortar pan",
+          "uncertainty": "Upper torso and head are outside the top-left frame."
+        },
+        {
+          "id": "ent_bystander_standing",
+          "kind": "person",
+          "label": "Person standing with arms crossed in the background wearing light shirt and grey trousers",
+          "uncertainty": "Head is cropped out at the top edge of the frame."
+        },
+        {
+          "id": "ent_bystander_seated",
+          "kind": "person",
+          "label": "Bearded man sitting on the right background wearing a light green shirt and dark trousers",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_brick_wall",
+          "kind": "object",
+          "label": "Low demonstration brick wall laid on edge with hollow cavities and wet mortar",
+          "uncertainty": "Built directly on sandy ground without a visible prepared concrete plinth in this shot."
+        },
+        {
+          "id": "ent_bricks",
+          "kind": "object",
+          "label": "Red clay bricks being placed on edge and stacked nearby",
+          "uncertainty": "Exact manufacturing method (e.g., wire-cut vs hand-moulded) and crushing strength cannot be verified visually; surfaces have visible irregularities and chipped edges."
+        },
+        {
+          "id": "ent_mortar_pans",
+          "kind": "object",
+          "label": "Two round metal pans (taslas): one on the ground holding grey mortar mix, one empty pan held by the helper",
+          "uncertainty": "Exact cement-sand ratio and moisture content are not visually measurable."
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Masonry trowel with a bright red handle resting on the ground in the lower-left foreground",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_speaker_offscreen",
+          "kind": "speaker",
+          "label": "Off-screen male speaker speaking Tamil near the camera",
+          "uncertainty": "Whether this voice belongs to an unseen presenter/director or one of the cropped figures is not visually established."
+        }
+      ],
+      "speech": [
+        {
+          "id": "sp_01",
+          "interval": {
+            "start_s": 5.3,
+            "end_s": 6.72
+          },
+          "speaker_id": "ent_speaker_offscreen",
+          "language": "ta",
+          "original_text": "இப்படி இப்படின்னு...",
+          "english_translation": "Like this, like this...",
+          "transcription_status": "partial",
+          "uncertainty": "Utterance begins near the end of the clip ('Ippadi ippadinnu...') and is cut off by the end of the recording at 6.72s before the sentence completes."
+        }
+      ],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.72
+          },
+          "label": "Mason removes, swaps, and places a header brick on edge across the cavity wall while pointing to the cavity",
+          "description": "In a stable low-angle medium shot looking along a low L-shaped brick wall built on sandy ground, the mason (ent_mason) stands bent over the wall. From 0.0s to 1.8s, he lifts a brick off the top mortar bed of the wall with his left hand while reaching down with his right hand to pick up a vertical brick standing on the ground beside the wall, placing the removed brick down on the ground at 1.4s–1.8s. From 1.8s to 3.4s, he brings the newly selected brick up with both hands and sets it on edge as a cross-brick (header/shiner bridging the two leaves) onto the wet mortar bed at 2.3s–2.6s, while gesturing and pointing with his right index finger toward the adjacent open rectangular cavity inside the wall from 2.2s to 5.6s. From 5.6s to 6.72s, he brings his right hand back up to the placed brick to adjust and steady it with both hands. Meanwhile, on the left, a helper (ent_helper) bends over holding an empty round metal pan above a second pan full of mortar from 0.0s to 5.2s, then stands upright and lifts the empty pan away toward the upper left from 5.2s to 6.72s. In the background, two observers remain mostly stationary.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_helper",
+            "ent_bystander_standing",
+            "ent_bystander_seated"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_mortar_pans",
+            "ent_trowel"
+          ],
+          "context_result": "A brick is placed on edge bridging the wall course, leaving a clearly visible series of hollow rectangular cavities and staggered vertical joints along the wall in the foreground and middle ground; the mason's final adjustment of the brick is still in progress when the clip ends at 6.72s.",
+          "camera_framing": "Static, tripod-like low-angle medium shot aligned along the length of the low brick course; the heads of the working mason, helper, and standing bystander are cropped out by the top frame edge.",
+          "uncertainty": "The exact reason the mason swaps the first brick for another from the ground (whether demonstrating selection, orientation, or mortar check) is not explicitly stated in the retained audio."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "construction_technique",
+          "claim": "The low brick wall in ve_01 demonstrates Rat-Trap Bond masonry geometry: bricks are laid on edge in parallel leaves bridged by cross-bricks (headers/Rowlocks on edge), forming repeating internal hollow rectangular cavities.",
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_wall"
+            }
+          ],
+          "uncertainty": "While the bond geometry and hollow cavities are directly visible, this Appears to be a low dry-run or instructional mock-up course built directly on bare soil rather than an actual structural building wall on a prepared plinth."
+        },
+        {
+          "id": "int_02",
+          "category": "instructional_gesture",
+          "claim": "The mason's right-hand pointing gesture toward the open cavity between 2.2s and 5.6s in ve_01 appears to be an instructional cue directing attention to the internal cavity or joint alignment during an on-site demonstration.",
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_01"
+            }
+          ],
+          "uncertainty": "Because the mason's face is out of frame and the audible speech at 5.3s–6.72s is incomplete, the exact verbal point accompanying the gesture is not established by this clip alone."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ed_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 1.8,
+            "end_s": 6.72
+          },
+          "reason": "Starting around 1.8s (after the mason finishes setting the discarded first brick onto the ground) provides a clean single action of lifting the replacement brick, placing it on edge onto the mortar bed, and pointing out the hollow cavity structure in ve_01.",
+          "uncertainty": "The helper on the left stands up and exits the left frame with an empty metal pan between 5.2s and 6.72s, and the mason begins a two-handed adjustment at 5.6s that is still ongoing at 6.72s.",
+          "details": {
+            "comparison_scope": "Single continuous demonstration within this 6.72s clip; compared against the full 0.0s–6.72s span which starts with removing an already-held brick.",
+            "alternative_refs": [
+              {
+                "source_id": "b4184ef52b53f8e9",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 5.2
+            },
+            "must_keep_setup": "Mason lifting the new brick from the ground at 1.8s–2.2s and setting it onto the mortar bed at 2.3s–2.6s.",
+            "visible_result": "Brick sits on edge bridging the wall course while the mason's right hand clearly points to the open rectangular cavities along the wall (2.6s–5.5s).",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Shows bricks being placed on edge to form continuous hollow cavities within the wall.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_02",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 1.8,
+            "end_s": 5.5
+          },
+          "reason": "Isolates the core brick placement and pointing pause in ve_01 while avoiding both the initial brick-removal swap (0.0s–1.8s) and the incomplete two-handed adjustment/helper exit at the tail (5.5s–6.72s).",
+          "uncertainty": "At 5.2s–5.5s the helper on the left begins lifting the empty metal pan upward; trimming earlier around 5.2s avoids the helper's upward movement if a calmer background is desired.",
+          "details": {
+            "comparison_scope": "Within source b4184ef52b53f8e9.",
+            "alternative_refs": null,
+            "alternative_interval": {
+              "start_s": 1.8,
+              "end_s": 5.2
+            },
+            "must_keep_setup": "Picking up the brick at 1.8s and lowering it onto the mortar bed on edge by 2.6s.",
+            "visible_result": "The placed brick rests on edge in the course and the mason holds a steady pointing gesture toward the hollow cavity from 2.6s to 5.2s.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_03",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 6.72
+          },
+          "reason": "The low-angle perspective down the length of the wall in ve_01 provides a clear anatomical view of the Rat-Trap Bond pattern: four consecutive hollow rectangular pockets, bricks standing on edge, mortar bed, and corner junction in the foreground.",
+          "uncertainty": "Because this wall is built directly on bare sandy dirt without guide strings or a prepared concrete plinth, it is best suited for explaining the brick-on-edge and hollow-cavity geometry rather than illustrating plinth preparation or guide-string alignment.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Foreground corner and middle-ground row of open cavities.",
+            "visible_result": "Clear visual evidence of bricks on edge creating internal hollow cavities and staggered joints.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Illustrates P001 lines explaining that Rat-Trap Bond places bricks on their edge to create continuous hollow cavities and a distinct pattern.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_04",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_wall"
+            }
+          ],
+          "interval": {
+            "start_s": 1.8,
+            "end_s": 5.5
+          },
+          "reason": "Directly matches the script's core technical description ('Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall' and 'Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall').",
+          "uncertainty": "While mortar is visible on the top bed and some mortar droppings lie on the ground outside the wall, this shot does not prove thermal performance, 25% brick savings, or crushing strength figures mentioned elsewhere in P001.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Visible brick-on-edge placement and open cavities inside the wall course.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Demonstrates brick-on-edge laying and the resulting hollow wall cavities.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_05",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "b4184ef52b53f8e9",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": null,
+          "reason": "While this live-action clip clearly shows a single course of hollow cavities from above (ve_01), the script claims in P001 about heat transfer ('Because of the hollow cavities, the wall acts as a natural thermal barrier. Less heat enters the building') and the three-tier crushing strength table (20, 35, and 75 kg/cm² for 1-, 2-, and 3-storey buildings) cannot be directly observed in site B-roll and would benefit from clean graphic/3D diagram overlays or generated explanatory visuals if not covered by other assets.",
+          "uncertainty": "Other clips in the 46-source collection have not been inspected in this single-source call; this is an optional planned_not_created proposal for undecided explanatory passages.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Visualize thermal insulation across the trapped air cavity and the building-height vs brick-crushing-strength requirements (20 / 35 / 75 kg/cm²).",
+            "missing_asset": "Clean architectural cutaway diagram / generated animation showing heat arrows blocked by the air cavity in a Rat-Trap Bond wall, plus a 1/2/3-storey crushing strength comparison graphic.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "b4184ef52b53f8e9",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No exact passage-level visual slot reservations were supplied in the media brief. This recorded clip (specifically 1.8s–5.5s or 0.0s–6.72s) is a strong candidate for the recorded-video portion of P001 explaining how bricks are laid on edge to form hollow cavities.",
+          "prerequisite": null,
+          "uncertainty": "Final slot allocation depends on comparing other clips in the collection and any user-designated generated-video passages."
+        },
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "generated_video",
+          "asset_status": "planned_not_created",
+          "asset_ref": null,
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "For the abstract quantitative and physical-mechanism portions of P001 (thermal barrier physics and 20/35/75 kg/cm² crushing strength by storey height) where recorded site footage is only illustrative, a generated visual or graphic animation could fill later gaps if desired.",
+          "prerequisite": "Requires downstream decision on whether to generate explanatory cutaway/graphic assets for P001.",
+          "uncertainty": "No reservation was supplied; proposed only as an optional complement."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unr_01",
+          "interval": {
+            "start_s": 5.3,
+            "end_s": 6.72
+          },
+          "field": "speech",
+          "issue": "The Tamil instructional sentence ('இப்படி இப்படின்னு...') is cut off at the clip's end at 6.72s, leaving its grammatical completion and exact technical point unresolved within this file."
+        },
+        {
+          "id": "unr_02",
+          "interval": {
+            "start_s": 5.6,
+            "end_s": 6.72
+          },
+          "field": "visual_events",
+          "issue": "The mason's two-handed adjustment of the newly placed brick begins at 5.6s and continues past the end of the recording at 6.72s."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "There is one continuous filming take across 0.0s–6.72s (ve_01, clm_01) with a static camera and no camera resets. Within this single take, the mason performs a two-part physical sequence on the same brick position: first (0.0s–1.8s, clm_02), he lifts a brick that was already at the top of the wall with his left hand and sets it down on the ground while picking up a replacement brick with his right hand; second (1.8s–6.72s, clm_03, clm_04), he lifts the replacement brick with both hands, sets it on edge across the cavity wall at 2.3s–2.6s, holds it with his left hand while pointing to the cavity with his right hand from 2.2s to 5.6s, and then places both hands on the brick to adjust its alignment from 5.6s until the clip cuts off at 6.72s. Entering at 1.8s treats the second stage as a clean, self-contained brick placement without the initial brick swap.",
+    "crop_guidance": "For a standard horizontal output aspect ratio (matching the wide native framing), the essential action and subject—the mason's hands, the bricks being placed on edge, the mortar pan, the foreground trowel, and the line of hollow cavities in the wall (ve_01, clm_01)—occupy the lower-center and lower-left quadrants of the frame. No talking face is visible because the mason's head is already cropped out above the top edge. However, two distracting background elements appear: a helper on the far left who stands up and lifts a large metal pan out of frame between 5.2s and 6.72s (clm_05), and two idle bystanders (one standing with crossed arms, one seated on a rock/mound) in the upper-right background throughout 0.0s–6.72s. A moderate zoom/crop toward the lower-center and foreground wall could exclude the seated bystander on the far right and reduce the prominence of the standing bystander's legs, provided the crop preserves the full foreground corner wall, the mason's hands/arms up to the top of the brick stack, and the mortar pan on the left. Do not crop tightly enough to cut off the mason's right hand when he reaches down to the ground at 0.8s–1.8s or points at 2.2s–5.6s. Exact pixel coordinates are not invented and crop clearance is not technically verified.",
+    "clean_handles": "Interval: 0.0–1.8; classification: active preparation; beginning observation: 0.0s mason bends over the wall with his left hand holding a brick on the top course and his right hand reaching toward the bricks on the ground (ve_01); middle observation: 0.9s mason lifts the first brick away from the wall in his left hand while grasping a standing brick on the ground with his right hand; end observation: 1.8s mason finishes setting the first brick down on the ground with his left hand while beginning to lift the replacement brick with his right hand; relevant action stopped: the removal and setting down of the first brick stops around 1.8s as the upward lift of the replacement brick begins; uncertainty: approximate transition boundary around 1.7s–1.9s between setting down the first brick and lifting the second; links: ve_01, clm_02; editorial use: provides an active lead-in if the editor wants to show the mason selecting and swapping a brick before placing it, or identifies 1.8s as the clean cut-in point to skip the swap. Interval: 1.8–2.6; classification: active preparation; beginning observation: 1.8s mason lifts the replacement brick from the ground with his right hand and brings his left hand to hold it (ve_01); middle observation: 2.2s mason holds the brick in his left hand just above the mortar bed while his right index finger begins pointing toward the cavity; end observation: 2.6s mason rests the brick on edge onto the mortar bed bridging the two leaves of the wall; relevant action stopped: downward placement of the brick onto the mortar bed finishes at approximately 2.6s, transitioning into a held pose; uncertainty: slight hand settling continues around 2.6s–2.8s; links: ve_01, clm_03; editorial use: preserves the essential setup and placement action of laying a brick on edge onto the wall. Interval: 2.6–5.2; classification: settled; beginning observation: 2.6s brick rests on edge on the mortar bed with the mason's left hand resting on top of the brick and his right hand pointing steadily at the adjacent cavity while the helper on the left holds the mortar pan stationary (ve_01); middle observation: 3.9s mason remains in the same bent posture with his left hand on the brick and right index finger pointing at the cavity, and the helper and background bystanders remain virtually still; end observation: 5.2s mason is still holding the brick and pointing pose just before the helper on the left starts lifting the empty metal pan; relevant action stopped: the downward placement of the brick stopped at 2.6s and both the mason's hands and the helper's pan remain held in a stable instructional pause across 2.6s–5.2s (with only tiny incidental finger movements); uncertainty: inspection through 6.2s (one second past 5.2s) shows that at 5.2s the helper begins lifting the empty pan and at 5.6s the mason brings his right hand up to adjust the brick, so extending past 5.2s introduces helper exit motion and extending past 5.6s introduces a new unfinished brick adjustment; links: ve_01, clm_04, clm_05; editorial use: provides a stable 2.6-second hold and clean lead-out handle showing the completed placement on edge and the hollow cavity structure before background movement and a new hand adjustment begin. Interval: 5.2–6.72; classification: active release; beginning observation: 5.2s helper on the left begins straightening up with the empty pan while the mason still points at the cavity (ve_01); middle observation: 5.8s helper lifts the pan high on the left edge of the frame while the mason brings his right hand up to grip and adjust the placed brick with both hands; end observation: 6.72s mason's hands are still actively adjusting the brick on the mortar bed as the clip ends; relevant action stopped: relevant action has not stopped—the mason's two-handed brick adjustment continues at the end of the file at 6.72s and post-6.72s context is unavailable because the attached window ends at 6.72s; uncertainty: recording cuts off the final adjustment outcome at 6.72s; links: ve_01, clm_04, clm_05; editorial use: usable only if an active cut-out during ongoing hand adjustment is desired; otherwise trim before 5.2s or 5.6s.",
+    "continuity": "At the start of the clip (0.0s, ve_01, clm_02), the mason is bent over in center-left frame facing toward the foreground-left, with his left hand on a brick atop the wall and his right hand descending toward loose bricks on the left side of the wall; the helper on the far left is bent over holding a round metal pan over a mortar pan. At the recommended internal entry point around 1.8s (ve_01, clm_03), the mason's left hand is releasing a brick on the ground just to the left of the wall while his right hand lifts a replacement brick upward toward the center-frame wall bed. Between 2.6s and 5.2s (ve_01, clm_04), the newly placed brick sits on edge bridging the wall course in center frame, the mason's left hand rests on top of it, and his right hand points downward toward the hollow cavity below it. If exiting at 5.2s (ve_01, clm_04, clm_05), the helper is still bent over the mortar pan on the left and the mason is still in the pointing pose. If exiting between 5.6s and 6.72s (ve_01, clm_04, clm_05), the helper has stood up and moved the empty metal pan out of the upper-left frame, and the mason has both hands on the placed brick in center frame actively adjusting it. Because this is a single shot, any match to neighboring clips in the collection is unestablished here.",
+    "preview_frames": "0.5s (ve_01): shows the initial state as the mason lifts the first brick off the wall with his left hand while reaching for a replacement brick on the ground with his right hand, with the full L-shaped hollow-cavity wall in the foreground. 2.2s (ve_01): shows the mason holding the replacement brick in his left hand just above the wet mortar bed while pointing with his right index finger into the hollow cavity of the Rat-Trap Bond course. 3.8s (ve_01): shows the settled instructional hold after the brick is placed on edge, with the mason's left hand resting on the placed brick, his right finger pointing at the cavity, and all four hollow cavities clearly visible along the wall. 6.2s (ve_01): shows the late state after the helper has lifted the empty pan out of the left frame and the mason is using both hands to adjust the placed brick on edge.",
+    "speech_action_links": "In ve_01, the off-screen Tamil speech sp_01 ('இப்படி இப்படின்னு...' / 'Like this, like this...') from ent_speaker_offscreen occurs between 5.3s and 6.72s (clm_06). Visually, this speech begins near the end of the mason's right-hand pointing gesture (which lasts from 2.2s to 5.6s) and continues simultaneously as the mason brings his right hand up to grip and adjust the placed brick with both hands (5.6s–6.72s). The demonstrative phrase 'Like this, like this...' plausibly refers to the visible brick-on-edge placement or alignment being demonstrated in ve_01, but because the speaker is off-screen and the utterance is cut off at 6.72s, the exact technical point being explained is uncertain. Furthermore, per source_audio_policy, original camera audio is excluded from the final output, so sp_01 should not be used as a spoken audio bite in the edit.",
+    "shorter_explanations": "A concise 3.4-second explanatory cut from 1.8s to 5.2s (duration: 5.2s - 1.8s = 3.4s, single contiguous segment with no transitions; ve_01, clm_03, clm_04) retains the complete setup of lifting the brick from the ground (1.8s–2.2s), the main action of setting it on edge onto the mortar bed (2.3s–2.6s), and the visible result of the brick resting in the Rat-Trap Bond course while the mason points directly at the open cavity (2.6s–5.2s). Alternatively, extending to 5.5s yields a 3.7-second segment (5.5s - 1.8s = 3.7s) that keeps the full pointing gesture right up to the moment the mason's right hand begins moving upward. Omitting 0.0s–1.8s removes the potentially confusing initial action where the mason takes a brick off the wall and swaps it for another on the ground (clm_02). Omitting 5.2s–6.72s removes the background distraction of the helper standing up with the metal pan (clm_05) and avoids cutting off in the middle of the mason's unfinished two-handed realignment at 5.6s–6.72s (clm_04). Using the full 6.72s clip adds the initial brick swap (which could illustrate brick selection/inspection if desired) and the two-handed adjustment at the end, at the cost of an incomplete final action at 6.72s. Neither shortened span claims to match recorded narration timing, which was not supplied.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "clm_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 1.8s–5.2s (or full clip 0.0s–6.72s) of ve_01 as direct visual proof of bricks placed on their edge and the resulting row of hollow cavities inside the wall course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "clm_03",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 1.8s–5.2s of ve_01 to directly show the mason carefully placing a brick on edge onto the mortar bed to continue the hollow-cavity bond pattern."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "clm_07",
+          "support_classification": "directly_seen",
+          "editorial_use": "The foreground and middle-ground courses in ve_01 directly show staggered vertical joints between the lower and upper courses, though structural strength and stability themselves remain inferred engineering properties rather than visually measured outcomes (clm_08)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "These cavities are not empty spaces wasted inside the wall. They serve an important purpose—reducing the use of bricks and mortar while improving the thermal performance of the building.",
+          "claim_id": "clm_08",
+          "support_classification": "illustrative",
+          "editorial_use": "While the mason points directly at the open cavities in ve_01 (2.2s–5.6s, clm_04), making this a strong illustrative visual while narration explains why the cavities exist, the percentage of brick/mortar reduction and thermal insulation performance are inferred/narration-supplied properties not measurable from the video."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "A cement mortar mix is prepared, and guide strings are fixed to maintain straight and uniform walls.",
+          "claim_id": "clm_09",
+          "support_classification": "directly_seen",
+          "editorial_use": "Can partially support the 'cement mortar mix is prepared' half of the clause because prepared grey mortar is directly seen in the metal pan on the left and bedded on the wall in ve_01; however, no guide strings or prepared plinth are visible in this demonstration shot."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Mixed-media workflow acknowledged: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level planned visual slots were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so no passage reservations are invented. Any suggested generated visuals are strictly marked planned_not_created and do not authorize automatic media generation. For audio, the intake policy is include_original_sound and the output policy is excluded; therefore, the original camera audio was inspected for intake and context, but source_audio editorial recommendations are omitted for output.",
+    "unavailable": "source_audio editorial ideas are omitted because source_audio_policy.output is excluded. visible_text is empty because no legible, scene-relevant writing appears in the clip (only an unreadable distant background wall emblem). No camera resets or multiple camera takes exist in this 6.72s window."
+  },
+  "claim_evidence": [
+    {
+      "id": "clm_01",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/script_support/claims/0/editorial_use"
+      ],
+      "claim": "Across 0.0s–6.72s in ve_01, the low L-shaped wall (ent_brick_wall) has bricks laid on edge in two parallel leaves bridged by cross-bricks on edge, forming a visible row of hollow rectangular cavities inside the wall.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ve_01 at 0.0s–6.72s, the foreground and middle-ground brick courses clearly show bricks standing on their narrow edge with four open rectangular pockets along the center of the wall and an L-corner in the foreground."
+        }
+      ],
+      "limits": "The wall is built directly on sandy soil as a low demonstration course rather than on a prepared building plinth, and internal properties below the top course are not visible."
+    },
+    {
+      "id": "clm_02",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 0.0s and 1.8s in ve_01, the mason lifts a brick off the top of the wall with his left hand and places it down on the ground to the left of the wall while reaching down with his right hand to grasp a replacement brick.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 1.8,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ve_01 at 0.0s–1.8s, the mason's left hand raises a brick from the mortar bed on the wall and lowers it onto the ground beside the wall by 1.8s, while his right hand grasps a standing brick on the ground."
+        }
+      ],
+      "limits": "Why the mason removes and swaps the first brick is not visually established or explained in audible speech."
+    },
+    {
+      "id": "clm_03",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "Between 1.8s and 2.6s in ve_01, the mason lifts the replacement brick from the ground and places it on edge onto the wet mortar bed across the two leaves of the wall.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 1.8,
+      "end_s": 2.6,
+      "cues": [
+        {
+          "time_s": 2.2,
+          "cue": "visual: In ve_01 from 1.8s to 2.6s, the mason brings the brick up from the ground, transfers it to his left hand above the mortar bed at 2.2s, and sets it down on edge onto the mortar bed by 2.6s."
+        }
+      ],
+      "limits": "Approximate boundary around 2.6s as the downward placement transitions into a stationary left-hand hold."
+    },
+    {
+      "id": "clm_04",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 2.2s to 5.6s in ve_01, the mason points with his right index finger toward the adjacent open cavity in the wall (holding both the placed brick and pointing pose steadily from 2.6s to 5.2s), and from 5.6s to 6.72s he brings his right hand up to adjust the placed brick with both hands.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 2.2,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 3.8,
+          "cue": "visual: In ve_01 from 2.6s to 5.2s, the mason's left hand rests on the placed brick while his right index finger points steadily toward the cavity just in front of it; at 5.6s his right hand moves up to grip the brick and continues adjusting it through 6.72s."
+        }
+      ],
+      "limits": "The two-handed adjustment starting at 5.6s is still ongoing when the recording ends at 6.72s."
+    },
+    {
+      "id": "clm_05",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/uncertainty",
+        "/sources/0/editorial_ideas/1/uncertainty",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "In ve_01, the helper on the left holds an empty round metal pan stationary above a pan of mortar from 0.0s to 5.2s, then straightens up and lifts the empty pan upward and toward the upper-left frame edge between 5.2s and 6.72s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 5.5,
+          "cue": "visual: In ve_01 at 0.0s–5.2s the helper on the left remains bent holding the metal pan over the mortar pan; starting around 5.2s he stands up and raises the empty pan toward the top-left corner through 6.72s."
+        }
+      ],
+      "limits": "The helper's destination after lifting the pan is off-screen and unestablished."
+    },
+    {
+      "id": "clm_06",
+      "target_paths": [
+        "/sources/0/speech/0/english_translation",
+        "/sources/0/interpretations/1/uncertainty",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "Between 5.3s and 6.72s (sp_01), an off-screen male speaker says 'இப்படி இப்படின்னு...' ('Like this, like this...') in Tamil before the clip cuts off.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 5.3,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 5.3,
+          "cue": "source_speech: In sp_01 (5.3s–6.72s), ent_speaker_offscreen says 'இப்படி இப்படின்னு...' ('Like this, like this...')."
+        }
+      ],
+      "limits": "The sentence is cut off by the end of the file at 6.72s, and the speaker is not visible in frame."
+    },
+    {
+      "id": "clm_07",
+      "target_paths": [
+        "/sources/0/visual_events/0/context_result",
+        "/additional_analysis/script_support/claims/2/editorial_use"
+      ],
+      "claim": "In ve_01 (0.0s–6.72s), the vertical mortar joints between the lower brick-on-edge course and the upper course are visibly staggered along the wall.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 3.8,
+          "cue": "visual: In ve_01 (0.0s–6.72s), the cross-bricks (headers) and stretchers in the upper course overlap the vertical joints of the course beneath them rather than aligning vertically."
+        }
+      ],
+      "limits": "Visual observation shows the staggered joint geometry in this two-course mock-up, but does not measure structural strength or long-term wall stability."
+    },
+    {
+      "id": "clm_08",
+      "target_paths": [
+        "/sources/0/editorial_ideas/3/uncertainty",
+        "/additional_analysis/script_support/claims/2/editorial_use",
+        "/additional_analysis/script_support/claims/3/editorial_use"
+      ],
+      "claim": "The visible hollow cavities and brick-on-edge placement in ve_01 (0.0s–6.72s) can illustratively accompany P001's explanation that the cavities reduce brick and mortar usage and improve thermal performance while maintaining structural strength, even though thermal barrier behavior, material savings percentages, and structural strength cannot be measured visually from this clip.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 3.8,
+          "cue": "visual: In ve_01 (2.2s–5.6s), the mason points directly into the open rectangular air cavities formed between the bricks laid on edge."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'These cavities are not empty spaces wasted inside the wall. They serve an important purpose—reducing the use of bricks and mortar while improving the thermal performance of the building' and 'Vertical joints are staggered to ensure strength and stability.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Trapped air pockets inside masonry walls reduce conductive heat transfer and occupy volume that would otherwise be solid brick and mortar."
+        }
+      ],
+      "limits": "The video itself does not measure heat transfer, percentage of brick savings (25%), or compressive strength (20/35/75 kg/cm²); those claims rely on the script's narration."
+    },
+    {
+      "id": "clm_09",
+      "target_paths": [
+        "/additional_analysis/script_support/claims/4/editorial_use"
+      ],
+      "claim": "In ve_01 (0.0s–6.72s), prepared grey mortar is visible in a round metal pan on the ground and spread along the top bed of the brick course, whereas guide strings and a prepared plinth surface are not present in this shot.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 6.72,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ve_01 (0.0s–6.72s), a mound of wet grey mortar sits in the lower-left metal pan (ent_mortar_pans) and on the brick joints, while the wall rests on bare sandy dirt with no string line attached."
+        }
+      ],
+      "limits": "Supports only the presence of prepared mortar mix, not mortar preparation from raw ingredients, plinth cleaning/moistening, or fixing guide strings."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The working mason (ent_mason) wears a short-sleeved tan collared shirt, dark trousers, and open dark sandals/slippers while laying bricks.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "uncertainty": "Head and upper shoulders are outside the top of the frame."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_helper"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The helper on the left (ent_helper) wears a white/light long-sleeved shirt rolled at the cuffs, dark trousers, open sandals, and a light wristband/thread on his right wrist.",
+      "entity_ids": [
+        "ent_helper"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "uncertainty": "Head and upper torso are cropped out by the top-left frame edge."
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar_pans"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "Masonry tools on the ground beside the wall include two round shallow metal mortar pans (taslas), a metal pointing/masonry trowel with a bright red handle in the lower-left foreground, a smaller wooden-handled tool by the mortar pan, and a long straight metal/aluminium levelling bar lying on the left ground.",
+      "entity_ids": [
+        "ent_mortar_pans",
+        "ent_trowel"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bricks"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Reddish-orange clay bricks with slightly rough, weathered edges and rectangular frogs/indentations on some faces are laid on edge with wet, coarse dark-grey mortar; loose mortar crumbs have fallen along the outer right base of the wall on the sandy dirt.",
+      "entity_ids": [
+        "ent_brick_wall",
+        "ent_bricks"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "uncertainty": "Whether the bricks are wire-cut or hand-moulded and their exact compressive strength cannot be determined visually."
+    },
+    {
+      "id": "wm_05",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor compound with bare sandy brown earth in the foreground and green trees, grass patches, and foliage in the background under diffused daylight.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_06",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "In the background stands a terracotta/red-painted single-storey building with arched/recessed wall panels, a patterned lattice door, a veranda/pavilion on the left, and black cylindrical storage tanks on the right.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      },
+      "uncertainty": "Background building is softly out of focus."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "lim_01",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_helper"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Mason and helper facial identity and visible lip-sync",
+      "kind": "not_visible",
+      "limitation": "The heads and faces of the working mason, the helper, and the standing background observer are outside the top edge of the frame throughout 0.0s–6.72s, so facial expressions and visible speaking cannot be observed.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      }
+    },
+    {
+      "id": "lim_02",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bricks"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        }
+      ],
+      "subject": "Brick manufacturing type, crushing strength, thermal insulation, and 25% material saving metrics",
+      "kind": "not_established",
+      "limitation": "Visual appearance of the bricks and cavities in this clip does not establish whether the bricks are wire-cut, their crushing strength (20, 35, or 75 kg/cm²), the percentage of brick savings, or measured thermal performance.",
+      "interval": null
+    },
+    {
+      "id": "lim_03",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        },
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Plinth preparation, guide strings, window sill course, pointing, and 7-day water curing",
+      "kind": "not_visible",
+      "limitation": "This shot shows a low two-course demonstration wall built directly on bare sandy ground without guide strings, a prepared concrete plinth, window sill detailing, finishing pointing, or water curing.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 6.72
+      }
+    },
+    {
+      "id": "lim_04",
+      "evidence_refs": [
+        {
+          "source_id": "b4184ef52b53f8e9",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Completion of the mason's final two-handed brick adjustment and off-screen Tamil sentence",
+      "kind": "not_visible",
+      "limitation": "The recording ends at 6.72s while the mason is still adjusting the placed brick with both hands (started at 5.6s) and while the off-screen Tamil utterance (started at 5.3s) is still in progress.",
+      "interval": {
+        "start_s": 5.3,
+        "end_s": 6.72
+      }
+    }
+  ],
+  "descriptive_name": "mason_laying_brick_on_edge_pointing_cavity_wall"
+}

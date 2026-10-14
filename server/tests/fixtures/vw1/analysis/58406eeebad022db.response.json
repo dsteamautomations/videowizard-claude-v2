@@ -1,0 +1,748 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "d9ad32a756ec1070a5af1cb5da9d6c1a",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "58406eeebad022db",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 25.450667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 25.450667
+            },
+            "status": "reviewed",
+            "note": "Continuous camera movement along an indoor display wall with framed educational posters; sampled at regular intervals across the full window."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 25.450667
+            },
+            "state": "silence",
+            "note": "The attached audio track contains no audible speech or ambient sound across the entire duration."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 25.450667
+          },
+          "reason": "Fine body text and distant poster captions on non-Rat-Trap Bond educational posters are omitted where they do not directly relate to the script's core Rat-Trap Bond Masonry subject or are too oblique/distant for clean reading."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_rtb_poster",
+          "kind": "object",
+          "label": "Framed educational poster titled 'Rat Trap Bond: Best masonry work for walls'",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_ceb_poster",
+          "kind": "object",
+          "label": "Framed educational poster titled 'Compressed Earth Blocks: The best substitute for bricks'",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_poster_gallery_wall",
+          "kind": "object",
+          "label": "Interior exhibition wall of light-coloured masonry blocks with a row of acrylic/glass-covered framed architectural posters",
+          "uncertainty": "Exact building material of the light-coloured blocks (whether painted brick, concrete block, or stabilized earth block) is not established from visual appearance alone."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ev_01_rtb_and_ceb_posters",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.2
+          },
+          "label": "Camera tracks left past 'Compressed Earth Blocks' and 'Rat Trap Bond' posters",
+          "description": "The camera starts in a medium-wide angled shot of a light-coloured block wall holding framed posters under acrylic/glass covers, then moves slowly leftward (bringing posters on the left toward the centre/right of the frame). At 0.0s–2.0s, the 'Compressed Earth Blocks' poster is on the right and the 'Rat Trap Bond: Best masonry work for walls' poster is near the centre, alongside 'Arch Foundation' to its left. A bright horizontal reflection from an overhead fluorescent tube light cuts across the upper text of the 'Rat Trap Bond' poster between 1.5s and 3.8s before the poster exits the right edge of the frame around 4.2s.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_rtb_poster",
+            "ent_ceb_poster",
+            "ent_poster_gallery_wall"
+          ],
+          "context_result": "The 'Rat Trap Bond' poster and its key diagrams/captions ('Plastering not required', 'Saves about 50% in Mortar', 'Saves 25% in Bricks', 'Excellent thermal insulator - keeps house cool', 'Has equal strength as other bonds', 'Up to 3 floors can be confidently constructed with this bond') are legible at 0.0s–3.5s before exiting frame right.",
+          "camera_framing": "Medium-wide oblique angle along the wall, tracking/panning slowly to the left.",
+          "uncertainty": "Exact frame of exit around 4.2s is approximate."
+        },
+        {
+          "id": "ev_02_gallery_corner_walk",
+          "interval": {
+            "start_s": 4.2,
+            "end_s": 14.5
+          },
+          "label": "Camera continues tracking left along posters to room corner and turns onto adjacent wall",
+          "description": "The camera continues moving smoothly leftward along the first wall past framed posters titled 'Arch Foundation', 'Appropriate technologies', 'Cleanliness in Lavatory & Bathroom', 'Kitchen and Bedroom', 'Living Room', and 'For a Livable and Lovable House' (in the corner at 11.5s–14.5s), then pivots around the interior corner onto the adjacent perpendicular wall showing 'Planning: The first step to building a good house'. Overhead tube-light reflections move across the glossy poster covers.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_poster_gallery_wall"
+          ],
+          "context_result": "Shows a broader series of sustainable/appropriate housing educational posters in an exhibition room; peeling paint and plaster wear are visible along a concrete ledge below the posters.",
+          "camera_framing": "Medium-wide tracking shot moving left along wall and panning left around an interior corner.",
+          "uncertainty": null
+        },
+        {
+          "id": "ev_03_second_wall_pan_and_settle",
+          "interval": {
+            "start_s": 14.5,
+            "end_s": 25.450667
+          },
+          "label": "Camera tracks and pans left along second wall of posters and settles in wide view",
+          "description": "Moving along the second wall, the camera passes posters titled 'Planning', 'House builders' plight', 'Wisdom from the wise' (featuring monochrome portraits and quotes attributed to Mahatma Gandhi, Hassan Fathy, and Laurie Baker), 'Global warming and Climate change', and 'Threat to our Eco-system'. Around 22.0s–25.45s, the camera slows and settles into a wide angled view looking down the remainder of the exhibition hall with a pitched timber/tile roof overhead and a patterned floor below.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_poster_gallery_wall"
+          ],
+          "context_result": "Establishes the institutional/educational exhibition setting dedicated to eco-friendly, cost-effective vernacular architecture.",
+          "camera_framing": "Medium-wide to wide angled shot along the wall, slowing to a near-stationary hold from about 22.5s to 25.450667s.",
+          "uncertainty": "Minor handheld sway continues during the final hold from 22.5s to 25.450667s."
+        }
+      ],
+      "visible_text": [
+        {
+          "id": "txt_01_rtb_poster",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.0
+          },
+          "location": "Centre framed poster ('Rat Trap Bond') on wall",
+          "original_text": "Rat Trap Bond | Best masonry work for walls | Plastering not required | Stability of wall is not affected | Saves about 50% in Mortar | Saves 25% in Bricks | Excellent thermal insulator - keeps house cool | Construction using Rat Trap Bond | Has equal strength as other bonds | Total wall load is reduced on the foundation | Up to 3 floors can be confidently constructed with this bond | Is there any alternative to the brick?",
+          "english_translation": null,
+          "legibility": "clear",
+          "uncertainty": "Fluorescent light glare partially obscures the subtitle 'Best masonry work for walls' between about 1.8s and 3.5s, though it is clearly legible at 0.0s–1.2s."
+        },
+        {
+          "id": "txt_02_ceb_poster",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 2.5
+          },
+          "location": "Rightmost framed poster on wall at start of clip",
+          "original_text": "Compressed Earth Blocks | The best substitute for bricks | Various stages of making Compressed Earth Blocks (CEB)",
+          "english_translation": null,
+          "legibility": "clear",
+          "uncertainty": "Poster is progressively cut off by the right frame edge after 0.8s and exits by about 2.5s."
+        },
+        {
+          "id": "txt_03_arch_and_approp_tech",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 7.5
+          },
+          "location": "Second and third posters to the left of Rat Trap Bond poster",
+          "original_text": "Arch Foundation: Economic and strong | Appropriate technologies: Appropriate building technologies are rooted in passion for life - Nature and Natural forms.",
+          "english_translation": null,
+          "legibility": "clear",
+          "uncertainty": null
+        },
+        {
+          "id": "txt_04_wisdom_climate_posters",
+          "interval": {
+            "start_s": 14.5,
+            "end_s": 25.450667
+          },
+          "location": "Posters on the second wall ('House builders' plight', 'Wisdom from the wise', 'Global warming and Climate change', 'Threat to our Eco-system')",
+          "original_text": "House builders' plight | Wisdom from the wise ... MAHATMA GANDHI ... HASSAN FATHY ... LAURIE BAKER | Global warming and Climate change | Threat to our Eco-system",
+          "english_translation": null,
+          "legibility": "partial",
+          "uncertainty": "Main headings and attributed names on 'Wisdom from the wise' are legible, while smaller bullet text on the more distant posters becomes too small/oblique to read clearly as the camera pulls back."
+        }
+      ],
+      "interpretations": [
+        {
+          "id": "interp_01_rtb_poster_summary",
+          "category": "editorial_relevance",
+          "claim": "The 'Rat Trap Bond: Best masonry work for walls' exhibition poster at 0.0s–3.5s visually displays printed architectural claims and diagrams that directly mirror several key points in script passage P001 (no plastering required, ~25% brick savings, thermal insulation keeping the house cool, equal strength to other bonds, and suitability up to 3 floors).",
+          "evidence_refs": [
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_rtb_and_ceb_posters"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visible_text",
+              "item_id": "txt_01_rtb_poster"
+            }
+          ],
+          "uncertainty": "The poster is an educational display board rather than physical masonry construction or laboratory testing; it illustrates that these claims are taught in an exhibition context, not physical verification of the engineering values."
+        },
+        {
+          "id": "interp_02_exhibition_context",
+          "category": "setting_context",
+          "claim": "The full gallery pan across posters on 'Appropriate technologies', 'Wisdom from the wise' (citing Gandhi, Hassan Fathy, and Laurie Baker), and 'Global warming and Climate change' situates Rat-Trap Bond Masonry within a broader Indian sustainable/cost-effective housing training or exhibition centre.",
+          "evidence_refs": [
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_02_gallery_corner_walk"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_03_second_wall_pan_and_settle"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visible_text",
+              "item_id": "txt_03_arch_and_approp_tech"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visible_text",
+              "item_id": "txt_04_wisdom_climate_posters"
+            }
+          ],
+          "uncertainty": "The exact name and location of the institution are not visibly stated in the legible text of this clip."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "idea_01_rtb_poster_opening_match",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_rtb_and_ceb_posters"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visible_text",
+              "item_id": "txt_01_rtb_poster"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01_rtb_poster_summary"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 3.5
+          },
+          "reason": "The opening 0.0s–3.5s span (ev_01_rtb_and_ceb_posters) clearly shows the 'Rat Trap Bond: Best masonry work for walls' poster (txt_01_rtb_poster) with legible callouts for 25% brick savings, thermal insulation, no plastering required, equal strength, and 3-storey capability. This provides direct visual B-roll of an institutional display board summarizing the exact benefits narrated in P001 when introducing Rat-Trap Bond Masonry or summarizing its advantages.",
+          "uncertainty": "The window from 0.0s to 3.5s is relatively short (~3.5s) before the poster nears the right edge of the frame and catches overhead tube-light glare (1.8s–3.5s), and the adjacent 'Compressed Earth Blocks' poster is also visible on the right during 0.0s–2.0s unless cropped.",
+          "details": {
+            "comparison_scope": "Within attached source 58406eeebad022db",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Start at 0.0s so the 'Rat Trap Bond' title is legible before the overhead fluorescent reflection crosses the subtitle around 1.8s.",
+            "visible_result": "Viewer sees the framed 'Rat Trap Bond' poster and its illustrated diagrams of thermal insulation, 25% brick savings, equal strength, and up to 3 floors.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Framed exhibition poster 'Rat Trap Bond: Best masonry work for walls' with diagrams and bullet points.",
+            "relationship": "match",
+            "intended_explanation": "Visualizes the institutional recognition and core efficiency claims of Rat-Trap Bond Masonry (25% brick savings, thermal comfort, no plastering, up to 3 storeys).",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_02_sustainable_context_pan",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_03_second_wall_pan_and_settle"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visible_text",
+              "item_id": "txt_04_wisdom_climate_posters"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_02_exhibition_context"
+            }
+          ],
+          "interval": {
+            "start_s": 16.0,
+            "end_s": 24.5
+          },
+          "reason": "The camera movement past 'House builders' plight', 'Wisdom from the wise' (showing Gandhi, Hassan Fathy, and Laurie Baker), 'Global warming and Climate change', and 'Threat to our Eco-system' (ev_03_second_wall_pan_and_settle) provides illustrative B-roll for either the opening challenge in P001 ('As the demand for affordable housing continues to grow, the construction sector faces a major challenge—how to build stronger, cooler, and more sustainable homes') or the environmental conservation section ('This makes Rat-Trap Bond an important step toward sustainable and climate-friendly construction').",
+          "uncertainty": "These posters discuss general housing challenges, architectural philosophy, and climate change rather than showing physical Rat-Trap Bond masonry work.",
+          "details": {
+            "comparison_scope": "Within attached source 58406eeebad022db",
+            "alternative_refs": [
+              {
+                "source_id": "58406eeebad022db",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ev_01_rtb_and_ceb_posters"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 3.5
+            },
+            "must_keep_setup": "Include 16.0s–20.5s to keep both 'House builders' plight' / 'Wisdom from the wise' and the transition to 'Global warming and Climate change' legible.",
+            "visible_result": "Establishes the broader environmental and affordable-housing dilemma through exhibition displays.",
+            "story_role": "opening",
+            "sound_type": null,
+            "useful_content": "Exhibition posters on house builders' plight, sustainable architecture pioneers, and climate change.",
+            "relationship": "complement",
+            "intended_explanation": "Illustrates the broader sustainable housing and climate challenge that motivates cost-effective techniques like Rat-Trap Bond.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_03_best_take_rtb_poster",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_rtb_and_ceb_posters"
+            },
+            {
+              "source_id": "58406eeebad022db",
+              "window_id": "full",
+              "collection": "visible_text",
+              "item_id": "txt_01_rtb_poster"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 3.5
+          },
+          "reason": "Within this single continuous gallery pan, 0.0s–3.5s (ev_01_rtb_and_ceb_posters) is the only span where the 'Rat Trap Bond' poster itself is in frame and legible; 16.0s–24.5s (ev_03_second_wall_pan_and_settle) is a useful alternative or complementary segment if broader environmental/housing context posters are preferred.",
+          "uncertainty": "Because the camera begins panning immediately at 0.0s, there is no stationary hold on the 'Rat Trap Bond' poster.",
+          "details": {
+            "comparison_scope": "Single continuous take across 0.0s–25.450667s in source 58406eeebad022db",
+            "alternative_refs": [
+              {
+                "source_id": "58406eeebad022db",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ev_03_second_wall_pan_and_settle"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 16.0,
+              "end_s": 24.5
+            },
+            "must_keep_setup": "Start at 0.0s before the camera pans the Rat Trap Bond poster toward the right edge.",
+            "visible_result": "Clear view of the 'Rat Trap Bond' poster title, diagrams, and efficiency bullet points.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Direct view of 'Rat Trap Bond: Best masonry work for walls' poster.",
+            "relationship": "match",
+            "intended_explanation": "Shows the exhibition poster dedicated specifically to Rat Trap Bond.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unres_01_institution_identity",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 25.450667
+          },
+          "field": "entities",
+          "issue": "The specific training centre or organisation hosting this poster gallery is not identified in the legible text of this clip."
+        },
+        {
+          "id": "unres_02_wall_block_material",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 25.450667
+          },
+          "field": "visual_details",
+          "issue": "The light-coloured masonry blocks forming the exhibition wall itself are laid in a regular stretcher-like bond rather than visible Rat-Trap Bond, and their material composition is not established."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 25.450667s clip is a single continuous camera move with no repeated takes or camera resets. It progresses through three connected framing stages along an indoor exhibition gallery: (1) 0.0s–4.2s (ev_01_rtb_and_ceb_posters), tracking left past the 'Compressed Earth Blocks' and 'Rat Trap Bond: Best masonry work for walls' posters; (2) 4.2s–14.5s (ev_02_gallery_corner_walk), continuing left past general housing-design posters ('Arch Foundation', 'Appropriate technologies', 'Cleanliness in Lavatory & Bathroom', 'Kitchen and Bedroom', 'Living Room', 'For a Livable and Lovable House') and pivoting around the room corner; and (3) 14.5s–25.450667s (ev_03_second_wall_pan_and_settle), tracking/panning left past philosophical and environmental posters ('Planning', 'House builders' plight', 'Wisdom from the wise', 'Global warming and Climate change', 'Threat to our Eco-system') before slowing to a wide hold from roughly 22.5s to 25.450667s.",
+    "crop_guidance": "No special aspect-ratio override was supplied, so assuming standard horizontal widescreen delivery, the full frame works well for general gallery pan shots. However, if the editor uses 0.0s–3.5s (ev_01_rtb_and_ceb_posters) specifically to highlight the 'Rat Trap Bond: Best masonry work for walls' poster (txt_01_rtb_poster), a moderate zoom/crop onto the central-to-right portion of the frame during 0.0s–3.0s can exclude or reduce the prominence of the neighbouring 'Compressed Earth Blocks: The best substitute for bricks' poster on the far right (0.0s–2.0s) and 'Arch Foundation' on the left, keeping the viewer's focus on the Rat-Trap Bond diagrams and text as the poster moves rightward across the screen. Because the poster shifts from center-left at 0.0s to the right edge by 3.5s–4.2s, any closer crop would need to follow that rightward screen movement; this is an unverified editorial option rather than a tested crop.",
+    "clean_handles": "Interval: 0.0–3.5; classification: active preparation; beginning observation: 0.0s camera is already moving slowly leftward with the 'Rat Trap Bond' poster near center-left and 'Compressed Earth Blocks' on the right; middle observation: 1.8s camera continues tracking left as the 'Rat Trap Bond' poster shifts right of center and an overhead fluorescent reflection crosses its subtitle; end observation: 3.5s 'Rat Trap Bond' poster approaches the right frame edge before exiting around 4.2s (inspected through 4.5s in ev_02_gallery_corner_walk, where 'Arch Foundation' and 'Appropriate technologies' occupy the frame); relevant action stopped: camera movement does not stop during this span—there is no stationary lead-in at 0.0s because the pan/track is already underway at the start of the file; uncertainty: approximate exit boundary between 3.5s and 4.2s as the poster clips the right edge; links: ev_01_rtb_and_ceb_posters, claim_01_rtb_poster_visible, claim_02_camera_pan_motion; editorial use: preserves the complete legible window of the 'Rat Trap Bond: Best masonry work for walls' poster before it exits frame right. | Interval: 22.5–25.450667; classification: settled; beginning observation: 22.5s leftward camera pan slows and comes to rest in a wide angled view of the second exhibition wall with 'Wisdom from the wise' on the right and 'Global warming and Climate change' in the center; middle observation: 24.0s wide view remains nearly stationary showing the row of 6 framed posters along the wall; end observation: 25.450667s recording ends on the same wide gallery composition; relevant action stopped: no human actors are present (posters and wall are inactive from the start), and the primary leftward camera panning/tracking motion across ev_03_second_wall_pan_and_settle stops around 22.5s leaving only slight handheld sway; uncertainty: minor residual handheld camera drift continues during 22.5s–25.450667s; links: ev_03_second_wall_pan_and_settle, claim_05_second_wall_settle; editorial use: provides a calm ~3.0s settled lead-out hold at the end of the gallery pan.",
+    "continuity": "Throughout 0.0s–22.5s (ev_01_rtb_and_ceb_posters, ev_02_gallery_corner_walk, ev_03_second_wall_pan_and_settle), the camera moves and pans from right to left along the exhibition walls, causing the framed posters to travel from left to right across the screen. Cutting out of ev_01_rtb_and_ceb_posters around 3.5s occurs while the camera is still in steady leftward motion; inspecting 3.5s–4.5s shows the 'Rat Trap Bond' poster clipping the right edge of the frame by ~4.2s while 'Arch Foundation' moves into the right half of the frame. If the editor cuts from 0.0s–3.5s directly to later segment 16.0s–24.5s (ev_03_second_wall_pan_and_settle), both segments share the same right-to-left camera movement and consistent indoor lighting, though a jump cut along the same continuous wall pan would be noticeable unless separated by another shot or used in only one place.",
+    "preview_frames": "0.5s (ev_01_rtb_and_ceb_posters): clearest view of the 'Rat Trap Bond: Best masonry work for walls' poster near center-left before the overhead fluorescent tube reflection crosses its subtitle, with 'Compressed Earth Blocks' partially visible on the right. | 6.5s (ev_02_gallery_corner_walk): mid-pan view showing the 'Appropriate technologies' and 'Cleanliness in Lavatory & Bathroom' posters along the first wall. | 17.5s (ev_03_second_wall_pan_and_settle): view of 'Wisdom from the wise' (with portraits of Gandhi, Hassan Fathy, and Laurie Baker) and 'House builders' plight' on the second wall. | 23.5s (ev_03_second_wall_pan_and_settle): wide settled composition looking down the second exhibition wall showing 'Wisdom from the wise', 'Global warming and Climate change', and 'Threat to our Eco-system'.",
+    "speech_action_links": "No speech is present in the attached audio track (0.0s–25.450667s is silent), so there are no spoken utterances to link to visual actions.",
+    "shorter_explanations": "Full 25.450667s gallery pan is much longer than needed for a single B-roll point and spends 4.2s–15.5s (ev_02_gallery_corner_walk) on general house-layout posters ('Cleanliness in Lavatory & Bathroom', 'Kitchen and Bedroom', 'Living Room') that are not discussed in P001. Two economical standalone trims are available depending on editorial need: (Option A: 0.0s–3.5s, duration 3.5s, from ev_01_rtb_and_ceb_posters, supported by claim_01_rtb_poster_visible) retains the complete legible display of the 'Rat Trap Bond: Best masonry work for walls' poster showing its diagrams and efficiency bullet points, omitting 3.5s–25.450667s where the poster leaves the frame and other topics are shown; (Option B: 16.0s–24.5s, duration 8.5s, from ev_03_second_wall_pan_and_settle, supported by claim_04_climate_wisdom_posters and claim_05_second_wall_settle) retains the camera pan past 'House builders' plight', 'Wisdom from the wise', and 'Global warming and Climate change' into the settled wide hold at 22.5s–24.5s, illustrating the broader sustainable-housing and climate context while omitting the earlier room-layout posters. If both Option A (3.5s) and Option B (8.5s) were used in separate places with no overlapping transition, their combined source duration would be 3.5s + 8.5s = 12.0s.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "One innovative solution that addresses all these concerns is Rat-Trap Bond Masonry, a simple yet effective brick-laying technique that uses fewer materials without compromising strength.",
+          "claim_id": "claim_01_rtb_poster_visible",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0s–3.5s (ev_01_rtb_and_ceb_posters) to show the physical exhibition poster titled 'Rat Trap Bond: Best masonry work for walls' containing printed statements 'Saves 25% in Bricks', 'Saves about 50% in Mortar', and 'Has equal strength as other bonds'. This directly shows an educational poster presenting those claims, though the poster itself is graphic display evidence rather than a physical structural test."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Because of the hollow cavities, the wall acts as a natural thermal barrier. Less heat enters the building, making indoor spaces cooler and more comfortable.",
+          "claim_id": "claim_03_rtb_poster_illustrates_script",
+          "support_classification": "illustrative",
+          "editorial_use": "The 'Rat Trap Bond' poster at 0.0s–3.5s (ev_01_rtb_and_ceb_posters, txt_01_rtb_poster) includes a diagram and caption reading 'Excellent thermal insulator - keeps house cool', which editorially illustrates the script's thermal barrier explanation in an exhibition graphic format without directly showing physical heat transfer or interior wall cavities in real masonry."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "The technique can reduce brick consumption by nearly twenty-five percent, resulting in substantial savings in material costs.",
+          "claim_id": "claim_03_rtb_poster_illustrates_script",
+          "support_classification": "illustrative",
+          "editorial_use": "The poster at 0.0s–3.5s (txt_01_rtb_poster) explicitly displays the printed text 'Saves 25% in Bricks' and 'Saves about 50% in Mortar', providing a graphic title/diagram reinforcement of the script's 25% savings figure, while physical brick counting or cost measurement is not shown."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.",
+          "claim_id": "claim_03_rtb_poster_illustrates_script",
+          "support_classification": "illustrative",
+          "editorial_use": "The poster at 0.0s–3.5s (txt_01_rtb_poster) includes a trowel icon and caption 'Plastering not required', illustrating this script point graphically."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "When constructed properly, buildings up to three storeys can be safely built using this technology.",
+          "claim_id": "claim_03_rtb_poster_illustrates_script",
+          "support_classification": "illustrative",
+          "editorial_use": "The bottom right of the 'Rat Trap Bond' poster at 0.0s–3.5s (txt_01_rtb_poster) displays a multi-storey building icon with the caption 'Up to 3 floors can be confidently constructed with this bond', visually reinforcing the script's three-storey statement via an exhibition graphic."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "As the demand for affordable housing continues to grow, the construction sector faces a major challenge—how to build stronger, cooler, and more sustainable homes while reducing costs and conserving natural resources.",
+          "claim_id": "claim_04_climate_wisdom_posters",
+          "support_classification": "illustrative",
+          "editorial_use": "Use 16.0s–24.5s (ev_03_second_wall_pan_and_settle) showing the 'House builders' plight', 'Wisdom from the wise', 'Global warming and Climate change', and 'Threat to our Eco-system' posters to visually illustrate the dilemma of balancing affordability, tradition, modern thinking, and environmental sustainability."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This makes Rat-Trap Bond an important step toward sustainable and climate-friendly construction.",
+          "claim_id": "claim_04_climate_wisdom_posters",
+          "support_classification": "illustrative",
+          "editorial_use": "The pan across 'Global warming and Climate change' and 'Threat to our Eco-system' posters at 18.0s–24.5s (ev_03_second_wall_pan_and_settle) provides thematic exhibition B-roll linking building technologies to climate and resource conservation."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this workflow uses a mixed-media plan where future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented here. Original camera audio was inspected for intake and found to be completely silent across 0.0s–25.450667s; additionally, the output audio policy is excluded, so source_audio editorial suggestions are omitted. Regarding inspection scope (G07), the clip was reviewed via sampled frames across the full 0.0s–25.450667s window at high media resolution; native frame rate and pixel dimensions are null in the supplied metadata, and exhaustive native frame-by-frame inspection is not claimed.",
+    "unavailable": "speech and speech_action_links are unavailable because the attached audio track is silent throughout 0.0s–25.450667s, and source_audio ideas are omitted both because no audible sound exists and because the output audio policy excludes source audio. visual_slot_guidance is empty because exact passage-level reservations were not supplied and no generated-video slot proposal is needed solely from this gallery B-roll clip."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01_rtb_poster_visible",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/visible_text/0/original_text",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "Between 0.0s and 3.5s (before exiting the right edge of the frame around 4.2s), a framed wall poster titled 'Rat Trap Bond: Best masonry work for walls' is directly visible with legible captions reading 'Plastering not required', 'Stability of wall is not affected', 'Saves about 50% in Mortar', 'Saves 25% in Bricks', 'Excellent thermal insulator - keeps house cool', 'Construction using Rat Trap Bond', 'Has equal strength as other bonds', 'Total wall load is reduced on the foundation', and 'Up to 3 floors can be confidently constructed with this bond'.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.2,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ev_01_rtb_and_ceb_posters and txt_01_rtb_poster at 0.5s, the framed 'Rat Trap Bond: Best masonry work for walls' poster is clearly legible near center-left of the frame."
+        },
+        {
+          "time_s": 2.5,
+          "cue": "visual: In ev_01_rtb_and_ceb_posters at 2.5s, the poster has shifted to the right half of the frame with an overhead horizontal fluorescent light reflection crossing its upper subtitle."
+        },
+        {
+          "time_s": 4.2,
+          "cue": "visual: In ev_01_rtb_and_ceb_posters around 4.2s, the 'Rat Trap Bond' poster finishes exiting the right edge of the frame."
+        }
+      ],
+      "limits": "Shows a printed exhibition poster and its diagrams rather than physical masonry construction or independent engineering measurements; overhead tube-light glare crosses the subtitle around 1.8s–3.5s, and the 'Compressed Earth Blocks' poster is also partly visible on the right during 0.0s–2.5s."
+    },
+    {
+      "id": "claim_02_camera_pan_motion",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/1/description",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity"
+      ],
+      "claim": "From 0.0s to approximately 22.5s, the camera continuously tracks and pans leftward along two perpendicular walls of an indoor poster gallery, causing the framed posters to move from left to right across the screen without a stationary pause at 0.0s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 22.5,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ev_01_rtb_and_ceb_posters from 0.0s to 4.0s, the camera is already moving leftward along the first wall."
+        },
+        {
+          "time_s": 13.0,
+          "cue": "visual: In ev_02_gallery_corner_walk around 12.0s–14.5s, the camera reaches the corner ('For a Livable and Lovable House') and pivots left onto the second wall ('Planning')."
+        }
+      ],
+      "limits": "Because the camera motion is continuous from 0.0s to 22.5s, any shorter trim taken from 0.0s–3.5s starts and ends during active camera movement."
+    },
+    {
+      "id": "claim_03_rtb_poster_illustrates_script",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/additional_analysis/script_support/claims/1",
+        "/additional_analysis/script_support/claims/2",
+        "/additional_analysis/script_support/claims/3",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The printed diagrams and captions on the 'Rat Trap Bond: Best masonry work for walls' poster at 0.0s–3.5s editorially illustrate the script's statements in P001 that Rat-Trap Bond acts as a thermal barrier keeping indoor spaces cooler, reduces brick consumption by nearly 25%, makes plastering unnecessary, maintains comparable strength, and supports buildings up to three storeys.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 3.5,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: In ev_01_rtb_and_ceb_posters and txt_01_rtb_poster at 0.5s, the poster displays the captions 'Plastering not required', 'Saves 25% in Bricks', 'Excellent thermal insulator - keeps house cool', 'Has equal strength as other bonds', and 'Up to 3 floors can be confidently constructed with this bond'."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Less heat enters the building, making indoor spaces cooler and more comfortable', 'The technique can reduce brick consumption by nearly twenty-five percent', 'plastering is often unnecessary', and 'When constructed properly, buildings up to three storeys can be safely built using this technology.'"
+        }
+      ],
+      "limits": "This is an illustrative graphic match showing an exhibition poster that states the same figures and benefits as the script; the clip does not show physical bricks on edge, internal wall cavities, or empirical structural/thermal testing."
+    },
+    {
+      "id": "claim_04_climate_wisdom_posters",
+      "target_paths": [
+        "/sources/0/visual_events/2/description",
+        "/sources/0/visible_text/3/original_text",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/5",
+        "/additional_analysis/script_support/claims/6"
+      ],
+      "claim": "Between 14.5s and 25.450667s, the camera moves past and holds on framed posters titled 'House builders' plight', 'Wisdom from the wise' (showing portraits and quotes attributed to Mahatma Gandhi, Hassan Fathy, and Laurie Baker), 'Global warming and Climate change', and 'Threat to our Eco-system', which editorially illustrate the broader sustainable-housing and environmental challenges introduced in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 14.5,
+      "end_s": 25.450667,
+      "cues": [
+        {
+          "time_s": 17.5,
+          "cue": "visual: In ev_03_second_wall_pan_and_settle and txt_04_wisdom_climate_posters at 17.5s, the posters 'House builders' plight' and 'Wisdom from the wise' (with names MAHATMA GANDHI, HASSAN FATHY, LAURIE BAKER) are visible on the wall."
+        },
+        {
+          "time_s": 21.0,
+          "cue": "visual: In ev_03_second_wall_pan_and_settle and txt_04_wisdom_climate_posters at 21.0s, the posters 'Global warming and Climate change' and 'Threat to our Eco-system' are visible to the left of 'Wisdom from the wise'."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'the construction sector faces a major challenge—how to build stronger, cooler, and more sustainable homes while reducing costs and conserving natural resources' and 'This makes Rat-Trap Bond an important step toward sustainable and climate-friendly construction.'"
+        }
+      ],
+      "limits": "These posters provide thematic and philosophical context on sustainable housing and climate change in an exhibition gallery, rather than direct visuals of Rat-Trap Bond masonry."
+    },
+    {
+      "id": "claim_05_second_wall_settle",
+      "target_paths": [
+        "/sources/0/visual_events/2/description",
+        "/sources/0/visual_events/2/camera_framing",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From approximately 22.5s to 25.450667s, the leftward camera pan stops and settles into a wide angled view down the second exhibition wall with only minor handheld drift.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 22.5,
+      "end_s": 25.450667,
+      "cues": [
+        {
+          "time_s": 22.5,
+          "cue": "visual: In ev_03_second_wall_pan_and_settle at 22.5s, the leftward panning motion ceases with six framed posters visible along the wall."
+        },
+        {
+          "time_s": 25.0,
+          "cue": "visual: In ev_03_second_wall_pan_and_settle at 25.0s, the framing remains nearly identical to 22.5s with slight handheld sway."
+        }
+      ],
+      "limits": "Slight handheld camera movement persists rather than a locked-off tripod hold."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01_poster_language_and_style",
+      "evidence_refs": [
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "txt_01_rtb_poster"
+        },
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "txt_04_wisdom_climate_posters"
+        }
+      ],
+      "category": "signage_language",
+      "observation": "Educational wall posters are printed in English with uniform cream/yellow backgrounds, purple headers and footers, recurring cartoon mascot illustrations at the bottom corners, and black metal frames with glossy transparent covers.",
+      "entity_ids": [
+        "ent_rtb_poster",
+        "ent_ceb_poster",
+        "ent_poster_gallery_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 25.450667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02_exhibition_hall_architecture",
+      "evidence_refs": [
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_01_rtb_and_ceb_posters"
+        },
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_03_second_wall_pan_and_settle"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Indoor gallery room built with exposed, light-coloured uniform masonry blocks laid in regular courses with recessed mortar joints, topped by a red-painted upper frieze band, exposed wooden rafters supporting a pitched roof, fluorescent tube lights, and white track/spot lights.",
+      "entity_ids": [
+        "ent_poster_gallery_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 25.450667
+      },
+      "uncertainty": "The exact material composition of the light-coloured wall blocks is not visually established."
+    },
+    {
+      "id": "wm_03_wall_ledge_wear",
+      "evidence_refs": [
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_02_gallery_corner_walk"
+        }
+      ],
+      "category": "condition",
+      "observation": "Flaking paint and weathered plaster/mortar are visible along the protruding horizontal wall ledge directly beneath the framed posters.",
+      "entity_ids": [
+        "ent_poster_gallery_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 22.0
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "lim_01_no_physical_rtb_masonry_shown",
+      "evidence_refs": [
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_01_rtb_and_ceb_posters"
+        }
+      ],
+      "subject": "Physical Rat-Trap Bond brick-laying, hollow wall cavities, and crushing-strength specifications",
+      "kind": "not_visible",
+      "limitation": "This clip shows only indoor educational posters and does not show actual bricks on edge, internal wall cavities, mason site work, or the specific brick crushing-strength figures (20, 35, 75 kg/cm²) mentioned in the script.",
+      "interval": null
+    },
+    {
+      "id": "lim_02_poster_claims_not_measured_proof",
+      "evidence_refs": [
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "txt_01_rtb_poster"
+        }
+      ],
+      "subject": "Quantitative efficiency and structural claims on the Rat Trap Bond poster",
+      "kind": "not_established",
+      "limitation": "While the poster visibly prints 'Saves about 50% in Mortar', 'Saves 25% in Bricks', 'Has equal strength as other bonds', and 'Up to 3 floors can be confidently constructed with this bond', seeing printed text on an exhibition board does not independently verify those engineering metrics.",
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.2
+      }
+    },
+    {
+      "id": "lim_03_distant_poster_body_text",
+      "evidence_refs": [
+        {
+          "source_id": "58406eeebad022db",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "txt_04_wisdom_climate_posters"
+        }
+      ],
+      "subject": "Full body text of distant posters on the second wall",
+      "kind": "ambiguous",
+      "limitation": "Smaller body text on the posters along the left end of the second wall ('Threat to our Eco-system' and the three posters further left) is too distant and oblique in the wide shot to read completely.",
+      "interval": {
+        "start_s": 18.0,
+        "end_s": 25.450667
+      }
+    }
+  ],
+  "descriptive_name": "indoor_exhibition_wall_rat_trap_bond_and_housing_posters_pan"
+}

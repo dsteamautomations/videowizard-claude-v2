@@ -1,0 +1,595 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "071d8a8ae7d27bdfe9b0176a1bea51a6",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "33d5daa609365812",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 4.330667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 4.330667
+            },
+            "status": "reviewed",
+            "note": "Continuous exterior architectural detail shot reviewed across the full 4.330667-second duration."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 4.330667
+            },
+            "state": "non_speech",
+            "note": "Quiet outdoor ambient sound with faint bird chirping and low environmental hum; no speech occurs."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "reason": "No readable text, numbers, or signage are present in the frame."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_brick_building",
+          "kind": "object",
+          "label": "Completed red-painted or red-finished exposed brick building exterior with arched porch canopy, diamond-pattern wall vents, and bottle-inlaid archway",
+          "uncertainty": "Whether the brick coursework is true rat-trap bond with internal hollow cavities cannot be determined from the finished exterior surface alone."
+        },
+        {
+          "id": "ent_bottle_arch",
+          "kind": "object",
+          "label": "Brick-trimmed semicircular archway at lower left with glass bottles embedded radially in red mortar/plaster",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_porch_canopy",
+          "kind": "object",
+          "label": "Corbelled, stepped brick barrel-vaulted canopy over exterior entrance steps",
+          "uncertainty": null
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_001",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "label": "Slow pull-back and slight pan left along finished red brick building facade",
+          "description": "The camera moves slowly backward and pans slightly left along the exterior wall of a completed red-brick building (ent_brick_building). On the main wall face, alternating stretcher and shorter header-like brick faces are visible with recessed mortar joints, along with a diagonal diamond grid of small square ventilation openings and the bottom corner of an upper window opening. At right, a stepped corbelled brick barrel-vaulted canopy (ent_porch_canopy) projects over entrance steps beside a small grey-and-red masonry bench and a circular well or planter structure in the sandy, tree-lined yard. As the camera pulls back between 0.0s and 4.330667s, more of a decorative semicircular archway (ent_bottle_arch) in the lower-left foreground comes into view, revealing green and brown glass bottles embedded radially like spokes around a central hub.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_brick_building",
+            "ent_bottle_arch",
+            "ent_porch_canopy"
+          ],
+          "context_result": "Completed exterior architectural showcase of exposed brickwork and decorative masonry features in a wooded compound; no active construction or people are present.",
+          "camera_framing": "Medium-wide angled architectural exterior shot moving gently backward/left.",
+          "uncertainty": "The exact internal bond structure (whether true rat-trap bond laid on edge or conventional/decorative brickwork) is not directly verifiable from the painted exterior surface."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_001",
+          "category": "architectural_bond_and_finish",
+          "claim": "The finished exterior wall shows an exposed brick pattern with alternating long and short faces, unplastered brick surfaces, and decorative masonry detailing (corbelled arch canopy, perforated brick jali vents, and bottle-inlaid arch) suitable for illustrating completed exposed-brick architecture in India.",
+          "evidence_refs": [
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            },
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_brick_building"
+            }
+          ],
+          "uncertainty": "Because the wall is completed and coated in a uniform terracotta/red wash or paint, internal cavities and brick-on-edge orientation are not directly proved by visual inspection alone, though the alternating stretcher/rowlock-like pattern is consistent with rat-trap bond facades."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ed_best_take_001",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "reason": "Single continuous smooth architectural gimbal/slider move (ve_001) across the entire 4.330667s window with no camera shake or distractions; claims ce_001 and ce_002 apply (finished exterior shows exposed brick pattern and pointing, though internal rat-trap cavities are not directly visible).",
+          "uncertainty": "Camera movement continues throughout the clip without a static lock-off.",
+          "details": {
+            "comparison_scope": "Single continuous shot in attached source 33d5daa609365812.",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_action_span_001",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "reason": "Complete smooth camera reveal of the brick facade and lower-left bottle-inlaid archway in ve_001 (supported by ce_001). Entering at 0.0s establishes the brick coursework, perforated wall vents, and stepped vault; holding until 4.330667s completes the reveal of the radial glass-bottle feature in the foreground arch.",
+          "uncertainty": "The backward camera movement is already underway at 0.0s and continues through the end of the file at 4.330667s.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "0.0s to 1.5s establishes the main red-brick wall pattern, diamond ventilation openings, and corbelled entrance canopy.",
+            "visible_result": "By 3.0s to 4.330667s, the lower-left semicircular archway with radially embedded glass bottles is clearly revealed alongside the full brick facade.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_story_moment_001",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            },
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_001"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "reason": "Strong architectural beauty shot (ve_001) to illustrate completed buildings using exposed brick masonry without exterior plastering, or as an opening/closing showcase of sustainable brick architecture (supported by ce_001, ce_002, ce_003, and ce_004).",
+          "uncertainty": "Does not directly show internal wall cavities or construction in progress; serves as an exterior finished-building visual.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Completed unplastered red brick facade with neat recessed pointing, corbelled brick vault, and bottle-inlaid arch.",
+            "story_role": "payoff",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_script_use_001",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_001"
+            },
+            {
+              "source_id": "33d5daa609365812",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_001"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "reason": "Matches P001 clauses about exposed brick pattern making plastering unnecessary (ce_003), pointing enhancing appearance and weather resistance (ce_004), and completed buildings built with this technology (ce_002). While the finished exterior brickwork and recessed mortar joints are directly visible in ve_001 (ce_001), the internal hollow cavities and cost savings are not directly visible and are supported illustratively.",
+          "uncertainty": "Whether this specific building was constructed with rat-trap bond is inferred from documentary context and the alternating header/stretcher face pattern rather than seen inside the closed wall.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": "Finished unplastered brick exterior wall with neat recessed pointing, perforated vents, and vaulted porch.",
+            "relationship": "match",
+            "intended_explanation": "Show how exposed brickwork with neat pointing creates an attractive finished building exterior without needing full wall plastering.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unres_001",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 4.330667
+          },
+          "field": "entities",
+          "issue": "Because the building exterior is completely finished and painted/washed red, the internal wall cavity structure and exact brick-on-edge thickness cannot be directly verified from this shot alone."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "There is just one continuous filming attempt (ve_001) across the entire 4.330667-second clip (0.0s to 4.330667s), consisting of a smooth backward/leftward camera movement along a finished red brick building exterior. There are no repeated takes, camera resets, or human demonstration stages in this clip.",
+    "crop_guidance": "For standard landscape output, preserve the full frame or the central-to-right region showing the main brick wall coursework, the diamond pattern of ventilation openings, and the stepped brick barrel-vaulted porch canopy (ent_brick_building, ent_porch_canopy in ve_001). Note that as the camera pulls back from 0.0s to 4.330667s, a decorative semicircular archway inlaid with green and brown glass bottles (ent_bottle_arch) enters prominently in the lower-left foreground; if the editor wants to focus purely on conventional rat-trap bond wall coursework and avoid visual distraction from the bottle-masonry feature, a slight crop toward the upper-right quadrant could exclude the lower-left archway, though keeping the full frame provides a richer architectural showcase.",
+    "clean_handles": "Interval: 0.0–4.330667; classification: settled; beginning observation: 0.0s shows the static completed brick facade, diamond wall vents, and stepped porch canopy while the camera begins a slow backward pull-back; middle observation: 2.1s shows the same inactive architectural facade as the camera continues its smooth pull-back, revealing more of the lower-left bottle-inlaid archway; end observation: 4.330667s shows the completed facade and lower-left bottle archway at the widest framing as the smooth camera drift reaches the end of the clip; relevant action stopped: the architectural subject (ent_brick_building) is completely stationary and inactive from the start across the entire span, with only smooth camera movement and faint background foliage motion continuing; uncertainty: camera motion is continuous throughout the 4.330667s window with no static camera lock-off before 0.0s or after 4.330667s; links: ve_001 and ce_001; editorial use: provides a clean, stable B-roll span that can be cut into or out of at any point to illustrate finished exposed brick architecture.",
+    "continuity": "Throughout ve_001 (0.0s to 4.330667s), the building subject (ent_brick_building) is stationary on the left and center of the frame while the camera pulls slowly backward and slightly left, causing wall features to drift slightly rightward and downward in screen space and progressively revealing the glass-bottle inlay inside the lower-left archway (ent_bottle_arch) from 0.0s (where only the arch bricks and two dark bottle ends are visible at the left edge) to 4.330667s (where the central hub and radial bottle spokes are visible). Because the camera is in continuous slow motion from 0.0s to 4.330667s, cutting into or out of this shot works best as a moving B-roll cut or dissolved transition.",
+    "preview_frames": "0.5s shows the tighter framing on the red brick wall coursework, recessed mortar joints, diamond ventilation holes, and stepped brick porch arch before the bottle-inlaid arch dominates the foreground (ve_001, ce_001). 3.8s shows the wider architectural reveal including the lower-left semicircular archway with radially embedded glass bottles alongside the perforated brick wall and vaulted porch canopy (ve_001, ce_001).",
+    "speech_action_links": "No speech is present in this source (0.0s to 4.330667s contains only quiet outdoor ambient sound), so there are no speech-to-action links.",
+    "shorter_explanations": "If a shorter B-roll insert is needed from ve_001 (4.330667s total), a 2.0-second trim from 0.0s to 2.0s (2.0s - 0.0s = 2.0s duration, with no transitions) retains the clean setup and view of the exposed red-brick coursework, recessed pointing, diamond vent openings, and stepped brick porch canopy (ce_001) while omitting the fuller reveal of the glass-bottle archway between 2.0s and 4.330667s. Alternatively, using 2.0s to 4.330667s (4.330667s - 2.0s = 2.330667s duration) showcases the decorative bottle-arch detail alongside the exposed brick facade. Either trim preserves the honest observation that this is a finished, painted exterior wall where internal cavities are not visible.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.",
+          "claim_id": "ce_002",
+          "support_classification": "illustrative",
+          "editorial_use": "Uses the finished red-brick building exterior (ve_001) to visually illustrate a completed building in an Indian setting while narration discusses widespread adoption, keeping explicit that a single finished exterior cannot verify thousands of buildings or prove internal cavity construction."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.",
+          "claim_id": "ce_001",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows an unplastered, exposed brick wall with alternating long and short brick faces and decorative brickwork (ve_001) to ground the visual pattern mentioned in the clause."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.",
+          "claim_id": "ce_003",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the narrative claim that leaving the attractive brick pattern unplastered avoids plastering costs, while noting that financial savings and aesthetic attractiveness are narrative interpretations rather than measured visual facts."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.",
+          "claim_id": "ce_004",
+          "support_classification": "illustrative",
+          "editorial_use": "Uses the visible recessed, neatly finished mortar joints on the exposed brick facade (ve_001) to illustrate completed pointing, while keeping weather-resistance performance as an inferred property."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this workflow uses a mixed-media plan where future generated video may be used for later gap filling, recorded footage is not forced into every script passage, and any supplied reservations must be preserved. Exact passage-level visual slot reservations were not supplied in this request (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), and none have been invented. Any future generated visual suggestions remain planned_not_created proposals rather than existing assets. Original camera audio was inspected for intake (only quiet outdoor ambient sound is present), and the output audio policy (excluded) is respected by omitting source_audio editorial recommendations.",
+    "unavailable": "No human actors, active masonry tools, raw materials, or spoken explanations appear in this clip; therefore speech, speech_action_links, and source_audio ideas are unavailable."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_001",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "From 0.0s to 4.330667s, the camera pulls slowly backward along an unplastered, red-finished brick building exterior displaying alternating longer and shorter brick faces, recessed mortar joints, a diamond grid of square wall vents, a stepped brick barrel-vaulted porch canopy, and a lower-left semicircular archway inlaid with radially arranged glass bottles.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.330667,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: in ve_001 at 0.5s, the red brick wall shows exposed courses of alternating brick lengths with recessed mortar joints, diamond ventilation openings, and a stepped brick canopy at right."
+        },
+        {
+          "time_s": 3.8,
+          "cue": "visual: in ve_001 at 3.8s, the wider framing reveals the semicircular archway at lower left filled with green and brown glass bottles arranged radially."
+        }
+      ],
+      "limits": "The exterior brick surface is finished/painted red and closed; internal wall cavities, brick-on-edge depth, and structural strength cannot be directly observed from the exterior surface."
+    },
+    {
+      "id": "ce_002",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "The completed red-brick building in ve_001 can illustratively represent finished Rat-Trap Bond Masonry architecture in India as described in P001, based on the alternating stretcher and header-like brick coursework pattern and documentary context.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.330667,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: in ve_001 at 0.5s, the exposed brick wall shows alternating long and short brick faces characteristic of rat-trap or Flemish-style bonding alongside alternative cost-saving masonry features (perforated brick vents, corbelled arch, bottle masonry)."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond walls appear on the exterior face as alternating stretchers and rowlocks (headers on edge) and are frequently paired with Laurie Baker-style vernacular architectural details such as bottle-inlaid arches, jali openings, and corbelled brick vaults."
+        }
+      ],
+      "limits": "Because the wall is completed and enclosed, this shot does not directly prove that internal cavities exist inside this specific wall or establish the script's statistical claim of 'thousands of buildings across India'."
+    },
+    {
+      "id": "ce_003",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The unplastered, red-finished exterior brickwork and decorative masonry features in ve_001 illustrate P001's point that an exposed brick pattern is visually attractive and makes exterior wall plastering unnecessary, creating additional savings.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.330667,
+      "cues": [
+        {
+          "time_s": 2.0,
+          "cue": "visual: in ve_001 at 2.0s, the building's main exterior wall and porch vault are finished in exposed brick without a continuous plaster coat covering the brick pattern."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.'"
+        }
+      ],
+      "limits": "While the absence of continuous wall plaster over the brick pattern is directly visible, aesthetic attractiveness and financial cost savings are narrative claims not measurable from the video."
+    },
+    {
+      "id": "ce_004",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The neat recessed mortar joints between the exposed bricks in ve_001 illustrate the finished appearance of pointed brickwork described in P001 for appearance and weather resistance.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 4.330667,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: in ve_001 at 1.0s, uniform recessed horizontal and vertical mortar joints are visible across the exposed brick wall face."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.'"
+        }
+      ],
+      "limits": "The active process of pointing is not shown in this clip, and long-term weather resistance cannot be measured from a brief exterior shot."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_001",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_building"
+        },
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Completed exterior brick wall finished in terracotta/red wash or paint, featuring alternating long and short brick faces, recessed mortar joints, and a diagonal grid of small recessed square ventilation holes (jali).",
+      "entity_ids": [
+        "ent_brick_building"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.330667
+      },
+      "uncertainty": "Whether the red colour is a surface paint/wash over clay bricks and whether the interior of the wall contains hollow rat-trap cavities cannot be verified from the exterior surface alone."
+    },
+    {
+      "id": "wm_002",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_porch_canopy"
+        },
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Stepped, corbelled red-brick barrel-vaulted canopy projecting over entrance steps, with a small grey-painted base and red-topped masonry bench immediately outside on the dirt ground.",
+      "entity_ids": [
+        "ent_porch_canopy"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.330667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_003",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bottle_arch"
+        },
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Semicircular brick-trimmed archway in the lower-left wall filled with green and brown glass bottles embedded radially in red plaster/mortar around a central round hub.",
+      "entity_ids": [
+        "ent_bottle_arch"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.330667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_004",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "category": "environment",
+      "observation": "Unpaved reddish-brown earth yard scattered with dry leaves, bordered by green leafy trees, a low circular masonry well or ring structure, and a small pile of rubble/stones in the background.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 4.330667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_001",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_building"
+        },
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "subject": "Internal wall cavity structure and brick orientation",
+      "kind": "not_visible",
+      "limitation": "Because the building exterior is completely finished and enclosed, internal hollow cavities, mortar cleanliness inside cavities, and brick-on-edge orientation cannot be directly observed in this clip.",
+      "interval": null
+    },
+    {
+      "id": "el_002",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_building"
+        },
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "subject": "Brick crushing strength, thermal performance, and total building height",
+      "kind": "not_established",
+      "limitation": "The exterior view of the lower wall and porch does not establish the total number of storeys of the building, indoor thermal comfort, or the measured crushing strength of the bricks.",
+      "interval": null
+    },
+    {
+      "id": "el_003",
+      "evidence_refs": [
+        {
+          "source_id": "33d5daa609365812",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_001"
+        }
+      ],
+      "subject": "Inspection scope and native frame verification",
+      "kind": "not_established",
+      "limitation": "While the full 4.330667-second window was reviewed at high media resolution, exhaustive native frame-by-frame inspection is not established by file metadata alone.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "red_brick_building_exterior_arch_and_bottle_wall"
+}

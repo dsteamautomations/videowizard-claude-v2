@@ -1,0 +1,847 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "797a1b101d1a955681cc4accd31adc1a",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "6463f57986b7b84e",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 11.050667
+            },
+            "status": "reviewed",
+            "note": "Continuous locked-off tripod medium shot of a low, multi-course brick wall junction laid on edge with visible interior cavities and mortar beds. A mason on the right retrieves and positions a single brick onto the junction."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 11.050667
+            },
+            "state": "omitted_background_speech",
+            "note": "Casual background site conversation in Tamil among workers (mentioning a person named Thangasamy and general site chatter) plus ambient birdsong; omitted from transcription because it does not explain the masonry technique, process, or measurements."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 0,
+            "end_s": 11.050667
+          },
+          "reason": "Casual off-camera Tamil site conversation (e.g., 'Illai, adhu Thangasamy eduthuradhaa sonnaaru' / 'No, Thangasamy said to take it') is unrelated to the construction demonstration and omitted per background speech rules."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 11.050667
+          },
+          "reason": "No readable text, numbers, or signage appear in the frame."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Mason standing at right edge of frame",
+          "uncertainty": "Only lower torso, dark grey trousers, light yellow/beige shirt hem, arms, and hands are visible; head and face remain outside the top-right frame."
+        },
+        {
+          "id": "ent_bg_person",
+          "kind": "person",
+          "label": "Person standing in upper-right background",
+          "uncertainty": "Only lower legs in dark trousers and dark sandals are visible in the background."
+        },
+        {
+          "id": "ent_wall_junction",
+          "kind": "object",
+          "label": "Low red-brick wall with corner and T-junction laid on edge with hollow cavities",
+          "uncertainty": "Exact mortar mix ratio and brick crushing strength are not visually determinable."
+        },
+        {
+          "id": "ent_brick_placed",
+          "kind": "object",
+          "label": "Red clay brick handled and placed on edge by the mason",
+          "uncertainty": "Whether the brick is wire-cut or hand-moulded is not established from visual inspection alone."
+        },
+        {
+          "id": "ent_mortar_pan",
+          "kind": "object",
+          "label": "Metal mortar pan (tasla) with grey mortar at bottom right",
+          "uncertainty": "Only a partial rim and contents are visible at the lower-right corner."
+        },
+        {
+          "id": "ent_bg_pillars",
+          "kind": "object",
+          "label": "Two small stacked-brick piers/pillars in background",
+          "uncertainty": null
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ev_wall_static_and_approach",
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.2
+          },
+          "label": "Static view of brick-on-edge wall junction while mason shifts position at right",
+          "description": "A locked-off medium shot shows a low L-shaped and T-junction red-brick wall built on sandy soil. Bricks are laid on edge in a staggered bond, leaving rectangular vertical cavities open along the top course and fresh grey mortar spread along the top junction bed. At the right edge of the frame, `ent_mason` steps slightly forward and gestures briefly with an empty right hand around 02.8s–03.5s before turning right to reach outside the frame.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_bg_person"
+          ],
+          "object_ids": [
+            "ent_wall_junction",
+            "ent_mortar_pan",
+            "ent_bg_pillars"
+          ],
+          "context_result": "The wall junction structure, staggered vertical joints, exposed brick faces, and open top cavities are clearly visible and undisturbed throughout this span.",
+          "camera_framing": "Locked-off tripod high-angle medium shot looking down at the low brick wall junction.",
+          "uncertainty": "The mason's upper body and whatever he reaches for off-screen right are outside the frame."
+        },
+        {
+          "id": "ev_place_brick_on_junction",
+          "interval": {
+            "start_s": 4.2,
+            "end_s": 11.050667
+          },
+          "label": "Mason brings a brick into frame and sets it on edge on the mortared junction",
+          "description": "At 04.2s, `ent_mason` brings `ent_brick_placed` into the right side of the frame, holding it in his right hand, briefly swings it back out/down around 06.3s–07.2s while adjusting grip, then lifts it forward with both hands (07.3s–08.5s) and places it on edge onto the fresh mortar bed at the central T-junction of `ent_wall_junction` at 08.8s. From 08.8s through the end of the clip at 11.05s, he keeps his right hand resting on top of `ent_brick_placed`, making slight alignment adjustments.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_bg_person"
+          ],
+          "object_ids": [
+            "ent_wall_junction",
+            "ent_brick_placed",
+            "ent_mortar_pan"
+          ],
+          "context_result": "A single red brick is positioned on edge atop the mortared T-junction, continuing the next course, while the mason's right hand remains in contact with the brick at the clip's end.",
+          "camera_framing": "Locked-off tripod high-angle medium shot.",
+          "uncertainty": "The clip ends at 11.050667s while the mason's right hand is still resting on the placed brick; final tapping, levelling, or hand release is not captured in this window."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "interp_rat_trap_bond_structure",
+          "category": "construction_technique",
+          "claim": "The low brick wall demonstrates Rat-Trap Bond Masonry construction, showing bricks laid on edge in parallel wythes connected by headers/cross-bricks to create internal hollow cavities, staggered vertical joints across courses, and an intersecting wall junction/corner detail.",
+          "evidence_refs": [
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_wall_static_and_approach"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_place_brick_on_junction"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall_junction"
+            }
+          ],
+          "uncertainty": "While the geometry of bricks on edge, internal cavities, staggered joints, and a wall junction are directly visible, this demonstration wall is a low freestanding test/sample assembly on bare earth rather than a full-height habitable building wall, and material properties (such as brick crushing strength or thermal performance) are not measured on screen."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "idea_best_take_brick_placement",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_place_brick_on_junction"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_rat_trap_bond_structure"
+            }
+          ],
+          "interval": {
+            "start_s": 7.2,
+            "end_s": 11.050667
+          },
+          "reason": "Cleanest continuous action span in this clip (`ev_place_brick_on_junction`, `ce_brick_placement_action`) where the mason brings the brick smoothly into frame and sets it on edge onto the mortared junction without the earlier false-start swing at 04.2s–07.2s. Note that the mason's right hand remains on the brick through the end of the file at 11.050667s.",
+          "uncertainty": "Hand release after placing the brick is cut off by the end of the source file at 11.050667s. The static opening span 00.0s–04.2s (`ev_wall_static_and_approach`, `ce_static_wall_view`) serves as an alternative if a static detail shot of the cavities and junction is preferred over active placement.",
+          "details": {
+            "comparison_scope": "Compared across the single attached 11.05s source window.",
+            "alternative_refs": [
+              {
+                "source_id": "6463f57986b7b84e",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ev_wall_static_and_approach"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0,
+              "end_s": 4.2
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_action_span_placement",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_place_brick_on_junction"
+            }
+          ],
+          "interval": {
+            "start_s": 7.2,
+            "end_s": 11.050667
+          },
+          "reason": "Captures the uninterrupted lifting and setting of a brick on edge onto the mortar bed at the wall junction (`ev_place_brick_on_junction`, `ce_brick_placement_action`).",
+          "uncertainty": "The post-placement settle/release is incomplete because the mason's hand stays on the brick until the clip ends at 11.050667s.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "07.2s–08.5s where the mason brings the brick forward over the pre-mortared T-junction bed.",
+            "visible_result": "08.8s–11.050667s showing the brick seated on edge on the mortar bed at the junction, with the mason's right hand still resting on top.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_story_moment_cavities_and_edge",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_wall_static_and_approach"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_place_brick_on_junction"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_rat_trap_bond_structure"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 11.050667
+          },
+          "reason": "Provides clear explanatory visual evidence of Rat-Trap Bond geometry (`ev_wall_static_and_approach`, `ev_place_brick_on_junction`, `ce_wall_geometry_observations`, `ce_rat_trap_bond_inference`): bricks laid on edge, continuous hollow cavities inside the wall, staggered vertical joints, and a wall corner/T-junction detail.",
+          "uncertainty": "Directly shows brick-on-edge placement, hollow cavities, staggered joints, and wall junctions, while only illustrating inferred thermal barrier or material-saving benefits (`ce_thermal_and_savings_illustrative`).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": "Visualizes how bricks are placed on edge to form internal cavities and how wall junctions and staggered courses are arranged.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_script_use_junction_and_laying",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_wall_static_and_approach"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_place_brick_on_junction"
+            },
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_rat_trap_bond_structure"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 11.050667
+          },
+          "reason": "Strong match for P001 clauses describing laying bricks on edge to form hollow cavities (`ce_wall_geometry_observations`), staggering vertical joints, and detailing wall junctions and corners (`ce_brick_placement_action`).",
+          "uncertainty": "Note that loose mortar droppings are visible on the sandy ground at the base of the wall, and no guide strings are attached to this low sample wall, so it should not be used as literal proof of guide strings being fixed.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Matches script descriptions of bricks laid on edge, hollow cavities, staggered vertical joints, and wall junctions/corners.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "idea_future_visual_thermal_and_strength",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "6463f57986b7b84e",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_rat_trap_bond_structure"
+            }
+          ],
+          "interval": null,
+          "reason": "While this live-action shot shows the physical cavities and brick-on-edge junction (`ce_wall_geometry_observations`), invisible mechanisms and quantitative requirements in P001—such as heat-transfer reduction across the air cavity or the 20/35/75 kg/cm² crushing-strength table by building height—cannot be directly observed in site footage (`ce_thermal_and_savings_illustrative`). A clean schematic diagram or motion graphic could complement this footage if not covered elsewhere.",
+          "uncertainty": "Proposed as an optional gap-filler (`planned_not_created`); other clips in the collection or planned graphics may already address these passages.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Illustrate thermal insulation across the hollow cavity or display the crushing-strength requirements (20, 35, 75 kg/cm²) for one-, two-, and three-storey buildings.",
+            "missing_asset": "Animated cross-section graphic showing heat flow blocked by the air cavity and/or an infographic comparing 1-, 2-, and 3-storey brick crushing strength figures.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "6463f57986b7b84e",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No exact passage-level visual slot reservations were supplied in the media brief (`exact_passage_level_reservations_not_supplied`). This recorded video clip provides strong B-roll for P001 passages covering brick-on-edge orientation, internal cavities, staggered vertical joints, and wall junctions/corners.",
+          "prerequisite": null,
+          "uncertainty": "Final slot assignment depends on review of the remaining collection clips and whether generated graphics are desired for abstract thermal/strength figures."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_clip_end_cutoff",
+          "interval": {
+            "start_s": 8.8,
+            "end_s": 11.050667
+          },
+          "field": "visual_events",
+          "issue": "The recording ends at 11.050667s while the mason's right hand is still resting on the newly placed brick (`ev_place_brick_on_junction`), so completion of alignment and hand withdrawal are not captured."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "There is one continuous filming take across 00.0s–11.050667s showing a single brick-placement stage on a pre-mortared wall junction (`ev_wall_static_and_approach`, `ev_place_brick_on_junction`, `ce_static_wall_view`, `ce_brick_pickup_hesitation`, `ce_brick_placement_action`). Within this single take, the mason exhibits a brief preparatory hesitation: after shifting position at the right edge of the frame (00.0s–04.2s, `ev_wall_static_and_approach`), he brings a brick into view in his right hand at 04.2s, pauses and swings it back down/out of the main action area around 06.3s–07.2s (`ce_brick_pickup_hesitation`), and then smoothly lifts it with both hands from 07.2s to place it on edge onto the junction mortar bed at 08.8s, holding his hand on it through 11.050667s (`ev_place_brick_on_junction`, `ce_brick_placement_action`).",
+    "crop_guidance": "The source framing is a horizontal wide/medium shot centered on the low brick wall junction (`ent_wall_junction`). For a standard horizontal (16:9) delivery, the full frame works well; however, the upper-right quadrant contains partial lower legs/sandals of a background bystander (`ent_bg_person`) and the headless lower torso/trousers of the mason (`ent_mason`). If a tighter crop or vertical/square reframe is needed, preserving the lower-left and central two-thirds of the frame retains the entire L-corner, T-junction, open cavities, mortar bed, and the mason's hands placing `ent_brick_placed` (`ev_place_brick_on_junction`, `ce_brick_placement_action`), while excluding the bystander's feet in the upper right. Any crop must keep the central T-junction top surface and the right-hand approach path so the brick entering from screen right between 07.2s and 08.8s is not clipped.",
+    "clean_handles": "Interval: 0.0–4.2; classification: settled; beginning observation: 0.0s low brick wall junction (`ent_wall_junction`) sits completely stationary in the foreground while the mason's legs (`ent_mason`) are at the far right edge (`ev_wall_static_and_approach`); middle observation: 2.0s brick wall and open cavities remain completely still while the mason shifts his weight slightly at the right edge (`ev_wall_static_and_approach`); end observation: 4.2s brick wall remains untouched just before the mason's right hand brings a brick (`ent_brick_placed`) into the right edge of the frame (`ev_wall_static_and_approach`); relevant action stopped: no masonry manipulation occurs on the wall from the start of the clip through 4.2s, with only incidental weight-shifting and a brief empty-handed gesture by the mason at the far right edge; uncertainty: incidental movement of the mason's trousers and hand at the right frame edge between 0.0s and 4.2s; links: ev_wall_static_and_approach, ce_static_wall_view; editorial use: provides a clean, stable 4.2-second static B-roll shot of the Rat-Trap Bond wall cavities, staggered courses, and mortared T-junction, or serves as a pre-action lead-in before brick placement. Interval: 7.2–8.8; classification: active preparation; beginning observation: 7.2s mason (`ent_mason`) begins lifting the red brick (`ent_brick_placed`) forward from the right edge toward the central junction (`ev_place_brick_on_junction`); middle observation: 8.0s mason holds the brick with both hands poised directly above the grey mortar bed on the T-junction (`ev_place_brick_on_junction`); end observation: 8.8s brick makes contact on edge with the mortar bed on top of the junction (`ev_place_brick_on_junction`); relevant action stopped: active carrying and lowering of the brick continues throughout this span until contact with the mortar bed at 8.8s; uncertainty: approximate transition boundary around 7.2s as the brick swings forward after the earlier hesitation; links: ev_place_brick_on_junction, ce_brick_placement_action; editorial use: clean active lead-in that skips the earlier 4.2s–7.2s hesitation swing and preserves the complete two-handed approach and setting of the brick onto the mortar bed. Interval: 8.8–11.050667; classification: active release; beginning observation: 8.8s brick (`ent_brick_placed`) rests on edge on the mortar bed with both of the mason's hands touching it (`ev_place_brick_on_junction`); middle observation: 9.8s mason withdraws his left hand slightly while keeping his right hand firmly on top of the brick (`ev_place_brick_on_junction`); end observation: 11.050667s mason's right hand remains resting on top of the placed brick as the file ends (`ev_place_brick_on_junction`); relevant action stopped: downward placement of the brick stops at 8.8s, but hand contact and subtle alignment pressure continue through the end of the recording at 11.050667s; uncertainty: recording cuts off at 11.050667s before the mason removes his right hand from the brick, so no post-release settled pause is available at the end of the clip; links: ev_place_brick_on_junction, ce_brick_placement_action; editorial use: preserves the visible result of the brick seated on edge at the wall junction for 2.25 seconds after placement.",
+    "continuity": "Throughout 00.0s–11.050667s, the camera is locked off on a tripod viewing the low brick wall junction (`ent_wall_junction`) from an oblique high angle (`ev_wall_static_and_approach`, `ev_place_brick_on_junction`). For a candidate entry at 00.0s (`ce_static_wall_view`), the top mortar bed along the T-junction is already spread and no brick sits on the central intersection; the mason (`ent_mason`) stands at the far right edge. For a candidate entry at 07.2s (`ce_brick_placement_action`), the mason is leaning slightly left from the right edge of the frame, bringing `ent_brick_placed` from screen right toward screen center-left. At the clip's exit (11.050667s, `ce_brick_placement_action`), `ent_brick_placed` sits on edge atop the central T-junction mortar bed, and the mason's right hand is still resting on top of the brick while his left hand hangs near his side. Any cut immediately to or from another shot of this same wall must account for the presence/absence of this newly placed brick on the junction and the mason's hand still resting on it at 11.050667s.",
+    "preview_frames": "01.5s (`ev_wall_static_and_approach`): clear unobstructed view of the low brick wall junction, staggered brick-on-edge courses, open rectangular top cavities, and fresh mortar bed before the mason's hands enter the central workspace. 08.0s (`ev_place_brick_on_junction`): the mason's hands holding the red brick on edge just above the mortared T-junction, illustrating the orientation of the brick prior to seating. 10.0s (`ev_place_brick_on_junction`): the brick seated on edge on the T-junction mortar bed with the mason's right hand resting on top and his left hand pulled back.",
+    "speech_action_links": "No relevant speech is linked to the visual actions (`ev_wall_static_and_approach`, `ev_place_brick_on_junction`). The audible Tamil speech in the background (00.0s–11.050667s) is casual off-camera site chatter unrelated to the brick-laying demonstration, and the output audio policy excludes source camera audio.",
+    "shorter_explanations": "Instead of using the entire 11.050667s clip, an editor can use two tighter options depending on narrative need: (1) For active brick laying on edge at a junction, use 07.2s–11.050667s (duration: 11.050667 - 7.2 = 3.850667s, approx. 3.85s; `ev_place_brick_on_junction`, `ce_brick_placement_action`), which omits the static opening (00.0s–04.2s, `ev_wall_static_and_approach`, `ce_static_wall_view`) and the mason's initial one-handed hesitation swing (04.2s–07.2s, `ce_brick_pickup_hesitation`) while retaining the full two-handed lift setup (07.2s–08.8s) and the seated brick result on the junction (08.8s–11.050667s, with the qualification that the mason's right hand remains on the brick until the clip ends). (2) For a static architectural detail shot of the cavities and staggered courses without hand movement over the wall, use 00.0s–04.2s (duration: 4.2 - 0.0 = 4.2s; `ev_wall_static_and_approach`, `ce_static_wall_view`), which omits the subsequent brick placement altogether.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "ce_wall_geometry_observations",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows bricks laid on their narrow edge with open rectangular hollow cavities running along the interior of the wall courses (`ev_wall_static_and_approach`, `ev_place_brick_on_junction`)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "One innovative solution that addresses all these concerns is Rat-Trap Bond Masonry",
+          "claim_id": "ce_rat_trap_bond_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the named Rat-Trap Bond Masonry technique through the visible brick-on-edge cavity bond pattern (`interp_rat_trap_bond_structure`)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "improving the thermal performance of the building.",
+          "claim_id": "ce_thermal_and_savings_illustrative",
+          "support_classification": "illustrative",
+          "editorial_use": "Visually shows the physical hollow air cavities inside the brick-on-edge wall (`ev_wall_static_and_approach`) that the script explains act as a thermal barrier and save material, though thermal transfer and percentage savings are not measured on camera."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "ce_brick_placement_action",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the mason carefully setting a brick on edge onto the mortar bed to continue the next course over the cavity wall (`ev_place_brick_on_junction`), noting that his hand remains on the brick at the clip's end."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "ce_wall_geometry_observations",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows staggered vertical mortar joints across the completed courses of the wall (`ev_wall_static_and_approach`), while the resulting structural strength is an engineering property not tested in the clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "ce_wall_geometry_observations",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows both a 90-degree corner and a T-junction intersection in the brick-on-edge wall (`ent_wall_junction`, `ev_wall_static_and_approach`), with mortar and brick placement occurring directly on the T-junction (`ev_place_brick_on_junction`)."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "This analysis follows the mixed-media workflow plan: future generated video assets may be used for later gap filling, recorded camera footage is not forced into every script passage, and any supplied slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (`planned_visual_slots` is empty and status is `exact_passage_level_reservations_not_supplied`), so none are invented. Proposed future visuals are marked `planned_not_created` and are non-binding leads rather than existing assets. In accordance with `source_audio_policy`, original camera audio was inspected for intake (`include_original_sound`) and found to contain only irrelevant background site chatter, while output audio is excluded (`excluded`), so no `source_audio` editorial suggestions are made.",
+    "unavailable": "No relevant spoken explanations or readable on-screen text exist in this source clip. Inspection scope note (G07): the full 11.050667s duration and audio track were reviewed via the multimodal interface under MEDIA_RESOLUTION_HIGH; however, native pixel dimensions and frame rate were null in the supplied metadata, and review does not constitute an external tool verification or exhaustive native frame-by-frame inspection."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_wall_geometry_observations",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/script_support/claims/0/editorial_use",
+        "/additional_analysis/script_support/claims/4/editorial_use",
+        "/additional_analysis/script_support/claims/5/editorial_use"
+      ],
+      "claim": "The foreground structure is a low red-brick wall featuring a 90-degree corner and a T-junction, built with bricks laid on edge in staggered courses that form open rectangular hollow cavities inside the wall and fresh grey mortar spread on the top junction bed.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: In `ev_wall_static_and_approach` (00.0s–04.2s) and `ev_place_brick_on_junction` (04.2s–11.050667s), `ent_wall_junction` is visible across the foreground with bricks resting on their narrow edges, rectangular internal cavities open along the top left course, staggered vertical joints across courses, an L-corner on the left, and a T-junction in the center covered with fresh grey mortar."
+        }
+      ],
+      "limits": "Shows a low freestanding demonstration/sample wall on sandy ground rather than a full-storey building; internal mortar droppings inside the lower cavities, exact brick dimensions, and structural load capacity are not visually verifiable."
+    },
+    {
+      "id": "ce_static_wall_view",
+      "target_paths": [
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/editorial_ideas/0/uncertainty",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 00.0s to 04.2s, the brick wall junction remains untouched and stationary in the foreground while the mason shifts position and gestures briefly with an empty hand at the far right edge of the frame.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.2,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: In `ev_wall_static_and_approach` (00.0s–04.2s), `ent_wall_junction` has no tools or hands over it while `ent_mason` steps slightly forward at the right edge and makes a brief hand gesture around 02.8s–03.5s before reaching off-screen right."
+        }
+      ],
+      "limits": "Incidental movement of the mason's legs and right hand occurs at the right frame edge between 00.0s and 04.2s."
+    },
+    {
+      "id": "ce_brick_pickup_hesitation",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/additional_analysis/attempts",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 04.2s and 07.2s, the mason brings a red brick into the right side of the frame in his right hand and then swings it back down/outward while adjusting his grip before starting the two-handed placement lift.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 4.2,
+      "end_s": 7.2,
+      "cues": [
+        {
+          "time_s": 4.2,
+          "cue": "visual: In `ev_place_brick_on_junction`, `ent_mason` brings `ent_brick_placed` into view at the right edge at 04.2s, holds it in his right hand, and swings it back down toward the right edge between 06.3s and 07.2s."
+        }
+      ],
+      "limits": "The mason's upper body is out of frame, so the reason for his brief pause and grip adjustment (whether checking the brick or responding to off-camera site conversation) is not visible."
+    },
+    {
+      "id": "ce_brick_placement_action",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/visual_events/1/context_result",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/3/editorial_use"
+      ],
+      "claim": "From 07.2s to 08.8s, the mason lifts the red brick forward with both hands and sets it on edge onto the fresh mortar bed at the central T-junction; from 08.8s through the end of the clip at 11.050667s, the brick rests on edge on the junction while the mason keeps his right hand resting on top of it.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 7.2,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 7.2,
+          "cue": "visual: In `ev_place_brick_on_junction`, `ent_mason` lifts `ent_brick_placed` with both hands from 07.2s, places it on edge onto the mortared T-junction of `ent_wall_junction` at 08.8s, pulls his left hand back around 09.8s, and leaves his right hand resting on top of the brick through 11.050667s."
+        }
+      ],
+      "limits": "The source clip ends at 11.050667s while the mason's right hand is still in contact with the brick; final hand withdrawal and any subsequent plumb/level check are not shown."
+    },
+    {
+      "id": "ce_rat_trap_bond_inference",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "The masonry assembly shown in the clip is an example of Rat-Trap Bond Masonry, identified by its characteristic brick-on-edge wythes bridged by cross-headers creating internal hollow cavities.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: `ev_wall_static_and_approach` and `ev_place_brick_on_junction` show `ent_wall_junction` constructed with bricks laid on edge forming rectangular internal cavities."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Unlike conventional brickwork, where bricks are laid flat, Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: In masonry construction, laying bricks on edge in a header-stretcher arrangement that encloses rectangular internal cavities is the defining geometry of Rat-Trap Bond."
+        }
+      ],
+      "limits": "Identified from visible bond geometry and script context; no on-screen label or spoken narration in the clip names the bond."
+    },
+    {
+      "id": "ce_thermal_and_savings_illustrative",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/uncertainty",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/script_support/claims/2/editorial_use"
+      ],
+      "claim": "The visible hollow cavities inside the brick-on-edge wall illustrate the physical structure behind the script's claims of thermal insulation and reduced brick/mortar consumption, although thermal performance, percentage material savings, and brick crushing strength are not measured in the footage.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 11.050667,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: `ev_wall_static_and_approach` shows the open rectangular air cavities between the inner and outer brick-on-edge faces of `ent_wall_junction`."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'They serve an important purpose—reducing the use of bricks and mortar while improving the thermal performance of the building' and 'Because of the hollow cavities, the wall acts as a natural thermal barrier.'"
+        }
+      ],
+      "limits": "Visual footage can only show the physical cavities; heat transfer, 25% material reduction, and 20/35/75 kg/cm² crushing strengths are engineering properties that cannot be verified visually from this clip."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_wardrobe_mason",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_place_brick_on_junction"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The mason at the right edge wears loose dark grey trousers, black footwear, and a light beige/yellow untucked shirt hem with short or rolled sleeves.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "uncertainty": "Only the lower torso, trousers, and arms are inside the frame."
+    },
+    {
+      "id": "wm_wardrobe_bg_person",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bg_person"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_wall_static_and_approach"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "A person standing in the upper-right background wears dark trousers and open dark sandals.",
+      "entity_ids": [
+        "ent_bg_person"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "uncertainty": "Only lower legs and feet are visible."
+    },
+    {
+      "id": "wm_environment_ground",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_wall_static_and_approach"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor construction/demonstration ground with reddish-brown sandy soil, scattered dry leaves, small weeds/grass tufts, and a low concrete curb strip running behind the foreground brick wall.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_architecture_wall_junction",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall_junction"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_wall_static_and_approach"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Low multi-course red-brick demonstration wall featuring an L-corner and a T-junction built with bricks on edge and hollow internal cavities, plus two small dry-stacked or mortared brick pillars in the background (`ent_bg_pillars`).",
+      "entity_ids": [
+        "ent_wall_junction",
+        "ent_bg_pillars"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_tools_mortar_pan_and_bar",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar_pan"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_wall_static_and_approach"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A round metal mortar pan (tasla) holding grey mortar sits at the lower-right edge of the frame, and a flat grey metal bar/straightedge lies on the ground behind the wall.",
+      "entity_ids": [
+        "ent_mortar_pan"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "uncertainty": "Only the edge of the metal mortar pan is in frame."
+    },
+    {
+      "id": "wm_material_state_mortar_and_bricks",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall_junction"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_placed"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_place_brick_on_junction"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Unplastered red clay bricks with sharp rectangular edges (several showing dark kiln-firing marks on their faces) laid with wet, freshly spread dark-grey mortar on the top bed and loose grey mortar droppings accumulated on the sandy ground inside the corner.",
+      "entity_ids": [
+        "ent_wall_junction",
+        "ent_brick_placed"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_mason_identity_not_visible",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bg_person"
+        }
+      ],
+      "subject": "Faces and upper bodies of the mason and background bystander",
+      "kind": "not_visible",
+      "limitation": "The camera framing cuts off above the mason's waist/chest and above the background person's knees, so their faces, headgear, and upper-body wardrobe are not visible in this clip.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.050667
+      }
+    },
+    {
+      "id": "el_post_placement_release_cutoff",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_place_brick_on_junction"
+        }
+      ],
+      "subject": "Completion of brick levelling and hand release",
+      "kind": "not_visible",
+      "limitation": "The recording ends at 11.050667s while the mason's right hand is still resting on top of `ent_brick_placed`, so hand withdrawal, trowel tapping, or level checking after placement is not captured.",
+      "interval": {
+        "start_s": 8.8,
+        "end_s": 11.050667
+      }
+    },
+    {
+      "id": "el_engineering_and_process_claims_not_established",
+      "evidence_refs": [
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall_junction"
+        },
+        {
+          "source_id": "6463f57986b7b84e",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_placed"
+        }
+      ],
+      "subject": "Brick crushing strength, wire-cut manufacturing method, thermal insulation performance, 25% brick savings, guide strings, pointing, and 7-day curing",
+      "kind": "not_established",
+      "limitation": "This clip shows a low freestanding sample wall without guide strings, plinth preparation, pointing, or water curing, and visual inspection alone cannot establish whether the bricks are wire-cut or verify quantitative crushing strength (20/35/75 kg/cm²), thermal resistance, or percentage material savings.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "mason_laying_brick_on_edge_at_wall_junction"
+}

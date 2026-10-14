@@ -1,0 +1,788 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "1c131c9cd7c31d07e65696011a4c41d0",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "a0d773a77ff5ca28",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 8.170667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 8.170667
+            },
+            "status": "reviewed",
+            "note": "Continuous high-angle view looking straight down along the top of a newly laid brick-on-edge wall course with central cavities and wet mortar patches on sandy ground; exact native frame rate and pixel dimensions are not supplied in metadata and frame-by-frame native inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 8.170667
+            },
+            "state": "omitted_background_speech",
+            "note": "Ambient outdoor site sounds, bird calls, a brief knocking sound around 04.0s, and faint, low-volume background site chatter that does not provide intelligible explanation or narrative information."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 0,
+            "end_s": 8.170667
+          },
+          "reason": "Faint, indistinct background conversation on site is omitted as non-relevant background chatter; camera audio is also excluded from final output by policy."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 8.170667
+          },
+          "reason": "No readable text or numbers are visible in the scene; faint recessed frog impressions inside some bricks are obscured by shadow and mortar."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "brick-on-edge wall course with internal cavities and wet mortar",
+          "uncertainty": "Only a short low section of brickwork on sandy ground is visible; full wall height, plinth preparation, and mortar fallen inside the cavities are observed as present rather than cleared."
+        },
+        {
+          "id": "ent_bystander_foot",
+          "kind": "person",
+          "label": "person's sandaled foot at upper-left edge",
+          "uncertainty": "Only a single foot in a dark slide sandal is briefly visible at the top-left corner from about 04.6s to 08.17s; the person's identity and role are unseen."
+        },
+        {
+          "id": "ent_brick_stack",
+          "kind": "object",
+          "label": "stacked red bricks at upper-right edge",
+          "uncertainty": "Only the bottom edge of a stack of bricks is partially visible at the top right from about 03.0s onward."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 8.170667
+          },
+          "label": "Overhead slow tilt/pull-back along brick-on-edge wall showing hollow cavities and mortar on top and inside",
+          "description": "A high-angle overhead shot looks directly down along a single visible course of red bricks laid on edge in an alternating header-stretcher arrangement that forms rectangular hollow cavities down the centre of the wall. Wet grey mortar patches rest on the top edges and cross-joints of the bricks, and loose mortar droppings and sandy debris are visible inside the open cavities as well as spilled along both sides of the base on the sandy ground. From 00.0s to about 05.5s, the camera tilts and moves slightly backward/upward along the wall axis, bringing the bottom edge of a stack of red bricks into view at the upper right (around 03.0s) and a person's foot wearing a dark sandal into the upper-left corner (entering around 04.6s and settling by 05.8s). From about 05.8s to 08.170667s, the camera and the sandaled foot remain virtually stationary.",
+          "actor_ids": [
+            "ent_bystander_foot"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_brick_stack"
+          ],
+          "context_result": "Clearly displays the parallel brick-on-edge geometry and internal rectangular cavities of the wall course, while also visibly showing wet mortar blobs on the top face and fallen mortar/debris inside the cavities.",
+          "camera_framing": "High-angle close-to-medium overhead framing centered vertically on the wall course; slight upward/backward camera drift from 00.0s to 05.5s, then steady to 08.17s with a sandaled foot intruding at upper left.",
+          "uncertainty": "Whether this low course sits on a prepared plinth or is a demonstration mock-up directly on sand cannot be verified from the framing; internal cavity depth below the visible droppings is partially shadowed."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "construction_technique",
+          "claim": "The overhead view directly shows bricks laid on their edge forming a double-wythe wall with cross-bricks (headers) and rectangular hollow cavities down the centre, which is the characteristic geometry of Rat-Trap Bond masonry described in the script.",
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "While the brick-on-edge cavity geometry is directly visible, thermal performance, 25% material savings, and structural strength cannot be measured visually from the clip."
+        },
+        {
+          "id": "int_02",
+          "category": "workmanship_condition",
+          "claim": "Loose mortar droppings and debris are visibly present inside the hollow cavities and spilled along the base of the wall, and wet mortar is spread across the top brick edges in preparation for the next course or before cleaning.",
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "It is not established whether a mason later cleans out the fallen mortar from the cavities after the clip ends, so this clip should be used carefully if paired with narration claiming that mortar is prevented from falling into cavities."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.4
+          },
+          "reason": "The opening 00.0s–04.4s span of ve_01 provides a clean, close overhead reveal of the brick-on-edge arrangement and hollow internal cavities before the bystander's sandaled foot enters the upper-left corner of the frame at around 04.6s (supported by clm_01, clm_02, and clm_03). An alternative span is 05.8s–08.170667s once the camera and foot have settled (clm_04), though it requires a slight crop if the editor wishes to exclude the foot at upper left.",
+          "uncertainty": "Visible mortar droppings inside the cavities (clm_02) remain visible in both intervals; exact native frame boundaries are approximate.",
+          "details": {
+            "comparison_scope": "Single continuous shot within attached source a0d773a77ff5ca28; comparing pre-intrusion movement (00.0s–04.4s) against post-intrusion settled hold (05.8s–08.170667s).",
+            "alternative_refs": [
+              {
+                "source_id": "a0d773a77ff5ca28",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 5.8,
+              "end_s": 8.170667
+            },
+            "must_keep_setup": "Overhead framing centered on the parallel brick-on-edge wythes and cross-headers.",
+            "visible_result": "Three distinct rectangular hollow cavities aligned down the middle of the brick course.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Clear top-down anatomical view of Rat-Trap Bond cavities.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 8.170667
+          },
+          "reason": "Full static-object showcase span in ve_01 combining slow upward camera tilt/reveal (00.0s–05.5s, clm_03) and settled overhead hold (05.8s–08.170667s, clm_04) showing the brick-on-edge course and central cavities (clm_01).",
+          "uncertainty": "A sandaled foot steps into the top-left corner at 04.6s (clm_03) and remains stationary through 08.170667s (clm_04).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Initial close overhead view of the brick-on-edge course at 00.0s.",
+            "visible_result": "Wider overhead view of four cavities along the brick course by 05.8s–08.170667s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.4
+          },
+          "reason": "Directly shows bricks placed on their edge and the resulting hollow cavities inside the wall in ve_01 (clm_01), and illustrates the script's explanation of how those cavities serve to reduce brick and mortar usage and act as a thermal barrier (clm_05, clm_06).",
+          "uncertainty": "Thermal performance and material percentage savings are not visually measurable (clm_06), and loose mortar is visible inside the cavities (clm_02).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Top-down view of the brick-on-edge course.",
+            "visible_result": "Clear sightline into the hollow rectangular pockets between the bricks.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Visual proof of the internal cavity geometry of Rat-Trap Bond.",
+            "relationship": "match",
+            "intended_explanation": "Shows how laying bricks on edge creates hollow pockets down the center of the wall.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.4
+          },
+          "reason": "Can also support the construction-stage description in P001 ('As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall', clm_01, clm_05), but editors should note a potential visual tension if placed directly over 'Care is also taken to prevent mortar from falling into the cavities' because mortar droppings are visibly sitting inside the cavities in ve_01 (clm_02, clm_07).",
+          "uncertainty": "Whether the cavities were cleaned out later is unseen (clm_02).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Completed course pattern with hollow cavities and uncleaned mortar droppings.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Shows the completed course pattern from above; highlights real-world mortar droppings in cavities.",
+            "relationship": "contrast",
+            "intended_explanation": "Matches the completed course cavity pattern, or contrasts with the instruction to keep mortar out of cavities.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_05",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "a0d773a77ff5ca28",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": null,
+          "reason": "Because this real site shot (ve_01) cannot visually depict heat transfer or invisible thermal insulation (clm_06), an optional future generated diagram or animated overlay (planned_not_created) could be used for the thermal-barrier and crushing-strength clauses in P001 if other collection clips do not cover them.",
+          "uncertainty": "Proposal only; no generated asset exists and exact passage-level visual slot reservations were not supplied.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Illustrate heat-flow reduction across the hollow air cavity and compare brick crushing-strength requirements by building height (20, 35, and 75 kg/sq cm).",
+            "missing_asset": "Clean schematic diagram or 3D cross-section animation showing solar heat arrows blocked by the air cavity in a Rat-Trap Bond wall and a 1-to-3 storey brick strength chart.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "a0d773a77ff5ca28",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No supplied visual slot reservations exist in the brief; this recorded clip is a strong candidate for P001 clauses describing bricks placed on edge creating hollow cavities within the wall.",
+          "prerequisite": "If used over the workmanship clause about preventing mortar from falling into cavities, be aware that mortar droppings are visible inside the cavities in this shot.",
+          "uncertainty": "Exact passage-level slot reservations were not supplied in this request."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unr_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 8.170667
+          },
+          "field": "visual_events",
+          "issue": "Cannot determine from this tight overhead framing whether the brick course is laid on a masonry plinth or directly on sandy ground as a demonstration sample, nor whether the mortar droppings inside the cavities are subsequently cleaned out."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "There is just one continuous filming observation (ve_01, 00.0s–08.170667s) of a completed brick-on-edge wall course with no repeated masonry takes or process resets. The camera performs a slow upward/backward tilt and pull-back from 00.0s to about 05.5s (clm_03) and then holds steady from about 05.8s to 08.170667s (clm_04).",
+    "crop_guidance": "The essential visual subject in ve_01 is the vertical column of red bricks laid on edge and the hollow cavities down the vertical center of the frame (clm_01, clm_02). From about 04.6s to 08.170667s, a bystander's dark-sandaled foot enters and rests in the upper-left corner of the frame, and from about 03.0s onward the bottom edge of a brick stack is visible at the upper-right edge (clm_03, clm_04). If the editor uses the second half of the clip (04.6s–08.170667s) and wants to exclude the distracting foot at the top-left edge, a slight zoom/crop preserving the central and lower-central region of the frame can exclude the upper-left corner without hiding the central brick cavities. No exact pixel coordinates or verified crop clearance are claimed.",
+    "clean_handles": "Interval: 0.0–4.4; classification: active preparation; beginning observation: 0.0s close overhead view of the brick-on-edge wall course and three hollow cavities while the camera begins a slow upward/backward tilt; middle observation: 2.2s camera continues its slow upward tilt along the brick course, revealing a fourth cavity toward the top of the frame; end observation: 4.4s camera tilt slows just before a sandaled foot enters the upper-left corner around 4.6s (inspected through 5.4s where the foot steps in and settles); relevant action stopped: the brick wall subject is stationary from the start, while the camera's slow reveal tilt continues across the span and a bystander's foot enters after 4.4s; uncertainty: approximate timestamp boundary before the foot intrusion at 4.6s; links: ve_01 and clm_01, clm_03; editorial use: preserves a clean 4.4-second overhead reveal of the brick-on-edge cavities without the bystander's foot in the upper-left corner. Interval: 5.8–8.170667; classification: settled; beginning observation: 5.8s overhead view of the brick-on-edge course with four visible cavities and the bystander's sandaled foot already stationary at the upper-left corner; middle observation: 7.0s stationary brick course, stationary sandaled foot at upper left, and steady overhead camera; end observation: 8.170667s clip ends with the brick course, foot, and camera still stationary (end of attached window, so no footage beyond 8.170667s is available to inspect); relevant action stopped: both the camera's upward tilt/pull-back and the bystander's foot entry have stopped by 5.8s, leaving the brick course and frame settled across 5.8s–8.170667s; uncertainty: recording ends at 8.170667s with the foot still visible in the upper-left corner; links: ve_01 and clm_01, clm_04; editorial use: provides a steady 2.37-second static hold on the brick-on-edge cavities if a stationary shot is preferred or if the upper-left corner is cropped.",
+    "continuity": "Throughout ve_01 (00.0s–08.170667s), the brick-on-edge wall course runs vertically from the bottom center to the top center of the frame on sandy ground, with wet grey mortar patches on top of the bricks and mortar droppings inside the cavities (clm_01, clm_02). At candidate entry 00.0s, the camera is closer and framing three main cavity pockets, moving slowly upward/backward along the wall axis until about 05.5s (clm_03). Between 03.0s and 05.8s, the bottom of a red brick stack appears at the upper-right margin and a sandaled foot steps into the upper-left corner (around 04.6s), coming to rest by 05.8s (clm_03, clm_04). At candidate exit 04.4s, the upper-left corner is still clear of the foot; at candidate exit 08.170667s, the camera and foot are stationary. No state change occurs to the brickwork itself during the clip.",
+    "preview_frames": "1.5s: shows a clean close overhead view of the brick-on-edge course, three hollow central cavities, wet mortar patches on the top edges, and loose mortar droppings inside the cavities before the bystander's foot enters the upper-left frame (ve_01, clm_01, clm_02, clm_03). 6.5s: shows the wider settled overhead framing of the brick course with four visible cavities, the bottom edge of stacked bricks at upper right, and the bystander's sandaled foot stationary in the upper-left corner (ve_01, clm_01, clm_04).",
+    "speech_action_links": "Unavailable: no relevant intelligible speech is present in this clip (only faint, omitted background site chatter), and camera audio is excluded from the final output by policy.",
+    "shorter_explanations": "For a concise explanatory B-roll cut of ve_01 showing the Rat-Trap Bond cavity structure without edge distractions, retain 00.0s–04.4s (duration: 4.4s - 0.0s = 4.4s with no transitions or overlaps). This retains the close overhead setup and clear visual result of the parallel bricks laid on edge and the hollow central cavities (clm_01, clm_03), while omitting 04.4s–08.170667s where a bystander's sandaled foot enters the upper-left corner (at ~04.6s) and the camera settles into a static hold (clm_03, clm_04). Retaining the longer full 8.170667s version adds a wider view of a fourth cavity pocket and a steady 2.37s hold at the end (05.8s–08.170667s), at the cost of showing the foot at upper left. In both the shorter and longer versions, wet mortar on the top edges and fallen mortar droppings inside the cavities remain visibly present (clm_02).",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "clm_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use ve_01 (especially 00.0s–04.4s) as direct visual evidence of red bricks laid on edge with cross-headers forming hollow rectangular cavities along the center of the wall course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "clm_05",
+          "support_classification": "illustrative",
+          "editorial_use": "Links the observed single course of brick-on-edge pockets in ve_01 to the script's technical identification of Rat-Trap Bond Masonry and continuous cavities across multiple courses, while noting that only one top course is visible here."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "They serve an important purpose—reducing the use of bricks and mortar while improving the thermal performance of the building.",
+          "claim_id": "clm_06",
+          "support_classification": "illustrative",
+          "editorial_use": "The visible hollow air pockets in ve_01 illustrate the physical spaces that the script explains reduce brick/mortar volume and act as a thermal barrier, even though thermal resistance and percentage material savings cannot be directly measured from the image."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "clm_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the completed course pattern of alternating edge-laid stretchers and headers forming central rectangular cavities in ve_01."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.",
+          "claim_id": "clm_07",
+          "support_classification": "illustrative",
+          "editorial_use": "Provides a cautionary visual counterpoint or real-site context: ve_01 clearly shows the cavities that need protection, but loose mortar droppings and debris are visibly sitting inside the cavities and spilled along the base (clm_02), so editors should avoid implying this shot shows clean, mortar-free cavities unless used to illustrate why care/cleaning is needed."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this workflow uses a mixed-media plan where future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented. Any suggested generated visual is marked planned_not_created and is not existing evidence or authorization to generate media. Original source audio was inspected for intake as required by include_original_sound, and no source_audio editorial recommendations are made because the output audio policy excludes camera audio (output: excluded).",
+    "unavailable": "speech_action_links and source_audio ideas are unavailable because the clip contains only faint, uninformative background chatter and the output policy excludes source audio. No readable text is present in the video."
+  },
+  "claim_evidence": [
+    {
+      "id": "clm_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "In ve_01 (00.0s–08.170667s), red bricks are laid on their narrow edge in two parallel outer lines connected by perpendicular cross-bricks, creating a line of hollow rectangular cavities down the centre of the wall course.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 8.170667,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: at 00.0s in ve_01 (ent_wall), overhead view shows parallel red bricks standing on edge with transverse header bricks forming three open central cavities."
+        },
+        {
+          "time_s": 5.8,
+          "cue": "visual: at 05.8s in ve_01 (ent_wall), slightly wider overhead framing shows four open rectangular cavities along the center of the brick-on-edge course."
+        }
+      ],
+      "limits": "Only the top visible course of a low wall section on sandy ground is seen; deeper courses or full wall height are not visible."
+    },
+    {
+      "id": "clm_02",
+      "target_paths": [
+        "/sources/0/entities/0/uncertainty",
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/0/uncertainty",
+        "/sources/0/editorial_ideas/2/uncertainty",
+        "/sources/0/editorial_ideas/3/reason",
+        "/sources/0/editorial_ideas/3/uncertainty",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Wet grey mortar patches sit on the upper brick edges and joints of ent_wall, and loose mortar droppings and sandy crumbs are visibly present inside the central cavities and along both sides of the wall base on the ground throughout 00.0s–08.170667s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 8.170667,
+      "cues": [
+        {
+          "time_s": 1.5,
+          "cue": "visual: at 01.5s in ve_01 (ent_wall), grey mortar beds cover the brick joints on top and crumbled mortar/soil clumps are visible inside the hollow cavities and along the base on the sand."
+        }
+      ],
+      "limits": "The clip does not show whether the mortar droppings inside the cavities were left permanently or cleaned out after filming."
+    },
+    {
+      "id": "clm_03",
+      "target_paths": [
+        "/sources/0/entities/1/uncertainty",
+        "/sources/0/entities/2/uncertainty",
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/camera_framing",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/1/uncertainty",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 00.0s to about 05.5s in ve_01, the camera tilts and pulls slightly upward/backward along the wall; the bottom edge of a brick stack (ent_brick_stack) enters at the upper right around 03.0s, and a bystander's sandaled foot (ent_bystander_foot) enters the upper-left corner around 04.6s before settling by 05.8s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.8,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: at 00.0s in ve_01, upper-left and upper-right corners show only sandy ground beside the brick course."
+        },
+        {
+          "time_s": 3,
+          "cue": "visual: around 03.0s in ve_01, the bottom row of stacked red bricks (ent_brick_stack) comes into view at the top-right edge as the camera tilts up."
+        },
+        {
+          "time_s": 4.6,
+          "cue": "visual: around 04.6s in ve_01, a dark-sandaled foot (ent_bystander_foot) steps into the top-left corner and shifts slightly until about 05.8s."
+        }
+      ],
+      "limits": "Timestamps for the gradual camera tilt and foot entry are approximate to within a few tenths of a second."
+    },
+    {
+      "id": "clm_04",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/camera_framing",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/1/uncertainty",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From about 05.8s to 08.170667s in ve_01, the camera framing, the brick course (ent_wall), the brick stack edge (ent_brick_stack), and the sandaled foot in the upper-left corner (ent_bystander_foot) remain stationary.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 5.8,
+      "end_s": 8.170667,
+      "cues": [
+        {
+          "time_s": 5.8,
+          "cue": "visual: at 05.8s in ve_01, the camera movement and foot adjustment cease."
+        },
+        {
+          "time_s": 8.170667,
+          "cue": "visual: through the end of the clip at 08.170667s in ve_01, the frame and subjects remain still."
+        }
+      ],
+      "limits": "Clip ends at 08.170667s, so stability beyond the end of the attached window cannot be inspected."
+    },
+    {
+      "id": "clm_05",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "The brick-on-edge arrangement with alternating headers and stretchers seen in ve_01 illustrates the Rat-Trap Bond masonry pattern and continuous internal wall cavities described in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 8.170667,
+      "cues": [
+        {
+          "time_s": 1.5,
+          "cue": "visual: at 01.5s in ve_01, bricks are laid on edge with cross-headers creating hollow central pockets."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.' and 'As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: in Rat-Trap Bond masonry, laying bricks on edge in a header-stretcher bond produces a series of internal vertical pockets across courses."
+        }
+      ],
+      "limits": "Only one top course is visible in ve_01; continuity of cavities across multiple stacked courses or a full building wall is inferred rather than directly shown in this shot."
+    },
+    {
+      "id": "clm_06",
+      "target_paths": [
+        "/sources/0/interpretations/0/uncertainty",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/2/uncertainty",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The hollow air cavities visible in ve_01 illustrate the physical mechanism that the script in P001 says reduces brick and mortar consumption and improves thermal performance, although neither material savings percentages nor thermal insulation values are visually measurable in the clip.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 8.170667,
+      "cues": [
+        {
+          "time_s": 1.5,
+          "cue": "visual: at 01.5s in ve_01, open air pockets are visible between the edge-laid bricks instead of solid brick fill."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'They serve an important purpose—reducing the use of bricks and mortar while improving the thermal performance of the building.'"
+        }
+      ],
+      "limits": "Thermal barrier performance, indoor temperature reduction, and exact percentage savings in bricks and mortar cannot be verified from visual inspection of the clip."
+    },
+    {
+      "id": "clm_07",
+      "target_paths": [
+        "/sources/0/interpretations/1/uncertainty",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "While ve_01 shows the internal cavities referenced in P001's clause 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall', the visible presence of mortar droppings inside the cavities in ve_01 means the shot illustrates the cavity vulnerability or uncleaned state rather than proving that mortar was prevented from falling in.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 8.170667,
+      "cues": [
+        {
+          "time_s": 1.5,
+          "cue": "visual: at 01.5s in ve_01, loose grey mortar clumps and sandy debris are visible resting inside the hollow brick cavities."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.'"
+        }
+      ],
+      "limits": "It is unknown whether the mason subsequently cleared these mortar droppings or whether this wall section is a rough practice/demonstration course."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Red-orange bricks are laid on their narrow edge in two parallel rows bridged by perpendicular header bricks, forming rectangular hollow cavities down the center of the wall course.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 8.170667
+      },
+      "uncertainty": "Only a low section of brickwork on sandy ground is visible; full structural context is outside the frame."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Coarse, wet grey mortar rests in patches along the top edges of the bricks, with loose mortar crumbs and debris fallen inside the central cavities and along both sides of the wall base.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 8.170667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Dry, tan-orange sandy soil surrounds the brickwork, scattered with a few dry brown leaves, twigs, and footwear sole imprints in the sand.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 8.170667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bystander_foot"
+        },
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "A person's bare foot wearing a dark open-toed slide sandal is visible at the upper-left edge of the frame.",
+      "entity_ids": [
+        "ent_bystander_foot"
+      ],
+      "interval": {
+        "start_s": 4.6,
+        "end_s": 8.170667
+      },
+      "uncertainty": "Only one foot is visible; the rest of the person's attire and role on site are outside the frame."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "brick crushing strength, manufacturing type, and thermal or material savings performance",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the brick-on-edge course cannot establish the bricks' crushing strength (e.g., 20, 35, or 75 kg/sq cm), whether they are wire-cut or hand-moulded, or the quantitative thermal insulation and percentage material savings of the wall.",
+      "interval": null
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "a0d773a77ff5ca28",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "plinth preparation and subsequent cavity cleaning",
+      "kind": "not_visible",
+      "limitation": "Because the clip only shows an already-laid low brick course on sandy soil for 8.17 seconds, prior plinth cleaning/moistening and any subsequent removal of the mortar droppings visible inside the cavities are not visible in this source.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 8.170667
+      }
+    }
+  ],
+  "descriptive_name": "overhead_brick_on_edge_wall_course_cavities"
+}

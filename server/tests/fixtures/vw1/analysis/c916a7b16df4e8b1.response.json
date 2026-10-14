@@ -1,0 +1,886 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "ce85fee19ce6346488ead6266d6dff5d",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "c916a7b16df4e8b1",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 28.330667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 28.330667
+            },
+            "status": "reviewed",
+            "note": "Continuous locked-off medium-wide shot of an outdoor demonstration of bricklaying on edge on a sandy ground surface. Sampled across the full duration; exact native frame-by-frame inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 28.330667
+            },
+            "state": "omitted_background_speech",
+            "note": "Contains natural site sounds (bricks scraping, footsteps, birds) and quiet, brief, low-volume background remarks among workers around 0.0-1.0s, 8.5-9.5s, 22.0-23.0s, and 26.5-27.5s that do not provide clear instructional explanations."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 0,
+            "end_s": 28.330667
+          },
+          "reason": "Quiet, brief, partially indistinct background site remarks among workers are omitted as non-instructional background speech; camera audio is also excluded from final output per policy."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 28.330667
+          },
+          "reason": "No readable text or numbers relevant to the scene or construction process are visible in the frame."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Mason in beige shirt and dark trousers laying bricks",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_helper",
+          "kind": "person",
+          "label": "Helper in light long-sleeved shirt and grey trousers bringing water pan and bricks",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_brick_wall",
+          "kind": "object",
+          "label": "L-shaped low brick wall course laid on edge with mortar bed on top",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_bricks",
+          "kind": "object",
+          "label": "Red clay bricks with moulded frog indentations on one face",
+          "uncertainty": "Exact manufacturing method (e.g., hand-moulded vs machine-moulded) and crushing strength are not visually verifiable, though visible frogs and rough edges indicate they are not smooth wire-cut bricks."
+        },
+        {
+          "id": "ent_mortar_pan",
+          "kind": "object",
+          "label": "Metal pan (tasla) containing grey mortar and a trowel",
+          "uncertainty": "Exact mortar mix ratio is not visually verifiable."
+        },
+        {
+          "id": "ent_water_pan",
+          "kind": "object",
+          "label": "Metal pan (tasla) filled with water placed on the ground",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Masonry trowel with orange handle resting on the mortar bed",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_green_tanks",
+          "kind": "object",
+          "label": "Cluster of cylindrical green metal or plastic tanks/digesters in the background",
+          "uncertainty": "Exact function of the green cylindrical units is not established by the video."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ev_01_first_brick",
+          "interval": {
+            "start_s": 0,
+            "end_s": 5.5
+          },
+          "label": "Laying first corner stretcher brick on edge",
+          "description": "The mason (ent_mason), wearing a clip-on lapel microphone on his beige shirt and sandals on his feet, bends over an L-shaped low brick wall base (ent_brick_wall) that already has a layer of grey mortar spread along its top. At 0.0s–1.8s he picks up a red brick (ent_bricks) from a small stack beside the wall, rotates it in his hands, and at 1.8s–5.5s places it on its narrow edge onto the mortar bed at the outer corner of the L-wall, pressing and adjusting its alignment with both hands.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_mortar_pan",
+            "ent_trowel"
+          ],
+          "context_result": "One brick is positioned on edge along the outer face of the corner mortar bed.",
+          "camera_framing": "Locked-off medium-wide shot angled slightly down at the L-shaped brick corner on sandy ground; mason's head is partially cropped at the top frame edge when standing upright.",
+          "uncertainty": null
+        },
+        {
+          "id": "ev_02_second_brick",
+          "interval": {
+            "start_s": 5.5,
+            "end_s": 11.5
+          },
+          "label": "Laying parallel inner brick on edge and helper walking past",
+          "description": "At 5.5s–7.5s the mason (ent_mason) reaches to the ground stack, picks up a second red brick (ent_bricks), and at 7.5s–11.5s places it on edge parallel to the first brick on the inner side of the corner mortar bed, leaving a narrow gap between the two parallel bricks and adjusting their alignment. Meanwhile, between 8.0s and 11.5s, a helper (ent_helper) walks across the background from right to left behind the mason.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_helper"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_mortar_pan",
+            "ent_trowel"
+          ],
+          "context_result": "Two parallel bricks on edge form the corner pocket of the new course.",
+          "camera_framing": "Locked-off medium-wide shot; helper's upper body is cropped by the top edge of the frame as he walks behind the mason.",
+          "uncertainty": null
+        },
+        {
+          "id": "ev_03_third_brick_and_water_delivery",
+          "interval": {
+            "start_s": 11.5,
+            "end_s": 19.5
+          },
+          "label": "Delivering water pan and laying transverse header brick on edge across corner",
+          "description": "At 11.5s–13.5s the mason (ent_mason) picks up a third brick (ent_bricks) from the ground stack while the helper (ent_helper) enters from the left carrying a metal pan filled with water (ent_water_pan), sets it down on the ground to the left of the wall around 13.0s–13.8s, and steps off-screen left by 15.0s. Simultaneously, at 13.5s–19.0s, the mason places the third brick on edge transversely across the ends of the first two parallel bricks (with the brick's frog indentation visible facing outward toward the camera), taps and adjusts the three-brick corner assembly with his hands, and at 18.0s–19.5s straightens his back slightly and rubs his hands together.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_helper"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_water_pan",
+            "ent_mortar_pan",
+            "ent_trowel"
+          ],
+          "context_result": "Three bricks on edge are arranged at the corner (two parallel stretchers and one perpendicular header closing the end), and a pan of water rests on the ground at left.",
+          "camera_framing": "Locked-off medium-wide shot; mason's head is partially cropped at the top of the frame during 18.0s–19.5s.",
+          "uncertainty": null
+        },
+        {
+          "id": "ev_04_brick_delivery_and_fourth_brick",
+          "interval": {
+            "start_s": 19.5,
+            "end_s": 28.330667
+          },
+          "label": "Helper delivering stack of bricks and mason laying fourth brick on edge",
+          "description": "At 19.5s–23.0s the helper (ent_helper) re-enters from the left carrying a stack of five red bricks (ent_bricks) and sets them upright in a row on the ground beside the mortar pan while the mason (ent_mason) touches his nose/face briefly at 19.8s–20.5s and then guides the top brick of the delivered stack at 21.5s–22.5s. At 22.5s–24.5s the mason picks up that brick, rotates it, and at 24.5s–26.8s places it on edge onto the mortar bed along the right-hand leg of the L-wall next to the corner header brick. The helper walks off-screen to the left between 25.0s and 26.5s. From 26.8s to 28.33s the mason releases the fourth brick and rubs the dirt/mortar off his hands while remaining bent over the wall.",
+          "actor_ids": [
+            "ent_mason",
+            "ent_helper"
+          ],
+          "object_ids": [
+            "ent_brick_wall",
+            "ent_bricks",
+            "ent_water_pan",
+            "ent_mortar_pan",
+            "ent_trowel"
+          ],
+          "context_result": "Four bricks on edge are positioned along the corner and right leg of the L-wall, and a fresh supply of cinque bricks sits ready beside the mortar pan.",
+          "camera_framing": "Locked-off medium-wide shot; upper bodies/heads of both men are partially cropped by the top edge of the frame.",
+          "uncertainty": null
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01_rat_trap_bond_laying",
+          "category": "process_identification",
+          "claim": "The mason is demonstrating the laying of bricks on edge to form the parallel wythes and cross-headers characteristic of Rat-Trap Bond masonry at a wall corner.",
+          "evidence_refs": [
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_first_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_02_second_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_03_third_brick_and_water_delivery"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_04_brick_delivery_and_fourth_brick"
+            }
+          ],
+          "uncertainty": "This appears to be a low-level instructional demonstration built directly on sandy ground without fixed guide strings or a prepared concrete plinth visible in frame."
+        },
+        {
+          "id": "int_02_brick_type_discrepancy",
+          "category": "material_observation",
+          "claim": "The bricks used in this demonstration have recessed frogs on their broad faces and slightly irregular edges typical of moulded clay bricks, rather than the smooth, sharp-edged wire-cut bricks mentioned as preferred in the script.",
+          "evidence_refs": [
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_bricks"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_03_third_brick_and_water_delivery"
+            }
+          ],
+          "uncertainty": "Exact brick manufacturing method and compressive strength cannot be verified from video alone."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ed_01_best_take_corner_sequence",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_first_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_02_second_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_03_third_brick_and_water_delivery"
+            }
+          ],
+          "interval": {
+            "start_s": 0.5,
+            "end_s": 18.2
+          },
+          "reason": "Continuous, clear demonstration of placing the first three bricks on edge to form a Rat-Trap Bond corner unit (two parallel stretchers and one perpendicular header). Avoids the mason's nose-touching pause and the helper's more intrusive foreground brick delivery at 19.5s–23.0s, though the helper does walk through the background and place a water pan at the left between 8.0s and 15.0s.",
+          "uncertainty": "Helper enters the left side of the frame during 8.0s–15.0s; if a completely solo shot of the mason is required, only 0.5s–8.0s is free of the second person.",
+          "details": {
+            "comparison_scope": "Within attached source c916a7b16df4e8b1",
+            "alternative_refs": [
+              {
+                "source_id": "c916a7b16df4e8b1",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ev_04_brick_delivery_and_fourth_brick"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 22.5,
+              "end_s": 27.5
+            },
+            "must_keep_setup": "Picking up the first brick and orienting it on its narrow edge (0.5s–2.0s).",
+            "visible_result": "Three bricks clearly seated on edge forming the hollow-wall corner arrangement by 18.2s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_02_action_span_first_two_bricks",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_first_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_02_second_brick"
+            }
+          ],
+          "interval": {
+            "start_s": 0.5,
+            "end_s": 11.2
+          },
+          "reason": "Shows the complete cycle of picking up and laying two parallel bricks on edge to establish the inner and outer leaves of the wall with a cavity space between them.",
+          "uncertainty": "Background helper walks behind the mason from 8.0s to 11.2s.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Mason lifting the first brick from the stack and rotating it onto its edge (0.5s–2.0s).",
+            "visible_result": "Both parallel bricks resting on edge on the mortar bed with a visible gap between them (8.5s–11.2s).",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_03_script_use_bricks_on_edge",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_01_first_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_02_second_brick"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ev_03_third_brick_and_water_delivery"
+            },
+            {
+              "source_id": "c916a7b16df4e8b1",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01_rat_trap_bond_laying"
+            }
+          ],
+          "interval": {
+            "start_s": 0.5,
+            "end_s": 18.2
+          },
+          "reason": "Directly shows the mason placing bricks on their narrow edge and forming parallel leaves with a cross-brick at the corner, supporting the script's core explanation of how Rat-Trap Bond Masonry is laid and how corners/junctions are detailed.",
+          "uncertainty": "Because this is the start of a second course on a low demonstration wall without guide strings, it illustrates the brick-on-edge orientation and corner arrangement rather than a full-scale building wall with fixed guide strings.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Visual demonstration of laying bricks on edge in parallel and transverse orientations at an L-shaped corner.",
+            "relationship": "match",
+            "intended_explanation": "Supports clauses in P001 describing placing bricks on their edge, forming the distinct course pattern, and detailing wall junctions/corners.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ed_04_future_visual_strength_chart",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [],
+          "interval": null,
+          "reason": "The attached clip shows manual bricklaying but cannot visually communicate quantitative crushing-strength requirements (20, 35, and 75 kg/cm² for 1, 2, and 3 storeys). A clean graphic or animated diagram is well suited for that technical specification passage if not covered by other sources.",
+          "uncertainty": "Other clips in the collection have not been inspected in this request; only needed if no existing graphic covers the crushing-strength figures.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Visualise the minimum brick crushing strength matched to building height: 1 storey = 20 kg/cm², 2 storeys = 35 kg/cm², 3 storeys = 75 kg/cm².",
+            "missing_asset": "Clean instructional diagram or motion graphic comparing 1-, 2-, and 3-storey building silhouettes alongside their required brick crushing strengths (20, 35, and 75 kg/cm²).",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "c916a7b16df4e8b1",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "No exact passage-level visual slot reservations were supplied in the media brief. This recorded video clip provides strong B-roll for the clauses in P001 describing laying bricks on edge and corner/junction detailing.",
+          "prerequisite": null,
+          "uncertainty": "Exact narration timing within P001 is not supplied."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_01_background_speech",
+          "interval": {
+            "start_s": 0,
+            "end_s": 28.330667
+          },
+          "field": "speech",
+          "issue": "Faint, brief background remarks in an Indian language (likely Tamil) occur around 0.5s, 8.8s, 22.3s, and 26.8s, too quiet and indistinct for reliable verbatim transcription, and excluded from output by the source audio policy."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "The clip consists of one continuous, unedited camera take (0.0s–28.33s) showing a single progressive masonry demonstration rather than repeated takes of the same action. Within this continuous demonstration, the mason performs four successive brick-laying cycles on the second course of an L-shaped wall corner: (1) picking up and laying the first outer corner stretcher brick on edge in ev_01_first_brick (0.0s–5.5s); (2) picking up and laying the second inner parallel brick on edge in ev_02_second_brick (5.5s–11.5s); (3) picking up and laying the third transverse header brick on edge across the ends of the first two bricks in ev_03_third_brick_and_water_delivery (11.5s–19.5s); and (4) receiving a fresh stack of five bricks from a helper and laying a fourth brick on edge along the right-hand wall leg in ev_04_brick_delivery_and_fourth_brick (19.5s–28.33s). There are no camera resets or failed attempts.",
+    "crop_guidance": "The source is horizontal widescreen video, and no non-standard output aspect ratio is forced in the brief. The essential action—the L-shaped brick wall corner (ent_brick_wall), the mortar pan (ent_mortar_pan), and the mason's hands placing bricks on edge (ent_bricks)—is concentrated in the lower-center and lower-right quadrant of the frame. In the full frame, the mason's head is awkwardly cut off by the top frame edge whenever he straightens slightly (notably around 0.0s–1.5s, 6.5s–7.5s, 11.5s–13.5s, and 18.0s–24.5s), and the helper walks through the upper-left background (8.0s–15.0s and 19.5s–26.5s) in front of bright green cylindrical tanks (ent_green_tanks). A moderate zoom-in or crop focusing on the lower-center/right area (framing from the mason's chest/forearms down to the sandy foreground) would eliminate the partial head-cut at the top edge and reduce the visual distraction of the green background tanks and the helper's legs, while keeping all four brick placements and the mortar bed clearly visible. However, any crop has not been technically verified for resolution loss.",
+    "clean_handles": "Interval: 0.0–1.8; classification: active preparation; beginning observation: 0.0s mason (ent_mason) is already bent over the wall reaching his right hand onto a vertical red brick in the supply stack beside the wall; middle observation: 1.0s mason lifts the brick off the ground stack and brings it toward his left hand; end observation: 1.8s mason holds the brick with both hands poised just above the corner mortar bed; relevant action stopped: preparation does not stop during this span, as lifting and orienting the first brick continues directly into placing it at 1.8s; uncertainty: clip starts mid-reach at 0.0s with no prior settled pause available; links: ev_01_first_brick, ce_01_first_brick_edge; editorial use: preserves the complete pickup and orientation of the first brick on edge for a clean action entry. Interval: 18.0–19.5; classification: active release; beginning observation: 18.0s mason removes his hands from the third laid brick and straightens his torso slightly; middle observation: 18.8s mason lightly rubs his palms together above the wall to brush off mortar dust; end observation: 19.5s mason's left hand rests near his waist while his right hand begins rising toward his face as the helper approaches from the left; relevant action stopped: brick manipulation on the wall has stopped at 18.0s, though hand-brushing and torso movement continue across the span; uncertainty: approximate boundary before the mason touches his nose at 19.8s and the helper enters with bricks at 19.5s; links: ev_03_third_brick_and_water_delivery, ce_03_third_brick_header; editorial use: provides a natural completion handle after the three-brick corner assembly is finished and hands clear the work, before the nose-touch and helper intrusion. Interval: 26.8–28.330667; classification: active release; beginning observation: 26.8s mason lifts both hands off the fourth laid brick; middle observation: 27.5s mason rubs his hands together above the mortar bed to dust them off; end observation: 28.33s clip ends while the mason is still bent over rubbing his hands; relevant action stopped: placement of the fourth brick stopped at 26.8s, while hand-dusting motion continues until the end of the file; uncertainty: recording cuts off at 28.330667s before the mason reaches a fully still posture, and no extra footage beyond 28.330667s exists; links: ev_04_brick_delivery_and_fourth_brick, ce_04_fourth_brick_edge; editorial use: usable lead-out handle showing hands releasing the fourth brick on edge so the viewer sees the completed placement.",
+    "continuity": "Throughout the clip, the camera remains locked off in a single position. At candidate entry 0.5s (inside ev_01_first_brick), the L-shaped base course already has wet mortar spread across its top, three loose supply bricks stand near the mortar pan, no water pan is present on the left, and the mason is reaching down with his right hand. Between 12.0s and 14.0s (ev_03_third_brick_and_water_delivery), the helper enters from screen left and places a metal pan of water (ent_water_pan) on the ground at screen left, where it remains for the rest of the clip. Between 19.5s and 22.5s (ev_04_brick_delivery_and_fourth_brick), the helper enters again from screen left and places a row of five upright red bricks beside the mortar pan. Therefore, cutting directly from an early segment (0.0s–11.5s) to a late segment (22.5s–28.33s) without an cutaway would produce a visible jump cut in both the number of laid bricks on the corner and the sudden appearance of the water pan and five-brick supply stack on the left.",
+    "preview_frames": "1.8s (ev_01_first_brick): mason holding the first red brick in both hands poised to set it on its narrow edge onto the mortar bed. 5.0s (ev_01_first_brick): first brick seated on edge on the outer corner of the mortar bed with the mason's hands adjusting its alignment. 10.5s (ev_02_second_brick): second brick placed on edge parallel to the first brick, clearly showing the two-wythe arrangement with a narrow gap between them. 17.5s (ev_03_third_brick_and_water_delivery): third brick placed transversely on edge across the ends of the first two parallel bricks (frog facing camera), completing the corner pocket. 26.0s (ev_04_brick_delivery_and_fourth_brick): fourth brick being set on edge along the right leg of the L-wall, with the newly delivered row of five upright supply bricks and the water pan visible on the left.",
+    "speech_action_links": "No intelligible instructional speech is present in the clip; only faint, non-instructional background remarks among the workers occur, and output camera audio is excluded by policy.",
+    "shorter_explanations": "A concise 17.7-second continuous sequence from 0.5s to 18.2s (covering ev_01_first_brick, ev_02_second_brick, and most of ev_03_third_brick_and_water_delivery; calculated as 18.2s - 0.5s = 17.7s) retains the complete setup and visible result of building the three-brick corner assembly on edge while omitting the pause where the mason touches his nose (19.8s–20.5s) and the helper's foreground brick delivery (19.5s–23.0s). For an even tighter two-part montage totaling 12.0 seconds with a cutaway or dissolve between segments, the editor can use 1.0s–10.5s (9.5s duration: laying the first two parallel bricks on edge in ev_01_first_brick and ev_02_second_brick) followed by 14.5s–17.0s (2.5s duration: seating and tapping the third transverse brick on edge in ev_03_third_brick_and_water_delivery; 9.5s + 2.5s = 12.0s with no transition overlap assumed). This shorter two-segment version omits the helper placing the water pan at 12.0s–14.0s and the later fourth brick delivery, though the water pan will appear at the left edge of the frame in the second segment; the longer 0.5s–18.2s continuous span preserves the uninterrupted real-time rhythm and shows why the water pan appeared.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "ce_01_first_brick_edge",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the mason picking up a brick and placing it on its narrow edge onto the mortar bed during 0.0s–5.5s (ev_01_first_brick)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "ce_02_parallel_bricks_cavity",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the mason placing a second brick on edge parallel to the first with an open space between them during 5.5s–11.5s (ev_02_second_brick), beginning the hollow-wall arrangement."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "ce_05_rat_trap_pattern_inference",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the careful manual laying of parallel stretcher bricks and a perpendicular header brick on edge across 0.0s–28.33s (ev_01_first_brick through ev_04_brick_delivery_and_fourth_brick), though only four bricks of anincomplete course are laid in this clip rather than a completed course."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "ce_03_third_brick_header",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the mason detailing the 90-degree L-shaped wall corner by placing a transverse header brick on edge across the two parallel bricks during 11.5s–19.5s (ev_03_third_brick_and_water_delivery)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Wire-cut bricks are generally preferred because of their accurate dimensions and neat finish.",
+          "claim_id": "ce_06_moulded_bricks_observation",
+          "support_classification": "illustrative",
+          "editorial_use": "Cautionary note for the editor: the bricks visible in this clip have recessed frogs and slightly rough edges typical of moulded bricks rather than smooth wire-cut bricks, so this clip is better used over general brick-laying narration rather than as a close-up example of wire-cut bricks."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "This analysis follows the mixed-media workflow plan: future generated video may be used for later gap filling (no generated asset currently exists and automatic media generation is disabled), recorded footage does not need to be forced into every script passage, and any supplied slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied). Any suggested future visual is marked planned_not_created and is a provisional proposal, not an existing asset or authorization to generate media. Original camera audio was inspected for intake as required, and the output audio policy (camera audio excluded from the final output) is respected by omitting source_audio editorial recommendations.",
+    "unavailable": "No intelligible instructional speech or relevant visible text occurs in this source, and no settled/inactive subject handle exists at the start or end of the file because the recording begins and ends while the mason's hands are in motion."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_01_first_brick_edge",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0/editorial_use"
+      ],
+      "claim": "From 0.0s to 5.5s, the mason picks up a red brick from the ground stack, rotates it onto its narrow edge, and places it on the mortar bed at the outer corner of the L-shaped wall, adjusting its position with both hands.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 5.5,
+      "cues": [
+        {
+          "time_s": 0.5,
+          "cue": "visual: Mason grasps and lifts a brick from the stack beside the mortar pan in ev_01_first_brick."
+        },
+        {
+          "time_s": 2.2,
+          "cue": "visual: Mason sets the brick on its narrow edge onto the grey mortar bed on top of the L-shaped base course in ev_01_first_brick."
+        }
+      ],
+      "limits": "Clip begins at 0.0s with the mason already reaching for the brick; mortar was spread prior to the recording."
+    },
+    {
+      "id": "ce_02_parallel_bricks_cavity",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1/editorial_use"
+      ],
+      "claim": "From 5.5s to 11.5s, the mason picks up a second brick and places it on its narrow edge parallel to the first brick on the inner side of the mortar bed, leaving a narrow space between the two parallel bricks while a helper walks past in the background.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 5.5,
+      "end_s": 11.5,
+      "cues": [
+        {
+          "time_s": 6.5,
+          "cue": "visual: Mason lifts the second brick from the ground stack in ev_02_second_brick."
+        },
+        {
+          "time_s": 8.5,
+          "cue": "visual: Mason places the second brick on edge parallel to the first brick with a visible gap between them while the helper walks right-to-left in the background in ev_02_second_brick."
+        }
+      ],
+      "limits": "Shows only a single pair of parallel bricks at the corner rather than a full enclosed cavity along a completed course."
+    },
+    {
+      "id": "ce_03_third_brick_header",
+      "target_paths": [
+        "/sources/0/visual_events/2/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/3/editorial_use"
+      ],
+      "claim": "From 11.5s to 19.5s, while the helper places a metal pan of water on the ground at screen left (12.0s–14.0s), the mason picks up a third brick and places it on edge transversely across the ends of the first two parallel bricks at the corner, then releases the brick at 18.0s and rubs his hands together until 19.5s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 11.5,
+      "end_s": 19.5,
+      "cues": [
+        {
+          "time_s": 13.2,
+          "cue": "visual: Helper sets the water-filled metal pan (ent_water_pan) on the ground at left while the mason holds the third brick in ev_03_third_brick_and_water_delivery."
+        },
+        {
+          "time_s": 14.8,
+          "cue": "visual: Mason sets the third brick on edge perpendicular to and across the ends of the first two parallel bricks at the corner in ev_03_third_brick_and_water_delivery."
+        },
+        {
+          "time_s": 18.5,
+          "cue": "visual: Mason removes his hands from the bricks and rubs his palms together in ev_03_third_brick_and_water_delivery."
+        }
+      ],
+      "limits": "No mortar is applied to the vertical joints between the three bricks during this span."
+    },
+    {
+      "id": "ce_04_fourth_brick_edge",
+      "target_paths": [
+        "/sources/0/visual_events/3/description",
+        "/sources/0/editorial_ideas/0/details/alternative_interval",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames"
+      ],
+      "claim": "From 19.5s to 28.330667s, the helper delivers a stack of five bricks to the ground beside the mortar pan (19.5s–22.5s), and the mason takes the top brick, places it on edge along the right leg of the L-wall (22.5s–26.8s), and then releases it and rubs his hands together until the clip ends at 28.330667s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 19.5,
+      "end_s": 28.330667,
+      "cues": [
+        {
+          "time_s": 21.5,
+          "cue": "visual: Helper sets five bricks in an upright row on the ground next to the mortar pan in ev_04_brick_delivery_and_fourth_brick."
+        },
+        {
+          "time_s": 25.0,
+          "cue": "visual: Mason places the fourth brick on edge on the mortar bed along the right leg of the wall in ev_04_brick_delivery_and_fourth_brick."
+        },
+        {
+          "time_s": 27.5,
+          "cue": "visual: Mason has released the fourth brick and rubs his hands together until the recording ends at 28.330667s in ev_04_brick_delivery_and_fourth_brick."
+        }
+      ],
+      "limits": "Clip ends at 28.330667s while the mason is still rubbing his hands; the completion of the rest of the course is not shown."
+    },
+    {
+      "id": "ce_05_rat_trap_pattern_inference",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/2/editorial_use"
+      ],
+      "claim": "The sequence of laying parallel bricks on edge with a perpendicular cross-brick on edge at the corner illustrates the Rat-Trap Bond masonry technique described in the script, although only four bricks of an incomplete demonstration course without guide strings or vertical-joint mortar are shown.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 28.330667,
+      "cues": [
+        {
+          "time_s": 17.5,
+          "cue": "visual: Three bricks placed on edge in a two-stretcher, one-header corner configuration on top of a base course in ev_01_first_brick, ev_02_second_brick, and ev_03_third_brick_and_water_delivery."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond masonry alternates stretchers and headers laid on edge to form a雙-leaf wall with internal cavities."
+        }
+      ],
+      "limits": "Only four bricks are laid during the clip, vertical mortar joints are not filled on camera, and the demonstration is built directly on sandy ground without guide strings."
+    },
+    {
+      "id": "ce_06_moulded_bricks_observation",
+      "target_paths": [
+        "/sources/0/entities/3/uncertainty",
+        "/sources/0/interpretations/1/claim",
+        "/additional_analysis/script_support/claims/4/editorial_use"
+      ],
+      "claim": "The red clay bricks used in the demonstration have visible recessed frog indentations on one broad face and slightly rounded, rough edges typical of moulded bricks rather than smooth, sharp-edged wire-cut bricks, while their compressive strength cannot be visually determined.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 28.330667,
+      "cues": [
+        {
+          "time_s": 15.0,
+          "cue": "visual: The outward-facing broad face of the third brick (ent_bricks) in ev_03_third_brick_and_water_delivery clearly displays a recessed rectangular frog indentation and slightly irregular edges."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Wire-cut bricks are generally preferred because of their accurate dimensions and neat finish.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Wire-cut extruded bricks typically have flat, frogless faces and sharp arrises, whereas moulded bricks often feature a frog indentation on one bed face."
+        }
+      ],
+      "limits": "Exact manufacturing process and crushing strength (in kg/cm²) cannot be measured from video inspection."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01_mason_wardrobe",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_01_first_brick"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The mason wears a short-sleeved beige collared shirt with pens/items in the chest pocket, a black clip-on lapel microphone on the placket, dark grey trousers, and open-toed brown leather sandals.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 28.330667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02_helper_wardrobe",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_helper"
+        },
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_04_brick_delivery_and_fourth_brick"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The helper wears a light-coloured long-sleeved collared shirt, grey trousers, and dark strap sandals.",
+      "entity_ids": [
+        "ent_helper"
+      ],
+      "interval": {
+        "start_s": 8,
+        "end_s": 26.5
+      },
+      "uncertainty": "At 12.0s–14.5s a person with grey hair in a white long-sleeved shirt and dark trousers sets down the water pan, whereas at 19.5s–26.5s a balding man with dark hair and moustache in a light shirt and grey trousers delivers the bricks; two different helpers may be present off-screen left."
+    },
+    {
+      "id": "wm_03_tools_and_materials",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar_pan"
+        },
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_water_pan"
+        },
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "Round shallow metal head-pans (taslas) are used on the ground to hold grey mortar and water, alongside a pointed masonry trowel with an orange handle and another small trowel inside the mortar pan.",
+      "entity_ids": [
+        "ent_mortar_pan",
+        "ent_water_pan",
+        "ent_trowel"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 28.330667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04_moulded_bricks_with_frogs",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bricks"
+        },
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_03_third_brick_and_water_delivery"
+        }
+      ],
+      "category": "material_state",
+      "observation": "The red clay bricks have a rectangular recessed frog indentation on one broad bed face and slightly rough, rounded edges.",
+      "entity_ids": [
+        "ent_bricks",
+        "ent_brick_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 28.330667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_05_outdoor_compound_environment",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_green_tanks"
+        },
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_01_first_brick"
+        }
+      ],
+      "category": "environment",
+      "observation": "The demonstration takes place outdoors on swept sandy soil under tree shade, with a cluster of bright green cylindrical tanks/digesters on the left and a red-painted pavilion or building structure in the right background.",
+      "entity_ids": [
+        "ent_green_tanks"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 28.330667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01_brick_strength_unestablished",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bricks"
+        }
+      ],
+      "subject": "Brick crushing strength and manufacturing specification",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the red clay bricks cannot establish their compressive crushing strength (such as the 20, 35, or 75 kg/cm² thresholds in the script) or firing quality.",
+      "interval": null
+    },
+    {
+      "id": "el_02_plinth_and_guide_strings_not_visible",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_brick_wall"
+        }
+      ],
+      "subject": "Plinth preparation, guide strings, and full course completion",
+      "kind": "not_visible",
+      "limitation": "This clip shows a low-level demonstration built directly on sandy soil without visible guide strings, plumb checking, vertical mortar joint filling, pointing, or curing.",
+      "interval": null
+    },
+    {
+      "id": "el_03_thermal_and_cost_performance",
+      "evidence_refs": [
+        {
+          "source_id": "c916a7b16df4e8b1",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ev_02_second_brick"
+        }
+      ],
+      "subject": "Thermal insulation and percentage material savings",
+      "kind": "not_established",
+      "limitation": "While the spacing between parallel bricks on edge is visible, the resulting percentage reduction in brick consumption (~25%) and thermal barrier performance cannot be measured from this footage.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "mason_laying_corner_bricks_on_edge_with_helper"
+}

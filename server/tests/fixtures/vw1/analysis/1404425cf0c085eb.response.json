@@ -1,0 +1,791 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "748433dd2adf18b0ad090d0c22d9926f",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "1404425cf0c085eb",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 46.570667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 46.570667
+            },
+            "status": "reviewed",
+            "note": "Continuous high-angle static shot of a mason laying a corner brick and applying mortar to the top of a low brick-on-edge wall."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 46.570667
+            },
+            "state": "non_speech",
+            "note": "Natural site sounds of trowel scraping metal pan, mortar being scooped and spread on bricks, and faint ambient outdoor background noise; no intelligible foreground speech."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 46.570667
+          },
+          "reason": "Brick frogs on the unmortared bricks in the background and left side contain faint stamped manufacturer markings that are too small, angled, and weathered to read reliably and do not affect scene comprehension."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_mason",
+          "kind": "person",
+          "label": "Adult male mason in light beige collared shirt, dark grey trousers, and sandals",
+          "uncertainty": "A small black clip-on microphone is visible on his shirt placket, though no speech is heard in this window."
+        },
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Low L-shaped red brick wall corner with bricks laid on edge and internal cavities",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Pointed metal masonry trowel",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_mortar_pan",
+          "kind": "object",
+          "label": "Round shallow metal pan (tasla) containing wet grey mortar",
+          "uncertainty": "Exact mix ratio of the grey mortar is not visually determinable."
+        },
+        {
+          "id": "ent_square_level",
+          "kind": "object",
+          "label": "Metal framing square and long silver straightedge/level resting on the ground in the background",
+          "uncertainty": null
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.3
+          },
+          "label": "Adjusting corner brick on edge and packing joint mortar",
+          "description": "In a static high-angle medium shot over an L-shaped low brick wall built on sandy ground, the mason (ent_mason) bends over the outer corner. From 0.0s to 3.8s, he holds and adjusts a red brick laid on edge on the outer right face of the corner, aligning it with the adjacent header brick to form a rectangular cavity between the two parallel brick faces. From 3.8s to 5.5s, he uses his trowel (ent_trowel) to pack and smooth wet grey mortar on top of the corner joint. At 5.5s–6.5s, he reaches to the mortar pan (ent_mortar_pan) on the ground, scoops a small amount of mortar, and from 6.5s to 9.3s presses and smooths it into the vertical and top joints of the newly placed corner bricks while steadying the brick with his left hand.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_trowel",
+            "ent_mortar_pan",
+            "ent_square_level"
+          ],
+          "context_result": "The outer corner brick on edge is positioned and its immediate corner joint is packed with mortar, leaving two open rectangular cavities visible along the right arm of the L-shaped wall and several open cavities along the left arm.",
+          "camera_framing": "Static high-angle medium shot looking down at the L-shaped wall corner in the foreground and the bent mason working from the upper right.",
+          "uncertainty": "The initial placement of the brick onto the mortar bed occurred before 0.0s."
+        },
+        {
+          "id": "ve_02",
+          "interval": {
+            "start_s": 9.3,
+            "end_s": 46.570667
+          },
+          "label": "Scooping and spreading mortar bed over the corner and around cavities",
+          "description": "Continuing in the same static framing, the mason (ent_mason) repeatedly scoops wet grey mortar from the metal pan (ent_mortar_pan) on the ground and spreads it across the top surface of the L-shaped brick-on-edge corner (ent_wall) using his trowel (ent_trowel). Between 9.3s and 11.5s he scrapes and packs mortar into the inner corner joint. He then performs seven distinct scoop-and-spread cycles from the pan to the wall: cycle 1 (11.5s–17.2s) building up the mortar bed over the corner and left-inner joint while using his left hand as a backstop; cycle 2 (17.2s–22.5s) spreading and smoothing mortar flat across the solid corner intersection; cycle 3 (22.5s–25.5s) adding mortar to the left-side brick next to the corner; cycle 4 (25.5s–28.7s) adding and smoothing more mortar across the corner top; cycle 5 (28.7s–32.7s) scooping and spreading mortar across the corner bed; cycle 6 (32.7s–41.6s, with a second quick scoop at 36.6s–38.3s) spreading mortar along the left-hand brick and then along the inner brick of the right-hand arm beside the open cavity; and cycle 7 (41.6s–46.57s) scooping mortar and spreading it along the outer brick of the right-hand arm on the other side of the cavity, with his left hand held open beside the cavity as a guard while the trowel shapes the mortar bed up to the clip end.",
+          "actor_ids": [
+            "ent_mason"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_trowel",
+            "ent_mortar_pan",
+            "ent_square_level"
+          ],
+          "context_result": "A thick grey mortar bed is progressively built up and leveled over the corner intersection and along the narrow top edges of the bricks flanking the cavities; some small mortar crumbs fall into or around the cavity edges during spreading, though the two main rectangular cavities on the right arm remain open at 46.57s when the clip cuts off mid-action.",
+          "camera_framing": "Static high-angle medium shot; the mason's head occasionally moves above the top frame edge as heStraightens slightly between scoops.",
+          "uncertainty": "The mortar bed preparation is still in progress when the recording ends at 46.570667s."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "process_technique",
+          "claim": "The low L-shaped wall under construction demonstrates Rat-Trap Bond masonry, where bricks are laid on edge in parallel wythes connected by headers (rowlocks) to form internal hollow cavities and a staggered corner bond.",
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "This looks like a low demonstration or practice mockup wall built directly on sandy soil rather than a full-scale building plinth, though the masonry bonding geometry itself is clearly shown."
+        },
+        {
+          "id": "int_02",
+          "category": "workmanship_detail",
+          "claim": "The mason uses his left hand alongside the brick edges and applies mortar selectively along the narrow top faces and corner headers to prepare the bed for the next course while keeping the internal cavities largely open, though small amounts of excess mortar still drop into the cavity openings.",
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            }
+          ],
+          "uncertainty": "Whether the mason later cleans out the small mortar droppings from the cavity is not seen within this clip."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.3
+          },
+          "reason": "The opening segment (0.0s–9.3s, ve_01, supported by clm_01 and clm_02) is the strongest visual span for showing a brick actually being positioned on edge and secured with mortar at the corner, clearly revealing both the mason's face/hands and the hollow cavity geometry across the L-shaped wall. A strong alternative span within this same clip is 32.7s–46.5s (ve_02, clm_04), where the mason spreads mortar along the narrow brick edges flanking the open rectangular cavities.",
+          "uncertainty": "Both spans come from one continuous demonstration take; 0.0s starts with the brick already in the mason's hands on the wall.",
+          "details": {
+            "comparison_scope": "Within attached source 1404425cf0c085eb only.",
+            "alternative_refs": [
+              {
+                "source_id": "1404425cf0c085eb",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_02"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 32.7,
+              "end_s": 46.5
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 9.3
+          },
+          "reason": "Complete action span of aligning the outer corner brick on edge and packing its corner joint with mortar (ve_01, clm_01).",
+          "uncertainty": "The initial lifting of the brick occurred prior to 0.0s.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Keep from 0.0s–3.8s where the mason's hands firmly align the brick on edge against the adjacent corner header.",
+            "visible_result": "By 8.8s–9.3s the brick is seated in place with its top corner joint packed with mortar alongside the open cavity.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            }
+          ],
+          "interval": {
+            "start_s": 11.5,
+            "end_s": 22.5
+          },
+          "reason": "Self-contained two-scoop cycle (ve_02, clm_03) showing the mason scooping wet mortar from the pan, applying it to the corner intersection while using his left hand as a guide, and troweling the corner bed flat.",
+          "uncertainty": "The mason immediately reaches back to the pan at 22.5s for additional mortar cycles.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Start at 11.5s as the trowel enters the mortar pan to scoop fresh mortar.",
+            "visible_result": "By 21.5s–22.5s the corner intersection has a smoothed, level bed of mortar ready for the next course.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 11.5
+          },
+          "reason": "Directly shows bricks placed on their edge creating hollow cavities within the wall (ve_01, clm_01, clm_02), matching the core physical description of Rat-Trap Bond Masonry in P001.",
+          "uncertainty": "The wall is only two courses high on sandy ground, so vertical continuity of cavities over a full-height wall is illustrated at small scale rather than shown at full building height.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Clear top-down view of the parallel bricks on edge, cross headers, and rectangular air cavities.",
+            "relationship": "match",
+            "intended_explanation": "Show how laying bricks on edge forms internal hollow pockets inside the wall thickness.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_05",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            },
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02"
+            }
+          ],
+          "interval": {
+            "start_s": 11.5,
+            "end_s": 46.570667
+          },
+          "reason": "Directly shows corner detailing and mortar bedding along the brick edges flanking the cavities (ve_02, clm_03, clm_04, clm_05), suitable for illustrating P001 lines about wall junctions/corners and taking care while applying mortar near cavities.",
+          "uncertainty": "No guide strings are fixed on this wall, and small crumbs of mortar do fall toward the cavity during troweling, so it is illustrative of the manual process rather than proof of zero mortar droppings.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Mason's trowel technique and hand guarding while bedding a right-angle corner in Rat-Trap Bond.",
+            "relationship": "match",
+            "intended_explanation": "Illustrate careful mortar placement at a wall corner and along cavity edges.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_06",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "1404425cf0c085eb",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": null,
+          "reason": "While this clip clearly shows the physical brick-on-edge cavity layout (clm_02), P001 also explains invisible physical mechanisms and quantitative standards—specifically thermal barrier heat-flow reduction and minimum brick crushing strength tiers (20, 35, and 75 kg/cm² for 1, 2, and 3 storeys)—which cannot be seen in live site footage unless covered by another graphic or generated asset.",
+          "uncertainty": "Other sources in the collection were not inspected in this request; exact passage-level visual slot reservations were not supplied.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Diagrammatic visualization of heat transfer blocked by the air cavity and a 1/2/3-storey building height chart paired with 20, 35, and 75 kg/cm² brick crushing strength requirements.",
+            "missing_asset": "Clean instructional graphic or generated 3D cutaway animation showing thermal insulation across the hollow brick cavity and the three storey-height crushing-strength thresholds.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unr_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 46.570667
+          },
+          "field": "visual_events",
+          "issue": "The wall is built directly on loose sandy ground without a visible concrete plinth or guide strings, and the clip ends at 46.570667s while the mason is still spreading mortar on the right-hand brick edge before laying the next course."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This source consists of a single continuous filming take (0.0s–46.570667s) with no camera resets or retakes. Within this continuous take, there are two distinct process stages: first (ve_01, 0.0s–9.3s, clm_01), the mason finishes positioning an outer corner brick on edge and packs mortar into its immediate joint; second (ve_02, 9.3s–46.570667s, clm_03, clm_04), after packing the inner corner joint at 9.3s–11.5s, he performs seven successive physical scoop-and-spread cycles from the mortar pan to build up and level the mortar bed across the corner and along the two brick wythes flanking the right-hand cavity (cycles at 11.5s–17.2s, 17.2s–22.5s, 22.5s–25.5s, 25.5s–28.7s, 28.7s–32.7s, 32.7s–41.6s, and 41.6s–46.57s). These seven cycles are progressive stages of building one continuous mortar bed rather than repeated camera takes.",
+    "crop_guidance": "In the native landscape framing, the essential action—the L-shaped brick-on-edge corner (ent_wall), the open rectangular cavities, the mortar pan (ent_mortar_pan), and the mason's hands with the trowel (ent_trowel)—occupies the lower-left and center-bottom two-thirds of the frame. From about 9.5s onward in ve_02, the mason stands slightly taller so the top of his head is clipped by the upper frame edge, and a bright green plastic object is partially visible at the top-left edge. If a tighter crop or vertical/square reframe is needed, centering on the lower-center region (preserving the L-shaped wall corner, the mortar pan, and the mason's arms/hands) cleanly excludes the partially clipped head at the top frame edge and the green object at top-left without hiding any masonry action.",
+    "clean_handles": "Interval: 0.0–9.3; classification: active preparation; beginning observation: 0.0s mason bends over the wall corner with both hands holding and aligning the outer red brick on edge in ve_01; middle observation: 4.5s mason uses the trowel in his right hand to press and smooth grey mortar onto the top joint of the corner brick while his left hand steadies the brick; end observation: 9.0s mason finishes smoothing the top edge of the corner brick with his trowel and left hand before shifting the trowel to the inner corner at 9.3s; relevant action stopped: the alignment and joint-packing of the outer corner brick finishes around 9.0s–9.3s, though the mason's hands remain in continuous motion transitioning to the next mortar joint; uncertainty: clip begins at 0.0s with the brick already in position on the wall, so prior lifting is unavailable; links: ve_01, clm_01; editorial use: preserves the clearest view of a brick being set on edge and secured at the corner alongside the open cavities. Interval: 11.5–22.5; classification: active release; beginning observation: 11.5s mason reaches his trowel into the metal pan on the ground to scoop wet mortar in ve_02; middle observation: 17.0s mason holds his left hand against the side of the brick while pressing mortar into the joint with the trowel, then scoops a second time at 18.0s; end observation: 22.0s mason finishes smoothing the mortar bed flat across the corner intersection and lifts the trowel away toward the pan at 22.5s; relevant action stopped: the two-scoop corner bedding and leveling cycle completes at 22.0s–22.5s as the trowel lifts clear of the smoothed corner bed, before he scoops again for the adjacent bricks; uncertainty: inspection of 22.5s–23.5s shows the mason immediately reaching back into the mortar pan for the next scoop rather than pausing in stillness; links: ve_02, clm_03; editorial use: provides a self-contained mortar-scooping and corner-bedding sequence with a clear smoothed result on the corner.",
+    "continuity": "Throughout 0.0s–46.570667s (ve_01, ve_02), the camera remains static in a high-angle medium shot looking down at the L-shaped brick wall in the lower-left foreground, with the mason standing to the upper right facing down and screen-left toward the corner. At 0.0s (ve_01), the outer corner brick on the right arm of the L is clean on top; by 9.3s its corner joint is mortared. From 11.5s to 46.570667s (ve_02), grey mortar progressively covers the top surface of the corner bricks: between 11.5s and 32.7s the solid corner intersection is covered with a thick mortar bed, between 32.7s and 41.6s mortar is extended along the inner wythe of the right arm, and between 41.6s and 46.570667s mortar is spread along the outer wythe of the right arm. Any cut between early and late segments of this clip will show a visible jump in the amount of wet mortar covering the top of the corner bricks.",
+    "preview_frames": "2.0s (ve_01): shows the mason using both hands to align the outer corner brick on edge, with the hollow rectangular cavities of the Rat-Trap Bond wall clearly visible before heavy mortar bedding covers the corner. 15.0s (ve_02): shows the mason applying wet grey mortar with a pointed trowel onto the corner intersection, with the mortar pan and loose bricks visible on the sandy ground behind the wall. 40.0s (ve_02): shows the corner bed fully covered in smoothed grey mortar while the mason spreads mortar along the narrow inner brick edge beside the open rectangular cavity.",
+    "speech_action_links": "unavailable: No intelligible speech is present in the audio track of this source (0.0s–46.570667s contains only natural masonry work sounds), and the output audio policy excludes source camera audio.",
+    "shorter_explanations": "For a concise 9.3-second sequence showing brick placement and cavity structure, use 0.0s–9.3s (ve_01, clm_01, clm_02), which retains the setup of aligning the corner brick on edge and the result of packing its joint with mortar. Alternatively, to show both brick alignment and mortar bed preparation across the corner in roughly 20.3 seconds (9.3s + 11.0s = 20.3s total assuming a straight cut or cutaway with no overlap), combine 0.0s–9.3s (ve_01, clm_01) with 32.7s–43.7s (ve_02, clm_04), omitting the repetitive intermediate mortar scooping cycles from 9.3s–32.7s while retaining the visible result of the mortared corner bed and careful troweling along the cavity edge (noting the continuity jump in mortar coverage on the corner if cut directly without a cutaway, and that small mortar crumbs still drop near the cavity).",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "clm_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0s–9.3s (ve_01) to directly show the mason positioning a red brick on its narrow edge at the corner of the wall where parallel bricks on edge form open rectangular cavities."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Bricks are then laid carefully on edge. As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "clm_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Use 0.0s–11.5s (ve_01, ve_02) to illustrate the alternating header-and-stretcher brick-on-edge course pattern and internal cavities; keep in mind this is a two-course low wall on sandy ground rather than a full-scale multi-course building wall."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "clm_03",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 11.5s–22.5s (ve_02) to directly show the mason detailing and bedding the 90-degree L-shaped wall corner with mortar."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.",
+          "claim_id": "clm_04",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 32.7s–46.570667s (ve_02) to directly show the mason spreading mortar along the narrow top edges of the bricks flanking the open cavity while holding his left hand beside the cavity opening, while noting that some small mortar crumbs still fall into the cavity during troweling."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.",
+          "claim_id": "clm_05",
+          "support_classification": "illustrative",
+          "editorial_use": "Supports using the cavity-edge troweling action in 32.7s–46.570667s (ve_02) as an illustrative visual for the script's explanation of preserving cavity insulation, even though thermal insulation performance itself is not visually measurable."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged mixed-media workflow: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented. Any suggested future visuals are marked planned_not_created and do not represent existing assets or authorization to generate media. Original source audio was inspected for intake (containing only non-speech masonry work sounds), and the output audio policy (excluded) is respected by omitting source_audio editorial recommendations.",
+    "unavailable": "speech_action_links is unavailable because there is no intelligible speech in the source audio and source audio is excluded from output. Visual slot guidance is empty because no passage-level slot reservations were supplied in the media brief."
+  },
+  "claim_evidence": [
+    {
+      "id": "clm_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "Between 0.0s and 9.3s, the mason aligns a red brick on its narrow edge at the outer corner of a low L-shaped wall and packs wet grey mortar into the corner joint alongside open rectangular cavities.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 9.3,
+      "cues": [
+        {
+          "time_s": 2,
+          "cue": "visual: In ve_01 around 2.0s, the mason's hands hold and adjust the outer corner brick on its edge parallel to the inner brick, leaving a hollow rectangular cavity between them."
+        },
+        {
+          "time_s": 7.5,
+          "cue": "visual: In ve_01 around 7.5s, the mason uses ent_trowel to press and smooth wet grey mortar into the joint of the brick on edge."
+        }
+      ],
+      "limits": "The initial lifting and placement of the brick onto the wall occurred prior to 0.0s."
+    },
+    {
+      "id": "clm_02",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/sources/0/editorial_ideas/5/reason",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "The low brick wall arrangement illustrates the Rat-Trap Bond masonry pattern described in the script, using bricks laid on edge in parallel wythes tied by headers to create internal hollow cavities.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 46.570667,
+      "cues": [
+        {
+          "time_s": 2,
+          "cue": "visual: In ve_01 and ent_wall, two courses of red bricks laid on edge form an L-shaped corner with alternating headers and stretchers enclosing rectangular air cavities."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond is a modular cavity bond in which bricks are placed on edge (shiner/rowlock orientation) creating an internal lattice of cavities."
+        }
+      ],
+      "limits": "Only two courses built directly on sandy soil are visible in this clip, so full-height continuous cavities across a complete building wall and structural strength are not directly established here."
+    },
+    {
+      "id": "clm_03",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "Between 11.5s and 22.5s, the mason scoops wet mortar from the pan twice and spreads and levels a mortar bed across the 90-degree corner intersection of the brick-on-edge wall while using his left hand as a side stop.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 11.5,
+      "end_s": 22.5,
+      "cues": [
+        {
+          "time_s": 13,
+          "cue": "visual: In ve_02 at 13.0s, the mason scoops mortar from ent_mortar_pan with ent_trowel and places it onto the corner bricks at 14.5s."
+        },
+        {
+          "time_s": 21.5,
+          "cue": "visual: In ve_02 at 21.5s, the mason smooths the mortar bed flat across the corner intersection with the trowel."
+        }
+      ],
+      "limits": "At 22.5s the mason immediately reaches back to the pan for subsequent mortar cycles rather than coming to a full rest."
+    },
+    {
+      "id": "clm_04",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/interpretations/1/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "Between 32.7s and 46.570667s, the mason spreads mortar along the narrow top edges of the inner and outer bricks flanking the open rectangular cavity on the right arm of the wall, holding his left hand near the cavity edge while some small mortar crumbs still drop into the cavity.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 32.7,
+      "end_s": 46.570667,
+      "cues": [
+        {
+          "time_s": 39.5,
+          "cue": "visual: In ve_02 at 39.5s, the mason spreads mortar along the narrow top edge of the inner wythe brick next to the open cavity."
+        },
+        {
+          "time_s": 44.5,
+          "cue": "visual: In ve_02 at 44.5s, the mason spreads mortar along the outer wythe brick edge on the opposite side of the cavity with his left hand positioned beside the cavity opening."
+        }
+      ],
+      "limits": "Small fragments of mortar visibly fall into the cavity during troweling, and the clip ends at 46.570667s before the mortar bed is finished or any fallen mortar is cleared."
+    },
+    {
+      "id": "clm_05",
+      "target_paths": [
+        "/sources/0/editorial_ideas/4/reason",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The mason's selective placement of mortar along the narrow brick edges around the open cavities illustrates the construction practice of keeping cavities open to preserve the wall's insulating properties as described in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 32.7,
+      "end_s": 46.570667,
+      "cues": [
+        {
+          "time_s": 44.5,
+          "cue": "visual: In ve_02 at 44.5s, the mason applies mortar only along the top brick edges around the rectangular cavity while holding his left hand beside the opening."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Care is also taken to prevent mortar from falling into the cavities, preserving the insulating properties of the wall.'"
+        }
+      ],
+      "limits": "Thermal insulation performance cannot be directly seen, and small crumbs of mortar do fall into the cavity during this demonstration."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mason"
+        },
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The mason wears a light beige short-sleeved collared shirt with a pen in the chest pocket, dark grey trousers, and open-toed brown/black sandals, with a small black lavalier microphone clipped to his shirt placket.",
+      "entity_ids": [
+        "ent_mason"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 46.570667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Molded red clay bricks with indented frogs on one flat face and slightly rough, irregular edges are laid on edge in two courses directly on bare sandy soil using wet dark-grey mortar.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 46.570667
+      },
+      "uncertainty": "Whether the bricks are hand-molded/table-molded rather than wire-cut is suggested by their frogs and slightly irregular edges, but manufacturing method and crushing strength are not independently verified."
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        },
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_mortar_pan"
+        },
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_square_level"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "The mason works with a pointed metal trowel and a round shallow metal mortar pan (tasla), while a long silver metal straightedge/level and a dark metal framing square lie on the ground behind the wall.",
+      "entity_ids": [
+        "ent_trowel",
+        "ent_mortar_pan",
+        "ent_square_level"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 46.570667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor site with swept reddish-tan sandy soil in the foreground, a low concrete curb, scattered dry leaves, sparse weeds, a small stack of bricks, and tree trunks in the background.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 46.570667
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        }
+      ],
+      "subject": "Brick crushing strength, wire-cut manufacture, and material savings percentage",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the red bricks and low wall cannot establish their crushing strength (e.g., 20, 35, or 75 kg/cm²), whether they are wire-cut (they visibly have indented frogs rather than smooth wire-cut faces), or the 25% material reduction figure stated in the script.",
+      "interval": null
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02"
+        }
+      ],
+      "subject": "Plinth preparation, guide strings, pointing, window sill courses, and 7-day curing",
+      "kind": "not_visible",
+      "limitation": "This clip shows only a two-course corner built directly on sandy soil and does not show plinth cleaning/moistening, fixed guide strings, window-sill courses, joint pointing, or water curing.",
+      "interval": {
+        "start_s": 0,
+        "end_s": 46.570667
+      }
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "1404425cf0c085eb",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02"
+        }
+      ],
+      "subject": "Completion of the mortar bed and next brick course",
+      "kind": "not_visible",
+      "limitation": "The recording ends at 46.570667s while the mason is still spreading mortar along the right-hand outer brick edge, so the completed mortar bed and placement of the next course are not seen.",
+      "interval": {
+        "start_s": 41.6,
+        "end_s": 46.570667
+      }
+    }
+  ],
+  "descriptive_name": "mason_laying_corner_brick_on_edge_and_spreading_mortar_rat_trap_bond"
+}

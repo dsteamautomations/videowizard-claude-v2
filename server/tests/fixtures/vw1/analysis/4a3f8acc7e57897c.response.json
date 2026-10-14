@@ -1,0 +1,839 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "d0fe5711b667c36a5cb78b38d5e35c20",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "4a3f8acc7e57897c",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 12.48
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 12.48
+            },
+            "status": "reviewed",
+            "note": "Full clip reviewed visually; static low-angle medium close-up of a brick wall corner and a worker's hands and lower legs checking vertical alignment with a plumb bob."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 10.2
+            },
+            "state": "omitted_background_speech",
+            "note": "Faint, low-volume background site chatter in an Indian language, distant bird calls (crow), and light tool/hand contact sounds; background chatter is not directed at explaining the process and is partially indistinct."
+          },
+          {
+            "interval": {
+              "start_s": 10.2,
+              "end_s": 11.3
+            },
+            "state": "speech",
+            "note": "Brief spoken confirmation ('Okay, pakka') as the worker finishes checking the corner with the plumb bob."
+          },
+          {
+            "interval": {
+              "start_s": 11.3,
+              "end_s": 12.48
+            },
+            "state": "non_speech",
+            "note": "Natural site sound of the wooden block and metal plumb bob hitting the sandy ground and footsteps shifting."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "speech",
+          "interval": {
+            "start_s": 0,
+            "end_s": 10.2
+          },
+          "reason": "Faint, indistinct background site conversation is omitted because it is low-volume ambient chatter not intelligibly addressing the demonstration; output audio policy also excludes source audio."
+        },
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0,
+            "end_s": 12.48
+          },
+          "reason": "No readable text, numbers, signage, or markings appear in the frame."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_person_worker",
+          "kind": "person",
+          "label": "Worker checking brick wall corner with plumb bob (visible from mid-thigh and forearms down)",
+          "uncertainty": "Upper body and face remain out of frame above the top edge throughout the clip."
+        },
+        {
+          "id": "ent_obj_plumb_bob",
+          "kind": "object",
+          "label": "Plumb bob consisting of a square wooden gauge block, string, and conical metal weight",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_obj_brick_wall",
+          "kind": "object",
+          "label": "Low exposed red-brick wall section laid with bricks on edge and mortar joints",
+          "uncertainty": "Internal cavities are enclosed by the top course in this section and are not directly visible inside the wall."
+        },
+        {
+          "id": "ent_speaker_1",
+          "kind": "speaker",
+          "label": "Off-screen male voice near the camera or belonging to the worker whose face is out of frame",
+          "uncertainty": "Speaker identity cannot be visually confirmed because no faces are in frame."
+        }
+      ],
+      "speech": [
+        {
+          "id": "sp_01",
+          "interval": {
+            "start_s": 10.2,
+            "end_s": 11.3
+          },
+          "speaker_id": "ent_speaker_1",
+          "language": "en-IN",
+          "original_text": "Okay, pakka.",
+          "english_translation": "Okay, solid / spot on.",
+          "transcription_status": "clear",
+          "uncertainty": "Code-mixed English 'Okay' and Indian-language term 'pakka' (used across Hindi, Tamil, and other Indian languages to mean solid, accurate, or confirmed); speaker's face is out of frame."
+        }
+      ],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.3
+          },
+          "label": "First plumb-bob check at brick wall corner",
+          "description": "In a static low-angle medium close-up outdoors on sandy ground, ent_person_worker stands beside the corner of ent_obj_brick_wall (three courses of bricks laid on edge with mortar joints). From 0.0s to 1.5s, the worker's right hand positions the wooden block of ent_obj_plumb_bob against the upper corner brick while his left hand touches the brick edge and then rests flat on top of the corner brick at 1.5s. From 1.5s to 4.3s, both hands hold steady on the corner while the conical metal weight hangs just outside the bottom brick course, settling with minimal swing.",
+          "actor_ids": [
+            "ent_person_worker"
+          ],
+          "object_ids": [
+            "ent_obj_plumb_bob",
+            "ent_obj_brick_wall"
+          ],
+          "context_result": "The plumb bob hangs vertically alongside the three-course brick corner, visually demonstrating a vertical alignment check.",
+          "camera_framing": "Static low-angle medium close-up; worker's upper body is cropped out above the top edge.",
+          "uncertainty": "Exact millimeter gap measurement between the plumb line and lower brick face cannot be independently verified from the camera angle."
+        },
+        {
+          "id": "ve_02",
+          "interval": {
+            "start_s": 4.3,
+            "end_s": 10.6
+          },
+          "label": "Repositioning and second plumb-bob check on corner",
+          "description": "At 4.3s, ent_person_worker lifts his left hand from the wall and raises ent_obj_plumb_bob slightly to adjust the string length and wooden block against the top corner of ent_obj_brick_wall between 4.3s and 7.3s. At 7.3s, the worker places his left hand back on top of the corner brick while holding the wooden block against the side face with his right hand, holding the pose steady from 7.5s to 9.6s as the metal weight hangs beside the lower course. Between 9.6s and 10.6s, the worker lifts his left hand away from the brick while his right hand still holds the wooden block and string at the corner.",
+          "actor_ids": [
+            "ent_person_worker"
+          ],
+          "object_ids": [
+            "ent_obj_plumb_bob",
+            "ent_obj_brick_wall"
+          ],
+          "context_result": "Second steady verticality check of the same corner completed before release.",
+          "camera_framing": "Static low-angle medium close-up.",
+          "uncertainty": "Exact numeric verticality tolerance is not visually measurable from the video frame."
+        },
+        {
+          "id": "ve_03",
+          "interval": {
+            "start_s": 10.6,
+            "end_s": 12.48
+          },
+          "label": "Dropping plumb bob to ground and stepping back",
+          "description": "Starting at 10.6s, ent_person_worker pulls ent_obj_plumb_bob away from ent_obj_brick_wall toward the lower-left foreground and releases it; the metal weight and wooden block drop onto the sandy ground near his right sandal between 11.0s and 11.8s. Simultaneously, the worker steps his left foot slightly back and his hands exit the upper-left frame by 11.8s, leaving the brick wall corner, the worker's lower legs, and the plumb bob resting on the ground from 11.8s to 12.48s.",
+          "actor_ids": [
+            "ent_person_worker"
+          ],
+          "object_ids": [
+            "ent_obj_plumb_bob",
+            "ent_obj_brick_wall"
+          ],
+          "context_result": "The plumb check concludes and the tool lies on the ground beside the wall corner.",
+          "camera_framing": "Static low-angle medium close-up.",
+          "uncertainty": null
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "construction_technique",
+          "claim": "The worker is checking the vertical alignment (plumb) of a three-course brick-on-edge wall corner using a traditional mason's plumb bob, and the spoken remark 'Okay, pakka' claims the alignment is satisfactory.",
+          "evidence_refs": [
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            },
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "speech",
+              "item_id": "sp_01"
+            }
+          ],
+          "uncertainty": "While the visual action clearly shows a plumb check on bricks laid on edge and the speaker states it is 'pakka' (solid/accurate), the clip does not independently measure vertical tolerance or show internal wall cavities."
+        },
+        {
+          "id": "int_02",
+          "category": "masonry_bond_identification",
+          "claim": "The wall section shows alternating headers and stretchers laid on edge with staggered vertical mortar joints characteristic of Rat-Trap Bond Masonry.",
+          "evidence_refs": [
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_obj_brick_wall"
+            },
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "uncertainty": "The exterior brick-on-edge pattern and staggered vertical joints are directly visible, whereas the enclosed hollow cavities inside the wall are inferred from the bond geometry and script context rather than directly seen from this low side angle."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_best_take_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_02"
+            }
+          ],
+          "interval": {
+            "start_s": 0.5,
+            "end_s": 4.3
+          },
+          "reason": "The first plumb check (ve_01, ~0.5s-4.3s) is the cleanest take within this clip because the wooden block and hanging metal bob remain clearly visible in profile outside the corner edge while the worker's left hand rests calmly on top of the brick; in the second check (ve_02, ~6.5s-10.0s), the wooden block is tucked slightly further behind the corner edge and ends with the worker tossing the plumb bob onto the ground in ve_03.",
+          "uncertainty": "Approximate cut boundaries; exact verticality precision is illustrative rather than measured.",
+          "details": {
+            "comparison_scope": "Compared the two plumb-bob checks within this single continuous recording (ve_01 at 0.0s-4.3s vs. ve_02 at 4.3s-10.6s).",
+            "alternative_refs": [
+              {
+                "source_id": "4a3f8acc7e57897c",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_02"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 6.5,
+              "end_s": 10.5
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "alternative",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_action_span_01",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 4.3
+          },
+          "reason": "Provides a self-contained vertical alignment check in ve_01 from positioning the plumb bob at the corner to holding it steady so the viewer can read the vertical line against the staggered brick-on-edge courses.",
+          "uncertainty": "Approximate timing on the original source clock.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Include 0.0s-1.5s where the worker settles the wooden block against the top corner brick and places his left hand on the top face.",
+            "visible_result": "Hold through ~1.5s-4.3s showing the metal plumb bob hanging steadily beside the bottom brick course before the hand lifts at 4.3s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_story_moment_01",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            },
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 10.5
+          },
+          "reason": "Directly supports the construction-stage explanation in P001 ('Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.' and 'Quality workmanship at every stage is essential for achieving the desired performance.') by showing a mason checking corner alignment with a plumb bob on a brick-on-edge wall with staggered vertical joints.",
+          "uncertainty": "Directly shows checking vertical alignment (plumb) and staggered vertical joints on bricks laid on edge; horizontal spirit-level checking and measured structural strength/stability are not directly shown in this clip.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": "Steady plumb bob hanging parallel to the three-course brick-on-edge corner.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Visual demonstration of plumb checking on a brick-on-edge corner with staggered vertical mortar joints.",
+            "relationship": "match",
+            "intended_explanation": "Illustrates how masons verify vertical alignment on Rat-Trap Bond corners while staggered vertical joints are clearly visible in the foreground.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_future_visual_01",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "4a3f8acc7e57897c",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_02"
+            }
+          ],
+          "interval": null,
+          "reason": "For the non-visualized thermal and structural comparison claims in P001 (e.g., heat transfer across hollow cavities and the 20/35/75 kg/cm² crushing-strength thresholds by building height), this close-up site shot cannot show internal heat flow or engineering tables, so a clean graphic/generated explainer visual could complement the live-action masonry footage if not covered by other sources.",
+          "uncertainty": "Optional proposal for undecided passages only; other clips in the collection may cover open cavities, and no generated asset currently exists.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Diagrammatic cross-section of a Rat-Trap Bond cavity reducing heat transfer, or a clean graphic comparing 1-, 2-, and 3-storey brick crushing-strength requirements (20, 35, and 75 kg/cm²).",
+            "missing_asset": "Animated diagram or generated cross-sectional visual showing thermal barrier cavities and storey-height crushing-strength figures.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "recorded_video",
+          "asset_status": "available_in_attached_source",
+          "asset_ref": "4a3f8acc7e57897c",
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "Strong recorded B-roll candidate for the portion of P001 covering maintaining alignment, staggered vertical joints, corners, and quality workmanship during construction.",
+          "prerequisite": null,
+          "uncertainty": "Exact passage-level visual slot reservations were not supplied in the media brief."
+        },
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "generated_video",
+          "asset_status": "planned_not_created",
+          "asset_ref": null,
+          "origin": "agent_proposal",
+          "preserve_reservation": false,
+          "reason": "Optional future generated visual or graphic for abstract thermal barrier and crushing-strength numbers (20, 35, 75 kg/cm²) in P001 where live-action masonry footage cannot directly depict internal heat flow or numeric specifications.",
+          "prerequisite": "Requires graphic/generated video creation if the editing agent chooses not to cover those lines with general masonry B-roll.",
+          "uncertainty": "Proposed only as an option for undecided passages; no generated asset exists yet."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unres_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 10.2
+          },
+          "field": "speech",
+          "issue": "Faint background conversation in the distance is too low in volume to transcribe reliably and is omitted as background speech."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "Within this single continuous 12.48s camera take, the worker performs two consecutive verticality (plumb) checks on the same brick-on-edge corner without a camera reset: Attempt 1 (ve_01, ~0.0s–4.3s, supported by claim_01) shows the worker positioning the wooden gauge block of the plumb bob against the top corner brick and holding his left hand flat on top of the brick from ~1.5s to 4.3s while the metal weight hangs steadily outside the bottom brick course. Attempt 2 (ve_02, ~4.3s–10.6s, supported by claim_02) is an immediate adjustment and second check where the worker lifts the plumb bob at 4.3s, repositions the string and wooden block slightly tighter around the corner between 4.3s and 7.3s, rests his left hand on the top brick again from ~7.3s to 9.6s while the bob hangs beside the base, and then lifts his left hand between 9.6s and 10.6s before dropping the plumb bob onto the ground in ve_03 (10.6s–12.48s, supported by claim_03). Attempt 1 (0.5s–4.3s) gives a clearer profile view of the wooden spacer block and hanging string than Attempt 2, while Attempt 2 can be included if a longer continuous demonstration (~0.0s–10.5s) is needed.",
+    "crop_guidance": "The source is a horizontal widescreen shot with the essential action—the worker's hands, the plumb bob (ent_obj_plumb_bob), and the three-course brick-on-edge corner (ent_obj_brick_wall)—concentrated in the center-left to lower-right foreground. No talking face is visible in frame (the worker is framed from mid-thigh and forearms down), so no crop is needed to hide lip movement. If reframing or cropping, preserve the vertical span from the top surface of the corner brick down to the sandy ground beneath the bottom brick course (where the plumb bob hangs in ve_01 and ve_02), as well as the foreground brick courses extending to the right edge so the staggered vertical joints and bricks laid on edge remain readable. Avoid cutting past 10.6s if you want to exclude the plumb bob dropping onto the lower-left ground and the worker's hands exiting the upper-left edge in ve_03.",
+    "clean_handles": "Interval: 0.0–1.5; classification: active preparation; beginning observation: 0.0s worker's right hand holds the wooden block of ent_obj_plumb_bob against the upper corner of ent_obj_brick_wall while his left hand touches the corner face and the metal bob hangs near the bottom course in ve_01; middle observation: 0.8s worker adjusts his grip on the coiled string and wooden block at the corner while his left hand lifts slightly above the brick; end observation: 1.5s worker places his left palm flat on top of the corner brick while holding the wooden block steady with his right hand; relevant action stopped: hand positioning stops at ~1.5s as both hands settle on the corner, though slight pendulum settling of the hanging bob continues; uncertainty: clip begins with the plumb bob already at the wall corner so earlier approach is not in the file; links: ve_01 and claim_01; editorial use: preserves the natural hand setup into the first steady plumb check. Interval: 1.5–4.3; classification: settled; beginning observation: 1.5s worker's left palm rests flat on the top corner brick and right hand holds the wooden block of ent_obj_plumb_bob steady against the upper brick face in ve_01; middle observation: 2.9s both hands remain stationary on the corner brick while the hanging metal plumb bob is nearly motionless beside the bottom brick course; end observation: 4.3s hands and plumb bob remain in the same stationary alignment just before the worker lifts his left hand; relevant action stopped: hand positioning has stopped at 1.5s and the worker holds a stationary inspection pose across 1.5s–4.3s with only minuscule residual oscillation of the hanging plumb weight; uncertainty: approximate boundary at 4.3s where the worker begins lifting his hand for the second check in ve_02 (inspected through 5.3s); links: ve_01 and claim_01; editorial use: provides a stable, readable hold showing the plumb line hanging parallel to the brick-on-edge corner. Interval: 7.5–9.6; classification: settled; beginning observation: 7.5s worker's left hand rests on top of the corner brick and right hand holds the wooden block against the corner in ve_02; middle observation: 8.5s worker holds both hands steady on the corner while the metal plumb bob hangs beside the lower course; end observation: 9.6s hands remain in the stationary check position just before the left hand begins lifting off the brick; relevant action stopped: repositioning from 4.3s–7.3s has stopped and the worker maintains a steady hold across 7.5s–9.6s; uncertainty: approximate end boundary at 9.6s followed by left-hand release in 9.6s–10.6s (inspected through 10.6s); links: ve_02 and claim_02; editorial use: offers an alternative steady hold from the second plumb check. Interval: 10.6–11.8; classification: active release; beginning observation: 10.6s worker pulls ent_obj_plumb_bob leftward away from the brick corner in ve_03; middle observation: 11.2s worker drops the plumb bob toward the ground as it lands near his right sandal and his left foot steps back; end observation: 11.8s wooden block and metal weight settle on the sandy ground at lower left while the worker's hands exit the upper-left frame; relevant action stopped: plumb-bob release and hand exit complete by ~11.8s; uncertainty: dropping the tool on the ground may look casual or abrupt in a formal instructional edit; links: ve_03 and claim_03; editorial use: shows completion of the check if a full exit is desired, though cutting before 10.6s is cleaner. Interval: 11.8–12.48; classification: settled; beginning observation: 11.8s worker's hands are out of frame, legs stand still in the background, and ent_obj_plumb_bob rests motionless on the ground beside ent_obj_brick_wall in ve_03; middle observation: 12.1s brick wall corner, resting plumb bob, and worker's lower legs remain stationary; end observation: 12.48s static frame at clip end; relevant action stopped: tool drop and foot movement stopped by 11.8s; uncertainty: short tail of 0.68s capped at the end of the attached file (12.48s); links: ve_03 and claim_03; editorial use: brief settled tail after the tool is dropped.",
+    "continuity": "At clip start (0.0s, ve_01), the worker (ent_person_worker) is already standing at the left of the brick wall corner (ent_obj_brick_wall) with the plumb bob (ent_obj_plumb_bob) held at the top corner brick. Across 0.0s–4.3s (ve_01, claim_01) and 4.3s–10.6s (ve_02, claim_02), both hands work at the upper-left corner of the three-course wall while the metal bob hangs near the bottom course at center-left. If exiting around 4.2s–4.3s (end of ve_01) or 9.6s–10.5s (end of ve_02), the worker's hands are still at the brick corner holding the plumb bob, which cuts cleanly to another close-up or wide shot of masonry work without implying the tool was dropped. After 10.6s (ve_03, claim_03), the worker drops the plumb bob downward-left onto the sandy ground (landing at ~11.0s–11.8s) and his hands exit upward-left out of frame by 11.8s, creating a visible state change (tool on ground, hands gone) that must be respected if matching to any subsequent shot.",
+    "preview_frames": "2.8s (ve_01): Shows the clearest steady profile of the first plumb-bob check with the worker's left hand resting on top of the brick-on-edge corner, the right hand holding the wooden block against the top course, and the metal weight hanging vertically beside the bottom course. 8.5s (ve_02): Shows the second steady plumb-bob check with the wooden block tucked slightly further around the corner and the left hand resting on the top brick. 12.0s (ve_03): Shows the post-action state after the worker has dropped the plumb bob onto the sandy ground at lower left and withdrawn his hands from the frame, leaving a clear view of the three-course brick-on-edge corner.",
+    "speech_action_links": "At 10.2s–11.3s, sp_01 ('Okay, pakka' / 'Okay, solid/spot on', supported by claim_04) occurs simultaneously with the transition between the end of the second plumb check (ve_02, where the worker lifts his left hand from the top brick between 9.6s and 10.6s) and the start of the release (ve_03, where he pulls the plumb bob away at 10.6s and drops it to the ground). The utterance is a spoken claim confirming that the vertical alignment just checked in ve_01 and ve_02 is satisfactory. It does not constitute an independent physical measurement of verticality, and per the output audio policy (source audio excluded from output), sp_01 should be used only for editorial intake understanding rather than played as a spoken soundbite in the final edit.",
+    "shorter_explanations": "To show a concise, complete verticality check without the repetition of the second adjustment or the tool being dropped on the ground, use the single span 0.0s–4.3s (ve_01, claim_01, edited duration: 4.3s - 0.0s = 4.3s with no transitions or overlaps). This retains the setup (0.0s–1.5s as the hands settle on the corner) and the visible result (1.5s–4.3s showing the plumb bob hanging steadily parallel to the three-course brick-on-edge corner), while omitting 4.3s–10.6s (ve_02, the lifting and second check) and 10.6s–12.48s (ve_03, dropping the plumb bob onto the dirt). If a longer 10.5s continuous B-roll shot is needed (0.0s–10.5s, combining ve_01 and ve_02, edited duration: 10.5s - 0.0s = 10.5s), it adds the visual detail of the mason double-checking and re-adjusting the string on the corner while still omitting the casual drop of the tool at 10.6s–12.48s. Both versions honestly preserve the illustrative visual result (a mason checking vertical plumb on a brick-on-edge corner) without claiming measured engineering precision.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Unlike conventional brickwork, where bricks are laid flat, Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "claim_05",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use ve_01/ve_02 to directly show bricks laid on their narrow edge in courses rather than flat; does not show a side-by-side comparison with conventional flat brickwork."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "claim_06",
+          "support_classification": "illustrative",
+          "editorial_use": "Provides an exterior view of the alternating header/stretcher brick-on-edge arrangement (int_02), though the internal hollow cavities are enclosed by the top course from this low camera angle and are inferred rather than directly visible here."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Throughout construction, attention is given to maintaining alignment, level, and proper bonding.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows the worker checking vertical alignment (plumb) at the wall corner using a plumb bob in ve_01 (and repeated in ve_02 via claim_02); supports vertical alignment and visible bonding pattern, while horizontal spirit-level checking is not shown."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "claim_05",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows staggered vertical mortar joints across the three visible brick-on-edge courses in ent_obj_brick_wall; the resulting structural strength and stability are engineering properties not measured in the clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "claim_07",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the narrative claim that staggered vertical joints and careful plumb checking contribute to wall stability, while keeping the engineering performance claim as an illustrative inference."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Quality workmanship at every stage is essential for achieving the desired performance.",
+          "claim_id": "claim_07",
+          "support_classification": "illustrative",
+          "editorial_use": "Uses the careful two-stage plumb check (ve_01, ve_02) and spoken confirmation (sp_01, claim_04) to illustrate attentive site workmanship during bricklaying."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Certain locations require special attention, particularly wall junctions, corners, and connections with partition walls.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows special attention being given to a wall corner using a plumb bob in ve_01 (and ve_02 via claim_02); partition wall connections and other junctions are not in this shot."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Acknowledged: this project uses a mixed-media plan where future generated video may be used for later gap filling, recorded footage is not forced into every script passage, and any supplied reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented. Any suggested generated visual is marked planned_not_created and is a provisional lead rather than an existing asset or authorization to generate media. Also acknowledged: the source audio policy includes original sound for intake analysis (used here to transcribe sp_01) but excludes camera audio from the output timeline, so no source_audio editorial ideas are proposed.",
+    "unavailable": "No visible_text entries are returned because no readable writing, numbers, or signage appear in the clip. No source_audio editorial ideas are returned because the output audio policy excludes source camera audio. In inspection scope (G07), the clip was reviewed as a multimodal video stream with high resolution setting across 0.0s–12.48s, but native frame-by-frame pixel inspection or external metrological verification is not established."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01",
+      "target_paths": [
+        "/sources/0/visual_events/0",
+        "/sources/0/interpretations/0",
+        "/sources/0/editorial_ideas/0",
+        "/sources/0/editorial_ideas/1",
+        "/sources/0/editorial_ideas/2",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2",
+        "/additional_analysis/script_support/claims/6"
+      ],
+      "claim": "From 0.0s to 4.3s (ve_01), the worker checks the vertical alignment of the three-course brick-on-edge wall corner by holding the wooden block of a plumb bob against the top corner brick (settling both hands in place from 1.5s to 4.3s) while the metal weight hangs vertically beside the lower brick course.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 4.3,
+      "cues": [
+        {
+          "time_s": 0,
+          "cue": "visual: In ve_01 at 0.0s–1.5s, ent_person_worker positions the wooden block of ent_obj_plumb_bob against the top corner of ent_obj_brick_wall and places his left palm flat on top of the brick at 1.5s."
+        },
+        {
+          "time_s": 2.8,
+          "cue": "visual: In ve_01 at 1.5s–4.3s, the worker holds both hands steady on the corner while the conical metal plumb weight hangs nearly motionless beside the bottom brick course."
+        }
+      ],
+      "limits": "Directly shows vertical alignment checking with a plumb bob at a corner; does not show horizontal spirit-level checking, partition junctions, or a millimeter-scale metrological measurement of plumb error."
+    },
+    {
+      "id": "claim_02",
+      "target_paths": [
+        "/sources/0/visual_events/1",
+        "/sources/0/interpretations/0",
+        "/sources/0/editorial_ideas/0",
+        "/sources/0/editorial_ideas/2",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 4.3s to 10.6s (ve_02), the worker lifts and repositions the plumb bob string and wooden block at the same brick corner (4.3s–7.3s), holds a second steady vertical check with his left hand on the top brick (7.5s–9.6s), and then lifts his left hand off the brick (9.6s–10.6s).",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 4.3,
+      "end_s": 10.6,
+      "cues": [
+        {
+          "time_s": 5.5,
+          "cue": "visual: In ve_02 at 4.3s–7.3s, ent_person_worker lifts ent_obj_plumb_bob slightly and adjusts the string and wooden block against the upper brick corner."
+        },
+        {
+          "time_s": 8.5,
+          "cue": "visual: In ve_02 at 7.5s–9.6s, the worker rests his left hand on top of the corner brick and holds the plumb bob steady beside the lower course before lifting his left hand between 9.6s and 10.6s."
+        }
+      ],
+      "limits": "In this second check, the wooden gauge block is held slightly further around the left corner face than in ve_01; exact numeric plumb tolerance is not measurable from the video."
+    },
+    {
+      "id": "claim_03",
+      "target_paths": [
+        "/sources/0/visual_events/2",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 10.6s to 12.48s (ve_03), the worker pulls the plumb bob away from the brick corner and drops it onto the sandy ground at lower left (landing between 11.0s and 11.8s) while stepping his left foot back and withdrawing his hands out of the upper-left frame, leaving the tool resting on the ground from 11.8s to 12.48s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 10.6,
+      "end_s": 12.48,
+      "cues": [
+        {
+          "time_s": 11.2,
+          "cue": "visual: In ve_03 at 10.6s–11.8s, ent_person_worker releases ent_obj_plumb_bob so the metal weight and wooden block land on the ground beside his right sandal while his hands exit upper-left."
+        },
+        {
+          "time_s": 12,
+          "cue": "visual: In ve_03 at 11.8s–12.48s, ent_obj_plumb_bob lies motionless on the sandy ground at lower left beside ent_obj_brick_wall."
+        }
+      ],
+      "limits": "Capped at the end of the source file at 12.48s; subsequent masonry actions after 12.48s are not recorded in this clip."
+    },
+    {
+      "id": "claim_04",
+      "target_paths": [
+        "/sources/0/speech/0",
+        "/sources/0/interpretations/0",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "Between 10.2s and 11.3s (sp_01), an off-screen speaker (ent_speaker_1) says 'Okay, pakka' ('Okay, solid / spot on') as the worker concludes the second plumb check and releases the plumb bob.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 10.2,
+      "end_s": 11.3,
+      "cues": [
+        {
+          "time_s": 10.5,
+          "cue": "source_speech: In sp_01 at 10.2s–11.3s, ent_speaker_1 says 'Okay, pakka.'"
+        }
+      ],
+      "limits": "Attributed spoken confirmation by an unseen speaker on site; it is a verbal assessment rather than an independent instrument measurement, and the speaker's face is outside the frame."
+    },
+    {
+      "id": "claim_05",
+      "target_paths": [
+        "/sources/0/entities/2",
+        "/sources/0/interpretations/1",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "Across 0.0s to 12.48s, the foreground wall section (ent_obj_brick_wall) consists of three courses of red bricks laid on their narrow edge with mortar joints and staggered vertical joints between alternating header and stretcher bricks.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 12.48,
+      "cues": [
+        {
+          "time_s": 2.8,
+          "cue": "visual: Across 0.0s–12.48s (seen clearly at 2.8s in ve_01), ent_obj_brick_wall displays three courses of red bricks placed on edge with vertical mortar joints staggered from course to course."
+        }
+      ],
+      "limits": "Directly establishes brick-on-edge placement and staggered vertical joints on the exterior faces; internal hollow cavities, mortar mix ratio, and brick crushing strength are not directly visible from this exterior side angle."
+    },
+    {
+      "id": "claim_06",
+      "target_paths": [
+        "/sources/0/interpretations/1",
+        "/sources/0/editorial_ideas/3",
+        "/additional_analysis/script_support/claims/1"
+      ],
+      "claim": "The visible alternating header-and-stretcher brick-on-edge bond pattern in ent_obj_brick_wall illustrates the Rat-Trap Bond wall arrangement that encloses internal hollow cavities as described in script passage P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 12.48,
+      "cues": [
+        {
+          "time_s": 2.8,
+          "cue": "visual: In ve_01 at 2.8s, ent_obj_brick_wall shows alternating narrow cross-bricks (headers) and length-bricks (stretchers) laid on edge."
+        },
+        {
+          "time_s": null,
+          "cue": "script: Passage P001 states 'Unlike conventional brickwork, where bricks are laid flat, Rat-Trap Bond Masonry places bricks on their edge. This arrangement creates continuous hollow cavities within the wall.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: In Rat-Trap Bond masonry, laying parallel stretchers on edge bridged by headers creates internal rectangular cavities between the stretchers."
+        }
+      ],
+      "limits": "Because the top course is already laid and the camera views the wall from a low side angle, the interior hollow cavities inside the wall are occluded and inferred from the bond geometry rather than directly seen."
+    },
+    {
+      "id": "claim_07",
+      "target_paths": [
+        "/sources/0/interpretations/0",
+        "/sources/0/editorial_ideas/2",
+        "/additional_analysis/script_support/claims/4",
+        "/additional_analysis/script_support/claims/5"
+      ],
+      "claim": "The worker's two-stage plumb-bob check on the staggered brick-on-edge corner (ve_01, ve_02) and the spoken confirmation 'Okay, pakka' (sp_01) illustrate careful masonry workmanship aimed at maintaining wall alignment and stability as described in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 11.3,
+      "cues": [
+        {
+          "time_s": 2.8,
+          "cue": "visual: In ve_01 (0.0s–4.3s) and ve_02 (4.3s–10.6s), ent_person_worker checks and re-checks the verticality of the corner of ent_obj_brick_wall with ent_obj_plumb_bob."
+        },
+        {
+          "time_s": 10.5,
+          "cue": "source_speech: In sp_01 (10.2s–11.3s), ent_speaker_1 confirms 'Okay, pakka.'"
+        },
+        {
+          "time_s": null,
+          "cue": "script: Passage P001 states 'Throughout construction, attention is given to maintaining alignment, level, and proper bonding. Vertical joints are staggered to ensure strength and stability.' and 'Quality workmanship at every stage is essential for achieving the desired performance.'"
+        }
+      ],
+      "limits": "Illustrates attentive alignment checking and visible staggered bonding on site, but does not independently measure structural load capacity, long-term durability, or overall building performance."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_person_worker"
+        },
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The worker wears loose dark grey trousers and open-toed dark strap sandals/flip-flops while working on the sandy ground.",
+      "entity_ids": [
+        "ent_person_worker"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 12.48
+      },
+      "uncertainty": "Upper-body clothing is not visible because the framing cuts off above the mid-thigh and forearms."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_obj_plumb_bob"
+        },
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "Traditional mason's plumb bob consisting of a pale square wooden spacer block, twisted cord, and a pointed conical metal weight coated with dry mortar dust.",
+      "entity_ids": [
+        "ent_obj_plumb_bob"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 12.48
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_obj_brick_wall"
+        },
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "material_state",
+      "observation": "Three courses of unplastered red-orange bricks with sharp rectangular edges (including one yellowish-faced header brick near the corner) laid on edge with grey-brown mortar in the bed and vertical joints, with loose mortar crumbs on the sandy soil at the base.",
+      "entity_ids": [
+        "ent_obj_brick_wall"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 12.48
+      },
+      "uncertainty": "Whether the bricks are wire-cut or hand-moulded and their exact crushing strength cannot be verified from appearance alone."
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor shaded work site on sunlit sandy brown soil with a thick tree trunk at left, green cylindrical drums/tanks, stacked brick piles, green foliage, and a red-walled open-pillared shelter in the background.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 12.48
+      },
+      "uncertainty": "Specific town, state, or institutional campus cannot be established from the visual background alone."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_person_worker"
+        }
+      ],
+      "subject": "Worker's face and upper body",
+      "kind": "not_visible",
+      "limitation": "The camera framing is a low-angle shot cropped below the worker's waist and forearms, so the worker's face, upper-body attire, and whether the worker himself spoke sp_01 are not visible in this clip.",
+      "interval": null
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_obj_brick_wall"
+        }
+      ],
+      "subject": "Internal hollow cavities inside the brick wall",
+      "kind": "not_visible",
+      "limitation": "Because the camera views the three-course wall from a low exterior side angle with the top course already in place, the internal hollow cavities of the Rat-Trap Bond wall are occluded in this shot.",
+      "interval": null
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_obj_brick_wall"
+        },
+        {
+          "source_id": "4a3f8acc7e57897c",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Brick crushing strength, mortar mix ratio, and thermal/structural performance",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the bricks and plumb-bob check cannot establish brick crushing strength (such as 20, 35, or 75 kg/cm²), cement-mortar proportions, percentage of brick savings, or thermal insulation performance.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "worker_checking_brick_on_edge_corner_with_plumb_bob"
+}

@@ -1,0 +1,700 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "0578a17276ddc8f393b9030636bd3fd3",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "f7b6e6385e7a0901",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 12.010667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 12.010667
+            },
+            "status": "reviewed",
+            "note": "Continuous exterior tracking shot of a circular unplastered brick building surrounded by trees and palm trunks, inspected at sampled intervals across the full clip."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 12.010667
+            },
+            "state": "non_speech",
+            "note": "Quiet outdoor ambience and birdsong throughout; no intelligible human speech."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 12.010667
+          },
+          "reason": "Two small white rectangular plaques mounted on the brickwork to the left of the arched doorway contain tiny dark text that is completely unreadable at this camera distance and resolution."
+        },
+        {
+          "field": "visual_details",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 12.010667
+          },
+          "reason": "Individual leaves, distant background foliage, and faint interior objects inside the shaded doorway are not enumerated individually."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_building",
+          "kind": "object",
+          "label": "Completed circular single-storey building with exposed alternating header-and-stretcher brickwork, horizontal red-brick bands, stone-rubble plinth, arched windows and doorway, scalloped roof eaves, and a white conical spire roof",
+          "uncertainty": "From the exterior bond pattern of alternating headers and stretchers with deep courses, it is consistent with Rat-Trap Bond masonry, though internal wall cavities cannot be directly seen in this finished wall."
+        },
+        {
+          "id": "ent_person_1",
+          "kind": "person",
+          "label": "Man in a light grey long-sleeved shirt and dark trousers walking and standing on the dirt path to the right of the building",
+          "uncertainty": "Seen at a distance in shaded foliage; facial details and exact activity are not clearly distinguishable."
+        },
+        {
+          "id": "ent_person_2",
+          "kind": "person",
+          "label": "Second person in a light shirt briefly visible next to the first man behind a tree trunk on the right",
+          "uncertainty": "Heavily occluded by tree trunks and foliage near the end of the clip (around 10.5s to 12.0s)."
+        },
+        {
+          "id": "ent_plaques",
+          "kind": "object",
+          "label": "Two small white rectangular wall plaques mounted on the brickwork just to the left of the main arched entrance doorway",
+          "uncertainty": "Text on both plaques is too small and low-resolution to read."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 12.010667
+          },
+          "label": "Rightward tracking and left-panning exterior shot around a circular exposed-brick building through foreground trees",
+          "description": "The camera tracks steadily rightward along a shaded dirt path while panning slightly left to keep a circular single-storey building (ent_building) centered-left in the frame. The building features a rubble-stone base/plinth, unplastered pale tan/grey bricks laid in an alternating header-and-stretcher pattern with recessed mortar joints, three horizontal decorative bands of reddish-terracotta bricks, arched barred windows with brick arches, a scalloped vaulted roof overhang, and a white conical peaked roof structure at the center. As the camera moves rightward: from 0.0s to 2.0s, two arched windows on the left curve of the wall are clearly visible before a foreground palm trunk passes right-to-left across the frame (1.5s–3.5s), revealing the open arched entrance doorway with three semicircular red steps and two small white wall plaques (ent_plaques) to its left. Between 3.5s and 6.8s, several thick tree trunks pass closely across the foreground, briefly occluding parts of the building. In the background to the right of the building, a man in a grey shirt and dark trousers (ent_person_1) walks away from the doorway area at 2.3s–3.5s, reappears walking leftward/pausing at 5.5s–8.5s, and stands looking toward the building with a second partially occluded person (ent_person_2) visible beside him at 10.5s–12.01s as the camera pans slightly rightward into the trees at the very end (10.5s–12.01s).",
+          "actor_ids": [
+            "ent_person_1",
+            "ent_person_2"
+          ],
+          "object_ids": [
+            "ent_building",
+            "ent_plaques"
+          ],
+          "context_result": "Provides a clean architectural exterior showcase of a completed building featuring exposed alternating brickwork, neat pointing, and no exterior plaster, though foreground tree trunks intermittently cross the frame and the camera drifts rightward off the building after 10.5s.",
+          "camera_framing": "Wide exterior establishing shot, tracking rightward with foreground tree and palm trunks passing right-to-left in parallax.",
+          "uncertainty": "Whether the wall contains internal hollow cavities is not directly visible in the finished exterior wall; the identity of the building and the text on the wall plaques (ent_plaques) are unreadable."
+        }
+      ],
+      "visible_text": [
+        {
+          "id": "vt_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 12.010667
+          },
+          "location": "On the exterior brick wall immediately to the left of the arched entrance doorway",
+          "original_text": "[unreadable text on two white rectangular plaques]",
+          "english_translation": null,
+          "legibility": "unreadable",
+          "uncertainty": "The plaques are too distant and small in the wide shot to resolve any characters."
+        }
+      ],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "architectural_technique",
+          "claim": "The circular building (ent_building) illustrates a completed structure built with exposed brickwork in an alternating header-and-stretcher pattern characteristic of Rat-Trap Bond masonry, left unplastered with neat recessed pointing.",
+          "evidence_refs": [
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_building"
+            }
+          ],
+          "uncertainty": "While the exterior bond pattern (alternating vertical-edge stretchers and headers) and unplastered pointed finish are directly visible, internal hollow cavities and structural or thermal performance are inferred from the script context and background architectural knowledge rather than directly seen inside the finished wall."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 7.0,
+            "end_s": 10.5
+          },
+          "reason": "From 7.0s to 10.5s, the heavy dark foreground tree trunks that wipe across the frame at 3.5s–6.8s have cleared to the left, leaving a well-balanced wide composition of the circular building's arched doorway, window, scalloped roof, and exposed brick pattern framed between palm trunks before the camera pans rightward away from the building after 10.5s.",
+          "uncertainty": "A palm trunk remains in the left-center foreground throughout 7.0s–10.5s, and a bystander (ent_person_1) is visible standing in the shaded background on the right.",
+          "details": {
+            "comparison_scope": "Compared within f7b6e6385e7a0901 against the opening 0.0s–2.0s window view and the middle 3.5s–6.8s heavy tree-occlusion section.",
+            "alternative_refs": [
+              {
+                "source_id": "f7b6e6385e7a0901",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 2.2
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 10.5
+          },
+          "reason": "Captures the full smooth rightward tracking showcase of the circular building from the side windows around to the front entrance doorway, cutting before the camera pans rightward off the building into the trees during 10.5s–12.01s.",
+          "uncertainty": "Includes foreground tree trunk wipes between 1.5s and 6.8s.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Initial unobscured view of the curved brick wall and two arched windows starting at 0.0s.",
+            "visible_result": "Full reveal of the arched entrance doorway, red steps, and conical roof framed between palm trees by 7.0s–10.5s.",
+            "story_role": null,
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 2.2
+          },
+          "reason": "Clean early sub-span showing the curved unplastered wall, alternating header-and-stretcher brick pattern, horizontal terracotta brick bands, and two arched windows without foreground tree trunks or background people in frame, ideal as an opening or concluding architectural beauty shot.",
+          "uncertainty": "The main doorway and full peaked spire are not yet fully revealed in this early 0.0s–2.2s sub-span.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "payoff",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": null,
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "f7b6e6385e7a0901",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 7.0,
+            "end_s": 10.5
+          },
+          "reason": "Directly illustrates the script's aesthetic and finish claims ('Since the exposed brick pattern is visually attractive, plastering is often unnecessary', 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance') and serves as an illustrative establishing/closing shot for completed buildings ('Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India' and the concluding summary).",
+          "uncertainty": "This single exterior shot cannot verify that thousands of buildings exist across India, nor does it show active pointing or cost savings directly.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": [
+              {
+                "source_id": "f7b6e6385e7a0901",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 0.0,
+              "end_s": 2.2
+            },
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Completed circular building with unplastered alternating brickwork and recessed pointing.",
+            "relationship": "match",
+            "intended_explanation": "Shows how a finished building with exposed alternating brickwork and recessed mortar joints looks attractive without exterior plastering.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unres_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 12.010667
+          },
+          "field": "visible_text",
+          "issue": "The text on the two small white plaques (ent_plaques) mounted to the left of the doorway is unreadable due to camera distance."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This clip (ve_01, 0.0s–12.010667s) consists of a single continuous camera take tracking rightward around the exterior of a completed circular brick building (ent_building). There are no repeated demonstration attempts, camera resets, or distinct construction stages within this source. However, editorially the continuous tracking shot divides into three distinct visual phases separated by foreground tree obstacles: (1) 0.0s–2.2s, an unobstructed view of the left side of the curved brick wall and two arched windows before a palm trunk crosses the center; (2) 2.2s–7.0s, a transitional tracking phase where a palm trunk and thick dark tree trunks pass across the foreground while the arched entrance doorway is revealed; and (3) 7.0s–10.5s, a clear view of the front arched doorway, windows, and roof framed by palm trees, followed by 10.5s–12.010667s where the camera pans rightward away from the building into the surrounding trees.",
+    "crop_guidance": "For a standard landscape output aspect ratio, the full frame from 0.0s to 2.2s and 7.0s to 10.5s preserves the circular building's stone plinth, alternating brick wall courses, arched openings, and scalloped/conical roof (ent_building in ve_01). During 2.3s–3.5s and 5.5s–12.01s, a man (ent_person_1, joined by ent_person_2 at 10.5s–12.01s) walks and stands in the shaded dirt area near the right edge of the frame; if the editor wishes to exclude the background bystanders or tighten on the brickwork and arched windows/doorway, a slight zoom/crop toward the left-center region of the frame during 0.0s–2.2s or 7.0s–10.2s can exclude the right-edge path without hiding the building's architecture, though any tight crop must account for the rightward camera tracking and foreground palm trunks passing right-to-left across the frame. No crop has been technically verified.",
+    "clean_handles": "Interval: 0.0–2.2; classification: settled; beginning observation: 0.0s shows the stationary circular brick building (ent_building) with two arched windows and scalloped eaves while the camera smoothly tracks rightward and no people are visible; middle observation: 1.1s shows the same stationary curved brick wall and two arched windows shifting slightly left in frame as the smooth rightward camera track continues and a palm trunk enters at the far right edge; end observation: 2.2s shows the foreground palm trunk approaching the right window just before ent_person_1 appears walking at the far right background at 2.3s; relevant action stopped: the primary architectural subject (ent_building) is stationary and inactive from the start, with no human actors in frame during 0.0s–2.2s while the camera performs a smooth rightward tracking motion; uncertainty: inspection before 0.0s is unavailable because the clip starts at 0.0s, and after 2.2s a palm trunk crosses the center of the building and ent_person_1 walks into view on the right (inspected through 3.2s); links: ve_01 and ce_01, ce_04; editorial use: provides a clean, distraction-free architectural lead-in or standalone B-roll cut of the exposed brickwork and arched windows before foreground tree trunks and background pedestrians enter. | Interval: 7.0–10.5; classification: settled; beginning observation: 7.0s shows the stationary circular brick building (ent_building) with its open arched doorway and red steps revealed as the large dark foreground tree trunk finishes exiting the left side of the frame, while ent_person_1 stands nearly still in the distant right background; middle observation: 8.8s shows the stationary building centered-left between palm trunks as the smooth rightward camera track continues and ent_person_1 steps slowly rightward toward the right frame edge; end observation: 10.5s shows the building still clearly framed on the left just before the camera begins panning rightward away from the building toward the trees; relevant action stopped: the primary architectural subject (ent_building) is stationary from the start, the heavy foreground tree-trunk occlusion from 3.5s–6.8s has cleared, and only incidental background movement by ent_person_1 and smooth camera tracking continue; uncertainty: inspected through 11.5s–12.01s, where the camera pans rightward off the building and a foreground palm trunk and ent_person_1/ent_person_2 occupy the right half of the frame; links: ve_01 and ce_01, ce_05; editorial use: preserves the clearest front-entrance architectural showcase of the completed building while avoiding the heavy foreground tree wipe before 7.0s and the rightward camera drift after 10.5s.",
+    "continuity": "Throughout ve_01 (0.0s–12.010667s), the camera tracks continuously from left to right along the dirt path outside ent_building, causing the building and foreground tree trunks to move from right to left across the screen in parallax. At candidate entry 0.0s, the left curve of the building with two arched windows is visible and no people are in frame. By candidate exit 2.2s, a palm trunk on the right is moving leftward toward the second window, and at 2.3s ent_person_1 enters near the doorway on the right walking rightward/away. At candidate entry 7.0s, a thick dark foreground tree trunk exits the left edge of the frame, leaving the arched doorway and right side of the building framed between palm trees with ent_person_1 standing in the right background. At candidate exit 10.5s, the building is positioned on the left half of the screen; after 10.5s (inspected through 12.010667s), the camera pans/angles rightward into the trees, shifting the building toward the far left edge while ent_person_1 and ent_person_2 appear behind a palm trunk in the center-right background.",
+    "preview_frames": "1.0s (ve_01): Clear unobstructed view of the curved unplastered wall of ent_building showing the alternating header-and-stretcher brick pattern, red brick horizontal bands, stone plinth, and two arched windows before any foreground tree trunks cross the center. 5.0s (ve_01): View between foreground tree trunks showing the newly revealed arched entrance doorway, red steps, and the white conical peaked spire roof atop the scalloped eaves of ent_building. 8.5s (ve_01): Balanced wide architectural view of ent_building showing the arched entrance doorway, side arched windows, scalloped eaves, and exposed brickwork framed by palm trees after the dark foreground tree trunks have cleared.",
+    "speech_action_links": "No speech is present in this source (0.0s–12.010667s contains only outdoor ambience and birdsong), and output camera audio is excluded by policy.",
+    "shorter_explanations": "Because ve_01 is a continuous architectural B-roll tracking shot with heavy foreground tree-trunk occlusions in the middle (3.5s–6.8s) and a camera drift into the trees at the end (10.5s–12.010667s), the editor can extract either a single concise 3.5-second showcase from 7.0s to 10.5s (retaining the front arched doorway, exposed alternating brickwork, scalloped roof, and stone plinth while omitting the 0.0s–7.0s tree wipes and 10.5s–12.010667s camera drift) or a 2.2-second clean detail shot from 0.0s to 2.2s (retaining the unobstructed side wall and arched windows with zero background people, calculated as 2.2s - 0.0s = 2.2s). If both sub-spans (0.0s–2.2s and 7.0s–10.5s) are used in separate places in the documentary (for example, 0.0s–2.2s during the aesthetic/unplastered explanation and 7.0s–10.5s during the concluding summary), their combined duration is 2.2s + 3.5s = 5.7s with no overlap, compared to the full 12.010667s clip. A longer continuous cut from 0.0s to 10.5s (10.5s duration) adds the full three-dimensional wrap-around parallax reveal of the circular building and its white conical spire roof (most visible around 3.0s–5.5s), at the cost of having dark tree trunks wipe across the foreground between 3.5s and 6.8s.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary",
+          "claim_id": "ce_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use ve_01 (especially 0.0s–2.2s or 7.0s–10.5s) to directly show a finished building exterior where the alternating header-and-stretcher brick pattern and contrasting red brick bands are left completely exposed without plaster."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.",
+          "claim_id": "ce_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Use ve_01 to illustrate the finished unplastered wall while narration explains that omitting plaster creates additional cost savings and that the pattern is Rat-Trap Bond masonry; financial figures and internal wall cavities are not visible in the shot."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.",
+          "claim_id": "ce_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use ve_01 to show the finished state of exposed brickwork with neat recessed mortar joints between the bricks."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "pointing is carried out to enhance appearance and weather resistance.",
+          "claim_id": "ce_03",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the neat finished appearance of pointed joints on a completed building, though the active pointing process and long-term weather resistance are not directly demonstrated in this exterior clip."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.",
+          "claim_id": "ce_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Provides a strong real-world example of a completed building using this exposed alternating brick bond style, illustrating the script's broader adoption claim without proving the 'thousands of buildings across India' statistic."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Simple, economical, and environmentally responsible, Rat-Trap Bond Masonry proves that the future of construction lies not in using more materials, but in using them more wisely.",
+          "claim_id": "ce_02",
+          "support_classification": "illustrative",
+          "editorial_use": "Serves as a calm, resolved closing architectural beauty shot (particularly 7.0s–10.5s) showing a completed, attractive structure built with this brickwork technique."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "This analysis acknowledges the mixed-media workflow: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and any supplied visual slot reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented here, and any future visual ideas remain planned_not_created proposals rather than existing assets. Original camera audio was inspected for intake (confirming only outdoor birdsong/ambience and no speech), and we acknowledge that source audio is excluded from the final output timeline by policy, so no source_audio editorial recommendations are made.",
+    "unavailable": "Speech and speech_action_links have no findings because the attached video contains only natural outdoor ambience and birdsong with no human speech. Visual_slot_guidance is empty because no passage-level slot reservations were supplied and this clip provides recorded B-roll rather than requiring a placeholder slot. Regarding inspection scope (G07), the clip was reviewed via sampled frames and audio across the full 0.0s–12.010667s window; exhaustive native frame-by-frame or pixel-level verification of every frame is not established."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/visual_events/0/context_result",
+        "/sources/0/entities/0/label",
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The video directly shows a completed circular single-storey building (ent_building) constructed with unplastered, exposed pale bricks laid in an alternating header-and-stretcher pattern with neat recessed mortar joints, three horizontal red-brick bands, a stone-rubble plinth, arched windows and doorway, scalloped roof eaves, and a white conical spire roof.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 12.010667,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: In ve_01 at 1.0s, the curved exterior wall of ent_building clearly displays unplastered pale bricks in an alternating header-and-stretcher bond with recessed mortar lines, three red-brick horizontal bands, a stone plinth, and two arched windows."
+        },
+        {
+          "time_s": 8.5,
+          "cue": "visual: In ve_01 at 8.5s, the arched entrance doorway with red semicircular steps, scalloped eaves, and white conical roof of ent_building are visible."
+        }
+      ],
+      "limits": "Only the finished exterior surface is visible; internal wall cavities, brick crushing strength, curing history, and construction cost savings are not directly observable."
+    },
+    {
+      "id": "ce_02",
+      "target_paths": [
+        "/sources/0/entities/0/uncertainty",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/3/reason",
+        "/sources/0/editorial_ideas/3/details/intended_explanation",
+        "/additional_analysis/script_support/claims/1",
+        "/additional_analysis/script_support/claims/4",
+        "/additional_analysis/script_support/claims/5"
+      ],
+      "claim": "The completed circular building (ent_building) in ve_01 is an illustrative example of finished Rat-Trap Bond masonry architecture where leaving the attractive alternating brick pattern unplastered avoids plastering costs and demonstrates practical adoption of the technique.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 12.010667,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: In ve_01 at 1.0s–10.5s, ent_building exhibits deep courses of alternating headers and stretchers with unplastered exposed brick faces and neat mortar joints."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India' and 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond masonry is characterized externally by alternating vertical-edge headers and stretchers that create a distinctive bond pattern often left exposed without plaster."
+        }
+      ],
+      "limits": "Because the wall is already finished and enclosed, internal hollow cavities cannot be seen directly in this shot, nor can a single building verify the script's statistical claim of 'thousands of buildings across India' or quantify financial/environmental savings."
+    },
+    {
+      "id": "ce_03",
+      "target_paths": [
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "The neat recessed mortar joints on the unplastered exterior wall of ent_building in ve_01 illustrate the finished appearance of pointed exposed brickwork described in the script.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 12.010667,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: In ve_01 at 1.0s, the mortar joints between the exposed bricks of ent_building appear uniform, clean, and slightly recessed."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.'"
+        }
+      ],
+      "limits": "This shot shows only the completed wall surface; the active process of pointing and the long-term weather resistance of the structure are not directly shown or measured."
+    },
+    {
+      "id": "ce_04",
+      "target_paths": [
+        "/sources/0/editorial_ideas/0/details/alternative_interval",
+        "/sources/0/editorial_ideas/2/interval",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "From 0.0s to 2.2s in ve_01, the stationary circular brick building (ent_building) and its two left-side arched windows are clearly visible with smooth rightward camera tracking before a foreground palm trunk crosses the center of the building and before any person enters the background on the right.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 2.2,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: At 0.0s in ve_01, the curved wall and two arched windows of ent_building are unobstructed and no people are visible."
+        },
+        {
+          "time_s": 1.1,
+          "cue": "visual: At 1.1s in ve_01, the camera tracks smoothly rightward as a palm trunk enters at the right edge of the frame."
+        },
+        {
+          "time_s": 2.2,
+          "cue": "visual: At 2.2s in ve_01, the palm trunk reaches the right arched window just before ent_person_1 appears walking in the far right background around 2.3s."
+        }
+      ],
+      "limits": "Timestamp 2.2s is an approximate boundary; the arched entrance doorway on the right is still partially hidden behind the curve and palm trunk during 0.0s–2.2s."
+    },
+    {
+      "id": "ce_05",
+      "target_paths": [
+        "/sources/0/editorial_ideas/0/interval",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/interval",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 3.5s and 6.8s in ve_01, thick dark foreground tree trunks pass across the center of the frame, whereas from 7.0s to 10.5s those dark foreground trunks have cleared the building, leaving the arched entrance doorway, windows, and roof of ent_building clearly visible between palm trees until the camera pans rightward toward the trees from 10.5s to 12.010667s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 3.5,
+      "end_s": 12.010667,
+      "cues": [
+        {
+          "time_s": 4.0,
+          "cue": "visual: At 4.0s and 6.0s in ve_01, thick dark tree trunks pass directly across the foreground in front of ent_building."
+        },
+        {
+          "time_s": 7.0,
+          "cue": "visual: By 7.0s in ve_01, the thick dark foreground trunk exits the left edge of the frame, revealing the open arched doorway and red steps of ent_building."
+        },
+        {
+          "time_s": 8.8,
+          "cue": "visual: At 8.8s in ve_01, ent_building is framed clearly on the left-center while ent_person_1 stands in the distant right background."
+        },
+        {
+          "time_s": 10.5,
+          "cue": "visual: From 10.5s through 12.01s in ve_01, the camera pans rightward away from ent_building into the trees on the right, where ent_person_1 and ent_person_2 are visible."
+        }
+      ],
+      "limits": "During 7.0s–10.5s, a slender palm trunk remains in the left-center foreground and ent_person_1 is visible in the shaded background on the right; boundaries at 7.0s and 10.5s are approximate."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_building"
+        },
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Circular single-storey building with unplastered pale tan/grey bricks laid in an alternating header-and-stretcher pattern, three horizontal bands of reddish-terracotta bricks, a dressed stone-rubble plinth with a grey mortar band, arched barred windows, an arched wood-panelled entrance door with three semicircular red steps, scalloped vaulted roof eaves, and a white conical peaked central roof spire.",
+      "entity_ids": [
+        "ent_building"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 12.010667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Unpaved reddish-brown dirt ground with shallow circular tree-watering basins dug around the bases of coconut palms and broadleaf trees in bright daylight.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 12.010667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_person_1"
+        },
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "Adult man (ent_person_1) wearing a casual light-grey long-sleeved collared shirt and dark full-length trousers.",
+      "entity_ids": [
+        "ent_person_1"
+      ],
+      "interval": {
+        "start_s": 2.3,
+        "end_s": 12.010667
+      },
+      "uncertainty": "Seen at a distance in shade; footwear and fine clothing details are not clearly visible."
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_plaques"
+        },
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "vt_01"
+        }
+      ],
+      "category": "signage_language",
+      "observation": "Two small white rectangular signage plaques mounted side-by-side on the exterior brickwork immediately to the left of the arched entrance doorway.",
+      "entity_ids": [
+        "ent_plaques"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 12.010667
+      },
+      "uncertainty": "The script/language and wording on the plaques are completely unreadable at this distance."
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_building"
+        },
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Internal wall cavities, brick crushing strength, and thermal performance of ent_building",
+      "kind": "not_established",
+      "limitation": "Because the circular building is already fully constructed and enclosed, internal hollow cavities inside the walls, the physical crushing strength of the bricks, and indoor thermal comfort cannot be directly seen or measured from this exterior shot.",
+      "interval": null
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_plaques"
+        },
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "vt_01"
+        }
+      ],
+      "subject": "Wording and language on the two wall plaques (ent_plaques) next to the doorway",
+      "kind": "not_visible",
+      "limitation": "The text on the two white plaques mounted to the left of the entrance doorway is too small and distant in the wide shot to be read or identified.",
+      "interval": null
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "f7b6e6385e7a0901",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Interior layout and room usage inside ent_building",
+      "kind": "not_visible",
+      "limitation": "Only a dark, shadowy glimpse through the open doorway is visible from the exterior path, so the interior room layout and contents are not established.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "circular_exposed_brick_building_exterior_tracking_shot"
+}

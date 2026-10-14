@@ -1,0 +1,737 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "604a6ce5298c5e5b7bab08117e50cf3b",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "e0cad4cb3a79a622",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0,
+        "end_s": 16.810667
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 16.810667
+            },
+            "status": "reviewed",
+            "note": "Continuous exterior tracking shot of a two-storey red-brick building reviewed across the full clip duration."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0,
+              "end_s": 16.810667
+            },
+            "state": "silence",
+            "note": "The audio track is completely silent throughout the entire clip; no speech or ambient sound is present."
+          }
+        ]
+      },
+      "scope_omissions": [],
+      "entities": [
+        {
+          "id": "ent_building_01",
+          "kind": "object",
+          "label": "Two-storey exposed red-brick building with arched entrance",
+          "uncertainty": "Internal wall cavity structure, structural bond depth, and exact brick manufacturing method (such as wire-cut versus hand-moulded) cannot be verified from the exterior view alone."
+        },
+        {
+          "id": "ent_sign_takshashila",
+          "kind": "object",
+          "label": "Blue arched nameplate sign above main entrance",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_solar_lamp",
+          "kind": "object",
+          "label": "Pole-mounted solar street light in foreground",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_well_structure",
+          "kind": "object",
+          "label": "Circular masonry well-like structure with metal frame and pulley in side yard",
+          "uncertainty": "Exact functional state or water depth is not visible."
+        }
+      ],
+      "speech": [],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 16.810667
+          },
+          "label": "Slow forward-right tracking shot across exterior of two-storey exposed brick building",
+          "description": "The camera moves smoothly forward and toward the right along the front-right exterior facade of a completed two-storey exposed red-brick building set on a dark stone plinth in a wooded compound with bare reddish-brown earth. From 0.0s to about 6.5s, the left corner, a foreground pole-mounted solar lamp, circular and arched upper openings, corbelled brick window hoods (chajjas), decorative staggered brick jali cutouts, and the central vaulted brick entrance porch with steps, concrete shoe racks, and a pair of dark footwear on the bottom step are in view. Above the entrance arch is a blue nameplate sign reading 'TAKSHASHILA', and inside the porch an interior room sign is partially visible from roughly 4.0s to 10.5s. As the camera continues moving right from about 6.5s to 16.81s, the left facade and entrance arch exit frame left while the long right-hand wing stays in view, showing a row of ground-floor windows with open cream-colored shutters under corbelled brick hoods, a second-storey terrace with curved brick parapet arches, an upper room block, a circular masonry well structure with a pulley frame at the far right corner, and a metal-roofed side shed with a pile of rubble/bricks beside green trees. Throughout the shot, the exterior walls display a regular alternating pattern of shorter header-like and longer stretcher-like brick faces with recessed, neatly finished mortar joints and no exterior wall plaster.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_building_01",
+            "ent_sign_takshashila",
+            "ent_solar_lamp",
+            "ent_well_structure"
+          ],
+          "context_result": "Completed two-storey exposed-brick building exterior shown in its surrounding wooded site; no people or active construction work are present.",
+          "camera_framing": "Wide low-angle exterior tracking shot moving slowly forward and panning/trucking right; tree branches intermittently frame the upper right and foreground left.",
+          "uncertainty": "While the alternating exterior brick pattern is visually consistent with Rat-Trap Bond masonry, the internal hollow cavities and actual brick crushing strength cannot be directly seen in the completed exterior wall."
+        }
+      ],
+      "visible_text": [
+        {
+          "id": "vt_01",
+          "interval": {
+            "start_s": 0,
+            "end_s": 10.5
+          },
+            "location": "Blue curved sign mounted on the front apex of the main brick entrance arch",
+          "original_text": "TAKSHASHILA",
+          "english_translation": "TAKSHASHILA",
+          "legibility": "clear",
+          "uncertainty": "Smallest at 0.0s–2.0s, clearly readable from about 3.0s until it exits the left edge of the frame around 10.5s."
+        },
+        {
+          "id": "vt_02",
+          "interval": {
+            "start_s": 4.0,
+            "end_s": 10.5
+          },
+          "location": "Small blue sign inside the entrance porch above an inner doorway",
+          "original_text": "PURNA",
+          "english_translation": "PURNA",
+          "legibility": "partial",
+          "uncertainty": "The left side of the sign is clipped by the brick arch until about 9.0s–10.0s where '...PURNA' (likely 'ANNAPURNA' or 'PURNA') is briefly visible before exiting frame left."
+        }
+      ],
+      "interpretations": [
+        {
+          "id": "interp_01",
+          "category": "construction_technique",
+          "claim": "The completed two-storey building exterior illustrates a finished structure built with Rat-Trap Bond masonry left unplastered with exposed brickwork and finished mortar joints.",
+          "evidence_refs": [
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "uncertainty": "Inferred from the visible alternating shiner/rowlock-style brick course pattern and the documentary context; the internal hollow wall cavities are enclosed and not directly visible."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 10.0
+          },
+          "reason": "The first 10.0s of ve_01 (claim_01, claim_02, claim_05) is the strongest architectural establishing section within this single continuous shot because it captures the full two-storey front-and-side massing, circular and corbelled brick openings, and the arched main entrance before the front facade exits frame left; 10.0s to 16.81s (claim_03) serves as a useful alternative or continuation focusing on the repetitive ground-floor windows, upper terrace arches, and exposed brickwork texture along the side wing.",
+          "uncertainty": "The blue 'TAKSHASHILA' entrance sign (vt_01) is clearly readable between 3.0s and 10.5s, which identifies a specific named building rather than a generic anonymous house.",
+          "details": {
+            "comparison_scope": "Single continuous camera take across 0.0s–16.81s; comparing the fuller 3/4 building front-and-side view (0.0s–10.0s) against the side-wing elevation pass (10.0s–16.81s).",
+            "alternative_refs": [
+              {
+                "source_id": "e0cad4cb3a79a622",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_01"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 10.0,
+              "end_s": 16.810667
+            },
+            "must_keep_setup": "Start at 0.0s (or after the foreground solar lamp passes left around 4.5s) to establish the full two-storey height and architectural facade.",
+            "visible_result": "Shows a finished, substantial two-storey unplastered red-brick building in a leafy setting.",
+            "story_role": "opening",
+            "sound_type": null,
+            "useful_content": "Smooth exterior architectural reveal of a completed two-storey exposed-brick building.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "action_span",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 16.810667
+          },
+          "reason": "The entire clip ve_01 (claim_01, claim_02, claim_03) is one continuous gimbal/stabilized tracking movement from the three-quarter front view at 0.0s to the side-wing view at 16.81s; any continuous slice within this span works smoothly without camera resets or sudden jerks.",
+          "uncertainty": "Camera motion continues right up to the end of the file at 16.81s without settling into a static hold.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Include at least a 3–5 second continuous window so the deliberate slow architectural glide reads as an intentional tracking shot.",
+            "visible_result": "Smooth transition across the building's front-right corner, entrance arch, and side window bays.",
+            "story_role": "other",
+            "sound_type": null,
+            "useful_content": "Full stabilized exterior tracking pass.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0,
+            "end_s": 16.810667
+          },
+          "reason": "Strongly supports opening or closing summary passages in P001 ('Developed as a cost-effective construction technology, Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India' or 'Rat-Trap Bond Masonry demonstrates how intelligent design can achieve more with less') by showing a complete, attractive, multi-storey finished building rather than raw site work (claim_01, claim_04, claim_05).",
+          "uncertainty": "This single building illustrates a completed structure in India, though it cannot by itself prove the script's quantitative claim of 'thousands of buildings across India' or 'up to three storeys' (since this building is two storeys).",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Keep wide framing showing both storeys and the unplastered architectural finish.",
+            "visible_result": "Completed two-storey exposed-brick building standing in a calm, green setting.",
+            "story_role": "payoff",
+            "sound_type": null,
+            "useful_content": "Finished architectural showcase for the intro or conclusion.",
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "e0cad4cb3a79a622",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "interp_01"
+            }
+          ],
+          "interval": {
+            "start_s": 4.5,
+            "end_s": 14.0
+          },
+          "reason": "Directly illustrates the P001 claims 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings' and 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance' because the tracking camera moves close enough to the unplastered facade to show the clean, uniform exposed brick bond pattern, decorative arches/corbels, and neat mortar joints without exterior plaster (claim_02, claim_03, claim_04, claim_06).",
+          "uncertainty": "While the finished recessed mortar joints are visible from a medium-wide exterior distance, close-up tooling of the pointing or the internal wall cavity is not shown in this wide shot.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Entering around 4.5s clears the foreground solar lamp post on the left and keeps focus on the brick facade, entrance arch, and side windows.",
+            "visible_result": "Clear view of unplastered brick walls, decorative brick arches/hoods, and neatly finished mortar joints on a two-storey building.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": "Mid-to-wide exterior pass over unplastered, pointed brickwork and multi-storey construction.",
+            "relationship": "match",
+            "intended_explanation": "Shows how an entire two-storey building looks when left unplastered with exposed brick and finished joints.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        }
+      ],
+      "visual_slot_guidance": [],
+      "unresolved": [
+        {
+          "id": "unres_01",
+          "interval": {
+            "start_s": 4.0,
+            "end_s": 10.5
+          },
+          "field": "visible_text",
+          "issue": "The small sign inside the arched entrance porch (vt_02) is partially occluded by the brick arch; only the ending letters '...PURNA' are readable around 9.0s–10.0s."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This clip (ve_01) consists of a single continuous, smooth exterior camera take from 0.0s to 16.810667s with no repeated attempts, camera resets, or human demonstration actions. Within this single continuous pass, there is a gradual compositional transition from a three-quarter front-and-side architectural view featuring the main vaulted entrance arch (0.0s–10.0s, claim_02) to an angled view along the right-hand side wing, ground-floor windows, upper terrace arches, and side yard (10.0s–16.81s, claim_03).",
+    "crop_guidance": "In the native 16:9 widescreen framing of ve_01, the essential subject is the two-storey exposed-brick building occupying the left and center-left two-thirds of the frame, balanced by green trees on the right. Between 0.0s and 4.5s (claim_02), aforeground pole-mounted solar lamp and small tree in the lower-left quadrant pass across the left facade. Between 3.0s and 10.5s, the blue 'TAKSHASHILA' sign (vt_01) is legible above the entrance arch, and from 10.0s to 16.81s (claim_03) a metal-roofed side shed and rubble pile appear at the far right edge behind the circular well structure. If the editor wishes to avoid the foreground solar lamp (0.0s–4.5s), starting the cut around 4.5s is cleaner than cropping, and a slight zoom/crop in from the right edge during 10.0s–16.81s could exclude the side shed and rubble pile if a purely residential facade look is preferred, though no crop has been technically verified.",
+    "clean_handles": "Interval: 0.0–16.810667; classification: settled; beginning observation: at 0.0s in ve_01 the completed two-storey brick building is stationary in a three-quarter exterior view while the camera begins a slow forward-right tracking movement; middle observation: at 8.4s in ve_01 the building remains stationary while the camera passes the 'TAKSHASHILA' arched entrance and reveals the right-hand window bays; end observation: at 16.81s in ve_01 the building and surrounding trees remain stationary as the camera finishes tracking along the right wing and circular well structure; relevant action stopped: the architectural subject (ent_building_01) is inactive from the start with no human actors or construction activity present, while the smooth camera tracking motion continues steadily across the entire 0.0s–16.810667s span without coming to a static camera stop; uncertainty: inspected up to the clip end at 16.810667s (no extra post-16.81s footage exists in the attached file); links: ve_01 and claim_01, claim_02, claim_03; editorial use: provides a continuous, steady architectural B-roll glide where any entry or exit point preserves a calm view of the finished exposed-brick building.",
+    "continuity": "Across ve_01 (0.0s–16.810667s), there are no people, tools, or active material changes; the building is completely finished and static. Camera movement is continuously forward and rightward (causing the building features to drift from right to left across the screen). At 0.0s (claim_02), the left corner of the building, foreground solar lamp, and main entrance arch are in frame; by 4.5s, the foreground solar lamp exits frame left; by 10.5s (claim_03), the main 'TAKSHASHILA' entrance arch exits frame left, leaving the right-hand ground-floor windows (with open cream shutters), upper terrace arches, circular well, and side shed in view through 16.81s. Because camera motion is continuous throughout, cutting into or out of this shot works best when matched with other slow moving B-roll or dissolved/cut cleanly on narration beats.",
+    "preview_frames": "1.0s (ve_01, claim_01, claim_02: wide three-quarter establishing view of the entire two-storey exposed-brick building showing circular and triangular brick openings, vaulted entrance porch, and stone plinth); 6.0s (ve_01, claim_02, claim_04: medium-wide view past the foreground solar lamp, clearly showing the 'TAKSHASHILA' arched entrance, unplastered brick bond pattern, and corbelled window hoods); 13.0s (ve_01, claim_03, claim_04: angled view along the right-hand wing showcasing the row of ground-floor windows under brick hoods, upper terrace arches, and exposed brick wall texture).",
+    "speech_action_links": "Unavailable: the attached audio track is completely silent from 0.0s to 16.810667s with no speech or natural sound, and the output audio policy excludes source audio.",
+    "shorter_explanations": "Because ve_01 (0.0s–16.810667s) is a single continuous exterior establishing shot rather than a multi-step process demonstration, it can be trimmed to any required narration length: (1) a 5.5-second establishing segment from 4.5s to 10.0s (5.5s total edited duration, no overlaps; claim_01, claim_02, claim_04) starts immediately after the foreground solar lamp exits frame left and holds on the arched main entrance, upper circular/arched openings, and exposed two-storey brickwork before the entrance arch exits left; or (2) a 6.0-second architectural detail segment from 8.0s to 14.0s (6.0s total edited duration, no overlaps; claim_03, claim_04) transitions from the entrance arch along the side wing's ground-floor windows and upper terrace parapet. Using the full 16.81s clip adds the wider initial corner reveal (0.0s–4.5s) and the far-right well and shed view (14.0s–16.81s).",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Developed as a cost-effective construction technology, Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India.",
+          "claim_id": "claim_05",
+          "support_classification": "illustrative",
+          "editorial_use": "Uses the wide tracking view of the completed two-storey building (ve_01) as a strong visual example of a finished building in India exhibiting an exposed alternating brick pattern consistent with Rat-Trap Bond, while noting that a single building cannot verify the quantitative claim of 'thousands of buildings' or its financial cost."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.",
+          "claim_id": "claim_04",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows a completed two-storey building facade left completely unplastered with an exposed alternating red-brick pattern and decorative brick arches/hoods (ve_01), visually supporting that exterior plastering is omitted on this structure (though financial savings are not visually measurable)."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "When constructed properly, buildings up to three storeys can be safely built using this technology.",
+          "claim_id": "claim_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows a substantial completed two-storey masonry building (ve_01), which falls within the script's 'up to three storeys' range, though structural safety ratings and internal wall cavities are not directly measurable from the exterior shot."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the brick surface often remains exposed, good-quality bricks enhance both structural performance and appearance.",
+          "claim_id": "claim_04",
+          "support_classification": "directly_seen",
+          "editorial_use": "Directly shows uniform, neat exposed red brickwork across the facade and arches of the building (ve_01), illustrating the visual appearance of exposed bricks while recognizing that structural performance cannot be measured visually."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.",
+          "claim_id": "claim_06",
+          "support_classification": "illustrative",
+          "editorial_use": "Illustrates the finished result of neat, recessed mortar joints across the exposed brick walls of the completed building (ve_01), complementing any close-up footage of a mason actively performing pointing."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry demonstrates how intelligent design can achieve more with less.",
+          "claim_id": "claim_05",
+          "support_classification": "illustrative",
+          "editorial_use": "Provides a polished closing or summary payoff shot (ve_01) of a finished two-storey exposed-brick building standing in a green compound."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Mixed-media workflow acknowledged: future generated video may be used for later gap filling (no generated asset currently exists), recorded footage does not need to be forced into every script passage, and supplied slot reservations must be preserved when present. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty with status exact_passage_level_reservations_not_supplied), so none are invented. Original source audio was inspected for intake (the attached audio track is completely silent), and the output camera-audio policy ('excluded') is respected by omitting actionable source_audio recommendations.",
+    "unavailable": "speech_action_links and source_audio editorial ideas are unavailable because the attached video's audio track is completely silent (0.0s–16.810667s) and the output policy excludes source audio. visual_slot_guidance is empty because no passage-level slot reservations were supplied in the media brief and this clip already provides strong recorded B-roll for finished-building passages."
+  },
+  "claim_evidence": [
+    {
+      "id": "claim_01",
+      "target_paths": [
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "From 0.0s to 16.810667s, the video directly shows the exterior of a completed two-storey exposed red-brick building built on a dark stone plinth with arched and corbelled brick architectural features in a wooded setting.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 16.810667,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ve_01 at 0.0s–16.810667s, a two-storey red-brick building on a stone plinth is seen from the exterior as the camera tracks slowly forward and right."
+        }
+      ],
+      "limits": "The exterior view shows a two-storey structure (not three storeys) and cannot directly verify internal structural strength, cost savings, or the hidden interior wall cavities."
+    },
+    {
+      "id": "claim_02",
+      "target_paths": [
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 0.0s and 10.5s, the camera tracks past a foreground pole-mounted solar lamp (which exits frame left around 4.5s) and shows the building's left corner, upper circular and arched openings, and the central vaulted brick entrance porch bearing a blue 'TAKSHASHILA' sign before the entrance arch exits frame left around 10.5s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 10.5,
+      "cues": [
+        {
+          "time_s": 1.0,
+          "cue": "visual: In ve_01 at 1.0s, the left facade, foreground solar lamp (ent_solar_lamp), and vaulted entrance porch are in frame."
+        },
+        {
+          "time_s": 6.0,
+          "cue": "visual: In ve_01 at 6.0s, the solar lamp has exited left and the blue 'TAKSHASHILA' sign (vt_01) is clearly legible on the entrance arch until exiting left around 10.5s."
+        }
+      ],
+      "limits": "The interior sign inside the porch (vt_02) is partially occluded by the brick arch until briefly showing '...PURNA' around 9.0s–10.0s."
+    },
+    {
+      "id": "claim_03",
+      "target_paths": [
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/attempts",
+        "/additional_analysis/crop_guidance",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "Between 10.0s and 16.810667s, as the main entrance arch exits frame left, the camera continues tracking right along the side wing, showing five ground-floor windows with open cream shutters under corbelled brick hoods, an upper terrace with curved brick parapet arches, a circular masonry well structure with a pulley, and a metal-roofed side shed with a rubble pile at the far right.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 10.0,
+      "end_s": 16.810667,
+      "cues": [
+        {
+          "time_s": 13.0,
+          "cue": "visual: In ve_01 at 13.0s, the side elevation windows, upper terrace arches, circular well (ent_well_structure), and side shed are clearly visible."
+        }
+      ],
+      "limits": "Camera motion continues through the end of the file at 16.810667s without coming to a complete stop."
+    },
+    {
+      "id": "claim_04",
+      "target_paths": [
+        "/sources/0/editorial_ideas/2/reason",
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/preview_frames",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "Across 0.0s to 16.810667s, the building's exterior walls are directly seen to be unplastered, displaying uniform exposed red bricks laid in a regular alternating course pattern with recessed mortar joints.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 16.810667,
+      "cues": [
+        {
+          "time_s": 6.0,
+          "cue": "visual: In ve_01 at 6.0s and 13.0s, the entire brick facade is unplastered and shows a regular alternating pattern of shorter and longer brick faces with finished mortar joints."
+        }
+      ],
+      "limits": "While the exposed brick surface and absence of exterior plaster are directly visible, brick crushing strength, weather resistance over time, and financial savings are not visually measurable."
+    },
+    {
+      "id": "claim_05",
+      "target_paths": [
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/script_support/claims/0",
+        "/additional_analysis/script_support/claims/5"
+      ],
+      "claim": "The completed two-storey exposed-brick building in ve_01 (0.0s–16.810667s) illustrates a finished building constructed with Rat-Trap Bond masonry, inferred from the visible alternating header/stretcher-like course pattern on the unplastered walls and the film's documentary subject.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 16.810667,
+      "cues": [
+        {
+          "time_s": 6.0,
+          "cue": "visual: In ve_01 at 6.0s, the exterior brickwork shows alternating short and long brick faces in each course."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Developed as a cost-effective construction technology, Rat-Trap Bond Masonry has been successfully used in thousands of buildings across India' and 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary'."
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Rat-Trap Bond masonry laid with bricks on edge in a Flemish-type alternating rowlock and shiner bond produces an exterior pattern of alternating short and tall/long brick faces."
+        }
+      ],
+      "limits": "Because the wall is completed and enclosed, the internal hollow cavities are not directly visible in this shot, and this single building does not independently verify the script's count of 'thousands of buildings across India'."
+    },
+    {
+      "id": "claim_06",
+      "target_paths": [
+        "/sources/0/editorial_ideas/3/reason",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The neat, recessed mortar joints visible across the unplastered facade in ve_01 (0.0s–16.810667s) illustrate the finished appearance of pointed exposed brickwork described in P001.",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0,
+      "end_s": 16.810667,
+      "cues": [
+        {
+          "time_s": 8.0,
+          "cue": "visual: In ve_01 at 8.0s, the mortar joints between the exposed red bricks appear uniform and recessed along the facade."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the brickwork often remains exposed, pointing is carried out to enhance appearance and weather resistance.'"
+        }
+      ],
+      "limits": "The wide exterior shot shows the completed joint appearance from a distance rather than the active process of a mason pointing the joints or measured weather-resistance performance."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_building_01"
+        },
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Two-storey unplastered red-brick building resting on a dark dressed-stone plinth, featuring a vaulted stepped-brick entrance arch, circular and corbelled triangular wall openings, decorative staggered brick jali cutouts, corbelled brick window hoods (chajjas), ground-floor windows with cream-painted shutters, and an upper terrace with curved brick parapet arches.",
+      "entity_ids": [
+        "ent_building_01"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 16.810667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "vt_01"
+        },
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_sign_takshashila"
+        }
+      ],
+      "category": "signage_language",
+      "observation": "Blue curved nameplate mounted above the main entrance arch displays 'TAKSHASHILA' in white uppercase Latin letters.",
+      "entity_ids": [
+        "ent_sign_takshashila"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 10.5
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "environment",
+      "observation": "Unpaved reddish-brown earth courtyard with scattered dry leaves and a small rectangular concrete pad in front of the entrance steps, surrounded by mature green leafy trees under an overcast grey sky.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0,
+        "end_s": 16.810667
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_solar_lamp"
+        },
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "Grey metal pole-mounted solar street light fixture with an angled top solar panel standing in the left foreground near the building corner.",
+      "entity_ids": [
+        "ent_solar_lamp"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 4.5
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_05",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_well_structure"
+        },
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "architecture",
+      "observation": "Circular plastered masonry well-like parapet with an overhead metal pulley frame at the right rear corner of the building, adjacent to a corrugated-sheet shed and a pile of broken bricks/rubble.",
+      "entity_ids": [
+        "ent_well_structure"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 16.810667
+      },
+      "uncertainty": "Whether the circular structure is an active water well is not directly visible from this exterior angle."
+    },
+    {
+      "id": "wm_06",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "condition",
+      "observation": "Two small grey concrete shoe-rack benches flank the main entrance steps with a pair of dark slip-on footwear left on the bottom step, indicating active occupancy/use of the finished building.",
+      "entity_ids": [
+        "ent_building_01"
+      ],
+      "interval": {
+        "start_s": 0,
+        "end_s": 11.5
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "subject": "Internal hollow wall cavities and active brick-laying process",
+      "kind": "not_visible",
+      "limitation": "Because the building in this clip is already completed and enclosed, the internal hollow cavities characteristic of Rat-Trap Bond masonry and the active construction steps (plinth preparation, mortar laying, staggered vertical jointing during laying, sill courses, and curing) are not visible in this source.",
+      "interval": null
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_building_01"
+        }
+      ],
+      "subject": "Physical and economic performance metrics (crushing strength, 25% brick savings, indoor thermal comfort)",
+      "kind": "not_established",
+      "limitation": "Exterior visual inspection of the finished building cannot establish the crushing strength of the bricks (e.g., 20, 35, or 75 kg/cm²), whether the bricks are wire-cut, percentage reductions in brick or mortar consumption, or indoor temperature differences.",
+      "interval": null
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "e0cad4cb3a79a622",
+          "window_id": "full",
+          "collection": "visible_text",
+          "item_id": "vt_02"
+        }
+      ],
+      "subject": "Full wording of interior doorway sign inside the entrance porch",
+      "kind": "not_visible",
+      "limitation": "The left portion of the small blue sign inside the entrance porch is occluded by the outer brick arch until only the trailing letters '...PURNA' are briefly visible around 9.0s–10.0s.",
+      "interval": {
+        "start_s": 4.0,
+        "end_s": 10.5
+      }
+    },
+    {
+      "id": "el_04",
+      "evidence_refs": [],
+      "subject": "Frame-level inspection scope",
+      "kind": "not_established",
+      "limitation": "Inspection was conducted on the supplied video stream under the configured processing mode; native frame-by-frame or pixel-level exhaustive verification beyond the sampled visual review is not established.",
+      "interval": null
+    }
+  ],
+  "descriptive_name": "completed_two_storey_exposed_red_brick_building_takshashila_exterior_track"
+}

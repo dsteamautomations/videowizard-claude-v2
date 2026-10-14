@@ -1,0 +1,874 @@
+{
+  "contract_version": "source-evidence-v2",
+  "request_id": "74769a8e6b18931e34cde1a2832955b0",
+  "script_id": "3c10d99ce5587ad8046706d1469f6407cdce956c8add74b4ab3e5be1ee1a57a6",
+  "sources": [
+    {
+      "source_id": "f632685cb779dfca",
+      "window_id": "full",
+      "media_kind": "video",
+      "clock": "original_source_seconds",
+      "requested_interval": {
+        "start_s": 0.0,
+        "end_s": 10.56
+      },
+      "review_status": "complete",
+      "coverage": {
+        "visual": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 10.56
+            },
+            "status": "reviewed",
+            "note": "Reviewed whole attached clip at sampled timestamps; exhaustive native-frame inspection is not established."
+          }
+        ],
+        "audio": [
+          {
+            "interval": {
+              "start_s": 0.0,
+              "end_s": 0.9
+            },
+            "state": "unintelligible",
+            "note": "Very faint, cut-off background syllable at clip start."
+          },
+          {
+            "interval": {
+              "start_s": 0.9,
+              "end_s": 2.8
+            },
+            "state": "speech",
+            "note": "Clear short utterance in Tamil mixed with an English loanword."
+          },
+          {
+            "interval": {
+              "start_s": 2.8,
+              "end_s": 10.56
+            },
+            "state": "non_speech",
+            "note": "Quiet outdoor ambient sound, light breeze and faint movement sounds."
+          }
+        ]
+      },
+      "scope_omissions": [
+        {
+          "field": "visible_text",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 10.56
+          },
+          "reason": "No legible text or signage observed in the scene; distant background sacks and vehicle have no readable writing."
+        },
+        {
+          "field": "visual_details",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 10.56
+          },
+          "reason": "Distant background clutter, foliage and individual bricks in background stacks are not enumerated individually beyond world-marker context."
+        }
+      ],
+      "entities": [
+        {
+          "id": "ent_wall",
+          "kind": "object",
+          "label": "Low exposed red-brick wall built with bricks laid on edge",
+          "uncertainty": "Only a short demonstration or low wall section is visible; full structural context and internal cavity cleanliness across all courses are only partly visible when the camera rises at the end."
+        },
+        {
+          "id": "ent_worker",
+          "kind": "person",
+          "label": "Adult person in light beige short-sleeved shirt and dark grey trousers",
+          "uncertainty": "Head and face remain above the top edge of the frame throughout; exact role (mason, supervisor, demonstrator) is not visually proven."
+        },
+        {
+          "id": "ent_trowel",
+          "kind": "object",
+          "label": "Masonry trowel with wooden handle resting on sandy ground near wall base",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_speaker1",
+          "kind": "speaker",
+          "label": "Male voice speaking Tamil",
+          "uncertainty": "Likely belongs to ent_worker whose hands gesture while speaking, but his mouth is out of frame so speaker-to-actor identity is not visually confirmed."
+        },
+        {
+          "id": "ent_bg_building",
+          "kind": "object",
+          "label": "Pinkish-red painted building partially visible behind trees",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_motorcycle",
+          "kind": "object",
+          "label": "Parked black motorcycle in mid-background",
+          "uncertainty": null
+        },
+        {
+          "id": "ent_water_tank",
+          "kind": "object",
+          "label": "Large black cylindrical plastic water storage tank on ground in background",
+          "uncertainty": null
+        }
+      ],
+      "speech": [
+        {
+          "id": "sp_01",
+          "interval": {
+            "start_s": 0.9,
+            "end_s": 2.8
+          },
+          "speaker_id": "ent_speaker1",
+          "language": "ta",
+          "original_text": "ஆ இதுதான் பேலன்ஸ்",
+          "english_translation": "Ah, this is the balance.",
+          "transcription_status": "clear",
+          "uncertainty": "The exact referent of 'balance' (whether referring to remaining bricks/work, wall level/alignment, or another aspect of the demonstration) is not established by the clip alone."
+        }
+      ],
+      "visual_events": [
+        {
+          "id": "ve_01",
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 1.8
+          },
+          "label": "Static low-angle close view of brick-on-edge wall",
+          "description": "The camera holds a static low-angle diagonal view along a low unpainted red-brick wall built on sandy ground. Bricks are laid on edge in alternating stretchers and headers (cross-bricks), with grey mortar joints between courses and vertical joints staggered between courses. A masonry trowel with a wooden handle rests on the ground at the right base of the wall.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_wall",
+            "ent_trowel"
+          ],
+          "context_result": "Clear unobstructed view of the exterior surface pattern, mortar joints, and brick-on-edge orientation across three completed courses plus a partial fourth course.",
+          "camera_framing": "Low-angle close-to-medium oblique shot of the wall, camera stationary.",
+          "uncertainty": "Internal hollow cavities are hidden from this low exterior angle."
+        },
+        {
+          "id": "ve_02",
+          "interval": {
+            "start_s": 1.8,
+            "end_s": 9.1
+          },
+          "label": "Camera pulls back slightly as person steps behind wall, gestures, pauses, and walks out frame left",
+          "description": "From about 1.8s to 4.2s the camera pulls back and tilts slightly upward to a wider framing while an adult (ent_worker, visible from neck/shoulders to knees in a light beige shirt and dark grey trousers) stands behind the wall and gestures slightly with both hands near chest/waist level around 2.0s–3.5s. From about 4.2s to 7.2s the camera settles and the person stands briefly behind the left section of the wall with arms lowered. Around 7.2s the person turns and walks leftward, exiting the left edge of the frame by about 8.5s. From 8.5s to 9.1s the wall remains in static low-angle view with nobody behind it.",
+          "actor_ids": [
+            "ent_worker"
+          ],
+          "object_ids": [
+            "ent_wall",
+            "ent_trowel",
+            "ent_bg_building",
+            "ent_motorcycle",
+            "ent_water_tank"
+          ],
+          "context_result": "The person exits left, leaving an unobstructed wider view of the brick-on-edge wall from 8.5s to 9.1s.",
+          "camera_framing": "Pull-back from close oblique shot to medium-wide low-angle shot; person's head is cut off by the top frame edge throughout.",
+          "uncertainty": "Because the person's head is out of frame, visible talking cannot be confirmed from lip movement."
+        },
+        {
+          "id": "ve_03",
+          "interval": {
+            "start_s": 9.1,
+            "end_s": 10.56
+          },
+          "label": "Camera cranes/tilts up and pans slightly left, revealing top hollow cavities of the wall",
+          "description": "Starting around 9.1s, the camera rises rapidly from its low position and tilts/pans toward the upper-left background (showing stacked red bricks, white woven sacks, hoses, a tarp-covered pile, trees, and the pink building), passing over the top of the foreground brick wall between 9.5s and 10.56s so that the open rectangular hollow cavities between the parallel brick-on-edge stretchers and cross-headers are briefly visible at the bottom right of the frame.",
+          "actor_ids": [],
+          "object_ids": [
+            "ent_wall",
+            "ent_bg_building",
+            "ent_motorcycle",
+            "ent_water_tank"
+          ],
+          "context_result": "Reveals the open hollow cavities inside the top courses of the brick-on-edge wall, though the camera is still moving as the clip ends at 10.56s.",
+          "camera_framing": "Upward jib/pedestal rise and slight leftward pan, transitioning from low angle to high angle looking over the wall into the site yard.",
+          "uncertainty": "Appears to be a camera repositioning or end-of-shot lift rather than a settled composition, as motion continues until the end of the file."
+        }
+      ],
+      "visible_text": [],
+      "interpretations": [
+        {
+          "id": "int_01",
+          "category": "construction_technique",
+          "claim": "The low brick wall (ent_wall) demonstrates Rat-Trap Bond masonry geometry: bricks placed on edge in alternating stretcher and header (shiner and rowlock) arrangement with staggered vertical joints and internal rectangular hollow cavities.",
+          "evidence_refs": [
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03"
+            },
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "entities",
+              "item_id": "ent_wall"
+            }
+          ],
+          "uncertainty": "Visual geometry matches Rat-Trap Bond masonry as described in the script and general construction knowledge, though brick dimensions, wire-cut manufacturing method, and crushing strength cannot be measured visually."
+        }
+      ],
+      "editorial_ideas": [
+        {
+          "id": "ei_01",
+          "kind": "best_take",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 1.8
+          },
+          "reason": "Clean, static low-angle close shot of the Rat-Trap Bond wall showing bricks laid on edge, alternating headers and stretchers, and staggered vertical joints without the distracting headless torso that enters at 1.8s. An alternative static unobstructed window occurs at 8.5s–9.1s inside ve_02 after the worker walks out of frame, though it is very brief (0.6s).",
+          "uncertainty": "At 1.8s capacity for a longer hold ends because a headless person enters at the top left and the camera pulls back.",
+          "details": {
+            "comparison_scope": "Compared across the 10.56s attached window of f632685cb779dfca.",
+            "alternative_refs": [
+              {
+                "source_id": "f632685cb779dfca",
+                "window_id": "full",
+                "collection": "visual_events",
+                "item_id": "ve_02"
+              }
+            ],
+            "alternative_interval": {
+              "start_s": 8.5,
+              "end_s": 9.1
+            },
+            "must_keep_setup": "Keep from 0.0s where the wall is already stationary and cleanly framed.",
+            "visible_result": "Shows the completed courses of bricks laid on edge with exposed brick faces and staggered mortar joints.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": null,
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_02",
+          "kind": "script_use",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_01"
+            },
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 0.0,
+            "end_s": 1.8
+          },
+          "reason": "Directly shows bricks placed on their edge, the distinct exposed brick pattern, and staggered vertical joints across completed courses, supporting P001 clauses on brick orientation, exposed appearance, and joint alignment.",
+          "uncertainty": "The shot is only 1.8s long before the worker's lower body enters the top of the frame; it does not show active bricklaying or internal cavities during this 0.0s–1.8s span.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "0.0s–1.8s static framing.",
+            "visible_result": "Exterior face of brick-on-edge masonry wall.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "match",
+            "intended_explanation": "Illustrates how Rat-Trap Bond places bricks on edge with staggered vertical joints and an exposed brick pattern.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_03",
+          "kind": "story_moment",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "visual_events",
+              "item_id": "ve_03"
+            },
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": {
+            "start_s": 9.1,
+            "end_s": 10.56
+          },
+          "reason": "As the camera rises at 9.1s–10.56s, the top of the wall comes into view at the bottom right, directly revealing the hollow rectangular cavities inside the brick-on-edge courses mentioned in P001.",
+          "uncertainty": "The camera movement looks like an unmotivated end-of-take lift/pan toward background site clutter and does not settle before 10.56s; check other collection clips for a cleaner dedicated top-down cavity shot before relying on this tail.",
+          "details": {
+            "comparison_scope": "Within this source window, 9.1s–10.56s is the only span where the internal cavities are visible.",
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": "Start by 9.1s if using the camera rise as a reveal, or around 9.6s when the top cavities become clearly visible.",
+            "visible_result": "Top-down oblique glimpse of open hollow cavities between parallel bricks laid on edge.",
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Shows the hollow cavities inside the wall created by laying bricks on edge.",
+            "missing_asset": null,
+            "asset_status": null
+          }
+        },
+        {
+          "id": "ei_04",
+          "kind": "future_visual",
+          "passage_ids": [
+            "P001"
+          ],
+          "evidence_refs": [
+            {
+              "source_id": "f632685cb779dfca",
+              "window_id": "full",
+              "collection": "interpretations",
+              "item_id": "int_01"
+            }
+          ],
+          "interval": null,
+          "reason": "While this clip shows exterior brick-on-edge courses (0.0s–1.8s) and a brief moving glimpse of top cavities (9.5s–10.56s), P001 also explains invisible physical mechanisms and quantitative standards—specifically thermal barrier heat-flow reduction, 25% brick savings compared to conventional flat bond, and crushing-strength requirements by building height (20, 35, and 75 kg/sq cm for 1-, 2-, and 3-storey buildings)—which cannot be directly seen in live site footage and would benefit from a clean instructional diagram or generated visual if not covered elsewhere.",
+          "uncertainty": "Exact passage-level visual slot reservations were not supplied in this request; this is a provisional suggestion labelled planned_not_created.",
+          "details": {
+            "comparison_scope": null,
+            "alternative_refs": null,
+            "alternative_interval": null,
+            "must_keep_setup": null,
+            "visible_result": null,
+            "story_role": "explanation",
+            "sound_type": null,
+            "useful_content": null,
+            "relationship": "complement",
+            "intended_explanation": "Visual comparison of conventional flat brickwork vs Rat-Trap Bond brick-on-edge cavity structure showing thermal insulation barrier and 1/2/3-storey crushing strength thresholds (20, 35, 75 kg/cm2).",
+            "missing_asset": "Instructional graphic or generated 3D cutaway animation comparing flat bond vs Rat-Trap Bond thermal cavity and storey-strength figures.",
+            "asset_status": "planned_not_created"
+          }
+        }
+      ],
+      "visual_slot_guidance": [
+        {
+          "slot_id": null,
+          "passage_ids": [
+            "P001"
+          ],
+          "intended_kind": "undecided",
+          "asset_status": "exact_passage_level_reservations_not_supplied",
+          "asset_ref": "f632685cb779dfca",
+          "origin": "agent_proposal",
+          "preserve_reservation": true,
+          "reason": "No passage-level slot reservations were supplied in the media brief. Recorded video in f632685cb779dfca (especially 0.0s–1.8s) can supply B-roll of completed brick-on-edge courses and staggered joints for P001, while quantitative/thermal passages remain candidates for other collection clips or future generated visuals (planned_not_created).",
+          "prerequisite": "Check whether other recorded clips in the 46-clip collection provide longer static shots of cavities or active bricklaying before committing to the short 1.8s opening or the moving 9.1s–10.56s tail.",
+          "uncertainty": "Passage P001 spans the entire narration script without sub-passage slot IDs."
+        }
+      ],
+      "unresolved": [
+        {
+          "id": "unr_01",
+          "interval": {
+            "start_s": 0.9,
+            "end_s": 2.8
+          },
+          "field": "speech.meaning",
+          "issue": "The speaker says 'Ah, this is the balance' (ஆ இதுதான் பேலன்ஸ்), but what 'balance' refers to (remaining work/bricks or wall alignment) is not visually or contextually established within this clip."
+        },
+        {
+          "id": "unr_02",
+          "interval": {
+            "start_s": 1.8,
+            "end_s": 8.5
+          },
+          "field": "visual_events.framing",
+          "issue": "An adult stands and gestures behind the wall with his head cropped off by the top of the frame, creating an awkward composition if used uncropped."
+        }
+      ]
+    }
+  ],
+  "additional_analysis": {
+    "attempts": "This 10.56s clip contains no active construction demonstration attempts or repeated physical cycles. It is a single continuous post-laying camera take of a partially built low brick-on-edge wall (ent_wall), consisting of three distinct framing phases: (1) an initial static close oblique view of the wall (ve_01, 0.0s–1.8s); (2) a slight pull-back where a worker (ent_worker) enters behind the wall with his head framed out at the top, gestures while speaking, pauses, and walks out frame left, leaving the wall clear again at 8.5s–9.1s (ve_02, 1.8s–9.1s); and (3) an upward camera lift and slight leftward pan at the end that reveals the open top cavities of the wall at the bottom right while tilting into the background yard (ve_03, 9.1s–10.56s).",
+    "crop_guidance": "No explicit output aspect ratio dimensions were supplied in the request metadata (width and height are null), though the source is widescreen horizontal video. In ve_01 (0.0s–1.8s) and the end of ve_02 (8.5s–9.1s), the full frame shows the brick-on-edge wall (ent_wall) and resting trowel (ent_trowel) cleanly with no distracting edge intrusions. Between 1.8s and 8.5s in ve_02, ent_worker stands behind the left half of the wall with his head cut off by the top frame edge; if the editing agent needs a longer static shot of the wall from 4.2s to 8.5s (after the camera finishes pulling back), a tighter crop on the lower-right two-thirds of the image could preserve the right section of the brick-on-edge wall and trowel while excluding the worker's headless torso on the upper left, provided resolution permits. In ve_03 (9.1s–10.56s), the hollow cavities appear at the bottom-right corner as the camera rises; cropping or reframing would still show strong upward camera motion.",
+    "clean_handles": "Interval: 0.0–1.8 in original source seconds; classification: settled; beginning observation: 0.0s static low-angle oblique view of the brick-on-edge wall (ent_wall) and trowel (ent_trowel) on the ground with no person in frame; middle observation: 0.9s identical static view of the wall and trowel while off-screen voice begins speaking; end observation: 1.8s static view of the wall just before ent_worker's trousers/torso appear behind the top-left bricks and the camera begins pulling back; relevant action stopped: the relevant subject (ent_wall and ent_trowel) is inactive from the start of the recording across the entire 0.0s–1.8s span, confirmed by examining 1.8s–2.8s where ent_worker enters and camera pullback begins; uncertainty: none identified for wall stability, though the handle is capped at 1.8s by the worker's entry; links: ve_01 and ce_01; editorial use: provides a clean 1.8s static B-roll shot of completed brick-on-edge courses, mortar joints, and staggered vertical bonding without the headless worker intrusion. Interval: 7.2–8.5 in original source seconds; classification: active release; beginning observation: 7.2s ent_worker behind the left side of the wall begins turning and stepping toward screen left; middle observation: 7.8s ent_worker walks leftward behind the top course of bricks toward the left frame edge; end observation: 8.5s ent_worker's hip and leg clear the left edge of the frame; relevant action stopped: ent_worker's departure continues throughout 7.2s–8.5s and finishes at approximately 8.5s when his body exits frame left; uncertainty: approximate boundary within a tenth of a second as the last edge of clothing clears the left border; links: ve_02 and ce_02; editorial use: active exit lead-in if cutting into the brief post-exit static wall view. Interval: 8.5–9.1 in original source seconds; classification: settled; beginning observation: 8.5s static medium-wide low-angle view of ent_wall immediately after ent_worker exits frame left; middle observation: 8.8s static view of ent_wall with foliage and parked motorcycle in background; end observation: 9.1s static view just before the camera begins tilting/lifting upward; relevant action stopped: ent_worker's departure has stopped by 8.5s (having exited frame left) and camera and wall remain stationary until 9.1s, confirmed by inspecting 9.1s–10.1s where the camera rises rapidly in ve_03; uncertainty: very short 0.6s duration limits standalone cut utility unless combined with the subsequent camera rise; links: ve_02 and ce_02; editorial use: provides a brief settled hold just before the upward camera reveal of the top cavities in ve_03.",
+    "continuity": "At candidate entry 0.0s (ve_01), the camera is stationary at a low angle looking diagonally left-to-right along the exterior face of ent_wall, with ent_trowel lying stationary on the ground at bottom right and no people visible. At 1.8s (transition to ve_02), ent_worker enters from the upper-left behind the wall while the camera pulls back slightly until about 4.2s. Between 7.2s and 8.5s (ve_02), ent_worker moves toward screen left and exits the left frame edge at 8.5s, leaving the wall and trowel in the same physical state in a slightly wider framing than at 0.0s. At 9.1s (ve_03), the camera lifts upward and pans slightly left, shifting the wall to the bottom-right foreground and exposing the open top cavities until the clip ends in motion at 10.56s. Do not cut directly from 0.0s–1.8s to 8.5s–9.1s without a cutaway, as the slight jump in camera focal length/distance on the same wall angle will read as a jump cut.",
+    "preview_frames": "0.9s: clean static low-angle close shot of the Rat-Trap Bond brick-on-edge exterior wall pattern, mortar beds, staggered vertical joints, and resting trowel (ve_01). 5.5s: wider low-angle framing showing the compositional issue in ve_02 where ent_worker stands behind the wall with his head cut off by the top of the frame (ve_02). 8.8s: unobstructed wider static view of the wall after ent_worker has exited left and before the camera lifts (ve_02). 10.0s: elevated angle during the upward camera movement showing the open rectangular hollow cavities along the top course of the brick-on-edge wall at bottom right (ve_03).",
+    "speech_action_links": "At 0.9s–2.8s, ent_speaker1 says 'ஆ இதுதான் பேலன்ஸ்' ('Ah, this is the balance', sp_01). This speech begins during the static wall view in ve_01 (0.9s–1.8s) and concludes as the camera pulls back and ent_worker steps in behind the wall and makes a brief two-handed gesture in ve_02 (1.8s–2.8s). The relationship between the spoken phrase 'this is the balance' and the visible wall/gesture is an explanatory spoken remark whose exact technical referent (whether remaining bricks/work or level/alignment) is uncertain because no measurement tool is in use and the speaker's face is out of frame (ce_04). Per source_audio_policy, original camera audio is excluded from final output, so this utterance should not be played in the edit.",
+    "shorter_explanations": "Because this clip shows a static completed section of brickwork rather than a multi-stage physical process, no multi-clip condensation is needed to preserve a demonstration cycle. However, if the editor wants to show both the exterior brick-on-edge face and the internal hollow cavities from this source while omitting the 6.7s middle stretch where the worker's headless torso stands behind the wall (1.8s–8.5s), the usable segments are: (1) 0.0s–1.8s (1.8s duration, ve_01, static close exterior view of brick-on-edge courses and staggered joints, ce_01) or 8.5s–10.2s (1.7s duration across the end of ve_02 and ve_03, starting from the 0.6s settled wider exterior view at 8.5s–9.1s and continuing for 1.1s into the upward camera rise from 9.1s to 10.2s that reveals the top hollow cavities, ce_02 and ce_03). Using 8.5s–10.2s yields a continuous 1.7s clip (0.6s settled + 1.1s upward reveal = 1.7s total) that shows both the unobstructed exterior and the internal cavities while completely omitting the headless worker in 1.8s–8.5s, with the honest qualification that the camera is rising throughout 9.1s–10.2s.",
+    "script_support": {
+      "claims": [
+        {
+          "passage_id": "P001",
+          "script_clause": "Rat-Trap Bond Masonry places bricks on their edge.",
+          "claim_id": "ce_01",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 0.0s–1.8s (ve_01) or 8.5s–9.1s (ve_02) to directly show red bricks laid on their narrow edge rather than flat in the wall courses."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "This arrangement creates continuous hollow cavities within the wall.",
+          "claim_id": "ce_03",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use the upward camera reveal at 9.1s–10.56s (ve_03) to directly show the open rectangular hollow cavities along the top course of the brick-on-edge wall, keeping in mind that the camera is in upward motion and only the top openings of the cavities are visible."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Since the exposed brick pattern is visually attractive, plastering is often unnecessary",
+          "claim_id": "ce_05",
+          "support_classification": "illustrative",
+          "editorial_use": "Use 0.0s–1.8s (ve_01) to illustrate the unplastered, exposed alternating header-and-stretcher brick pattern; whether it is visually attractive or makes plastering unnecessary is an editorial/script value judgement rather than a measurable visual property."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "As each course is completed, a distinct pattern is formed, creating continuous cavities inside the wall.",
+          "claim_id": "ce_03",
+          "support_classification": "directly_seen",
+          "editorial_use": "Use 9.1s–10.56s (ve_03) where the camera rises over the completed courses to show both the alternating course pattern and the open cavities inside the wall."
+        },
+        {
+          "passage_id": "P001",
+          "script_clause": "Vertical joints are staggered to ensure strength and stability.",
+          "claim_id": "ce_06",
+          "support_classification": "illustrative",
+          "editorial_use": "Use 0.0s–1.8s (ve_01) to directly show staggered vertical mortar joints between successive brick-on-edge courses, which illustrates the script's structural explanation (though actual structural strength and stability are inferred engineering properties, not visually measured)."
+        }
+      ]
+    },
+    "workflow_acknowledgement": "Mixed-media workflow acknowledged: future generated video may be used for later gap filling, recorded footage is not forced into every script passage, and any supplied reservations must be preserved. In this request, exact passage-level visual slot reservations were not supplied (planned_visual_slots is empty and status is exact_passage_level_reservations_not_supplied), so no passage slot IDs were invented. Any proposed future generated visuals are marked planned_not_created and are not existing assets or authorization to generate media. Per source_audio_policy, original camera audio was inspected for intake evidence (including sp_01), but camera audio is excluded from final output, so no source_audio editorial recommendations are made.",
+    "unavailable": "No active bricklaying, mortar mixing, plinth preparation, string-line fixing, pointing, or water curing occurs in this 10.56s clip, so action_span recommendations for active masonry execution are unavailable in this source. Source_audio editorial recommendations are omitted because the output audio policy excludes camera sound."
+  },
+  "claim_evidence": [
+    {
+      "id": "ce_01",
+      "target_paths": [
+        "/sources/0/visual_events/0/description",
+        "/sources/0/editorial_ideas/0/reason",
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/0"
+      ],
+      "claim": "From 0.0s to 1.8s (ve_01), the stationary camera shows a low unplastered red-brick wall (ent_wall) where bricks are laid on edge in alternating stretchers and headers with staggered vertical mortar joints, and a trowel (ent_trowel) rests motionless on the ground at lower right.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 1.8,
+      "cues": [
+        {
+          "time_s": 0.0,
+          "cue": "visual: In ve_01 at 0.0s–1.8s, three full courses and a partial fourth course of red bricks are visibly resting on their narrow long edges with mortar between them and staggered vertical joints; ent_trowel lies still on the dirt at bottom right."
+        }
+      ],
+      "limits": "Internal cavities inside the wall are not visible from this low exterior angle during 0.0s–1.8s, and the static unobstructed framing ends at 1.8s when ent_worker enters behind the wall and the camera pulls back."
+    },
+    {
+      "id": "ce_02",
+      "target_paths": [
+        "/sources/0/visual_events/1/description",
+        "/sources/0/editorial_ideas/0/details/alternative_interval",
+        "/additional_analysis/clean_handles",
+        "/additional_analysis/continuity",
+        "/additional_analysis/shorter_explanations"
+      ],
+      "claim": "In ve_02, an adult (ent_worker) stands behind the wall with his head out of frame from 1.8s, turns and walks leftward between 7.2s and 8.5s to exit the left frame edge at 8.5s, leaving a stationary unobstructed wider view of ent_wall from 8.5s to 9.1s.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 1.8,
+      "end_s": 9.1,
+      "cues": [
+        {
+          "time_s": 2.5,
+          "cue": "visual: In ve_02 at 2.5s, ent_worker's torso and trousers are behind the left part of ent_wall with his head above the top frame line while his hands gesture."
+        },
+        {
+          "time_s": 7.8,
+          "cue": "visual: In ve_02 at 7.2s–8.5s, ent_worker walks toward screen left and clears the left edge of the frame at approximately 8.5s."
+        },
+        {
+          "time_s": 8.8,
+          "cue": "visual: In ve_02 at 8.5s–9.1s, the wall and background remain in static view with no person in frame before the camera starts rising at 9.1s."
+        }
+      ],
+      "limits": "The settled unobstructed post-exit window (8.5s–9.1s) is only about 0.6s long before upward camera motion begins at 9.1s."
+    },
+    {
+      "id": "ce_03",
+      "target_paths": [
+        "/sources/0/visual_events/2/description",
+        "/sources/0/interpretations/0/claim",
+        "/sources/0/editorial_ideas/2/reason",
+        "/additional_analysis/shorter_explanations",
+        "/additional_analysis/script_support/claims/1",
+        "/additional_analysis/script_support/claims/3"
+      ],
+      "claim": "Between 9.1s and 10.56s (ve_03), the camera rises and tilts/pans slightly left, revealing open rectangular hollow cavities between the parallel brick-on-edge stretchers and cross-headers along the top courses of ent_wall at the bottom right of the frame.",
+      "basis_type": "visual",
+      "time_scope": "interval",
+      "start_s": 9.1,
+      "end_s": 10.56,
+      "cues": [
+        {
+          "time_s": 10.0,
+          "cue": "visual: In ve_03 at 9.5s–10.56s, looking down into the top course of ent_wall at bottom right, hollow rectangular spaces between parallel edge-laid bricks and perpendicular header bricks are directly visible."
+        }
+      ],
+      "limits": "The camera is moving upward throughout 9.1s–10.56s and only the top opening of the cavities in the upper courses is visible; continuity of cavities down through the lower courses is inferred from the external bonding pattern rather than directly seen."
+    },
+    {
+      "id": "ce_04",
+      "target_paths": [
+        "/sources/0/speech/0/english_translation",
+        "/sources/0/unresolved/0/issue",
+        "/additional_analysis/speech_action_links"
+      ],
+      "claim": "From 0.9s to 2.8s (sp_01), a male speaker (ent_speaker1) says in Tamil 'ஆ இதுதான் பேலன்ஸ்' ('Ah, this is the balance') as ent_worker steps behind the wall and gestures slightly with both hands.",
+      "basis_type": "speech",
+      "time_scope": "interval",
+      "start_s": 0.9,
+      "end_s": 2.8,
+      "cues": [
+        {
+          "time_s": 1.5,
+          "cue": "source_speech: In sp_01 (0.9s–2.8s), ent_speaker1 says 'ஆ இதுதான் பேலன்ஸ்' ('Ah, this is the balance')."
+        },
+        {
+          "time_s": 2.2,
+          "cue": "visual: In ve_02 (1.8s–3.5s), ent_worker's hands gesture briefly near the top of the wall while his head remains above the frame."
+        }
+      ],
+      "limits": "Because the worker's face is out of frame and no level, plumb bob, or remaining brick count is referenced, whether 'balance' refers to remaining work/material or wall level/alignment is not established."
+    },
+    {
+      "id": "ce_05",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/2"
+      ],
+      "claim": "The unplastered exterior face of ent_wall in 0.0s–1.8s (ve_01) illustrates the exposed alternating header-and-stretcher brick pattern referred to in P001 ('Since the exposed brick pattern is visually attractive, plastering is often unnecessary').",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 1.8,
+      "cues": [
+        {
+          "time_s": 0.9,
+          "cue": "visual: In ve_01 (0.0s–1.8s), ent_wall has an unplastered exterior of red bricks laid on edge in an alternating stretcher-header pattern."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Since the exposed brick pattern is visually attractive, plastering is often unnecessary, creating additional savings.'"
+        }
+      ],
+      "limits": "The footage shows a low unplastered wall during or shortly after construction with rough mortar still visible in the joints (before pointing); it does not prove that the final wall will remain unplastered or measure aesthetic/cost outcomes."
+    },
+    {
+      "id": "ce_06",
+      "target_paths": [
+        "/sources/0/editorial_ideas/1/reason",
+        "/additional_analysis/script_support/claims/4"
+      ],
+      "claim": "The brick courses in 0.0s–1.8s (ve_01) directly show staggered vertical mortar joints between successive courses, illustrating the P001 statement 'Vertical joints are staggered to ensure strength and stability.'",
+      "basis_type": "inference",
+      "time_scope": "interval",
+      "start_s": 0.0,
+      "end_s": 1.8,
+      "cues": [
+        {
+          "time_s": 0.9,
+          "cue": "visual: In ve_01 (0.0s–1.8s), vertical mortar joints in each course of ent_wall are offset horizontally from the vertical joints in the courses immediately above and below."
+        },
+        {
+          "time_s": null,
+          "cue": "script: P001 states 'Vertical joints are staggered to ensure strength and stability.'"
+        },
+        {
+          "time_s": null,
+          "cue": "background_knowledge: Staggering vertical joints in masonry bonds prevents continuous vertical planes of weakness."
+        }
+      ],
+      "limits": "While the staggered geometry of the vertical joints is directly visible, the resulting mechanical strength and stability of the wall are engineering properties not measured in the video."
+    }
+  ],
+  "world_markers": [
+    {
+      "id": "wm_01",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02"
+        }
+      ],
+      "category": "wardrobe",
+      "observation": "The adult standing behind the wall (ent_worker) wears a light beige button-front short-sleeved shirt untucked over loose dark grey trousers.",
+      "entity_ids": [
+        "ent_worker"
+      ],
+      "interval": {
+        "start_s": 1.8,
+        "end_s": 8.5
+      },
+      "uncertainty": "Headwear or facial details are not visible because the subject's head remains above the top edge of the frame."
+    },
+    {
+      "id": "wm_02",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_trowel"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        }
+      ],
+      "category": "tools_props",
+      "observation": "A metal masonry trowel with a light-coloured wooden handle rests on the sandy ground beside the right end of the brick wall, with a metal pan and white plastic pipe/rod partially visible nearby.",
+      "entity_ids": [
+        "ent_trowel"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 10.56
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_03",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03"
+        }
+      ],
+      "category": "material_state",
+      "observation": "The low brick wall is constructed of reddish-orange rectangular clay bricks laid on edge with grey mortar; several bricks show yellowish or dark firing discolouration patches and slight edge chips, and the mortar joints are rough and unpointed.",
+      "entity_ids": [
+        "ent_wall"
+      ],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 10.56
+      },
+      "uncertainty": "Whether the bricks are wire-cut or hand-moulded and whether the mortar is still wet or recently set cannot be verified from visual appearance alone."
+    },
+    {
+      "id": "wm_04",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03"
+        }
+      ],
+      "category": "environment",
+      "observation": "Outdoor sandy dirt yard surrounded by green broadleaf trees and a coconut palm on the right, with stacked loose red bricks, white woven sacks, coiled hoses, and a white sheet/tarp covering a pile of material in the background.",
+      "entity_ids": [],
+      "interval": {
+        "start_s": 0.0,
+        "end_s": 10.56
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_05",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_bg_building"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03"
+        }
+      ],
+      "category": "architecture",
+      "observation": "A pinkish-terracotta painted masonry building with window awnings/hoods is partially visible behind the trees in the background.",
+      "entity_ids": [
+        "ent_bg_building"
+      ],
+      "interval": {
+        "start_s": 1.8,
+        "end_s": 10.56
+      },
+      "uncertainty": ""
+    },
+    {
+      "id": "wm_06",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_motorcycle"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_water_tank"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02"
+        }
+      ],
+      "category": "vehicles",
+      "observation": "A black motorcycle is parked in the mid-background next to a large black ribbed cylindrical plastic water tank.",
+      "entity_ids": [
+        "ent_motorcycle",
+        "ent_water_tank"
+      ],
+      "interval": {
+        "start_s": 1.8,
+        "end_s": 10.56
+      },
+      "uncertainty": ""
+    }
+  ],
+  "evidence_limits": [
+    {
+      "id": "el_01",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_worker"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_02"
+        }
+      ],
+      "subject": "ent_worker head, face, and visible speech articulation",
+      "kind": "not_visible",
+      "limitation": "The person standing behind the wall has his head and face cropped above the top edge of the frame throughout 1.8s–8.5s, so facial identity and lip synchronization with sp_01 cannot be visually established.",
+      "interval": {
+        "start_s": 1.8,
+        "end_s": 8.5
+      }
+    },
+    {
+      "id": "el_02",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "entities",
+          "item_id": "ent_wall"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_01"
+        },
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03"
+        }
+      ],
+      "subject": "Brick crushing strength, wire-cut manufacturing, thermal insulation performance, and 25% material saving",
+      "kind": "not_established",
+      "limitation": "Visual inspection of the low brick-on-edge wall shows its bond geometry and top cavities but cannot establish brick compressive strength (20, 35, or 75 kg/cm2), whether the bricks are wire-cut, thermal heat-transfer reduction, or percentage material savings.",
+      "interval": null
+    },
+    {
+      "id": "el_03",
+      "evidence_refs": [
+        {
+          "source_id": "f632685cb779dfca",
+          "window_id": "full",
+          "collection": "visual_events",
+          "item_id": "ve_03"
+        }
+      ],
+      "subject": "Cleanliness of internal cavities at lower courses",
+      "kind": "not_visible",
+      "limitation": "Only the upper openings of the hollow cavities are briefly visible as the camera rises at 9.1s–10.56s; whether mortar fell into the bottom of the cavities during laying is not visible.",
+      "interval": {
+        "start_s": 9.1,
+        "end_s": 10.56
+      }
+    }
+  ],
+  "descriptive_name": "low-brick-on-edge-wall-worker-walks-left-camera-tilt-up"
+}
