@@ -197,17 +197,12 @@ def preflight(need_gb):
 
 
 def cmd_start(a):
-    missing = [q for q, ok in (('Are the input files already in the run folder and under the size limit? (--inputs-ready)', a.inputs_ready),
-                               ('Are spend caps set on the provider dashboards? (--spend-caps-set)', a.spend_caps_set),
-                               ('Which machine will do assembly? (--assembly-machine)', a.assembly_machine)) if not ok]
-    if missing:
-        emit({'action': 'ask_operator', 'questions': missing, 'message': 'Ask the operator these before starting; pass the answers as flags.'}, 2)
     preflight(a.need_gb)
     run = write('/api/runs', {'client': a.client, **({'procedure_version': a.version} if a.version else {})})
     if workspace(run['code']).exists():
         emit({'action': 'refused', 'message': f"Folder runs/{run['code']} already exists on this machine."}, 2)
     write(f"/api/runs/{run['id']}/claim", {'machine': machine_id()})
-    m = make_workspace(run, a.keep_logs, a.assembly_machine)
+    m = make_workspace(run, a.keep_logs)
     emit({**run, 'workspace': str(workspace(run['code'])), 'next': call('GET', f"/api/runs/{run['id']}/next")}, 0, f"Started {run['code']} in {m['code']}/")
 
 
@@ -657,8 +652,7 @@ def main(argv=None):
     sub.add_parser('whoami').set_defaults(fn=cmd_whoami)
     s = sub.add_parser('start')
     s.add_argument('--client', required=True); s.add_argument('--version')
-    s.add_argument('--need-gb', type=float, default=5); s.add_argument('--inputs-ready', action='store_true'); s.add_argument('--spend-caps-set', action='store_true')
-    s.add_argument('--assembly-machine'); s.add_argument('--keep-logs', action='store_true'); s.set_defaults(fn=cmd_start)
+    s.add_argument('--need-gb', type=float, default=5); s.add_argument('--keep-logs', action='store_true'); s.set_defaults(fn=cmd_start)
     s = sub.add_parser('next'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_next)
     s = sub.add_parser('output')
     s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--file', action='append', default=[])

@@ -16,7 +16,7 @@ import pytest
 
 from conftest import ROOT, VW, GUARD, vw, connected, server, home  # noqa: F401
 
-START = ['start', '--client', 'C', '--version', 'test', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this']
+START = ['start', '--client', 'C', '--version', 'test', '--need-gb', '0']
 
 
 def test_p1_no_session_prints_connect_link(home):
@@ -76,9 +76,9 @@ def test_p5_p6_p8_start_output_close(home, database):
     assert all((ws / d).is_dir() for d in ('in', 'out', 'work', 'logs')) and (home['runs'] / '.active').read_text() == run_code
     assert vw(home, *START)[0] == 0  # a second start for the same client makes a new run; folders are per code
     # client must be one Active directory client: unknown → refused with candidates; the directory is listable
-    rc, out, _ = vw(home, 'start', '--client', 'VK Nard', '--version', 'test', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this')
+    rc, out, _ = vw(home, 'start', '--client', 'VK Nard', '--version', 'test', '--need-gb', '0')
     assert rc == 2 and out['code'] == 'CLIENT_UNKNOWN' and out['candidates'] == []
-    rc, out, _ = vw(home, 'start', '--client', 'vk', '--version', 'test', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this')
+    rc, out, _ = vw(home, 'start', '--client', 'vk', '--version', 'test', '--need-gb', '0')
     assert rc == 0 and out['client'] == 'VK' and out['client_id'] == 'c-vk' and out['title'] == ''
     rc, out, _ = vw(home, 'clients', '--search', 'vk')
     assert rc == 0 and [c['client_name'] for c in out['clients']] == ['VK', 'VK Textiles']

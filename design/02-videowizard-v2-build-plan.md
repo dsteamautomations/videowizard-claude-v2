@@ -23,7 +23,7 @@ Approvals: no browser Approve button, no paid gate (decisions 9–10). Acceptanc
 
 Everything in [pattern §3](01-architecture-pattern.md#3-proportionality-build-only-what-the-tool-needs) applies. Specifically **not** built in v2: roles beyond owner/admin, lease timers, spend caps, key rotation, purge jobs, audit tables, CI version gates, client-side throttling, redaction tooling. If a run shows the need, add the single cheapest thing.
 
-**Asked of the operator at `/vw start`** (trusted, not checked): title and client; input files already in `runs/<id>/in/` and under 200 MB each; provider spend caps set on ElevenLabs, Google and OpenAI dashboards; which machine runs assembly; whether to keep logs on close (default no).
+**Asked of the operator at `/vw start`** (trusted, not checked; revised 14 Oct 2026 after the first live start: only the client is asked at start, the title is chosen at intake, input files are asked for by the intake/media steps when they need them, the assembly machine is asked at the Mac stage, and provider spend caps are a one-time setup note in the operator guide). Original list: title and client; input files already in `runs/<id>/in/` and under 200 MB each; provider spend caps set on ElevenLabs, Google and OpenAI dashboards; which machine runs assembly; whether to keep logs on close (default no).
 
 ## 3. Stages
 

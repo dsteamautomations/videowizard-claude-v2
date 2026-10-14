@@ -5,3 +5,4 @@
 - A stage is accepted only by the operator's explicit yes to your question, passed verbatim as `--quote`.
 - Paid steps are information, not a question: say which provider is used and proceed.
 - One run at a time on this machine; do not write files outside `runs/<code>/`; no reports unless asked.
+- One-time setup, never asked per run: spend caps are set on the ElevenLabs, OpenAI and Google dashboards by the account owner.

@@ -22,7 +22,7 @@ Narration: Each block is pressed, not fired, so it keeps the carbon in the groun
 
 def start_run(home, database):
     connected(home, database)
-    code, out, err = vw(home, 'start', '--client', 'VK', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this')
+    code, out, err = vw(home, 'start', '--client', 'VK', '--need-gb', '0')
     assert code == 0, err
     return out['code'], home['runs'] / out['code']
 
