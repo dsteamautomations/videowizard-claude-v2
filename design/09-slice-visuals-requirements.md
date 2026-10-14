@@ -26,7 +26,7 @@ Unit of work: **one shot inside a gap**. The stage completes when every gap shot
 4. A take whose decoded duration differs from the placement by more than one frame is still `ready` but flagged; the review step must carry `timing_notes` (v1 rule).
 5. Reference approval and take selection are the operator's yes in chat, stored verbatim (no browser button).
 6. Retained on close: approved references, selected takes, local assets, the visual plan versions. Rejected takes and candidate references are deleted on close.
-7. Model: `gpt-image-2.5` endpoint and parameters confirmed against OpenAI docs at build; if the account lacks the model, the server reports `MODEL_UNAVAILABLE` and the operator can fall back to `supplied` references.
+7. Model (checked against OpenAI docs, 14 Oct 2026): the GPT Image 2.5 ids are **`gpt-image-2.5-sunburst`** (editing precision; use for keyframes/edits with parents) and **`gpt-image-2.5-flare`** (fast everyday generation; use for isolated/sheet drafts). `POST /v1/images/generations` (`size` e.g. `1536x864` for 16:9 within the 16-px/aspect/pixel limits, `quality` low|medium|high|xhigh|max|auto, `output_format` png) and `POST /v1/images/edits` (`image[]` inputs ≤50 MB, optional `mask` with alpha, applies to the first image). Responses carry `data[i].b64_json`; no usage fields are documented, so cost is recorded from the published per-image price table at build time. If the account lacks the model, the server reports `MODEL_UNAVAILABLE` and the operator can fall back to `supplied` references.
 
 ## 3. Edge cases (tests; providers faked)
 | # | Case | Expected |

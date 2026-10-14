@@ -33,7 +33,7 @@ class FakeTransport:
 
     def generate(self, payload):
         FakeTransport.calls['generate'] += 1
-        prompt = payload['contents'][0]['parts'][1]['text']
+        prompt = [p['text'] for p in payload['contents'][0]['parts'] if 'text' in p][-1]
         FakeTransport.seen_modes.append('AGENTIC' if payload['contents'][0]['parts'][0].get('mediaProcessing') == 'AGENTIC' else 'STATIC')
         mode = FakeTransport.mode
         if mode == 'http429' or mode == 'http429_forever':
@@ -44,6 +44,15 @@ class FakeTransport:
             FakeTransport.mode = 'ok'
             raise GeminiTransportError('connection_error', 'socket closed')
         schema = payload['generationConfig']['responseJsonSchema']
+        if 'answers' in schema.get('properties', {}):  # planning inspection (flash schema)
+            qid = re.search(r'"id": "(Q[0-9]+)"', prompt).group(1)
+            sid = re.search(r'"source_id": "([0-9a-f]{16})"', prompt).group(1)
+            body = {'answers': [{'question_id': qid, 'status': 'answered', 'answer': 'The block does not move.',
+                                 'observations': [{'source_id': sid, 'start_s': 0.2, 'end_s': 1.0, 'visual_observation': 'block still on table', 'relevant_speech': '', 'limits': 'none'}],
+                                 'interpretation': 'static subject', 'uncertainty': 'low', 'inspection_method': 'full clip', 'sampling_rate': '1 fps'}],
+                    'inspection_limits': 'short clip'}
+            raw = json.dumps(body)
+            return {'body': body, 'metadata': {'finish_reason': 'STOP', 'usage': {'promptTokenCount': 1200, 'candidatesTokenCount': 100}, 'elapsed_seconds': 0.5}, 'raw': raw}
         src = schema['$defs']['source']['properties']
         request_id = re.search(r'"request_id": "([0-9a-f]+)"', prompt).group(1)
         script_id = re.search(r'"script_id": "([0-9a-f]{64})"', prompt).group(1)

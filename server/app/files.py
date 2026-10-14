@@ -49,9 +49,10 @@ def download(run_id: UUID, key: str, user=User):
     with connect() as conn:
         run = core.load_run(conn, user, run_id)
         row = conn.execute('select * from vw2_files where run_id=%s and key=%s', (run['id'], key)).fetchone()
-    if not row:
+    store = storage()
+    if not row and not (key.startswith(f"{run['id']}/") and store.exists(key)):  # working files (planning package, ledger…) live under the run prefix without a receipt row
         raise Problem(404, 'FILE_MISSING', 'No such retained file.')
-    return RedirectResponse(storage().signed_download(key), status_code=307)
+    return RedirectResponse(store.signed_download(key), status_code=307)
 
 
 # Local storage backend only (tests / local dev): PUT and GET objects directly through the server.

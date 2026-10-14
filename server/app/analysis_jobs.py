@@ -202,8 +202,83 @@ def silent_copy(src, directory):
     return target
 
 
+def process_inspection(job):
+    """Paid focused inspection for one planning question: ≤3 originals or the extracted stills, schema-constrained answer."""
+    import base64
+    jid = str(job['id'])
+    store = storage()
+    req = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
+    raw_path = SPOOL / f'{jid}.response.json'
+    dispatched = False
+    try:
+        if not raw_path.exists():
+            transport = transport_factory(settings().GEMINI_API_KEY.get_secret_value(), 'gemini-4-argon', terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS,
+                                          initial_soft_wait_seconds=60, on_update=lambda e: None, capture_answer_deltas=False, allow_agentic_video=True)
+            parts = []
+            with tempfile.TemporaryDirectory(prefix='vw2-inspect-') as directory:
+                if req['mode'] == 'frames':
+                    for f in req['frames']:
+                        parts += [{'text': f"Frame {f['frame_id']}; original source time {f['original_s']:.6f} seconds."},
+                                  {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(f['key'])).decode()}}]
+                else:
+                    for sid, src in req['sources'].items():
+                        path = Path(directory) / (sid + '.mp4')
+                        data = store.get(f"{job['run_id']}/media/{src['name']}")
+                        if hashlib.sha256(data).hexdigest() != src['sha256']:
+                            raise Problem(409, 'ANALYSIS_SOURCE', 'Stored clip hash differs from the media record.')
+                        path.write_bytes(data)
+                        receipt_path = SPOOL / f'{jid}.{sid}.upload.json'
+                        uploaded = transport.upload(path, 'video/mp4', src['sha256'], existing_receipt=read_json(receipt_path))
+                        durable(receipt_path, json.dumps(uploaded).encode('utf-8'))
+                        parts += [{'text': 'Original source ' + sid + '; its own original-source seconds clock.'}, {'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}]
+                parts.append({'text': req['prompt']})
+                payload = {'contents': [{'role': 'user', 'parts': parts}],
+                           'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': req['schema'], 'thinkingConfig': {'thinkingLevel': 'MEDIUM'},
+                                                'mediaResolution': 'MEDIA_RESOLUTION_HIGH', 'maxOutputTokens': 16384}}
+                renew(jid, 'generate')
+                dispatched = True
+                try:
+                    received = transport.generate(payload)
+                    durable(raw_path, json.dumps({'raw': received.get('raw') or json.dumps(received['body']), 'metadata': received['metadata']}, ensure_ascii=False).encode('utf-8'))
+                except GeminiTransportError as exc:
+                    if exc.code == 'http_error' and exc.http_status in (400, 401, 403, 404, 413, 429):
+                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status}, f'Provider rejected the inspection ({exc.code}, HTTP {exc.http_status}).', None, None
+                    if exc.code in ('incomplete_response', 'empty_response', 'model_json', 'blocked_response', 'provider_stream_error'):
+                        return 'failed', {'failure': exc.code}, str(exc), None, None
+                    return 'submission_unknown', {'failure': exc.code}, f'Outcome unknown after dispatch ({exc.code}).', None, None
+        saved = read_json(raw_path)
+        parsed = json.loads(saved['raw'])
+        from jsonschema import Draft202012Validator
+        errors = list(Draft202012Validator(req['schema']).iter_errors(parsed))
+        if errors:
+            return 'failed', {'failure': 'schema', 'errors': [e.message for e in errors[:5]]}, 'Inspector answer did not match the schema; retained, not regenerated.', None, None
+        usage = (saved.get('metadata') or {}).get('usage') or {}
+        cost = {'model': 'gemini-4-argon', 'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')}
+        if req['mode'] == 'frames':
+            frames = parsed['frames']
+            answer = {'answers': [{'question_id': req['question_id'], 'status': 'partly_answered', 'answer': 'Sampled still contact/position only: ' + json.dumps(frames),
+                                   'observations': [], 'interpretation': 'Only the named frames were supplied. Motion and exact onset remain unchecked.',
+                                   'uncertainty': 'Frame answers are model claims; inspect overlap and hand ownership before relying on them.',
+                                   'inspection_method': 'Extracted labelled stills', 'sampling_rate': 'Explicit manifest timestamps'}],
+                      'inspection_limits': 'No continuous viewing; no movement or onset established.'}
+            frame_rows = [{**f, 'original_s': next(x['original_s'] for x in req['frames'] if x['frame_id'] == f['frame_id'])} for f in frames]
+        else:
+            answer, frame_rows = parsed, []
+        k = f"{job['run_id']}/planning/inspection/{req['question_id']}.answer.json"
+        store.put(k, json.dumps({'answer': answer, 'frames': frame_rows}, ensure_ascii=False).encode('utf-8'), 'application/json')
+        return 'retained', {'answer': answer, 'frames': frame_rows, 'answer_key': k}, None, cost, None
+    except (Problem, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
+        if raw_path.exists():
+            return 'storage_pending', {'phase': 'store'}, f'Response saved locally; storage will be retried ({exc.__class__.__name__}).', None, 10
+        if dispatched:
+            return 'submission_unknown', {'phase': 'generate'}, f'Interrupted after dispatch ({exc.__class__.__name__}).', None, None
+        return 'failed', {'phase': 'prepare'}, (exc.message if isinstance(exc, Problem) else f'{exc.__class__.__name__}: {exc}'), None, None
+
+
 def process(job):
     """Returns (status, result, error, cost, retry_in_minutes). Resumes from spool receipts."""
+    if job['request'].get('kind') == 'inspection':
+        return process_inspection(job)
     jid = str(job['id'])
     store = storage()
     req_meta = job['request']
@@ -293,6 +368,8 @@ def process(job):
 
 def finalize(conn, user_id, job, status, result, error, cost, retry_in):
     jobs.finish(conn, job['id'], status, result=result, error=error, cost=cost, retry_in=retry_in)
+    if job['request'].get('kind') == 'inspection':
+        return
     if status == 'retained':
         run = conn.execute('select * from vw2_runs where id=%s', (job['run_id'],)).fetchone()
         clip = job['request']['clip']

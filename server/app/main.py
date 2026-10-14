@@ -9,7 +9,8 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, web, worker
+from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, web, worker
+from .storage import storage
 from .config import settings
 from .db import connect as db_connect, migrate
 from .errors import Problem
@@ -115,6 +116,52 @@ class AnalysisStart(Write):
 
 class Note(Write):
     note: str | None = None
+
+
+class PlanningPrepare(Write):
+    fps: int = Field(ge=1, le=120)
+    resolution: list[int] = Field(min_length=2, max_length=2)
+    source_audio_in_output: Literal['none', 'ambient', 'speech', 'both'] = 'none'
+    visible_speaking: Literal['allow', 'avoid'] = 'avoid'
+    film_type: str = ''
+
+
+class PlanningScenes(Write):
+    scenes: list[dict[str, Any]]
+    quote: str = Field(min_length=1)
+
+
+class PlanningPlan(Write):
+    plan: dict[str, Any]
+    quote: str | None = None
+
+
+class PlanningAnswer(Write):
+    question_id: str
+    answer: str | None = None
+    quote: str | None = None
+    check: dict[str, Any] | None = None
+
+
+class PlanningFrames(Write):
+    question_id: str
+    source_id: str
+    times: list[float]
+
+
+class PlanningInspect(Write):
+    question_ids: list[str]
+
+
+class PlanningReview(Write):
+    response_digest: str
+    fields: list[dict[str, Any]]
+    excluded_observation_ids: list[str] = []
+
+
+class PlanningFinalize(Write):
+    assessment: dict[str, Any]
+    quote: str = Field(min_length=1)
 
 
 class LibraryAdd(Strict):
@@ -405,6 +452,125 @@ def job_release(job_id: UUID, body: Write, user=User, conn=DB):
         raise Problem(404, 'NOT_FOUND', 'Not found.')
     analysis_jobs.release(conn, job_id)
     return Response({'id': str(job_id), 'released': True})
+
+
+# ---------- planning ----------
+
+def _planning_run(conn, user, run_id):
+    run = core.load_run(conn, user, run_id, lock=True)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    nxt = core.next_for(conn, run)
+    if nxt['stage'] != 'planning':
+        raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not 'planning'.", next=nxt)
+    return run
+
+
+@app.get('/api/runs/{run_id}/planning')
+def planning_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(planning_stage.status(conn, storage(), run))
+
+
+@app.get('/api/runs/{run_id}/planning/review-input')
+def planning_review_input(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(planning_stage.review_input(conn, storage(), run))
+
+
+@app.get('/api/runs/{run_id}/planning/handoff')
+def planning_handoff(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    out = next((o for o in core.current_outputs(conn, run['id']) if o['stage'] == 'planning'), None)
+    if not out:
+        raise Problem(409, 'EXECUTION_NOT_READY', 'Planning is not finalized.')
+    ref = next(f for f in out['files'] if f['name'] == 'handoff.json')
+    return Response(planning_stage.load_json(storage(), ref['key']))
+
+
+@app.post('/api/runs/{run_id}/planning/prepare')
+def planning_prepare(run_id: UUID, body: PlanningPrepare, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    outputs = core.current_outputs(conn, run['id'])
+    settings_ = {'fps': body.fps, 'resolution': body.resolution, 'source_audio_in_output': body.source_audio_in_output, 'visible_speaking': body.visible_speaking, 'film_type': body.film_type}
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.prepare(conn, storage(), user, run, outputs, settings_)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/scenes')
+def planning_scenes(run_id: UUID, body: PlanningScenes, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.set_scenes(conn, storage(), user, run, body.scenes, body.quote)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/check', dependencies=[Depends(size_guard)])
+def planning_check(run_id: UUID, body: PlanningPlan, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    return Response(planning_stage.check(storage(), run, body.plan))
+
+
+@app.post('/api/runs/{run_id}/planning/draft', dependencies=[Depends(size_guard)])
+def planning_draft(run_id: UUID, body: PlanningPlan, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.draft(conn, storage(), user, run, body.plan, body.quote)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/revise', dependencies=[Depends(size_guard)])
+def planning_revise(run_id: UUID, body: PlanningPlan, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.revise(conn, storage(), user, run, body.plan, body.quote)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/answer')
+def planning_answer(run_id: UUID, body: PlanningAnswer, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    if body.check is not None:
+        fn = lambda: (200, planning_stage.answer_mechanical(storage(), user, run, body.question_id, body.check))
+    else:
+        if not (body.answer or '').strip() or not (body.quote or '').strip():
+            raise Problem(422, 'PLANNING_CONTRACT', 'A user answer needs answer and the operator reply as quote.')
+        fn = lambda: (200, planning_stage.answer_user(storage(), user, run, body.question_id, body.answer, body.quote))
+    status, resp = core.with_receipt(conn, user, body_dict(body), fn)
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/frames')
+def planning_frames(run_id: UUID, body: PlanningFrames, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.extract_frames(storage(), user, run, body.question_id, body.source_id, body.times)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/inspect', status_code=201)
+def planning_inspect(run_id: UUID, body: PlanningInspect, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, planning_stage.inspect(conn, storage(), user, run, body.question_ids)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/review')
+def planning_review(run_id: UUID, body: PlanningReview, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    doc = {'response_digest': body.response_digest, 'fields': body.fields, 'excluded_observation_ids': body.excluded_observation_ids}
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.review_answers(conn, storage(), user, run, doc)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/ledger')
+def planning_ledger(run_id: UUID, body: Write, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, planning_stage.ledger(conn, storage(), user, run)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/planning/finalize', status_code=201)
+def planning_finalize(run_id: UUID, body: PlanningFinalize, user=User, conn=DB):
+    run = _planning_run(conn, user, run_id)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, planning_stage.finalize(conn, storage(), user, run, body.assessment, body.quote)))
+    return Response(resp, status_code=status)
 
 
 @app.get('/health')

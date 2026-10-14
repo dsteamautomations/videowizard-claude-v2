@@ -82,9 +82,9 @@ def begin_connect():
     return pending
 
 
-def need_connect():
+def need_connect(reason=''):
     p = begin_connect()
-    emit({'action': 'connect', 'url': p['url'], 'code': p['code'], 'expires_at': p['expires_at'],
+    emit({'action': 'connect', 'url': p['url'], 'code': p['code'], 'expires_at': p['expires_at'], 'reason': reason,
           'message': f"Ask the operator to open {p['url']}, sign in, check that the page shows code {p['code']}, and approve. Then run `vw connect`."}, 2)
 
 
@@ -102,7 +102,7 @@ def call(method, path, **kw):
     except httpx.RequestError as exc:
         emit({'action': 'tell_builder', 'message': f'VideoWizard server not reachable at {server_url()} ({exc.__class__.__name__}). Tell the builder; do not debug.'}, 2)
     if r.status_code == 401:
-        need_connect()
+        need_connect(f'{method} {path} returned 401')
     body = r.json() if r.headers.get('content-type', '').startswith('application/json') else {'message': r.text[:300]}
     if r.status_code < 300:
         return body
@@ -442,6 +442,80 @@ def cmd_analysis(a):
         emit(write(f'/api/runs/{run}/analysis/{a.unit}/{a.what}', {'note': a.note or ''}))
 
 
+def _json_file(m, rel):
+    path = workspace(m['code']) / rel
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        emit({'action': 'refused', 'message': f'{rel} is missing or not valid JSON ({exc.__class__.__name__}).'}, 2)
+
+
+def _download(m, key, rel):
+    ws = workspace(m['code'])
+    with api() as c:
+        r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
+    if r.status_code != 200:
+        emit({'action': 'tell_builder', 'message': f'Download of {key} failed: HTTP {r.status_code}.'}, 2)
+    (ws / rel).parent.mkdir(parents=True, exist_ok=True)
+    (ws / rel).write_bytes(r.content)
+    return str(ws / rel)
+
+
+def cmd_planning(a):
+    m = active()
+    run = m['run_id']
+    base = f'/api/runs/{run}/planning'
+    if a.what == 'prepare':
+        missing = [q for q, ok in (('Output fps? (--fps 24|25|30)', a.fps), ('Output resolution? (--resolution 1920x1080)', a.resolution),
+                                   ('May original camera sound be heard in the film? (--source-audio none|ambient|speech|both)', a.source_audio),
+                                   ('May people be seen speaking on screen? (--visible-speaking allow|avoid)', a.visible_speaking)) if not ok]
+        if missing:
+            emit({'action': 'ask_operator', 'questions': missing}, 2)
+        w, h = (int(x) for x in a.resolution.lower().split('x'))
+        out = write(base + '/prepare', {'fps': int(a.fps), 'resolution': [w, h], 'source_audio_in_output': a.source_audio, 'visible_speaking': a.visible_speaking, 'film_type': a.film_type or ''})
+        path = _download(m, out['package']['key'], 'work/planning-package.json')
+        emit({**out, 'package_path': path}, 0, 'Planning package ready in work/planning-package.json. Next: group scenes (out/scenes.json) then `vw planning scenes`.')
+    if a.what == 'package':
+        st = call('GET', base)
+        if st.get('state') != 'prepared':
+            emit({'action': 'refused', 'message': 'Run `vw planning prepare` first.'}, 2)
+        full = call('GET', f'/api/runs/{run}')
+        emit({'package_path': _download(m, f"{run}/planning/package.json", 'work/planning-package.json'), 'status': st}, 0, 'Package downloaded.')
+    if a.what == 'scenes':
+        out = write(base + '/scenes', {'scenes': _json_file(m, a.file), 'quote': a.quote or ''})
+        _download(m, out['package']['key'], 'work/planning-package.json')
+        emit(out, 0, f"Scenes saved; passages {out['passages']}. Package refreshed. Next: author out/plan.json and `vw planning check`.")
+    if a.what in ('check', 'draft', 'revise'):
+        body = {'plan': _json_file(m, a.file)}
+        if a.what != 'check':
+            body['quote'] = a.quote
+        out = write(base + '/' + a.what, body)
+        emit(out, 0 if out.get('status') in (None, 'draft_technically_valid') else 2, f"{a.what}: {out.get('status', 'ok')}")
+    if a.what == 'status':
+        emit(call('GET', base))
+    if a.what == 'answer':
+        emit(write(base + '/answer', {'question_id': a.question, 'answer': a.answer, 'quote': a.quote}))
+    if a.what == 'mechanical':
+        emit(write(base + '/answer', {'question_id': a.question, 'check': json.loads(a.check)}))
+    if a.what == 'frames':
+        emit(write(base + '/frames', {'question_id': a.question, 'source_id': a.source, 'times': [float(t) for t in a.times.split(',')]}))
+    if a.what == 'inspect':
+        emit(write(base + '/inspect', {'question_ids': a.question_ids or ([a.question] if a.question else [])}), 0, 'Paid Gemini 4 Argon inspection queued; tell the operator. Poll `vw planning status`.')
+    if a.what == 'review-input':
+        out = call('GET', base + '/review-input')
+        (workspace(m['code']) / 'work' / 'inspector-answers.json').write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding='utf-8')
+        emit(out, 0, 'Inspector answers in work/inspector-answers.json; write out/answer-review.json with a scope and reason per field.')
+    if a.what == 'review':
+        emit(write(base + '/review', _json_file(m, a.file)))
+    if a.what == 'ledger':
+        out = write(base + '/ledger', {})
+        _download(m, out['ledger']['key'], 'work/ledger.json')
+        emit(out, 0, f"Ledger prepared (digest {out['ledger_digest'][:12]}…) in work/ledger.json. Revise the plan, then `vw planning revise`.")
+    if a.what == 'finalize':
+        out = write(base + '/finalize', {'assessment': _json_file(m, a.file), 'quote': a.quote})
+        emit(out, 0, 'Planning finalized; certificate recorded. Run `vw next`.')
+
+
 def cmd_pull(a):
     runs = call('GET', '/api/runs')
     run = next((r for r in runs if r['code'] == a.code), None)
@@ -503,6 +577,9 @@ def main(argv=None):
     s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude'])
     s.add_argument('--camera-audio', choices=['allowed', 'excluded']); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
     s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.set_defaults(fn=cmd_analysis)
+    s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
+    s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
+    s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     a = p.parse_args(argv)

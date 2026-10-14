@@ -45,8 +45,14 @@ def _start_container():
 
 @pytest.fixture(scope='session', autouse=True)
 def database():
+    """One database per pytest session so parallel runs on the same container never share rows."""
     _start_container()
-    os.environ['VW2_DATABASE_URL'] = URL
+    name = f'vw2_t{os.getpid()}'
+    with psycopg.connect(URL, autocommit=True) as admin:
+        admin.execute(f'drop database if exists {name}')
+        admin.execute(f'create database {name}')
+    url = URL.rsplit('/', 1)[0] + '/' + name
+    os.environ['VW2_DATABASE_URL'] = url
     os.environ['VW2_SHARED_SUPABASE_URL'] = 'https://shared.invalid'
     os.environ['VW2_SHARED_SUPABASE_SERVICE_KEY'] = 'sb_secret_test'
     os.environ['VW2_APP_ID'] = 'app-test'
@@ -56,8 +62,14 @@ def database():
     os.environ['VW2_SPOOL'] = str(scratch / 'spool')
     os.environ['VW2_ELEVENLABS_API_KEY'] = 'test-key'
     from app import db
-    db.migrate(URL)
-    yield URL
+    db.migrate(url)
+    yield url
+    try:
+        with psycopg.connect(URL, autocommit=True) as admin:
+            admin.execute(f"select pg_terminate_backend(pid) from pg_stat_activity where datname = '{name}' and pid <> pg_backend_pid()")
+            admin.execute(f'drop database if exists {name}')
+    except psycopg.Error:
+        pass
 
 
 TEST_PROCEDURE = {
