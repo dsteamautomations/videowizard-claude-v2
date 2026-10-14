@@ -183,6 +183,15 @@ def output(conn, user, run, body):
         files = body.get('files') or []
         if st['requires_files'] and not files:
             raise Problem(422, 'FILES_REQUIRED', 'This stage must record at least one file.')
+        stored = [f for f in files if f.get('location') == 'storage']
+        if stored:
+            from .files import received
+            ok = received(conn, run['id'], [f['key'] for f in stored])
+            missing = [f['name'] for f in stored if f['key'] not in ok]
+            if missing:
+                raise Problem(422, 'FILE_NOT_RECEIVED', 'Upload these files and get receipts before recording the output.', files=missing)
+            for f in stored:
+                f['receipt'] = True
     except Problem:
         conn.rollback()
         _bump_attempt(run['id'], st['name'], unit, st['cap'])
@@ -244,6 +253,9 @@ def decide(conn, user, run, stage, unit, decision, note):
 def close(conn, user, run):
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is already closed.')
+    nxt = next_for(conn, run)
+    if nxt['stage'] is not None:
+        raise Problem(409, 'NOT_ALLOWED', f"Stage {nxt['stage']!r} is not done; a run closes only after delivery.", next=nxt)
     missing = [f.get('name') for o in current_outputs(conn, run['id']) for f in o['files'] if not f.get('receipt')]
     if missing:
         raise Problem(409, 'UPLOAD_INCOMPLETE', 'Some retained files have no upload receipt yet.', files=missing)

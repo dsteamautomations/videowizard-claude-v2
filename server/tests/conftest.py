@@ -50,6 +50,11 @@ def database():
     os.environ['VW2_SHARED_SUPABASE_URL'] = 'https://shared.invalid'
     os.environ['VW2_SHARED_SUPABASE_SERVICE_KEY'] = 'sb_secret_test'
     os.environ['VW2_APP_ID'] = 'app-test'
+    import tempfile
+    scratch = Path(tempfile.mkdtemp(prefix='vw2test-'))
+    os.environ['VW2_STORAGE_LOCAL_DIR'] = str(scratch / 'storage')
+    os.environ['VW2_SPOOL'] = str(scratch / 'spool')
+    os.environ['VW2_ELEVENLABS_API_KEY'] = 'test-key'
     from app import db
     db.migrate(URL)
     yield URL
@@ -75,7 +80,7 @@ TEST2_PROCEDURE = {
 def clean_tables(database):
     from app import db
     with psycopg.connect(database) as conn:
-        conn.execute("truncate vw2_receipts, vw2_defects, vw2_jobs, vw2_attempts, vw2_revises, vw2_stage_outputs, vw2_runs, vw2_sessions, vw2_connections")
+        conn.execute("truncate vw2_receipts, vw2_defects, vw2_jobs, vw2_attempts, vw2_revises, vw2_stage_outputs, vw2_runs, vw2_sessions, vw2_connections, vw2_files")
         conn.execute("delete from vw2_procedures where version in ('test','test2')")
         conn.execute("insert into vw2_procedures(version, document) values ('test', %s::jsonb), ('test2', %s::jsonb)",
                      (psycopg.types.json.Json(TEST_PROCEDURE), psycopg.types.json.Json(TEST2_PROCEDURE)))

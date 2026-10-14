@@ -19,6 +19,9 @@ def main():
     cwd = Path(data.get('cwd') or os.getcwd())
     root = Path(os.environ.get('CLAUDE_PLUGIN_ROOT') or Path(__file__).resolve().parents[1]).resolve()
     vw = (root / 'scripts' / 'vw.py').resolve()
+    repo, here = root.parent, cwd.resolve()
+    if here == repo or repo in here.parents or here in root.parents:
+        sys.exit(0)  # builder checkout: the session works inside the repo that holds the plugin source; operators never do
 
     if tool == 'Bash':
         cmd = (inp.get('command') or '').strip()

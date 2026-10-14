@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     CONNECT_MINUTES: int = 10
     SERVER_VERSION: str = '0.2.0'
     PLUGIN_MIN_VERSION: str = '0.1.0'
+    # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
+    STORAGE_SUPABASE_URL: str = ''
+    STORAGE_SUPABASE_SERVICE_KEY: SecretStr = SecretStr('')
+    STORAGE_BUCKET: str = ''
+    STORAGE_LOCAL_DIR: str = ''
+    MEDIA_MAX_BYTES: int = 200 * 1024 * 1024
+    ELEVENLABS_API_KEY: SecretStr = SecretStr('')
+    FFPROBE_EXECUTABLE: str = 'ffprobe'
+    FFMPEG_EXECUTABLE: str = 'ffmpeg'
 
 
 @lru_cache

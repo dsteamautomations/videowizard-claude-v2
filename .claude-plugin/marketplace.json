@@ -1,0 +1,8 @@
+{
+  "name": "vw-local",
+  "description": "VideoWizard v2 operator plugin (local marketplace)",
+  "owner": { "name": "DigitalSEO" },
+  "plugins": [
+    { "name": "vw", "source": "./plugin", "description": "VideoWizard v2 operator tools" }
+  ]
+}

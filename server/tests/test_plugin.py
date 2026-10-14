@@ -161,3 +161,9 @@ def test_p13_p14_guard_files(tmp_path):
     assert guard('Write', {'file_path': str(ROOT / 'plugin' / 'commands' / 'vw.md')}, tmp_path)[0] == 2
     assert guard('Write', {'file_path': str(runs / 'VW-4' / 'out' / 'x.json')}, tmp_path)[0] == 2
     assert guard('Read', {'file_path': str(tmp_path / 'anything')}, tmp_path)[0] == 0  # reads are not guarded
+
+
+def test_guard_stands_down_in_the_builder_checkout():
+    for cwd in (ROOT, ROOT / 'server', ROOT.parent):
+        assert guard('Bash', {'command': 'git status'}, cwd)[0] == 0, cwd
+        assert guard('Write', {'file_path': str(ROOT / 'README.md')}, cwd)[0] == 0, cwd

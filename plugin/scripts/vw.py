@@ -29,7 +29,8 @@ RUNS = Path(os.environ.get('VW2_RUNS') or Path.cwd() / 'runs')
 
 def emit(payload, code=0, summary=None):
     print(json.dumps(payload, indent=1, default=str))
-    print(summary or payload.get('message') or payload.get('action') or 'ok', file=sys.stderr)
+    hint = (payload.get('message') or payload.get('action')) if isinstance(payload, dict) else f'{len(payload)} item(s)'
+    print(summary or hint or 'ok', file=sys.stderr)
     sys.exit(code)
 
 
@@ -284,12 +285,14 @@ def cmd_stage(a):
     """Stage scripts: prepare (inputs + prompt for the model) and record (validate out/<stage>.json, record output)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import stages_text
+    import stages_av
     m = active()
     nxt = call('GET', f"/api/runs/{m['run_id']}/next")
     ensure_mine(nxt, a.take_over, m['run_id'])
     if nxt.get('stage') != a.stage:
         emit({'action': 'refused', 'message': f"The next stage is {nxt.get('stage')!r}, not {a.stage!r}. Run `vw next`.", 'next': nxt}, 2)
-    if a.stage not in stages_text.STAGES:
+    scripts = {**stages_text.STAGES, 'media': (stages_av.media_prepare, stages_av.media_record), 'voice': (stages_av.voice_prepare, stages_av.voice_record)}
+    if a.stage not in scripts:
         emit({'action': 'refused', 'message': f'Stage {a.stage!r} has no script in this plugin version.'}, 2)
     procedure = call('GET', f"/api/procedures/{nxt['version']}/{a.stage}")
     full = call('GET', f"/api/runs/{m['run_id']}")
@@ -301,14 +304,19 @@ def cmd_stage(a):
         return current[stage]
 
     ws = workspace(m['code'])
-    prepare, record = stages_text.STAGES[a.stage]
+    prepare, record = scripts[a.stage]
     try:
         if a.step == 'prepare':
-            emit({'stage': a.stage, **prepare(ws, procedure, prior)}, 0, f'{a.stage}: inputs and prompt ready; write the proposal to out/{a.stage}.json')
-        result = record(ws, procedure, prior)
+            emit({'stage': a.stage, **prepare(ws, procedure, prior)}, 0, f'{a.stage}: inputs and prompt ready')
+        if a.stage == 'media':
+            result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size))
+        elif a.stage == 'voice':
+            result = record(ws, procedure, prior, None)
+        else:
+            result = record(ws, procedure, prior)
     except stages_text.Refused as exc:
         emit({'action': 'refused', 'message': str(exc)}, 2)
-    refs = file_refs(m, result['files'], a.stage, result.get('retain', True))
+    refs = file_refs(m, result['files'], a.stage, result.get('retain', True)) + result.get('stored', [])
     body = {'stage': a.stage, 'files': refs, 'summary': result['summary']}
     if a.quote:
         body['accepted_quote'] = a.quote
@@ -317,6 +325,92 @@ def cmd_stage(a):
         m['files'] = [f for f in m['files'] if f['name'] != ref['name']] + [{**ref, 'stage': a.stage, 'action': 'retain' if result.get('retain', True) else 'upload'}]
     save_json(manifest_path(m['code']), m)
     emit(row, 0, f'Recorded {a.stage}; run `vw next`.')
+
+
+def upload_file(m, stage, path, sha, size):
+    """Sign → PUT → receipt. Skips files the manifest already shows as receipted (resumable)."""
+    path = Path(path)
+    name = path.name
+    done = next((f for f in m['files'] if f.get('sha256') == sha and f.get('receipt') and f.get('location') == 'storage'), None)
+    if done:
+        return {k: done[k] for k in ('name', 'key', 'sha256', 'bytes', 'receipt', 'location')}
+    signed = write(f"/api/runs/{m['run_id']}/files/sign", {'stage': stage, 'name': name})
+    url = signed['url'] if signed['url'].startswith('http') else server_url() + signed['url']
+    try:
+        with path.open('rb') as f:
+            r = httpx.put(url, content=f, headers=signed.get('headers') or {}, timeout=httpx.Timeout(600, connect=30))
+    except httpx.RequestError as exc:
+        emit({'action': 'refused', 'message': f'Upload of {name} was interrupted ({exc.__class__.__name__}). Run the step again; finished files are skipped.'}, 2)
+    if r.status_code >= 300:
+        emit({'action': 'tell_builder', 'message': f'Storage refused the upload of {name}: HTTP {r.status_code}.'}, 2)
+    write(f"/api/runs/{m['run_id']}/files/receipt", {'key': signed['key'], 'sha256': sha, 'bytes': size})
+    ref = {'name': name, 'key': signed['key'], 'sha256': sha, 'bytes': size, 'receipt': True, 'location': 'storage'}
+    m['files'] = [f for f in m['files'] if f.get('key') != ref['key']] + [{**ref, 'stage': stage, 'action': 'upload'}]
+    save_json(manifest_path(m['code']), m)
+    return ref
+
+
+def cmd_upload(a):
+    m = active()
+    ws = workspace(m['code'])
+    path = (ws / a.file).resolve()
+    if not path.is_file() or ws.resolve() not in path.parents:
+        emit({'action': 'refused', 'message': f'{a.file} must be a file inside the run folder.'}, 2)
+    data = path.read_bytes()
+    emit(upload_file(m, a.stage, path, hashlib.sha256(data).hexdigest(), len(data)), 0, f'Uploaded {path.name}')
+
+
+def cmd_voice(a):
+    m = active() if a.what in ('audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve') else None
+    if a.what == 'recover':
+        emit(write(f"/api/runs/{m['run_id']}/jobs/{a.job}/recover", {}))
+    if a.what == 'resolve':
+        emit(write(f"/api/runs/{m['run_id']}/jobs/{a.job}/resolve", {'note': a.note or ''}), 0, 'Attempt set aside; a new narration may be submitted.')
+    if a.what == 'catalog':
+        params = {k: v for k, v in (('scope', a.scope), ('search', a.search), ('cursor', a.cursor), ('language', a.language), ('accent', a.accent),
+                                    ('gender', a.gender), ('age', a.age), ('use_cases', ','.join(a.use_case or [])), ('high_quality', 'true' if a.high_quality else '')) if v}
+        emit(call('GET', '/api/voice/catalog', params=params))
+    if a.what == 'models':
+        emit(call('GET', '/api/voice/models'))
+    if a.what == 'preview':
+        emit(call('GET', f'/api/voice/preview/{a.voice[0]}'), 0, 'Give the operator the preview link to listen.')
+    if a.what == 'add-library':
+        emit(call('POST', '/api/voice/library-add', json={'public_owner_id': a.owner, 'voice_id': a.voice[0]}))
+    if a.what in ('audition', 'narrate'):
+        script = load_json(workspace(m['code']) / 'out' / 'script.json') or {}
+        text = a.excerpt if a.what == 'audition' else script.get('spoken_text')
+        if not text:
+            emit({'action': 'refused', 'message': 'No text: auditions need --excerpt; narration needs out/script.json.'}, 2)
+        settings_ = json.loads(a.settings) if a.settings else None
+        rows = []
+        for voice in (a.voice if a.what == 'audition' else a.voice[:1]):
+            req = {'kind': 'audition' if a.what == 'audition' else 'narration', 'voice_id': voice, 'model_id': a.model, 'text': text, **({'settings': settings_} if settings_ else {})}
+            rows.append(write(f"/api/runs/{m['run_id']}/jobs", {'stage': 'voice', 'provider': 'elevenlabs', 'request': req}))
+        emit({'jobs': [{'id': r['id'], 'voice_id': r['request']['voice_id'], 'status': r['status']} for r in rows]}, 0,
+             f"Submitted {len(rows)} paid ElevenLabs {a.what} job(s); tell the operator, then poll with `vw voice jobs`.")
+    if a.what == 'jobs':
+        emit(call('GET', f"/api/runs/{m['run_id']}/jobs", params={'stage': 'voice'}))
+    if a.what == 'fetch':
+        job = call('GET', f"/api/runs/{m['run_id']}/jobs/{a.job}")
+        if job['status'] != 'ready':
+            emit({'action': 'refused', 'message': f"Job is {job['status']}: {job.get('error') or 'not ready yet'}.", 'job': job}, 2)
+        ws = workspace(m['code'])
+        res = job['result']
+        for name, key in (('narration.mp3' if job['request']['kind'] == 'narration' else f"audition-{job['request']['voice_id']}.mp3", res['audio_key']), ('timing.json', res.get('timing_key'))):
+            if not key:
+                continue
+            try:
+                with api() as c:
+                    r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
+            except httpx.RequestError as exc:
+                emit({'action': 'tell_builder', 'message': f'Download failed ({exc.__class__.__name__}).'}, 2)
+            if r.status_code != 200:
+                emit({'action': 'tell_builder', 'message': f'Download of {name} failed: HTTP {r.status_code}.'}, 2)
+            (ws / 'out' / name).write_bytes(r.content)
+        if job['request']['kind'] == 'narration':
+            save_json(ws / 'work' / 'voice-fetched.json', job)
+        emit({'job': job['id'], 'files': [str(ws / 'out' / 'narration.mp3')], 'duration_s': res.get('duration_s')}, 0,
+             'Fetched. Give the operator the file to listen to, ask for approval, then `vw stage voice record --quote`.')
 
 
 def cmd_pull(a):
@@ -371,6 +465,12 @@ def main(argv=None):
     s = sub.add_parser('decide'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--decision', required=True, choices=['retry', 'revise', 'defect', 'stop']); s.add_argument('--note'); s.set_defaults(fn=cmd_decide)
     s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
+    s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)
+    s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve'])
+    s.add_argument('--scope', default='account'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
+    s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
+    s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')
+    s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note'); s.set_defaults(fn=cmd_voice)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     a = p.parse_args(argv)
