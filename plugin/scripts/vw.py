@@ -615,6 +615,75 @@ def cmd_visuals(a):
         emit(write(base + '/record', {'gap_id': a.gap, 'quote': a.quote}), 0, 'Gap recorded; `vw next`.')
 
 
+def _s2_fetch(m, kind, out_name):
+    st = call('GET', f"/api/runs/{m['run_id']}/stage2")
+    r = (st.get('renders') or {}).get(kind) or {}
+    if r.get('status') != 'ready':
+        emit({'action': 'refused', 'message': f"The {kind} film is {r.get('status') or 'not rendered'}: {r.get('error') or 'poll status'}", 'render': r}, 2)
+    path = _download(m, r['result']['key'], out_name)
+    emit({'film': kind, 'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': r['result'].get('record')}, 0, f'{kind} film at {path}; let the operator watch it.')
+
+
+def cmd_options(a):
+    m = active()
+    run = m['run_id']
+    base = f'/api/runs/{run}/options'
+    if a.what == 'prepare':
+        out = write(base + '/prepare', {})
+        _download(m, out['package']['key'], 'work/options-package.json')
+        emit(out, 0, f"Package in work/options-package.json: {out['beats']} beats, {out['eligible_sub_clips']} eligible sub-clips. Show the coverage report first.")
+    if a.what == 'coverage':
+        emit(call('GET', base + '/coverage'))
+    if a.what in ('check', 'propose'):
+        out = write(base + '/' + a.what, {'document': _json_file(m, a.file)})
+        emit(out, 2 if out.get('status') == 'rejected' else 0, f"{a.what}: {out.get('status') or 'version ' + str(out.get('version'))}")
+    if a.what == 'frames':
+        out = write(base + '/frames', {'sub_clip_id': a.sub, 'edge': a.edge or 'in'})
+        paths = [_download(m, f['key'], f"work/frames/{a.sub.replace(':', '-')}-{a.edge or 'in'}/{f['frame_id']}.png") for f in out['frames']]
+        emit({**out, 'paths': paths}, 0, 'Stills around the cut point are in work/frames/; show them to the operator.')
+    if a.what == 'inspect':
+        emit(write(base + '/inspect', {'sub_clip_id': a.sub, 'edge': a.edge or 'in'}), 0, 'Paid Gemini boundary check queued; tell the operator, poll `vw options status`.')
+    if a.what == 'render':
+        emit(write(f'/api/runs/{run}/stage2/render', {'film': 'review'}), 0, 'Review film rendering; poll `vw options status`.')
+    if a.what == 'status':
+        emit(call('GET', f'/api/runs/{run}/stage2'))
+    if a.what == 'show':
+        emit(call('GET', f'{base}/{a.option}'))
+    if a.what == 'log':
+        out = call('GET', f'{base}/log/{a.unit}')
+        emit({**out, 'path': _download(m, out['key'], f'work/logs/{a.unit}.evidence.json')}, 0, 'Full log downloaded; read it for this candidate only.')
+    if a.what == 'fetch':
+        _s2_fetch(m, 'review', 'out/review.mp4')
+    if a.what == 'record':
+        emit(write(base + '/record', {'quote': a.quote}), 0, 'Options recorded; next the operator decides per option (`vw master decide`).')
+
+
+def cmd_master(a):
+    m = active()
+    run = m['run_id']
+    base = f'/api/runs/{run}/master'
+    if a.what == 'decide':
+        body = {'option_number': int(a.option), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
+        emit(write(base + '/decide', body))
+    if a.what == 'rule':
+        emit(write(base + '/rule', {'rule': a.add}))
+    if a.what == 'build':
+        emit(write(base + '/build', {}))
+    if a.what == 'render':
+        emit(write(f'/api/runs/{run}/stage2/render', {'film': 'master'}), 0, 'Master film rendering; poll `vw master status`.')
+    if a.what == 'status':
+        emit(call('GET', f'/api/runs/{run}/stage2'))
+    if a.what == 'fetch':
+        _s2_fetch(m, 'master', 'out/master.mp4')
+    if a.what == 'record':
+        emit(write(base + '/record', {'quote': a.quote}), 0, 'Master recorded; next `vw first-cut record`.')
+
+
+def cmd_first_cut(a):
+    m = active()
+    emit(write(f"/api/runs/{m['run_id']}/first-cut/record", {'quote': a.quote}), 0, 'First cut recorded.')
+
+
 def cmd_pull(a):
     runs = call('GET', '/api/runs')
     run = next((r for r in runs if r['code'] == a.code), None)
@@ -683,6 +752,15 @@ def main(argv=None):
     for flag in ('--file', '--gap', '--choice', '--quote', '--element', '--name', '--subject', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)
+    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
+    for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote'):
+        s.add_argument(flag)
+    s.set_defaults(fn=cmd_options)
+    s = sub.add_parser('master'); s.add_argument('what', choices=['decide', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
+    for flag in ('--option', '--action', '--note', '--edit', '--add', '--quote'):
+        s.add_argument(flag)
+    s.set_defaults(fn=cmd_master)
+    s = sub.add_parser('first-cut'); s.add_argument('what', choices=['record']); s.add_argument('--quote'); s.set_defaults(fn=cmd_first_cut)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     a = p.parse_args(argv)

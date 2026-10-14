@@ -151,6 +151,9 @@ def tick():
         busy = True
     if visual_workers.tick():
         busy = True
+    from .stage2 import render_jobs
+    if render_jobs.tick():
+        busy = True
     return busy
 
 

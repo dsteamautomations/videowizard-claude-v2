@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, visuals_stage, web, worker
+from .stage2 import stage as stage2
 from .storage import storage
 from .config import settings
 from .db import connect as db_connect, migrate
@@ -265,6 +266,34 @@ class AssetBody(Write):
 class GapBody(Write):
     gap_id: str
     quote: str = Field(min_length=1)
+
+
+class Quote(Write):
+    quote: str = Field(min_length=1)
+
+
+class OptionsDoc(Write):
+    document: dict[str, Any]
+
+
+class FramesBody(Write):
+    sub_clip_id: str
+    edge: Literal['in', 'out'] = 'in'
+
+
+class RenderBody(Write):
+    film: Literal['review', 'master']
+
+
+class DecideBody(Write):
+    option_number: int
+    action: Literal['KEEP', 'REJECT', 'KEEP_WITH_EDIT']
+    note: str = ''
+    edit: str | None = None
+
+
+class RuleBody(Write):
+    rule: str = Field(min_length=1, max_length=2000)
 
 
 class LibraryAdd(Strict):
@@ -809,6 +838,109 @@ def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/record', status_code=201)
 def visuals_record(run_id: UUID, body: GapBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.record_gap(conn, storage(), user, run, outputs, body.gap_id, body.quote), 201)
+
+
+# ---------- stage 2: options / master / first cut ----------
+
+def _stage_run(conn, user, run_id, stage):
+    run = core.load_run(conn, user, run_id, lock=True)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    nxt = core.next_for(conn, run)
+    if nxt['stage'] != stage:
+        raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not {stage!r}.", next=nxt)
+    return run, core.current_outputs(conn, run['id'])
+
+
+def _s2(conn, user, run_id, stage, body, fn, status=200):
+    run, outputs = _stage_run(conn, user, run_id, stage)
+    st, resp = core.with_receipt(conn, user, body_dict(body), lambda: (status, fn(run, outputs)))
+    return Response(resp, status_code=st)
+
+
+@app.post('/api/runs/{run_id}/options/prepare')
+def options_prepare(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.prepare(conn, storage(), user, run, outputs))
+
+
+@app.get('/api/runs/{run_id}/options/coverage')
+def options_coverage(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage2.coverage(storage(), run))
+
+
+@app.post('/api/runs/{run_id}/options/check', dependencies=[Depends(size_guard)])
+def options_check(run_id: UUID, body: OptionsDoc, user=User, conn=DB):
+    run, _ = _stage_run(conn, user, run_id, 'options')
+    return Response(stage2.check(storage(), run, body.document))
+
+
+@app.post('/api/runs/{run_id}/options/propose', dependencies=[Depends(size_guard)])
+def options_propose(run_id: UUID, body: OptionsDoc, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.propose(conn, storage(), user, run, body.document))
+
+
+@app.post('/api/runs/{run_id}/options/frames')
+def options_frames(run_id: UUID, body: FramesBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.frames(storage(), user, run, body.sub_clip_id, body.edge))
+
+
+@app.post('/api/runs/{run_id}/options/inspect', status_code=201)
+def options_inspect(run_id: UUID, body: FramesBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.inspect(conn, storage(), user, run, body.sub_clip_id, body.edge), 201)
+
+
+@app.post('/api/runs/{run_id}/stage2/render', status_code=201)
+def stage2_render(run_id: UUID, body: RenderBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options' if body.film == 'review' else 'master', body, lambda run, outputs: stage2.render(conn, storage(), user, run, body.film), 201)
+
+
+@app.get('/api/runs/{run_id}/stage2')
+def stage2_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage2.status(conn, storage(), run))
+
+
+@app.get('/api/runs/{run_id}/options/{option_number}')
+def options_show(run_id: UUID, option_number: int, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage2.show(storage(), run, option_number))
+
+
+@app.get('/api/runs/{run_id}/options/log/{unit}')
+def options_log(run_id: UUID, unit: str, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage2.log_key(storage(), run, core.current_outputs(conn, run['id']), unit))
+
+
+@app.post('/api/runs/{run_id}/options/record', status_code=201)
+def options_record(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.record_options(conn, storage(), user, run, body.quote), 201)
+
+
+@app.post('/api/runs/{run_id}/master/decide')
+def master_decide(run_id: UUID, body: DecideBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.decide(storage(), user, run, body.option_number, body.action, body.note, body.edit))
+
+
+@app.post('/api/runs/{run_id}/master/rule')
+def master_rule(run_id: UUID, body: RuleBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.add_rule(storage(), user, run, body.rule))
+
+
+@app.post('/api/runs/{run_id}/master/build')
+def master_build(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.build_master(conn, storage(), user, run))
+
+
+@app.post('/api/runs/{run_id}/master/record', status_code=201)
+def master_record(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.record_master(conn, storage(), user, run, body.quote), 201)
+
+
+@app.post('/api/runs/{run_id}/first-cut/record', status_code=201)
+def first_cut_record(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'first_cut', body, lambda run, outputs: stage2.record_first_cut(conn, storage(), user, run, outputs, body.quote), 201)
 
 
 @app.get('/health')

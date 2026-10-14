@@ -69,7 +69,7 @@ def sub_clip(sid, a, b, fps, talking=False, bad_enum=False):
             'camera_and_optics': {'native_shot_size': 'WS', 'camera_angle': 'Eye_Level', 'lens_feel': 'Standard', 'movement_type': 'Static', 'movement_direction': 'none', 'movement_speed': 'None',
                                   'movement_easing': 'Not_Applicable', 'has_3d_parallax': False, 'has_internal_scene_motion': False, 'subject_screen_direction': 'Neutral', 'depth_of_field': 'Deep_Sharp',
                                   'leading_lines': [], 'uncertainty': ''},
-            'pacing_and_flow': {'entry_eye_grid': 'Mid_Center', 'exit_eye_grid': 'Mid_Center', 'kinetic_energy_score': 2, 'min_comprehension_hold_s': 1.0,
+            'pacing_and_flow': {'entry_eye_grid': 'Mid_Center', 'exit_eye_grid': 'Mid_Center', 'kinetic_energy_score': 2, 'min_comprehension_hold_s': 0.4,
                                 'time_manipulation_options': ['SLOW_MO_ELIGIBLE', 'HOLD_LAST_FRAME_OK'], 'natural_cut_points': [], 'accent_events': [{'tc': tc(a, fps), 's': a / fps, 'frame': a, 'description': 'start'}],
                                 'text_safe_zone': None},
             'continuity_and_story': {'primary_fit_for_beats': ['BEAT_01'], 'secondary_fit_for_beats': [], 'beat_fit_reasoning': 'synthetic', 'beat_fit_basis': 'illustrative', 'beat_fit_limits': '',

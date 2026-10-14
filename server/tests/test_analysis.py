@@ -61,6 +61,10 @@ class FakeTransport:
                 FakeTransport.pending_raw = raw
                 raise OSError('worker killed after generate')
             return {'body': body, 'metadata': {'finish_reason': 'STOP', 'usage': {'promptTokenCount': 1200, 'candidatesTokenCount': 400}, 'elapsed_seconds': 1.5}, 'raw': raw}
+        if 'residual_lip_movement' in schema.get('properties', {}):  # options boundary check
+            body = {'residual_lip_movement': 'no', 'last_movement_s': None, 'looking_at_lens': 'no', 'notes': 'synthetic'}
+            raw = json.dumps(body)
+            return {'body': body, 'metadata': {'finish_reason': 'STOP', 'usage': {'promptTokenCount': 900, 'candidatesTokenCount': 40}, 'elapsed_seconds': 0.3}, 'raw': raw}
         if 'answers' in schema.get('properties', {}):  # planning inspection (flash schema)
             qid = re.search(r'"id": "(Q[0-9]+)"', prompt).group(1)
             sid = re.search(r'"source_id": "([0-9a-f]{16})"', prompt).group(1)
@@ -103,10 +107,10 @@ def gemini(monkeypatch, tmp_path):
     return FakeTransport
 
 
-def run_until_analysis(home, database, fake, n_clips=3, seconds=1):
+def run_until_analysis(home, database, fake, n_clips=3, seconds=1, rate=10):
     code, ws = run_until_media(home, database, fake)
     for i in range(n_clips):
-        clip(ws / 'in' / f'c{i}.mp4', seconds=seconds, tone=440 + 110 * i, size='128x72')   # 16:9 like real footage; the crop solver is aspect-locked
+        clip(ws / 'in' / f'c{i}.mp4', seconds=seconds, tone=440 + 110 * i, size='128x72', rate=rate)   # 16:9 like real footage; the crop solver is aspect-locked
     assert vw(home, 'stage', 'media', 'prepare')[0] == 0
     rc, out, err = vw(home, 'stage', 'media', 'record', '--quote', 'yes')
     assert rc == 0, err

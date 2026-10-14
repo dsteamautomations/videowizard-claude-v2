@@ -1,0 +1,223 @@
+"""FFmpeg renders for stage 2: the options review film (slates + option events + each beat's narration window + A2 nat sound)
+and the master film (events rippled from zero + the continuous narration + A2). Codec spec per design/17: H.264 High, yuv420p, BT.709 tags,
+AAC 48 kHz stereo, faststart. Segments are cached by digest so a revise re-renders only what changed."""
+import hashlib
+import json
+import math
+import re
+import subprocess
+from fractions import Fraction
+from pathlib import Path
+
+from ..config import settings
+from ..errors import Problem
+from . import SLATE_FRAMES
+
+A2_PEAK_DBFS = -27.0          # blueprint A2 band −24 to −30 dBFS peak
+A1_TARGET_LUFS = -16.0
+FADE_FRAMES = 4
+
+
+def ffmpeg():
+    return settings().FFMPEG_EXECUTABLE
+
+
+def ffprobe():
+    return settings().FFPROBE_EXECUTABLE
+
+
+def run(args, timeout=1800):
+    try:
+        return subprocess.run(args, check=True, capture_output=True, timeout=timeout)
+    except subprocess.CalledProcessError as exc:
+        raise Problem(502, 'RENDER', 'ffmpeg failed: ' + exc.stderr.decode(errors='replace')[-600:])
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise Problem(502, 'RENDER', f'ffmpeg could not run ({exc.__class__.__name__}).')
+
+
+def digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def duration_of(path):
+    out = subprocess.run([ffprobe(), '-v', 'error', '-show_entries', 'format=duration', '-of', 'json', str(path)], capture_output=True, check=True, timeout=60).stdout
+    return float(json.loads(out)['format']['duration'])
+
+
+def slate_png(lines, width, height, path):
+    from PIL import Image, ImageDraw, ImageFont
+    img = Image.new('RGB', (width, height), (0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    size = max(12, height // 22)
+    try:
+        font = ImageFont.load_default(size=size)
+    except TypeError:
+        font = ImageFont.load_default()
+    y = height // 2 - int(size * 2.2)
+    for line in lines:
+        text = ''.join(c if ord(c) < 127 else '?' for c in line)
+        draw.text((width // 16, y), text, fill=(240, 240, 240), font=font)
+        y += int(size * 1.6)
+    img.save(path, format='PNG')
+
+
+class Renderer:
+    def __init__(self, work, timeline):
+        self.work = Path(work)
+        self.cache = self.work / 'cache'
+        self.cache.mkdir(parents=True, exist_ok=True)
+        self.tl = timeline
+        self.W, self.H, self.fps = int(timeline['width']), int(timeline['height']), Fraction(str(timeline['fps']))
+
+    # ---------- picture ----------
+
+    def video_args(self):
+        return ['-c:v', 'libx264', '-profile:v', 'high', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(self.fps), '-an']
+
+    def slate(self, lines, frames=SLATE_FRAMES):
+        key = digest({'slate': lines, 'tl': self.tl, 'frames': frames})
+        out = self.cache / f'slate-{key[:16]}.mp4'
+        if not out.exists():
+            png = self.cache / f'slate-{key[:16]}.png'
+            slate_png(lines, self.W, self.H, png)
+            run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
+        return out
+
+    def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False):
+        """One picture event: source frames [in,out) at src_fps → exactly n_tl timeline frames. hold_last_frame pads with the last frame."""
+        key = digest({'src': src_sha, 'in': ev['source_in_frame'], 'out': ev['source_out_frame'], 'n': n_tl, 'crop': crop_rect, 'rot': rotation_deg, 'hold': bool(ev.get('hold_last_frame')), 'tl': self.tl, 'hdr': hdr})
+        out = self.cache / f'seg-{key[:16]}.mp4'
+        if out.exists():
+            return out
+        src_fps = Fraction(str(src_fps))
+        start = Fraction(ev['source_in_frame']) / src_fps
+        n_src = ev['source_out_frame'] - ev['source_in_frame']
+        filters = []
+        if crop_rect:
+            x, y, w, h = crop_rect
+            filters.append(f'crop=iw*{w}:ih*{h}:iw*{x}:ih*{y}')
+        if rotation_deg:
+            filters.append(f'rotate={math.radians(rotation_deg)}:c=black')
+        if hdr:
+            filters.append('zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,format=yuv420p')
+        filters += [f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease', f'pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2', f'fps={self.fps}']
+        if ev.get('hold_last_frame'):
+            filters.append(f'tpad=stop_mode=clone:stop_duration={float(n_tl / self.fps) + 1}')
+        run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{float(start):.6f}', '-i', str(src_path), '-t', f'{float(Fraction(n_src) / src_fps) + 0.5:.6f}',
+             '-vf', ','.join(filters), '-frames:v', str(n_tl), *self.video_args(), str(out)])
+        return out
+
+    def concat(self, parts, out):
+        lst = out.with_suffix('.txt')
+        lst.write_text(''.join(f"file '{Path(p).as_posix()}'\n" for p in parts), encoding='utf-8')
+        run([ffmpeg(), '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-c', 'copy', str(out)])
+        return out
+
+    # ---------- audio ----------
+
+    def narration_window(self, narration, start_s, end_s, out):
+        run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{start_s:.6f}', '-t', f'{max(0.0, end_s - start_s):.6f}', '-i', str(narration), '-ar', '48000', '-ac', '2', str(out)])
+        return out
+
+    def silence(self, seconds, out):
+        run([ffmpeg(), '-y', '-v', 'error', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', f'{seconds:.6f}', str(out)])
+        return out
+
+    def peak_dbfs(self, path):
+        r = subprocess.run([ffmpeg(), '-i', str(path), '-af', 'volumedetect', '-f', 'null', '-'], capture_output=True, timeout=600)
+        m = re.search(r'max_volume: (-?[0-9.]+) dB', r.stderr.decode(errors='replace'))
+        return float(m.group(1)) if m else None
+
+    def loudness(self, path):
+        r = subprocess.run([ffmpeg(), '-i', str(path), '-af', 'ebur128=peak=true', '-f', 'null', '-'], capture_output=True, timeout=600)
+        txt = r.stderr.decode(errors='replace')
+        i = re.findall(r'I:\s+(-?[0-9.]+) LUFS', txt)
+        tp = re.findall(r'Peak:\s+(-?[0-9.]+) dBFS', txt)
+        return {'integrated_lufs': float(i[-1]) if i else None, 'true_peak_dbfs': float(tp[-1]) if tp else None}
+
+    def a2_piece(self, src_path, src_fps, iv, timeline_at_s, out):
+        """One nat-sound interval: cut, 4-frame fades, gain to −27 dBFS peak, placed at timeline_at_s. Returns the piece path or None (silent source)."""
+        src_fps = Fraction(str(src_fps))
+        start, end = float(Fraction(iv['in_frame']) / src_fps), float(Fraction(iv['out_frame']) / src_fps)
+        raw = out.with_name(out.stem + '.raw.wav')
+        r = subprocess.run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{start:.6f}', '-t', f'{end - start:.6f}', '-i', str(src_path), '-vn', '-ar', '48000', '-ac', '2', str(raw)], capture_output=True)
+        if r.returncode != 0 or not raw.exists():
+            return None
+        peak = self.peak_dbfs(raw)
+        gain = (A2_PEAK_DBFS - peak) if peak is not None else 0.0
+        fade = float(FADE_FRAMES / self.fps)
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(raw), '-af', f'volume={gain:.2f}dB,afade=t=in:st=0:d={fade:.4f},afade=t=out:st={max(0.0, end - start - fade):.4f}:d={fade:.4f},adelay={int(timeline_at_s * 1000)}|{int(timeline_at_s * 1000)}', str(out)])
+        return out
+
+    def mix(self, a1, pieces, length_s, out):
+        inputs = [a1] + [p for p in pieces if p]
+        args = [ffmpeg(), '-y', '-v', 'error']
+        for p in inputs:
+            args += ['-i', str(p)]
+        if len(inputs) == 1:
+            run(args + ['-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(out)])
+        else:
+            run(args + ['-filter_complex', f'amix=inputs={len(inputs)}:duration=first:normalize=0', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(out)])
+        return out
+
+    def mux(self, picture, audio, out):
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(picture), '-i', str(audio), '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2',
+             '-movflags', '+faststart', '-shortest', str(out)])
+        return out
+
+
+def a1_gain(renderer, narration):
+    """design/17 C2: A1 is measured; one gain change only when more than 1 LU from −16, recorded; never re-encoded otherwise."""
+    lo = renderer.loudness(narration)
+    i = lo.get('integrated_lufs')
+    gain = 0.0 if i is None or abs(i - A1_TARGET_LUFS) <= 1.0 else A1_TARGET_LUFS - i
+    return gain, lo
+
+
+def render_film(kind, plan, sources, narration, work, timeline):
+    """plan: {'items': [...]} where each item is {'kind': 'slate', 'lines': [...]} or
+    {'kind': 'event', 'sub_clip_id', 'clip': {'id','name','sha256','fps','rotation_deg','hdr'}, 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop_rect', 'hold_last_frame',
+     'a2': [{'in_frame','out_frame'}]} and, for the review film, {'kind': 'narration', 'start_s', 'end_s'} markers before each option; the master uses the whole narration.
+    sources: {clip_id: Path}. Returns the film path and a record."""
+    r = Renderer(work, timeline)
+    parts, a2_pieces, a1_parts = [], [], []
+    cursor = Fraction(0)
+    silence_before = Fraction(0)
+    for i, item in enumerate(plan['items']):
+        if item['kind'] == 'slate':
+            n = int(item.get('frames') or SLATE_FRAMES)
+            parts.append(r.slate(item['lines'], n))
+            silence_before += Fraction(n) / r.fps
+            cursor += Fraction(n) / r.fps
+        elif item['kind'] == 'narration':
+            if silence_before:
+                a1_parts.append(r.silence(float(silence_before), r.work / f'a1-sil-{i}.wav'))
+                silence_before = Fraction(0)
+            a1_parts.append(r.narration_window(narration, item['start_s'], item['end_s'], r.work / f'a1-{i}.wav'))
+        else:
+            clip = item['clip']
+            seg = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], item, item['timeline_frames'], item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')))
+            parts.append(seg)
+            for j, iv in enumerate(item.get('a2') or []):
+                src_fps = Fraction(str(clip['fps']))
+                at = cursor + (Fraction(iv['in_frame'] - item['source_in_frame']) / src_fps)
+                a2_pieces.append(r.a2_piece(sources[clip['id']], clip['fps'], iv, float(at), r.work / f'a2-{i}-{j}.wav'))
+            cursor += Fraction(item['timeline_frames']) / r.fps
+    picture = r.concat(parts, r.work / f'{kind}-picture.mp4')
+    length_s = float(cursor)
+    gain, a1_measured = a1_gain(r, narration)
+    if kind == 'master':
+        a1 = r.work / 'a1.wav'
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(narration), '-af', f'volume={gain:.2f}dB,apad', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(a1)])
+    else:
+        if silence_before:
+            a1_parts.append(r.silence(float(silence_before), r.work / 'a1-sil-end.wav'))
+        a1 = r.work / 'a1.wav'
+        lst = r.work / 'a1.txt'
+        lst.write_text(''.join(f"file '{Path(p).as_posix()}'\n" for p in a1_parts), encoding='utf-8')
+        run([ffmpeg(), '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-af', f'volume={gain:.2f}dB,apad', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(a1)])
+    mixed = r.mix(a1, a2_pieces, length_s, r.work / f'{kind}-mix.wav')
+    film = r.mux(picture, mixed, r.work / f'{kind}.mp4')
+    master_loudness = r.loudness(film)
+    return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
+                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': 'h264 high yuv420p bt709 / aac 48k stereo'}

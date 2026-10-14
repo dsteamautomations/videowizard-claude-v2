@@ -76,9 +76,9 @@ def save_session(store, run, session):
 def gaps_source(store, outputs):
     """Gaps come from the approved first cut when present (Mac slice), else from the planning certificate."""
     first_cut = next((o for o in outputs if o['stage'] == 'first_cut' and o['unit'] is None), None)
-    planning = next((o for o in outputs if o['stage'] == 'planning' and o['unit'] is None), None)
+    planning = next((o for o in outputs if o['stage'] in ('planning', 'master') and o['unit'] is None), None)
     if not planning:
-        raise Problem(409, 'NOT_ALLOWED', 'Visuals needs a finalized plan first.')
+        raise Problem(409, 'NOT_ALLOWED', 'Visuals needs a finalized plan (planning or master) first.')
     base = first_cut['summary'] if first_cut and first_cut['summary'].get('gaps') is not None else planning['summary']
     gaps = {g['shot_id']: {'start_frame': g['start_frame'], 'end_frame': g['end_frame'], 'passage_ids': g.get('passage_ids', []), 'requirement': g.get('reason', '')} for g in base['gaps']}
     return {'from': 'first_cut' if base is not planning['summary'] else 'planning', 'fps': str(base.get('fps') or planning['summary']['fps']),
