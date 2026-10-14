@@ -1,0 +1,183 @@
+"""One Resolve timeline from the delivery bundle (design/16 §1, design/17 §3). Targets DaVinci Resolve 21.1.1 scripting (DaVinciResolveScript):
+ImportMedia (idempotent by path), CreateEmptyTimeline, AppendToTimeline (mediaType 1 video-only), SetProperty ZoomX/ZoomY/Pan/Tilt/RotationAngle,
+AddMarker, SetClipColor, Export DRT, reopen the DRT and compare per event. VW2_RESOLVE_FAKE=1 uses an in-memory adapter (tests, dry runs)."""
+import json
+import os
+import re
+import sys
+from fractions import Fraction
+from pathlib import Path
+
+COLOURS = {'Blue': 'Blue', 'Green': 'Green'}
+
+
+class FakeAdapter:
+    """Records the calls a real Resolve would receive and answers the readback from them; writes a small XML DRT."""
+    def __init__(self):
+        self.imported, self.items, self.markers, self.props = {}, [], [], {}
+
+    def check(self):
+        return {'resolve': 'fake', 'version': '21.1.1-fake', 'scripting': True}
+
+    def project(self, name, timeline):
+        self.name = name
+        return name
+
+    def import_media(self, paths):
+        out = []
+        for p in paths:
+            self.imported.setdefault(str(p), {'path': str(p)})
+            out.append(self.imported[str(p)])
+        return out
+
+    def timeline(self, name):
+        self.tl = name
+        return name
+
+    def append(self, item, start, end, record, track=1, media_type=1):
+        row = {'path': item['path'], 'start': start, 'end': end, 'record': record, 'track': track, 'media_type': media_type}
+        self.items.append(row)
+        return row
+
+    def set_property(self, item, props):
+        self.props[id(item)] = props
+        item.update(props)
+
+    def marker(self, frame, colour, name, note, duration=1):
+        self.markers.append({'frame': frame, 'colour': colour, 'name': name, 'note': note})
+
+    def export_drt(self, path):
+        Path(path).write_text('<?xml version="1.0"?><xmeml version="5"><sequence><name>' + self.tl + '</name><media><video><track>'
+                              + ''.join(f'<clipitem><name>{Path(i["path"]).name}</name><start>{i["record"]}</start><end>{i["record"] + (i["end"] - i["start"])}</end><in>{i["start"]}</in><out>{i["end"]}</out></clipitem>'
+                                        for i in self.items if i['media_type'] == 1) + '</track></video></media></sequence></xmeml>', encoding='utf-8')
+        return path
+
+    def reopen(self, drt_path):
+        txt = Path(drt_path).read_text(encoding='utf-8')
+        return [{'record_in': int(m.group(1)), 'record_out': int(m.group(2)), 'source_in': int(m.group(3)), 'source_out': int(m.group(4))}
+                for m in re.finditer(r'<start>(\d+)</start><end>(\d+)</end><in>(\d+)</in><out>(\d+)</out>', txt)]
+
+    def export_project(self, path):
+        Path(path).write_bytes(b'fake project export')
+        return path
+
+
+class ResolveAdapter:
+    def __init__(self):
+        try:
+            import DaVinciResolveScript as dvr
+        except ImportError:
+            candidates = ['/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules', 'C:/ProgramData/Blackmagic Design/DaVinci Resolve/Support/Developer/Scripting/Modules']
+            for c in candidates:
+                if Path(c).exists():
+                    sys.path.append(c)
+            import DaVinciResolveScript as dvr
+        self.resolve = dvr.scriptapp('Resolve')
+        if not self.resolve:
+            raise SystemExit('Resolve is not running or scripting is disabled (Preferences > System > General > External scripting: Local).')
+        self.pm = self.resolve.GetProjectManager()
+
+    def check(self):
+        return {'resolve': 'live', 'version': self.resolve.GetVersionString(), 'scripting': True, 'product': self.resolve.GetProductName()}
+
+    def project(self, name, timeline):
+        p = self.pm.LoadProject(name) or self.pm.CreateProject(name)
+        if not p:
+            raise SystemExit(f'Could not open or create project {name}.')
+        for k, v in (('timelineFrameRate', str(timeline['fps'])), ('timelineResolutionWidth', str(timeline['width'])), ('timelineResolutionHeight', str(timeline['height']))):
+            p.SetSetting(k, v)
+        self.p, self.mp = p, p.GetMediaPool()
+        return p.GetUniqueId()
+
+    def import_media(self, paths):
+        existing = {}
+        for item in self.mp.GetRootFolder().GetClipList() or []:
+            existing[item.GetClipProperty('File Path')] = item
+        missing = [str(p) for p in paths if str(p) not in existing]
+        if missing:
+            for item in self.mp.ImportMedia(missing) or []:
+                existing[item.GetClipProperty('File Path')] = item
+        return [{'path': str(p), 'item': existing.get(str(p))} for p in paths]
+
+    def timeline(self, name):
+        for i in range(1, int(self.p.GetTimelineCount()) + 1):
+            t = self.p.GetTimelineByIndex(i)
+            if t.GetName() == name:
+                raise SystemExit(f'Timeline {name} already exists; a dispatched import is never replayed. Inspect or close it.')
+        self.tl = self.mp.CreateEmptyTimeline(name)
+        return name
+
+    def append(self, item, start, end, record, track=1, media_type=1):
+        res = self.mp.AppendToTimeline([{'mediaPoolItem': item['item'], 'startFrame': start, 'endFrame': end - 1, 'trackIndex': track, 'recordFrame': record, 'mediaType': media_type}])
+        if not res:
+            raise SystemExit(f"AppendToTimeline failed for {item['path']} at record {record}.")
+        return res[0]
+
+    def set_property(self, item, props):
+        for k, v in props.items():
+            item.SetProperty(k, v)
+
+    def marker(self, frame, colour, name, note, duration=1):
+        self.tl.AddMarker(frame, COLOURS.get(colour, 'Blue'), name, note, duration)
+
+    def export_drt(self, path):
+        if not self.tl.Export(str(path), self.resolve.EXPORT_DRT):
+            raise SystemExit('DRT export failed.')
+        return path
+
+    def reopen(self, drt_path):
+        t = self.mp.ImportTimelineFromFile(str(drt_path), {'timelineName': self.tl.GetName() + '-verify'})
+        if not t:
+            raise SystemExit('DRT reopen failed.')
+        out = []
+        for it in t.GetItemListInTrack('video', 1) or []:
+            out.append({'record_in': it.GetStart(), 'record_out': it.GetEnd(), 'source_in': it.GetLeftOffset(), 'source_out': it.GetLeftOffset() + it.GetDuration()})
+        return out
+
+    def export_project(self, path):
+        self.pm.ExportProject(self.p.GetName(), str(path))
+        return path
+
+
+def build(adapter, bundle_dir, manifest, run_code, out_dir):
+    tl = manifest['timeline']
+    fps = Fraction(str(tl['fps']))
+    adapter.project(f'VW-{run_code}', tl)
+    events = manifest['resolve_events']
+    files = sorted({e['file'] for e in events if e['file']} | {'Audio/narration.mp3'})
+    items = {e['path']: e for e in adapter.import_media([bundle_dir / f for f in files])}
+    name = f'VW-{run_code}-master'
+    adapter.timeline(name)
+    expected = []
+    for e in events:
+        item = items[str(bundle_dir / e['file'])]
+        src_fps = Fraction(e['source_fps'])
+        # source frames are at source fps; Resolve wants source frames of the media item
+        ti = adapter.append(item, e['source_in_frame'], e['source_out_frame'], e['record_in_frame'], 1, 1)
+        props = {}
+        if e['zoom'] and e['zoom'] != 1.0:
+            props.update(ZoomX=e['zoom'], ZoomY=e['zoom'], Pan=e['pan'], Tilt=e['tilt'])
+        if e['rotation']:
+            props['RotationAngle'] = e['rotation']
+        if props:
+            adapter.set_property(ti, props)
+        adapter.marker(e['record_in_frame'], e['marker']['colour'], e['marker']['name'], e['marker']['note'] + (f"; colour group {e['color_group']}" if e.get('color_group') else ''))
+        expected.append({'record_in': e['record_in_frame'], 'record_out': e['record_out_frame'], 'source_in': e['source_in_frame'], 'source_out': e['source_out_frame']})
+    narration = items[str(bundle_dir / 'Audio/narration.mp3')]
+    adapter.append(narration, 0, int(expected[-1]['record_out']) if expected else 0, 0, 1, 2)
+    drt = adapter.export_drt(out_dir / 'Approved-timeline.drt')
+    readback = adapter.reopen(drt)
+    differences = []
+    for i, (exp, got) in enumerate(zip(expected, readback)):
+        for k in ('record_in', 'record_out', 'source_in', 'source_out'):
+            if int(exp[k]) != int(got.get(k, -1)):
+                differences.append({'event': i + 1, 'field': k, 'expected': exp[k], 'readback': got.get(k)})
+    if len(readback) != len(expected):
+        differences.append({'event': None, 'field': 'count', 'expected': len(expected), 'readback': len(readback)})
+    project_export = adapter.export_project(out_dir / 'project.drp')
+    return {'timeline': name, 'events': len(expected), 'readback_events': len(readback), 'differences': differences, 'drt_verified': not differences,
+            'drt_path': str(drt), 'project_export_path': str(project_export), 'check': adapter.check()}
+
+
+def adapter():
+    return FakeAdapter() if os.environ.get('VW2_RESOLVE_FAKE') == '1' else ResolveAdapter()

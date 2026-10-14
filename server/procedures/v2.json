@@ -244,7 +244,13 @@
       "paid": null,
       "per_unit": null,
       "requires_files": true,
-      "cap": 2
+      "cap": 2,
+      "steps": [
+        "`vw assembly prepare`: shows every gap fill (slot frames vs available, default offset/end policy, issues such as untagged colour or rotation) and shaky shots flagged by the logs.",
+        "Ask the operator per fill: start offset and end policy (trim or hold last frame); per flagged shot: leave it for the editor, or stabilise with FFmpeg (counted in the zoom cap). `vw assembly choose`, `vw assembly stabilize`.",
+        "`vw assembly build`, `vw assembly render` (A1 narration untouched, A2 nat sound at the blueprint band, no music), poll, `vw assembly fetch`. The operator watches AND listens.",
+        "`vw assembly review --decision accepted|changes|rejected …` with their words; on accepted (must say watched and listened) `vw assembly record --quote`."
+      ]
     },
     {
       "name": "delivery",
@@ -252,7 +258,12 @@
       "paid": null,
       "per_unit": null,
       "requires_files": true,
-      "cap": 1
+      "cap": 1,
+      "steps": [
+        "`vw delivery bundle` writes the package manifest (approved film, narration, originals used, normalised fills, plans, SRT, finishing checklist, media-pool CSV, OPEN-EDIT).",
+        "On the Mac: `vw pull <code>`, `vw delivery resolve --check`, then once `vw delivery resolve --run --authorization \"<the operator's words>\"`: builds one Resolve 21.1.1 timeline from the bundle, exports and reopens the DRT, uploads DRT and report. Never run twice; `--inspect` and `--close` manage a dispatched step.",
+        "Back on the build machine: ask the five questions (watched the film, listened, read the subtitles, timeline verified, package complete) and `vw delivery final --quote \"<their words>\"`. Then `vw close` (retention: final film and package, narration, approved visuals, records; everything else deleted)."
+      ]
     }
   ],
   "published_at": "2026-10-14",

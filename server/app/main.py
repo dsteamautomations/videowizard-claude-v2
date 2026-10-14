@@ -11,6 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, visuals_stage, web, worker
 from .stage2 import stage as stage2
+from .stage3 import assembly as stage3, delivery as deliv
+from .stage3 import assembly as stage3, delivery as deliv
+from .stage3 import assembly as stage3, delivery as deliv
 from .storage import storage
 from .config import settings
 from .db import connect as db_connect, migrate
@@ -296,6 +299,99 @@ class RuleBody(Write):
     rule: str = Field(min_length=1, max_length=2000)
 
 
+class ChooseBody(Write):
+    shot_id: str
+    offset_frames: int = 0
+    end_policy: Literal['trim', 'hold_last'] = 'trim'
+    accept_as_is: bool = False
+
+
+class StabBody(Write):
+    sub_clip_id: str
+    choice: Literal['leave', 'ffmpeg']
+
+
+class ReviewBody(Write):
+    decision: Literal['accepted', 'changes', 'rejected']
+    notes: str = ''
+    frame_notes: list[dict[str, Any]] = []
+    quote: str = Field(min_length=1)
+
+
+class ReserveBody(Write):
+    machine: str = Field(min_length=1)
+    authorization: str = ''
+
+
+class MarkBody(Write):
+    machine: str = Field(min_length=1)
+    state: Literal['dispatched', 'reported', 'closed']
+    report: dict[str, Any] | None = None
+    note: str = ''
+
+
+class ChooseBody(Write):
+    shot_id: str
+    offset_frames: int = 0
+    end_policy: Literal['trim', 'hold_last'] = 'trim'
+    accept_as_is: bool = False
+
+
+class StabBody(Write):
+    sub_clip_id: str
+    choice: Literal['leave', 'ffmpeg']
+
+
+class ReviewBody(Write):
+    decision: Literal['accepted', 'changes', 'rejected']
+    notes: str = ''
+    frame_notes: list[dict[str, Any]] = []
+    quote: str = Field(min_length=1)
+
+
+class ReserveBody(Write):
+    machine: str = Field(min_length=1)
+    authorization: str = ''
+
+
+class MarkBody(Write):
+    machine: str = Field(min_length=1)
+    state: Literal['dispatched', 'reported', 'closed']
+    report: dict[str, Any] | None = None
+    note: str = ''
+
+
+class ChooseBody(Write):
+    shot_id: str
+    offset_frames: int = 0
+    end_policy: Literal['trim', 'hold_last'] = 'trim'
+    accept_as_is: bool = False
+
+
+class StabBody(Write):
+    sub_clip_id: str
+    choice: Literal['leave', 'ffmpeg']
+
+
+class ReviewBody(Write):
+    decision: Literal['accepted', 'changes', 'rejected']
+    notes: str = ''
+    frame_notes: list[dict[str, Any]] = []
+    quote: str = Field(min_length=1)
+
+
+class ReserveBody(Write):
+    machine: str = Field(min_length=1)
+    authorization: str = ''
+
+
+class MarkBody(Write):
+    machine: str = Field(min_length=1)
+    state: Literal['dispatched', 'reported', 'closed']
+    report: dict[str, Any] | None = None
+    note: str = ''
+
+
 class LibraryAdd(Strict):
     public_owner_id: str
     voice_id: str
@@ -438,8 +534,15 @@ def post_adopt(run_id: UUID, body: Adopt, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/close')
 def post_close(run_id: UUID, body: Write, user=User, conn=DB):
     run = core.load_run(conn, user, run_id, lock=True)
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, dict(core.close(conn, user, run))))
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, _close_with_retention(conn, user, run)))
     return Response(resp, status_code=status)
+
+
+def _close_with_retention(conn, user, run):
+    outputs = core.current_outputs(conn, run['id'])
+    closed = dict(core.close(conn, user, run))
+    closed['retention'] = deliv.retention(conn, storage(), run, outputs)
+    return closed
 
 
 @app.post('/api/runs/{run_id}/defects', status_code=201)
@@ -941,6 +1044,195 @@ def master_record(run_id: UUID, body: Quote, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/first-cut/record', status_code=201)
 def first_cut_record(run_id: UUID, body: Quote, user=User, conn=DB):
     return _s2(conn, user, run_id, 'first_cut', body, lambda run, outputs: stage2.record_first_cut(conn, storage(), user, run, outputs, body.quote), 201)
+
+
+# ---------- stage 3: assembly / delivery ----------
+
+@app.post('/api/runs/{run_id}/assembly/prepare')
+def assembly_prepare(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.prepare(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/assembly/choose')
+def assembly_choose(run_id: UUID, body: ChooseBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.choose(storage(), user, run, body.shot_id, body.offset_frames, body.end_policy, body.accept_as_is))
+
+
+@app.post('/api/runs/{run_id}/assembly/stabilize')
+def assembly_stabilize(run_id: UUID, body: StabBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.stabilize(storage(), user, run, body.sub_clip_id, body.choice))
+
+
+@app.post('/api/runs/{run_id}/assembly/build')
+def assembly_build(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.build(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/assembly/render', status_code=201)
+def assembly_render(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.render(conn, storage(), user, run), 201)
+
+
+@app.get('/api/runs/{run_id}/stage3')
+def stage3_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage3.status(conn, storage(), run))
+
+
+@app.post('/api/runs/{run_id}/assembly/review')
+def assembly_review(run_id: UUID, body: ReviewBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.review(conn, storage(), user, run, body.decision, body.notes, body.frame_notes, body.quote))
+
+
+@app.post('/api/runs/{run_id}/assembly/record', status_code=201)
+def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.record(conn, storage(), user, run, body.quote), 201)
+
+
+@app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
+def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)
+
+
+@app.post('/api/runs/{run_id}/delivery/resolve/reserve')
+def delivery_reserve(run_id: UUID, body: ReserveBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))
+
+
+@app.post('/api/runs/{run_id}/delivery/resolve/mark')
+def delivery_mark(run_id: UUID, body: MarkBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
+
+
+@app.post('/api/runs/{run_id}/delivery/final', status_code=201)
+def delivery_final(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.final(conn, storage(), user, run, outputs, body.quote), 201)
+
+
+# ---------- stage 3: assembly / delivery ----------
+
+@app.post('/api/runs/{run_id}/assembly/prepare')
+def assembly_prepare(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.prepare(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/assembly/choose')
+def assembly_choose(run_id: UUID, body: ChooseBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.choose(storage(), user, run, body.shot_id, body.offset_frames, body.end_policy, body.accept_as_is))
+
+
+@app.post('/api/runs/{run_id}/assembly/stabilize')
+def assembly_stabilize(run_id: UUID, body: StabBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.stabilize(storage(), user, run, body.sub_clip_id, body.choice))
+
+
+@app.post('/api/runs/{run_id}/assembly/build')
+def assembly_build(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.build(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/assembly/render', status_code=201)
+def assembly_render(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.render(conn, storage(), user, run), 201)
+
+
+@app.get('/api/runs/{run_id}/stage3')
+def stage3_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage3.status(conn, storage(), run))
+
+
+@app.post('/api/runs/{run_id}/assembly/review')
+def assembly_review(run_id: UUID, body: ReviewBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.review(conn, storage(), user, run, body.decision, body.notes, body.frame_notes, body.quote))
+
+
+@app.post('/api/runs/{run_id}/assembly/record', status_code=201)
+def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.record(conn, storage(), user, run, body.quote), 201)
+
+
+@app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
+def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)
+
+
+@app.post('/api/runs/{run_id}/delivery/resolve/reserve')
+def delivery_reserve(run_id: UUID, body: ReserveBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))
+
+
+@app.post('/api/runs/{run_id}/delivery/resolve/mark')
+def delivery_mark(run_id: UUID, body: MarkBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
+
+
+@app.post('/api/runs/{run_id}/delivery/final', status_code=201)
+def delivery_final(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.final(conn, storage(), user, run, outputs, body.quote), 201)
+
+
+# ---------- stage 3: assembly / delivery ----------
+
+@app.post('/api/runs/{run_id}/assembly/prepare')
+def assembly_prepare(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.prepare(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/assembly/choose')
+def assembly_choose(run_id: UUID, body: ChooseBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.choose(storage(), user, run, body.shot_id, body.offset_frames, body.end_policy, body.accept_as_is))
+
+
+@app.post('/api/runs/{run_id}/assembly/stabilize')
+def assembly_stabilize(run_id: UUID, body: StabBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.stabilize(storage(), user, run, body.sub_clip_id, body.choice))
+
+
+@app.post('/api/runs/{run_id}/assembly/build')
+def assembly_build(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.build(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/assembly/render', status_code=201)
+def assembly_render(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.render(conn, storage(), user, run), 201)
+
+
+@app.get('/api/runs/{run_id}/stage3')
+def stage3_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(stage3.status(conn, storage(), run))
+
+
+@app.post('/api/runs/{run_id}/assembly/review')
+def assembly_review(run_id: UUID, body: ReviewBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.review(conn, storage(), user, run, body.decision, body.notes, body.frame_notes, body.quote))
+
+
+@app.post('/api/runs/{run_id}/assembly/record', status_code=201)
+def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.record(conn, storage(), user, run, body.quote), 201)
+
+
+@app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
+def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)
+
+
+@app.post('/api/runs/{run_id}/delivery/resolve/reserve')
+def delivery_reserve(run_id: UUID, body: ReserveBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))
+
+
+@app.post('/api/runs/{run_id}/delivery/resolve/mark')
+def delivery_mark(run_id: UUID, body: MarkBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
+
+
+@app.post('/api/runs/{run_id}/delivery/final', status_code=201)
+def delivery_final(run_id: UUID, body: Quote, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.final(conn, storage(), user, run, outputs, body.quote), 201)
 
 
 @app.get('/health')

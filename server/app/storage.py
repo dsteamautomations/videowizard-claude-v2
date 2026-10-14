@@ -39,6 +39,16 @@ class LocalStorage:
     def signed_upload(self, key):
         return '/files/local/' + quote(key, safe='/'), {}
 
+    def list(self, prefix):
+        base = (self.root / prefix)
+        return [p.relative_to(self.root).as_posix() for p in base.rglob('*') if p.is_file()] if base.exists() else []
+
+    def delete(self, keys):
+        for k in keys:
+            p = self.path(k)
+            if p.exists():
+                p.unlink()
+
     def signed_download(self, key):
         return '/files/local/' + quote(key, safe='/')
 
@@ -83,6 +93,23 @@ class SupabaseStorage:
     def signed_upload(self, key):
         data = self._call('POST', f'/storage/v1/object/upload/sign/{self.bucket}/{quote(key, safe="/")}').json()
         return self.url + '/storage/v1' + data['url'], {'x-upsert': 'true'}
+
+    def list(self, prefix):
+        out, offset = [], 0
+        while True:
+            page = self._call('POST', f'/storage/v1/object/list/{self.bucket}', json={'prefix': prefix, 'limit': 1000, 'offset': offset}).json()
+            for o in page:
+                if o.get('id'):
+                    out.append(f"{prefix}/{o['name']}")
+                else:
+                    out += self.list(f"{prefix}/{o['name']}")
+            if len(page) < 1000:
+                return out
+            offset += 1000
+
+    def delete(self, keys):
+        for i in range(0, len(keys), 100):
+            self._call('DELETE', f'/storage/v1/object/{self.bucket}', json={'prefixes': keys[i:i + 100]})
 
     def signed_download(self, key, seconds=3600):
         data = self._call('POST', f'/storage/v1/object/sign/{self.bucket}/{quote(key, safe="/")}', json={'expiresIn': seconds}).json()

@@ -684,6 +684,88 @@ def cmd_first_cut(a):
     emit(write(f"/api/runs/{m['run_id']}/first-cut/record", {'quote': a.quote}), 0, 'First cut recorded.')
 
 
+def cmd_assembly(a):
+    m = active()
+    run = m['run_id']
+    base = f'/api/runs/{run}/assembly'
+    if a.what == 'prepare':
+        emit(write(base + '/prepare', {}))
+    if a.what == 'choose':
+        emit(write(base + '/choose', {'shot_id': a.shot, 'offset_frames': int(a.offset or 0), 'end_policy': a.end or 'trim', 'accept_as_is': bool(a.accept_as_is)}))
+    if a.what == 'stabilize':
+        emit(write(base + '/stabilize', {'sub_clip_id': a.sub, 'choice': a.choice or 'leave'}))
+    if a.what == 'build':
+        emit(write(base + '/build', {}))
+    if a.what == 'render':
+        emit(write(base + '/render', {}), 0, 'Assembly film rendering; poll `vw assembly status`.')
+    if a.what == 'status':
+        emit(call('GET', f'/api/runs/{run}/stage3'))
+    if a.what == 'fetch':
+        st = call('GET', f'/api/runs/{run}/stage3')
+        r = (st.get('renders') or {}).get('assembly') or {}
+        if r.get('status') != 'ready':
+            emit({'action': 'refused', 'message': f"The assembly film is {r.get('status') or 'not rendered'}: {r.get('error') or 'poll status'}"}, 2)
+        path = _download(m, r['result']['key'], 'out/assembly.mp4')
+        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': r['result'].get('record')}, 0, f'Assembly film at {path}; the operator watches and listens.')
+    if a.what == 'review':
+        notes = [{'frame': int(x.split(':', 1)[0]), 'note': x.split(':', 1)[1]} for x in (a.frame_note or [])]
+        emit(write(base + '/review', {'decision': a.decision, 'notes': a.notes or '', 'frame_notes': notes, 'quote': a.quote}))
+    if a.what == 'record':
+        emit(write(base + '/record', {'quote': a.quote}), 0, 'Assembly recorded; next `vw delivery bundle`.')
+
+
+def cmd_delivery(a):
+    m = active()
+    run = m['run_id']
+    base = f'/api/runs/{run}/delivery'
+    ws = workspace(m['code'])
+    if a.what == 'bundle':
+        out = write(base + '/bundle', {})
+        _download(m, out['manifest']['key'], 'work/manifest.json')
+        emit(out, 0, f"Bundle manifest: {out['files']} files, {out['bytes'] / 1e6:.0f} MB. On the Mac: `vw pull {m['code']}` then `vw delivery resolve --check`.")
+    if a.what == 'status':
+        emit(call('GET', f'/api/runs/{run}/stage3'))
+    if a.what == 'resolve':
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import resolve_bridge
+        st = call('GET', f'/api/runs/{run}/stage3')
+        if not st.get('bundle'):
+            emit({'action': 'refused', 'message': 'No bundle yet; run `vw delivery bundle` on the build machine.'}, 2)
+        if a.check:
+            emit({'preflight': resolve_bridge.adapter().check(), 'ledger': st.get('resolve')}, 0, 'Resolve preflight passed.')
+        if a.inspect:
+            emit({'ledger': st.get('resolve')}, 0, 'Current Resolve ledger state.')
+        if a.close:
+            emit(write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'closed', 'note': a.note or 'closed by operator'}))
+        if a.run_it:
+            led = write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': a.authorization or ''})
+            manifest = _json_file(m, 'work/manifest.json') if (ws / 'work' / 'manifest.json').exists() else None
+            if manifest is None:
+                manifest = call('GET', f"/api/runs/{run}/files/{st['bundle']['manifest']['key']}") if False else None
+            if manifest is None:
+                path = _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
+                manifest = _json_file(m, 'work/manifest.json')
+            bundle_dir = ws / 'bundle'
+            for f in manifest['files']:
+                if f['role'] in ('original', 'normalised', 'narration'):
+                    _download(m, f['key'], 'bundle/' + f['name'])
+            write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
+            out_dir = ws / 'out' / 'delivery'
+            out_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                report = resolve_bridge.build(resolve_bridge.adapter(), bundle_dir, manifest, m['code'], out_dir)
+            except SystemExit as exc:
+                emit({'action': 'tell_builder', 'message': f'Resolve step failed after dispatch: {exc}. The ledger stays dispatched; inspect in Resolve, then `vw delivery resolve --close`.'}, 2)
+            drt = upload_file(m, 'delivery', out_dir / 'Approved-timeline.drt', hashlib.sha256((out_dir / 'Approved-timeline.drt').read_bytes()).hexdigest(), (out_dir / 'Approved-timeline.drt').stat().st_size)
+            (out_dir / 'resolve-report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
+            rep = upload_file(m, 'delivery', out_dir / 'resolve-report.json', hashlib.sha256((out_dir / 'resolve-report.json').read_bytes()).hexdigest(), (out_dir / 'resolve-report.json').stat().st_size)
+            led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported', 'report': {**{k: report[k] for k in ('timeline', 'events', 'readback_events', 'differences', 'drt_verified', 'check')},
+                                                                                                           'readback': {'events': report['readback_events']}, 'drt': drt, 'report': rep}})
+            emit({'ledger': led, 'differences': report['differences']}, 0, 'Resolve timeline built, DRT exported and verified; report uploaded.' if report['drt_verified'] else 'Resolve timeline built but the DRT readback differs; show the differences to the operator.')
+    if a.what == 'final':
+        emit(write(base + '/final', {'quote': a.quote}), 0, 'Delivery recorded; `vw close` when the operator is done.')
+
+
 def cmd_pull(a):
     runs = call('GET', '/api/runs')
     run = next((r for r in runs if r['code'] == a.code), None)
@@ -761,6 +843,13 @@ def main(argv=None):
         s.add_argument(flag)
     s.set_defaults(fn=cmd_master)
     s = sub.add_parser('first-cut'); s.add_argument('what', choices=['record']); s.add_argument('--quote'); s.set_defaults(fn=cmd_first_cut)
+    s = sub.add_parser('assembly'); s.add_argument('what', choices=['prepare', 'choose', 'stabilize', 'build', 'render', 'status', 'fetch', 'review', 'record'])
+    for flag in ('--shot', '--offset', '--end', '--sub', '--choice', '--decision', '--notes', '--quote'):
+        s.add_argument(flag)
+    s.add_argument('--accept-as-is', action='store_true'); s.add_argument('--frame-note', action='append'); s.set_defaults(fn=cmd_assembly)
+    s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'resolve', 'final'])
+    s.add_argument('--check', action='store_true'); s.add_argument('--run', dest='run_it', action='store_true'); s.add_argument('--inspect', action='store_true'); s.add_argument('--close', action='store_true')
+    s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     a = p.parse_args(argv)

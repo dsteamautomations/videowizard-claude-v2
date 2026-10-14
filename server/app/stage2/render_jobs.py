@@ -15,11 +15,11 @@ CACHE = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[2] 
 
 
 def _source(store, run_id, clip, folder):
-    """Download a clip once per sha into the render cache."""
+    """Download a source once per sha into the render cache: a media clip by name, or any file by key (takes, assets)."""
     p = CACHE / 'sources' / f"{clip['sha256'][:24]}{Path(clip['name']).suffix}"
     if not p.exists():
         p.parent.mkdir(parents=True, exist_ok=True)
-        data = store.get(f"{run_id}/media/{clip['name']}")
+        data = store.get(clip['key'] if clip.get('key') else f"{run_id}/media/{clip['name']}")
         if hashlib.sha256(data).hexdigest() != clip['sha256']:
             raise Problem(409, 'RENDER_SOURCE', f"Stored clip {clip['name']} differs from the media record.")
         tmp = p.with_suffix(p.suffix + '.tmp')
@@ -39,6 +39,8 @@ def process(job):
         for item in plan['items']:
             if item['kind'] == 'event' and not item.get('gap'):
                 sources[item['clip']['id']] = _source(store, job['run_id'], item['clip'], work)
+            elif item['kind'] == 'still':
+                sources[item['file']['sha256']] = _source(store, job['run_id'], {**item['file'], 'key': item['file']['key']}, work)
         narration = work / 'narration.mp3'
         narration.write_bytes(store.get(plan['narration_key']))
         items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"GAP | {it['beat_id']} | {it['timeline_frames']} frames", 'to be filled by the visuals stage', '']} if it.get('gap') else it)
@@ -49,6 +51,12 @@ def process(job):
         store.put(req['out_key'], data, 'video/mp4')
         if hashlib.sha256(store.get(req['out_key'])).hexdigest() != sha:
             raise Problem(502, 'STORAGE', 'Film read-back failed.')
+        uploaded = []
+        for nk, seg in record.pop('normalised_segments', []):
+            blob = Path(seg).read_bytes()
+            store.put(nk, blob, 'video/mp4')
+            uploaded.append({'key': nk, 'sha256': hashlib.sha256(blob).hexdigest(), 'bytes': len(blob)})
+        record['normalised'] = uploaded
         return 'ready', {'key': req['out_key'], 'sha256': sha, 'bytes': len(data), 'duration_s': record['duration_s'], 'record': record}, None
     except Problem as exc:
         return 'failed', {'phase': 'render'}, exc.message

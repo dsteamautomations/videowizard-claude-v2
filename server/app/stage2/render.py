@@ -83,6 +83,25 @@ class Renderer:
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
         return out
 
+    def still(self, png_path, sha, n_tl):
+        """A still asset held for n_tl frames, contain-padded to the timeline."""
+        key = digest({'still': sha, 'n': n_tl, 'tl': self.tl})
+        out = self.cache / f'still-{key[:16]}.mp4'
+        if not out.exists():
+            run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png_path), '-frames:v', str(n_tl),
+                 '-vf', f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease,pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2,format=yuv420p', *self.video_args(), str(out)])
+        return out
+
+    def stabilized(self, seg):
+        """vidstab two-pass on one segment only (design/16): the 1.08 zoom is applied here and counted by the assembly stage."""
+        out = seg.with_name(seg.stem + '-stab.mp4')
+        if out.exists():
+            return out
+        trf = seg.with_suffix('.trf')
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(seg), '-vf', f'vidstabdetect=shakiness=5:accuracy=15:result={trf.as_posix()}', '-f', 'null', '-'])
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(seg), '-vf', f'vidstabtransform=input={trf.as_posix()}:zoom=8:smoothing=15:crop=black,unsharp=5:5:0.8:3:3:0.4', *self.video_args(), str(out)])
+        return out
+
     def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False):
         """One picture event: source frames [in,out) at src_fps → exactly n_tl timeline frames. hold_last_frame pads with the last frame."""
         key = digest({'src': src_sha, 'in': ev['source_in_frame'], 'out': ev['source_out_frame'], 'n': n_tl, 'crop': crop_rect, 'rot': rotation_deg, 'hold': bool(ev.get('hold_last_frame')), 'tl': self.tl, 'hdr': hdr})
@@ -180,7 +199,7 @@ def render_film(kind, plan, sources, narration, work, timeline):
      'a2': [{'in_frame','out_frame'}]} and, for the review film, {'kind': 'narration', 'start_s', 'end_s'} markers before each option; the master uses the whole narration.
     sources: {clip_id: Path}. Returns the film path and a record."""
     r = Renderer(work, timeline)
-    parts, a2_pieces, a1_parts = [], [], []
+    parts, a2_pieces, a1_parts, normalised = [], [], [], []
     cursor = Fraction(0)
     silence_before = Fraction(0)
     for i, item in enumerate(plan['items']):
@@ -194,10 +213,20 @@ def render_film(kind, plan, sources, narration, work, timeline):
                 a1_parts.append(r.silence(float(silence_before), r.work / f'a1-sil-{i}.wav'))
                 silence_before = Fraction(0)
             a1_parts.append(r.narration_window(narration, item['start_s'], item['end_s'], r.work / f'a1-{i}.wav'))
+        elif item['kind'] == 'still':
+            seg = r.still(sources[item['file']['sha256']], item['file']['sha256'], item['timeline_frames'])
+            parts.append(seg)
+            normalised.append((item, seg))
+            cursor += Fraction(item['timeline_frames']) / r.fps
+            continue
         else:
             clip = item['clip']
             seg = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], item, item['timeline_frames'], item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')))
+            if item.get('stabilize'):
+                seg = r.stabilized(seg)
             parts.append(seg)
+            if item.get('normalised_key'):
+                normalised.append((item, seg))
             for j, iv in enumerate(item.get('a2') or []):
                 src_fps = Fraction(str(clip['fps']))
                 at = cursor + (Fraction(iv['in_frame'] - item['source_in_frame']) / src_fps)
@@ -220,4 +249,5 @@ def render_film(kind, plan, sources, narration, work, timeline):
     film = r.mux(picture, mixed, r.work / f'{kind}.mp4')
     master_loudness = r.loudness(film)
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
-                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': 'h264 high yuv420p bt709 / aac 48k stereo'}
+                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': 'h264 high yuv420p bt709 / aac 48k stereo',
+                  'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')]}
