@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "stages": [
+    {"name": "intake",    "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": false, "cap": 3},
+    {"name": "brief",     "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": false, "cap": 3},
+    {"name": "script",    "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": false, "cap": 3},
+    {"name": "voice",     "needs_acceptance": true,  "paid": "elevenlabs",              "per_unit": null,    "requires_files": true,  "cap": 2},
+    {"name": "media",     "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": false, "cap": 3},
+    {"name": "analysis",  "needs_acceptance": false, "paid": "gemini-4-argon",          "per_unit": "media", "requires_files": true,  "cap": 2},
+    {"name": "planning",  "needs_acceptance": true,  "paid": "gemini",                  "per_unit": null,    "requires_files": true,  "cap": 2},
+    {"name": "edit",      "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": true,  "cap": 2},
+    {"name": "first_cut", "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": true,  "cap": 2},
+    {"name": "visuals",   "needs_acceptance": true,  "paid": "openai-images,video",     "per_unit": "shot",  "requires_files": true,  "cap": 2},
+    {"name": "assembly",  "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": true,  "cap": 2},
+    {"name": "delivery",  "needs_acceptance": true,  "paid": null,                      "per_unit": null,    "requires_files": true,  "cap": 1}
+  ]
+}
