@@ -2,6 +2,8 @@
 
 Sources: slice 6 walk-through (this morning, 14 Oct 2026), blueprint v3.2 §4 step 2 (track routing and loudness), §4 step 3 (API vs human finishing), §5.1 edge rules 3 and 6, §6.4 (SRT), §6.5 (finishing checklist); design/12 §B; v1 late-stage spec §4 (what the Mac scripts did); decisions: MP4 only, SRT added, no music, Resolve 21.1.1, Resolve used once from the finished film, shake flagged and optionally stabilised with FFmpeg. Written 14 Oct 2026 after step 3; to be read with design/15.
 
+> **Read with design/17** (review additions, 14 Oct late): it adds items and resolves contradictions for step 5; where 17 differs from this file, 17 wins.
+
 ## 1. Restated requirement
 After the master film is approved (step 4) and every gap has a selected take or asset (visuals, slice 5), two stages finish the film:
 

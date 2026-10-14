@@ -305,7 +305,7 @@ def test_m2_m4_m5_m6_media_upload_resume_dedupe_close(home, database, fake):
 
 def test_m3_receipt_with_wrong_hash(client, alice, database):
     from conftest import rid
-    run = client.post('/api/runs', json={'request_id': rid(), 'procedure_version': 'test'}, headers=alice).json()
+    run = client.post('/api/runs', json={'request_id': rid(), 'client': 'C', 'procedure_version': 'test'}, headers=alice).json()
     signed = client.post(f"/api/runs/{run['id']}/files/sign", json={'request_id': rid(), 'stage': 's2', 'name': 'x.bin'}, headers=alice).json()
     assert client.put(signed['url'], content=b'hello').status_code == 200
     r = client.post(f"/api/runs/{run['id']}/files/receipt", json={'request_id': rid(), 'key': signed['key'], 'sha256': 'ab' * 32, 'bytes': 5}, headers=alice)

@@ -2,6 +2,8 @@
 
 Sources: blueprint v3.2 Sections 3–6 (options, slates, feedback, track routing, edge rules, 8-point QC, payloads), design/12 §B–§C (dispositions, 15 editor rules), design/13 §6 decisions (chat model + validator; blueprint review film; no music; Resolve once at the end). Written 14 Oct 2026 after step 3.
 
+> **Read with design/17** (review additions, 14 Oct late): it adds items and resolves contradictions for step 4; where 17 differs from this file, 17 wins.
+
 ## 1. Restated requirement
 A new stage pair replaces the v1-ported planning stage for runs on procedure version 2:
 
