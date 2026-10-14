@@ -28,7 +28,7 @@ def mp3_bytes(seconds=2):
 
 
 class FakeEleven:
-    mode = 'ok'          # ok | reject | unknown | timing_bad
+    mode = 'ok'          # ok | reject | unknown | timing_bad | timing_padding
     history = []
     calls = []
 
@@ -61,7 +61,7 @@ class FakeEleven:
             headers = {'request-id': 'req-' + hashlib.sha256(text.encode()).hexdigest()[:8], 'character-cost': str(len(text))}
             if path.endswith('/with-timestamps'):
                 n = len(text)
-                dur = 2.0 if cls.mode != 'timing_bad' else 9.0
+                dur = {'timing_bad': 9.0, 'timing_padding': 2.3}.get(cls.mode, 2.0)  # padding: ends ~0.3 s after the decoded MP3, as ElevenLabs does
                 starts = [round(i * dur / n, 4) for i in range(n)]
                 ends = [round((i + 1) * dur / n, 4) for i in range(n)]
                 body = {'audio_base64': base64.b64encode(audio).decode(), 'alignment': {'characters': list(text), 'character_start_times_seconds': starts, 'character_end_times_seconds': ends}, 'normalized_alignment': None}
@@ -145,6 +145,30 @@ def test_v2_unknown_outcome_blocks_second_narration_until_resolved(home, databas
     assert rc == 2 and out['code'] == 'TIMING_RECOVERY'
     assert vw(home, 'voice', 'resolve', '--job', job['id'], '--note', 'checked account: no charge')[0] == 0
     assert vw(home, 'voice', 'narrate', '--voice', 'v1')[0] == 0
+
+
+def test_v2c_alignment_padding_tolerated_and_failed_job_reprocessed_from_journal(home, database, fake):
+    run_until_voice(home, database)
+    fake.mode = 'timing_padding'
+    assert vw(home, 'voice', 'narrate', '--voice', 'v1')[0] == 0
+    drain()
+    job = vw(home, 'voice', 'jobs')[1][0]
+    assert job['status'] == 'ready', job
+    from app.storage import storage
+    timing = json.loads(storage().get(job['result']['timing_key']).decode('utf-8'))
+    assert 0.1 < timing['alignment_overshoot_s'] < 1.0 and timing['script_characters_match']
+    # a job that failed validation keeps its paid response; recover re-processes it without a second synthesis
+    fake.mode = 'timing_bad'
+    assert vw(home, 'voice', 'narrate', '--voice', 'v2')[0] == 0
+    drain()
+    bad = next(j for j in vw(home, 'voice', 'jobs')[1] if j['request']['voice_id'] == 'v2')
+    assert bad['status'] == 'failed' and 'retained' in bad['error']
+    posts = len([c for c in fake.calls if c[0] == 'POST'])
+    rc, out, _ = vw(home, 'voice', 'recover', '--job', bad['id'])
+    assert rc == 0 and out['status'] == 'storage_pending' and 'no new synthesis' in out['message']
+    drain()
+    assert next(j for j in vw(home, 'voice', 'jobs')[1] if j['id'] == bad['id'])['status'] == 'failed'  # still over tolerance
+    assert len([c for c in fake.calls if c[0] == 'POST']) == posts  # and not paid again
 
 
 def test_v2b_audition_recovered_from_history(home, database, fake):

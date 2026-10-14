@@ -495,11 +495,17 @@ def recover_job(run_id: UUID, job_id: UUID, body: Write, user=User, conn=DB):
     """Reconcile a submission_unknown voice job from provider history; never synthesizes."""
     run = core.load_run(conn, user, run_id, lock=True)
     row = conn.execute('select * from vw2_jobs where id=%s and run_id=%s', (job_id, run['id'])).fetchone()
-    if not row or row['status'] != 'submission_unknown':
-        raise Problem(409, 'NOT_ALLOWED', 'Only a job with an unknown provider outcome can be recovered.')
-    worker.recover_voice(row)
+    journaled = row and row['status'] == 'failed' and any((worker.SPOOL / f"{job_id}{suffix}").is_file() for suffix in ('.response.json', '.mp3'))
+    if journaled:
+        # The paid response is retained on this server: re-process it (e.g. after a validation rule change). No synthesis.
+        message = 'Re-processing the retained response; no new synthesis.'
+    elif not row or row['status'] != 'submission_unknown':
+        raise Problem(409, 'NOT_ALLOWED', 'Only a job with an unknown provider outcome, or a failed job whose response is retained, can be recovered.')
+    else:
+        worker.recover_voice(row)
+        message = 'Recovered from provider history; the worker will store it.'
     conn.execute("update vw2_jobs set status='storage_pending', lease_until=null, error=null, updated_at=now() where id=%s", (job_id,))
-    return Response({'id': str(job_id), 'status': 'storage_pending', 'message': 'Recovered from provider history; the worker will store it.'})
+    return Response({'id': str(job_id), 'status': 'storage_pending', 'message': message})
 
 
 @app.post('/api/runs/{run_id}/jobs/{job_id}/resolve')

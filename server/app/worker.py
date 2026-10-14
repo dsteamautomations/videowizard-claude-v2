@@ -20,6 +20,8 @@ from .errors import Problem
 from .storage import storage
 from .voice_timing import decode_response, inspect_audio, timing_evidence
 
+ALIGNMENT_TOLERANCE_S = 1.0  # MP3 frame padding: the provider's last character may end a little after the decoded duration
+
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
 
 
@@ -72,7 +74,8 @@ def process_voice(job, provider=None, store=None):
         if timed:
             timing = timing_evidence(snap, meta.get('alignments') or {})
             timing['audio'] = inspect_audio(audio_path)
-            if timing['last_character_end_s'] > timing['audio']['duration_s'] + .05:
+            timing['alignment_overshoot_s'] = round(max(0.0, timing['last_character_end_s'] - timing['audio']['duration_s']), 3)
+            if timing['alignment_overshoot_s'] > ALIGNMENT_TOLERANCE_S:
                 raise ValueError('Alignment exceeds the decoded recording duration.')
             timing_key = key.removesuffix('.mp3') + '.timing.json'
             timing_data = json.dumps(timing, ensure_ascii=False).encode('utf-8')
