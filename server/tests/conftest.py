@@ -75,7 +75,7 @@ TEST2_PROCEDURE = {
 def clean_tables(database):
     from app import db
     with psycopg.connect(database) as conn:
-        conn.execute("truncate vw2_receipts, vw2_defects, vw2_jobs, vw2_attempts, vw2_revises, vw2_stage_outputs, vw2_runs, vw2_sessions")
+        conn.execute("truncate vw2_receipts, vw2_defects, vw2_jobs, vw2_attempts, vw2_revises, vw2_stage_outputs, vw2_runs, vw2_sessions, vw2_connections")
         conn.execute("delete from vw2_procedures where version in ('test','test2')")
         conn.execute("insert into vw2_procedures(version, document) values ('test', %s::jsonb), ('test2', %s::jsonb)",
                      (psycopg.types.json.Json(TEST_PROCEDURE), psycopg.types.json.Json(TEST2_PROCEDURE)))
