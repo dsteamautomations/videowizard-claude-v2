@@ -127,7 +127,7 @@ Operator profile: separate `CLAUDE.md` with five lines (no reports unless asked;
 
 Workspace manifest per file: `{path, stage, action: retain|upload|delete, sha256, uploaded_at}`. `/vw close` refuses while any `upload` file lacks a server receipt, then deletes `work/` and `logs/` (logs uploaded first only if the operator said so at start).
 
-## 7. Web UI (Next.js, 5 pages)
+## 7. Web UI (server-rendered HTML from FastAPI, 5 pages)
 
 login · my runs · run page (stage list, latest output per stage, Download) · defects (admin) · close/delete files (admin). No approve button. Polling only on the run page while a job is pending, every 10 s, stops otherwise.
 
@@ -138,18 +138,18 @@ login · my runs · run page (stage list, latest output per stage, Download) · 
 - Defects: builder reads `defects`, reproduces against a copied run in a local database, fixes, releases, marks fixed. No live-data SQL.
 - Builder profile has no production keys; local `.env` points at a local Supabase.
 
-## 9. Build order (each slice: requirement list → tests → implement)
+## 9. Build order (each slice: requirement list → tests → implement). Re-cut 14 Oct: slices merged at the owner's request.
 
-1. **Core:** tables, `runs`, `next`, `output` with chat acceptance, view/revise, attempts + 409, idempotent `request_id`, v1 login ported. Local Postgres in Docker.
-2. **Plugin skeleton:** `/vw start|next|close|pull`, manifest, two hooks, operator `CLAUDE.md`.
-3. **Web UI:** login, my runs, run page (view outputs), download.
-4. **Stages 1–3** (intake, brief, script): text-only, proves the loop end to end.
-5. **Voice** (ElevenLabs port) and **media** (upload with signed URLs).
-6. **Analysis** and **planning** (Gemini ports, jobs + worker).
-7. **Visuals**: references, OpenAI images, local assets, video takes.
-8. **Edit / first_cut / assembly / delivery** on the Mac via `/vw pull`.
-9. **Defects** table and admin page.
-10. Optional: Agent SDK operator app.
+1. **Core** (done 14 Oct): tables, `runs`, `next`, `output` with chat acceptance, view/revise, attempts + 409, idempotent `request_id`, v1 login ported.
+2. **Plugin + web UI** (was 2+3): browser connect flow (v1 ported), server-rendered pages (login, connect approve, my runs, run view, defects), `/vw` command, `vw.py` CLI, two hooks, operator `CLAUDE.md`, workspace manifest, `claim`/`pull`/`close`.
+3. **Text stages + voice + media** (was 4+5): intake → brief → script first (end-to-end checkpoint shown to the owner), then voice (ElevenLabs port) and media upload via signed URLs.
+4. **Analysis** (Gemini 4 Argon) and **planning** (Gemini): jobs table + one worker per provider family.
+5. **Visuals**: references, OpenAI GPT Image 2.5, local assets, video takes.
+6. **Edit / first_cut / assembly / delivery** on the Mac via `/vw pull`.
+7. **Defects** admin workflow (table exists since slice 1; builder process).
+8. Optional: Agent SDK operator app.
+
+Web UI decision (14 Oct): pages are served by FastAPI as HTML templates; no Next.js.
 
 ## 10. Edge cases carried into every slice
 
