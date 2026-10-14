@@ -7,6 +7,7 @@ import json
 import math
 import re
 from copy import deepcopy
+from fractions import Fraction
 
 from .errors import Problem
 from .video_evidence.expanded import expanded_schema
@@ -30,7 +31,75 @@ def processing_mode(procedure, duration_s):
     return mode
 
 
+TIMELINE = {'width': 1920, 'height': 1080, 'fps': 25, 'aspect_ratio': '16:9'}
+
+
+def speaker_policy(policy, production):
+    """design/14 §2 default mapping: camera audio excluded → Mode 3; allowed → Mode 2, or Mode 1 when the brief shows the speaker."""
+    allow = policy.get('camera_audio') == 'allowed'
+    show = bool((production or {}).get('show_speaker_video')) and allow
+    return {'allow_speaker_audio': allow, 'show_speaker_video': show}
+
+
+def build_request_clip_log(run, procedure, brief, script, clip, policy, *, generation=None):
+    from .clip_log import CONTRACT, prompt as P, schema as S
+    duration = float(clip.get('duration_s') or 0)
+    if not math.isfinite(duration) or duration <= 0:
+        raise Problem(422, 'ANALYSIS_SOURCE', f"Clip {clip.get('name')} has no usable duration.")
+    try:
+        fps = Fraction(str(clip.get('fps') or TIMELINE['fps']))
+    except (ValueError, ZeroDivisionError):
+        fps = Fraction(TIMELINE['fps'])
+    frames = int(math.floor(Fraction(str(duration)) * fps))
+    beats = [{'beat_id': b['beat_id'], 'text': b['text']} for b in (script.get('beats') or [])] or \
+        [{'beat_id': f'BEAT_{i + 1:02d}', 'text': t} for i, t in enumerate(passages_of(script) and [p['text'] for p in passages_of(script)])]
+    production = brief.get('production') or {}
+    sp = speaker_policy(policy, production)
+    clip_tag = clip['id'].upper()[:12]
+    project_config = {'project_id': run.get('code') or str(run['id']), 'client_name': run.get('client') or 'unspecified',
+                      'video_purpose': brief.get('purpose', ''), 'target_audience': brief.get('audience', ''), 'tone_and_mood': brief.get('tone', ''), 'intended_takeaway': brief.get('message', ''),
+                      'target_aspect_ratio': TIMELINE['aspect_ratio'], 'timeline_resolution_width': TIMELINE['width'], 'timeline_resolution_height': TIMELINE['height'], 'timeline_fps': TIMELINE['fps'],
+                      'target_runtime_seconds': production.get('target_runtime_s'),
+                      'speaker_policy': {**sp, 'mode': P.MODES[P.mode_of(sp)]},
+                      'language_config': {'expected_field_speech_languages': production.get('field_speech_languages') or ['en'], 'final_vo_language': production.get('narration_language') or 'en'},
+                      'script_mode': 'SCRIPTED', 'script_beats': beats, 'process_stages': production.get('process_stages') or [],
+                      'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'learned_client_rules': production.get('learned_client_rules') or []}
+    ffprobe_meta = {'clip_id': clip_tag, 'filename': clip['name'], 'source_resolution_width': clip.get('width'), 'source_resolution_height': clip.get('height'),
+                    'source_fps': float(fps), 'is_variable_frame_rate_vfr': False, 'transcoded_from_vfr': bool(clip.get('transcoded_from_vfr')), 'rotation_flag_deg': clip.get('rotation_deg') or 0,
+                    'color_transfer': clip.get('color_transfer') or 'unknown', 'duration_seconds': round(duration, 3), 'duration_frames': frames,
+                    'duration_tc': tc_of(frames, fps), 'audio_channels': clip.get('audio_channels') or 0, 'audio_sample_rate_hz': clip.get('audio_sample_rate_hz'),
+                    'creation_timestamp': clip.get('creation_time')}
+    understand_audio = bool(policy.get('understand_audio', True))
+    if not understand_audio:
+        ffprobe_meta['audio_channels'] = 0
+    text = P.build(project_config, ffprobe_meta, float(fps), frames, beats, clip_tag, sp, audio_removed=not understand_audio)
+    schema = S.build_schema(clip_tag, clip['name'])
+    identity = {'contract_version': CONTRACT, 'run_id': str(run['id']), 'source_id': clip['id'], 'clip_tag': clip_tag, 'source_sha256': clip['sha256'], 'script_digest': script['content_digest'],
+                'brief_digest': brief.get('content_digest'), 'camera_audio': policy['camera_audio'], 'understand_audio': understand_audio, 'speaker_policy': sp,
+                'prompt_digest': digest(text), 'schema_digest': digest(schema), 'model': procedure['model'], 'settings': {**procedure['settings'], 'processing_mode': processing_mode(procedure, duration)},
+                'timeline': TIMELINE, **({'generation': str(generation)} if generation else {})}
+    return {'contract_version': CONTRACT, 'identity': identity, 'analysis_key': digest(identity), 'prompt': text, 'schema': schema, 'wire_schema': S.wire_schema(schema),
+            'clip': clip, 'mime': 'video/mp4', 'fps': str(fps), 'duration_frames': frames, 'policy': sp, 'timeline': TIMELINE, 'audio_removed': not understand_audio,
+            'project_config': project_config, 'ffprobe_meta': ffprobe_meta}
+
+
+def tc_of(frames, fps):
+    f = int(round(float(fps)))
+    s, ff = divmod(int(frames), max(f, 1))
+    h, s = divmod(s, 3600)
+    m, s = divmod(s, 60)
+    return f'{h:02d}:{m:02d}:{s:02d}:{ff:02d}'
+
+
 def build_request(run, procedure, brief, script, clip, policy, *, generation=None):
+    if procedure.get('contract_version') == 'clip-log-v1':
+        if policy.get('camera_audio') not in ('allowed', 'excluded'):
+            raise Problem(422, 'ANALYSIS_POLICY', 'camera_audio must be allowed or excluded.')
+        return build_request_clip_log(run, procedure, brief, script, clip, policy, generation=generation)
+    return build_request_v2(run, procedure, brief, script, clip, policy, generation=generation)
+
+
+def build_request_v2(run, procedure, brief, script, clip, policy, *, generation=None):
     """clip: {'id','name','sha256','bytes','duration_s','has_audio','width','height','fps'} from the media output.
     policy: {'camera_audio': allowed|excluded, 'understand_audio': bool, 'film_type': str, 'exclude': [ids]}."""
     if policy.get('camera_audio') not in ('allowed', 'excluded'):
@@ -87,6 +156,13 @@ def build_request(run, procedure, brief, script, clip, policy, *, generation=Non
 
 
 def review_response(raw, request):
+    if request.get('contract_version') == 'clip-log-v1':
+        from .clip_log import gate
+        return gate.review(raw, request)
+    return review_response_v2(raw, request)
+
+
+def review_response_v2(raw, request):
     """Keep the first response and explicit gaps; never resubmit to repair formatting (ported)."""
     try:
         def reject(_):
@@ -107,6 +183,13 @@ def review_response(raw, request):
 
 
 def summary_of(reviewed, clip):
+    if reviewed.get('contract_version') == 'clip-log-v1':
+        from .clip_log import gate
+        return gate.summary_of(reviewed, clip)
+    return summary_of_v2(reviewed, clip)
+
+
+def summary_of_v2(reviewed, clip):
     ev = reviewed.get('evidence') or {}
     counts = {}
     for row in ev.get('usable') or []:  # list of {'ref': {'collection': …}, 'item': …}

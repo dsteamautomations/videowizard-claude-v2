@@ -1,0 +1,717 @@
+{
+ "clip_id": "CLIP_C0120",
+ "filename": "C0120_02786596.mp4",
+ "descriptive_name": "mason_troweling_mortar_and_chipping_brick_rat_trap_bond",
+ "tc_confidence": "HIGH",
+ "clip_overview": "In an outdoor training facility shaded by trees, a mason works on a low rat-trap bond brick wall. In the first portion, he bends over to scoop cement mortar from a metal pan and spread it smoothly across the top of the bricks laid on edge. Later, after an off-camera exchange clarifying that this work is for training and a brief brick delivery by an assistant, he stands up and uses his trowel to chip and dress a red clay brick.",
+ "clip_overview_uncertainty": "The specific training institution or site location is not visually verified.",
+ "audio_observed": "MIXED",
+ "lighting_and_weather": "Natural outdoor daylight filtered through tree canopy creating soft dappled shade on the workspace with bright background ambient light",
+ "exposure_health": "Proper",
+ "contrast_profile": "Standard_Normal",
+ "color_match_group_id": "outdoor_daylight_yard_training_ground",
+ "max_safe_zoom_limit": 1.35,
+ "entities": [
+  {
+   "name": "Mason",
+   "kind": "person",
+   "first_seen_s": 0.0,
+   "last_seen_s": 19.2,
+   "description": "Adult male mason wearing a beige collared short-sleeve shirt with a clipped lavalier microphone, dark grey trousers, and sandals, performing masonry mortar bedding and brick dressing",
+   "basis": "directly_seen",
+   "uncertainty": ""
+  },
+  {
+   "name": "Assistant / Helper",
+   "kind": "person",
+   "first_seen_s": 10.8,
+   "last_seen_s": 11.6,
+   "description": "Co-worker wearing a white checkered long-sleeve shirt and a wristwatch who briefly enters frame right to place down a red clay brick",
+   "basis": "directly_seen",
+   "uncertainty": "Head is cropped out of frame by top boundary"
+  },
+  {
+   "name": "Rat-Trap Bond Brick Wall",
+   "kind": "structure",
+   "first_seen_s": 0.0,
+   "last_seen_s": 19.2,
+   "description": "Low red clay brick wall under construction with bricks clearly laid on edge creating visible hollow internal cavities",
+   "basis": "directly_seen",
+   "uncertainty": ""
+  },
+  {
+   "name": "Steel Brick Trowel",
+   "kind": "tool",
+   "first_seen_s": 0.0,
+   "last_seen_s": 19.2,
+   "description": "Pointed steel trowel with wooden handle used for scooping, spreading mortar, and dressing brick edges",
+   "basis": "directly_seen",
+   "uncertainty": ""
+  },
+  {
+   "name": "Mortar Pan (Tasla)",
+   "kind": "tool",
+   "first_seen_s": 0.0,
+   "last_seen_s": 16.0,
+   "description": "Shallow circular metal pan holding grey cement mortar placed on the sandy ground near the mason's foot",
+   "basis": "directly_seen",
+   "uncertainty": ""
+  },
+  {
+   "name": "Red Clay Bricks",
+   "kind": "material",
+   "first_seen_s": 0.0,
+   "last_seen_s": 19.2,
+   "description": "Burnt red clay bricks stacked and laid into the wall structure, as well as loose bricks resting on the ground",
+   "basis": "directly_seen",
+   "uncertainty": ""
+  },
+  {
+   "name": "Wooden Straightedge Plank",
+   "kind": "tool",
+   "first_seen_s": 0.0,
+   "last_seen_s": 19.2,
+   "description": "Straight wooden plank resting horizontally on the sand along the front base of the brick wall used for alignment checking",
+   "basis": "directly_seen",
+   "uncertainty": ""
+  }
+ ],
+ "sub_clips": [
+  {
+   "sub_clip_id": "SUB_C0120_01",
+   "tc_confidence": "HIGH",
+   "client_safe": true,
+   "risk_flags": [
+    "no_safety_gloves_or_boots_worn"
+   ],
+   "ocr_text_on_screen": [],
+   "usability_grade": "A",
+   "shot_role": "PROCESS_ACTION_B_ROLL",
+   "pairing_constraints": [
+    "AVOID_CONSECUTIVE_USE_WITH: SUB_C0120_02"
+   ],
+   "max_usable_window": {
+    "in_tc": "00:00:00:00",
+    "out_tc": "00:00:07:10",
+    "in_s": 0.0,
+    "out_s": 7.2,
+    "in_frame": 0,
+    "out_frame": 360,
+    "duration_s": 7.2,
+    "video_handle_frames_before": 0,
+    "video_handle_frames_after": 0,
+    "audio_handle_frames_before": 0,
+    "audio_handle_frames_after": 0
+   },
+   "must_include_action_peak": {
+    "in_tc": "00:00:05:25",
+    "out_tc": "00:00:07:00",
+    "in_s": 5.5,
+    "out_s": 7.0,
+    "duration_s": 1.5
+   },
+   "hero_frame_tc": "00:00:06:25",
+   "hero_frame_s": 6.5,
+   "action_completeness": "COMPLETE",
+   "visual_action_observed": "A mason wearing a beige shirt bends over a low rat-trap bond wall course. He dips his steel trowel into a metal mortar pan on the ground to his right, scoops cement mortar, and spreads it smoothly along the top face of the bricks laid on edge, leveling the bed joint.",
+   "visual_action_uncertainty": "",
+   "why_sliced_here": "Clean process segment ending at 00:00:07:10 immediately prior to off-camera vocalization, providing an undisturbed, speech-free B-roll clip of mortar bed application.",
+   "people_and_speaker_analysis": {
+    "people_count": 1,
+    "people_roles": [
+     "Worker_Silent"
+    ],
+    "audio_nature": "NAT_SOUND_ONLY",
+    "mouth_visible": false,
+    "looking_at_lens": false,
+    "uncertainty": "",
+    "speech_translation_block": null,
+    "speaker_crop_module": null
+   },
+   "camera_and_optics": {
+    "native_shot_size": "MWS",
+    "camera_angle": "Eye_Level",
+    "lens_feel": "Standard",
+    "movement_type": "Static",
+    "movement_direction": "None",
+    "movement_speed": "None",
+    "movement_easing": "Not_Applicable",
+    "has_3d_parallax": false,
+    "has_internal_scene_motion": true,
+    "subject_screen_direction": "Neutral",
+    "depth_of_field": "Deep_Sharp",
+    "leading_lines": [
+     "Horizontal line of the brick-on-edge wall course stretching across the lower third",
+     "Horizontal wooden straightedge plank lying on the ground",
+     "Vertical tree trunks in the background"
+    ],
+    "uncertainty": ""
+   },
+   "pacing_and_flow": {
+    "entry_eye_grid": "Bottom_Center",
+    "exit_eye_grid": "Bottom_Center",
+    "kinetic_energy_score": 4,
+    "min_comprehension_hold_s": 2.5,
+    "time_manipulation_options": [
+     "SLOW_MO_ELIGIBLE"
+    ],
+    "natural_cut_points": [
+     {
+      "tc": "00:00:05:25",
+      "s": 5.5,
+      "description": "End of first smoothing pass before trowel re-dips into pan"
+     },
+     {
+      "tc": "00:00:07:10",
+      "s": 7.2,
+      "description": "Completion of mortar spread on this section before verbal dialogue starts"
+     }
+    ],
+    "accent_events": [
+     {
+      "tc": "00:00:03:10",
+      "s": 3.2,
+      "description": "Trowel scrapes against metal mortar pan scooping fresh mix"
+     },
+     {
+      "tc": "00:00:06:05",
+      "s": 6.1,
+      "description": "Trowel deposits fresh mortar onto the brick top edge"
+     }
+    ],
+    "text_safe_zone": {
+     "grid": "Top_Left",
+     "valid_in_tc": "00:00:00:00",
+     "valid_out_tc": "00:00:07:10",
+     "contrast": "DARK_BG_USE_WHITE_TEXT"
+    }
+   },
+   "continuity_and_story": {
+    "primary_fit_for_beats": [
+     "BEAT_22",
+     "BEAT_23"
+    ],
+    "secondary_fit_for_beats": [
+     "BEAT_03",
+     "BEAT_24",
+     "BEAT_25",
+     "BEAT_26"
+    ],
+    "beat_fit_reasoning": "Directly illustrates applying mortar to bricks laid on edge during the creation of a rat-trap bond course, showing the cavity structure and bedding process described in Beats 22 and 23.",
+    "beat_fit_basis": "directly_seen",
+    "beat_fit_limits": "Guide strings mentioned in Beat 22 are not prominently visible in this exact frame; mortar mixing itself occurred prior to this clip.",
+    "process_stage": "Stage_2_Laying_Bricks_on_Edge",
+    "prerequisite_action": "Sub-structure foundation established and lower brick-on-edge course laid with hollow cavities",
+    "outcome_state": "Even bed of mortar spread across top edge of bricks ready for the next course",
+    "world_landmarks_and_props": [
+     "rat_trap_bond_wall",
+     "trowel",
+     "mortar_pan",
+     "wooden_straightedge_plank",
+     "red_clay_bricks",
+     "background_trees",
+     "workshop_shed"
+    ],
+    "marketing_value_tag": "PROCESS",
+    "mood_tag": "Calm"
+   },
+   "audio_and_sfx_plan": {
+    "clean_nat_sound_intervals": [
+     {
+      "in_tc": "00:00:00:00",
+      "out_tc": "00:00:07:10",
+      "in_s": 0.0,
+      "out_s": 7.2,
+      "duration_s": 7.2,
+      "description": "Continuous clean ambient sound of metal trowel scraping, scooping, and patting wet cement mortar onto bricks"
+     }
+    ],
+    "creative_sfx_cues": [
+     {
+      "target_track": "A3",
+      "sfx_type": "mortar_trowel_spread",
+      "start_tc": "00:00:06:00",
+      "end_tc": "00:00:07:00",
+      "duration_s": 1.0,
+      "description": "Tactile squelch and friction of wet sand-cement mortar being leveled over brick edge",
+      "resolved_sfx_file": "HUMAN_TO_SOURCE"
+     }
+    ]
+   },
+   "technical_qc": {
+    "defects_detected": [],
+    "stabilization_needed": false,
+    "horizon_rotation_deg": 0.0,
+    "voice_isolation_recommended": false,
+    "dual_mono_channel_fix": false,
+    "uncertainty": ""
+   },
+   "vfx_and_graphics_opportunities": [
+    {
+     "type": "callout_label",
+     "in_tc": "00:00:01:00",
+     "out_tc": "00:00:06:00",
+     "what_and_why": "Leader callout pointing to the open cavity between the bricks on edge labeled 'Continuous Hollow Cavity' to reinforce the core structural feature."
+    }
+   ],
+   "editorial_ideas": [
+    "Primary candidate B-roll for Beat 22 or Beat 23 to demonstrate authentic site craftsmanship and careful mortar placement on rat-trap bond masonry.",
+    "Can be conformed to 50% slow motion from 50 fps source onto a 25 fps timeline to emphasize the smooth, tactile trowel action."
+   ],
+   "sub_clip_uncertainty": ""
+  },
+  {
+   "sub_clip_id": "SUB_C0120_02",
+   "tc_confidence": "HIGH",
+   "client_safe": true,
+   "risk_flags": [
+    "no_safety_gloves_or_boots_worn",
+    "partial_body_intrusion_at_frame_edge"
+   ],
+   "ocr_text_on_screen": [],
+   "usability_grade": "B",
+   "shot_role": "PROCESS_ACTION_B_ROLL",
+   "pairing_constraints": [
+    "MUTUALLY_EXCLUSIVE_WITH: SUB_C0120_01"
+   ],
+   "max_usable_window": {
+    "in_tc": "00:00:07:10",
+    "out_tc": "00:00:15:30",
+    "in_s": 7.2,
+    "out_s": 15.6,
+    "in_frame": 360,
+    "out_frame": 780,
+    "duration_s": 8.4,
+    "video_handle_frames_before": 0,
+    "video_handle_frames_after": 0,
+    "audio_handle_frames_before": 0,
+    "audio_handle_frames_after": 0
+   },
+   "must_include_action_peak": {
+    "in_tc": "00:00:10:00",
+    "out_tc": "00:00:13:00",
+    "in_s": 10.0,
+    "out_s": 13.0,
+    "duration_s": 3.0
+   },
+   "hero_frame_tc": "00:00:12:10",
+   "hero_frame_s": 12.2,
+   "action_completeness": "COMPLETE",
+   "visual_action_observed": "The mason continues smoothing and finishing the mortar bed across the rat-trap bond course. Between approximately 10.8 s and 11.5 s, a second worker in a white plaid shirt briefly enters the frame edge on the right to set down a red clay brick beside the mortar pan and exits. The mason completes leveling the joint across the entire section.",
+   "visual_action_uncertainty": "",
+   "why_sliced_here": "Begins at dialogue onset and covers the continued mortar smoothing phase until the mason stops troweling and prepares to pick up a brick.",
+   "people_and_speaker_analysis": {
+    "people_count": 2,
+    "people_roles": [
+     "Subject_Speaking",
+     "Worker_Silent"
+    ],
+    "audio_nature": "ON_CAMERA_SPEECH",
+    "mouth_visible": true,
+    "looking_at_lens": false,
+    "uncertainty": "Mason's face is angled downward toward the bricks; mouth movement is subtle in 3/4 downward profile.",
+    "speech_translation_block": {
+     "speaker_id": "SPK_MASON",
+     "spoken_language": "ta",
+     "speaker_role": "SUBJECT_EXPLAINING",
+     "verbatim_transcript": "[00:08.0] (Off-camera: ஏங்க வேற எல்லாம் எங்கேயும் வீடு கட்டி குடுத்தீங்களா?) [00:11.0] இல்ல இல்ல, ட்ரைனிங் மட்டும்தான், ட்ரைனிங் மட்டும்தான். [00:13.0] (Off-camera: ட்ரைனிங் மட்டுமா?)",
+     "english_translation": "[00:08.0] (Off-camera: Sir, did you build houses anywhere else?) [00:11.0] No, no, only training, only training. [00:13.0] (Off-camera: Only training?)",
+     "transcription_status": "clear",
+     "extracted_domain_facts": [
+      {
+       "fact": "The brick masonry demonstrated is executed as part of an institutional training program rather than commercial housing construction.",
+       "basis": "spoken_claim",
+       "matches_visual_on_screen": false,
+       "visual_evidence_s": null,
+       "limits": "Statement clarifies the educational context of the facility; it does not detail technical masonry rules or multi-storey limits."
+      }
+     ],
+     "soundbite_grade": "CONTEXT_ONLY"
+    },
+    "speaker_crop_module": {
+     "speaker_head_mouth_box": [
+      0.62,
+      0.15,
+      0.1,
+      0.2
+     ],
+     "speaker_full_body_box": [
+      0.55,
+      0.15,
+      0.3,
+      0.73
+     ],
+     "must_preserve_action_box": [
+      0.0,
+      0.55,
+      0.65,
+      0.45
+     ],
+     "sharp_in_crop_zone": true,
+     "speaker_moves_during_subclip": false,
+     "suggested_split_s": null,
+     "limits": "Mason is bent over facing down; helper's torso and arm enter briefly on the far right edge around 11.0s."
+    }
+   },
+   "camera_and_optics": {
+    "native_shot_size": "MWS",
+    "camera_angle": "Eye_Level",
+    "lens_feel": "Standard",
+    "movement_type": "Static",
+    "movement_direction": "None",
+    "movement_speed": "None",
+    "movement_easing": "Not_Applicable",
+    "has_3d_parallax": false,
+    "has_internal_scene_motion": true,
+    "subject_screen_direction": "Neutral",
+    "depth_of_field": "Deep_Sharp",
+    "leading_lines": [
+     "Horizontal line of the brick-on-edge wall course stretching across the lower third",
+     "Wooden leveling plank lying horizontally in front of the wall",
+     "Vertical tree trunks in the background"
+    ],
+    "uncertainty": ""
+   },
+   "pacing_and_flow": {
+    "entry_eye_grid": "Bottom_Center",
+    "exit_eye_grid": "Bottom_Center",
+    "kinetic_energy_score": 4,
+    "min_comprehension_hold_s": 2.5,
+    "time_manipulation_options": [
+     "SLOW_MO_ELIGIBLE"
+    ],
+    "natural_cut_points": [
+     {
+      "tc": "00:00:10:20",
+      "s": 10.4,
+      "description": "Immediately before the helper enters the right edge"
+     },
+     {
+      "tc": "00:00:12:00",
+      "s": 12.0,
+      "description": "After the helper leaves the frame"
+     },
+     {
+      "tc": "00:00:15:30",
+      "s": 15.6,
+      "description": "Final trowel pass completed across mortar bed"
+     }
+    ],
+    "accent_events": [
+     {
+      "tc": "00:00:11:12",
+      "s": 11.24,
+      "description": "Helper sets fresh brick down onto the ground"
+     },
+     {
+      "tc": "00:00:14:15",
+      "s": 14.3,
+      "description": "Mason levels the mortar bed with a final smooth trowel stroke"
+     }
+    ],
+    "text_safe_zone": {
+     "grid": "Top_Left",
+     "valid_in_tc": "00:00:07:10",
+     "valid_out_tc": "00:00:15:30",
+     "contrast": "DARK_BG_USE_WHITE_TEXT"
+    }
+   },
+   "continuity_and_story": {
+    "primary_fit_for_beats": [
+     "BEAT_24",
+     "BEAT_26"
+    ],
+    "secondary_fit_for_beats": [
+     "BEAT_22",
+     "BEAT_23",
+     "BEAT_25"
+    ],
+    "beat_fit_reasoning": "Illustrates the attention to level, alignment, and quality workmanship as the mason finishes the mortar joint across the rat-trap bond course.",
+    "beat_fit_basis": "directly_seen",
+    "beat_fit_limits": "Speech discusses training center context rather than technical wall specifications; helper intrusion slightly disrupts isolated work.",
+    "process_stage": "Stage_2_Laying_Bricks_on_Edge",
+    "prerequisite_action": "Initial mortar application along the course",
+    "outcome_state": "Completed smooth bed joint ready for laying the subsequent course of bricks",
+    "world_landmarks_and_props": [
+     "rat_trap_bond_wall",
+     "trowel",
+     "mortar_pan",
+     "wooden_straightedge_plank",
+     "red_clay_bricks",
+     "background_trees",
+     "workshop_shed"
+    ],
+    "marketing_value_tag": "QUALITY",
+    "mood_tag": "Calm"
+   },
+   "audio_and_sfx_plan": {
+    "clean_nat_sound_intervals": [],
+    "creative_sfx_cues": [
+     {
+      "target_track": "A3",
+      "sfx_type": "mortar_trowel_spread",
+      "start_tc": "00:00:13:30",
+      "end_tc": "00:00:15:00",
+      "duration_s": 1.5,
+      "description": "Foley enhancement of trowel smoothing cement bed over masonry",
+      "resolved_sfx_file": "HUMAN_TO_SOURCE"
+     }
+    ]
+   },
+   "technical_qc": {
+    "defects_detected": [],
+    "stabilization_needed": false,
+    "horizon_rotation_deg": 0.0,
+    "voice_isolation_recommended": false,
+    "dual_mono_channel_fix": false,
+    "uncertainty": ""
+   },
+   "vfx_and_graphics_opportunities": [
+    {
+     "type": "callout_label",
+     "in_tc": "00:00:12:00",
+     "out_tc": "00:00:15:00",
+     "what_and_why": "Text callout 'Uniform Bed Joint' to illustrate quality workmanship and alignment along the course."
+    }
+   ],
+   "editorial_ideas": [
+    "Usable as secondary B-roll for Beat 24 or Beat 26 with audio muted per Mode 3 speaker policy.",
+    "If desired, crop the right 25% of the frame to isolate the troweling action and remove the helper intrusion."
+   ],
+   "sub_clip_uncertainty": "Assistant's arm and torso briefly enter on the frame right edge."
+  },
+  {
+   "sub_clip_id": "SUB_C0120_03",
+   "tc_confidence": "HIGH",
+   "client_safe": true,
+   "risk_flags": [
+    "no_safety_gloves_or_boots_worn",
+    "partial_head_crop_at_frame_edge"
+   ],
+   "ocr_text_on_screen": [],
+   "usability_grade": "B",
+   "shot_role": "DETAIL_INSERT_B_ROLL",
+   "pairing_constraints": [
+    "AVOID_CONSECUTIVE_USE_WITH: SUB_C0120_01",
+    "AVOID_CONSECUTIVE_USE_WITH: SUB_C0120_02"
+   ],
+   "max_usable_window": {
+    "in_tc": "00:00:15:30",
+    "out_tc": "00:00:19:10",
+    "in_s": 15.6,
+    "out_s": 19.2,
+    "in_frame": 780,
+    "out_frame": 960,
+    "duration_s": 3.6,
+    "video_handle_frames_before": 0,
+    "video_handle_frames_after": 0,
+    "audio_handle_frames_before": 0,
+    "audio_handle_frames_after": 0
+   },
+   "must_include_action_peak": {
+    "in_tc": "00:00:16:40",
+    "out_tc": "00:00:19:05",
+    "in_s": 16.8,
+    "out_s": 19.1,
+    "duration_s": 2.3
+   },
+   "hero_frame_tc": "00:00:17:20",
+   "hero_frame_s": 17.4,
+   "action_completeness": "TRUNCATED_CUT_OFF",
+   "visual_action_observed": "The mason reaches down to his right, picks up a red clay brick, and stands upright. His head is cropped above the frame border as he holds the brick in his left hand and uses the steel edge of his trowel to repeatedly chip and dress the brick, generating fine ceramic chips and brick dust.",
+   "visual_action_uncertainty": "Target brick size (half-bat or closer) cannot be verified because the clip ends while chipping is still ongoing.",
+   "why_sliced_here": "Action state changes from horizontal mortar spreading to standing brick dressing and cutting with a trowel.",
+   "people_and_speaker_analysis": {
+    "people_count": 1,
+    "people_roles": [
+     "Worker_Silent"
+    ],
+    "audio_nature": "OFF_CAMERA_SPEECH",
+    "mouth_visible": false,
+    "looking_at_lens": false,
+    "uncertainty": "Mason's head and face are out of frame above the top frame border.",
+    "speech_translation_block": {
+     "speaker_id": "SPK_OFF_CAMERA",
+     "spoken_language": "ta",
+     "speaker_role": "BACKGROUND_CHATTER",
+     "verbatim_transcript": "[00:15.8] வாரா மேஸ்திரி...",
+     "english_translation": "[00:15.8] Mason is coming...",
+     "transcription_status": "partial",
+     "extracted_domain_facts": [],
+     "soundbite_grade": "UNUSABLE_SPEECH"
+    },
+    "speaker_crop_module": null
+   },
+   "camera_and_optics": {
+    "native_shot_size": "MS",
+    "camera_angle": "Eye_Level",
+    "lens_feel": "Standard",
+    "movement_type": "Static",
+    "movement_direction": "None",
+    "movement_speed": "None",
+    "movement_easing": "Not_Applicable",
+    "has_3d_parallax": false,
+    "has_internal_scene_motion": true,
+    "subject_screen_direction": "Neutral",
+    "depth_of_field": "Deep_Sharp",
+    "leading_lines": [
+     "Angled line of mason's arms holding the brick",
+     "Horizontal course line of the brick wall across the bottom of the frame"
+    ],
+    "uncertainty": ""
+   },
+   "pacing_and_flow": {
+    "entry_eye_grid": "Center_Right",
+    "exit_eye_grid": "Center_Right",
+    "kinetic_energy_score": 7,
+    "min_comprehension_hold_s": 1.5,
+    "time_manipulation_options": [
+     "SLOW_MO_ELIGIBLE"
+    ],
+    "natural_cut_points": [
+     {
+      "tc": "00:00:16:40",
+      "s": 16.8,
+      "description": "Point when mason begins first downward trowel strike on brick"
+     }
+    ],
+    "accent_events": [
+     {
+      "tc": "00:00:17:05",
+      "s": 17.1,
+      "description": "First sharp strike of trowel blade on the brick edge"
+     },
+     {
+      "tc": "00:00:17:35",
+      "s": 17.7,
+      "description": "Second sharp strike chipping brick corner with visible dust"
+     },
+     {
+      "tc": "00:00:18:20",
+      "s": 18.4,
+      "description": "Third rhythmic impact of trowel trimming brick"
+     }
+    ],
+    "text_safe_zone": {
+     "grid": "Top_Left",
+     "valid_in_tc": "00:00:15:30",
+     "valid_out_tc": "00:00:19:10",
+     "contrast": "DARK_BG_USE_WHITE_TEXT"
+    }
+   },
+   "continuity_and_story": {
+    "primary_fit_for_beats": [
+     "BEAT_17",
+     "BEAT_27"
+    ],
+    "secondary_fit_for_beats": [
+     "BEAT_18",
+     "BEAT_24",
+     "BEAT_29"
+    ],
+    "beat_fit_reasoning": "Shows manual brick dressing and shaping with a trowel, directly matching the need to cut and size bricks for wall junctions, corners, and closures (Beat 27) and demonstrating brick sound/quality under impact (Beat 17).",
+    "beat_fit_basis": "directly_seen",
+    "beat_fit_limits": "Action ends before the cut brick is placed into the wall structure.",
+    "process_stage": "Stage_3_Junctions_Lintels_and_Pointing",
+    "prerequisite_action": "Mason selects a whole brick to cut into a closer or bat for junction detailing",
+    "outcome_state": "Brick edge partially chipped and dressed with trowel blade",
+    "world_landmarks_and_props": [
+     "rat_trap_bond_wall",
+     "trowel",
+     "red_clay_bricks",
+     "background_trees"
+    ],
+    "marketing_value_tag": "PROCESS",
+    "mood_tag": "Industrial"
+   },
+   "audio_and_sfx_plan": {
+    "clean_nat_sound_intervals": [
+     {
+      "in_tc": "00:00:16:40",
+      "out_tc": "00:00:19:10",
+      "in_s": 16.8,
+      "out_s": 19.2,
+      "duration_s": 2.4,
+      "description": "Crisp percussive clinking sounds of metal trowel blade striking and chipping red clay brick"
+     }
+    ],
+    "creative_sfx_cues": [
+     {
+      "target_track": "A3",
+      "sfx_type": "brick_trowel_strike",
+      "start_tc": "00:00:17:05",
+      "end_tc": "00:00:17:20",
+      "duration_s": 0.3,
+      "description": "Sharp ceramic impact crack of trowel blade dressing brick edge",
+      "resolved_sfx_file": "HUMAN_TO_SOURCE"
+     },
+     {
+      "target_track": "A3",
+      "sfx_type": "brick_trowel_strike",
+      "start_tc": "00:00:17:35",
+      "end_tc": "00:00:18:00",
+      "duration_s": 0.5,
+      "description": "Second percussive ceramic strike with loose chip rattle",
+      "resolved_sfx_file": "HUMAN_TO_SOURCE"
+     }
+    ]
+   },
+   "technical_qc": {
+    "defects_detected": [
+     {
+      "defect": "other",
+      "in_tc": "00:00:16:15",
+      "out_tc": "00:00:19:10",
+      "description": "Mason's head is cropped out above the top edge of the frame when he stands upright"
+     }
+    ],
+    "stabilization_needed": false,
+    "horizon_rotation_deg": 0.0,
+    "voice_isolation_recommended": false,
+    "dual_mono_channel_fix": false,
+    "uncertainty": ""
+   },
+   "vfx_and_graphics_opportunities": [
+    {
+     "type": "callout_label",
+     "in_tc": "00:00:17:00",
+     "out_tc": "00:00:19:00",
+     "what_and_why": "Callout 'Dressing Brick for Junction Detailing' to explain the practical purpose of shaping the brick with the trowel."
+    }
+   ],
+   "editorial_ideas": [
+    "Use as a punchy, energetic 1.5 to 2.0s insert during Beat 17 (brick quality) or Beat 27 (junction detailing).",
+    "Align cut transitions with the loud trowel strike accent events at 17.1s and 17.7s for rhythmic pacing."
+   ],
+   "sub_clip_uncertainty": "Action cut off abruptly by end of recording at 19.20s."
+  }
+ ],
+ "clip_level_notes_for_editor": [
+  "SUB_C0120_01 offers 7.20 seconds of pristine, speech-free B-roll showing the core rat-trap bond technique of laying mortar across bricks on edge; highly recommended for Beat 22 or Beat 23.",
+  "Source audio contains informal Tamil dialogue between 00:07.4 and 00:13.5 where the mason confirms the site is an instructional training facility ('ட்ரைனிங் மட்டும்தான்'); under Mode 3 speaker policy this audio is muted on the final film timeline.",
+  "SUB_C0120_03 captures tactile brick cutting/dressing with trowel strikes and distinct natural percussive clicks from 16.8s to 19.2s; ideal as an energetic insert for Beat 17 or Beat 27.",
+  "The camera is framed for a bent-over mason, so when the mason stands upright in SUB_C0120_03 his head is cut off by the top edge; treat it as an insert focused on hands and tool work."
+ ],
+ "summary_card_lines": [
+  "OVERVIEW: Skilled mason spreads mortar on rat-trap bond brick-on-edge course and later trims a brick with a trowel in an outdoor training yard.",
+  "SOURCE SPECS: 1920x1080, 50.0 fps, 19.20s (960 frames), 16:9, Rec.709, static camera on tripod.",
+  "SUB-CLIPS HARVESTED: SUB_C0120_01 (00:00:00:00-00:00:07:10, 7.20s, Grade A); SUB_C0120_02 (00:00:07:10-00:00:15:30, 8.40s, Grade B); SUB_C0120_03 (00:00:15:30-00:00:19:10, 3.60s, Grade B).",
+  "SPEAKER & AUDIO STATUS: Mode 3 Pure Visual Infill; source speech in Tamil at 07.4-13.5s muted in edit; SUB_C0120_01 has clean nat sound; SUB_C0120_03 has clean trowel-strike nat sound from 16.8s.",
+  "SCRIPT BEAT MATCHES: Primary fits for BEAT_22, BEAT_23 (mortar spreading on course), BEAT_24, BEAT_26 (leveling workmanship), and BEAT_17, BEAT_27 (brick dressing).",
+  "CONTINUITY & STAGE: Stage_2_Laying_Bricks_on_Edge (SUB_01, SUB_02) and Stage_3_Junctions_Lintels_and_Pointing (SUB_03); landmarks include rat-trap wall, trowel, mortar pan, wooden plank.",
+  "MARKETING & MOOD: Tags PROCESS / QUALITY; Mood Calm instructional documentary tone with Industrial percussive elements.",
+  "VISUAL FLOW of the best sub-clip: Static MWS, eye-level, entry Bottom_Center to exit Bottom_Center, kinetic score 4/10, slow-motion eligible (50 fps conform), safe text zone Top_Left.",
+  "AUDIO / SFX PLAN: Nat sound trowel scraping (0.0-7.2s) and brick chipping (16.8-19.2s); Foley cues for wet mortar spreading and sharp ceramic trowel strikes on A3.",
+  "PAIRING & NOTES: Use SUB_C0120_01 as primary B-roll for mortar laying; SUB_C0120_02 is mutually exclusive with SUB_01; SUB_C0120_03 serves as detail insert of brick cutting."
+ ],
+ "unavailable_or_uncertain": [
+  {
+   "field": "entities[1].description",
+   "reason": "Assistant's face and upper head are cut off by the top edge of the frame; person cannot be definitively identified."
+  },
+  {
+   "field": "sub_clips[2].continuity_and_story.outcome_state",
+   "reason": "Recording terminates at 19.20s while the mason is actively dressing the brick, leaving final cut dimensions unobservable."
+  }
+ ]
+}

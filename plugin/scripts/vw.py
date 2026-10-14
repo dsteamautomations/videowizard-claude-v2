@@ -448,7 +448,11 @@ def cmd_analysis(a):
     if a.what == 'show':
         st = call('GET', f'/api/runs/{run}/analysis')
         u = next((x for x in st['units'] if x['unit'] == a.unit), None)
-        emit(u or {'action': 'refused', 'message': f'No clip {a.unit}.'}, 0 if u else 2)
+        card = ((u or {}).get('summary') or {}).get('summary_card') or []
+        emit(u or {'action': 'refused', 'message': f'No clip {a.unit}.'}, 0 if u else 2, ('\n'.join(f'{i + 1}. {l}' for i, l in enumerate(card)) if card else None))
+    if a.what == 'policy':
+        body = {'camera_audio': a.camera_audio, **({'show_speaker_video': bool(a.show_speaker_video)} if a.show_speaker_video is not None else {})}
+        emit(write(f'/api/runs/{run}/analysis/policy', body), 0, 'Speaker policy re-solved on the retained logs; no paid call. Poll `vw analysis status`.')
     if a.what in ('retry', 'recover', 'resolve', 'exclude'):
         emit(write(f'/api/runs/{run}/analysis/{a.unit}/{a.what}', {'note': a.note or ''}))
 
@@ -669,9 +673,9 @@ def main(argv=None):
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
     s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')
     s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note'); s.set_defaults(fn=cmd_voice)
-    s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude'])
+    s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude', 'policy'])
     s.add_argument('--camera-audio', choices=['allowed', 'excluded']); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
-    s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.set_defaults(fn=cmd_analysis)
+    s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.set_defaults(fn=cmd_analysis)
     s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)

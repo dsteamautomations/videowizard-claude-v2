@@ -106,6 +106,11 @@ class Resolve(Write):
     note: str | None = None
 
 
+class AnalysisPolicy(Write):
+    camera_audio: Literal['allowed', 'excluded']
+    show_speaker_video: bool | None = None
+
+
 class AnalysisStart(Write):
     camera_audio: Literal['allowed', 'excluded']
     understand_audio: bool = True
@@ -538,6 +543,16 @@ def analysis_start(run_id: UUID, body: AnalysisStart, user=User, conn=DB):
     outputs = core.current_outputs(conn, run['id'])
     policy = {'camera_audio': body.camera_audio, 'understand_audio': body.understand_audio, 'film_type': body.film_type, 'exclude': body.exclude}
     status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, analysis_jobs.start(conn, user, run, outputs, policy, body.again)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/analysis/policy', status_code=201)
+def analysis_policy(run_id: UUID, body: AnalysisPolicy, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id, lock=True)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    outputs = core.current_outputs(conn, run['id'])
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, analysis_jobs.repolicy(conn, user, run, outputs, {'camera_audio': body.camera_audio, 'show_speaker_video': body.show_speaker_video})))
     return Response(resp, status_code=status)
 
 

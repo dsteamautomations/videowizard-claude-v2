@@ -48,6 +48,19 @@ class FakeTransport:
             FakeTransport.mode = 'ok'
             raise GeminiTransportError('connection_error', 'socket closed')
         schema = payload['generationConfig']['responseJsonSchema']
+        if 'sub_clips' in schema.get('properties', {}):  # clip-log-v1 (procedure version 2)
+            from clip_log_fixture import synthetic_log
+            clip_id = re.search(r'"clip_id": "([A-Z0-9]+)"', prompt).group(1)
+            filename = re.search(r'"filename": "([^"]+)"', prompt).group(1)
+            fps = float(re.search(r'"source_fps": ([0-9.]+)', prompt).group(1))
+            frames = int(re.search(r'"duration_frames": ([0-9]+)', prompt).group(1))
+            body = synthetic_log('WRONG' if mode == 'wrong_source' else clip_id, filename, fps, frames, bad_enum=(mode == 'bad_enum'), nine_lines=(mode == 'nine_lines'))
+            raw = 'not json at all {' if mode == 'text' else json.dumps(body)
+            if mode == 'crash_after_generate':
+                FakeTransport.mode = 'ok'
+                FakeTransport.pending_raw = raw
+                raise OSError('worker killed after generate')
+            return {'body': body, 'metadata': {'finish_reason': 'STOP', 'usage': {'promptTokenCount': 1200, 'candidatesTokenCount': 400}, 'elapsed_seconds': 1.5}, 'raw': raw}
         if 'answers' in schema.get('properties', {}):  # planning inspection (flash schema)
             qid = re.search(r'"id": "(Q[0-9]+)"', prompt).group(1)
             sid = re.search(r'"source_id": "([0-9a-f]{16})"', prompt).group(1)
@@ -93,7 +106,7 @@ def gemini(monkeypatch, tmp_path):
 def run_until_analysis(home, database, fake, n_clips=3, seconds=1):
     code, ws = run_until_media(home, database, fake)
     for i in range(n_clips):
-        clip(ws / 'in' / f'c{i}.mp4', seconds=seconds, tone=440 + 110 * i)
+        clip(ws / 'in' / f'c{i}.mp4', seconds=seconds, tone=440 + 110 * i, size='128x72')   # 16:9 like real footage; the crop solver is aspect-locked
     assert vw(home, 'stage', 'media', 'prepare')[0] == 0
     rc, out, err = vw(home, 'stage', 'media', 'record', '--quote', 'yes')
     assert rc == 0, err
@@ -112,8 +125,8 @@ def test_a1_three_clips_succeed(home, database, fake, gemini):
     st = vw(home, 'analysis', 'status')[1]
     assert st['counts'] == {'retained': 3}
     u = st['units'][0]
-    assert u['recorded'] and u['summary']['usable_rows']['visual_events'] == 1 and u['summary']['excluded_rows'] >= 1  # A8 in passing
-    assert u['cost']['input_tokens'] == 1200 and u['summary']['descriptive_name'] == 'earth-block-table'
+    assert u['recorded'] and u['summary']['contract_version'] == 'clip-log-v1' and u['summary']['sub_clips'] == 2 and u['summary']['by_eligibility'] == {'ELIGIBLE_AS_IS': 1, 'ELIGIBLE_WITH_CROP': 1}
+    assert u['cost']['input_tokens'] == 1200 and u['summary']['descriptive_name'] == 'synthetic_test_clip' and len(u['summary']['summary_card']) == 10
     nxt = vw(home, 'next')[1]
     assert nxt['stage'] == 'planning'
     with psycopg.connect(database) as c:
@@ -229,6 +242,33 @@ def test_a16_identity_changes_with_model_only():
     a = analysis.build_request({'id': 'r'}, proc, {}, script, clip, {'camera_audio': 'allowed'})
     b = analysis.build_request({'id': 'r'}, {**proc, 'model': 'gemini-4-argon'}, {}, script, clip, {'camera_audio': 'allowed'})
     assert a['analysis_key'] != b['analysis_key'] and a['identity']['model'] == 'gemini-3.8-flash'
+
+
+def test_e20_planning_refuses_clip_log_runs_until_step4(home, database, fake, gemini):
+    run_until_analysis(home, database, fake, n_clips=1)
+    vw(home, *START)
+    drain()
+    assert vw(home, 'next')[1]['stage'] == 'planning'
+    rc, out, _ = vw(home, 'planning', 'prepare', '--fps', '25', '--resolution', '64x64', '--source-audio', 'none', '--visible-speaking', 'avoid')
+    assert rc == 2 and 'step 4' in out['message']
+    rc, out, _ = vw(home, 'analysis', 'show', '--unit', vw(home, 'analysis', 'status')[1]['units'][0]['unit'])
+    assert rc == 0 and len(out['summary']['summary_card']) == 10
+
+
+def test_e18_policy_change_resolves_without_paid_call(home, database, fake, gemini):
+    run_until_analysis(home, database, fake, n_clips=1)
+    vw(home, *START)   # camera audio allowed → Mode 2: talking sub-clip cropped
+    drain()
+    before = vw(home, 'analysis', 'status')[1]['units'][0]['summary']['by_eligibility']
+    assert before == {'ELIGIBLE_AS_IS': 1, 'ELIGIBLE_WITH_CROP': 1}
+    calls = dict(gemini.calls)
+    rc, out, err = vw(home, 'analysis', 'policy', '--camera-audio', 'allowed', '--show-speaker-video')
+    assert rc == 0 and out['paid'] is False and len(out['resolved']) == 1, err
+    drain()
+    u = vw(home, 'analysis', 'status')[1]['units'][0]
+    assert u['summary']['by_eligibility'] == {'ELIGIBLE_AS_IS': 1, 'ELIGIBLE_A_ROLL_SPEAKER': 1} and u['cost'] is None
+    assert gemini.calls == calls   # no upload, no generate
+    assert vw(home, 'next')[1]['stage'] == 'planning'
 
 
 def test_a10_long_clip_uses_agentic(home, database, fake, gemini, monkeypatch):

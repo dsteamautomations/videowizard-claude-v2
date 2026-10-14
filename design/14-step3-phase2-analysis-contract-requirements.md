@@ -60,3 +60,8 @@ Planning on the new contract (step 4). Flex pricing. STATIC mode. Tamil transcri
 - Speaker policy mapping as in §2.
 - Beats come from the script stage (done in step 2).
 - `learned_client_rules`: empty list per client until step 4's feedback loop writes them; stored per client id.
+
+## 8. Build notes (14 Oct 2026, during step 3)
+- The blueprint's CLIP_04 prose example (zoom 1.45, position −431.3 / −7.8, crop y 0.15) does not match the blueprint's own solver code on the same boxes (−431.5 / +7.8 / 0.16). The code is ported verbatim and is the authority; the test asserts the code's numbers (E8).
+- Procedure **version 2** = version 1 with the analysis stage on clip-log-v1; new runs default to 2. Version 1 stays published so planning tests and any old run keep the v1 evidence contract (E19).
+- `active_speech_tc_range` is an object {in_tc, out_tc} rather than the blueprint's "tc - tc" string; same information, no parsing.

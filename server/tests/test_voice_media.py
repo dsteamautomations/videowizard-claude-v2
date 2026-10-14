@@ -244,8 +244,8 @@ def test_v_narration_must_match_script(home, database, fake):
 
 # ---------- media ----------
 
-def clip(path, seconds=1, audio=True, tone=440):
-    cmd = ['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', f'testsrc=duration={seconds}:size=64x64:rate=10']
+def clip(path, seconds=1, audio=True, tone=440, size='64x64'):
+    cmd = ['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', f'testsrc=duration={seconds}:size={size}:rate=10']
     if audio:
         cmd += ['-f', 'lavfi', '-i', f'sine=frequency={tone}:duration={seconds}', '-c:a', 'aac']
     cmd += ['-c:v', 'libx264', '-pix_fmt', 'yuv420p', str(path)]

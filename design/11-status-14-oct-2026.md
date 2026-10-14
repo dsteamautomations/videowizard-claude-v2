@@ -31,3 +31,14 @@ Slices 8 (Agent SDK operator app) and 9 are out of scope by your decision today.
 1. You finish VW-1 to the end of planning; I fix what the run shows, in one batch.
 2. Live smoke of one image and one video take (visuals) before you reach that stage.
 3. Slice 6 requirements list for your approval, then build; slice 7 with it.
+
+## Addendum, 14 Oct 2026 late: implementation run (design/13 §4 order)
+
+| Step | What | State |
+|---|---|---|
+| 0 | real VW-1 fixtures; defect 2 fixed at the producer; one word rule; `VW2_WORKERS` | done, pushed |
+| 1 | Flash 3.8, HIGH, AGENTIC, no temperature; inspection model from the procedure; token details in cost | done, pushed, live smoke passed |
+| 2 | script beats; brief production inputs; per-beat narration durations; media probe fields + VFR transcode | done, pushed |
+| 3 | clip-log-v1 contract: schema (strict + wire), prompt, Stage 1.5 solver, gate, summary card, `vw analysis show`, `vw analysis policy` (unpaid re-solve); procedure version 2; planning refuses v2 runs until step 4 | code done; live schema probe accepted; pipeline tests running |
+| 4 | Stage 2A/2B replaces planning | next; requirements list to write |
+| 5 | assembly + delivery, Resolve once | after 4 |

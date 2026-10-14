@@ -22,7 +22,7 @@ def clip25(path, seconds=2, tone=440):
 def run_until_planning(home, database, fake, gemini, n_clips=1):
     """Full pipeline on procedure version 1 (real stage table): intake → brief → script → voice → media → analysis."""
     connected(home, database)
-    rc, out, err = vw(home, 'start', '--client', 'VK', '--need-gb', '0')
+    rc, out, err = vw(home, 'start', '--client', 'VK', '--version', '1', '--need-gb', '0')  # v1 evidence contract until step 4
     assert rc == 0, (out, err)
     ws = home['runs'] / out['code']
     (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')

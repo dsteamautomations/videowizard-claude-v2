@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     SHARED_SUPABASE_SERVICE_KEY: SecretStr = SecretStr('')
     APP_ID: str = ''
     SESSION_HOURS: int = 168
-    DEFAULT_PROCEDURE_VERSION: str = '1'
+    DEFAULT_PROCEDURE_VERSION: str = '2'  # clip-log-v1 analysis; version 1 keeps the v1 evidence contract
     MAX_BODY_BYTES: int = 256 * 1024            # guard against blobs in the database; files go to storage
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs

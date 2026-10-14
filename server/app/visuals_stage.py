@@ -97,8 +97,14 @@ def prepare(conn, store, user, run, outputs):
         if o['stage'] == 'analysis' and not o['summary'].get('excluded'):
             ref = next((f for f in o['files'] if f['name'].endswith('.evidence.json')), None)
             if ref:
-                ev = load_json(store, ref['key'])['evidence']
-                world.append({'clip': o['unit'], 'world_markers': ev.get('world_markers'), 'evidence_limits': ev.get('evidence_limits')})
+                doc = load_json(store, ref['key'])
+                if doc.get('contract_version') == 'clip-log-v1':
+                    log = doc['log']
+                    world.append({'clip': o['unit'], 'entities': log.get('entities'), 'unavailable_or_uncertain': log.get('unavailable_or_uncertain'),
+                                  'landmarks': sorted({l for s in log.get('sub_clips') or [] for l in (s.get('continuity_and_story') or {}).get('world_landmarks_and_props', [])})})
+                else:
+                    ev = doc['evidence']
+                    world.append({'clip': o['unit'], 'world_markers': ev.get('world_markers'), 'evidence_limits': ev.get('evidence_limits')})
     save_session(store, run, session)
     package = {'source': session['source'], 'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
                'brief': brief['summary'] if brief else None, 'script_digest': script['summary'].get('content_digest') if script else None,

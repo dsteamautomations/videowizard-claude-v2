@@ -117,6 +117,8 @@ def build_inputs(conn, store, run, outputs, settings):
         raise Problem(409, 'NARRATION_TIMING', str(exc))
     analyses = []
     excluded = []
+    if any(o['stage'] == 'analysis' and o['summary'].get('contract_version') == 'clip-log-v1' for o in outputs):
+        raise Problem(409, 'NOT_ALLOWED', 'This run was analysed under clip-log-v1; planning for that contract arrives with step 4 (Stage 2A/2B). Runs on procedure version 1 plan as before.')
     for o in outputs:
         if o['stage'] != 'analysis':
             continue

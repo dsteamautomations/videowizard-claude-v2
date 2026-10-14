@@ -65,7 +65,7 @@ def _inputs(conn, run, outputs):
         if not ref:
             raise Problem(409, 'FILE_MISSING', f'{name} is not recorded on the {output["stage"]} output; re-record that stage.')
         return json.loads(store.get(ref['key']).decode('utf-8'))
-    return file_of(by['brief'], 'brief.json') | {'content_digest': by['brief']['summary'].get('content_digest')}, \
+    return file_of(by['brief'], 'brief.json') | {'content_digest': by['brief']['summary'].get('content_digest'), 'production': by['brief']['summary'].get('production') or {}}, \
         file_of(by['script'], 'script.json'), by['media']
 
 
@@ -102,6 +102,47 @@ def start(conn, user, run, outputs, policy, again):
         created.append({'unit': clip['id'], 'job_id': str(row['id'])})
     conn.execute("update vw2_jobs set request = request || %s where run_id=%s and stage='analysis' and status='queued'", (Jsonb({'policy': policy}), run['id']))
     return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips)}
+
+
+def repolicy(conn, user, run, outputs, policy):
+    """Speaker policy is a solver input (blueprint rule 3). Reopen the stage, and queue one job per retained clip that re-reviews the
+    retained provider response under the new policy. No upload, no generate, no cost. understand_audio cannot change this way."""
+    brief, script, media = _inputs(conn, run, outputs)
+    retained = [o for o in outputs if o['stage'] == 'analysis' and o['unit'] and not o['summary'].get('excluded')]
+    if not retained:
+        raise Problem(409, 'NOT_ALLOWED', 'Nothing analysed yet; start analysis instead.')
+    if any(o['summary'].get('contract_version') != 'clip-log-v1' for o in retained):
+        raise Problem(409, 'NOT_ALLOWED', 'Policy re-solve applies to clip-log-v1 runs only.')
+    store = storage()
+    procedure = core._stage(core.stage_table(run['procedure_version']), 'analysis')
+    jobs_ = []
+    for o in retained:
+        clip = next((c for c in media['summary']['clips'] if c['id'] == o['unit']), None)
+        if not clip:
+            continue
+        src_job = conn.execute("select request, result from vw2_jobs where id=%s", (o['summary'].get('job_id'),)).fetchone()
+        if not src_job or not (src_job['result'] or {}).get('response_key'):
+            raise Problem(409, 'NOT_ALLOWED', f"Clip {o['unit']} has no retained response to re-solve.")
+        old = json.loads(store.get(src_job['request']['request_key']).decode('utf-8'))
+        if bool(policy.get('understand_audio', True)) != bool(old['identity'].get('understand_audio', True)):
+            raise Problem(422, 'ANALYSIS_POLICY', 'understand_audio changes the attachment; that needs a new paid analysis (vw analysis start --again).')
+        req = analysis.build_request(run, procedure, brief, script, clip, {'camera_audio': policy['camera_audio'], 'understand_audio': old['identity'].get('understand_audio', True)})
+        if policy.get('show_speaker_video') is not None:
+            sp = analysis.speaker_policy({'camera_audio': policy['camera_audio']}, {'show_speaker_video': policy['show_speaker_video']})
+            req['policy'] = sp
+            req['identity']['speaker_policy'] = sp
+            req['analysis_key'] = analysis.digest(req['identity'])
+        rk = f"{run['id']}/analysis/{clip['id']}.{req['analysis_key'][:12]}.request.json"
+        store.put(rk, json.dumps(req, ensure_ascii=False).encode('utf-8'), 'application/json')
+        jobs_.append((clip['id'], rk, src_job['result']['response_key'], req['analysis_key']))
+    core.revise(conn, user, run, 'analysis', None, None)
+    created = []
+    for unit, rk, response_key, key in jobs_:
+        row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'analysis',%s,%s,%s, gen_random_uuid()) returning id",
+                           (run['id'], unit, PROVIDER, Jsonb({'kind': 'analysis', 'procedure_version': run['procedure_version'], 'request_key': rk, 'analysis_key': key,
+                                                               'clip': next(c for c in media['summary']['clips'] if c['id'] == unit), 'reuse_response_key': response_key, 'policy_resolve': True}))).fetchone()
+        created.append({'unit': unit, 'job_id': str(row['id'])})
+    return {'resolved': created, 'policy': policy, 'paid': False}
 
 
 def status(conn, run, outputs):
@@ -298,6 +339,10 @@ def process(job):
         clip = request['clip']
         if job['status'] == 'storage_pending' and not paths['response.json'].exists():
             raise Problem(409, 'NO_RECEIPT', 'Saved response is missing on this worker. Resolve the attempt; nothing was regenerated.')
+        if req_meta.get('reuse_response_key') and not paths['response.json'].exists():
+            # policy re-solve: the retained provider answer is the input; no upload, no generate
+            raw = store.get(req_meta['reuse_response_key']).decode('utf-8')
+            durable(paths['response.json'], json.dumps({'raw': raw, 'metadata': {'reused_from': req_meta['reuse_response_key']}, 'received_at': datetime.now(timezone.utc).isoformat()}, ensure_ascii=False).encode('utf-8'))
         if not paths['response.json'].exists():
             renew(jid, 'download')
             with tempfile.TemporaryDirectory(prefix='vw2-analysis-') as directory:
@@ -315,7 +360,7 @@ def process(job):
                 uploaded = transport.upload(attachment, request['mime'], sha, existing_receipt=read_json(paths['upload.json']))
                 durable(paths['upload.json'], json.dumps(uploaded).encode('utf-8'))
                 mode = request['identity']['settings']['processing_mode']
-                wire_schema = provider_schema(request['schema'], mode)
+                wire_schema = request['wire_schema'] if request.get('contract_version') == 'clip-log-v1' else provider_schema(request['schema'], mode)
                 parts = [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text': request['prompt']}]
                 if mode == 'AGENTIC':
                     parts[0]['mediaProcessing'] = 'AGENTIC'
@@ -344,19 +389,23 @@ def process(job):
         saved = read_json(paths['response.json'])
         reviewed = analysis.review_response(saved['raw'], request)
         usage = (saved.get('metadata') or {}).get('usage') or {}
-        cost = {'model': request['identity']['model'], 'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount'),
+        cost = None if req_meta.get('reuse_response_key') else {'model': request['identity']['model'], 'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount'),
                 'thoughts_tokens': usage.get('thoughtsTokenCount'), 'tool_use_prompt_tokens': usage.get('toolUsePromptTokenCount'), 'cached_tokens': usage.get('cachedContentTokenCount'),
                 'video_tokens': next((d.get('tokenCount') for d in usage.get('promptTokensDetails') or [] if d.get('modality') == 'VIDEO'), None),
                 'thinking_tokens': usage.get('thoughtsTokenCount'), 'elapsed_seconds': (saved.get('metadata') or {}).get('elapsed_seconds')}
         renew(jid, 'store')
-        base = f"{job['run_id']}/analysis/{clip['id']}"
+        base = f"{job['run_id']}/analysis/{clip['id']}" + (f".{req_meta['analysis_key'][:12]}" if req_meta.get('reuse_response_key') else '')
         raw_bytes = saved['raw'].encode('utf-8')
         store.put(base + '.response.json', raw_bytes, 'application/json')
         result = {'response_key': base + '.response.json', 'response_sha256': hashlib.sha256(raw_bytes).hexdigest(), 'response_bytes': len(raw_bytes),
                   'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': analysis.summary_of(reviewed, clip)}
         if reviewed['status'] == 'retained':
-            ev = json.dumps({'evidence': reviewed['evidence'], 'gaps': reviewed['gaps'], 'descriptive_name': (reviewed['result'] or {}).get('descriptive_name'),
-                             'identity': request['identity'], 'clip': clip}, ensure_ascii=False).encode('utf-8')
+            if reviewed.get('contract_version') == 'clip-log-v1':
+                from .clip_log import gate
+                ev = json.dumps(gate.evidence_document(reviewed, request, clip), ensure_ascii=False).encode('utf-8')
+            else:
+                ev = json.dumps({'evidence': reviewed['evidence'], 'gaps': reviewed['gaps'], 'descriptive_name': (reviewed['result'] or {}).get('descriptive_name'),
+                                 'identity': request['identity'], 'clip': clip}, ensure_ascii=False).encode('utf-8')
             store.put(base + '.evidence.json', ev, 'application/json')
             if store.get(base + '.evidence.json') != ev:
                 raise Problem(502, 'STORAGE', 'Evidence read-back failed.')
