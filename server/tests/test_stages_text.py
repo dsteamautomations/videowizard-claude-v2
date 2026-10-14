@@ -69,6 +69,8 @@ def test_t7_intake_brief_script_end_to_end(home, database):
     rc, out, err = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
     assert rc == 0, (out, err)
     assert out['summary']['answers'] == {'q1': 'awareness only, no sales'} and out['summary']['questions'] == 1
+    prod = out['summary']['production']
+    assert prod['process_stages'][0] == 'Stage_1_Setup' and prod['show_speaker_video'] is False and prod['target_runtime_s'] is None and 'brand_and_safety_rules' in prod['defaults_applied']
     assert vw(home, 'next')[1]['stage'] == 'script'
 
     rc, out, err = vw(home, 'stage', 'script', 'prepare')
@@ -77,8 +79,13 @@ def test_t7_intake_brief_script_end_to_end(home, database):
                                   'notes': '', 'assessment': 'fits', 'changes': [{'before': 'keeps the carbon', 'after': 'keeps the carbon in the ground', 'reason': 'brief tone'}]})
     rc, out, err = vw(home, 'stage', 'script', 'record', '--quote', 'approved')
     assert rc == 0, err
-    assert out['summary']['passages'] == 2 and len(out['summary']['content_digest']) == 64
+    assert out['summary']['passages'] == 2 and out['summary']['beats'] == 2 and len(out['summary']['content_digest']) == 64
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
+    assert [b['beat_id'] for b in script['beats']] == ['BEAT_01', 'BEAT_02'] and script['beats'][1]['passage_id'] == 'P002' and script['beats'][1]['text'].startswith('Each block')
+    # beat ids are stable: recording the same script again yields the same beats
+    assert vw(home, 'revise', '--stage', 'script')[0] == 0
+    assert vw(home, 'stage', 'script', 'record', '--quote', 'approved again')[0] == 0
+    assert json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))['beats'] == script['beats']
     assert list(script['passages']) == ['P001', 'P002']
     nxt = vw(home, 'next')[1]
     assert nxt['stage'] == 'voice' and nxt['paid'] == 'elevenlabs'

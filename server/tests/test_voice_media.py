@@ -124,6 +124,10 @@ def test_v1_auditions_then_narration_then_record(home, database, fake):
     rc, out, err = vw(home, 'stage', 'voice', 'record', '--quote', 'yes, that voice')
     assert rc == 0, err
     assert {f['name'] for f in out['files']} == {'voice.json', 'narration.mp3', 'timing.json'} and all(f['receipt'] for f in out['files'])
+    beats = out['summary']['beats']
+    assert [b['beat_id'] for b in beats] == ['BEAT_01', 'BEAT_02'] and all(b['breathing_pause_s'] == 0.8 for b in beats)
+    assert all(b['target_beat_duration_s'] == round(b['measured_vo_duration_s'] + 0.8, 3) for b in beats)
+    assert beats[0]['end_s'] <= beats[1]['start_s'] and beats[-1]['end_s'] <= out['summary']['duration_s']
     assert out['summary']['cost']['characters'] == len('Earth blocks are pressed.\n\nNot fired.\n')
     assert vw(home, 'next')[1]['stage'] == 'media'
 
@@ -271,20 +275,29 @@ def test_m2_m4_m5_m6_media_upload_resume_dedupe_close(home, database, fake):
     code, ws = run_until_media(home, database, fake)
     clip(ws / 'in' / 'a.mp4')
     clip(ws / 'in' / 'b.mp4', audio=False)
-    (ws / 'in' / 'a-copy.mp4').write_bytes((ws / 'in' / 'a.mp4').read_bytes())
+    (ws / 'in' / 'z-copy.mp4').write_bytes((ws / 'in' / 'a.mp4').read_bytes())
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=duration=2:size=64x64:rate=25', '-vf', "select='not(eq(mod(n,7),3))'", '-fps_mode', 'vfr',
+                    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', str(ws / 'in' / 'v.mp4')], check=True)   # variable frame rate, as phones record
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-display_rotation', '90', '-i', str(ws / 'in' / 'b.mp4'), '-c', 'copy', str(ws / 'in' / 'r.mp4')], check=True)  # rotated 90°
     rc, out, err = vw(home, 'stage', 'media', 'prepare')
     assert rc == 0, err
-    assert len(out['clips']) == 2 and out['duplicates_skipped'] == 1  # M4
-    assert [c['has_audio'] for c in out['clips']] == [True, False]  # M6
+    assert len(out['clips']) == 4 and out['duplicates_skipped'] == 1  # M4
+    by = {c['name']: c for c in out['clips']}
+    assert by['a.mp4']['has_audio'] and not by['b.mp4']['has_audio']  # M6
+    assert by['a.mp4']['audio_channels'] == 1 and by['a.mp4']['audio_sample_rate_hz'] == 44100 and by['b.mp4']['audio_channels'] == 0
+    assert by['v.mp4']['transcoded_from_vfr'] and by['v.mp4']['is_variable_frame_rate'] is False and by['v.mp4']['fps'] == '25/1' and by['v.mp4']['path'] == 'work/cfr/v.mp4'
+    assert by['r.mp4']['rotation_deg'] == 90 and (by['r.mp4']['width'], by['r.mp4']['height']) == (64, 64) and by['r.mp4']['stored_width'] == 64
+    assert not by['a.mp4'].get('transcoded_from_vfr') and by['a.mp4']['rotation_deg'] == 0
     # M2: one clip uploaded beforehand (simulating a previous, interrupted record) is skipped on record
     assert vw(home, 'upload', '--stage', 'media', '--file', 'in/a.mp4')[0] == 0
     rc, out, err = vw(home, 'stage', 'media', 'record', '--quote', 'yes these clips')
     assert rc == 0, err
     assert out['summary']['units']['analysis'] == [c['id'] for c in out['summary']['clips']]
+    assert next(c for c in out['summary']['clips'] if c['name'] == 'v.mp4')['transcoded_from_vfr'] is True
     with psycopg.connect(database) as c:
-        assert c.execute("select count(*) from vw2_files where stage='media' and name like '%%.mp4'").fetchone()[0] == 2  # a.mp4 once (resumed), b.mp4; the copy deduped
+        assert c.execute("select count(*) from vw2_files where stage='media' and name like '%%.mp4'").fetchone()[0] == 4  # a.mp4 once (resumed), b, v (CFR copy), r; the copy deduped
     nxt = vw(home, 'next')[1]
-    assert nxt['stage'] == 'analysis' and nxt['units_open'] == out['summary']['units']['analysis'] and nxt['paid'] == 'gemini-4-argon'
+    assert nxt['stage'] == 'analysis' and nxt['units_open'] == out['summary']['units']['analysis'] and nxt['paid'] == 'gemini-3.8-flash'
     # M5: close (remaining stages are not done, so close is not allowed yet) — verify receipts instead via a direct close attempt
     rc, out, _ = vw(home, 'close')
     assert rc == 2 and out['code'] == 'NOT_ALLOWED'

@@ -135,8 +135,36 @@ def brief_record(ws, procedure, prior):
             raise Refused(f"out/brief.json: question {q['id']} is required; ask the operator and store their exact answer in `answers`.")
     body = {k: data.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}
     body['answers'] = {k: str(v) for k, v in answers.items()}
+    body['production'] = production_inputs(data.get('production') or {})
     summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True))}
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
+
+
+BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', 'Stage_4_Result'],
+                      'brand_and_safety_rules': ['No missing PPE/safety gear', 'No competitor logos', 'No trash/clutter',
+                                                 'Do not claim specific compressive strength numbers unless stated in verified script'],
+                      'field_speech_languages': ['en', 'ta', 'hi'], 'narration_language': 'en', 'show_speaker_video': False}
+
+
+def production_inputs(given):
+    """Blueprint v3.2 project inputs (design/12 §A.1). Defaults apply only to keys the operator did not supply; nothing is invented per client."""
+    out = {}
+    for k, default in BLUEPRINT_DEFAULTS.items():
+        v = given.get(k, default)
+        if k == 'target_runtime_s':
+            if v is not None and not (isinstance(v, (int, float)) and 0 < v <= 7200):
+                raise Refused('out/brief.json: production.target_runtime_s must be seconds between 1 and 7200, or omitted (derived from the narration).')
+        elif k == 'show_speaker_video':
+            if not isinstance(v, bool):
+                raise Refused('out/brief.json: production.show_speaker_video must be true or false.')
+        elif k == 'narration_language':
+            if not isinstance(v, str) or not v.strip():
+                raise Refused('out/brief.json: production.narration_language must be a language code.')
+        elif not isinstance(v, list) or not all(isinstance(x, str) and x.strip() for x in v):
+            raise Refused(f'out/brief.json: production.{k} must be a list of strings (an empty list is allowed).')
+        out[k] = v
+    out['defaults_applied'] = sorted(k for k in BLUEPRINT_DEFAULTS if k not in given)
+    return out
 
 
 # ---------- script ----------
@@ -160,9 +188,10 @@ def script_record(ws, procedure, prior):
     passages = paragraphs(text)
     if not passages:
         raise Refused('out/script.json: spoken_text has no passages.')
-    data.update({'spoken_text': text, 'passages': passages, 'content_digest': digest(text), 'parser': 'reference-paragraphs-v1'})
+    beats = [{'beat_id': f'BEAT_{i + 1:02d}', 'passage_id': pid, 'text': t} for i, (pid, t) in enumerate(passages.items())]
+    data.update({'spoken_text': text, 'passages': passages, 'beats': beats, 'content_digest': digest(text), 'parser': 'reference-paragraphs-v1'})
     (ws / 'out' / 'script.json').write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding='utf-8')
-    summary = {'content_digest': data['content_digest'], 'passages': len(passages), 'characters': len(text),
+    summary = {'content_digest': data['content_digest'], 'passages': len(passages), 'beats': len(beats), 'characters': len(text),
                'source_intake': intake['summary']['source_digest'], 'source_brief': brief['summary']['content_digest'],
                'assessment': data.get('assessment', ''), 'changes': len(data.get('changes') or [])}
     return {'files': ['out/script.json'], 'summary': summary, 'retain': True, 'upload': True}

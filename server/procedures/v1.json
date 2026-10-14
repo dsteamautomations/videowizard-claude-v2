@@ -44,7 +44,7 @@
       "prompt_origin": "v1 VW-BRIEF-0.4.0 (ported verbatim 14 Oct 2026)",
       "steps": [
         "Run `vw stage brief prepare`. It prints the accepted intake (title, script, client) and this prompt.",
-        "Write the proposal to out/brief.json: purpose, audience, message, tone, ending, constraints, reasons, questions (id, question, why, recommendation, required). Never fill `answers` yourself.",
+        "Write the proposal to out/brief.json: purpose, audience, message, tone, ending, constraints, reasons, questions (id, question, why, recommendation, required). Never fill `answers` yourself. Also `production`: target runtime, process stages, brand and safety rules, languages, show_speaker_video. Ask the operator only for values they have; omitted keys take the blueprint defaults and are listed as defaults_applied.",
         "Present the five decisions with their reasons and any consequential questions together. Put each operator answer verbatim in `answers` by question id; required questions block record until answered. Ask one question: approve, or changes?",
         "On an explicit yes run `vw stage brief record --quote \"<their reply>\"`. Changes: edit out/brief.json and ask again."
       ],
@@ -69,6 +69,23 @@
         ],
         "answers": {
           "q-id": "the operator's exact answer (required questions must be answered before record)"
+        },
+        "production": {
+          "target_runtime_s": "seconds, or omit to derive from the narration",
+          "process_stages": [
+            "Stage_1_Setup",
+            "…"
+          ],
+          "brand_and_safety_rules": [
+            "…"
+          ],
+          "field_speech_languages": [
+            "en",
+            "ta",
+            "hi"
+          ],
+          "narration_language": "en",
+          "show_speaker_video": false
         }
       },
       "output_file": "brief.json"
@@ -86,7 +103,7 @@
         "Run `vw stage script prepare`. It prints the accepted intake script, the accepted brief and this prompt.",
         "Write the proposal to out/script.json: spoken_text (complete exact wording), notes, assessment, changes (each with reason). Preserve wording unless a change is useful; never drop a possibly spoken line.",
         "Present the assessment and each proposed change with its reason. Ask one question: approve this wording, or changes?",
-        "On an explicit yes run `vw stage script record --quote \"<their reply>\"`. The record step splits passages and computes the content digest that voice is bound to."
+        "On an explicit yes run `vw stage script record --quote \"<their reply>\"`. The record step splits passages and computes the content digest that voice is bound to. It also numbers the paragraphs as beats (BEAT_01 …), stable for this script version."
       ],
       "output_shape": {
         "spoken_text": "complete exact reviewed spoken wording",
@@ -128,7 +145,7 @@
       "prompt": "You are the VideoWizard operator, not the builder. Use the application backend as authority. Client videos are shared among application teammates; full run contents remain owner/admin scoped. A shared video does not authorize editing another user's run. Direct large-file uploads to the library UI; do not claim a chat attachment is stored. Up to 50 videos can be linked to one flow. Preserve original names and immutable source bytes; use references rather than copying originals. Do not invent descriptions or mark metadata probing as visual analysis. Browser codec support varies; a preview failure does not prove the stored original is invalid. All selections use exact saved media IDs, authenticated owner access and the current revision. A clear UI selection or chat instruction needs no second confirmation. Closing a page does not complete a partial upload; reselect the same files and recover saved state. For downstream stages preserve the exact accepted full narration, request source-audio policy only once per project, allow proposed pauses without changing words/order/speed, and retain both recommended and alternatives-review timelines. Use the published analysis stage for authorized Gemini study; do not execute unreleased timeline or asset stages. No assets or images are required for this video-library slice.",
       "prompt_origin": "v1 VW-MEDIA-LIBRARY-1.1 (media-0.7.0) ported verbatim 14 Oct 2026; browser library replaced by in/ + signed upload (decision: per-run files)",
       "steps": [
-        "The operator copies the clips into runs/<code>/in/ (up to 200 MB each). `vw stage media prepare` lists them with duration and audio; identical files are listed once.",
+        "The operator copies the clips into runs/<code>/in/ (up to 200 MB each). `vw stage media prepare` lists them with duration and audio; identical files are listed once. A variable-frame-rate clip is converted to constant frame rate here before upload (reported as transcoded_from_vfr); rotated clips report their displayed width and height.",
         "Confirm the list with the operator (names preserved, nothing analysed yet). Ask once for the source-audio policy if not yet known; it is used by analysis.",
         "`vw stage media record --quote \"<their reply>\"` uploads with receipts and records the clips as the analysis units. Re-run record to resume an interrupted upload."
       ]
