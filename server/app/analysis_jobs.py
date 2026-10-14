@@ -212,7 +212,13 @@ def process_inspection(job):
     dispatched = False
     try:
         if not raw_path.exists():
-            transport = transport_factory(settings().GEMINI_API_KEY.get_secret_value(), 'gemini-4-argon', terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS,
+            version = job['request'].get('procedure_version')
+            if not version:
+                with connect() as conn:
+                    version = conn.execute('select procedure_version from vw2_runs where id=%s', (job['run_id'],)).fetchone()['procedure_version']
+            procedure = core._stage(core.stage_table(version), 'analysis')  # the model is never a literal here
+            inspection = procedure.get('inspection') or {}
+            transport = transport_factory(settings().GEMINI_API_KEY.get_secret_value(), procedure['model'], terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS,
                                           initial_soft_wait_seconds=60, on_update=lambda e: None, capture_answer_deltas=False, allow_agentic_video=True)
             parts = []
             with tempfile.TemporaryDirectory(prefix='vw2-inspect-') as directory:
@@ -233,13 +239,13 @@ def process_inspection(job):
                         parts += [{'text': 'Original source ' + sid + '; its own original-source seconds clock.'}, {'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}]
                 parts.append({'text': req['prompt']})
                 payload = {'contents': [{'role': 'user', 'parts': parts}],
-                           'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': req['schema'], 'thinkingConfig': {'thinkingLevel': 'MEDIUM'},
-                                                'mediaResolution': 'MEDIA_RESOLUTION_HIGH', 'maxOutputTokens': 16384}}
+                           'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': req['schema'], 'thinkingConfig': {'thinkingLevel': inspection.get('thinking_level', 'HIGH')},
+                                                'mediaResolution': procedure['settings']['media_resolution'], 'maxOutputTokens': inspection.get('max_output_tokens', 16384)}}
                 renew(jid, 'generate')
                 dispatched = True
                 try:
                     received = transport.generate(payload)
-                    durable(raw_path, json.dumps({'raw': received.get('raw') or json.dumps(received['body']), 'metadata': received['metadata']}, ensure_ascii=False).encode('utf-8'))
+                    durable(raw_path, json.dumps({'raw': received.get('raw') or json.dumps(received['body']), 'metadata': received['metadata'], 'model': procedure['model']}, ensure_ascii=False).encode('utf-8'))
                 except GeminiTransportError as exc:
                     if exc.code == 'http_error' and exc.http_status in (400, 401, 403, 404, 413, 429):
                         return 'rejected', {'failure': exc.code, 'http_status': exc.http_status}, f'Provider rejected the inspection ({exc.code}, HTTP {exc.http_status}).', None, None
@@ -253,7 +259,7 @@ def process_inspection(job):
         if errors:
             return 'failed', {'failure': 'schema', 'errors': [e.message for e in errors[:5]]}, 'Inspector answer did not match the schema; retained, not regenerated.', None, None
         usage = (saved.get('metadata') or {}).get('usage') or {}
-        cost = {'model': 'gemini-4-argon', 'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')}
+        cost = {'model': saved.get('model') or 'unknown', 'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')}
         if req['mode'] == 'frames':
             frames = parsed['frames']
             answer = {'answers': [{'question_id': req['question_id'], 'status': 'partly_answered', 'answer': 'Sampled still contact/position only: ' + json.dumps(frames),
@@ -339,6 +345,8 @@ def process(job):
         reviewed = analysis.review_response(saved['raw'], request)
         usage = (saved.get('metadata') or {}).get('usage') or {}
         cost = {'model': request['identity']['model'], 'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount'),
+                'thoughts_tokens': usage.get('thoughtsTokenCount'), 'tool_use_prompt_tokens': usage.get('toolUsePromptTokenCount'), 'cached_tokens': usage.get('cachedContentTokenCount'),
+                'video_tokens': next((d.get('tokenCount') for d in usage.get('promptTokensDetails') or [] if d.get('modality') == 'VIDEO'), None),
                 'thinking_tokens': usage.get('thoughtsTokenCount'), 'elapsed_seconds': (saved.get('metadata') or {}).get('elapsed_seconds')}
         renew(jid, 'store')
         base = f"{job['run_id']}/analysis/{clip['id']}"

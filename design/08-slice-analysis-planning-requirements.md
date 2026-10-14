@@ -1,4 +1,4 @@
-# Slice: analysis (Gemini 4 Argon) + planning — requirement list for approval
+# Slice: analysis (Gemini 4 Argon → gemini-3.8-flash since 14 Oct 2026 evening, design/11 Phase 1) + planning — requirement list for approval
 
 Source for what v1 did: `_work/v1-late-stages-spec.md` (extracted 14 Oct 2026 from the latest v1 definitions, modules and incident docs). This is the first of the two stages where v1 broke; every v1 failure mode is mapped to a v2 mechanism in §5.
 

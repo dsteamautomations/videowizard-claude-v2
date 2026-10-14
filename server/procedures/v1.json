@@ -136,15 +136,15 @@
     {
       "name": "analysis",
       "needs_acceptance": false,
-      "paid": "gemini-4-argon",
+      "paid": "gemini-3.8-flash",
       "per_unit": "media",
       "requires_files": false,
       "cap": 2,
-      "model": "gemini-4-argon",
+      "model": "gemini-3.8-flash",
       "settings": {
-        "thinking_level": "MEDIUM",
+        "thinking_level": "HIGH",
         "media_resolution": "MEDIA_RESOLUTION_HIGH",
-        "processing_mode": "auto",
+        "processing_mode": "AGENTIC",
         "agentic_over_seconds": 300,
         "max_output_tokens": 65536
       },
@@ -158,14 +158,18 @@
       ],
       "naming_prompt": "Return descriptive_name as a short factual filename stem based only on visible source content, not script claims or inferred identities. Preserve uncertainty. This is a suggestion, not permission to rename the original.",
       "evidence_extensions": "world-context-v1",
-      "prompt_origin": "v1 VW-ANALYSIS-0.7.6 prompt blocks (ported verbatim 14 Oct 2026); model and settings changed for Gemini 4 Argon",
+      "prompt_origin": "v1 VW-ANALYSIS-0.7.6 prompt blocks (ported verbatim 14 Oct 2026); model gemini-3.8-flash, thinking HIGH, AGENTIC on every clip, no temperature (design/11 Phase 1, SK 14 Oct 2026)",
       "steps": [
-        "Run `vw analysis start` with the operator's answers: --camera-audio allowed|excluded, --understand-audio yes|no, --film-type \"…\", and --exclude <clip name> for any clip to leave out. One paid Gemini 4 Argon request per clip; tell the operator, do not ask.",
+        "Run `vw analysis start` with the operator's answers: --camera-audio allowed|excluded, --understand-audio yes|no, --film-type \"…\", and --exclude <clip name> for any clip to leave out. One paid Gemini 3.8 Flash request per clip; tell the operator, do not ask. Changing the model or settings gives every clip a new analysis identity: a run started after the change pays again for clips analysed before it.",
         "Poll `vw analysis status` while clips run (every minute or so). Report finished / running / failed counts in one line; do not read the evidence files.",
         "A failed clip: tell the operator the reason from status. On their instruction run `vw analysis retry --unit <id> --note \"<their words>\"` (terminal failures) or `vw analysis recover --unit <id>` (unknown outcome). `vw analysis exclude --unit <id> --note` leaves a clip out of the film.",
         "When every clip is retained or excluded, `vw next` moves to planning. Nothing to approve: analysis has no acceptance step."
       ],
-      "output_file": null
+      "output_file": null,
+      "inspection": {
+        "thinking_level": "HIGH",
+        "max_output_tokens": 16384
+      }
     },
     {
       "name": "planning",

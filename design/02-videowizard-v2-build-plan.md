@@ -15,7 +15,7 @@ Date: 14 Oct 2026. Decisions from the proposal are locked as recommended (see §
 | 7 | Images | OpenAI GPT Image 2.5 via a server-side provider module; key in server environment. Model id confirmed against OpenAI docs when that stage is built. |
 | 9 | Paid actions (decided 14 Oct) | **Information, not a gate.** The executor tells the operator what a step costs and proceeds. No approval button, token or question for paid work. Cost is recorded on the stage output. Attempt caps stay (loop protection, not money). |
 | 10 | Stage acceptance | Given **in chat**, not in the browser. The executor asks "approve the script? (yes / changes)" and commits only an explicit yes to that question, storing the operator's reply verbatim. Ambiguous replies are asked again. Trade-off accepted: a misread is possible; it is caught by the recorded quote and by revise. |
-| 8 | Video assessment (analysis stage) | **Gemini 4 Argon** (`gemini-4-argon`) replaces `gemini-3.8-flash`. See §5a. Planning stays on its current Gemini model unless you say otherwise. |
+| 8 | Video assessment (analysis stage) | **Superseded 14 Oct 2026 evening: `gemini-3.8-flash`, thinking HIGH, AGENTIC on every clip (design/11 Phase 1; design/13 §6).** Original: **Gemini 4 Argon** (`gemini-4-argon`) replaces `gemini-3.8-flash`. See §5a. Planning stays on its current Gemini model unless you say otherwise. |
 
 ## 2. Proportionality for this build
 

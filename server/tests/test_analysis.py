@@ -18,9 +18,12 @@ class FakeTransport:
     mode = 'ok'            # ok | text | wrong_source | http429 | http429_forever | conn_after_dispatch | crash_after_upload | crash_after_generate
     calls = {'upload': 0, 'generate': 0}
     seen_modes = []
+    models = []
+    payloads = []
 
     def __init__(self, api_key, model, terminal_deadline_seconds, initial_soft_wait_seconds, on_update, capture_answer_deltas, allow_agentic_video):
         self.model = model
+        FakeTransport.models.append(model)
 
     def upload(self, path, mime, sha, existing_receipt=None):
         FakeTransport.calls['upload'] += 1
@@ -33,6 +36,7 @@ class FakeTransport:
 
     def generate(self, payload):
         FakeTransport.calls['generate'] += 1
+        FakeTransport.payloads.append(payload)
         prompt = [p['text'] for p in payload['contents'][0]['parts'] if 'text' in p][-1]
         FakeTransport.seen_modes.append('AGENTIC' if payload['contents'][0]['parts'][0].get('mediaProcessing') == 'AGENTIC' else 'STATIC')
         mode = FakeTransport.mode
@@ -80,7 +84,7 @@ class FakeTransport:
 
 @pytest.fixture
 def gemini(monkeypatch, tmp_path):
-    FakeTransport.mode, FakeTransport.calls, FakeTransport.seen_modes = 'ok', {'upload': 0, 'generate': 0}, []
+    FakeTransport.mode, FakeTransport.calls, FakeTransport.seen_modes, FakeTransport.models, FakeTransport.payloads = 'ok', {'upload': 0, 'generate': 0}, [], [], []
     monkeypatch.setattr(analysis_jobs, 'transport_factory', FakeTransport)
     monkeypatch.setattr(analysis_jobs, 'SPOOL', tmp_path / 'spool')
     return FakeTransport
@@ -114,7 +118,7 @@ def test_a1_three_clips_succeed(home, database, fake, gemini):
     assert nxt['stage'] == 'planning'
     with psycopg.connect(database) as c:
         assert c.execute("select count(*) from vw2_files where stage='analysis'").fetchone()[0] == 6
-    assert gemini.seen_modes == ['STATIC'] * 3
+    assert gemini.seen_modes == ['AGENTIC'] * 3  # production setting since 14 Oct 2026 evening
     rc, out, _ = vw(home, *START)  # stage complete: start is no longer allowed
     assert rc == 2 and out['code'] == 'NOT_ALLOWED'
 
@@ -202,12 +206,38 @@ def test_a9_lease_expiry_then_recover(home, database, fake, gemini):
     assert vw(home, 'analysis', 'status')[1]['counts'] == {'retained': 1}
 
 
+def test_a15_phase1_model_and_settings(home, database, fake, gemini):
+    """design/11 Phase 1: gemini-3.8-flash, thinking HIGH, AGENTIC on the part (never inside fileData), no temperature; cost names the model."""
+    run_until_analysis(home, database, fake, n_clips=1, seconds=2)
+    vw(home, *START)
+    drain()
+    assert gemini.models == ['gemini-3.8-flash']
+    p = gemini.payloads[-1]
+    part = p['contents'][0]['parts'][0]
+    assert part['mediaProcessing'] == 'AGENTIC' and 'mediaProcessing' not in part['fileData']
+    assert p['generationConfig']['thinkingConfig'] == {'thinkingLevel': 'HIGH'} and 'temperature' not in p['generationConfig']
+    st = vw(home, 'analysis', 'status')[1]
+    unit = next(iter(st['units'].values())) if isinstance(st.get('units'), dict) else st['units'][0]
+    assert unit['cost']['model'] == 'gemini-3.8-flash'
+
+
+def test_a16_identity_changes_with_model_only():
+    from app import analysis, core
+    proc = dict(core._stage(core.stage_table('1'), 'analysis'))
+    clip = {'id': 'c1', 'name': 'c.mp4', 'sha256': 'a' * 64, 'bytes': 1, 'duration_s': 2.0, 'has_audio': True}
+    script = {'spoken_text': 'A.\n', 'content_digest': 'd', 'passages': {'P001': 'A.'}}
+    a = analysis.build_request({'id': 'r'}, proc, {}, script, clip, {'camera_audio': 'allowed'})
+    b = analysis.build_request({'id': 'r'}, {**proc, 'model': 'gemini-4-argon'}, {}, script, clip, {'camera_audio': 'allowed'})
+    assert a['analysis_key'] != b['analysis_key'] and a['identity']['model'] == 'gemini-3.8-flash'
+
+
 def test_a10_long_clip_uses_agentic(home, database, fake, gemini, monkeypatch):
     from app import db
     doc = db.stage_table('1')
     for st in doc:
         if st['name'] == 'analysis':
             monkeypatch.setitem(st['settings'], 'agentic_over_seconds', 1.5)
+            monkeypatch.setitem(st['settings'], 'processing_mode', 'auto')  # the auto rule still works when chosen; production is AGENTIC
     run_until_analysis(home, database, fake, n_clips=1, seconds=2)
     vw(home, *START)
     drain()

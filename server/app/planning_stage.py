@@ -343,7 +343,7 @@ def extract_frames(store, user, run, qid, source_id, times):
 
 
 def inspect(conn, store, user, run, qids):
-    """Queue one paid Gemini 4 Argon inspection job per routed question (≤3 sources or the extracted stills)."""
+    """Queue one paid Gemini inspection job (model from the analysis stage of the run's procedure) per routed question (≤3 sources or the extracted stills)."""
     session = session_of(store, run)
     if session.get('ledger'):
         raise Problem(409, 'NOT_ALLOWED', 'The ledger is prepared; inspections belong before it.')
@@ -370,7 +370,7 @@ def inspect(conn, store, user, run, qids):
                 'understand_audio': True}
         rk = save_json(store, key(run, f'inspection/{qid}.request.json'), snap)
         row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'planning',%s,'gemini',%s, gen_random_uuid()) returning id",
-                           (run['id'], qid, Jsonb({'kind': 'inspection', 'question_id': qid, 'request_key': rk['key'], 'mode': snap['mode'], 'sources': snap['sources'], 'frames': snap['frames'], 'prompt_key': rk['key']}))).fetchone()
+                           (run['id'], qid, Jsonb({'kind': 'inspection', 'procedure_version': run['procedure_version'], 'question_id': qid, 'request_key': rk['key'], 'mode': snap['mode'], 'sources': snap['sources'], 'frames': snap['frames'], 'prompt_key': rk['key']}))).fetchone()
         session['jobs'][qid] = {'job_id': str(row['id']), 'status': 'queued', 'request': rk}
         created.append(qid)
     save_session(store, run, session)
