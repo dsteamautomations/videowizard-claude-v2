@@ -158,7 +158,7 @@ def test_t5_revise_brief_after_script_is_free(home, database):
     write_proposal(ws, 'script', {'spoken_text': 'Just narration.', 'notes': '', 'assessment': '', 'changes': []})
     assert vw(home, 'stage', 'script', 'record', '--quote', 'yes')[0] == 0
     rc, out, _ = vw(home, 'revise', '--stage', 'brief')
-    assert rc == 0 and out['reopened'] == ['brief', 'script', 'voice', 'media', 'analysis', 'planning', 'edit', 'first_cut', 'visuals', 'assembly', 'delivery']
+    assert rc == 0 and out['reopened'] == ['brief', 'script', 'voice', 'media', 'analysis', 'options', 'master', 'first_cut', 'visuals', 'assembly', 'delivery']  # version 2 stage order
     assert vw(home, 'next')[1]['stage'] == 'brief'
     assert vw(home, 'view', '--stage', 'script')[1]['outputs'][0]['stale'] is True
 
