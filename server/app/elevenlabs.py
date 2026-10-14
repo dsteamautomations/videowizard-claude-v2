@@ -55,7 +55,13 @@ class ElevenLabs:
             if path.startswith('/v1/history') and response.status_code in (401, 403):
                 raise Problem(403, 'HISTORY_PERMISSION', 'ElevenLabs history access is unavailable. Enable History read for the configured key.')
             code = 'PROVIDER_UNKNOWN' if method == 'POST' and (response.status_code >= 500 or response.status_code == 408) else 'PROVIDER_REJECTED'
-            error = Problem(502, code, f'ElevenLabs did not complete the request (HTTP {response.status_code}). Check account access, quota and model/voice compatibility; no automatic retry.')
+            detail = ''
+            try:   # ElevenLabs says why (e.g. quota_exceeded with the characters needed vs left); pass that on so the operator hears the real reason
+                d = response.json().get('detail')
+                detail = (f" ElevenLabs says: {d.get('status')}: {d.get('message')}" if isinstance(d, dict) else f' ElevenLabs says: {d}') if d else ''
+            except ValueError:
+                pass
+            error = Problem(502, code, f'ElevenLabs did not complete the request (HTTP {response.status_code}).{detail[:400]} Check account access, quota and model/voice compatibility; no automatic retry.')
             error.provider_request_id = response.headers.get('request-id')
             raise error
         return response
