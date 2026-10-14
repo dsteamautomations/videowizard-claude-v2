@@ -88,6 +88,16 @@ TEST2_PROCEDURE = {
 }
 
 
+DIRECTORY = [{'client_id': 'c-c', 'client_name': 'C'}, {'client_id': 'c-vk', 'client_name': 'VK'}, {'client_id': 'c-vk2', 'client_name': 'VK Textiles'}]
+
+
+@pytest.fixture(autouse=True)
+def fake_client_directory(monkeypatch):
+    """The shared Active clients directory, as v1 read it; the server resolves `client` against it."""
+    from app import auth
+    monkeypatch.setattr(auth, 'client_directory', lambda: list(DIRECTORY))
+
+
 @pytest.fixture(autouse=True)
 def clean_tables(database):
     from app import db

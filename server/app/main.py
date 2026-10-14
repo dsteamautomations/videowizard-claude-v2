@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, web, worker
+from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, visuals_stage, web, worker
 from .storage import storage
 from .config import settings
 from .db import connect as db_connect, migrate
@@ -71,8 +71,8 @@ class Write(Strict):
 
 
 class NewRun(Write):
+    client: str = Field(min_length=1, max_length=200)
     title: str = ''
-    client: str | None = None
     procedure_version: str | None = None
 
 
@@ -164,6 +164,104 @@ class PlanningFinalize(Write):
     quote: str = Field(min_length=1)
 
 
+class VisualPlan(Write):
+    plan: dict[str, Any]
+
+
+class VisualSelect(Write):
+    choices: dict[str, str]
+
+
+class VisualAccept(Write):
+    gap_ids: list[str]
+    quote: str = Field(min_length=1)
+
+
+class ReferenceAdd(Write):
+    element_id: str
+    name: str
+    kind: Literal['frame', 'supplied', 'web']
+    subject: str
+    content_base64: str = ''
+    source_media_id: str | None = None
+    requested_s: float | None = None
+    source_url: str = ''
+    selection_reply: str = ''
+
+
+class ImageGenerate(Write):
+    element_id: str
+    name: str
+    kind: Literal['isolated', 'sheet', 'keyframe']
+    subject: str
+    prompt: str = Field(min_length=1, max_length=8000)
+    parents: list[str] = []
+    model: str | None = None
+    size: str | None = None
+    quality: str | None = None
+
+
+class ReferenceApprove(Write):
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    quote: str = Field(min_length=1)
+
+
+class BindBody(Write):
+    shot_id: str
+    references: dict[str, list[str]]
+    subject_selectors: dict[str, dict[str, str]] = {}
+    quote: str = Field(min_length=1)
+
+
+class GeneratorBody(Write):
+    shot_id: str
+    provider: str
+    model: str
+
+
+class PrepareTake(Write):
+    shot_id: str
+    start_image: str
+    end_image: str | None = None
+    motion_prompt: str = Field(min_length=1, max_length=16000)
+    subject_reconciliation: dict[str, str]
+    continuity_notes: str = ''
+    duration_seconds: int | None = None
+    aspect_ratio: Literal['16:9', '9:16'] = '16:9'
+    resolution: Literal['720p', '1080p'] | None = None
+
+
+class ShotBody(Write):
+    shot_id: str
+
+
+class TakeReview(Write):
+    job_id: UUID
+    decision: Literal['accepted', 'rejected']
+    notes: str = Field(min_length=1)
+    timing_notes: str = ''
+    quote: str = Field(min_length=1)
+
+
+class TakeSelect(Write):
+    job_id: UUID
+    quote: str = Field(min_length=1)
+
+
+class AssetBody(Write):
+    shot_id: str
+    key: str
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    bytes: int = Field(ge=1)
+    kind: Literal['movie', 'still']
+    quote: str = Field(min_length=1)
+
+
+class GapBody(Write):
+    gap_id: str
+    quote: str = Field(min_length=1)
+
+
 class LibraryAdd(Strict):
     public_owner_id: str
     voice_id: str
@@ -243,6 +341,12 @@ def me(user=User):
 def create_run(body: NewRun, user=User, conn=DB):
     status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, dict(core.create_run(conn, user, body.title, body.client, body.procedure_version))))
     return Response(resp, status_code=status)
+
+
+@app.get('/api/clients')
+def clients(search: str = '', user=User):
+    term = search.strip().lower()
+    return Response([r for r in auth.client_directory() if not term or term in r['client_name'].lower()][:50])
 
 
 @app.get('/api/runs')
@@ -571,6 +675,119 @@ def planning_finalize(run_id: UUID, body: PlanningFinalize, user=User, conn=DB):
     run = _planning_run(conn, user, run_id)
     status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, planning_stage.finalize(conn, storage(), user, run, body.assessment, body.quote)))
     return Response(resp, status_code=status)
+
+
+# ---------- visuals ----------
+
+def _visuals_run(conn, user, run_id):
+    run = core.load_run(conn, user, run_id, lock=True)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    nxt = core.next_for(conn, run)
+    if nxt['stage'] != 'visuals':
+        raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not 'visuals'.", next=nxt)
+    return run, core.current_outputs(conn, run['id'])
+
+
+def _visuals_call(conn, user, run_id, body, fn, status=200):
+    run, outputs = _visuals_run(conn, user, run_id)
+    st, resp = core.with_receipt(conn, user, body_dict(body), lambda: (status, visuals_stage.guarded(lambda: fn(run, outputs))))
+    return Response(resp, status_code=st)
+
+
+@app.get('/api/runs/{run_id}/visuals')
+def visuals_status(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.status(conn, storage(), run, core.current_outputs(conn, run['id'])))
+
+
+@app.get('/api/runs/{run_id}/visuals/shots/{shot_id}/packet')
+def visuals_packet(run_id: UUID, shot_id: str, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.packet(storage(), run, core.current_outputs(conn, run['id']), shot_id))
+
+
+@app.post('/api/runs/{run_id}/visuals/prepare')
+def visuals_prepare(run_id: UUID, body: Write, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.prepare(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/visuals/check', dependencies=[Depends(size_guard)])
+def visuals_check(run_id: UUID, body: VisualPlan, user=User, conn=DB):
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.check(storage(), run, outputs, body.plan))
+
+
+@app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(size_guard)])
+def visuals_propose(run_id: UUID, body: VisualPlan, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan))
+
+
+@app.post('/api/runs/{run_id}/visuals/select')
+def visuals_select(run_id: UUID, body: VisualSelect, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_choice(storage(), user, run, outputs, body.choices))
+
+
+@app.post('/api/runs/{run_id}/visuals/accept')
+def visuals_accept(run_id: UUID, body: VisualAccept, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.accept(storage(), user, run, outputs, body.gap_ids, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/references', status_code=201)
+def visuals_reference(run_id: UUID, body: ReferenceAdd, user=User, conn=DB):
+    import base64 as b64
+    content = b64.b64decode(body.content_base64) if body.content_base64 else b''
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_reference(conn, storage(), user, run, outputs, body_dict(body), content), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/images', status_code=201)
+def visuals_image(run_id: UUID, body: ImageGenerate, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.generate_image(conn, storage(), user, run, outputs, body_dict(body)), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/references/{ref_id}/approve')
+def visuals_approve(run_id: UUID, ref_id: str, body: ReferenceApprove, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/bind')
+def visuals_bind(run_id: UUID, body: BindBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.bind(storage(), user, run, outputs, body.shot_id, body.references, body.subject_selectors, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/generator')
+def visuals_generator(run_id: UUID, body: GeneratorBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_generator(storage(), user, run, outputs, body.shot_id, body.provider, body.model))
+
+
+@app.post('/api/runs/{run_id}/visuals/prepare-take')
+def visuals_prepare_take(run_id: UUID, body: PrepareTake, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.prepare_take(storage(), user, run, outputs, body_dict(body)))
+
+
+@app.post('/api/runs/{run_id}/visuals/take', status_code=201)
+def visuals_take(run_id: UUID, body: ShotBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.submit_take(conn, storage(), user, run, outputs, body.shot_id), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/review')
+def visuals_review(run_id: UUID, body: TakeReview, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.review_take(conn, storage(), user, run, outputs, body.job_id, body.decision, body.notes, body.timing_notes, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/select-take')
+def visuals_select_take(run_id: UUID, body: TakeSelect, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_take(conn, storage(), user, run, outputs, body.job_id, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/asset')
+def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_asset(conn, storage(), user, run, outputs, body.shot_id, body.key, body.sha256, body.bytes, body.kind, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/record', status_code=201)
+def visuals_record(run_id: UUID, body: GapBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.record_gap(conn, storage(), user, run, outputs, body.gap_id, body.quote), 201)
 
 
 @app.get('/health')

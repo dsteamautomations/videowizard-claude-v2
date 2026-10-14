@@ -145,8 +145,10 @@ def tick():
         with connect() as conn:
             finalize_voice(conn, job, status, result, error, cost, retry_in)
         busy = True
-    from . import analysis_jobs
+    from . import analysis_jobs, visual_workers
     if analysis_jobs.tick():
+        busy = True
+    if visual_workers.tick():
         busy = True
     return busy
 

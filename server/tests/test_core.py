@@ -7,7 +7,7 @@ from conftest import rid, seed_session
 
 
 def new_run(client, headers, version='test', **extra):
-    r = client.post('/api/runs', json={'request_id': rid(), 'title': 'T', 'client': 'C', 'procedure_version': version, **extra}, headers=headers)
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'C', 'procedure_version': version, **extra}, headers=headers)
     assert r.status_code == 201, r.text
     return r.json()['id']
 
@@ -280,7 +280,7 @@ def test_e30_bad_or_expired_session(client, database):
 
 
 def test_run_code_and_default_version(client, alice):
-    r = client.post('/api/runs', json={'request_id': rid(), 'title': 'T'}, headers=alice)
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'C'}, headers=alice)
     assert r.status_code == 201
     assert r.json()['code'].startswith('VW-') and r.json()['procedure_version'] == '1'
 

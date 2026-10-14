@@ -608,7 +608,7 @@ def finalize(conn, store, user, run, review, quote):
     refs = [{'name': n, 'key': f['key'], 'sha256': f['sha256'], 'bytes': f['bytes'], 'location': 'storage', 'receipt': True} for n, f in files.items()]
     inspection_cost = [j.get('cost') for j in session['jobs'].values() if j.get('cost')]
     out = core.output(conn, user, run, {'stage': STAGE, 'files': refs, 'accepted_quote': quote,
-                                        'summary': {**certificate, 'versions': len(session['versions']), 'questions': len(questions), 'inspections': len(session['jobs']),
+                                        'summary': {**certificate, 'units': {'visuals': [g['shot_id'] for g in certificate['gaps']]}, 'versions': len(session['versions']), 'questions': len(questions), 'inspections': len(session['jobs']),
                                                     'inspection_cost': inspection_cost, 'supplemental_notes': len(supplemental.get('supplemental_notes', []))}})
     return {'certificate': certificate, 'output': str(out['id'])}
 

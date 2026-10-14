@@ -22,7 +22,7 @@ Narration: Each block is pressed, not fired, so it keeps the carbon in the groun
 
 def start_run(home, database):
     connected(home, database)
-    code, out, err = vw(home, 'start', '--title', 'Earth', '--client', 'VK', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this')
+    code, out, err = vw(home, 'start', '--client', 'VK', '--need-gb', '0', '--inputs-ready', '--spend-caps-set', '--assembly-machine', 'this')
     assert code == 0, err
     return out['code'], home['runs'] / out['code']
 
@@ -40,17 +40,22 @@ def test_t7_intake_brief_script_end_to_end(home, database):
     assert out['needs_readable_copy'] is False and out['output_file'] == 'out/intake.json'
     write_proposal(ws, 'intake', {'remove': [{'line': 1, 'kind': 'scene_heading', 'why': 'heading'}, {'line': 5, 'kind': 'timing', 'why': 'duration'},
                                              {'line': 7, 'kind': 'section_label', 'why': 'label'}, {'line': 8, 'kind': 'visual_note', 'why': 'seen not said'}],
-                                  'titles': ['Earth Blocks - Documentary Explainer', 'Pressed Earth - Explainer'], 'notes': 'removed plan lines', 'client': 'VK Nardep'})
-    rc, out, err = vw(home, 'stage', 'intake', 'record', '--quote', 'yes, approved')
+                                  'titles': ['Earth Blocks - Documentary Explainer', 'Pressed Earth - Explainer'], 'notes': 'removed plan lines'})
+    # the operator picks the second suggestion; the client is the run's directory client
+    rc, out, err = vw(home, 'stage', 'intake', 'record', '--title', 'Pressed Earth - Explainer', '--quote', 'yes, approved, the second one')
     assert rc == 0, (out, err)
-    assert out['summary']['title'] == 'Earth Blocks - Documentary Explainer' and out['summary']['client'] == 'VK Nardep'
+    assert out['summary']['title'] == 'Pressed Earth - Explainer' and out['summary']['client'] == 'VK'
+    import httpx
+    tok = json.loads((home['home'] / 'session.json').read_text())['token']
+    run = httpx.get(f"{home['env']['VW2_SERVER_URL']}/api/runs/{out['run_id']}", headers={'Authorization': 'Bearer ' + tok}).json()
+    assert run['title'] == 'Pressed Earth - Explainer' and run['client'] == 'VK' and run['client_id'] == 'c-vk'
     cleaned = (ws / 'out' / 'source.txt').read_text(encoding='utf-8')
     assert 'Scene 1' not in cleaned and 'Duration' not in cleaned and 'Close-up' not in cleaned
     assert 'Narration: Earth blocks are made' in cleaned and 'keeps the carbon' in cleaned
     assert vw(home, 'next')[1]['stage'] == 'brief'
 
     rc, out, err = vw(home, 'stage', 'brief', 'prepare')
-    assert rc == 0 and 'keeps the carbon' in out['inputs']['script'] and out['inputs']['title'].startswith('Earth Blocks')
+    assert rc == 0 and 'keeps the carbon' in out['inputs']['script'] and out['inputs']['title'] == 'Pressed Earth - Explainer'
     write_proposal(ws, 'brief', {'purpose': 'Understand why earth blocks matter', 'audience': 'self-builders (recommendation)', 'message': 'Pressed, not fired',
                                  'tone': 'calm', 'ending': 'invite to visit the yard', 'constraints': '', 'reasons': {'audience': 'subject suggests it'}, 'questions': []})
     rc, out, err = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
@@ -107,12 +112,12 @@ def test_t4_malformed_proposals_refused(home, database):
     code, ws = start_run(home, database)
     (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
     vw(home, 'stage', 'intake', 'prepare')
-    write_proposal(ws, 'intake', {'remove': [{'line': 2, 'kind': 'timing', 'why': 'blank'}], 'titles': ['T'], 'notes': '', 'client': 'VK'})
+    write_proposal(ws, 'intake', {'remove': [{'line': 2, 'kind': 'timing', 'why': 'blank'}], 'titles': ['T'], 'notes': ''})
     rc, out, _ = vw(home, 'stage', 'intake', 'record', '--quote', 'yes')
     assert rc == 2 and out['action'] == 'refused' and 'Blank' in out['message']
-    write_proposal(ws, 'intake', {'remove': [{'line': 99, 'kind': 'timing', 'why': 'x'}], 'titles': ['T'], 'notes': '', 'client': 'VK'})
+    write_proposal(ws, 'intake', {'remove': [{'line': 99, 'kind': 'timing', 'why': 'x'}], 'titles': ['T'], 'notes': ''})
     assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 2
-    write_proposal(ws, 'intake', {'remove': [], 'titles': [], 'notes': '', 'client': 'VK'})
+    write_proposal(ws, 'intake', {'remove': [], 'titles': [], 'notes': ''})
     assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 2  # a title is required
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth'], 'notes': '', 'client': 'VK'})
     assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 0

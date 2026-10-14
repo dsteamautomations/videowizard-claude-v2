@@ -211,7 +211,7 @@ def test_m1_oversized_clip_refused_before_upload(home, database, fake):
     rc, out, _ = vw(home, 'stage', 'media', 'prepare')
     assert rc == 2 and '200 MB' in out['message']
     with psycopg.connect(database) as c:
-        assert c.execute('select count(*) from vw2_files').fetchone()[0] == 2  # only the voice files
+        assert c.execute("select count(*) from vw2_files where stage='media'").fetchone()[0] == 0  # nothing of the clip reached storage
 
 
 def test_m2_m4_m5_m6_media_upload_resume_dedupe_close(home, database, fake):
@@ -229,7 +229,7 @@ def test_m2_m4_m5_m6_media_upload_resume_dedupe_close(home, database, fake):
     assert rc == 0, err
     assert out['summary']['units']['analysis'] == [c['id'] for c in out['summary']['clips']]
     with psycopg.connect(database) as c:
-        assert c.execute("select count(*) from vw2_files where stage='media'").fetchone()[0] == 2
+        assert c.execute("select count(*) from vw2_files where stage='media' and name like '%%.mp4'").fetchone()[0] == 2  # a.mp4 once (resumed), b.mp4; the copy deduped
     nxt = vw(home, 'next')[1]
     assert nxt['stage'] == 'analysis' and nxt['units_open'] == out['summary']['units']['analysis'] and nxt['paid'] == 'gemini-4-argon'
     # M5: close (remaining stages are not done, so close is not allowed yet) — verify receipts instead via a direct close attempt

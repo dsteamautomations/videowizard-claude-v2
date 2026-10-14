@@ -27,6 +27,20 @@ def shared_client():
     return httpx.Client(base_url=settings().SHARED_SUPABASE_URL.rstrip('/') + '/rest/v1', headers=headers, timeout=30)
 
 
+def client_directory():
+    """Active clients from the shared directory (v1 client_list)."""
+    rows, offset = [], 0
+    with shared_client() as shared:
+        while True:
+            page = shared.get('/clients', params={'select': 'client_id,client_name', 'status': 'eq.Active', 'order': 'client_name.asc,client_id.asc', 'limit': '500', 'offset': str(offset)}).json()
+            if not isinstance(page, list):
+                raise Problem(503, 'DIRECTORY', 'The client directory did not answer.')
+            rows.extend({'client_id': str(r['client_id']), 'client_name': str(r['client_name'])} for r in page)
+            if len(page) < 500 or offset >= 50000:
+                return rows
+            offset += 500
+
+
 def _field(employee, key):
     return next((f.get('value') for f in (employee or {}).get('field_values') or [] if isinstance(f, dict) and f.get('fieldId') == key), None)
 

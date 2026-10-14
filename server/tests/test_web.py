@@ -85,7 +85,7 @@ def test_c6_login_wrong_password(client, monkeypatch):
 
 
 def test_c7_c8_run_pages_and_admin(client, monkeypatch, alice, admin):
-    r = client.post('/api/runs', json={'request_id': rid(), 'title': 'Alice film', 'procedure_version': 'test'}, headers=alice)
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'C', 'procedure_version': 'test'}, headers=alice)
     code = r.json()['code']
     client.post(f"/api/runs/{r.json()['id']}/output", json={'request_id': rid(), 'stage': 's1', 'accepted_quote': 'yes'}, headers=alice)
     browser_login(client, monkeypatch, username='bob', password='pw2')  # directory user e1 ≠ alice
@@ -93,7 +93,7 @@ def test_c7_c8_run_pages_and_admin(client, monkeypatch, alice, admin):
     client.post('/logout')
     browser_login(client, monkeypatch, username='root', password='pw3', role='Admin')
     page = client.get('/runs')
-    assert page.status_code == 200 and 'Alice film' in page.text
+    assert page.status_code == 200 and code in page.text and '<td>C</td>' in page.text
     page = client.get(f'/runs/{code}')
     assert page.status_code == 200 and 's1' in page.text and 'yes' in page.text
     assert client.get('/defects').status_code == 200
@@ -101,7 +101,7 @@ def test_c7_c8_run_pages_and_admin(client, monkeypatch, alice, admin):
 
 def test_meta_and_claim(client, alice):
     assert 'plugin_min_version' in client.get('/api/meta').json()
-    run = client.post('/api/runs', json={'request_id': rid(), 'procedure_version': 'test'}, headers=alice).json()
+    run = client.post('/api/runs', json={'request_id': rid(), 'client': 'C', 'procedure_version': 'test'}, headers=alice).json()
     r = client.post(f"/api/runs/{run['id']}/claim", json={'request_id': rid(), 'machine': 'mac-1'}, headers=alice)
     assert r.status_code == 200 and r.json()['active_machine'] == 'mac-1'
     assert client.get(f"/api/runs/{run['id']}/next", headers=alice).json()['active_machine'] == 'mac-1'

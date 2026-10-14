@@ -88,7 +88,7 @@ def intake_prepare(ws, procedure, prior):
             'output_file': 'out/intake.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
-def intake_record(ws, procedure, prior):
+def intake_record(ws, procedure, prior, title=None, client=''):
     data = read_proposal(ws, 'intake')
     try:
         src = json.loads((ws / 'work' / 'intake-source.json').read_text(encoding='utf-8'))
@@ -97,14 +97,16 @@ def intake_record(ws, procedure, prior):
     titles = data.get('titles')
     if not isinstance(titles, list) or not titles or not all(isinstance(t, str) and 8 <= len(t.strip()) <= 70 or t.strip() for t in titles):
         raise Refused('out/intake.json: `titles` must list at least one title (recommended first).')
-    need_text(data, ['client'], 'intake')
+    chosen = (title or '').strip() or titles[0].strip()
+    if not 1 <= len(chosen) <= 160:
+        raise Refused('The chosen title must be 1-160 characters (`--title`).')
     cleaned = remove_lines(src['text'], data.get('remove', []))
     if not cleaned.strip():
         raise Refused('Nothing would remain of the source; check the removals.')
     (ws / 'out' / 'source.txt').write_text(cleaned, encoding='utf-8')
     original = ws / 'in' / src['file']
     (ws / 'out' / ('original' + original.suffix.lower())).write_bytes(original.read_bytes())
-    summary = {'title': titles[0].strip(), 'titles': [t.strip() for t in titles], 'client': data['client'].strip(), 'notes': data.get('notes', ''),
+    summary = {'title': chosen, 'titles': [t.strip() for t in titles], 'client': client, 'notes': data.get('notes', ''),
                'removed_lines': len(data.get('remove', [])), 'warnings': src['warnings'], 'source_digest': digest(cleaned)}
     return {'files': ['out/source.txt', 'out/original' + original.suffix.lower(), 'out/intake.json'], 'summary': summary, 'retain': True, 'upload': True}
 

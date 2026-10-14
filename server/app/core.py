@@ -55,12 +55,25 @@ def with_receipt(conn, user, body, fn):
 
 # ---------- runs ----------
 
+def resolve_client(client):
+    """Exactly one Active directory client by id or exact name (case-insensitive); otherwise refuse with candidates."""
+    from .auth import client_directory
+    rows = client_directory()
+    term = (client or '').strip().lower()
+    matches = [r for r in rows if term and (r['client_id'].lower() == term or r['client_name'].lower() == term)]
+    if len(matches) == 1:
+        return matches[0]
+    candidates = [r['client_name'] for r in rows if term and term in r['client_name'].lower()][:10]
+    raise Problem(422, 'CLIENT_UNKNOWN', 'The client must be one Active client of the directory; ask the operator which one.', candidates=candidates, ambiguous=len(matches) > 1)
+
+
 def create_run(conn, user, title, client, version):
     version = version or settings().DEFAULT_PROCEDURE_VERSION
     if stage_table(version) is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
-    return conn.execute('insert into vw2_runs(title, client, owner_id, owner_name, procedure_version) values (%s,%s,%s,%s,%s) returning *',
-                        (title, client, user['id'], user['name'], version)).fetchone()
+    chosen = resolve_client(client)
+    return conn.execute('insert into vw2_runs(title, client, client_id, owner_id, owner_name, procedure_version) values (%s,%s,%s,%s,%s,%s) returning *',
+                        (title or '', chosen['client_name'], chosen['client_id'], user['id'], user['name'], version)).fetchone()
 
 
 def is_admin(user):
@@ -117,6 +130,8 @@ def compute_next(run, stages, outputs, attempts):
     done = {(o['stage'], o['unit']) for o in outputs}
     for st in stages:
         units = declared_units(outputs, st['name']) if st['per_unit'] else None
+        if st['per_unit'] and units == []:
+            continue  # declared empty: nothing to do in this stage
         candidates = units if units else [None]
         open_units = [u for u in candidates if (st['name'], u) not in done]
         if not open_units:
@@ -201,6 +216,8 @@ def output(conn, user, run, body):
                           values (%s,%s,%s,%s,%s,%s,%s,%s, case when %s then now() end, %s) returning *''',
                        (run['id'], st['name'], unit, run['procedure_version'], Json(files), Json(summary), summary.get('cost_cents'),
                         user['id'] if quote else None, bool(quote), quote or None)).fetchone()
+    if st['name'] == 'intake' and str(summary.get('title') or '').strip():
+        conn.execute('update vw2_runs set title=%s where id=%s', (str(summary['title']).strip()[:160], run['id']))
     conn.execute('delete from vw2_attempts where run_id=%s and stage=%s and unit=%s', (run['id'], st['name'], unit or UNIT_NONE))
     return row
 
