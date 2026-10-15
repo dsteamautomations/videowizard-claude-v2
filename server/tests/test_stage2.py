@@ -378,3 +378,37 @@ def test_scenes_and_pauses_end_to_end(home, database, fake, gemini):
     assert rc == 0 and abs(out['duration_s'] - total / 25) < 0.15, (out, err)
     sil = silences_in(ws / 'out' / 'master.mp4')
     assert any(abs(s - pause_at) < 0.1 and abs(d - pause_len) < 0.1 for s, d in sil), (sil, pause_at, pause_len)
+
+
+# ---------- ticket 7 (15 Oct 2026): recorded scenes vanished ----------
+
+def test_t7_supabase_reads_bypass_the_cdn(monkeypatch):
+    from app import storage as S
+    seen = []
+    st = S.SupabaseStorage.__new__(S.SupabaseStorage)
+    st.bucket = 'b'
+    monkeypatch.setattr(st, '_call', lambda method, path, **kw: seen.append(path) or type('R', (), {'content': b'{}'})())
+    st.get('run/stage2/session.json')
+    st.get('run/stage2/session.json')
+    assert all('?nocache=' in p for p in seen) and seen[0] != seen[1]   # a unique URL each read: never a cached copy
+
+
+def test_t7_failed_session_read_is_not_a_new_session():
+    from app.errors import Problem
+    from app.stage2 import stage as S
+
+    class Flaky:
+        def get(self, k):
+            raise Problem(502, 'STORAGE', 'Storage returned 520.')
+
+        def exists(self, k):
+            return True
+    with pytest.raises(Problem) as e:
+        S.session_of(Flaky(), {'id': 'r'}, create=True)
+    assert e.value.status == 502
+
+
+def test_t7_scene_process_stage_may_be_singular():
+    from app.stage2 import narration as N
+    out = N.normalise_scenes([{'first_word_id': 'W1', 'title': 'a', 'process_stage': 'Stage_1'}, {'first_word_id': 'W9', 'title': 'b', 'process_stages': ['Stage_2']}])
+    assert [s['process_stages'] for s in out] == [['Stage_1'], ['Stage_2']] and 'process_stage' not in out[0]

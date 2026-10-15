@@ -49,6 +49,8 @@ def session_of(store, run, create=False):
     try:
         return load_json(store, key(run, 'session.json'))
     except Problem:
+        if store.exists(key(run, 'session.json')):
+            raise   # a failed read is not a missing session: starting a new one would drop recorded work
         if not create:
             raise Problem(409, 'NOT_ALLOWED', 'Run `vw options prepare` first.')
     return {'contract': 'vw2-stage2-session-v1', 'package': None, 'versions': [], 'current': None, 'accepted': None, 'frames': {}, 'inspections': {},
@@ -181,10 +183,11 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     stages = (brief_o['summary'].get('production') or {}).get('process_stages') or []
     duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
     try:
+        document = {**document, 'scenes': NR.normalise_scenes(document.get('scenes'))}
         NR.validate_scenes(words, document.get('scenes'), stages)
         plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], document.get('pauses') or [])
         bs = NR.beats(words, document['scenes'], plan, to_tl, TIMELINE['fps'])
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
         fail(exc)
     session = session_of(store, run, create=True)
     version = (session.get('scenes') or {}).get('version', 0) + 1

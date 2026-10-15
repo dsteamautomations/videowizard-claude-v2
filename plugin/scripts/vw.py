@@ -485,6 +485,8 @@ def cmd_analysis(a):
 
 
 def _json_file(m, rel):
+    if not rel:
+        emit({'action': 'refused', 'message': 'Give the file: --file out/<name>.json'}, 2)
     path = workspace(m['code']) / rel
     try:
         return json.loads(path.read_text(encoding='utf-8'))

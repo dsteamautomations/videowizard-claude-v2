@@ -1,6 +1,7 @@
 """Object storage: Supabase Storage in production, a local folder for tests and local development.
 Interface: put(key, data, mime), get(key), exists(key), signed_upload(key) -> (url, headers), signed_download(key) -> url."""
 import hashlib
+import uuid
 from pathlib import Path
 from urllib.parse import quote
 
@@ -87,7 +88,9 @@ class SupabaseStorage:
                    headers={'Content-Type': mime or 'application/octet-stream', 'x-upsert': 'true'})
 
     def get(self, key):
-        return self._call('GET', f'/storage/v1/object/{self.bucket}/{quote(key, safe="/")}').content
+        # Ticket 7 (15 Oct 2026): Supabase's CDN served a cached session.json right after an overwrite (cf-cache-status HIT),
+        # so recorded scenes vanished. A unique query value forces a fresh read.
+        return self._call('GET', f'/storage/v1/object/{self.bucket}/{quote(key, safe="/")}?nocache={uuid.uuid4().hex}').content
 
     def exists(self, key):
         try:

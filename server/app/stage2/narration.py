@@ -106,6 +106,20 @@ def silences(words, fps, to_timeline, total_frames, min_s=1.2):
     return out
 
 
+def normalise_scenes(scenes):
+    """Accept a single `process_stage` string as well as the `process_stages` list (ticket 7: the assistant wrote the singular)."""
+    if not isinstance(scenes, list):
+        return scenes
+    out = []
+    for s in scenes:
+        s = dict(s)
+        one = s.pop('process_stage', None)
+        if not s.get('process_stages') and one:
+            s['process_stages'] = [one] if isinstance(one, str) else list(one)
+        out.append(s)
+    return out
+
+
 def validate_scenes(words, scenes, process_stages=()):
     if not isinstance(scenes, list) or not scenes:
         raise ValueError('Give at least one scene.')

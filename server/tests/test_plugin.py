@@ -236,3 +236,10 @@ def test_c3_long_wait_timeout_says_still_working(monkeypatch, capsys):
     with pytest.raises(SystemExit):
         vwm.call('POST', '/x')
     assert json.loads(capsys.readouterr().out)['action'] == 'tell_builder'
+
+
+def test_t7_missing_file_is_refused_not_a_crash(capsys):
+    vwm = _plugin_module("vw")
+    with pytest.raises(SystemExit) as e:
+        vwm._json_file({"code": "VW-X"}, None)
+    assert e.value.code == 2 and "--file" in json.loads(capsys.readouterr().out)["message"]
