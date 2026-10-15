@@ -162,7 +162,10 @@ def unique(rows, key, label):
     return set(values)
 
 
-def validate_plan(document, source_gaps):
+MAX_GENERATED_SHOT_S = 30   # design/21 E7: today's AI video tools make at most 30 s per shot; longer blanks are several shots
+
+
+def validate_plan(document, source_gaps, fps=None):
     plan = Plan.model_validate(document)
     elements = unique(plan.elements, 'id', 'element')
     unique(plan.gaps, 'gap_id', 'gap')
@@ -194,6 +197,9 @@ def validate_plan(document, source_gaps):
                     need(shot.start_frame == cursor and shot.end_frame > cursor,
                          'Shots must cover their gap in order, without overlaps or missing frames.')
                     cursor = shot.end_frame
+                    if fps and shot.visual_type in ('video', 'animation'):
+                        need((shot.end_frame - shot.start_frame) <= MAX_GENERATED_SHOT_S * float(fps),
+                             f'A generated shot is at most {MAX_GENERATED_SHOT_S} s; split a longer stretch into several shots.')
                     need(set(shot.element_ids) <= elements, 'Shot names an unknown reference element.')
                     subjects = unique(shot.subjects, 'element_id', 'visible subject')
                     need(subjects <= set(shot.element_ids), 'Every visible subject must be a required shot element.')

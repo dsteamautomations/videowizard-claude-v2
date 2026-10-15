@@ -73,6 +73,11 @@ def save_session(store, run, session):
 
 # ---------- gaps ----------
 
+def _fps(session):
+    from fractions import Fraction
+    return Fraction(str(session['source'].get('fps'))) if session['source'].get('fps') else None
+
+
 def gaps_source(store, outputs):
     """Gaps come from the approved first cut when present (Mac slice), else from the planning certificate."""
     first_cut = next((o for o in outputs if o['stage'] == 'first_cut' and o['unit'] is None), None)
@@ -117,7 +122,7 @@ def prepare(conn, store, user, run, outputs):
 def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
     try:
-        plan, warnings = validate_plan(document, session['source']['gaps'])
+        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session))
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
     return {'status': 'valid', 'warnings': warnings, 'plan_digest': digest(plan)}
@@ -125,7 +130,7 @@ def check(store, run, outputs, document):
 
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
-    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps']))
+    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session)))
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'source_plan_digest': session['source']['plan_digest'], 'document': plan,
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}

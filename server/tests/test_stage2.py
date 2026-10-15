@@ -37,13 +37,17 @@ def make_package(n_clips=3, beats=None):
 
 
 def ev(sid, a, b, **kw):
-    return {'sub_clip_id': sid, 'source_in_frame': a, 'source_out_frame': b, 'crop': kw.pop('crop', 'full'), 'a2_intervals': kw.pop('a2', []), **kw}
+    return {'sub_clip_id': sid, 'source_in_frame': a, 'source_out_frame': b, 'crop': kw.pop('crop', 'full'), 'a2_intervals': kw.pop('a2', []),
+            'match': kw.pop('match', 'direct'), 'evidence': kw.pop('evidence', 'primary_fit_for_beats names this scene'), **kw}
 
 
-def option(n, beat, rank, events, shared=''):
+def blank(frames, intent='material savings, shown as an animation', **kw):
+    return {'blank': True, 'timeline_frames': frames, 'intent': intent, **kw}
+
+
+def option(n, beat, rank, events):
     return {'option_number': n, 'beat_id': beat, 'rank': rank, 'events': events,
-            'slate_lines': [f"OPTION #{n} | {beat} ({rank}) | {sum(e['source_out_frame'] - e['source_in_frame'] for e in events) / 25:.1f}s ({len(events)} Shot{'s' if len(events) != 1 else ''})", 'Clips: ' + ' + '.join(e['sub_clip_id'] for e in events), shared],
-            'reasoning': 'synthetic', 'log_fields_cited': ['primary_fit_for_beats'], 'best_unchosen': {'sub_clip_id': 'none', 'rule': 'none better'}, 'shared_justification': 'nothing else fits' if shared else ''}
+            'reasoning': 'synthetic', 'log_fields_cited': ['primary_fit_for_beats'], 'best_unchosen': {'sub_clip_id': 'none', 'rule': 'none better'}}
 
 
 def good_doc():
@@ -91,11 +95,8 @@ def test_s6_hard_sun_to_overcast_inside_a_beat():
     assert any('G8' in x for x in refusals(good_doc(), pk))
 
 
-def test_s7_shared_clip_without_warning():
-    d = good_doc(); d['options'][1]['events'][0] = ev('clip0:SUB_01', 0, 25)
-    assert any('Q4' in x for x in refusals(d))
-    d['options'][0]['slate_lines'][2] = '[WARNING: SHARED CLIP] clip0:SUB_01 also in OPTION #2'; d['options'][0]['shared_justification'] = 'only wide'
-    d['options'][1]['slate_lines'][2] = '[WARNING: SHARED CLIP] clip0:SUB_01 also in OPTION #1'; d['options'][1]['shared_justification'] = 'only wide'
+def test_s7_first_and_backup_option_of_one_scene_may_share_a_clip():
+    d = good_doc(); d['options'][1]['events'][0] = ev('clip1:SUB_01', 0, 25)   # design/21 E5: shares clip1 with option 1; only one of the two is kept
     assert not any('Q4' in x for x in refusals(d))
 
 
@@ -262,15 +263,6 @@ def test_s21_boundary_frames_and_paid_inspection(home, database, fake, gemini):
 
 
 # ---------- design/19: slate, word-timed flags, scenes and pauses ----------
-
-def test_c1_slate_line_1_states_real_length_and_shots():
-    d = good_doc()
-    d['options'][0]['slate_lines'][0] = 'OPTION #1 | BEAT_01 (PRIMARY) | 9.9s (2 Shots)'
-    assert any('slate line 1 must end with "| 1.5s (2 Shots)"' in r for r in refusals(d))
-    d = good_doc()
-    d['options'][0]['slate_lines'][0] = 'OPTION #1 | BEAT_01 (PRIMARY) | 1.5s (3 Shots)'
-    assert any('slate line 1' in r for r in refusals(d))
-
 
 def word_pk(silences=()):
     pk = make_package()

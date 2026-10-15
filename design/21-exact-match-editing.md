@@ -1,6 +1,6 @@
 # 21 — Exact-match editing: real footage only where it shows what is said
 
-Date 15 Oct 2026. Raised by SK after watching the VW-2 review film (options v1, 11 options over 9 scenes). Revision 3 includes SK's corrections and SK's answers after the VK02 reference analysis (design/22). Awaiting SK's final yes.
+Date 15 Oct 2026. Raised by SK after watching the VW-2 review film (options v1, 11 options over 9 scenes). Revision 3 includes SK's corrections and answers after the VK02 reference analysis (design/22). Approved by SK on 15 Oct 2026 ("go ahead") and built the same day.
 
 ## What went wrong in VW-2 options v1
 - Every sentence was filled with whatever footage was available, even when it only loosely related to the words.

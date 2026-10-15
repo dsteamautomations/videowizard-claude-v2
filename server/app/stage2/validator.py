@@ -3,8 +3,11 @@ Returns {'refusals': [...], 'flags': [...]}: a refusal rejects the proposal; a f
 from fractions import Fraction
 
 from .package import SHOT_SIZES, GRID
+from .slides import DECISION_KINDS
 
 ROLL_SPEAKER = 'ELIGIBLE_A_ROLL_SPEAKER'
+MIN_BLANK_S = 3      # design/21: a blank (AI video or animation) is at least 3 s
+LONG_REAL_S = 4      # design/21 rule 11: a real shot longer than this must earn its length
 NEUTRAL = ('Toward_Lens', 'Away', 'Neutral')
 
 
@@ -49,16 +52,15 @@ def validate_options(doc, package, policy):
         if ranks[0] != 'PRIMARY' or ranks.count('PRIMARY') != 1 or len(group) > 2 or (len(group) == 2 and ranks[1] != 'SECONDARY'):
             refusals.append(f'G12: {bid} needs one PRIMARY first and at most one SECONDARY')
         if len(group) == 2:
-            a = [(e['sub_clip_id'], e['source_in_frame'], e['source_out_frame']) for e in group[0].get('events', [])]
-            b = [(e['sub_clip_id'], e['source_in_frame'], e['source_out_frame']) for e in group[1].get('events', [])]
-            sizes_a = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[0].get('events', []) if e['sub_clip_id'] in rows]
-            sizes_b = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[1].get('events', []) if e['sub_clip_id'] in rows]
+            a = [(e.get('sub_clip_id'), e.get('source_in_frame'), e.get('source_out_frame')) for e in group[0].get('events', []) if not e.get('blank')]
+            b = [(e.get('sub_clip_id'), e.get('source_in_frame'), e.get('source_out_frame')) for e in group[1].get('events', []) if not e.get('blank')]
+            sizes_a = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[0].get('events', []) if e.get('sub_clip_id') in rows]
+            sizes_b = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[1].get('events', []) if e.get('sub_clip_id') in rows]
             if {x[0] for x in a} == {x[0] for x in b} and sizes_a == sizes_b:
                 refusals.append(f'G13: {bid} SECONDARY must differ from PRIMARY in sub-clips or shot sizes')
     words = {w['id']: w for w in (package.get('narration') or {}).get('words') or []}
     silences = (package.get('narration') or {}).get('silences') or []
-    usage = {}   # sub_clip_id -> [(option_number, timeline_start)]
-    cursor_by_option = {}
+    uses = {}    # clip_id -> [(option_number, beat_id, event_index, has_reuse_decision)] in film order (design/21 rule 7)
     for o in opts:
         n, bid, events = o.get('option_number'), o.get('beat_id'), o.get('events') or []
         beat = beats.get(bid)
@@ -69,24 +71,47 @@ def validate_options(doc, package, policy):
             refusals.append(f'OPTION #{n}: reasoning and log_fields_cited are required')
         if not (o.get('best_unchosen') or {}).get('rule'):
             refusals.append(f'OPTION #{n}: R15 best_unchosen with the excluding rule is required')
-        lines = o.get('slate_lines') or []
-        if len(lines) != 3 or not lines[0].startswith(f'OPTION #{n} | {bid} ({o.get("rank")})') or any(ord(c) > 126 for l in lines for c in l):
-            refusals.append(f'OPTION #{n}: slate needs 3 ASCII lines, line 1 "OPTION #{n} | {bid} ({o.get("rank")}) | …"')
-        else:   # design/19 C1: line 1 states the real length and shot count
-            want = f"{beat['target_beat_frames'] / tl_fps:.1f}s ({len(events)} Shot{'s' if len(events) != 1 else ''})"
-            if not lines[0].endswith('| ' + want):
-                refusals.append(f'OPTION #{n}: slate line 1 must end with "| {want}"')
         total = 0
         prev = None
         sizes = []
         cursor = beat['timeline_start_frame']
         for i, ev in enumerate(events):
+            if ev.get('blank'):   # design/21: a stretch left for AI video or animation; the narration runs on
+                k = ev.get('timeline_frames')
+                tag = f'OPTION #{n} blank at event {i + 1}'
+                if not isinstance(k, int) or k <= 0:
+                    refusals.append(f'{tag}: timeline_frames must be a positive whole number')
+                    continue
+                if not str(ev.get('intent') or '').strip():
+                    refusals.append(f'{tag}: intent is required (what the AI video or animation must show)')
+                if k < MIN_BLANK_S * tl_fps:
+                    if str(ev.get('short_reason') or '').strip():
+                        flags.append(f'{tag}: E1 blank of {k / tl_fps:.1f} s is under {MIN_BLANK_S} s; the operator decides ({ev["short_reason"]})')
+                    else:
+                        refusals.append(f'{tag}: E1 a blank must be at least {MIN_BLANK_S} s ({k / tl_fps:.1f} s): hold a neighbouring shot longer, or give short_reason so the operator decides')
+                ev['_timeline_frames'], ev['_fps_ratio'] = k, '1'
+                total += k
+                cursor += k
+                prev, sizes = None, []
+                continue
             sid = ev.get('sub_clip_id')
             row = rows.get(sid)
             tag = f'OPTION #{n} shot {i + 1} ({sid})'
             if not row:
                 refusals.append(f'{tag}: unknown sub-clip')
                 continue
+            # design/21: every real shot states how it matches the words; anything uncertain goes behind a decision slide
+            d = ev.get('decision')
+            if d is not None and (not isinstance(d, dict) or d.get('kind') not in DECISION_KINDS or not str(d.get('question') or '').strip()):
+                refusals.append(f'{tag}: decision needs kind ({", ".join(DECISION_KINDS)}) and the question for the operator')
+                d = None
+            if ev.get('match') not in ('direct', 'b_roll') or not str(ev.get('evidence') or '').strip():
+                refusals.append(f'{tag}: match (direct or b_roll) and evidence (the log fields that show it matches the words) are required')
+            if ev.get('match') == 'b_roll' and not d:
+                refusals.append(f'{tag}: B-roll goes behind a decision slide (decision kind b_roll)')
+            if row.get('grade') == 'C' and not d:
+                refusals.append(f'{tag}: E3 the log grades this sub-clip C (poor quality): put it behind a decision slide (kind poor_quality) or leave a blank')
+            uses.setdefault(row['clip_id'], []).append((n, bid, i, bool(d and d.get('kind') == 'reuse')))
             if not row['eligibility'].startswith('ELIGIBLE') or not row['client_safe'] or row['risk_flags']:
                 refusals.append(f'{tag}: G10/Q8 sub-clip is not eligible or not client-safe ({row["eligibility"]}, risk flags {row["risk_flags"]})')
             if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
@@ -126,6 +151,8 @@ def validate_options(doc, package, policy):
             n_tl, ratio = _tl_frames(ev, row, tl_fps)
             ev['_timeline_frames'] = n_tl
             ev['_fps_ratio'] = str(ratio)
+            if n_tl > LONG_REAL_S * tl_fps and not str(ev.get('hold_reason') or '').strip():
+                flags.append(f'{tag}: rule 11 real shot of {n_tl / tl_fps:.1f} s: cut it to the part that carries the meaning, or give hold_reason')
             total += n_tl
             if prev:
                 ps, cs = prev['effective_shot_size'], row['effective_shot_size']
@@ -160,22 +187,19 @@ def validate_options(doc, package, policy):
                     flags.append(f"{tag}: B2 the word {words[awid]['text']!r} is not within 6 frames of the shot's action accent")
             if i > 0 and not row['nat_sound'] and any(s['start_frame'] < cursor < s['end_frame'] for s in silences):
                 flags.append(f'{tag}: B3 cuts inside a narration pause of 1.2 s or more; hold the shot or use a sub-clip with clean natural sound')
-            usage.setdefault(sid, []).append((n, cursor))
             cursor += n_tl
             prev = row
         if total != beat['target_beat_frames']:
             refusals.append(f"OPTION #{n}: G11 timeline length {total} frames must equal the beat's {beat['target_beat_frames']}")
         for i, ev in enumerate(events):
             ev.pop('_lm', None)
-    for sid, uses in usage.items():
-        if len(uses) > 1:
-            for n, _ in uses:
-                o = next(o for o in opts if o['option_number'] == n)
-                if 'SHARED CLIP' not in (o.get('slate_lines') or ['', '', ''])[2] or not str(o.get('shared_justification') or '').strip():
-                    refusals.append(f'OPTION #{n}: Q4 {sid} is shared with another option; slate line 3 needs [WARNING: SHARED CLIP] and a shared_justification')
-            starts = sorted(t for _, t in uses)
-            if any(b - a < 20 * tl_fps for a, b in zip(starts, starts[1:])):
-                flags.append(f'R8: {sid} reused within 20 s of timeline')
+    # design/21 rule 7: a clip appears once in the film. Its first and backup options for one scene may share it (only one is kept);
+    # any other second use, including another part of the same clip, must be a decision of kind reuse.
+    for cid, us in uses.items():
+        for j, (n, bid, i, is_reuse) in enumerate(us):
+            earlier = [u for u in us[:j] if not (u[1] == bid and u[0] != n)]
+            if earlier and not is_reuse:
+                refusals.append(f'OPTION #{n} shot {i + 1}: Q4 clip {cid} is already used (option #{earlier[0][0]}); a second use, even of another part, needs a decision of kind reuse or another clip')
     energies = []
     for b in package['beats']:
         group = by_beat.get(b['beat_id'])
@@ -200,7 +224,7 @@ def validate_master(master, package):
         if ev.get('kind') == 'gap':
             cursor += ev['timeline_frames']
             continue
-        if ev['sub_clip_id'] in seen:
+        if ev['sub_clip_id'] in seen and not ev.get('reuse_approved'):
             refusals.append(f"Q4: {ev['sub_clip_id']} appears twice in the master (options #{seen[ev['sub_clip_id']]} and #{ev['approved_from_option']})")
         seen[ev['sub_clip_id']] = ev['approved_from_option']
         if ev['timeline_frames'] <= 1:

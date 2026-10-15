@@ -13,7 +13,7 @@ from psycopg.types.json import Jsonb
 
 from .. import core, jobs
 from ..errors import Problem
-from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, narration as NR, package as P, validator as V
+from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, narration as NR, package as P, slides as SL, validator as V
 
 TIMELINE = {'width': 1920, 'height': 1080, 'fps': 25}
 BOUNDARY_PROMPT = ('Targeted boundary check (blueprint v3.2 §3 step 1.4). Watch ONLY the interval given below, which surrounds a planned cut point of a clip where a speaker was trimmed out. '
@@ -220,8 +220,12 @@ def check(store, run, doc):
     pk = _package(store, session)
     if doc.get('contract') != CONTRACT_OPTIONS:
         return {'status': 'rejected', 'refusals': [f"contract must be {CONTRACT_OPTIONS}"], 'flags': []}
-    result = V.validate_options(deepcopy(doc), pk, session['package']['policy'])
-    return {'status': 'rejected' if result['refusals'] else 'valid', **result}
+    work = deepcopy(doc)
+    result = V.validate_options(work, pk, session['package']['policy'])
+    out = {'status': 'rejected' if result['refusals'] else 'valid', **result}
+    if not result['refusals']:
+        out['scenes'] = SL.scene_summary(work, pk, TIMELINE['fps'])
+    return out
 
 
 def propose(conn, store, user, run, doc):
@@ -238,11 +242,14 @@ def propose(conn, store, user, run, doc):
         for ev in o['events']:
             ev['timeline_frames'] = ev.pop('_timeline_frames')
             ev['fps_ratio'] = ev.pop('_fps_ratio')
+    slides = SL.slides(work, pk, TIMELINE['fps'])
+    scenes = SL.scene_summary(work, pk, TIMELINE['fps'])
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'package_digest': session['package']['digest'], 'document': work, 'flags': result['flags'], 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     saved = save_json(store, key(run, f'options-v{version}.json'), record)
     identity = digest(work)
-    session['versions'].append({'version': version, 'file': saved, 'digest': identity, 'flags': result['flags'], 'options': len(work['options']), 'gaps': [g['beat_id'] for g in work.get('gaps') or []]})
+    session['versions'].append({'version': version, 'file': saved, 'digest': identity, 'flags': result['flags'], 'options': len(work['options']), 'gaps': [g['beat_id'] for g in work.get('gaps') or []],
+                                'slides': slides, 'scenes': scenes})
     session['current'] = identity
     session['accepted'] = None
     session['decisions'] = {}
@@ -250,7 +257,13 @@ def propose(conn, store, user, run, doc):
     session['renders'].pop('review', None)
     conn.execute("delete from vw2_attempts where run_id=%s and stage='options' and unit=%s", (run['id'], core.UNIT_NONE))
     save_session(store, run, session)
-    return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'], 'flags': result['flags'], 'next': '`vw options render`, let the operator watch, then `vw options record --quote`'}
+    return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'], 'flags': result['flags'], 'scenes': scenes,
+            'slides': [{k: s.get(k) for k in ('no', 'type', 'scene', 'backup_for', 'kind', 'question')} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
+            'next': '`vw options render`, let the operator watch, then `vw options record --quote`'}
+
+
+def _slides(store, session, doc, entry):
+    return entry.get('slides') or SL.slides(doc, _package(store, session), TIMELINE['fps'])   # versions proposed before design/21 carry none
 
 
 def current(store, session):
@@ -369,12 +382,7 @@ def render(conn, store, user, run, kind):
     beats = {b['beat_id']: b for b in pk['beats']}
     if kind == 'review':
         doc, entry = current(store, session)
-        items = []
-        for o in doc['options']:
-            b = beats[o['beat_id']]
-            items.append({'kind': 'slate', 'lines': o['slate_lines']})
-            items.append({'kind': 'narration', 'start_s': b['window_start_s'], 'end_s': b['window_end_s']})
-            items += _event_items(session, pk, o['events'], rows)
+        items = SL.review_items(doc, pk, _slides(store, session, doc, entry), lambda evs: _event_items(session, pk, evs, rows), TIMELINE['fps'])
         version, plan_digest = entry['version'], entry['digest']
     else:
         if not session.get('master'):
@@ -382,7 +390,7 @@ def render(conn, store, user, run, kind):
         items = []
         for ev in session['master']['plan']['events']:
             if ev['kind'] == 'gap':
-                items.append({'kind': 'event', 'sub_clip_id': None, 'gap': True, 'timeline_frames': ev['timeline_frames'], 'beat_id': ev['beat_id']})
+                items.append({'kind': 'event', 'sub_clip_id': None, 'gap': True, 'timeline_frames': ev['timeline_frames'], 'beat_id': ev.get('gap_id') or ev['beat_id']})
             else:
                 items += _event_items(session, pk, [ev], rows)
         version, plan_digest = session['master']['version'], session['master']['digest']
@@ -433,32 +441,48 @@ def record_options(conn, store, user, run, quote):
                                         'summary': {'version': entry['version'], 'options_digest': entry['digest'], 'options': entry['options'], 'gaps': entry['gaps'], 'flags': len(entry['flags']),
                                                     'scenes': ({'version': session['scenes']['version'], 'digest': session['scenes']['digest'], 'quote': session['scenes']['quote'],
                                                                 'pauses': len(session['scenes']['document']['pauses'])} if session.get('scenes') else None),
+                                                    'slides': len(entry.get('slides') or []), 'decision_slides': sum(1 for s in entry.get('slides') or [] if s['type'] == 'decision'),
+                                                    'blank_slides': sum(1 for s in entry.get('slides') or [] if s['type'] == 'blank'), 'scene_summary': entry.get('scenes'),
                                                     'review_film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s')}, 'inspection_cost': inspection_cost}})
     session['accepted'] = {'version': entry['version'], 'digest': entry['digest'], 'quote': quote, 'output': str(out['id'])}
     session['recorded']['options'] = str(out['id'])
     save_session(store, run, session)
-    return {'output': str(out['id']), 'version': entry['version'], 'next': 'the operator decides per option: `vw master decide --option n KEEP|REJECT|KEEP_WITH_EDIT`'}
+    return {'output': str(out['id']), 'version': entry['version'],
+            'next': 'the operator answers every numbered slide: `vw master decide --slide N --action KEEP|REJECT|KEEP_WITH_EDIT` for scene slides, KEEP|DROP for decision slides'}
 
 
 # ---------- master ----------
 
-def decide(store, user, run, option_number, action, note, edit):
+def decide(store, user, run, slide_no, action, note, edit):
+    """design/21: the operator answers by slide number. Scene and backup slides: KEEP, REJECT, KEEP_WITH_EDIT. Decision slides: KEEP or DROP."""
     session = session_of(store, run)
     if not session.get('accepted'):
         raise Problem(409, 'NOT_ALLOWED', 'Record the options stage first.')
     doc, entry = current(store, session)
-    if not any(o['option_number'] == option_number for o in doc['options']):
-        fail(f'No option #{option_number}.')
+    sl = _slides(store, session, doc, entry)
+    s = next((x for x in sl if x['no'] == slide_no), None)
+    if not s:
+        fail(f'No slide #{slide_no:02d}; the review film has #01 to #{len(sl):02d}.')
+    if s['type'] == 'blank':
+        fail(f'Slide #{slide_no:02d} is a blank for AI video or animation; it needs no decision.')
+    if s['type'] == 'decision':
+        if action not in ('KEEP', 'DROP'):
+            fail(f'Slide #{slide_no:02d} is a decision: answer KEEP or DROP.')
+        session['decisions'][str(slide_no)] = {'action': action, 'type': 'decision', 'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+        session['master'] = None
+        save_session(store, run, session)
+        return {'slide': slide_no, 'type': 'decision', 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
     if action not in ('KEEP', 'REJECT', 'KEEP_WITH_EDIT'):
         fail('action must be KEEP, REJECT or KEEP_WITH_EDIT')
     if action == 'KEEP_WITH_EDIT' and not edit:
         fail('KEEP_WITH_EDIT needs --edit "shot:N,in:±frames,out:±frames" (source frames).')
     if action == 'REJECT' and not str(note or '').strip():
         fail('REJECT needs the operator\'s reason (--note); it becomes a learned rule.')
-    session['decisions'][str(option_number)] = {'action': action, 'note': note or '', 'edit': edit, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    session['decisions'][str(slide_no)] = {'action': action, 'type': s['type'], 'option_number': s['option_number'], 'note': note or '', 'edit': edit, 'by': user['id'],
+                                           'at': datetime.now(timezone.utc).isoformat()}
     session['master'] = None
     save_session(store, run, session)
-    return {'option': option_number, 'action': action, 'decided': len(session['decisions']), 'of': len(doc['options'])}
+    return {'slide': slide_no, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
 
 
 def add_rule(store, user, run, text):
@@ -485,6 +509,8 @@ def _apply_edit(option, edit, rows, tl_fps):
     if not 0 <= idx < len(option['events']):
         fail(f"edit names shot {e['shot']} but option #{option['option_number']} has {len(option['events'])}")
     ev = option['events'][idx]
+    if ev.get('blank'):
+        fail(f"edit names shot {e['shot']}, which is a blank; count only the real shots and blanks in the option's order")
     row = rows[ev['sub_clip_id']]
     a, z = ev['source_in_frame'] + e['in'], ev['source_out_frame'] + e['out']
     if not (row['in_frame'] <= a < z <= row['out_frame']):
@@ -509,12 +535,16 @@ def build_master(conn, store, user, run):
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     beats = pk['beats']
     decisions = session['decisions']
-    missing = [o['option_number'] for o in doc['options'] if str(o['option_number']) not in decisions]
+    sl = _slides(store, session, doc, entry)
+    missing = [f"#{s['no']:02d}" for s in sl if s['type'] != 'blank' and str(s['no']) not in decisions]
     if missing:
-        fail(f'Every option needs a decision; missing: {missing}')
+        fail(f"Every numbered slide needs an answer; missing: {', '.join(missing)}")
+    head = {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}
+    inner = {(s['option_number'], s['event_index']): s for s in sl if s['type'] == 'decision'}
+    fps = TIMELINE['fps']
     kept = {}
     for o in deepcopy(doc['options']):
-        d = decisions[str(o['option_number'])]
+        d = decisions[str(head[o['option_number']]['no'])]
         if d['action'] == 'REJECT':
             continue
         if d['action'] == 'KEEP_WITH_EDIT':
@@ -524,38 +554,72 @@ def build_master(conn, store, user, run):
             if total != target:
                 fail(f"option #{o['option_number']} after the edit is {total} frames; the beat needs {target}. Trim one shot and extend another in the same option.")
         if o['beat_id'] in kept:
-            fail(f"{o['beat_id']}: both options kept (#{kept[o['beat_id']]['option_number']} and #{o['option_number']}); keep one.")
+            fail(f"{o['beat_id']}: both options kept (#{head[kept[o['beat_id']]['option_number']]['no']:02d} and #{head[o['option_number']]['no']:02d}); keep one.")
+        # design/21: a dropped placement becomes a blank; a kept reuse may repeat its clip; adjacent blanks merge
+        for i, ev in enumerate(o['events']):
+            ds = inner.get((o['option_number'], i))
+            if ds and decisions[str(ds['no'])]['action'] == 'DROP':
+                o['events'][i] = {'blank': True, 'timeline_frames': ev['timeline_frames'], 'intent': f"in place of dropped #{ds['no']:02d}: {ds['question']}", 'dropped_from': ds['no']}
+            elif ds and ds.get('kind') == 'reuse':
+                ev['reuse_approved'] = True
+        merged = []
+        for ev in o['events']:
+            if ev.get('blank') and merged and merged[-1].get('blank'):
+                merged[-1] = {**merged[-1], 'timeline_frames': merged[-1]['timeline_frames'] + ev['timeline_frames'], 'intent': f"{merged[-1]['intent']}; {ev['intent']}"}
+            else:
+                merged.append(ev)
+        for ev in merged:
+            if ev.get('blank') and ev.get('dropped_from') and ev['timeline_frames'] < V.MIN_BLANK_S * fps:
+                fail(f"Dropping #{ev['dropped_from']:02d} leaves a blank of {ev['timeline_frames'] / fps:.1f} s, under {V.MIN_BLANK_S} s: keep it, or keep the scene with an edit that lengthens a neighbouring shot.")
+        o['events'] = merged
         kept[o['beat_id']] = o
     # collision audit: a sub-clip in two kept options → swap in the beat's other option if it is clean, else refuse
     used = {}
     for bid, o in list(kept.items()):
         for ev in o['events']:
-            used.setdefault(ev['sub_clip_id'], []).append(bid)
+            if not ev.get('blank') and not ev.get('reuse_approved'):
+                used.setdefault(ev['sub_clip_id'], []).append(bid)
     swaps = []
     for sid, bids in used.items():
         if len(bids) > 1:
             for bid in bids[1:]:
                 alt = next((x for x in doc['options'] if x['beat_id'] == bid and x['option_number'] != kept[bid]['option_number']), None)
-                alt_sids = {e['sub_clip_id'] for e in (alt or {}).get('events', [])}
+                alt_sids = {e.get('sub_clip_id') for e in (alt or {}).get('events', []) if not e.get('blank')}
                 if alt and not (alt_sids & set(used)):
-                    swaps.append({'beat_id': bid, 'from': kept[bid]['option_number'], 'to': alt['option_number'], 'because': sid})
+                    swaps.append({'beat_id': bid, 'from': head[kept[bid]['option_number']]['no'], 'to': head[alt['option_number']]['no'], 'because': sid})
                     kept[bid] = deepcopy(alt)
                 else:
                     fail(f"collision: {sid} is in kept options for {bids}; no unused alternative for {bid}. Reject one of them.")
+    words = (pk.get('narration') or {}).get('words') or []
+
+    def spoken(a, z):
+        return ' '.join(w['text'] for w in words if a <= w['start_frame'] < z)
+
     events, gaps, cursor = [], [], 0
     for b in beats:
         o = kept.get(b['beat_id'])
+        passages = [p for p in [b.get('passage_id')] if p]
         if not o:
-            events.append({'kind': 'gap', 'beat_id': b['beat_id'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + b['target_beat_frames'], 'timeline_frames': b['target_beat_frames']})
-            gaps.append({'shot_id': b['beat_id'], 'start_frame': cursor, 'end_frame': cursor + b['target_beat_frames'], 'passage_ids': [b['passage_id']],
-                         'reason': 'no kept option' if any(x['beat_id'] == b['beat_id'] for x in doc['options']) else 'zero coverage'})
-            cursor += b['target_beat_frames']
+            n = b['target_beat_frames']
+            events.append({'kind': 'gap', 'beat_id': b['beat_id'], 'gap_id': b['beat_id'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n})
+            why = 'no kept option' if any(x['beat_id'] == b['beat_id'] for x in doc['options']) else next((g.get('reason') for g in doc.get('gaps') or [] if g['beat_id'] == b['beat_id']), 'zero coverage')
+            gaps.append({'shot_id': b['beat_id'], 'start_frame': cursor, 'end_frame': cursor + n, 'passage_ids': passages, 'reason': f"{why} | narration: {spoken(cursor, cursor + n)}"})
+            cursor += n
             continue
+        k = 0
         for ev in o['events']:
-            events.append({'kind': 'event', 'beat_id': b['beat_id'], 'approved_from_option': o['option_number'], **{k: ev[k] for k in ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_frames')},
+            n = ev['timeline_frames']
+            if ev.get('blank'):   # design/21: a blank inside a scene is its own gap for the visuals stage
+                k += 1
+                gid = f"{b['beat_id']}-B{k}"
+                events.append({'kind': 'gap', 'beat_id': b['beat_id'], 'gap_id': gid, 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n})
+                gaps.append({'shot_id': gid, 'start_frame': cursor, 'end_frame': cursor + n, 'passage_ids': passages, 'reason': f"{ev.get('intent', '')} | narration: {spoken(cursor, cursor + n)}"})
+                cursor += n
+                continue
+            events.append({'kind': 'event', 'beat_id': b['beat_id'], 'approved_from_option': o['option_number'], **{k2: ev[k2] for k2 in ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_frames')},
                            'crop': ev.get('crop', 'full'), 'hold_last_frame': bool(ev.get('hold_last_frame')), 'a2_intervals': ev.get('a2_intervals') or [], 'marker': ev.get('marker'),
-                           'timeline_in_frame': cursor, 'timeline_out_frame': cursor + ev['timeline_frames'], 'edited': ev.get('edited')})
-            cursor += ev['timeline_frames']
+                           'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'edited': ev.get('edited'), 'reuse_approved': bool(ev.get('reuse_approved'))})
+            cursor += n
     plan = {'contract': CONTRACT_MASTER, 'run_id': str(run['id']), 'options_version': entry['version'], 'options_digest': entry['digest'], 'timeline': TIMELINE, 'events': events,
             'gaps': gaps, 'duration_frames': cursor, 'swaps': swaps, 'decisions': decisions, 'extra_rules': session['extra_rules'],
             'sfx_cues': [{'sub_clip_id': r['sub_clip_id'], **c} for r in pk['sub_clips'] if any(e.get('sub_clip_id') == r['sub_clip_id'] for e in events) for c in r['sfx_cues']],

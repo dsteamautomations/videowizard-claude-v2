@@ -296,8 +296,9 @@ class RenderBody(Write):
 
 
 class DecideBody(Write):
-    option_number: int
-    action: Literal['KEEP', 'REJECT', 'KEEP_WITH_EDIT']
+    slide: int | None = None
+    option_number: int | None = None   # before design/21; the same as the slide number when a version has no decision or blank slides
+    action: Literal['KEEP', 'REJECT', 'KEEP_WITH_EDIT', 'DROP']
     note: str = ''
     edit: str | None = None
 
@@ -1035,7 +1036,7 @@ def options_record(run_id: UUID, body: Quote, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/master/decide')
 def master_decide(run_id: UUID, body: DecideBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.decide(storage(), user, run, body.option_number, body.action, body.note, body.edit))
+    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.decide(storage(), user, run, body.slide if body.slide is not None else body.option_number, body.action, body.note, body.edit))
 
 
 @app.post('/api/runs/{run_id}/master/rule')

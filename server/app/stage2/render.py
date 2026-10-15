@@ -53,7 +53,7 @@ def slate_png(lines, width, height, path):
         font = ImageFont.load_default(size=size)
     except TypeError:
         font = ImageFont.load_default()
-    y = height // 2 - int(size * 2.2)
+    y = height // 2 - int(size * 0.8 * len(lines))
     for line in lines:
         text = ''.join(c if ord(c) < 127 else '?' for c in line)
         draw.text((width // 16, y), text, fill=(240, 240, 240), font=font)
@@ -237,6 +237,10 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             n = int(item.get('frames') or SLATE_FRAMES)
             parts.append(r.slate(item['lines'], n))
             silence_before += Fraction(n) / r.fps
+            cursor += Fraction(n) / r.fps
+        elif item['kind'] == 'card':   # design/21: a blank inside an option, captioned; the narration window already covers it
+            n = int(item['frames'])
+            parts.append(r.slate(item['lines'], n))
             cursor += Fraction(n) / r.fps
         elif item['kind'] == 'narration':
             if silence_before:

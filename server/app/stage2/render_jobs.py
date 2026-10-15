@@ -43,7 +43,7 @@ def process(job):
                 sources[item['file']['sha256']] = _source(store, job['run_id'], {**item['file'], 'key': item['file']['key']}, work)
         narration = work / 'narration.mp3'
         narration.write_bytes(store.get(plan['narration_key']))
-        items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"GAP | {it['beat_id']} | {it['timeline_frames']} frames", 'to be filled by the visuals stage', '']} if it.get('gap') else it)
+        items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"BLANK | {it['beat_id']} | {it['timeline_frames']} frames", 'for AI video or animation (visuals stage)']} if it.get('gap') else it)
                  for it in plan['items']]
         film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'], plan.get('narration'))
         data = film.read_bytes()

@@ -696,7 +696,10 @@ def cmd_master(a):
     run = m['run_id']
     base = f'/api/runs/{run}/master'
     if a.what == 'decide':
-        body = {'option_number': int(a.option), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
+        n = a.slide or a.option
+        if not n:
+            emit({'action': 'refused', 'message': 'Give the slide number: --slide N'}, 2)
+        body = {'slide': int(str(n).lstrip('#')), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
         emit(write(base + '/decide', body))
     if a.what == 'rule':
         emit(write(base + '/rule', {'rule': a.add}))
@@ -872,7 +875,7 @@ def main(argv=None):
         s.add_argument(flag)
     s.set_defaults(fn=cmd_options)
     s = sub.add_parser('master'); s.add_argument('what', choices=['decide', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
-    for flag in ('--option', '--action', '--note', '--edit', '--add', '--quote'):
+    for flag in ('--slide', '--option', '--action', '--note', '--edit', '--add', '--quote'):
         s.add_argument(flag)
     s.set_defaults(fn=cmd_master)
     s = sub.add_parser('first-cut'); s.add_argument('what', choices=['record']); s.add_argument('--quote'); s.set_defaults(fn=cmd_first_cut)
