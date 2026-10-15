@@ -299,7 +299,8 @@ def test_a11_understand_audio_no(home, database, fake, gemini):
     assert vw(home, 'analysis', 'status')[1]['counts'] == {'retained': 1}
 
 
-def test_a13_global_cap_three(home, database, fake, gemini):
+def test_a13_global_cap(home, database, fake, gemini, monkeypatch):
+    monkeypatch.setattr(analysis_jobs, 'GLOBAL_CAP', 3)   # the cap is a setting (VW2_ANALYSIS_CAP, default 5); test it at 3 with 5 clips
     run_until_analysis(home, database, fake, n_clips=5)
     vw(home, *START)
     with psycopg.connect(database) as c:

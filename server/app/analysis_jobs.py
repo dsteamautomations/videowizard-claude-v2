@@ -26,7 +26,7 @@ from .video_evidence.world import provider_schema
 PROVIDER = 'gemini'
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
 LEASE_MINUTES = 45
-GLOBAL_CAP = 3
+GLOBAL_CAP = int(os.environ.get("VW2_ANALYSIS_CAP", "5"))  # concurrent Gemini analysis calls across all runs
 MAX_EXPLICIT_RETRIES = 3
 TERMINAL = ('retained', 'retained_unstructured', 'rejected', 'failed')
 
