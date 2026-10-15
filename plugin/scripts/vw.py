@@ -457,7 +457,7 @@ def cmd_analysis(a):
         if missing:
             emit({'action': 'ask_operator', 'questions': missing + ['Should the model listen to the clips\' audio to understand them? (--understand-audio yes|no, default yes)', 'Any clip to leave out? (--exclude <name>, repeatable)']}, 2)
         body = {'camera_audio': a.camera_audio, 'understand_audio': a.understand_audio != 'no', 'film_type': a.film_type, 'exclude': a.exclude or [], 'again': a.again}
-        emit(write(f'/api/runs/{run}/analysis/start', body), 0, 'Analysis started: one paid Gemini request per clip (model: the analysis stage's procedure, gemini-3.8-flash today). Tell the operator; poll with `vw analysis status`.')
+        emit(write(f'/api/runs/{run}/analysis/start', body), 0, 'Analysis started: one paid Gemini request per clip (model: from the analysis stage procedure, gemini-3.8-flash today). Tell the operator; poll with `vw analysis status`.')
     if a.what == 'status':
         st = call('GET', f'/api/runs/{run}/analysis')
         c = st['counts']

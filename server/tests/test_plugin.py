@@ -174,3 +174,14 @@ def test_guard_stands_down_in_the_builder_checkout():
     for cwd in (ROOT, ROOT / 'server', ROOT.parent):
         assert guard('Bash', {'command': 'git status'}, cwd)[0] == 0, cwd
         assert guard('Write', {'file_path': str(ROOT / 'README.md')}, cwd)[0] == 0, cwd
+
+
+def test_every_plugin_script_compiles():
+    """15 Oct 2026: a one-character edit (an apostrophe in a quoted message) broke every vw command mid-run. Compile them all."""
+    import py_compile
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2] / 'plugin'
+    files = sorted(root.rglob('*.py'))
+    assert files
+    for f in files:
+        py_compile.compile(str(f), doraise=True)
