@@ -213,6 +213,13 @@ def timeline_narration(r, narration, pieces, total_frames, out):
     return out
 
 
+def review_proxy(film, out, fps):
+    run([ffmpeg(), '-y', '-v', 'error', '-i', str(film), '-vf', 'scale=1280:720:flags=bicubic', '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '28',
+         '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(fps),
+         '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart', str(out)])
+    return out
+
+
 def render_film(kind, plan, sources, narration, work, timeline, narration_plan=None):
     """plan: {'items': [...]} where each item is {'kind': 'slate', 'lines': [...]} or
     {'kind': 'event', 'sub_clip_id', 'clip': {'id','name','sha256','fps','rotation_deg','hdr'}, 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop_rect', 'hold_last_frame',
@@ -270,7 +277,11 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
         run([ffmpeg(), '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-af', f'volume={gain:.2f}dB,apad', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(a1)])
     mixed = r.mix(a1, a2_pieces, length_s, r.work / f'{kind}-mix.wav')
     film = r.mux(picture, mixed, r.work / f'{kind}.mp4')
+    codec = 'h264 high yuv420p bt709 / aac 48k stereo'
+    if kind == 'review':   # 15 Oct 2026: the full-quality review film was 513 MB and could not be uploaded; it is only for choosing options
+        film = review_proxy(film, r.work / 'review-720p.mp4', r.fps)
+        codec = 'h264 high yuv420p bt709 1280x720 crf 28 / aac 48k stereo (review copy)'
     master_loudness = r.loudness(film)
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
-                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': 'h264 high yuv420p bt709 / aac 48k stereo',
+                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': codec,
                   'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')]}

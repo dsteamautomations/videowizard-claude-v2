@@ -8,7 +8,7 @@ from pathlib import Path
 from .. import jobs
 from ..db import connect
 from ..errors import Problem
-from ..storage import storage
+from ..storage import HASH_ON_RECEIPT_MAX, storage
 from . import render as R
 
 CACHE = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[2] / '.spool') / 'render'
@@ -32,7 +32,7 @@ def process(job):
     store = storage()
     req = job['request']
     plan = json.loads(store.get(req['plan_key']).decode('utf-8'))
-    work = CACHE / str(job['id'])
+    work = CACHE / Path(req['out_key']).stem   # per film plan, not per job: a rerun after a failed upload reuses every rendered piece
     work.mkdir(parents=True, exist_ok=True)
     try:
         sources = {}
@@ -49,7 +49,10 @@ def process(job):
         data = film.read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         store.put(req['out_key'], data, 'video/mp4')
-        if hashlib.sha256(store.get(req['out_key'])).hexdigest() != sha:
+        if len(data) > HASH_ON_RECEIPT_MAX:   # downloading a large film again just to hash it doubles the transfer
+            if store.size(req['out_key']) != len(data):
+                raise Problem(502, 'STORAGE', 'Film read-back size differs.')
+        elif hashlib.sha256(store.get(req['out_key'])).hexdigest() != sha:
             raise Problem(502, 'STORAGE', 'Film read-back failed.')
         uploaded = []
         for nk, seg in record.pop('normalised_segments', []):

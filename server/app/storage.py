@@ -76,16 +76,24 @@ class SupabaseStorage:
 
     def _call(self, method, path, **kw):
         try:
-            r = httpx.request(method, self.url + path, headers={**self.headers, **kw.pop('headers', {})}, timeout=120, **kw)
+            r = httpx.request(method, self.url + path, headers={**self.headers, **kw.pop('headers', {})}, timeout=kw.pop('timeout', 120), **kw)
         except httpx.RequestError as exc:
             raise Problem(503, 'STORAGE', f'Storage not reachable ({exc.__class__.__name__}).') from None
         if not r.is_success:
             raise Problem(404 if r.status_code == 404 else 502, 'STORAGE', f'Storage returned {r.status_code}.')
         return r
 
-    def put(self, key, data, mime=None):
-        self._call('POST', f'/storage/v1/object/{self.bucket}/{quote(key, safe="/")}', content=data,
-                   headers={'Content-Type': mime or 'application/octet-stream', 'x-upsert': 'true'})
+    def put(self, key, data, mime=None, waits=(5, 15, 30)):
+        """15 Oct 2026: a 513 MB film hit WriteTimeout once and the render failed. Retry like the plugin does; allow slow writes."""
+        import time
+        for attempt, wait in enumerate((*waits, None)):
+            try:
+                return self._call('POST', f'/storage/v1/object/{self.bucket}/{quote(key, safe="/")}', content=data, timeout=httpx.Timeout(120, write=600),
+                                  headers={'Content-Type': mime or 'application/octet-stream', 'x-upsert': 'true'})
+            except Problem as exc:
+                if wait is None or exc.status != 503:
+                    raise
+                time.sleep(wait)
 
     def get(self, key):
         # Ticket 7 (15 Oct 2026): Supabase's CDN served a cached session.json right after an overwrite (cf-cache-status HIT),

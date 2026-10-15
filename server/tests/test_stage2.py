@@ -208,7 +208,7 @@ def test_s1_s2_s12_s15_s16_s17_s18_s19_end_to_end(home, database, fake, gemini):
     assert abs(out['duration_s'] - (2 * 75 + 2 * pk['beats'][0]['target_beat_frames']) / 25) < 0.15, out['duration_s']
     probe = json.loads(subprocess.run(['ffprobe', '-v', 'error', '-show_streams', '-of', 'json', str(ws / 'out' / 'review.mp4')], capture_output=True, check=True).stdout)
     v = next(s for s in probe['streams'] if s['codec_type'] == 'video'); a = next(s for s in probe['streams'] if s['codec_type'] == 'audio')
-    assert v['codec_name'] == 'h264' and v['pix_fmt'] == 'yuv420p' and v['width'] == 1920 and a['codec_name'] == 'aac' and a['sample_rate'] == '48000'
+    assert v['codec_name'] == 'h264' and v['pix_fmt'] == 'yuv420p' and v['width'] == 1280 and v['height'] == 720 and a['codec_name'] == 'aac' and a['sample_rate'] == '48000'
     rc, out, err = vw(home, 'options', 'record', '--quote', 'yes, these options')
     assert rc == 0, (out, err)
     assert vw(home, 'next')[1]['stage'] == 'master'
@@ -412,3 +412,24 @@ def test_t7_scene_process_stage_may_be_singular():
     from app.stage2 import narration as N
     out = N.normalise_scenes([{'first_word_id': 'W1', 'title': 'a', 'process_stage': 'Stage_1'}, {'first_word_id': 'W9', 'title': 'b', 'process_stages': ['Stage_2']}])
     assert [s['process_stages'] for s in out] == [['Stage_1'], ['Stage_2']] and 'process_stage' not in out[0]
+
+
+def test_server_upload_retries_a_dropped_connection(monkeypatch):
+    from app import storage as S
+    from app.errors import Problem
+    st = S.SupabaseStorage.__new__(S.SupabaseStorage)
+    st.bucket = 'b'
+    calls = []
+
+    def flaky(method, path, **kw):
+        calls.append(kw.get('timeout'))
+        if len(calls) < 3:
+            raise Problem(503, 'STORAGE', 'Storage not reachable (WriteTimeout).')
+        return 'ok'
+    monkeypatch.setattr(st, '_call', flaky)
+    monkeypatch.setattr('time.sleep', lambda s: None)
+    assert st.put('k', b'x', waits=(1, 1, 1)) == 'ok' and len(calls) == 3 and calls[0].write == 600
+    calls.clear()
+    monkeypatch.setattr(st, '_call', lambda *a, **kw: (_ for _ in ()).throw(Problem(502, 'STORAGE', 'Storage returned 413.')))
+    with pytest.raises(Problem):   # a refusal (not a network failure) is not retried
+        st.put('k', b'x', waits=(1, 1, 1))
