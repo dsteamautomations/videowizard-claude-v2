@@ -222,7 +222,7 @@ def render(conn, store, user, run):
     open_job = session['renders'].get('assembly')
     if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == entry['digest']:
         raise Problem(409, 'JOB_OPEN', 'The assembly film is already rendering.', job_id=open_job['job_id'])
-    plan = {'kind': 'master', 'items': items, 'timeline': pk['timeline'], 'narration_key': s2['package']['narration_key'], 'version': entry['version'], 'digest': entry['digest'],
+    plan = {'kind': 'master', 'items': items, 'timeline': pk['timeline'], 'narration_key': s2['package']['narration_key'], 'narration': s2['package'].get('narration'), 'version': entry['version'], 'digest': entry['digest'],
             'out_key': key(run, f"assembly-v{entry['version']}-{entry['digest'][:8]}.mp4"), 'upload_normalised': True}
     rk = S2.save_json(store, key(run, f"render-assembly-v{entry['version']}.json"), plan)
     job = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'assembly','assembly','render',%s, gen_random_uuid()) returning id",

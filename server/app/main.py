@@ -281,6 +281,11 @@ class OptionsDoc(Write):
     document: dict[str, Any]
 
 
+class ScenesBody(Write):
+    document: dict[str, Any]
+    quote: str = ''   # the stage refuses an empty one with a readable message
+
+
 class FramesBody(Write):
     sub_clip_id: str
     edge: Literal['in', 'out'] = 'in'
@@ -972,6 +977,11 @@ def options_prepare(run_id: UUID, body: Write, user=User, conn=DB):
 def options_coverage(run_id: UUID, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
     return Response(stage2.coverage(storage(), run))
+
+
+@app.post('/api/runs/{run_id}/options/scenes', dependencies=[Depends(size_guard)])
+def options_scenes(run_id: UUID, body: ScenesBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.set_scenes(conn, storage(), user, run, outputs, body.document, body.quote))
 
 
 @app.post('/api/runs/{run_id}/options/check', dependencies=[Depends(size_guard)])

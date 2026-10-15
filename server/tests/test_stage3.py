@@ -10,14 +10,16 @@ import pytest
 from app.stage3 import delivery as D
 from conftest import vw
 from test_analysis import FakeTransport, gemini  # noqa: F401
-from test_stage2 import author, run_until_options
+from test_stage2 import approve_scenes, author, run_until_options, silences_in
 from test_visuals import png_bytes, scene, shot, vplan
 from test_voice_media import drain, fake  # noqa: F401
 
 
-def run_until_assembly(home, database, fake, gemini):
-    """Through options, master, first cut, and the visuals gap BEAT_02 filled with a still asset."""
+def run_until_assembly(home, database, fake, gemini, scenes=False):
+    """Through options, master, first cut, and the visuals gap BEAT_02 filled with a still asset. scenes: two scenes with a pause (design/19)."""
     code, ws, pk = run_until_options(home, database, fake, gemini)
+    if scenes:
+        _, pk = approve_scenes(home, ws)
     (ws / 'out' / 'options.json').write_text(json.dumps(author(pk)), encoding='utf-8')
     assert vw(home, 'options', 'propose', '--file', 'out/options.json')[0] == 0
     assert vw(home, 'options', 'render')[0] == 0
@@ -148,3 +150,41 @@ def test_srt_and_checklist_shapes():
     assert 'Stabilise a' in text and 'birds' in text and 'GRP_X' in text and 'A4' in text and '14 LUFS' in text
     csv_text = D.media_pool_csv(pk)
     assert csv_text.splitlines()[0].startswith('File Name,Scene,Shot') and 'c.mp4,S1,c,1,1' in csv_text and 'GRP_X' in csv_text
+
+
+def test_scenes_and_pause_through_assembly_delivery_and_resolve(home, database, fake, gemini):
+    code, ws, pk = run_until_assembly(home, database, fake, gemini, scenes=True)
+    nar = pk['narration']
+    cut, total = nar['cuts'][0], nar['total_frames']
+    assert vw(home, 'assembly', 'prepare')[0] == 0
+    assert vw(home, 'assembly', 'choose', '--shot', 'VS2', '--offset', '0', '--end', 'hold_last')[0] == 0
+    assert vw(home, 'assembly', 'build')[0] == 0
+    assert vw(home, 'assembly', 'render')[0] == 0
+    drain()
+    rc, out, err = vw(home, 'assembly', 'fetch')
+    assert rc == 0 and abs(out['duration_s'] - total / 25) < 0.15, (out, err)   # the pause is in the approved film
+    film = ws / 'out' / 'assembly.mp4'
+    assert any(abs(s - cut['source_cut_frame'] / 25) < 0.1 and abs(d - cut['inserted_frames'] / 25) < 0.1 for s, d in silences_in(film)), silences_in(film)
+    assert vw(home, 'assembly', 'review', '--decision', 'accepted', '--notes', 'good', '--quote', 'yes, watched it and listened to it')[0] == 0
+    assert vw(home, 'assembly', 'record', '--quote', 'yes assembly')[0] == 0
+    rc, out, err = vw(home, 'delivery', 'bundle')
+    assert rc == 0, (out, err)
+    manifest = json.loads((ws / 'work' / 'manifest.json').read_text(encoding='utf-8'))
+    pieces = manifest['narration_pieces']
+    assert [(p['source_in_frame'], p['source_out_frame'], p['record_in_frame']) for p in pieces] == \
+        [(q['source_start_frame'], q['source_end_frame'], q['timeline_start_frame']) for q in nar['pieces']] and len(pieces) == 2
+    home['env']['VW2_RESOLVE_FAKE'] = '1'
+    rc, out, err = vw(home, 'delivery', 'resolve', '--run', '--authorization', 'yes build the Resolve timeline')
+    assert rc == 0 and out['differences'] == [] and out['ledger']['report']['drt_verified'] is True, (out, err)
+    from app.storage import storage
+    srt = storage().get(next(f['key'] for f in manifest['files'] if f['name'] == 'Subtitles.srt')).decode('utf-8')
+    second = nar['sentences'][1]
+    assert srt.count(' --> ') == 2 and D.srt_time(second['start_frame'] / 25) + ' --> ' in srt   # one cue per sentence, shifted by the pause
+    drt = (ws / 'out' / 'delivery' / 'Approved-timeline.drt').read_text(encoding='utf-8')
+    assert drt.count('<audio><track>') == 1 and drt.split('<audio><track>')[1].count('<clipitem>') == 2   # narration as two whole-frame pieces
+
+
+def test_srt_per_sentence_shifted():
+    sentences = [{'text': 'One.', 'start_frame': 3, 'end_frame': 30}, {'text': 'Two.', 'start_frame': 55, 'end_frame': 70}]
+    srt = D.srt_of([], sentences, 25)
+    assert srt.startswith('1\n00:00:00,120 --> 00:00:01,200\nOne.\n\n2\n00:00:02,200 --> 00:00:02,800\nTwo.')

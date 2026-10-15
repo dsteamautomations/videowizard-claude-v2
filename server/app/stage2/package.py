@@ -110,9 +110,9 @@ def coverage(beats, rows, policy):
     return report
 
 
-def build(run, production, beats, cards, rows, landmarks, entities, learned_rules, timeline, policy, prompt):
+def build(run, production, beats, cards, rows, landmarks, entities, learned_rules, timeline, policy, prompt, narration=None):
     return {'contract': 'vw2-options-package-v1', 'project': {'code': run['code'], 'client': run.get('client'), **production}, 'timeline': timeline, 'policy': policy,
-            'beats': beats, 'cards': cards, 'sub_clips': rows, 'landmarks': sorted(landmarks), 'entities': entities, 'learned_rules': learned_rules,
+            'narration': narration or {}, 'beats': beats, 'cards': cards, 'sub_clips': rows, 'landmarks': sorted(landmarks), 'entities': entities, 'learned_rules': learned_rules,
             'coverage': coverage(beats, rows, policy), 'prompt': prompt,
             'shapes': {'options': {'contract': 'vw2-options-v1', 'options': [{'option_number': 1, 'beat_id': 'BEAT_01', 'rank': 'PRIMARY|SECONDARY',
                                                                               'events': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'hold_last_frame': False, 'crop': 'solver|full|hands_only',

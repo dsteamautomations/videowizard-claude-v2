@@ -45,7 +45,7 @@ def process(job):
         narration.write_bytes(store.get(plan['narration_key']))
         items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"GAP | {it['beat_id']} | {it['timeline_frames']} frames", 'to be filled by the visuals stage', '']} if it.get('gap') else it)
                  for it in plan['items']]
-        film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'])
+        film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'], plan.get('narration'))
         data = film.read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         store.put(req['out_key'], data, 'video/mp4')

@@ -55,6 +55,8 @@ def validate_options(doc, package, policy):
             sizes_b = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[1].get('events', []) if e['sub_clip_id'] in rows]
             if {x[0] for x in a} == {x[0] for x in b} and sizes_a == sizes_b:
                 refusals.append(f'G13: {bid} SECONDARY must differ from PRIMARY in sub-clips or shot sizes')
+    words = {w['id']: w for w in (package.get('narration') or {}).get('words') or []}
+    silences = (package.get('narration') or {}).get('silences') or []
     usage = {}   # sub_clip_id -> [(option_number, timeline_start)]
     cursor_by_option = {}
     for o in opts:
@@ -70,6 +72,10 @@ def validate_options(doc, package, policy):
         lines = o.get('slate_lines') or []
         if len(lines) != 3 or not lines[0].startswith(f'OPTION #{n} | {bid} ({o.get("rank")})') or any(ord(c) > 126 for l in lines for c in l):
             refusals.append(f'OPTION #{n}: slate needs 3 ASCII lines, line 1 "OPTION #{n} | {bid} ({o.get("rank")}) | …"')
+        else:   # design/19 C1: line 1 states the real length and shot count
+            want = f"{beat['target_beat_frames'] / tl_fps:.1f}s ({len(events)} Shot{'s' if len(events) != 1 else ''})"
+            if not lines[0].endswith('| ' + want):
+                refusals.append(f'OPTION #{n}: slate line 1 must end with "| {want}"')
         total = 0
         prev = None
         sizes = []
@@ -143,6 +149,17 @@ def validate_options(doc, package, policy):
                 if prev['landmarks'] and row['landmarks'] and set(prev['landmarks'][:1]) == set(row['landmarks'][:1]) and i >= 2 and set(events[i - 2].get('_lm', [])) == set(row['landmarks'][:1]):
                     flags.append(f'{tag}: R8 same dominant landmark in three consecutive shots')
             ev['_lm'] = row['landmarks'][:1]
+            # design/19 B1–B3: word-timed craft rules (flags)
+            wid = ev.get('illustrates_word_id')
+            if i > 0 and wid in words and not (words[wid]['start_frame'] - 12 <= cursor <= words[wid]['start_frame'] - 6):
+                flags.append(f"{tag}: B1 pre-roll: starts at frame {cursor}, the phrase at {words[wid]['start_frame']} (aim 6-12 frames before)")
+            awid = ev.get('action_word_id')
+            if awid in words and row['accent_frames']:
+                accents = [cursor + int(round((f - a) * ratio)) for f in row['accent_frames'] if a <= f < z]
+                if accents and min(abs(x - words[awid]['start_frame']) for x in accents) > 6:
+                    flags.append(f"{tag}: B2 the word {words[awid]['text']!r} is not within 6 frames of the shot's action accent")
+            if i > 0 and not row['nat_sound'] and any(s['start_frame'] < cursor < s['end_frame'] for s in silences):
+                flags.append(f'{tag}: B3 cuts inside a narration pause of 1.2 s or more; hold the shot or use a sub-clip with clean natural sound')
             usage.setdefault(sid, []).append((n, cursor))
             cursor += n_tl
             prev = row

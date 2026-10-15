@@ -24,9 +24,13 @@ def srt_time(seconds):
     return f'{h:02d}:{m:02d}:{s:02d},{ms:03d}'
 
 
-def srt_of(beats):
-    """One cue per beat from the narration's measured first and last word (design/17 A15)."""
+def srt_of(beats, sentences=None, fps=25):
+    """design/19 A7: one cue per sentence on the timeline (shifted by every pause before it); falls back to one per beat."""
     lines = []
+    if sentences:
+        for i, s in enumerate(sentences, 1):
+            lines += [str(i), f"{srt_time(s['start_frame'] / fps)} --> {srt_time(s['end_frame'] / fps)}", s['text'].strip(), '']
+        return '\n'.join(lines) + '\n'
     for i, b in enumerate(beats, 1):
         lines += [str(i), f"{srt_time(b['narration_first_word_s'])} --> {srt_time(b['narration_last_word_s'])}", b['text'].strip(), '']
     return '\n'.join(lines) + '\n'
@@ -93,7 +97,7 @@ def bundle(conn, store, user, run, outputs):
         f = next(x for x in o['files'] if x['name'] == name)
         files.append({'role': 'plan', 'name': 'Plans/' + name, **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
     files.append({'role': 'plan', 'name': 'Plans/options-package.json', **{k: s2['package'][k] for k in ('key', 'sha256', 'bytes')}})
-    srt = srt_of(pk['beats']).encode('utf-8')
+    srt = srt_of(pk['beats'], (pk.get('narration') or {}).get('sentences'), pk['timeline']['fps']).encode('utf-8')
     pk_flat = {**pk, 'sfx_cues_flat': assembly.get('sfx_cues') or []}
     checklist = checklist_of(asm_o['summary'], pk_flat, master_o['summary'])
     md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n'
@@ -108,7 +112,9 @@ def bundle(conn, store, user, run, outputs):
         store.put(k, data, mime)
         files.append({'role': 'generated', 'name': name, 'key': k, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)})
     manifest = {'contract': CONTRACT_BUNDLE, 'run': run['code'], 'client': run.get('client'), 'created_at': datetime.now(timezone.utc).isoformat(), 'film_sha256': film['sha256'],
-                'assembly_digest': asm_o['summary']['assembly_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': resolve_events(assembly, pk, master)}
+                'assembly_digest': asm_o['summary']['assembly_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': resolve_events(assembly, pk, master),
+                'narration_pieces': [{'file': 'Audio/narration.mp3', 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
+                                     for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': assembly['duration_frames'], 'timeline_start_frame': 0}])]}
     mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')

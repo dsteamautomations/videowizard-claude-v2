@@ -42,7 +42,7 @@ def ev(sid, a, b, **kw):
 
 def option(n, beat, rank, events, shared=''):
     return {'option_number': n, 'beat_id': beat, 'rank': rank, 'events': events,
-            'slate_lines': [f'OPTION #{n} | {beat} ({rank}) | x.xs ({len(events)} Shots)', 'Clips: ' + ' + '.join(e['sub_clip_id'] for e in events), shared],
+            'slate_lines': [f"OPTION #{n} | {beat} ({rank}) | {sum(e['source_out_frame'] - e['source_in_frame'] for e in events) / 25:.1f}s ({len(events)} Shot{'s' if len(events) != 1 else ''})", 'Clips: ' + ' + '.join(e['sub_clip_id'] for e in events), shared],
             'reasoning': 'synthetic', 'log_fields_cited': ['primary_fit_for_beats'], 'best_unchosen': {'sub_clip_id': 'none', 'rule': 'none better'}, 'shared_justification': 'nothing else fits' if shared else ''}
 
 
@@ -259,3 +259,122 @@ def test_s21_boundary_frames_and_paid_inspection(home, database, fake, gemini):
     st = vw(home, 'options', 'status')[1]
     j = st['inspections'][f"{crop['sub_clip_id'].replace(':', '-')}-in"]
     assert j['status'] == 'retained' and j['answer']['residual_lip_movement'] == 'no' and gemini.calls['generate'] == calls['generate'] + 1
+
+
+# ---------- design/19: slate, word-timed flags, scenes and pauses ----------
+
+def test_c1_slate_line_1_states_real_length_and_shots():
+    d = good_doc()
+    d['options'][0]['slate_lines'][0] = 'OPTION #1 | BEAT_01 (PRIMARY) | 9.9s (2 Shots)'
+    assert any('slate line 1 must end with "| 1.5s (2 Shots)"' in r for r in refusals(d))
+    d = good_doc()
+    d['options'][0]['slate_lines'][0] = 'OPTION #1 | BEAT_01 (PRIMARY) | 1.5s (3 Shots)'
+    assert any('slate line 1' in r for r in refusals(d))
+
+
+def word_pk(silences=()):
+    pk = make_package()
+    pk['narration'] = {'words': [{'id': 'W1', 'text': 'Bricks', 'start_frame': 31, 'end_frame': 36}, {'id': 'W2', 'text': 'pressed.', 'start_frame': 40, 'end_frame': 45}],
+                       'silences': list(silences)}
+    return pk
+
+
+def flags_of(d, pk):
+    r = V.validate_options(deepcopy(d), pk, POLICY)
+    assert r['refusals'] == [], r
+    return r['flags']
+
+
+def test_b1_b2_b3_word_timed_flags():
+    d = good_doc()   # option 1 shot 2 (clip1:SUB_01, accent at its frame 0) starts on timeline frame 25
+    d['options'][0]['events'][1]['illustrates_word_id'] = 'W1'   # W1 at 31: 6 frames of pre-roll
+    d['options'][0]['events'][1]['action_word_id'] = 'W1'        # accent at 25, word at 31: within 6
+    assert not any(' B' in f for f in flags_of(d, word_pk()))
+    d['options'][0]['events'][1]['illustrates_word_id'] = 'W2'   # 15 frames early
+    d['options'][0]['events'][1]['action_word_id'] = 'W2'
+    fl = flags_of(d, word_pk())
+    assert any('B1 pre-roll' in f for f in fl) and any("B2 the word 'pressed.'" in f for f in fl)
+    fl = flags_of(good_doc(), word_pk([{'start_frame': 20, 'end_frame': 50}]))
+    assert any('B3' in f for f in fl)                             # cut at 25 inside a 1.2 s+ silence, no clean nat sound
+    pk = word_pk([{'start_frame': 20, 'end_frame': 50}])
+    for r in pk['sub_clips']:
+        if r['sub_clip_id'] in ('clip1:SUB_01', 'clip0:SUB_02'):
+            r['nat_sound'] = [{'in_frame': r['in_frame'], 'out_frame': r['out_frame']}]
+    assert not any('B3' in f for f in flags_of(good_doc(), pk))   # the next shot carries natural sound: allowed
+
+
+def approve_scenes(home, ws, pause_s=0.5):
+    """Split 'Earth blocks are pressed. / Not fired.' into two scenes with a pause after 'pressed.' (the scene boundary)."""
+    pk = json.loads((ws / 'work' / 'options-package.json').read_text(encoding='utf-8'))
+    sents = pk['narration']['sentences']
+    doc = {'scenes': [{'first_word_id': sents[0]['first_word_id'], 'title': 'Pressing'}, {'first_word_id': sents[1]['first_word_id'], 'title': 'Not fired'}],
+           'pauses': [{'after_word_id': sents[0]['last_word_id'], 'seconds': pause_s, 'reason': 'let the press finish on screen'}]}
+    (ws / 'out' / 'scenes.json').write_text(json.dumps(doc), encoding='utf-8')
+    rc, out, err = vw(home, 'options', 'scenes', '--file', 'out/scenes.json', '--quote', 'yes, these scenes and the pause')
+    assert rc == 0, (out, err)
+    return out, json.loads((ws / 'work' / 'options-package.json').read_text(encoding='utf-8'))
+
+
+def silences_in(path, min_s=0.25):
+    err = subprocess.run(['ffmpeg', '-v', 'info', '-i', str(path), '-af', f'silencedetect=noise=-50dB:d={min_s}', '-f', 'null', '-'], capture_output=True).stderr.decode(errors='replace')
+    starts = [float(x) for x in re.findall(r'silence_start: ([0-9.]+)', err)]
+    durs = [float(x) for x in re.findall(r'silence_duration: ([0-9.]+)', err)]
+    return list(zip(starts, durs))
+
+
+def test_scenes_and_pauses_end_to_end(home, database, fake, gemini):
+    code, ws, pk0 = run_until_options(home, database, fake, gemini)
+    assert pk0['narration']['scenes_approved'] is False and pk0['narration']['cuts'] == [] and len(pk0['narration']['sentences']) == 2
+    sents = pk0['narration']['sentences']
+    words = pk0['narration']['words']
+    # refusals: no quote; a scene inside a sentence; a pause inside a sentence; a pause over 4 s
+    bad = [({'scenes': [{'first_word_id': words[0]['id'], 'title': 'a'}, {'first_word_id': words[1]['id'], 'title': 'b'}]}, 'beginning of a sentence'),
+           ({'scenes': [{'first_word_id': words[0]['id'], 'title': 'a'}], 'pauses': [{'after_word_id': words[1]['id'], 'seconds': 1, 'reason': 'x'}]}, 'sentence ends'),
+           ({'scenes': [{'first_word_id': words[0]['id'], 'title': 'a'}], 'pauses': [{'after_word_id': sents[0]['last_word_id'], 'seconds': 5, 'reason': 'x'}]}, 'at most')]
+    (ws / 'out' / 'scenes.json').write_text(json.dumps(bad[0][0]), encoding='utf-8')
+    rc, out, _ = vw(home, 'options', 'scenes', '--file', 'out/scenes.json')
+    assert rc == 2 and 'approval' in out['message'], out
+    for doc, msg in bad:
+        (ws / 'out' / 'scenes.json').write_text(json.dumps(doc), encoding='utf-8')
+        rc, out, _ = vw(home, 'options', 'scenes', '--file', 'out/scenes.json', '--quote', 'yes')
+        assert rc == 2 and msg in out['message'], (msg, out)
+    out, pk = approve_scenes(home, ws)
+    cut = pk['narration']['cuts'][0]
+    natural = cut['natural_gap_s']
+    assert cut['inserted_frames'] == round((0.5 - natural) * 25) and out['inserted_seconds'] == round(cut['inserted_frames'] / 25, 2)
+    total = pk['narration']['total_frames']
+    assert total == 50 + cut['inserted_frames'] and out['film_seconds'] == total / 25
+    b1, b2 = pk['beats']
+    assert (b1['title'], b2['title']) == ('Pressing', 'Not fired') and b1['timeline_end_frame'] == b2['timeline_start_frame'] == cut['source_cut_frame'] + cut['inserted_frames']
+    assert b2['timeline_end_frame'] == total and [p['after_word_id'] for p in b1['pauses']] == [sents[0]['last_word_id']]
+    assert pk['narration']['sentences'][1]['start_frame'] == sents[1]['start_frame'] + cut['inserted_frames']   # words after the pause move; before do not
+    assert pk['narration']['sentences'][0]['start_frame'] == sents[0]['start_frame']
+    # options on the new beats; the review film carries the pause inside BEAT_01's window
+    doc = author(pk)
+    (ws / 'out' / 'options.json').write_text(json.dumps(doc), encoding='utf-8')
+    rc, out, err = vw(home, 'options', 'propose', '--file', 'out/options.json')
+    assert rc == 0, (out, err)
+    assert vw(home, 'options', 'render')[0] == 0
+    drain()
+    rc, out, err = vw(home, 'options', 'fetch')
+    assert rc == 0 and abs(out['duration_s'] - (2 * 75 + 2 * b1['target_beat_frames']) / 25) < 0.15, (out, err)
+    pause_at, pause_len = cut['source_cut_frame'] / 25, cut['inserted_frames'] / 25
+    sil = silences_in(ws / 'out' / 'review.mp4')
+    beat_s = b1['target_beat_frames'] / 25   # the pause closes BEAT_01, so in option 1 it runs into the next (silent) slate; option 2 ends the film with it
+    assert any(abs(s - (3.0 + pause_at)) < 0.1 and abs(d - (pause_len + 3.0)) < 0.1 for s, d in sil), (sil, pause_at, pause_len)
+    assert any(abs(s - (6.0 + beat_s + pause_at)) < 0.1 and abs(d - pause_len) < 0.1 for s, d in sil), (sil, pause_at, pause_len)
+    rc, out, err = vw(home, 'options', 'record', '--quote', 'yes, these options')
+    assert rc == 0, (out, err)
+    summary = vw(home, 'view', '--stage', 'options')[1]['outputs'][0]['summary']
+    assert summary['scenes']['version'] == 1 and summary['scenes']['pauses'] == 1 and summary['scenes']['quote'].startswith('yes')
+    # master: the whole timeline including the pause; the silence sits at the cut
+    assert vw(home, 'master', 'decide', '--option', '1', '--action', 'KEEP')[0] == 0
+    assert vw(home, 'master', 'decide', '--option', '2', '--action', 'REJECT', '--note', 'prefer the wide')[0] == 0
+    rc, out, err = vw(home, 'master', 'build')
+    assert rc == 0 and out['duration_frames'] == total, (out, err)
+    assert vw(home, 'master', 'render')[0] == 0
+    drain()
+    rc, out, err = vw(home, 'master', 'fetch')
+    assert rc == 0 and abs(out['duration_s'] - total / 25) < 0.15, (out, err)
+    sil = silences_in(ws / 'out' / 'master.mp4')
+    assert any(abs(s - pause_at) < 0.1 and abs(d - pause_len) < 0.1 for s, d in sil), (sil, pause_at, pause_len)

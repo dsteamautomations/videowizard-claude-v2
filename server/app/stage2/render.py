@@ -193,13 +193,36 @@ def a1_gain(renderer, narration):
     return gain, lo
 
 
-def render_film(kind, plan, sources, narration, work, timeline):
+def timeline_narration(r, narration, pieces, total_frames, out):
+    """design/19 A6: the narration laid on the timeline: each piece cut from the recording at whole frames (sample-exact, PCM),
+    silence inserted between pieces where a pause was approved, padded to the timeline length. Words are never altered."""
+    fps = r.fps
+    parts = []
+    cursor = 0
+    for j, p in enumerate(pieces):
+        if p['timeline_start_frame'] > cursor:
+            parts.append(r.silence(float(Fraction(p['timeline_start_frame'] - cursor) / fps), r.work / f'a1-pause-{j}.wav'))
+        seg = r.work / f'a1-piece-{j}.wav'
+        a, b = Fraction(p['source_start_frame']) / fps, Fraction(p['source_end_frame']) / fps
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(narration), '-af', f'atrim=start={float(a):.6f}:end={float(b):.6f},asetpts=N/SR/TB', '-ar', '48000', '-ac', '2', str(seg)])
+        parts.append(seg)
+        cursor = p['timeline_start_frame'] + (p['source_end_frame'] - p['source_start_frame'])
+    lst = r.work / 'a1-timeline.txt'
+    lst.write_text(''.join(f"file '{Path(x).as_posix()}'\n" for x in parts), encoding='utf-8')
+    run([ffmpeg(), '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-af', 'apad', '-t', f'{float(Fraction(total_frames) / fps):.6f}', '-ar', '48000', '-ac', '2', str(out)])
+    return out
+
+
+def render_film(kind, plan, sources, narration, work, timeline, narration_plan=None):
     """plan: {'items': [...]} where each item is {'kind': 'slate', 'lines': [...]} or
     {'kind': 'event', 'sub_clip_id', 'clip': {'id','name','sha256','fps','rotation_deg','hdr'}, 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop_rect', 'hold_last_frame',
      'a2': [{'in_frame','out_frame'}]} and, for the review film, {'kind': 'narration', 'start_s', 'end_s'} markers before each option; the master uses the whole narration.
     sources: {clip_id: Path}. Returns the film path and a record."""
     r = Renderer(work, timeline)
     parts, a2_pieces, a1_parts, normalised = [], [], [], []
+    recording = narration
+    if narration_plan and narration_plan.get('pieces'):
+        narration = timeline_narration(r, recording, narration_plan['pieces'], narration_plan['total_frames'], r.work / 'narration-timeline.wav')
     cursor = Fraction(0)
     silence_before = Fraction(0)
     for i, item in enumerate(plan['items']):
@@ -234,7 +257,7 @@ def render_film(kind, plan, sources, narration, work, timeline):
             cursor += Fraction(item['timeline_frames']) / r.fps
     picture = r.concat(parts, r.work / f'{kind}-picture.mp4')
     length_s = float(cursor)
-    gain, a1_measured = a1_gain(r, narration)
+    gain, a1_measured = a1_gain(r, recording)
     if kind == 'master':
         a1 = r.work / 'a1.wav'
         run([ffmpeg(), '-y', '-v', 'error', '-i', str(narration), '-af', f'volume={gain:.2f}dB,apad', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(a1)])

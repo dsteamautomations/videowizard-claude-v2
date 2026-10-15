@@ -185,3 +185,54 @@ def test_every_plugin_script_compiles():
     assert files
     for f in files:
         py_compile.compile(str(f), doraise=True)
+
+
+def _plugin_module(name):
+    scripts = str(Path(__file__).resolve().parents[2] / 'plugin' / 'scripts')
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    return __import__(name)
+
+
+def test_c2_media_uploads_three_at_a_time_in_order(tmp_path):
+    stages_av = _plugin_module('stages_av')
+    (tmp_path / 'work').mkdir()
+    (tmp_path / 'out').mkdir()
+    clips = [{'id': str(i), 'name': f'c{i}.mp4', 'path': f'in/c{i}.mp4', 'sha256': str(i), 'bytes': 1, 'duration_s': 1.0} for i in range(7)]
+    (tmp_path / 'work' / 'media-clips.json').write_text(json.dumps(clips), encoding='utf-8')
+    lock, live, peak = threading.Lock(), [0], [0]
+
+    def upload(stage, path, sha, size):
+        with lock:
+            live[0] += 1
+            peak[0] = max(peak[0], live[0])
+        time.sleep(0.1)
+        with lock:
+            live[0] -= 1
+        return {'key': path.name}
+    out = stages_av.media_record(tmp_path, {}, {}, upload)
+    assert peak[0] == 3 and [r['key'] for r in out['stored']] == [f'c{i}.mp4' for i in range(7)]
+
+
+def test_c3_long_wait_timeout_says_still_working(monkeypatch, capsys):
+    import httpx
+    vwm = _plugin_module('vw')
+
+    class Slow:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def request(self, *a, **kw):
+            Slow.timeout = kw.get('timeout')
+            raise httpx.ReadTimeout('slow')
+    monkeypatch.setattr(vwm, 'api', lambda: Slow())
+    with pytest.raises(SystemExit) as e:
+        vwm.call('POST', '/x', wait=600)
+    out = json.loads(capsys.readouterr().out)
+    assert e.value.code == 2 and Slow.timeout == 600 and out['action'] == 'refused' and 'still working' in out['message']
+    with pytest.raises(SystemExit):
+        vwm.call('POST', '/x')
+    assert json.loads(capsys.readouterr().out)['action'] == 'tell_builder'

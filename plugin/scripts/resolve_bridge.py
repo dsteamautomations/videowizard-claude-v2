@@ -47,15 +47,19 @@ class FakeAdapter:
         self.markers.append({'frame': frame, 'colour': colour, 'name': name, 'note': note})
 
     def export_drt(self, path):
+        clip = lambda i: f'<clipitem><name>{Path(i["path"]).name}</name><start>{i["record"]}</start><end>{i["record"] + (i["end"] - i["start"])}</end><in>{i["start"]}</in><out>{i["end"]}</out></clipitem>'
         Path(path).write_text('<?xml version="1.0"?><xmeml version="5"><sequence><name>' + self.tl + '</name><media><video><track>'
-                              + ''.join(f'<clipitem><name>{Path(i["path"]).name}</name><start>{i["record"]}</start><end>{i["record"] + (i["end"] - i["start"])}</end><in>{i["start"]}</in><out>{i["end"]}</out></clipitem>'
-                                        for i in self.items if i['media_type'] == 1) + '</track></video></media></sequence></xmeml>', encoding='utf-8')
+                              + ''.join(clip(i) for i in self.items if i['media_type'] == 1) + '</track></video><audio><track>'
+                              + ''.join(clip(i) for i in self.items if i['media_type'] == 2) + '</track></audio></media></sequence></xmeml>', encoding='utf-8')
         return path
 
     def reopen(self, drt_path):
         txt = Path(drt_path).read_text(encoding='utf-8')
-        return [{'record_in': int(m.group(1)), 'record_out': int(m.group(2)), 'source_in': int(m.group(3)), 'source_out': int(m.group(4))}
-                for m in re.finditer(r'<start>(\d+)</start><end>(\d+)</end><in>(\d+)</in><out>(\d+)</out>', txt)]
+        out = []
+        for track, body in re.findall(r'<(video|audio)><track>(.*?)</track></\1>', txt):
+            out += [{'track': track, 'record_in': int(m.group(1)), 'record_out': int(m.group(2)), 'source_in': int(m.group(3)), 'source_out': int(m.group(4))}
+                    for m in re.finditer(r'<start>(\d+)</start><end>(\d+)</end><in>(\d+)</in><out>(\d+)</out>', body)]
+        return out
 
     def export_project(self, path):
         Path(path).write_bytes(b'fake project export')
@@ -130,8 +134,9 @@ class ResolveAdapter:
         if not t:
             raise SystemExit('DRT reopen failed.')
         out = []
-        for it in t.GetItemListInTrack('video', 1) or []:
-            out.append({'record_in': it.GetStart(), 'record_out': it.GetEnd(), 'source_in': it.GetLeftOffset(), 'source_out': it.GetLeftOffset() + it.GetDuration()})
+        for track in ('video', 'audio'):
+            for it in t.GetItemListInTrack(track, 1) or []:
+                out.append({'track': track, 'record_in': it.GetStart(), 'record_out': it.GetEnd(), 'source_in': it.GetLeftOffset(), 'source_out': it.GetLeftOffset() + it.GetDuration()})
         return out
 
     def export_project(self, path):
@@ -164,18 +169,24 @@ def build(adapter, bundle_dir, manifest, run_code, out_dir):
         adapter.marker(e['record_in_frame'], e['marker']['colour'], e['marker']['name'], e['marker']['note'] + (f"; colour group {e['color_group']}" if e.get('color_group') else ''))
         expected.append({'record_in': e['record_in_frame'], 'record_out': e['record_out_frame'], 'source_in': e['source_in_frame'], 'source_out': e['source_out_frame']})
     narration = items[str(bundle_dir / 'Audio/narration.mp3')]
-    adapter.append(narration, 0, int(expected[-1]['record_out']) if expected else 0, 0, 1, 2)
+    expected_audio = []
+    for p in manifest.get('narration_pieces') or [{'source_in_frame': 0, 'source_out_frame': int(expected[-1]['record_out']) if expected else 0, 'record_in_frame': 0}]:
+        adapter.append(narration, p['source_in_frame'], p['source_out_frame'], p['record_in_frame'], 1, 2)   # whole frames: no fractional placement (VW10)
+        expected_audio.append({'record_in': p['record_in_frame'], 'record_out': p['record_in_frame'] + p['source_out_frame'] - p['source_in_frame'],
+                               'source_in': p['source_in_frame'], 'source_out': p['source_out_frame']})
     drt = adapter.export_drt(out_dir / 'Approved-timeline.drt')
     readback = adapter.reopen(drt)
     differences = []
-    for i, (exp, got) in enumerate(zip(expected, readback)):
-        for k in ('record_in', 'record_out', 'source_in', 'source_out'):
-            if int(exp[k]) != int(got.get(k, -1)):
-                differences.append({'event': i + 1, 'field': k, 'expected': exp[k], 'readback': got.get(k)})
-    if len(readback) != len(expected):
-        differences.append({'event': None, 'field': 'count', 'expected': len(expected), 'readback': len(readback)})
+    for track, exp_list in (('video', expected), ('audio', expected_audio)):
+        got_list = [g for g in readback if g.get('track', 'video') == track]
+        for i, (exp, got) in enumerate(zip(exp_list, got_list)):
+            for k in ('record_in', 'record_out', 'source_in', 'source_out'):
+                if int(exp[k]) != int(got.get(k, -1)):
+                    differences.append({'track': track, 'event': i + 1, 'field': k, 'expected': exp[k], 'readback': got.get(k)})
+        if len(got_list) != len(exp_list):
+            differences.append({'track': track, 'event': None, 'field': 'count', 'expected': len(exp_list), 'readback': len(got_list)})
     project_export = adapter.export_project(out_dir / 'project.drp')
-    return {'timeline': name, 'events': len(expected), 'readback_events': len(readback), 'differences': differences, 'drt_verified': not differences,
+    return {'timeline': name, 'events': len(expected), 'narration_pieces': len(expected_audio), 'readback_events': len(readback), 'differences': differences, 'drt_verified': not differences,
             'drt_path': str(drt), 'project_export_path': str(project_export), 'check': adapter.check()}
 
 

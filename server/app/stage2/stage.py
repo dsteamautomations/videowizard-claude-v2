@@ -13,7 +13,7 @@ from psycopg.types.json import Jsonb
 
 from .. import core, jobs
 from ..errors import Problem
-from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, package as P, validator as V
+from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, narration as NR, package as P, validator as V
 
 TIMELINE = {'width': 1920, 'height': 1080, 'fps': 25}
 BOUNDARY_PROMPT = ('Targeted boundary check (blueprint v3.2 §3 step 1.4). Watch ONLY the interval given below, which surrounds a planned cut point of a clip where a speaker was trimmed out. '
@@ -108,10 +108,22 @@ def prepare(conn, store, user, run, outputs):
     beats = script.get('beats') or []
     if not beats:
         fail('The script has no beats; re-record the script on this build.')
+    session = session_of(store, run, create=True)
+    approved = session.get('scenes')
+    words = timing['words']
+    duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
     try:
-        windows = P.beat_windows(beats, timing, TIMELINE['fps'], voice_o['summary'].get('duration_s') or timing['audio']['duration_s'])
+        if approved:
+            plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], approved['document'].get('pauses') or [])
+            windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, TIMELINE['fps'])
+        else:
+            plan, to_tl = NR.plan(words, duration, TIMELINE['fps'])
+            windows = NR.beats(words, NR.paragraph_scenes(beats, words), plan, to_tl, TIMELINE['fps'], ids=[b['beat_id'] for b in beats])
     except ValueError as exc:
         fail(exc)
+    narration = {**plan, 'scenes_approved': bool(approved), 'words': NR.word_rows(words, TIMELINE['fps'], to_tl),
+                 'sentences': NR.sentences(words, TIMELINE['fps'], to_tl), 'silences': NR.silences(words, TIMELINE['fps'], to_tl, plan['total_frames']),
+                 'pause_rules': {'only_after_sentence_end': True, 'max_seconds': NR.MAX_PAUSE_S, 'seconds_means': 'total silence wanted; the recording\'s own gap counts toward it'}}
     clips = {c['id']: c for c in media_o['summary']['clips']}
     cards, rows, landmarks, entities, policy = [], [], set(), [], None
     for o in outputs:
@@ -132,16 +144,63 @@ def prepare(conn, store, user, run, outputs):
         entities.extend({'clip_id': clip['id'], **e} for e in log.get('entities') or [])
     if not rows:
         raise Problem(409, 'NOT_ALLOWED', 'No analysed clips; run analysis first.')
+    if approved:   # scene fits come from the approved scene → process stage mapping (the logs only know the script's own beats)
+        by_stage = {}
+        for b in windows:
+            for st in b['process_stages']:
+                by_stage.setdefault(st, []).append(b['beat_id'])
+        for r in rows:
+            r['model_fits'] = {'primary': r['primary_fits'], 'secondary': r['secondary_fits']}
+            r['primary_fits'] = list(by_stage.get(r.get('process_stage') or '', []))
+            r['secondary_fits'] = []
+            r['fit_source'] = 'scene process stage'
     rules = learned_rules(conn, run)
-    pk = P.build(run, production, windows, cards, rows, landmarks, entities, rules, TIMELINE, policy or {}, procedure.get('prompt') or '')
-    session = session_of(store, run, create=True)
+    pk = P.build(run, production, windows, cards, rows, landmarks, entities, rules, TIMELINE, policy or {}, procedure.get('prompt') or '', narration)
     saved = save_json(store, key(run, 'package.json'), pk)
-    session['package'] = {**saved, 'digest': digest({k: pk[k] for k in ('beats', 'sub_clips', 'timeline', 'policy')}), 'beats': windows, 'timeline': TIMELINE, 'policy': policy or {},
-                          'narration_key': next(f['key'] for f in voice_o['files'] if f['name'] == 'narration.mp3'), 'clips': {c['id']: c for c in media_o['summary']['clips']}}
+    session['package'] = {**saved, 'digest': digest({k: pk[k] for k in ('beats', 'sub_clips', 'timeline', 'policy', 'narration')}), 'beats': windows, 'timeline': TIMELINE, 'policy': policy or {},
+                          'narration_key': next(f['key'] for f in voice_o['files'] if f['name'] == 'narration.mp3'), 'clips': {c['id']: c for c in media_o['summary']['clips']},
+                          'narration': {k: plan[k] for k in ('pieces', 'total_frames', 'fps', 'cuts')}}
     save_session(store, run, session)
     eligible = sum(1 for r in rows if r['eligibility'].startswith('ELIGIBLE'))
     return {'package': saved, 'beats': len(windows), 'clips': len(cards), 'sub_clips': len(rows), 'eligible_sub_clips': eligible, 'coverage': pk['coverage'],
-            'learned_rules': len(rules), 'next': 'present the coverage report, then author out/options.json and `vw options check`'}
+            'learned_rules': len(rules), 'scenes_approved': bool(approved), 'pauses': len(plan['cuts']), 'sentences': len(narration['sentences']),
+            'next': ('present the coverage report, then author out/options.json and `vw options check`' if approved or len(windows) > 1 else
+                     'the script is one paragraph: propose scenes and pauses (out/scenes.json, `vw options scenes`) before options')}
+
+
+def set_scenes(conn, store, user, run, outputs, document, quote):
+    """design/19 A1–A3: scene boundaries (sentence starts) and sentence-end pauses on the existing narration, approved with one quote."""
+    if not str(quote or '').strip():
+        fail("The operator's approval of the scenes and pauses is required (--quote).")
+    brief_o, script_o, voice_o = (_output(outputs, s) for s in ('brief', 'script', 'voice'))
+    script, _ = _file(store, script_o, 'script.json')
+    timing, _ = _file(store, voice_o, 'timing.json')
+    words = timing['words']
+    if ' '.join(w['text'] for w in words) != ' '.join(script['spoken_text'].split()):
+        fail('The narration timing does not match the accepted script word for word; narrate again before splitting scenes.')
+    stages = (brief_o['summary'].get('production') or {}).get('process_stages') or []
+    duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
+    try:
+        NR.validate_scenes(words, document.get('scenes'), stages)
+        plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], document.get('pauses') or [])
+        bs = NR.beats(words, document['scenes'], plan, to_tl, TIMELINE['fps'])
+    except (ValueError, KeyError, TypeError) as exc:
+        fail(exc)
+    session = session_of(store, run, create=True)
+    version = (session.get('scenes') or {}).get('version', 0) + 1
+    record = {'version': version, 'document': {'scenes': document['scenes'], 'pauses': document.get('pauses') or []}, 'quote': quote, 'by': user['id'],
+              'at': datetime.now(timezone.utc).isoformat()}
+    saved = save_json(store, key(run, f'scenes-v{version}.json'), record)
+    session['scenes'] = {**record, 'file': saved, 'digest': digest(record['document'])}
+    session['current'] = None          # options built on the old beats no longer apply
+    session['accepted'] = None
+    session['renders'].pop('review', None)
+    save_session(store, run, session)
+    out = prepare(conn, store, user, run, outputs)
+    return {**out, 'scenes': [{k: b[k] for k in ('beat_id', 'title', 'target_beat_frames', 'process_stages')} | {'seconds': round(b['target_beat_frames'] / TIMELINE['fps'], 2),
+                                                                                                                  'pauses': [{'after_word_id': p['after_word_id'], 'inserted_s': round(p['inserted_frames'] / TIMELINE['fps'], 2)} for p in b['pauses']]}
+                                for b in bs],
+            'film_seconds': round(plan['total_frames'] / TIMELINE['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / TIMELINE['fps'], 2)}
 
 
 def coverage(store, run):
@@ -327,7 +386,7 @@ def render(conn, store, user, run, kind):
     open_job = session['renders'].get(kind)
     if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == plan_digest:
         raise Problem(409, 'JOB_OPEN', f'The {kind} film is already rendering.', job_id=open_job['job_id'])
-    plan = {'kind': kind, 'items': items, 'timeline': TIMELINE, 'narration_key': session['package']['narration_key'], 'version': version, 'digest': plan_digest,
+    plan = {'kind': kind, 'items': items, 'timeline': TIMELINE, 'narration_key': session['package']['narration_key'], 'narration': session['package'].get('narration'), 'version': version, 'digest': plan_digest,
             'out_key': key(run, f'{kind}-v{version}-{plan_digest[:8]}.mp4')}
     rk = save_json(store, key(run, f'render-{kind}-v{version}.json'), plan)
     job = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,%s,%s,'render',%s, gen_random_uuid()) returning id",
@@ -369,6 +428,8 @@ def record_options(conn, store, user, run, quote):
     inspection_cost = [j.get('cost') for j in session['inspections'].values() if j.get('cost')]
     out = core.output(conn, user, run, {'stage': 'options', 'files': files, 'accepted_quote': quote,
                                         'summary': {'version': entry['version'], 'options_digest': entry['digest'], 'options': entry['options'], 'gaps': entry['gaps'], 'flags': len(entry['flags']),
+                                                    'scenes': ({'version': session['scenes']['version'], 'digest': session['scenes']['digest'], 'quote': session['scenes']['quote'],
+                                                                'pauses': len(session['scenes']['document']['pauses'])} if session.get('scenes') else None),
                                                     'review_film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s')}, 'inspection_cost': inspection_cost}})
     session['accepted'] = {'version': entry['version'], 'digest': entry['digest'], 'quote': quote, 'output': str(out['id'])}
     session['recorded']['options'] = str(out['id'])

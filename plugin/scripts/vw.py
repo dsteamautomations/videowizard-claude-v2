@@ -94,12 +94,17 @@ def api():
     return httpx.Client(base_url=server_url(), headers={'Authorization': 'Bearer ' + tok} if tok else {}, timeout=60)
 
 
-def call(method, path, **kw):
+def call(method, path, wait=None, **kw):
     """One server call with the standard outcomes handled: unreachable → tell builder; 401 → connect;
-    NEEDS_USER_DECISION → exit 3; other 4xx → refused; 5xx → tell builder."""
+    NEEDS_USER_DECISION → exit 3; other 4xx → refused; 5xx → tell builder. `wait` (seconds) is for long server steps:
+    a timeout then means "still working", not "unreachable"."""
     try:
         with api() as c:
-            r = c.request(method, path, **kw)
+            r = c.request(method, path, **({'timeout': wait} if wait else {}), **kw)
+    except httpx.ReadTimeout:
+        if wait:
+            emit({'action': 'refused', 'message': f'The server is still working on this after {wait} s. It may finish on its own: check status in a minute before repeating.'}, 2)
+        emit({'action': 'tell_builder', 'message': f'VideoWizard server at {server_url()} did not answer in time (ReadTimeout). Tell the builder; do not debug.'}, 2)
     except httpx.RequestError as exc:
         emit({'action': 'tell_builder', 'message': f'VideoWizard server not reachable at {server_url()} ({exc.__class__.__name__}). Tell the builder; do not debug.'}, 2)
     if r.status_code == 401:
@@ -114,8 +119,8 @@ def call(method, path, **kw):
     emit({'action': 'refused', 'status': r.status_code, **body}, 2)
 
 
-def write(path, body):
-    return call('POST', path, json={'request_id': str(uuid.uuid4()), **body})
+def write(path, body, wait=None):
+    return call('POST', path, wait=wait, json={'request_id': str(uuid.uuid4()), **body})
 
 
 # ---------- workspace ----------
@@ -352,6 +357,9 @@ def put_with_retry(put, waits=(5, 15, 30), sleep=time.sleep):
         sleep(waits[i])
 
 
+_manifest_lock = __import__('threading').Lock()
+
+
 def upload_file(m, stage, path, sha, size):
     """Sign → PUT → receipt. Skips files the manifest already shows as receipted (resumable)."""
     path = Path(path)
@@ -372,8 +380,9 @@ def upload_file(m, stage, path, sha, size):
         emit({'action': 'tell_builder', 'message': f'Storage refused the upload of {name}: HTTP {r.status_code}.'}, 2)
     write(f"/api/runs/{m['run_id']}/files/receipt", {'key': signed['key'], 'sha256': sha, 'bytes': size})
     ref = {'name': name, 'key': signed['key'], 'sha256': sha, 'bytes': size, 'receipt': True, 'location': 'storage'}
-    m['files'] = [f for f in m['files'] if f.get('key') != ref['key']] + [{**ref, 'stage': stage, 'action': 'upload'}]
-    save_json(manifest_path(m['code']), m)
+    with _manifest_lock:
+        m['files'] = [f for f in m['files'] if f.get('key') != ref['key']] + [{**ref, 'stage': stage, 'action': 'upload'}]
+        save_json(manifest_path(m['code']), m)
     return ref
 
 
@@ -470,7 +479,7 @@ def cmd_analysis(a):
     if a.what == 'policy':
         body = {**({'camera_audio': a.camera_audio} if a.camera_audio else {}), **({'show_speaker_video': bool(a.show_speaker_video)} if a.show_speaker_video is not None else {}),
                 **({'waived_risk_flags': a.waive, 'note': a.note or ''} if a.waive is not None else {})}
-        emit(write(f'/api/runs/{run}/analysis/policy', body), 0, 'Eligibility re-checked on the retained logs with the new policy; no paid call. Poll `vw analysis status`.')
+        emit(write(f'/api/runs/{run}/analysis/policy', body, wait=600), 0, 'Eligibility re-checked on the retained logs with the new policy; no paid call. Poll `vw analysis status`.')
     if a.what in ('retry', 'recover', 'resolve', 'exclude'):
         emit(write(f'/api/runs/{run}/analysis/{a.unit}/{a.what}', {'note': a.note or ''}))
 
@@ -652,6 +661,10 @@ def cmd_options(a):
         emit(out, 0, f"Package in work/options-package.json: {out['beats']} beats, {out['eligible_sub_clips']} eligible sub-clips. Show the coverage report first.")
     if a.what == 'coverage':
         emit(call('GET', base + '/coverage'))
+    if a.what == 'scenes':
+        out = write(base + '/scenes', {'document': _json_file(m, a.file), 'quote': a.quote or ''}, wait=300)
+        _download(m, out['package']['key'], 'work/options-package.json')
+        emit(out, 0, f"Scenes and pauses recorded: {len(out['scenes'])} scenes, film {out['film_seconds']} s ({out['inserted_seconds']} s of pauses added). Package refreshed; show the coverage report next.")
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'document': _json_file(m, a.file)})
         emit(out, 2 if out.get('status') == 'rejected' else 0, f"{a.what}: {out.get('status') or 'version ' + str(out.get('version'))}")
@@ -852,7 +865,7 @@ def main(argv=None):
     for flag in ('--file', '--gap', '--choice', '--quote', '--element', '--name', '--subject', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)
-    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
+    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote'):
         s.add_argument(flag)
     s.set_defaults(fn=cmd_options)

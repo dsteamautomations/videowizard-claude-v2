@@ -1,4 +1,4 @@
-# 19 — Fix batch: scene beats, narration pauses, word-timed rules, small fixes (plan for SK's approval)
+# 19 — Fix batch: scene beats, narration pauses, word-timed rules, small fixes (approved 15 Oct 2026, implemented)
 
 Date 15 Oct 2026. VW-2 is paused at options. Nothing in this batch makes a paid call or re-records the narration.
 

@@ -88,9 +88,9 @@ def media_record(ws, procedure, prior, upload):
         clips = json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         raise Refused('Run `vw stage media prepare` before record.')
-    refs = []
-    for c in clips:
-        refs.append(upload('media', ws / c.get('path', 'in/' + c['name']), c['sha256'], c['bytes']))  # skips files already receipted
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as pool:   # design/19 C2: three uploads at a time; each keeps its own retry
+        refs = list(pool.map(lambda c: upload('media', ws / c.get('path', 'in/' + c['name']), c['sha256'], c['bytes']), clips))  # skips files already receipted
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
     summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr')} for c in clips],
                'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1)}
