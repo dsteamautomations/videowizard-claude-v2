@@ -170,7 +170,7 @@
         "Run `vw analysis start` with the operator's answers: --camera-audio allowed|excluded, --understand-audio yes|no, --film-type \"…\", and --exclude <clip name> for any clip to leave out. One paid Gemini 3.8 Flash request per clip (agentic); tell the operator, do not ask. The log follows the blueprint Stage 1 contract (clip-log-v1); the server computes eligibility and crops.",
         "Poll `vw analysis status` while clips run (every minute or so). Report finished / running / failed counts in one line; do not read the evidence files.",
         "A failed clip: tell the operator the reason from status. On their instruction run `vw analysis retry --unit <id> --note \"<their words>\"` (terminal failures) or `vw analysis recover --unit <id>` (unknown outcome). `vw analysis exclude --unit <id> --note` leaves a clip out of the film.",
-        "When every clip is retained or excluded, `vw next` moves to planning. Nothing to approve: analysis has no acceptance step.",
+        "When every clip is retained or excluded, `vw next` moves to options. Nothing to approve: analysis has no acceptance step.",
         "`vw analysis show --unit <id>` prints the clip's 10-line summary card; never read the full log. `vw analysis policy --camera-audio … [--show-speaker-video]` re-runs the crop solver without a paid call."
       ],
       "output_file": null,
