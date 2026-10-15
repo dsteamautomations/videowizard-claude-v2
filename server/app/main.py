@@ -111,8 +111,10 @@ class Resolve(Write):
 
 
 class AnalysisPolicy(Write):
-    camera_audio: Literal['allowed', 'excluded']
+    camera_audio: Literal['allowed', 'excluded'] | None = None
     show_speaker_video: bool | None = None
+    waived_risk_flags: list[str] | None = None
+    note: str = ''
 
 
 class AnalysisStart(Write):
@@ -684,7 +686,7 @@ def analysis_policy(run_id: UUID, body: AnalysisPolicy, user=User, conn=DB):
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     outputs = core.current_outputs(conn, run['id'])
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, analysis_jobs.repolicy(conn, user, run, outputs, {'camera_audio': body.camera_audio, 'show_speaker_video': body.show_speaker_video})))
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, analysis_jobs.repolicy(conn, user, run, outputs, {'camera_audio': body.camera_audio, 'show_speaker_video': body.show_speaker_video, 'waived_risk_flags': body.waived_risk_flags, 'note': body.note})))
     return Response(resp, status_code=status)
 
 

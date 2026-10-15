@@ -65,12 +65,32 @@ def ui_path(sol):
             f"(crop rect x={sol['crop_rect'][0]} y={sol['crop_rect'][1]} w={sol['crop_rect'][2]} h={sol['crop_rect'][3]})") if sol and sol.get('crop_rect') else None
 
 
+def waived(flag, waivers):
+    f = str(flag).lower()
+    return any(w and w.lower() in f for w in waivers or [])
+
+
+def client_safety(sub, policy):
+    """The model judges client safety against the brief's rules; the operator may waive a rule for a client afterwards (e.g. PPE on a
+    rural training film). A sub-clip marked unsafe becomes safe when every one of its risk flags is waived. Returns (safe, kept_flags, waived_flags)."""
+    flags = sub.get('risk_flags') or []
+    waivers = policy.get('waived_risk_flags') or []
+    kept = [f for f in flags if not waived(f, waivers)]
+    gone = [f for f in flags if waived(f, waivers)]
+    if sub['client_safe']:
+        return True, kept, gone
+    return bool(flags) and not kept, kept, gone
+
+
 def eligibility(sub, policy, max_zoom, src_w, src_h, timeline_w, timeline_h):
     """Returns (eligibility, crop_solution_or_None, notes[])."""
     p = sub['people_and_speaker_analysis']
     qc = sub.get('technical_qc_and_remediation') or sub.get('technical_qc') or {}
     notes = []
-    if sub['usability_grade'] == 'REJECT' or not sub['client_safe']:
+    safe, _, gone = client_safety(sub, policy)
+    if gone and safe and not sub['client_safe']:
+        notes.append('client-safe after operator waiver of: ' + ', '.join(gone))
+    if sub['usability_grade'] == 'REJECT' or not safe:
         return 'REJECT_ALL', None, notes
     talking = bool(p.get('mouth_visible') or p.get('looking_at_lens'))
     if not talking:
@@ -116,10 +136,12 @@ def solve(log, policy, clip, timeline):
         if notes and any('NEEDS_BOUNDARY_CHECK' in n for n in notes):
             sub['tc_confidence'] = 'NEEDS_BOUNDARY_CHECK'
         zoom = (sol or {}).get('zoom_x') if elig == 'ELIGIBLE_WITH_CROP' else None
-        sub['stage15'] = {'visual_eligibility': elig, 'crop_solution': sol,
+        safe, kept_flags, waived_flags = client_safety(sub, policy)
+        sub['stage15'] = {'visual_eligibility': elig, 'crop_solution': sol, 'client_safe_effective': safe, 'risk_flags_effective': kept_flags, 'risk_flags_waived': waived_flags,
                           'still_frame_dynamic_zoom_eligible': not cam.get('has_3d_parallax') and not cam.get('has_internal_scene_motion'),
                           'effective_post_crop_shot_size': effective_post_crop_shot_size(cam.get('native_shot_size'), zoom),
                           'time_manipulation_options': options, 'ui_path': ui_path(sol) if elig == 'ELIGIBLE_WITH_CROP' else None,
-                          'policy': {'allow_speaker_audio': bool(policy.get('allow_speaker_audio')), 'show_speaker_video': bool(policy.get('show_speaker_video'))},
+                          'policy': {'allow_speaker_audio': bool(policy.get('allow_speaker_audio')), 'show_speaker_video': bool(policy.get('show_speaker_video')),
+                                     'waived_risk_flags': list(policy.get('waived_risk_flags') or [])},
                           'timeline': dict(timeline), 'notes': notes}
     return log

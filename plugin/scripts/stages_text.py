@@ -141,8 +141,7 @@ def brief_record(ws, procedure, prior):
 
 
 BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', 'Stage_4_Result'],
-                      'brand_and_safety_rules': ['No missing PPE/safety gear', 'No competitor logos', 'No trash/clutter',
-                                                 'Do not claim specific compressive strength numbers unless stated in verified script'],
+                      'brand_and_safety_rules': [],   # asked of the operator at brief; never filled with blueprint examples (VW-2, 15 Oct 2026)
                       'field_speech_languages': ['en', 'ta', 'hi'], 'narration_language': 'en', 'show_speaker_video': False}
 
 

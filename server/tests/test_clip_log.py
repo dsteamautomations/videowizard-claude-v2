@@ -166,3 +166,23 @@ def test_build_request_clip_log_identity_mode_and_audio_sentence():
 @pytest.mark.skipif(True, reason='live probe: run by hand with a key (design/14 E23)')
 def test_e23_live_schema_probe():
     pass
+
+
+def test_risk_flag_waiver_makes_sub_clip_safe_only_when_every_flag_is_waived():
+    """VW-2 (15 Oct 2026): 30 sub-clips were unsafe only for missing PPE; the operator waived PPE for the client. Free re-check, no re-analysis."""
+    base = synthetic_log('CLIP_W', 'w.mp4', 25.0, 100)
+    tl, clip = {'width': 1920, 'height': 1080, 'fps': 25}, {'width': 1920, 'height': 1080, 'fps': '25/1'}
+    for s in base['sub_clips']:
+        s['client_safe'] = False
+    base['sub_clips'][0]['risk_flags'] = ['missing_ppe_no_gloves', 'open_toed_footwear']
+    base['sub_clips'][1]['risk_flags'] = ['missing_ppe', 'copyrighted_music']
+    log = deepcopy(base); solver.solve(log, {}, clip, tl)
+    assert [s['stage15']['visual_eligibility'] for s in log['sub_clips']] == ['REJECT_ALL', 'REJECT_ALL']
+    policy = {'waived_risk_flags': ['ppe', 'glove', 'footwear', 'sandal', 'boot', 'helmet']}
+    log = deepcopy(base); solver.solve(log, policy, clip, tl)
+    a, b = log['sub_clips']
+    assert a['stage15']['visual_eligibility'] == 'ELIGIBLE_AS_IS' and a['stage15']['client_safe_effective'] and a['stage15']['risk_flags_effective'] == []
+    assert b['stage15']['visual_eligibility'] == 'REJECT_ALL' and b['stage15']['risk_flags_effective'] == ['copyrighted_music']   # music is not waived
+    from app.stage2 import package as P
+    row = P.sub_clip_row({'id': 'w', 'name': 'w.mp4', 'fps': '25/1', 'width': 1920, 'height': 1080}, log, a, 25)
+    assert row['client_safe'] is True and row['risk_flags'] == [] and row['risk_flags_waived'] == ['missing_ppe_no_gloves', 'open_toed_footwear']

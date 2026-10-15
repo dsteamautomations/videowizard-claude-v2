@@ -44,7 +44,7 @@
       "prompt_origin": "v1 VW-BRIEF-0.4.0 (ported verbatim 14 Oct 2026)",
       "steps": [
         "Run `vw stage brief prepare`. It prints the accepted intake (title, script, client) and this prompt.",
-        "Write the proposal to out/brief.json: purpose, audience, message, tone, ending, constraints, reasons, questions (id, question, why, recommendation, required). Never fill `answers` yourself. Also `production`: target runtime, process stages, brand and safety rules, languages, show_speaker_video. Ask the operator only for values they have; omitted keys take the blueprint defaults and are listed as defaults_applied.",
+        "Write the proposal to out/brief.json: purpose, audience, message, tone, ending, constraints, reasons, questions (id, question, why, recommendation, required). Never fill `answers` yourself. Also `production`: target runtime, process stages, brand and safety rules, languages, show_speaker_video. Ask the operator explicitly for brand and safety rules (for example: no competitor logos, PPE required or not, nothing staged); record exactly what they say, an empty list if none. Ask only for other values they have; omitted keys take defaults and are listed as defaults_applied.",
         "Present the five decisions with their reasons and any consequential questions together. Put each operator answer verbatim in `answers` by question id; required questions block record until answered. Ask one question: approve, or changes?",
         "On an explicit yes run `vw stage brief record --quote \"<their reply>\"`. Changes: edit out/brief.json and ask again."
       ],
@@ -171,7 +171,7 @@
         "Poll `vw analysis status` while clips run (every minute or so). Report finished / running / failed counts in one line; do not read the evidence files.",
         "A failed clip: tell the operator the reason from status. On their instruction run `vw analysis retry --unit <id> --note \"<their words>\"` (terminal failures) or `vw analysis recover --unit <id>` (unknown outcome). `vw analysis exclude --unit <id> --note` leaves a clip out of the film.",
         "When every clip is retained or excluded, `vw next` moves to options. Nothing to approve: analysis has no acceptance step.",
-        "`vw analysis show --unit <id>` prints the clip's 10-line summary card; never read the full log. `vw analysis policy --camera-audio … [--show-speaker-video]` re-runs the crop solver without a paid call."
+        "`vw analysis show --unit <id>` prints the clip's 10-line summary card; never read the full log. `vw analysis policy [--camera-audio …] [--show-speaker-video] [--waive <risk flag> … --note \"<operator's words>\"]` re-checks eligibility without a paid call: a waived risk flag (e.g. ppe) no longer makes a sub-clip unsafe for this run."
       ],
       "output_file": null,
       "inspection": {

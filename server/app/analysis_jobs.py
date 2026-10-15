@@ -126,12 +126,21 @@ def repolicy(conn, user, run, outputs, policy):
         old = json.loads(store.get(src_job['request']['request_key']).decode('utf-8'))
         if bool(policy.get('understand_audio', True)) != bool(old['identity'].get('understand_audio', True)):
             raise Problem(422, 'ANALYSIS_POLICY', 'understand_audio changes the attachment; that needs a new paid analysis (vw analysis start --again).')
-        req = analysis.build_request(run, procedure, brief, script, clip, {'camera_audio': policy['camera_audio'], 'understand_audio': old['identity'].get('understand_audio', True)})
-        if policy.get('show_speaker_video') is not None:
-            sp = analysis.speaker_policy({'camera_audio': policy['camera_audio']}, {'show_speaker_video': policy['show_speaker_video']})
-            req['policy'] = sp
-            req['identity']['speaker_policy'] = sp
-            req['analysis_key'] = analysis.digest(req['identity'])
+        camera_audio = policy.get('camera_audio') or old['identity'].get('camera_audio')
+        req = analysis.build_request(run, procedure, brief, script, clip, {'camera_audio': camera_audio, 'understand_audio': old['identity'].get('understand_audio', True)})
+        show = policy.get('show_speaker_video')
+        if show is None:
+            show = (old.get('policy') or {}).get('show_speaker_video')
+        sp = analysis.speaker_policy({'camera_audio': camera_audio}, {'show_speaker_video': bool(show)})
+        waivers = policy.get('waived_risk_flags')
+        if waivers is None:
+            waivers = (old.get('policy') or {}).get('waived_risk_flags') or []
+        sp['waived_risk_flags'] = list(waivers)
+        if waivers:
+            sp['waiver_note'] = policy.get('note') or (old.get('policy') or {}).get('waiver_note') or ''
+        req['policy'] = sp
+        req['identity']['speaker_policy'] = sp
+        req['analysis_key'] = analysis.digest(req['identity'])
         rk = f"{run['id']}/analysis/{clip['id']}.{req['analysis_key'][:12]}.request.json"
         store.put(rk, json.dumps(req, ensure_ascii=False).encode('utf-8'), 'application/json')
         jobs_.append((clip['id'], rk, src_job['result']['response_key'], req['analysis_key']))
