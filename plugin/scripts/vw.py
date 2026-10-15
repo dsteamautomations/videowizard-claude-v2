@@ -337,6 +337,21 @@ def cmd_stage(a):
     emit(row, 0, f'Recorded {a.stage}; run `vw next`.')
 
 
+def put_with_retry(put, waits=(5, 15, 30), sleep=time.sleep):
+    """A dropped connection or a 5xx from storage is retried with the same signed URL (it stays valid for hours).
+    Returns the response, or raises the last RequestError after len(waits)+1 attempts."""
+    for i in range(len(waits) + 1):
+        try:
+            r = put()
+            if r.status_code < 500 or i == len(waits):
+                return r
+        except httpx.RequestError:
+            if i == len(waits):
+                raise
+        print(f'upload interrupted; retrying in {waits[i]} s ({i + 1}/{len(waits)})', file=sys.stderr, flush=True)
+        sleep(waits[i])
+
+
 def upload_file(m, stage, path, sha, size):
     """Sign → PUT → receipt. Skips files the manifest already shows as receipted (resumable)."""
     path = Path(path)
@@ -346,11 +361,13 @@ def upload_file(m, stage, path, sha, size):
         return {k: done[k] for k in ('name', 'key', 'sha256', 'bytes', 'receipt', 'location')}
     signed = write(f"/api/runs/{m['run_id']}/files/sign", {'stage': stage, 'name': name})
     url = signed['url'] if signed['url'].startswith('http') else server_url() + signed['url']
-    try:
+    def put():
         with path.open('rb') as f:
-            r = httpx.put(url, content=f, headers=signed.get('headers') or {}, timeout=httpx.Timeout(600, connect=30))
+            return httpx.put(url, content=f, headers=signed.get('headers') or {}, timeout=httpx.Timeout(600, connect=30))
+    try:
+        r = put_with_retry(put)
     except httpx.RequestError as exc:
-        emit({'action': 'refused', 'message': f'Upload of {name} was interrupted ({exc.__class__.__name__}). Run the step again; finished files are skipped.'}, 2)
+        emit({'action': 'refused', 'message': f'Upload of {name} was interrupted four times ({exc.__class__.__name__}); the connection to storage keeps dropping. Check the internet connection, then run the step again; finished files are skipped.'}, 2)
     if r.status_code >= 300:
         emit({'action': 'tell_builder', 'message': f'Storage refused the upload of {name}: HTTP {r.status_code}.'}, 2)
     write(f"/api/runs/{m['run_id']}/files/receipt", {'key': signed['key'], 'sha256': sha, 'bytes': size})

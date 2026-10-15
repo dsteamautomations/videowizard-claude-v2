@@ -316,3 +316,35 @@ def test_m3_receipt_with_wrong_hash(client, alice, database):
     r = client.post(f"/api/runs/{run['id']}/output", json={'request_id': rid(), 'stage': 's1', 'accepted_quote': 'yes',
                     'files': [{'name': 'y.bin', 'key': f"{run['id']}/s1/y.bin", 'sha256': 'cd' * 32, 'bytes': 1, 'location': 'storage'}]}, headers=alice)
     assert r.status_code == 422 and r.json()['code'] == 'FILE_NOT_RECEIVED'
+
+
+def test_m7_upload_retries_a_dropped_connection_and_receipt_checks_size_only_for_large_files(tmp_path):
+    """Defect 6 (15 Oct 2026): the line dropped mid-upload and the receipt re-downloaded the clip. Now a dropped PUT is retried with the
+    same signed URL, and a large file's receipt checks its size in storage instead of downloading it."""
+    import importlib.util, sys
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location('vwcli', Path(__file__).resolve().parents[2] / 'plugin' / 'scripts' / 'vw.py')
+    vwcli = importlib.util.module_from_spec(spec); spec.loader.exec_module(vwcli)
+    calls, waits = [], []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise httpx.RemoteProtocolError('peer closed connection')
+        return httpx.Response(200)
+    assert vwcli.put_with_retry(flaky, sleep=waits.append).status_code == 200 and len(calls) == 3 and waits == [5, 15]
+    calls.clear()
+    with pytest.raises(httpx.RequestError):
+        vwcli.put_with_retry(lambda: (calls.append(1), (_ for _ in ()).throw(httpx.ConnectError('down')))[1], sleep=lambda s: None)
+    assert len(calls) == 4
+
+    from app import storage as S
+    st = S.LocalStorage(tmp_path)
+    big = b'x' * (S.HASH_ON_RECEIPT_MAX + 1)
+    st.put('r/media/big.mp4', big)
+    S.verify(st, 'r/media/big.mp4', 'not-checked-here', len(big))          # size matches: accepted without download
+    with pytest.raises(Exception):
+        S.verify(st, 'r/media/big.mp4', 'x', len(big) + 1)                  # size differs: refused
+    st.put('r/voice/small.json', b'{}')
+    with pytest.raises(Exception):
+        S.verify(st, 'r/voice/small.json', '0' * 64, 2)                     # small file: still hashed

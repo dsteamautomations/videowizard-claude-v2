@@ -39,6 +39,12 @@ class LocalStorage:
     def signed_upload(self, key):
         return '/files/local/' + quote(key, safe='/'), {}
 
+    def size(self, key):
+        p = self.path(key)
+        if not p.exists():
+            raise Problem(404, 'STORAGE', 'Object not found.')
+        return p.stat().st_size
+
     def list(self, prefix):
         base = (self.root / prefix)
         return [p.relative_to(self.root).as_posix() for p in base.rglob('*') if p.is_file()] if base.exists() else []
@@ -94,6 +100,10 @@ class SupabaseStorage:
         data = self._call('POST', f'/storage/v1/object/upload/sign/{self.bucket}/{quote(key, safe="/")}').json()
         return self.url + '/storage/v1' + data['url'], {'x-upsert': 'true'}
 
+    def size(self, key):
+        info = self._call('GET', f'/storage/v1/object/info/{self.bucket}/{quote(key, safe="/")}').json()
+        return int(info.get('size') or (info.get('metadata') or {}).get('size') or -1)
+
     def list(self, prefix):
         out, offset = [], 0
         while True:
@@ -121,9 +131,17 @@ def storage():
     return LocalStorage(local) if local else SupabaseStorage()
 
 
+HASH_ON_RECEIPT_MAX = 8 * 1024 * 1024
+
+
 def verify(store, key, sha256, bytes_):
-    """Receipt check: the object exists with the declared size and hash. ponytail: hashes by downloading; fine for
-    voice files and single clips, revisit with a streaming hash if clips grow past a few hundred MB."""
+    """Receipt check: the object exists with the declared size; small files are also hashed here. Large files (clips, films)
+    are hashed by whoever downloads them (analysis and render check the sha before use), so the receipt never re-downloads
+    hundreds of MB over a slow line (defect 6, 15 Oct 2026)."""
+    if bytes_ > HASH_ON_RECEIPT_MAX:
+        if store.size(key) != bytes_:
+            raise Problem(409, 'FILE_MISMATCH', 'The stored file does not match the declared size. Upload it again.')
+        return
     data = store.get(key)
     if len(data) != bytes_ or hashlib.sha256(data).hexdigest() != sha256:
         raise Problem(409, 'FILE_MISMATCH', 'The stored file does not match the declared size and hash. Upload it again.')
