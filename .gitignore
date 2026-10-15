@@ -6,3 +6,4 @@ __pycache__/
 node_modules/
 runs/
 .spool/
+design/_work/sample-run/

@@ -2,6 +2,7 @@
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -109,6 +110,20 @@ def test_d1_d10_d12_d13_d15_d16_d17_d18_end_to_end(home, database, fake, gemini)
     st = storage()
     before = st.list(run_id)
     assert any('/media/' in k for k in before) and any('review-v' in k for k in before)
+    keep = os.environ.get('VW2_TEST_KEEP')
+    if keep:   # snapshot every stage's files before close deletes the intermediates (for a human to browse)
+        import shutil
+        dest = Path(keep)
+        shutil.rmtree(dest, ignore_errors=True)
+        shutil.copytree(ws, dest / 'run-folder')
+        shutil.copytree(Path(os.environ['VW2_STORAGE_LOCAL_DIR']) / run_id, dest / 'server-storage')
+        with psycopg.connect(database) as c:
+            from psycopg.rows import dict_row
+            c.row_factory = dict_row
+            rows = c.execute("select stage, unit, summary, files, accepted_quote, created_at from vw2_stage_outputs where run_id=%s and not stale order by created_at", (run_id,)).fetchall()
+            (dest / 'stage-outputs.json').write_text(json.dumps(rows, indent=1, default=str), encoding='utf-8')
+            jobs_ = c.execute("select stage, unit, provider, status, cost, created_at from vw2_jobs where run_id=%s order by created_at", (run_id,)).fetchall()
+            (dest / 'jobs.json').write_text(json.dumps(jobs_, indent=1, default=str), encoding='utf-8')
     rc, out, err = vw(home, 'close')
     assert rc == 0 and out['retention']['deleted'] > 0, (out, err)
     after = st.list(run_id)
