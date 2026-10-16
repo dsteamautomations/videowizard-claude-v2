@@ -293,3 +293,49 @@ def test_t8_no_json_file_is_written_on_one_line():
     bad = [f'{p.name}:{i}' for p in root.glob('*.py') for i, line in enumerate(p.read_text(encoding='utf-8').split('\n'), 1)
            if re.search(r'write_text\(json\.dumps\(', line) and 'indent' not in line]
     assert bad == [], bad
+
+
+# ---------- ticket 10: --subject was defined twice (a single value and a list under another name) ----------
+
+def _visuals_cmd(vwm, monkeypatch, tmp_path, argv):
+    sent = {}
+    monkeypatch.setattr(vwm, 'session', lambda: {'token': 't'})
+    monkeypatch.setattr(vwm, 'active', lambda: {'run_id': 'r', 'code': 'VW-X'})
+    monkeypatch.setattr(vwm, 'workspace', lambda code: tmp_path)
+    monkeypatch.setattr(vwm, 'write', lambda path, body, wait=None: sent.update(path=path, body=body) or {})
+    with pytest.raises(SystemExit) as e:
+        vwm.main(argv)
+    return e.value.code, sent
+
+
+def test_t10_prepare_take_subjects_keep_commas_and_several_subjects(monkeypatch, tmp_path, capsys):
+    vwm = _plugin_module('vw')
+    code, sent = _visuals_cmd(vwm, monkeypatch, tmp_path, ['visuals', 'prepare-take', '--shot', 'G1-S1-SH1', '--start', 'bc29c76c', '--motion', 'slow push in',
+                                                          '--subject', 'pl-town=a growing town, roofs and scaffolding, dusk', '--subject', 'pe-mason=mason, 40s, lays bricks = on edge'])
+    assert code == 0 and sent['body']['subject_reconciliation'] == {'pl-town': 'a growing town, roofs and scaffolding, dusk', 'pe-mason': 'mason, 40s, lays bricks = on edge'}
+
+
+def test_t10_malformed_or_repeated_subject_is_refused_not_a_crash(monkeypatch, tmp_path, capsys):
+    vwm = _plugin_module('vw')
+    code, sent = _visuals_cmd(vwm, monkeypatch, tmp_path, ['visuals', 'prepare-take', '--shot', 'S', '--start', 'R', '--motion', 'm', '--subject', 'no equals sign, here'])
+    assert code == 2 and 'ELEMENT=' in json.loads(capsys.readouterr().out)['message'] and not sent
+    code, _ = _visuals_cmd(vwm, monkeypatch, tmp_path, ['visuals', 'prepare-take', '--shot', 'S', '--start', 'R', '--motion', 'm', '--subject', 'a=x', '--subject', 'a=y'])
+    assert code == 2 and 'twice' in json.loads(capsys.readouterr().out)['message']
+    code, sent = _visuals_cmd(vwm, monkeypatch, tmp_path, ['visuals', 'bind', '--shot', 'S', '--refs', 'E1=R1,R2', 'E2=R3', '--quote', 'yes'])
+    assert code == 0 and sent['body']['references'] == {'E1': ['R1', 'R2'], 'E2': ['R3']}
+
+
+def test_no_command_defines_two_options_with_the_same_name():
+    """Guard for ticket 10's cause across the whole tool: within each command, every destination belongs to one option."""
+    import argparse
+    vwm = _plugin_module('vw')
+    p = vwm.build_parser()
+    subs = next(a for a in p._actions if isinstance(a, argparse._SubParsersAction))
+    clashes = []
+    for name, sp in subs.choices.items():
+        seen = {}
+        for act in sp._actions:
+            if act.dest in seen and act.dest != 'help':
+                clashes.append(f'{name}: {seen[act.dest]} and {act.option_strings} share {act.dest!r}')
+            seen[act.dest] = act.option_strings
+    assert clashes == [], clashes

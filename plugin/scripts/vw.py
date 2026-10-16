@@ -615,7 +615,7 @@ def cmd_visuals(a):
     if a.what == 'accept':
         emit(write(base + '/accept', {'gap_ids': a.gaps, 'quote': a.quote}))
     if a.what in ('frame', 'supply', 'web'):
-        body = {'element_id': a.element, 'name': a.name or f'{a.what}-{a.element}', 'kind': 'frame' if a.what == 'frame' else 'supplied' if a.what == 'supply' else 'web', 'subject': a.subject or a.element}
+        body = {'element_id': a.element, 'name': a.name or f'{a.what}-{a.element}', 'kind': 'frame' if a.what == 'frame' else 'supplied' if a.what == 'supply' else 'web', 'subject': _one_subject(a)}
         if a.what == 'frame':
             body.update(source_media_id=a.clip, requested_s=float(a.at))
         else:
@@ -628,17 +628,14 @@ def cmd_visuals(a):
         out = write(base + '/references', body)
         emit(out, 0, f"Reference {out['id']} ({out['kind']}) is a candidate; show it to the operator (`vw visuals fetch --ref {out['id']}`) and approve with its sha256.")
     if a.what == 'image':
-        body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': a.subject or a.element, 'prompt': a.prompt,
+        body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {})}
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, poll `vw visuals status`.")
     if a.what == 'approve':
         emit(write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote}))
     if a.what == 'bind':
-        refs = {}
-        for item in a.refs or []:
-            eid, ids = item.split('=', 1)
-            refs[eid] = ids.split(',')
+        refs = {eid: text.split(',') for eid, text in _pairs(a.refs, '--refs', 'ELEMENT=REF1,REF2').items()}
         emit(write(base + '/bind', {'shot_id': a.shot, 'references': refs, 'quote': a.quote}))
     if a.what == 'packet':
         out = call('GET', f'{base}/shots/{a.shot}/packet')
@@ -647,7 +644,7 @@ def cmd_visuals(a):
     if a.what == 'generator':
         emit(write(base + '/generator', {'shot_id': a.shot, 'provider': a.provider, 'model': a.model}))
     if a.what == 'prepare-take':
-        subjects = dict(s.split('=', 1) for s in (a.subject or []))
+        subjects = _pairs(a.subject, '--subject', 'ELEMENT="what this subject does in the shot"')
         body = {'shot_id': a.shot, 'start_image': a.start, 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
                 **({'end_image': a.end} if a.end else {}), **({'duration_seconds': int(a.seconds)} if a.seconds else {})}
         emit(write(base + '/prepare-take', body))
@@ -874,7 +871,33 @@ def cmd_close(a):
     emit(run, 0, f"Closed {m['code']}; scratch deleted, {len(keep)} retained file(s) kept in out/.")
 
 
+def _pairs(items, flag, shape):
+    """ELEMENT=text pairs (ticket 10): the text may hold commas and '=' signs; a malformed or repeated element is refused, never a traceback."""
+    out = {}
+    for item in items or []:
+        eid, sep, text = str(item).partition('=')
+        if not sep or not eid.strip() or not text.strip():
+            emit({'action': 'refused', 'message': f'{flag} takes {shape}; got {item!r}. Repeat {flag} once per element.'}, 2)
+        if eid.strip() in out:
+            emit({'action': 'refused', 'message': f'{flag} names element {eid.strip()} twice.'}, 2)
+        out[eid.strip()] = text.strip()
+    return out
+
+
+def _one_subject(a):
+    """References take one subject description; a repeated --subject keeps the last one."""
+    return (a.subject or [None])[-1] or a.element
+
+
 def main(argv=None):
+    p = build_parser()
+    a = p.parse_args(argv)
+    if a.cmd not in ('connect',) and not session().get('token'):
+        need_connect()
+    a.fn(a)
+
+
+def build_parser():
     p = argparse.ArgumentParser(prog='vw', description=__doc__)
     sub = p.add_subparsers(dest='cmd', required=True)
     s = sub.add_parser('connect'); s.add_argument('--timeout', type=float, default=600); s.add_argument('--poll', type=float, default=2); s.set_defaults(fn=cmd_connect)
@@ -905,9 +928,9 @@ def main(argv=None):
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'asset', 'record'])
-    for flag in ('--file', '--gap', '--choice', '--quote', '--element', '--name', '--subject', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
+    for flag in ('--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
         s.add_argument(flag)
-    s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)
+    s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote'):
         s.add_argument(flag)
@@ -926,10 +949,7 @@ def main(argv=None):
     s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
-    a = p.parse_args(argv)
-    if a.cmd not in ('connect',) and not session().get('token'):
-        need_connect()
-    a.fn(a)
+    return p
 
 
 if __name__ == '__main__':
