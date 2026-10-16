@@ -82,7 +82,7 @@ def intake_prepare(ws, procedure, prior):
         result = extract(source.name, source.read_bytes())
     except ExtractionError as exc:
         raise Refused(str(exc))
-    (ws / 'work' / 'intake-source.json').write_text(json.dumps({'file': source.name, **result}), encoding='utf-8')
+    (ws / 'work' / 'intake-source.json').write_text(json.dumps({'file': source.name, **result}, indent=1), encoding='utf-8')
     return {'prompt': procedure['prompt'].replace('{numbered_script}', numbered(result['text'])),
             'source_file': source.name, 'warnings': result['warnings'], 'needs_readable_copy': result['needs_readable_copy'],
             'output_file': 'out/intake.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}

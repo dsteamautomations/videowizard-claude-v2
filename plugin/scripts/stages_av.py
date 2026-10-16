@@ -78,7 +78,7 @@ def media_prepare(ws, procedure, prior):
             meta = {**probe(path), 'transcoded_from_vfr': True, 'original_sha256': sha, 'original_fps': meta['fps']}
             sha, size = hashlib.sha256(data).hexdigest(), len(data)
         clips.append({'id': sha[:16], 'name': p.name, 'path': str(path.relative_to(ws).as_posix()), 'sha256': sha, 'bytes': size, **meta})
-    (ws / 'work' / 'media-clips.json').write_text(json.dumps(clips), encoding='utf-8')
+    (ws / 'work' / 'media-clips.json').write_text(json.dumps(clips, indent=1), encoding='utf-8')
     return {'prompt': procedure.get('prompt') or '', 'clips': clips, 'duplicates_skipped': len(files) - len(clips),
             'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'message': 'Confirm the clip list with the operator, then record.'}
 

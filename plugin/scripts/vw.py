@@ -47,6 +47,33 @@ def save_json(path, data):
     path.write_text(json.dumps(data, indent=1, default=str), encoding='utf-8')
 
 
+READ_BACK = {'work/manifest.json'}   # downloaded files this tool reads again (delivery, Resolve): never reshaped
+LONG_TEXT = 2000   # characters: the assistant's file reader cuts longer lines and refuses files over ~25k tokens (ticket 8)
+
+
+def readable_json(path, data):
+    """Write a file the assistant has to read so it can be read in parts (ticket 8): one value per line, and every text longer
+    than LONG_TEXT in its own .md file beside it, wrapped to short lines; the value then names that file. Returns the .md names."""
+    import textwrap
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sidecars = []
+
+    def walk(x, trail):
+        if isinstance(x, dict):
+            return {k: walk(v, trail + [str(k)]) for k, v in x.items()}
+        if isinstance(x, list):
+            return [walk(v, trail + [str(i)]) for i, v in enumerate(x)]
+        if isinstance(x, str) and len(x) > LONG_TEXT:
+            side = path.with_name(f"{path.stem}.{'.'.join(trail) or 'text'}.md")
+            side.write_text('\n'.join(textwrap.fill(line, 160) if len(line) > 160 else line for line in x.split('\n')) + '\n', encoding='utf-8')
+            sidecars.append(side.name)
+            return f'(long text, {len(x)} characters: read {side.name} in the same folder)'
+        return x
+    path.write_text(json.dumps(walk(data, []), indent=1, ensure_ascii=False, default=str) + '\n', encoding='utf-8')
+    return sidecars
+
+
 # ---------- session / server ----------
 
 def session():
@@ -501,6 +528,17 @@ def _download(m, key, rel):
     if r.status_code != 200:
         emit({'action': 'tell_builder', 'message': f'Download of {key} failed: HTTP {r.status_code}.'}, 2)
     (ws / rel).parent.mkdir(parents=True, exist_ok=True)
+    if rel.startswith('work/') and rel.endswith('.json'):   # make it readable in parts (ticket 8)
+        try:
+            data = json.loads(r.content)
+        except ValueError:
+            data = None
+        if data is not None:
+            if rel in READ_BACK:
+                save_json(ws / rel, data)      # the tool reads this one back: line breaks only, values unchanged
+            else:
+                readable_json(ws / rel, data)  # read by the assistant only: long texts move to .md files beside it
+            return str(ws / rel)
     (ws / rel).write_bytes(r.content)
     return str(ws / rel)
 

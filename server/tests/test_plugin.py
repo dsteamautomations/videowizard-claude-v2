@@ -243,3 +243,53 @@ def test_t7_missing_file_is_refused_not_a_crash(capsys):
     with pytest.raises(SystemExit) as e:
         vwm._json_file({"code": "VW-X"}, None)
     assert e.value.code == 2 and "--file" in json.loads(capsys.readouterr().out)["message"]
+
+
+# ---------- ticket 8: files the assistant reads must be readable in parts ----------
+
+def test_t8_packages_are_written_one_value_per_line_with_long_texts_beside_them(tmp_path):
+    vwm = _plugin_module('vw')
+    prompt = '\n'.join(f'## Section {i}\n' + 'Plan every shot to match the site. ' * 40 for i in range(60))   # ~100 KB, like the visuals prompt
+    package = {'prompt': prompt, 'gaps': [{'gap_id': 'BEAT_04', 'intent': 'environmental benefits'}],
+               'world_evidence': [{'clip': f'c{i}', 'summary': 'brick ' * 500} for i in range(3)], 'plan_schema': {'type': 'object'}}
+    path = tmp_path / 'work' / 'visuals-package.json'
+    sidecars = vwm.readable_json(path, package)
+    text = path.read_text(encoding='utf-8')
+    assert max(len(line) for line in text.split('\n')) <= vwm.LONG_TEXT and text.count('\n') > 10
+    back = json.loads(text)
+    assert back['gaps'] == package['gaps'] and back['plan_schema'] == package['plan_schema']
+    assert 'visuals-package.prompt.md' in sidecars and 'visuals-package.prompt.md' in back['prompt']
+    md = (tmp_path / 'work' / 'visuals-package.prompt.md').read_text(encoding='utf-8')
+    assert ' '.join(md.split()) == ' '.join(prompt.split()) and max(len(line) for line in md.split('\n')) <= 200   # nothing lost, short lines
+    assert (tmp_path / 'work' / 'visuals-package.world_evidence.0.summary.md').exists()
+
+
+def test_t8_download_reshapes_packages_but_never_a_file_the_tool_reads_back(tmp_path, monkeypatch):
+    vwm = _plugin_module('vw')
+    long = 'x' * (vwm.LONG_TEXT + 10)
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def get(self, url, **kw):
+            return type('R', (), {'status_code': 200, 'content': json.dumps({'note': long, 'files': [1, 2]}).encode()})()
+    monkeypatch.setattr(vwm, 'api', lambda: Client())
+    monkeypatch.setattr(vwm, 'workspace', lambda code: tmp_path)
+    vwm._download({'code': 'VW-X', 'run_id': 'r'}, 'k', 'work/options-package.json')
+    assert 'options-package.note.md' in json.loads((tmp_path / 'work' / 'options-package.json').read_text(encoding='utf-8'))['note']
+    vwm._download({'code': 'VW-X', 'run_id': 'r'}, 'k', 'work/manifest.json')
+    manifest = (tmp_path / 'work' / 'manifest.json').read_text(encoding='utf-8')
+    assert json.loads(manifest)['note'] == long and manifest.count('\n') > 1   # values unchanged, line breaks only
+
+
+def test_t8_no_json_file_is_written_on_one_line():
+    """Guard for the whole plugin: every JSON file it writes uses indent (hashing and request bodies stay compact)."""
+    import re
+    root = Path(__file__).resolve().parents[2] / 'plugin' / 'scripts'
+    bad = [f'{p.name}:{i}' for p in root.glob('*.py') for i, line in enumerate(p.read_text(encoding='utf-8').split('\n'), 1)
+           if re.search(r'write_text\(json\.dumps\(', line) and 'indent' not in line]
+    assert bad == [], bad
