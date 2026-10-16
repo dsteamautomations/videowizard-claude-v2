@@ -12,10 +12,13 @@ READ FIRST
 - server/app/worker.py (graceful stop on SIGTERM, commit 88bd430)
 
 STATE ON 16 OCT 2026, EVENING
-- NOT LIVE. No VM, no DNS record (vw2.digitalseo.in does not resolve). Everything still runs on SK's PC at http://localhost:8002.
-- A deployment team member will build the VM from design/26. They need from SK: repo read access, the domain, the GCP project (PC's gcloud uses sm-project-435806; login expired), and server/.env sent as a file.
-- Committed and pushed: graceful stop, Pillow + jsonschema in requirements.txt, design/25 and 26.
-- UNCOMMITTED on the PC (other builder sessions, ticket work): plugin/scripts/vw.py, server/app/stage3/assembly.py, server/app/visuals_stage.py, server/tests/test_concurrency.py, server/tests/test_exact_match.py, server/tests/_diag_hang.py. The PC server runs this code. Before the VM is built or cut over, these must be committed and pushed (after their own tests), so the VM runs the same code as the PC. Ask SK; do not commit someone else's work blind.
+- VM BUILT AND PUBLIC (server only; workers off; operator still on the PC). GCE VM `vw2`, project sm-project-435806, zone asia-south1-a, e2-standard-4, 100 GB, Ubuntu 24.04, static IP 8.234.82.225 (address `vw2-ip`), firewall rule `vw2-allow-web` (80/443, tag vw2-web). SSH: gcloud compute ssh vw2 --zone asia-south1-a --project sm-project-435806.
+- Public URL will be https://8-234-82-225.sslip.io (free IP hostname, A record only; SK asked for a default Google domain; *.run.app exists only for Cloud Run and has AAAA records). VW2_APP_ORIGIN on the VM is already set to it.
+- Running on the VM: vw2-server (127.0.0.1:8002, commit e918715, migrations applied, /api/meta OK), FFmpeg/ffprobe n9.0.2 in /usr/local/bin, spool /var/lib/vw2/spool, render-cache cleanup cron. vw2-worker installed but DISABLED.
+- HTTPS: Caddy with a Let's Encrypt certificate for 8-234-82-225.sslip.io (obtained 16 Oct 14:32 UTC, renews itself). From SK's PC: curl -4 https://8-234-82-225.sslip.io/api/meta -> 200 in 0.45 s; plugin's httpx client -> 200 in 1.6 s; no IPv6 offered.
+- Code reaches the VM as a git bundle (repo is private; the VM holds no GitHub credential): on the PC `git bundle create vw2.bundle origin/main main`, gcloud compute scp it to /tmp, then on the VM `sudo -u vw2 git -C /opt/vw2/app pull /tmp/vw2.bundle main`.
+- Everything still runs on SK's PC at http://localhost:8002 until cut-over.
+- Pushed: graceful stop (88bd430), tickets 12 and 13 fixes plus these handoffs (e918715). Only server/tests/_diag_hang.py (scratch diagnostic) is uncommitted.
 - VW-2 (VK Nardep): assembly film rendered (job bc95f76a, ready 11:59 UTC). No open jobs. Tickets 11, 12, 13 have no resolution note; 14 resolved (storage limit raised to 800 MB).
 
 WHEN THE DEPLOYMENT TEAM HANDS BACK
@@ -39,7 +42,7 @@ Drain VM workers (sudo systemctl stop vw2-worker; waits up to 40 min for running
 
 UPDATES ON THE VM (after cut-over)
 - Tell SK what changes and that workers restart. Run tests only for what changed, commit, push.
-- On the VM: cd /opt/vw2/app && sudo -u vw2 git pull && sudo -u vw2 /opt/vw2/venv/bin/pip install -r server/requirements.txt && sudo systemctl restart vw2-server vw2-worker
+- Bundle and copy main (see STATE), then on the VM: sudo -u vw2 git -C /opt/vw2/app pull /tmp/vw2.bundle main && sudo -u vw2 /opt/vw2/venv/bin/pip install -r /opt/vw2/app/server/requirements.txt && sudo systemctl restart vw2-server vw2-worker
 - The worker restart drains: running jobs finish first (up to 40 min). Then curl https://<domain>/api/meta.
 - Plugin updates: compile-check, sync to ~/.claude/plugins/cache/vw-local/vw/0.1.0 as before. No change for the VM.
 - Logs: journalctl -u vw2-server / -u vw2-worker. Spool: /var/lib/vw2/spool (paid-call journals; only spool/render is auto-cleaned after 7 days).

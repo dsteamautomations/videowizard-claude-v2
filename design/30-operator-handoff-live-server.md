@@ -4,7 +4,7 @@
 
 ## What is changing
 
-Today the VideoWizard server runs on SK's PC (`http://localhost:8002`). It is moving to a server on the internet, at an address like `https://vw2.digitalseo.in` (the builder will confirm the exact one).
+Today the VideoWizard server runs on SK's PC (`http://localhost:8002`). It is moving to a server on the internet, at `https://8-234-82-225.sslip.io` (the builder confirms it before the switch).
 
 After the switch:
 - Runs keep going when SK's PC is off: analysis, narration and film renders happen on the server.
