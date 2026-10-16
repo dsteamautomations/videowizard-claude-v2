@@ -1,4 +1,4 @@
-# 29 — From VW-2 to a stable build: how I would go about it (proposal for SK, 17 Oct 2026)
+# 32 — From VW-2 to a stable build: how I would go about it (proposal for SK, 17 Oct 2026)
 
 ## What VW-2 taught us
 VW-2 reached assembly in about a day and a half, with 14 tickets. Grouped by cause:
@@ -34,8 +34,8 @@ Found without tickets: a render failure nobody was told about, Supabase's error 
 - **Every stage's instructions are checked against v2's real commands.** Visuals is known to be wrong; check the others the same way.
 - **Generated takes are silent,** and the contact sheets you approved go in.
 
-### 3. Go live (the live-server thread, in progress)
-- Deploy per design/26: a Linux VM, FFmpeg 9.0, HTTPS, the worker's graceful stop.
+### 3. Go live (done 16 Oct by the live-server thread)
+- Live on GCE VM `vw2` since 16 Oct 14:39 UTC (design/29). The PC server and workers must not run.
 - A **scripted smoke run** on the live server: a 30-second script, 3 short clips, one real voice, real analysis, 2 real images and 1 real video take, through to delivery. It costs very little and takes about 20 minutes. It proves the live machine, storage, keys and limits end to end. Repeat it after every deploy.
 
 ### 4. The test round: a full production run on the live server (VW-3)

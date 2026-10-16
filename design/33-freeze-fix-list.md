@@ -1,4 +1,4 @@
-# 30 — Fix list before the code freeze (for SK's approval, 17 Oct 2026)
+# 33 — Fix list before the code freeze (for SK's approval, 17 Oct 2026)
 
 Scope: fix the **patterns** behind VW-2's 14 tickets, not only the tickets, then review and freeze. SK runs the test rounds. Each fix still gets its own fast checks, as the working rules require; I do not run the long suites. Another thread is bringing the system online in the same code folder.
 
@@ -50,11 +50,11 @@ Scope: fix the **patterns** behind VW-2's 14 tickets, not only the tickets, then
 1. Build A–E (and the F items you approve), each with its fast checks.
 2. Review the whole change set once more, file by file, against this list.
 3. Bump the server and plugin versions, tag the repository `v2.0.0-rc1`, and add a changelog entry to the walkthrough page.
-4. From then on, only fixes for tickets you raise, each recorded against the ticket. No features.
-5. The live-server thread deploys the tag, not whatever is in the folder.
+4. Deploy to the live VM the way design/29 (UPDATES) says: tell SK first, push, pull the bundle on the VM, restart the services (running jobs finish first). Sync the plugin. **Never start the server or workers on the PC.**
+5. From then on, only fixes for tickets you raise, each recorded against the ticket. No features.
 
 ## Coordination with the live-server thread
-Both threads work in the same code folder. It recently added the worker's graceful stop and committed some of my changes with its own. To avoid clashes, I touch only the files these fixes need: storage, plugin, the visuals, voice and intake instructions, the stage modules, and the tests. The live thread should deploy the `v2.0.0-rc1` tag once it exists.
+VideoWizard runs on the live VM since 16 Oct (design/29). Both threads work in the same code folder; I touch only the files these fixes need (storage, plugin, the visuals, voice and intake instructions, the stage modules, the tests). Updates reach the VM only as described in design/29, after SK's yes.
 
 ## Estimate
 | Group | Time |
