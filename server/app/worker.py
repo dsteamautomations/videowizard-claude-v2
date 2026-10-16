@@ -6,6 +6,7 @@ outcome becomes submission_unknown and waits for recover()."""
 import hashlib
 import json
 import os
+import signal
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,13 @@ from .voice_timing import check_words, clamp_words, decode_response, inspect_aud
 ALIGNMENT_TOLERANCE_S = 1.0  # MP3 frame padding: the provider's last character may end a little after the decoded duration
 
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
+
+STOP = False  # set by SIGTERM: finish the current job, claim nothing new, exit (design/25)
+
+
+def _stop(*_):
+    global STOP
+    STOP = True
 
 
 def durable(path, data):
@@ -139,6 +147,8 @@ def recover_voice(job, provider=None):
 def tick():
     """One pass over every provider family: voice, then analysis. Returns True when anything was processed."""
     busy = False
+    if STOP:
+        return busy
     with connect() as conn:
         job = jobs.claim(conn, 'elevenlabs')
     if job:
@@ -147,38 +157,52 @@ def tick():
             finalize_voice(conn, job, status, result, error, cost, retry_in)
         busy = True
     from . import analysis_jobs, visual_workers
-    if analysis_jobs.tick():
-        busy = True
-    if visual_workers.tick():
-        busy = True
     from .stage2 import render_jobs
-    if render_jobs.tick():
-        busy = True
+    for family in (analysis_jobs.tick, visual_workers.tick, render_jobs.tick):
+        if STOP:
+            break
+        if family():
+            busy = True
     return busy
 
 
 def main():
     n = settings().WORKERS
+    children = []
     if n > 1 and os.environ.get('VW2_WORKER_CHILD') != '1':
         import subprocess, sys
         children = [subprocess.Popen([sys.executable, '-m', 'app.worker'], env={**os.environ, 'VW2_WORKER_CHILD': '1'}) for _ in range(n - 1)]
         print(f'started {n} workers', flush=True)
-        try:
-            loop()
-        finally:
-            for c in children:
-                c.terminate()
-        return
-    loop()
+
+    def on_term(signum, frame):
+        _stop()
+        for c in children:
+            c.send_signal(signum)  # no-op for a child that already exited
+
+    signal.signal(signal.SIGTERM, on_term)
+    try:
+        loop()
+    finally:
+        for c in children:
+            c.terminate()  # POSIX: SIGTERM, so children drain; Windows: immediate kill, as before
+        for c in children:
+            c.wait()
+
+
+def pause(seconds):
+    for _ in range(seconds):
+        if STOP:
+            return
+        time.sleep(1)
 
 
 def loop():
     failures = 0
-    while True:
+    while not STOP:
         try:
             busy = tick()
             failures = 0
-            time.sleep(2 if busy else 10)
+            pause(2 if busy else 10)
         except KeyboardInterrupt:
             return
         except Exception as exc:  # connection problems: back off, keep job identities intact
@@ -186,7 +210,7 @@ def loop():
             print(f'worker error ({exc.__class__.__name__}); retrying', flush=True)
             if failures >= 5:
                 raise SystemExit('Worker stopped after five consecutive failures. Restore connectivity and restart.')
-            time.sleep(10)
+            pause(10)
 
 
 if __name__ == '__main__':

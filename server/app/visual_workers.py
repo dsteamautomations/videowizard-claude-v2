@@ -206,6 +206,9 @@ def tick():
         with connect() as conn:
             finalize_image(conn, job, *outcome)
         busy = True
+    from . import worker
+    if worker.STOP:
+        return busy
     with connect() as conn:
         job = claim_take(conn)
     if job:
