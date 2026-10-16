@@ -93,8 +93,24 @@ def process_image(job):
         return 'failed', {'phase': 'prepare'}, (exc.message if isinstance(exc, Problem) else f'{exc.__class__.__name__}: {exc}'), None, None
 
 
+def apply_image_result(conn, run_id, ref, status, result, error, cost):
+    """A finished image job's outcome on its reference: retained → candidate, rejected/failed → failed. Returns True when it changed."""
+    if status == 'retained':
+        ref.update(status='candidate', key=result['key'], sha256=result['sha256'], bytes=result['bytes'], width=result['width'], height=result['height'])
+        ref['generation'] = {**ref.get('generation', {}), 'cost': cost, 'revised_prompt': result.get('revised_prompt')}
+        jobs.record_file(conn, run_id, 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'image/png')
+        return True
+    if status in ('rejected', 'failed'):
+        ref.update(status='failed', error=error)
+        return True
+    return False
+
+
 def finalize_image(conn, job, status, result, error, cost, retry_in):
     jobs.finish(conn, job['id'], status, result=result, error=error, cost=cost, retry_in=retry_in)
+    # Ticket 9 (16 Oct 2026): this read-modify-write raced the server and the other workers, and two finished images were lost.
+    # The same per-run lock every server write takes serialises it; it is held until this transaction ends.
+    conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
     store = storage()
     k = f"{job['run_id']}/visuals/session.json"
     try:
@@ -102,15 +118,8 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
     except Problem:
         return
     ref = session['references'].get(job['request']['reference']['id'])
-    if not ref:
-        return
-    if status == 'retained':
-        ref.update(status='candidate', key=result['key'], sha256=result['sha256'], bytes=result['bytes'], width=result['width'], height=result['height'])
-        ref['generation'] = {**ref.get('generation', {}), 'cost': cost, 'revised_prompt': result.get('revised_prompt')}
-        jobs.record_file(conn, job['run_id'], 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'image/png')
-    elif status in ('rejected', 'failed'):
-        ref.update(status='failed', error=error)
-    store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+    if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
+        store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
 
 
 # ---------- video takes ----------

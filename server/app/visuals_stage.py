@@ -445,11 +445,26 @@ def add_asset(conn, store, user, run, outputs, shot_id, file_key, sha256, size, 
 
 # ---------- status / gap outputs ----------
 
+def reconcile(conn, run, session):
+    """Ticket 9: repair references left 'generating' after their image job finished (a lost write). Returns how many changed."""
+    from .visual_workers import apply_image_result
+    fixed = 0
+    for ref in session['references'].values():
+        if ref.get('status') != 'generating' or not ref.get('job_id'):
+            continue
+        job = conn.execute('select status, result, error, cost from vw2_jobs where id=%s', (ref['job_id'],)).fetchone()
+        if job and apply_image_result(conn, run['id'], ref, job['status'], job['result'] or {}, job['error'], job['cost']):
+            fixed += 1
+    return fixed
+
+
 def status(conn, store, run, outputs):
     try:
         session = session_of(store, run, outputs)
     except Problem:
         return {'state': 'not_prepared', 'next': 'prepare'}
+    if reconcile(conn, run, session):
+        save_session(store, run, session)
     plan = current_plan(store, session) if session.get('current') else None
     gaps = []
     for gid, g in session['source']['gaps'].items():

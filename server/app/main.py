@@ -733,7 +733,7 @@ def _planning_run(conn, user, run_id):
 
 @app.get('/api/runs/{run_id}/planning')
 def planning_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)
+    run = core.load_run(conn, user, run_id, lock=True)   # it saves the session (ticket 9)
     return Response(planning_stage.status(conn, storage(), run))
 
 
@@ -858,7 +858,7 @@ def _visuals_call(conn, user, run_id, body, fn, status=200):
 
 @app.get('/api/runs/{run_id}/visuals')
 def visuals_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)
+    run = core.load_run(conn, user, run_id, lock=True)   # ticket 9: it may repair and save the session
     return Response(visuals_stage.status(conn, storage(), run, core.current_outputs(conn, run['id'])))
 
 
@@ -1013,7 +1013,7 @@ def stage2_render(run_id: UUID, body: RenderBody, user=User, conn=DB):
 
 @app.get('/api/runs/{run_id}/stage2')
 def stage2_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)
+    run = core.load_run(conn, user, run_id, lock=True)   # it saves the session (ticket 9)
     return Response(stage2.status(conn, storage(), run))
 
 
@@ -1088,133 +1088,7 @@ def assembly_render(run_id: UUID, body: Write, user=User, conn=DB):
 
 @app.get('/api/runs/{run_id}/stage3')
 def stage3_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)
-    return Response(stage3.status(conn, storage(), run))
-
-
-@app.post('/api/runs/{run_id}/assembly/review')
-def assembly_review(run_id: UUID, body: ReviewBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.review(conn, storage(), user, run, body.decision, body.notes, body.frame_notes, body.quote))
-
-
-@app.post('/api/runs/{run_id}/assembly/record', status_code=201)
-def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.record(conn, storage(), user, run, body.quote), 201)
-
-
-@app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
-def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)
-
-
-@app.post('/api/runs/{run_id}/delivery/resolve/reserve')
-def delivery_reserve(run_id: UUID, body: ReserveBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))
-
-
-@app.post('/api/runs/{run_id}/delivery/resolve/mark')
-def delivery_mark(run_id: UUID, body: MarkBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
-
-
-@app.post('/api/runs/{run_id}/delivery/final', status_code=201)
-def delivery_final(run_id: UUID, body: Quote, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.final(conn, storage(), user, run, outputs, body.quote), 201)
-
-
-# ---------- stage 3: assembly / delivery ----------
-
-@app.post('/api/runs/{run_id}/assembly/prepare')
-def assembly_prepare(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.prepare(conn, storage(), user, run, outputs))
-
-
-@app.post('/api/runs/{run_id}/assembly/choose')
-def assembly_choose(run_id: UUID, body: ChooseBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.choose(storage(), user, run, body.shot_id, body.offset_frames, body.end_policy, body.accept_as_is))
-
-
-@app.post('/api/runs/{run_id}/assembly/stabilize')
-def assembly_stabilize(run_id: UUID, body: StabBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.stabilize(storage(), user, run, body.sub_clip_id, body.choice))
-
-
-@app.post('/api/runs/{run_id}/assembly/build')
-def assembly_build(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.build(conn, storage(), user, run, outputs))
-
-
-@app.post('/api/runs/{run_id}/assembly/render', status_code=201)
-def assembly_render(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.render(conn, storage(), user, run), 201)
-
-
-@app.get('/api/runs/{run_id}/stage3')
-def stage3_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)
-    return Response(stage3.status(conn, storage(), run))
-
-
-@app.post('/api/runs/{run_id}/assembly/review')
-def assembly_review(run_id: UUID, body: ReviewBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.review(conn, storage(), user, run, body.decision, body.notes, body.frame_notes, body.quote))
-
-
-@app.post('/api/runs/{run_id}/assembly/record', status_code=201)
-def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.record(conn, storage(), user, run, body.quote), 201)
-
-
-@app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
-def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)
-
-
-@app.post('/api/runs/{run_id}/delivery/resolve/reserve')
-def delivery_reserve(run_id: UUID, body: ReserveBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))
-
-
-@app.post('/api/runs/{run_id}/delivery/resolve/mark')
-def delivery_mark(run_id: UUID, body: MarkBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
-
-
-@app.post('/api/runs/{run_id}/delivery/final', status_code=201)
-def delivery_final(run_id: UUID, body: Quote, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.final(conn, storage(), user, run, outputs, body.quote), 201)
-
-
-# ---------- stage 3: assembly / delivery ----------
-
-@app.post('/api/runs/{run_id}/assembly/prepare')
-def assembly_prepare(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.prepare(conn, storage(), user, run, outputs))
-
-
-@app.post('/api/runs/{run_id}/assembly/choose')
-def assembly_choose(run_id: UUID, body: ChooseBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.choose(storage(), user, run, body.shot_id, body.offset_frames, body.end_policy, body.accept_as_is))
-
-
-@app.post('/api/runs/{run_id}/assembly/stabilize')
-def assembly_stabilize(run_id: UUID, body: StabBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.stabilize(storage(), user, run, body.sub_clip_id, body.choice))
-
-
-@app.post('/api/runs/{run_id}/assembly/build')
-def assembly_build(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.build(conn, storage(), user, run, outputs))
-
-
-@app.post('/api/runs/{run_id}/assembly/render', status_code=201)
-def assembly_render(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'assembly', body, lambda run, outputs: stage3.render(conn, storage(), user, run), 201)
-
-
-@app.get('/api/runs/{run_id}/stage3')
-def stage3_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)
+    run = core.load_run(conn, user, run_id, lock=True)   # it saves the session (ticket 9)
     return Response(stage3.status(conn, storage(), run))
 
 
