@@ -1,19 +1,27 @@
 <title>VideoWizard v2 Walkthrough</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap">
 <style>
-/* Layout: a film strip of twelve stages reads left to right, then one card per stage below; chalk-on-slate palette with a brass accent */
+/* Layout: a film strip of twelve stages reads left to right, then one card per stage below; chalk-on-slate palette with a brass accent; teal marks what changed on 15 Oct */
 :root{--bg:#f6f4ee;--fg:#1f2a2e;--muted:#5d6b70;--line:#d9d3c6;--card:#ffffff;--accent:#b4731c;--accent-ink:#ffffff;--paid:#8a2f2f;--mac:#2f5f8a;--soft:#efe9dc;
+ --changed:#0d6b60;--changed-soft:#e3f1ee;--changed-ink:#ffffff;
  --display:"Fraunces",Georgia,serif;--body:"Source Sans 3",system-ui,sans-serif}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#171c1f;--fg:#ebe6da;--muted:#a5afb3;--line:#33403f;--card:#1f2629;--accent:#d9a04a;--accent-ink:#171c1f;--paid:#e08a8a;--mac:#8ab8e8;--soft:#252d30;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#171c1f;--fg:#ebe6da;--muted:#a5afb3;--line:#33403f;--card:#1f2629;--accent:#d9a04a;--accent-ink:#171c1f;--paid:#e08a8a;--mac:#8ab8e8;--soft:#252d30;color-scheme:dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#171c1f;--fg:#ebe6da;--muted:#a5afb3;--line:#33403f;--card:#1f2629;--accent:#d9a04a;--accent-ink:#171c1f;--paid:#e08a8a;--mac:#8ab8e8;--soft:#252d30;
+ --changed:#6fd3c0;--changed-soft:#17322e;--changed-ink:#0f1f1c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171c1f;--fg:#ebe6da;--muted:#a5afb3;--line:#33403f;--card:#1f2629;--accent:#d9a04a;--accent-ink:#171c1f;--paid:#e08a8a;--mac:#8ab8e8;--soft:#252d30;
+ --changed:#6fd3c0;--changed-soft:#17322e;--changed-ink:#0f1f1c;color-scheme:dark}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.5;margin:0}
 .wrap{max-width:1040px;margin:0 auto;padding-block:40px 64px;padding-inline:20px}
 h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,5vw,44px);line-height:1.1;margin:0 0 8px;text-wrap:balance}
 h2{font-family:var(--display);font-weight:500;font-size:26px;margin:48px 0 12px;text-wrap:balance}
 p.lead{font-size:19px;max-width:62ch;color:var(--muted);margin:0 0 24px}
+a{color:var(--changed)}
+a:focus-visible{outline:2px solid var(--changed);outline-offset:2px}
+.notice{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;background:var(--changed-soft);border:1px solid var(--changed);border-radius:4px;padding:12px 16px;margin:0 0 20px;font-size:15.5px;max-width:880px}
+.notice b{color:var(--changed)}
 .legend{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:14px;color:var(--muted);margin:8px 0 20px}
 .legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-.legend .op::before{background:var(--accent)}.legend .ai::before{background:var(--fg)}.legend .srv::before{background:var(--muted)}.legend .pay::before{background:var(--paid)}.legend .mac::before{background:var(--mac)}
+.legend .op::before{background:var(--accent)}.legend .ai::before{background:var(--fg)}.legend .srv::before{background:var(--muted)}.legend .pay::before{background:var(--paid)}.legend .mac::before{background:var(--mac)}.legend .chg::before{background:var(--changed)}
+.legend .chg{color:var(--changed);font-weight:600}
 .strip{overflow-x:auto;padding:8px 0 16px}
 .strip svg{display:block;min-width:900px;width:100%;height:auto}
 .stage{display:grid;grid-template-columns:150px 1fr;gap:18px;padding:22px 0;border-top:1px solid var(--line)}
@@ -24,71 +32,92 @@ p.lead{font-size:19px;max-width:62ch;color:var(--muted);margin:0 0 24px}
 .stage .body p{margin:0 0 8px}
 .stage .out{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);padding:10px 14px;margin-top:10px;font-size:15.5px}
 .stage .out b{color:var(--accent)}
+.stage.changed .id{color:var(--changed)}
+.stage.changed .out{border-left-color:var(--changed)}
+.chg{color:var(--changed)}
+.stage .out .chg b,.chg b{color:var(--changed)}
 .tag{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-right:6px;vertical-align:2px}
 .tag.pay{background:var(--paid);color:#fff}.tag.mac{background:var(--mac);color:#fff}.tag.op{background:var(--accent);color:var(--accent-ink)}
+.tag.new{background:var(--changed);color:var(--changed-ink)}
+.stage .id .tag.new{display:inline-block;margin-top:8px;font-family:var(--body);font-size:11px}
 .who{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:12px}
 .who div{background:var(--soft);padding:14px 16px;border-radius:4px;font-size:15.5px}
 .who b{display:block;font-family:var(--display);font-size:18px;margin-bottom:4px}
 .rules{columns:2;column-gap:32px;font-size:15.5px;max-width:980px}
 .rules li{break-inside:avoid;margin-bottom:8px}
-@media (max-width:640px){.stage{grid-template-columns:1fr;gap:6px}.rules{columns:1}}
+.log{display:grid;gap:0;margin-top:8px}
+.entry{display:grid;grid-template-columns:120px 1fr;gap:18px;padding:20px 0;border-top:1px solid var(--line)}
+.entry:last-child{border-bottom:1px solid var(--line)}
+.entry time{font-variant-numeric:tabular-nums;font-weight:600;color:var(--changed);font-size:15px}
+.entry time small{display:block;color:var(--muted);font-weight:400;font-size:13px}
+.entry h3{font-family:var(--display);font-weight:500;font-size:20px;margin:0 0 8px;line-height:1.25;text-wrap:balance}
+.entry .body{min-width:0;font-size:15.5px}
+.entry .body p{margin:0 0 8px}
+.entry ul{margin:4px 0 10px;padding-left:20px}
+.entry li{margin-bottom:4px}
+.entry .lbl{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin:10px 0 2px}
+.stages{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stages span{font-size:12.5px;font-weight:600;border:1px solid var(--changed);color:var(--changed);border-radius:3px;padding:1px 7px}
+.entry.lead-entry h3{font-size:23px}
+@media (max-width:640px){.stage,.entry{grid-template-columns:1fr;gap:6px}.rules{columns:1}}
 code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:3px}
 </style>
 <div class="wrap">
 <h1>VideoWizard v2, from script to delivered film</h1>
 <p class="lead">You talk to an assistant in a chat. It runs one tool, the server keeps the order and the record, and the film is built on this machine. One trip to the Mac, at the very end, for DaVinci Resolve.</p>
 
-<div class="legend"><span class="op">operator decides</span><span class="ai">assistant writes</span><span class="srv">server checks and records</span><span class="pay">paid provider call</span><span class="mac">on the Mac</span></div>
+<p class="notice"><b>Updated 16 Oct 2026.</b> <span>Stages changed on 15 Oct are shown in teal, with the changed sentences in teal too.</span> <a href="#changelog">Read the changelog</a></p>
+
+<div class="legend"><span class="op">operator decides</span><span class="ai">assistant writes</span><span class="srv">server checks and records</span><span class="pay">paid provider call</span><span class="mac">on the Mac</span><span class="chg">changed 15 Oct</span></div>
 
 <div class="strip">
-<svg viewBox="0 0 1200 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Twelve stages in order: intake, brief, script, voice, media, analysis, options, master, first_cut, visuals, assembly, delivery">
-<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8a8578"/></marker></defs>
+<svg viewBox="0 0 1200 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Twelve stages in order: intake, brief, script, voice, media, analysis, options, master, first_cut, visuals, assembly, delivery. Teal dots mark the stages changed on 15 October: brief, script, voice, media, analysis, options, master, visuals, assembly and delivery.">
 <g font-family="Source Sans 3, system-ui, sans-serif" font-size="14">
 <rect x="10" y="40" width="1180" height="4" fill="#d9d3c6"/>
-<g id="s">
-<!-- words -->
+<g>
 <rect x="20" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="64" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">intake</text>
 <rect x="118" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="162" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">brief</text>
 <rect x="216" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="260" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">script</text>
-<!-- sound and pictures in -->
 <rect x="314" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#8a2f2f" stroke-width="2"/><text x="358" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">voice</text>
 <rect x="412" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="456" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">media</text>
 <rect x="510" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#8a2f2f" stroke-width="2"/><text x="554" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">analysis</text>
-<!-- deciding -->
 <rect x="608" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="652" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">options</text>
 <rect x="706" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="750" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">master</text>
 <rect x="804" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="848" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">first_cut</text>
-<!-- finishing -->
 <rect x="902" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#8a2f2f" stroke-width="2"/><text x="946" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">visuals</text>
 <rect x="1000" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#b4731c" stroke-width="2"/><text x="1044" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">assembly</text>
 <rect x="1098" y="20" width="88" height="44" rx="4" fill="#fff" stroke="#2f5f8a" stroke-width="2"/><text x="1142" y="47" text-anchor="middle" fill="#1f2a2e" font-weight="600">delivery</text>
 </g>
-<!-- group labels -->
-<g fill="#5d6b70" font-size="13" font-weight="600" letter-spacing="1">
+<g style="fill:var(--changed)">
+<circle cx="200" cy="22" r="6"/><circle cx="298" cy="22" r="6"/><circle cx="396" cy="22" r="6"/><circle cx="494" cy="22" r="6"/><circle cx="592" cy="22" r="6"/>
+<circle cx="690" cy="22" r="6"/><circle cx="788" cy="22" r="6"/><circle cx="984" cy="22" r="6"/><circle cx="1082" cy="22" r="6"/><circle cx="1180" cy="22" r="6"/>
+</g>
+<g style="fill:var(--muted)" font-size="13" font-weight="600" letter-spacing="1">
 <text x="162" y="92" text-anchor="middle">WORDS</text>
 <text x="456" y="92" text-anchor="middle">SOUND AND PICTURES IN</text>
 <text x="750" y="92" text-anchor="middle">DECIDING THE CUT</text>
 <text x="1044" y="92" text-anchor="middle">FINISHING</text>
 <path d="M20 78 H304" stroke="#d9d3c6" stroke-width="2"/><path d="M314 78 H598" stroke="#d9d3c6" stroke-width="2"/><path d="M608 78 H892" stroke="#d9d3c6" stroke-width="2"/><path d="M902 78 H1186" stroke="#d9d3c6" stroke-width="2"/>
 </g>
-<!-- what each produces -->
-<g fill="#1f2a2e" font-size="12.5">
+<g style="fill:var(--fg)" font-size="12.5">
 <text x="64" y="125" text-anchor="middle">clean script</text><text x="64" y="141" text-anchor="middle">+ title</text>
 <text x="162" y="125" text-anchor="middle">five</text><text x="162" y="141" text-anchor="middle">decisions</text>
 <text x="260" y="125" text-anchor="middle">final wording</text><text x="260" y="141" text-anchor="middle">in beats</text>
 <text x="358" y="125" text-anchor="middle">narration.mp3</text><text x="358" y="141" text-anchor="middle">+ word timing</text>
 <text x="456" y="125" text-anchor="middle">clips uploaded</text><text x="456" y="141" text-anchor="middle">+ checked</text>
 <text x="554" y="125" text-anchor="middle">one log per</text><text x="554" y="141" text-anchor="middle">clip + card</text>
-<text x="652" y="125" text-anchor="middle">review film</text><text x="652" y="141" text-anchor="middle">with options</text>
-<text x="750" y="125" text-anchor="middle">master film</text><text x="750" y="141" text-anchor="middle">+ gaps</text>
 <text x="848" y="125" text-anchor="middle">approved</text><text x="848" y="141" text-anchor="middle">first cut</text>
 <text x="946" y="125" text-anchor="middle">images and</text><text x="946" y="141" text-anchor="middle">takes per gap</text>
 <text x="1044" y="125" text-anchor="middle">complete</text><text x="1044" y="141" text-anchor="middle">film</text>
 <text x="1142" y="125" text-anchor="middle">package +</text><text x="1142" y="141" text-anchor="middle">Resolve timeline</text>
 </g>
-<g fill="#8a2f2f" font-size="11.5" font-weight="600"><text x="358" y="170" text-anchor="middle">ElevenLabs</text><text x="554" y="170" text-anchor="middle">Gemini 3.8 Flash</text><text x="946" y="170" text-anchor="middle">OpenAI images / video</text></g>
-<g fill="#2f5f8a" font-size="11.5" font-weight="600"><text x="1142" y="170" text-anchor="middle">one Mac trip</text></g>
-<g fill="#5d6b70" font-size="12"><text x="600" y="210" text-anchor="middle">Every stage ends with an explicit yes from the operator in chat. The server stores that reply word for word and only then moves to the next stage.</text></g>
+<g style="fill:var(--changed)" font-size="12.5" font-weight="600">
+<text x="652" y="125" text-anchor="middle">review film with</text><text x="652" y="141" text-anchor="middle">numbered slides</text>
+<text x="750" y="125" text-anchor="middle">master film</text><text x="750" y="141" text-anchor="middle">+ blanks</text>
+</g>
+<g style="fill:var(--paid)" font-size="11.5" font-weight="600"><text x="358" y="170" text-anchor="middle">ElevenLabs</text><text x="554" y="170" text-anchor="middle">Gemini 3.8 Flash</text><text x="946" y="170" text-anchor="middle">OpenAI images / video</text></g>
+<g style="fill:var(--mac)" font-size="11.5" font-weight="600"><text x="1142" y="170" text-anchor="middle">one Mac trip</text></g>
+<g style="fill:var(--muted)" font-size="12"><text x="600" y="210" text-anchor="middle">Every stage ends with an explicit yes from the operator in chat. The server stores that reply word for word and only then moves to the next stage.</text></g>
 </g>
 </svg>
 </div>
@@ -107,48 +136,59 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background
 <p>The run starts with a client chosen from the company directory and the script document. The assistant separates the spoken lines from everything else in the document and suggests up to three titles. You pick one, or type your own.</p>
 <div class="out"><b>Creates</b> the clean script, the original document, and the title on the run.</div></div></div>
 
-<div class="stage"><div class="id">2 · brief<small>words</small></div><div class="body">
+<div class="stage changed"><div class="id">2 · brief<small>words</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
 <p>Five decisions about the film: purpose, audience, message, tone, ending. The assistant proposes them from the script and asks only the questions that would change the film. Your answers are stored in your own words. Production details come here too: target length, process stages, brand rules, languages.</p>
+<p class="chg">Brand and safety rules are asked for explicitly. None are filled in from examples, so a rule such as "everyone wears PPE" applies only when you give it.</p>
 <div class="out"><b>Creates</b> the brief with its reasons and your answers.</div></div></div>
 
-<div class="stage"><div class="id">3 · script<small>words</small></div><div class="body">
-<p>One wording pass against the brief. Every proposed change is shown as before and after with a reason. You accept all, some, or keep the original. The accepted text is split into numbered <b>beats</b>: a beat is one paragraph of the script, the unit the film is built in (the earlier application called the same thing a passage, P001, P002; BEAT_01 is P001).</p>
+<div class="stage changed"><div class="id">3 · script<small>words</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<p>One wording pass against the brief. Every proposed change is shown as before and after with a reason. You accept all, some, or keep the original. The accepted text is split into numbered <b>beats</b>: a beat is one paragraph of the script (the earlier application called it a passage, P001, P002; BEAT_01 is P001).</p>
+<p class="chg">A paragraph beat is only the starting point. In options you can split the narration into scenes at sentence starts instead, without changing the script or re-recording.</p>
 <div class="out"><b>Creates</b> the final spoken text with beats BEAT_01, BEAT_02 and so on. Everything after this is bound to this exact text.</div></div></div>
 
-<div class="stage"><div class="id">4 · voice<small><span class="tag pay">paid</span></small></div><div class="body">
+<div class="stage changed"><div class="id">4 · voice<small><span class="tag pay">paid</span></small><span class="tag new">Changed 15 Oct</span></div><div class="body">
 <p>Choosing a voice: catalogue browsing, previews, up to six short auditions on one passage, then the full narration. You listen to the files the assistant downloads for you. ElevenLabs is paid; the assistant tells you, then proceeds.</p>
-<div class="out"><b>Creates</b> <code>narration.mp3</code> and a timing file with the start and end of every word. The narration is never cut or changed after this.</div></div></div>
+<div class="out"><b>Creates</b> <code>narration.mp3</code> and a timing file with the start and end of every word. <span class="chg">The narration is never re-recorded and its words never change. It is cut only between sentences, at pauses you approve in options, and silence is added there.</span></div></div></div>
 
-<div class="stage"><div class="id">5 · media<small>pictures in</small></div><div class="body">
+<div class="stage changed"><div class="id">5 · media<small>pictures in</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
 <p>You copy the clips into the run folder. The tool lists them with length, size and sound, skips exact duplicates, converts phone clips with variable frame rate, and uploads each one with a receipt.</p>
+<p class="chg">Three clips upload at a time. A dropped connection is retried after 5, 15 and 30 seconds, and large files are checked by size instead of being downloaded again.</p>
 <div class="out"><b>Creates</b> the clip list that every later stage refers to.</div></div></div>
 
-<div class="stage"><div class="id">6 · analysis<small><span class="tag pay">paid</span></small></div><div class="body">
-<p>Each clip is watched once by Gemini 3.8 Flash, which writes a detailed log: usable sub-clips with exact frames, who is talking and when, camera and movement, which beats the clip could serve, clean sound intervals, safety flags. The server then works out, for every sub-clip, whether it can be used as is, cropped to hide a speaker, or not at all. Five clips run at a time.</p>
+<div class="stage changed"><div class="id">6 · analysis<small><span class="tag pay">paid</span></small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<p>Each clip is watched once by Gemini 3.8 Flash, which writes a detailed log: usable sub-clips with exact frames, who is talking and when, camera and movement, clean sound intervals, safety flags. The server then works out, for every sub-clip, whether it can be used as is, cropped to hide a speaker, or not at all. Five clips run at a time.</p>
+<p class="chg">A client rule can be dropped afterwards, for example "no PPE rule for this client". Every clip is then re-checked from the saved logs at no cost, without watching the clips again.</p>
 <div class="out"><b>Creates</b> one log per clip and a 10-line summary card. Ask the assistant for a clip's card at any time.</div></div></div>
 
-<div class="stage"><div class="id">7 · options<small>deciding the cut</small></div><div class="body">
-<p>The assistant first shows a coverage report: for each beat, how many good candidates exist and which beats have none. Then it proposes, per beat, a primary and a secondary option, each a short sequence of sub-clips. The server refuses anything that breaks the editing rules. The server renders a <b>review film</b>: a 3-second slate before every numbered option, then the option with its narration.</p>
-<div class="out"><b>Creates</b> the review film and the numbered option list. You watch the film.</div></div></div>
+<div class="stage changed"><div class="id">7 · options<small>deciding the cut</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<p class="chg"><b>Scenes and pauses.</b> When the script is one paragraph, the assistant proposes scenes, each starting at a sentence and tied to a process stage from the brief. It also proposes pauses, only after a sentence ends, at most 4 seconds each, with a reason. The recording's own gap counts toward each pause. One yes from you approves both.</p>
+<p class="chg"><b>Exact matches first.</b> Real footage goes only where it shows exactly what is being said, cut into short shots of about 2 to 3.5 seconds. Everything else is a blank, at least 3 seconds, for AI video or animation later. Each clip is used once.</p>
+<p class="chg"><b>Decisions.</b> B-roll, a second use of any clip, a clip to check by eye, and a poor-quality match each come behind a decision slide.</p>
+<p>The assistant first shows a coverage report, then proposes a first and, where possible, a backup option for each scene. <span class="chg">Before rendering, it shows the seconds of real footage, blanks and decisions in each scene.</span> The server refuses anything that breaks the editing rules, then renders the <b>review film</b>.</p>
+<div class="out"><b>Creates</b> <span class="chg">the review film with numbered slides: <code>#05</code> a scene, <code>BACKUP for #05</code>, <code>DECISION</code> with its question, and <code>BLANK</code> cards that the narration plays under. It is a lighter 720p copy, so it uploads quickly.</span> You watch the film.</div></div></div>
 
-<div class="stage"><div class="id">8 · master<small>deciding the cut</small></div><div class="body">
-<p>You give one decision per option number: keep, reject with a reason, or keep with a small trim. The server checks that nothing is used twice, applies the trims within the rules, and builds a fresh master. Beats with no kept option become gaps for the next stages. Your rejection reasons are remembered for this client's future films.</p>
-<div class="out"><b>Creates</b> the <b>master film</b> with gap cards where pictures are still missing, and the list of gaps.</div></div></div>
+<div class="stage changed"><div class="id">8 · master<small>deciding the cut</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<p class="chg">You answer every numbered slide by its number, for example "#05 keep, #06 reject, #12 drop". Scene and backup slides: keep, reject with a reason, or keep with a small trim. Decision slides: keep or drop. Blank slides need no answer. A dropped placement becomes part of a blank.</p>
+<p>The server checks that nothing is used twice unless you kept a reuse, applies the trims within the rules, and builds a fresh master. Your rejection reasons are remembered for this client's future films.</p>
+<div class="out"><b>Creates</b> the <b>master film</b> <span class="chg">with BLANK cards wherever pictures are still to come, and one gap per blank, each with its intent and the words under it.</span></div></div></div>
 
 <div class="stage"><div class="id">9 · first_cut<small>deciding the cut</small></div><div class="body">
 <p>One question: did you watch the master film and listen to it, and do you approve it as the first cut? Your reply must say both.</p>
 <div class="out"><b>Creates</b> the approved first cut, locked to the exact film file.</div></div></div>
 
-<div class="stage"><div class="id">10 · visuals<small><span class="tag pay">paid</span></small></div><div class="body">
+<div class="stage changed"><div class="id">10 · visuals<small><span class="tag pay">paid</span></small><span class="tag new">Changed 15 Oct</span></div><div class="body">
 <p>For each gap, the assistant plans what the picture should be, gathers reference images (a frame from a clip, a photo you supply, or a generated image from OpenAI), and either generates a short video take or uses a still or movie you provide. You approve each reference by looking at it, and each take by watching it.</p>
+<p class="chg">Gaps now include the blanks inside scenes, each with what it must show. One generated shot is at most 30 seconds, so a longer blank is made as several shots.</p>
 <div class="out"><b>Creates</b> the chosen take or asset for every gap, with its references.</div></div></div>
 
-<div class="stage"><div class="id">11 · assembly<small>finishing</small></div><div class="body">
-<p>The master plus the gap fills becomes the whole film. You choose per fill how a take sits in its slot, and for any shaky shot whether to leave it, stabilise it, or swap it. The narration is untouched, the clips' own clean sound is placed quietly under it, no music. You watch and listen, ask for changes, or accept.</p>
+<div class="stage changed"><div class="id">11 · assembly<small>finishing</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<p>The master plus the gap fills becomes the whole film. You choose per fill how a take sits in its slot, and for any shaky shot whether to leave it, stabilise it, or swap it. The clips' own clean sound is placed quietly under the narration, no music. You watch and listen, ask for changes, or accept.</p>
+<p class="chg">The narration is laid with the pauses you approved; its words are untouched.</p>
 <div class="out"><b>Creates</b> the <b>complete film</b> as one MP4, with loudness measured and recorded.</div></div></div>
 
-<div class="stage"><div class="id">12 · delivery<small><span class="tag mac">mac</span></small></div><div class="body">
+<div class="stage changed"><div class="id">12 · delivery<small><span class="tag mac">mac</span></small><span class="tag new">Changed 15 Oct</span></div><div class="body">
 <p>The package is written: the approved film, the narration, the original clips used, the normalised fills, the plans, subtitles, a finishing checklist for the editor, and a media-pool sheet. Then the one Mac step: pull the run on the Mac and run the Resolve step once. It builds a DaVinci Resolve 21.1.1 timeline that reproduces the film's cuts and crops, exports it, reopens it to verify, and uploads it. Back here, you confirm five things: watched, listened, read the subtitles, timeline verified, package complete. Then the run closes and keeps only what matters.</p>
+<p class="chg">Subtitles have one line per sentence, timed with the pauses. In Resolve the narration is placed as pieces on whole frames, one per stretch between pauses, and the check after reopening covers those pieces too.</p>
 <div class="out"><b>Creates</b> the delivery package with <code>Approved-film.mp4</code> and <code>Approved-timeline.drt</code>, ready for the editor.</div></div></div>
 
 <h2>Five rules that hold everywhere</h2>
@@ -162,4 +202,93 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background
 
 <h2>Where things are</h2>
 <p>On this machine, everything for one run lives in <code>runs/VW-n/</code>: <code>in/</code> for what you drop in, <code>out/</code> for what the assistant and the tool produce, <code>work/</code> for scratch that is deleted at close. The server keeps every stage's output, your approvals, costs and the files, and the web page at <code>/runs</code> lists every run with its stage.</p>
+
+<h2 id="changelog">Changelog</h2>
+<p class="lead">Every change since this page was last updated, newest first. Times are IST on 15 October 2026.</p>
+<div class="log">
+
+<div class="entry lead-entry"><time>20:03<small>built by 22:37</small></time><div class="body">
+<h3>Exact-match editing and numbered slides</h3>
+<span class="lbl">You asked</span>
+<p>After watching the first VW-2 review film: use real footage only where it shows exactly what is said, in short shots cut to the meaning. Leave every other stretch blank for AI video or animation. A blank is at least 3 seconds; AI shots are at most 30 seconds each, and there is no limit on total length. Use each clip once. Offer B-roll and any reuse, including another part of the same clip, as a choice behind a slide. Number every slide and drop the confusing words "option" and "beat".</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>Options: blanks inside a scene, each with what it must show. Every real shot states how it matches the words.</li>
+<li>Decision slides for B-roll, reuse, clips to check by eye, poor-quality matches and unsure joins.</li>
+<li>A clip is used once unless you keep a reuse. Real shots over 4 seconds must say why.</li>
+<li>Slides written by the server and numbered in film order: scene, BACKUP for #n, DECISION, BLANK, with readable clip names.</li>
+<li>Review film: blanks are captioned cards with the narration still playing; decision slides are silent and keep words with their pictures.</li>
+<li>Master: answers by slide number; a dropped placement becomes a blank; each blank is a gap for visuals with its intent and the words under it.</li>
+<li>Visuals: one generated shot at most 30 seconds. The assistant's options instructions were rewritten around exact matches first.</li>
+</ul>
+<span class="lbl">Testing</span>
+<p>12 new tests, one for each agreed edge case, plus an end-to-end run from options to visuals. The affected stages were re-tested: 64 of 65 passed, and the one failure was a mistake in a test, fixed and passed. Full report: design/23.</p>
+<div class="stages"><span>7 options</span><span>8 master</span><span>10 visuals</span></div>
+</div></div>
+
+<div class="entry"><time>16:18</time><div class="body">
+<h3>Review film too large to upload</h3>
+<span class="lbl">You asked</span>
+<p>Why rendering was taking so long after 15 minutes. The film had rendered, but the 513 MB upload timed out.</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>The review film is a 720p copy, roughly 60 to 100 MB. Master and final film keep full quality.</li>
+<li>A render that runs again reuses the pieces it already made.</li>
+<li>Server uploads retry a dropped or stalled connection.</li>
+</ul>
+<div class="stages"><span>7 options</span><span>all films</span></div>
+</div></div>
+
+<div class="entry"><time>15:10</time><div class="body">
+<h3>Ticket 7: approved scenes disappeared</h3>
+<span class="lbl">You asked</span>
+<p>Check and clear ticket 7: the scenes were recorded, but the options still showed one beat.</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>Storage reads always get the latest copy. The storage service's cache had returned an old one.</li>
+<li>A failed read never starts an empty record.</li>
+<li>Scenes accept a single process stage, and a missing <code>--file</code> is refused clearly.</li>
+<li>Your 9 scenes and 8 pauses were re-applied with your original approval.</li>
+</ul>
+<div class="stages"><span>7 options</span></div>
+</div></div>
+
+<div class="entry"><time>14:50</time><div class="body">
+<h3>Scenes, sentence-end pauses, word-timed rules</h3>
+<span class="lbl">You asked</span>
+<p>Split the one-paragraph narration into scenes without re-recording. Add pauses only at the end of a sentence, so an activity can finish on screen; never force a pause. Later voiceovers will carry their own gaps.</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>Scenes and pauses on the existing narration, approved with one yes. A pause states the total silence wanted; the recording's own gap counts.</li>
+<li>Films, subtitles (one per sentence) and the Resolve timeline all carry the pauses.</li>
+<li>Editor warnings: start a shot 6 to 12 frames before its phrase, land the action word on the action, and do not cut inside a long pause.</li>
+<li>Media uploads three at a time. Re-checking clip rules waits up to 10 minutes. Defects 3 to 6 closed with their causes.</li>
+</ul>
+<div class="stages"><span>3 script</span><span>4 voice</span><span>5 media</span><span>6 analysis</span><span>7 options</span><span>11 assembly</span><span>12 delivery</span></div>
+</div></div>
+
+<div class="entry"><time>12:47</time><div class="body">
+<h3>Drop the PPE rule for this client</h3>
+<span class="lbl">You asked</span>
+<p>Drop the PPE rule for VK Nardep.</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>A safety rule can be waived for a client, and every clip is re-checked from the saved logs at no cost.</li>
+<li>The brief no longer fills brand rules in from examples.</li>
+</ul>
+<div class="stages"><span>2 brief</span><span>6 analysis</span></div>
+</div></div>
+
+<div class="entry"><time>11:57</time><div class="body">
+<h3>Tool error after a message edit</h3>
+<span class="lbl">You asked</span>
+<p>The VW-2 chat reported an error on every command.</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>A one-character mistake in a message broke the tool. It was fixed, and a test now checks that every part of the tool loads before an update goes out.</li>
+</ul>
+<div class="stages"><span>all stages</span></div>
+</div></div>
+
+</div>
 </div>
