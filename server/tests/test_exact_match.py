@@ -274,3 +274,51 @@ def test_after_three_review_rounds_the_assistant_suggests_blanks():
     from app.stage2 import stage as S
     assert S.round_advice(1) is None and S.round_advice(3) is None
     assert 'blanks' in S.round_advice(4) and 'round 4' in S.round_advice(4)
+
+
+def test_blanks_inside_a_scene_go_through_visuals_and_assembly(home, database, fake, gemini):
+    """Tickets 12 and 13: a gap named BEAT_01-B1 (a blank inside scene 1) is filled, recorded and assembled; two of its shots share one still."""
+    from test_visuals import png_bytes, scene, shot, vplan
+    code, ws, _ = run_until_options(home, database, fake, gemini)
+    _, pk = approve_scenes(home, ws, pause_s=4.0)
+    doc, gap, n1, n3 = author_exact(pk)
+    (ws / 'out' / 'options.json').write_text(json.dumps(doc), encoding='utf-8')
+    assert vw(home, 'options', 'propose', '--file', 'out/options.json')[0] == 0
+    assert vw(home, 'options', 'render')[0] == 0
+    drain()
+    assert vw(home, 'options', 'record', '--quote', 'yes, these options')[0] == 0
+    assert vw(home, 'master', 'decide', '--slide', '1', '--action', 'KEEP')[0] == 0
+    assert vw(home, 'master', 'decide', '--slide', '3', '--action', 'DROP')[0] == 0
+    assert vw(home, 'master', 'build')[0] == 0
+    assert vw(home, 'master', 'render')[0] == 0
+    drain()
+    assert vw(home, 'master', 'record', '--quote', 'yes the master')[0] == 0
+    rc, out, err = vw(home, 'first-cut', 'record', '--quote', 'yes, watched and listened')
+    assert rc == 0 and out['gaps'] == ['BEAT_01-B1', 'BEAT_02'], (out, err)
+    gaps = {g['shot_id']: g for g in vw(home, 'view', '--stage', 'first_cut')[1]['outputs'][0]['summary']['gaps']}
+    assert vw(home, 'visuals', 'prepare')[0] == 0
+    b1, b2 = gaps['BEAT_01-B1'], gaps['BEAT_02']
+    mid = (b1['start_frame'] + b1['end_frame']) // 2
+    plan = {'foundation': {'treatment': 'documentary', 'appearance': 'warm'}, 'elements': [{'id': 'E1', 'name': 'wall', 'kind': 'object', 'identity': 'representative', 'requirements': 'a wall'}],
+            'gaps': [{'gap_id': 'BEAT_01-B1', 'intent': 'curing', 'treatment_fit': 'fits', 'scenes': [scene('SC1', [shot('VA', b1['start_frame'], mid, 'image', subjects=False),
+                                                                                                                  shot('VB', mid, b1['end_frame'], 'image', subjects=False)])]},
+                     {'gap_id': 'BEAT_02', 'intent': 'not fired', 'treatment_fit': 'fits', 'scenes': [scene('SC2', [shot('VC', b2['start_frame'], b2['end_frame'], 'image', subjects=False)])]}]}
+    rc, out, err = vw(home, 'visuals', 'propose', '--file', vplan(ws, plan))
+    assert rc == 0, (out, err)
+    assert vw(home, 'visuals', 'accept', '--gaps', 'BEAT_01-B1', 'BEAT_02', '--quote', 'yes')[0] == 0
+    (ws / 'out' / 'placeholder.png').write_bytes(png_bytes((40, 40, 40), (1920, 1080)))
+    assert vw(home, 'upload', '--stage', 'visuals', '--file', 'out/placeholder.png')[0] == 0
+    for s in ('VA', 'VB', 'VC'):   # one file shared by three shots, two of them in the same gap (ticket 12)
+        assert vw(home, 'visuals', 'asset', '--shot', s, '--file', 'out/placeholder.png', '--kind', 'still', '--quote', 'placeholder')[0] == 0
+    for g in ('BEAT_01-B1', 'BEAT_02'):
+        rc, out, err = vw(home, 'visuals', 'record', '--gap', g, '--quote', 'done')
+        assert rc == 0, (out, err)
+    assert vw(home, 'next')[1]['stage'] == 'assembly'
+    rc, out, err = vw(home, 'assembly', 'prepare')
+    assert rc == 0 and set(out['fills']) == {'VA', 'VB', 'VC'}, (out, err)
+    rc, out, err = vw(home, 'assembly', 'build')
+    assert rc == 0, (out, err)
+    assert vw(home, 'assembly', 'render')[0] == 0
+    drain()
+    rc, out, err = vw(home, 'assembly', 'fetch')
+    assert rc == 0 and abs(out['duration_s'] - pk['narration']['total_frames'] / FPS) < 0.15, (out, err)

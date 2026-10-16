@@ -479,6 +479,16 @@ def status(conn, store, run, outputs):
     return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_}
 
 
+def unique_by_name(files):
+    """Ticket 12: one entry per file name, not per stored key, so two shots may share one placeholder or image."""
+    seen, out = set(), []
+    for f in files:
+        if f['name'] not in seen:
+            seen.add(f['name'])
+            out.append(f)
+    return out
+
+
 def record_gap(conn, store, user, run, outputs, gap_id, quote):
     """Stage output for one gap: every shot has a selected take or an asset."""
     session = session_of(store, run, outputs)
@@ -507,11 +517,7 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
                 r = session['references'][b['id']]
                 files.append({'name': f"ref-{b['id'][:8]}.png", 'key': r['key'], 'sha256': r['sha256'], 'bytes': r['bytes'], 'location': 'storage', 'receipt': True})
                 jobs.record_file(conn, run['id'], STAGE, r['key'], f"ref-{b['id'][:8]}.png", r['sha256'], r['bytes'], 'image/png')
-    seen, unique_files = set(), []
-    for f in files:
-        if f['key'] not in seen:
-            seen.add(f['key'])
-            unique_files.append(f)
+    unique_files = unique_by_name(files)
     image_cost = [r.get('generation', {}).get('cost') for r in session['references'].values() if r.get('generation', {}).get('cost')]
     out = core.output(conn, user, run, {'stage': STAGE, 'unit': gap_id, 'files': unique_files, 'accepted_quote': quote,
                                         'summary': {'gap_id': gap_id, 'plan_digest': session['current'], 'shots': shots, 'take_cost': cost, 'image_cost': image_cost}})

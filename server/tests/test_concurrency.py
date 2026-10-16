@@ -71,3 +71,21 @@ def test_every_request_that_saves_a_session_takes_the_run_lock_and_no_route_is_d
     for name in ('visuals_status', 'planning_status', 'stage2_status', 'stage3_status'):
         body = re.search(rf'def {name}\(.*?\n(.*?)\n\n', src, re.S).group(1)
         assert 'lock=True' in body, name
+
+
+# ---------- ticket 12: two shots sharing one file ----------
+
+def test_a_recorded_gap_keeps_every_shot_that_shares_one_file():
+    files = [{'name': 'S4-asset.png', 'key': 'run/visuals/placeholder.png', 'sha256': 'p'}, {'name': 'S5-asset.png', 'key': 'run/visuals/placeholder.png', 'sha256': 'p'},
+             {'name': 'ref-1.png', 'key': 'run/visuals/references/1.png', 'sha256': 'r'}, {'name': 'ref-1.png', 'key': 'run/visuals/references/1.png', 'sha256': 'r'}]
+    assert [f['name'] for f in VS.unique_by_name(files)] == ['S4-asset.png', 'S5-asset.png', 'ref-1.png']
+
+
+def test_assembly_finds_a_shared_file_in_a_gap_recorded_before_the_fix():
+    from app.stage3.assembly import fill_file
+    files = [{'name': 'S4-asset.png', 'key': 'run/visuals/placeholder.png', 'sha256': 'p', 'bytes': 1}]       # S5's entry was dropped
+    s5 = {'shot_id': 'S5', 'source': 'asset', 'kind': 'still'}
+    assert fill_file(files, s5, 'S5-asset.png', {'S5': {'key': 'run/visuals/placeholder.png', 'sha256': 'p'}})['name'] == 'S5-asset.png'
+    assert fill_file(files, s5, 'S5-asset.png', {'S5': {'key': 'run/visuals/placeholder.png', 'sha256': 'other'}}) is None   # different file: refused
+    assert fill_file(files, s5, 'S5-asset.png', {}) is None
+    assert fill_file(files, {'shot_id': 'T1', 'source': 'take'}, 'T1.mp4', {}) is None                       # takes are never guessed

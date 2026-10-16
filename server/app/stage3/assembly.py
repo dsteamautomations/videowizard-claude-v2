@@ -43,6 +43,18 @@ def save_session(store, run, session):
     return session
 
 
+def fill_file(files, shot, name, visuals_assets):
+    """A gap's file for one shot, by name. Ticket 12: gaps recorded before 16 Oct dropped a second shot's entry when two shots shared one
+    file; the shot's asset in the visuals record names that file, and it is used only if the gap's recorded output holds the same
+    stored file with the same fingerprint."""
+    ref = next((f for f in files if f['name'] == name), None)
+    if ref or shot['source'] != 'asset':
+        return ref
+    asset = visuals_assets.get(shot['shot_id']) or {}
+    same = next((f for f in files if f['key'] == asset.get('key') and f['sha256'] == asset.get('sha256')), None)
+    return {**same, 'name': name} if same else None
+
+
 def probe_file(store, k, name):
     with tempfile.TemporaryDirectory(prefix='vw2-probe-') as folder:
         p = Path(folder) / (name or 'x.mp4')
@@ -67,25 +79,34 @@ def prepare(conn, store, user, run, outputs):
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     session = session_of(store, run, create=True)
     fills = {}
+    found = []   # ticket 12: find every fill's file before probing any, so a missing file fails in seconds, not after the downloads
+    visuals_assets = None
     for g in plan['gaps']:
         vo = next((o for o in outputs if o['stage'] == 'visuals' and o['unit'] == g['shot_id']), None)
         if not vo:
             raise Problem(409, 'NOT_ALLOWED', f"Gap {g['shot_id']} has no recorded visuals output.")
         for shot in vo['summary']['shots']:
             name = f"{shot['shot_id']}.mp4" if shot['source'] == 'take' else f"{shot['shot_id']}-asset{'.mp4' if shot.get('kind') == 'movie' else '.png'}"
-            ref = next((f for f in vo['files'] if f['name'] == name), None)
+            if shot['source'] == 'asset' and visuals_assets is None and not any(f['name'] == name for f in vo['files']):
+                try:
+                    visuals_assets = S2.load_json(store, f"{run['id']}/visuals/session.json").get('assets') or {}
+                except Problem:
+                    visuals_assets = {}
+            ref = fill_file(vo['files'], shot, name, visuals_assets or {})
             if not ref:
                 fail(f"Visuals output for {g['shot_id']} lacks the file {name}.")
-            placement = shot['placement']
-            slot = placement['end_frame'] - placement['start_frame']
-            if ref['name'].endswith('.png'):
-                meta = {'kind': 'still', 'duration_s': None, 'fps': None, 'issues': []}
-            else:
-                meta = {'kind': 'movie', **probe_file(store, ref['key'], ref['name'])}
-            avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
-            fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
-                                      'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'}}
-            session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
+            found.append((g, shot, name, ref))
+    for g, shot, name, ref in found:
+        placement = shot['placement']
+        slot = placement['end_frame'] - placement['start_frame']
+        if ref['name'].endswith('.png'):
+            meta = {'kind': 'still', 'duration_s': None, 'fps': None, 'issues': []}
+        else:
+            meta = {'kind': 'movie', **probe_file(store, ref['key'], ref['name'])}
+        avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
+        fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
+                                  'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'}}
+        session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
     session['fills'] = fills
     session['stabilize'] = {ev['sub_clip_id']: session['stabilize'].get(ev['sub_clip_id'], {'flagged': bool(rows[ev['sub_clip_id']].get('stabilization_needed')), 'choice': 'leave'})
                             for ev in plan['events'] if ev['kind'] == 'event'}
@@ -156,9 +177,10 @@ def build(conn, store, user, run, outputs):
                 checklist.append({'item': f"Stabilise {ev['sub_clip_id']} in Resolve (flagged, left as is)", 'timeline_in_frame': ev['timeline_in_frame']})
             events.append({**ev, 'source': 'footage', 'stabilize': apply_stab, 'cumulative_zoom': round(zoom * (STABILIZE_ZOOM if apply_stab else 1.0), 3)})
         else:
-            shots = sorted(fills_by_gap.get(ev['beat_id'], []), key=lambda x: x[1]['placement']['start_frame'])
+            gid = ev.get('gap_id') or ev['beat_id']   # ticket 13: since design/21 a scene can hold several blanks (BEAT_01-B1, -B2)
+            shots = sorted(fills_by_gap.get(gid, []), key=lambda x: x[1]['placement']['start_frame'])
             if not shots:
-                fail(f"Gap {ev['beat_id']} has no fills; record its visuals first.")
+                fail(f"Gap {gid} has no fills; record its visuals first.")
             cursor = ev['timeline_in_frame']
             for sid, f in shots:
                 c = session['choices'][sid]
@@ -167,12 +189,12 @@ def build(conn, store, user, run, outputs):
                     fail(f"{sid}: the take is shorter than its slot with end_policy trim; choose hold_last")
                 if f['meta']['issues'] and not c.get('accept_as_is'):
                     fail(f"{sid} has issues {f['meta']['issues']} and was not accepted as is")
-                events.append({'kind': 'fill', 'beat_id': ev['beat_id'], 'shot_id': sid, 'source': 'take' if f['file']['name'].endswith('.mp4') and 'asset' not in f['file']['name'] else 'asset',
+                events.append({'kind': 'fill', 'beat_id': ev['beat_id'], 'gap_id': gid, 'shot_id': sid, 'source': 'take' if f['file']['name'].endswith('.mp4') and 'asset' not in f['file']['name'] else 'asset',
                                'file': f['file'], 'media': f['meta'], 'offset_frames': c['offset_frames'], 'end_policy': c['end_policy'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n,
                                'fit': 'contain', 'stabilize': False, 'cumulative_zoom': 1.0, 'a2_intervals': []})
                 cursor += n
             if cursor != ev['timeline_out_frame']:
-                fail(f"Gap {ev['beat_id']} fills cover {cursor - ev['timeline_in_frame']} frames; the gap is {ev['timeline_frames']}")
+                fail(f"Gap {gid} fills cover {cursor - ev['timeline_in_frame']} frames; the gap is {ev['timeline_frames']}")
     assembly = {'contract': CONTRACT_ASSEMBLY, 'run_id': str(run['id']), 'master_output': str(master_o['id']), 'master_digest': master_o['summary']['plan_digest'], 'timeline': tl,
                 'events': events, 'duration_frames': plan['duration_frames'], 'sfx_cues': plan.get('sfx_cues') or [], 'finishing': (plan.get('finishing_preview') or []) + checklist,
                 'choices': session['choices'], 'stabilize': session['stabilize']}

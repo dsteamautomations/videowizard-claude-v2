@@ -759,8 +759,8 @@ def cmd_assembly(a):
     m = active()
     run = m['run_id']
     base = f'/api/runs/{run}/assembly'
-    if a.what == 'prepare':
-        emit(write(base + '/prepare', {}))
+    if a.what == 'prepare':   # ticket 12: it measures every generated take, which can take minutes
+        emit(write(base + '/prepare', {}, wait=600))
     if a.what == 'choose':
         emit(write(base + '/choose', {'shot_id': a.shot, 'offset_frames': int(a.offset or 0), 'end_policy': a.end or 'trim', 'accept_as_is': bool(a.accept_as_is)}))
     if a.what == 'stabilize':
