@@ -44,21 +44,53 @@ def duration_of(path):
     return float(json.loads(out)['format']['duration'])
 
 
+def _font(size):
+    from PIL import ImageFont
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
 def slate_png(lines, width, height, path):
-    from PIL import Image, ImageDraw, ImageFont
+    """A black slide. A first line that starts "#NN | ..." shows the number large on its own line (16 Oct: SK missed the small one)."""
+    from PIL import Image, ImageDraw
     img = Image.new('RGB', (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(img)
     size = max(12, height // 22)
-    try:
-        font = ImageFont.load_default(size=size)
-    except TypeError:
-        font = ImageFont.load_default()
-    y = height // 2 - int(size * 0.8 * len(lines))
-    for line in lines:
-        text = ''.join(c if ord(c) < 127 else '?' for c in line)
-        draw.text((width // 16, y), text, fill=(240, 240, 240), font=font)
+    rows = [''.join(c if ord(c) < 127 else '?' for c in line) for line in lines]
+    m = re.match(r'^(#\d+)\s*\|\s*(.*)$', rows[0]) if rows else None
+    head = None
+    if m:
+        head, rows = m.group(1), [m.group(2)] + rows[1:]
+    y = height // 2 - int(((size * 3.2) if head else 0) + size * 0.8 * len(rows))
+    if head:
+        draw.text((width // 16, y), head, fill=(255, 190, 60), font=_font(size * 2))
+        y += int(size * 3.2)
+    for text in rows:
+        draw.text((width // 16, y), text, fill=(240, 240, 240), font=_font(size))
         y += int(size * 1.6)
     img.save(path, format='PNG')
+
+
+def label_png(text, height, path):
+    """The small corner label on review-film footage, e.g. "#08" or "#11 DECISION"."""
+    from PIL import Image, ImageDraw
+    size = max(12, height // 20)
+    font = _font(size)
+    text = ''.join(c if ord(c) < 127 else '?' for c in text)
+    w = int(draw_width(text, font)) + size
+    img = Image.new('RGBA', (w, int(size * 1.6)), (0, 0, 0, 170))
+    ImageDraw.Draw(img).text((size // 2, int(size * 0.25)), text, fill=(255, 190, 60), font=font)
+    img.save(path, format='PNG')
+    return path
+
+
+def draw_width(text, font):
+    try:
+        return font.getlength(text)
+    except AttributeError:
+        return len(text) * font.size * 0.6
 
 
 class Renderer:
@@ -102,9 +134,11 @@ class Renderer:
         run([ffmpeg(), '-y', '-v', 'error', '-i', str(seg), '-vf', f'vidstabtransform=input={trf.as_posix()}:zoom=8:smoothing=15:crop=black,unsharp=5:5:0.8:3:3:0.4', *self.video_args(), str(out)])
         return out
 
-    def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False):
-        """One picture event: source frames [in,out) at src_fps → exactly n_tl timeline frames. hold_last_frame pads with the last frame."""
-        key = digest({'src': src_sha, 'in': ev['source_in_frame'], 'out': ev['source_out_frame'], 'n': n_tl, 'crop': crop_rect, 'rot': rotation_deg, 'hold': bool(ev.get('hold_last_frame')), 'tl': self.tl, 'hdr': hdr})
+    def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False, label=None):
+        """One picture event: source frames [in,out) at src_fps → exactly n_tl timeline frames. hold_last_frame pads with the last frame.
+        label: a corner caption burned in (review film only, so the operator knows which numbered slide is playing)."""
+        key = digest({'src': src_sha, 'in': ev['source_in_frame'], 'out': ev['source_out_frame'], 'n': n_tl, 'crop': crop_rect, 'rot': rotation_deg, 'hold': bool(ev.get('hold_last_frame')), 'tl': self.tl, 'hdr': hdr,
+                      **({'label': label} if label else {})})
         out = self.cache / f'seg-{key[:16]}.mp4'
         if out.exists():
             return out
@@ -122,6 +156,12 @@ class Renderer:
         filters += [f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease', f'pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2', f'fps={self.fps}']
         if ev.get('hold_last_frame'):
             filters.append(f'tpad=stop_mode=clone:stop_duration={float(n_tl / self.fps) + 1}')
+        if label:
+            png = label_png(label, self.H, self.cache / f'label-{key[:16]}.png')
+            margin = max(8, self.H // 30)
+            run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{float(start):.6f}', '-i', str(src_path), '-i', str(png), '-t', f'{float(Fraction(n_src) / src_fps) + 0.5:.6f}',
+                 '-filter_complex', f"[0:v]{','.join(filters)}[b];[b][1:v]overlay={margin}:{margin}[o]", '-map', '[o]', '-frames:v', str(n_tl), *self.video_args(), str(out)])
+            return out
         run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{float(start):.6f}', '-i', str(src_path), '-t', f'{float(Fraction(n_src) / src_fps) + 0.5:.6f}',
              '-vf', ','.join(filters), '-frames:v', str(n_tl), *self.video_args(), str(out)])
         return out
@@ -255,7 +295,8 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             continue
         else:
             clip = item['clip']
-            seg = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], item, item['timeline_frames'], item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')))
+            seg = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], item, item['timeline_frames'], item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')),
+                            item.get('label'))
             if item.get('stabilize'):
                 seg = r.stabilized(seg)
             parts.append(seg)

@@ -66,9 +66,9 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background
 <h1>VideoWizard v2, from script to delivered film</h1>
 <p class="lead">You talk to an assistant in a chat. It runs one tool, the server keeps the order and the record, and the film is built on this machine. One trip to the Mac, at the very end, for DaVinci Resolve.</p>
 
-<p class="notice"><b>Updated 16 Oct 2026.</b> <span>Stages changed on 15 Oct are shown in teal, with the changed sentences in teal too.</span> <a href="#changelog">Read the changelog</a></p>
+<p class="notice"><b>Updated 16 Oct 2026.</b> <span>Stages changed on 15 and 16 Oct are shown in teal, with the changed sentences in teal too.</span> <a href="#changelog">Read the changelog</a></p>
 
-<div class="legend"><span class="op">operator decides</span><span class="ai">assistant writes</span><span class="srv">server checks and records</span><span class="pay">paid provider call</span><span class="mac">on the Mac</span><span class="chg">changed 15 Oct</span></div>
+<div class="legend"><span class="op">operator decides</span><span class="ai">assistant writes</span><span class="srv">server checks and records</span><span class="pay">paid provider call</span><span class="mac">on the Mac</span><span class="chg">changed 15–16 Oct</span></div>
 
 <div class="strip">
 <svg viewBox="0 0 1200 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Twelve stages in order: intake, brief, script, voice, media, analysis, options, master, first_cut, visuals, assembly, delivery. Teal dots mark the stages changed on 15 October: brief, script, voice, media, analysis, options, master, visuals, assembly and delivery.">
@@ -160,16 +160,19 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background
 <p class="chg">A client rule can be dropped afterwards, for example "no PPE rule for this client". Every clip is then re-checked from the saved logs at no cost, without watching the clips again.</p>
 <div class="out"><b>Creates</b> one log per clip and a 10-line summary card. Ask the assistant for a clip's card at any time.</div></div></div>
 
-<div class="stage changed"><div class="id">7 · options<small>deciding the cut</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<div class="stage changed"><div class="id">7 · options<small>deciding the cut</small><span class="tag new">Changed 15–16 Oct</span></div><div class="body">
 <p class="chg"><b>Scenes and pauses.</b> When the script is one paragraph, the assistant proposes scenes, each starting at a sentence and tied to a process stage from the brief. It also proposes pauses, only after a sentence ends, at most 4 seconds each, with a reason. The recording's own gap counts toward each pause. One yes from you approves both.</p>
 <p class="chg"><b>Exact matches first.</b> Real footage goes only where it shows exactly what is being said, cut into short shots of about 2 to 3.5 seconds. Everything else is a blank, at least 3 seconds, for AI video or animation later. Each clip is used once.</p>
 <p class="chg"><b>Decisions.</b> B-roll, a second use of any clip, a clip to check by eye, and a poor-quality match each come behind a decision slide.</p>
 <p>The assistant first shows a coverage report, then proposes a first and, where possible, a backup option for each scene. <span class="chg">Before rendering, it shows the seconds of real footage, blanks and decisions in each scene.</span> The server refuses anything that breaks the editing rules, then renders the <b>review film</b>.</p>
+<p class="chg"><b>Numbers on screen.</b> Each slide shows its number large, in amber. Every real shot carries its number in the top-left corner, for example <code>#08</code>, or <code>#11 DECISION</code> for a placement you decide on.</p>
+<p class="chg"><b>Limits.</b> You can ask for changes to the review film as often as you like; each new review film takes about 10 minutes to render. From the fourth round, the assistant first suggests leaving the scenes still not approved blank, and asks which scenes to keep trying. If the server refuses the assistant's plan three times in a row, it stops and asks you to retry, revise an earlier stage, file a defect, or stop.</p>
 <div class="out"><b>Creates</b> <span class="chg">the review film with numbered slides: <code>#05</code> a scene, <code>BACKUP for #05</code>, <code>DECISION</code> with its question, and <code>BLANK</code> cards that the narration plays under. It is a lighter 720p copy, so it uploads quickly.</span> You watch the film.</div></div></div>
 
-<div class="stage changed"><div class="id">8 · master<small>deciding the cut</small><span class="tag new">Changed 15 Oct</span></div><div class="body">
+<div class="stage changed"><div class="id">8 · master<small>deciding the cut</small><span class="tag new">Changed 15–16 Oct</span></div><div class="body">
 <p class="chg">You answer every numbered slide by its number, for example "#05 keep, #06 reject, #12 drop". Scene and backup slides: keep, reject with a reason, or keep with a small trim. Decision slides: keep or drop. Blank slides need no answer. A dropped placement becomes part of a blank.</p>
 <p>The server checks that nothing is used twice unless you kept a reuse, applies the trims within the rules, and builds a fresh master. Your rejection reasons are remembered for this client's future films.</p>
+<p class="chg"><b>Limits.</b> You can change your answers and rebuild the master as often as you like. If recording the master fails, for example because a file is missing, it is tried three times before you are asked how to proceed.</p>
 <div class="out"><b>Creates</b> the <b>master film</b> <span class="chg">with BLANK cards wherever pictures are still to come, and one gap per blank, each with its intent and the words under it.</span></div></div></div>
 
 <div class="stage"><div class="id">9 · first_cut<small>deciding the cut</small></div><div class="body">
@@ -204,8 +207,24 @@ code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em;background
 <p>On this machine, everything for one run lives in <code>runs/VW-n/</code>: <code>in/</code> for what you drop in, <code>out/</code> for what the assistant and the tool produce, <code>work/</code> for scratch that is deleted at close. The server keeps every stage's output, your approvals, costs and the files, and the web page at <code>/runs</code> lists every run with its stage.</p>
 
 <h2 id="changelog">Changelog</h2>
-<p class="lead">Every change since this page was last updated, newest first. Times are IST on 15 October 2026.</p>
+<p class="lead">Every change since 11:46 on 15 October, newest first. Times are IST.</p>
 <div class="log">
+
+<div class="entry"><time>16 Oct<small>morning</small></time><div class="body">
+<h3>Slide numbers on the footage, and the review limits</h3>
+<span class="lbl">You asked</span>
+<p>The chat refers to slide numbers, but the review film did not seem to show them. Also: after three rounds, the assistant should suggest leaving the hard scenes blank, and the page should state the limits.</p>
+<span class="lbl">What changed</span>
+<ul>
+<li>Each slide shows its number large, in amber, on its own line. The numbers were there before, but small at the start of a long line.</li>
+<li>Every real shot in the review film carries its number in the top-left corner, for example <code>#08</code> or <code>#11 DECISION</code>. The master and final films carry no labels.</li>
+<li>From the fourth review round, the assistant first suggests leaving the scenes still not approved blank.</li>
+<li>The limits for stages 7 and 8 are now on this page.</li>
+</ul>
+<span class="lbl">Testing</span>
+<p>Four new checks: labels in the review sequence, the corner label drawn on a real shot, the large slide number, and the fourth-round advice. The end-to-end run renders a review film and a master film. All passed.</p>
+<div class="stages"><span>7 options</span><span>8 master</span></div>
+</div></div>
 
 <div class="entry lead-entry"><time>20:03<small>built by 22:37</small></time><div class="body">
 <h3>Exact-match editing and numbered slides</h3>

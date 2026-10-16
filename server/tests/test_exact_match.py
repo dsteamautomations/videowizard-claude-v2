@@ -125,6 +125,7 @@ def test_review_sequence_keeps_words_with_their_pictures():
     d = proposed(doc_with([ev('clip0:SUB_01', 0, 25), blank(75), ev('clip1:SUB_01', 0, 12, match='b_roll', decision={'kind': 'b_roll', 'question': 'keep?'})]), pk)
     items = SL.review_items(d, pk, SL.slides(d, pk, FPS), lambda evs: [{'kind': 'event', 'frames': e['timeline_frames']} for e in evs], FPS)
     assert [i['kind'] for i in items] == ['slate', 'narration', 'event', 'card', 'slate', 'narration', 'event']
+    assert items[2]['label'] == '#01' and items[6]['label'] == '#03 DECISION'   # every real shot shows which numbered slide it belongs to
     n1, n2 = items[1], items[5]
     assert (n1['start_s'], n1['end_s']) == (0.0, 100 / FPS) and (n2['start_s'], n2['end_s']) == (100 / FPS, 112 / FPS)   # split at the decision; the blank keeps its words
     assert items[3]['frames'] == 75 and items[3]['lines'][0].startswith('#02 | BLANK')
@@ -247,3 +248,29 @@ def test_one_generated_shot_is_at_most_30_s_and_a_long_blank_is_several_shots():
         validate_plan(plan, gaps, 25)
     plan['gaps'][0]['scenes'] = [scene('SC1', [shot('VS1', 0, 750, 'video'), shot('VS2', 750, 1000, 'video')])]   # 30 s + 10 s
     validate_plan(plan, gaps, 25)
+
+
+def test_slides_show_the_number_large_and_footage_carries_a_corner_label(tmp_path):
+    from PIL import Image
+    amber = lambda im, box: any(r > 200 and 150 < g < 230 and b < 120 for r, g, b in im.crop(box).convert('RGB').getdata())
+    R.slate_png(['#14 | DECISION | Scene 3: Why Rat-Trap Bond is different', 'Keep or drop?'], 640, 360, tmp_path / 's.png')
+    assert amber(Image.open(tmp_path / 's.png'), (0, 0, 640, 360))          # the number, drawn large in amber
+    R.slate_png(['no number here'], 640, 360, tmp_path / 'p.png')
+    assert not amber(Image.open(tmp_path / 'p.png'), (0, 0, 640, 360))
+    src = tmp_path / 'src.mp4'
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x204060:s=320x180:r=25:d=2', '-pix_fmt', 'yuv420p', str(src)], check=True)
+    r = R.Renderer(tmp_path / 'work', {'width': 320, 'height': 180, 'fps': 25})
+    seg = r.segment(src, 'x' * 64, '25', {'source_in_frame': 0, 'source_out_frame': 25}, 25, label='#08')
+    plain = r.segment(src, 'x' * 64, '25', {'source_in_frame': 0, 'source_out_frame': 25}, 25)
+    assert seg != plain
+    frames = json.loads(subprocess.run(['ffprobe', '-v', 'error', '-count_frames', '-show_entries', 'stream=nb_read_frames', '-of', 'json', str(seg)], capture_output=True, check=True).stdout)
+    assert int(frames['streams'][0]['nb_read_frames']) == 25
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', str(seg), '-frames:v', '1', str(tmp_path / 'f.png')], check=True)
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-i', str(plain), '-frames:v', '1', str(tmp_path / 'g.png')], check=True)
+    assert amber(Image.open(tmp_path / 'f.png'), (0, 0, 120, 50)) and not amber(Image.open(tmp_path / 'g.png'), (0, 0, 120, 50))
+
+
+def test_after_three_review_rounds_the_assistant_suggests_blanks():
+    from app.stage2 import stage as S
+    assert S.round_advice(1) is None and S.round_advice(3) is None
+    assert 'blanks' in S.round_advice(4) and 'round 4' in S.round_advice(4)

@@ -259,7 +259,19 @@ def propose(conn, store, user, run, doc):
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'], 'flags': result['flags'], 'scenes': scenes,
             'slides': [{k: s.get(k) for k in ('no', 'type', 'scene', 'backup_for', 'kind', 'question')} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
+            **({'advice': round_advice(version)} if round_advice(version) else {}),
             'next': '`vw options render`, let the operator watch, then `vw options record --quote`'}
+
+
+ROUNDS_BEFORE_BLANKS = 3
+
+
+def round_advice(version):
+    """Agreed with SK on 16 Oct: after three review rounds the assistant suggests leaving the scenes that keep failing blank."""
+    if version > ROUNDS_BEFORE_BLANKS:
+        return (f'This is review round {version}. Before proposing more footage, suggest to the operator that the scenes still not approved '
+                'become blanks for AI video or animation, and ask which scenes to keep trying.')
+    return None
 
 
 def _slides(store, session, doc, entry):

@@ -84,7 +84,8 @@ def review_items(doc, pk, sl, event_items, fps):
             if ev.get('blank'):
                 pending.append({'kind': 'card', 'frames': _frames(ev), 'lines': s['lines'] if s else ['BLANK']})
             else:
-                pending += event_items([ev])
+                label = f"#{s['no']:02d} DECISION" if s and s['type'] == 'decision' else f"#{head[o['option_number']]['no']:02d}"
+                pending += [{**it, 'label': label} for it in event_items([ev])]
             cursor += _frames(ev)
         items += [{'kind': 'narration', 'start_s': seg_start / fps, 'end_s': cursor / fps}] + pending
     return items
