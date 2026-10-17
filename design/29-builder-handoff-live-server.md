@@ -48,6 +48,13 @@ UPDATES ON THE VM (after cut-over)
 - Logs: journalctl -u vw2-server / -u vw2-worker. Spool: /var/lib/vw2/spool (paid-call journals; only spool/render is auto-cleaned after 7 days).
 - A job stuck 'running' after a force-kill or crash: clear it by hand (analysis: POST /api/jobs/{id}/release).
 
+TWO BUILDERS (from 17 Oct 2026): SK's Windows PC and the team member's Mac
+- Code: both work on main. Before any commit: git pull --rebase origin main. Push only after the change's own tests pass and SK has approved it. Never force-push.
+- Deploys to the VM: one builder at a time. Before deploying, tell SK and say which commit; SK confirms nobody else is deploying. Deploy only what is on origin/main (bundle origin/main, never local-only commits).
+- Never run the server or workers on either laptop against the live database (two worker sets lose paid work). Tests are fine: they use their own throwaway Docker database.
+- Tickets: whoever picks up a ticket says so to SK first, so two builders never fix the same one.
+- The Mac also runs the DaVinci Resolve step at delivery; that is unchanged.
+
 WORKING RULES (CLAUDE.md)
 Requirements before code; wait for SK's approval; tests first; "not covered" list. Minimal, no enterprise guardrails. Tell SK before restarting anything. Never print or commit secrets. Never modify videowizard-beta.
 
