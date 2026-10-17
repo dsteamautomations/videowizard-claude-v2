@@ -5,7 +5,7 @@ This folder (`/Users/vasudha/Codex/videowizard-claude-v2`, GitHub `dsteamautomat
 ## Roles and places
 
 - **Builder (this folder).** Fixes defects, runs tests, commits, pushes, deploys. The working copy here is never what the operator runs.
-- **Operator.** Works in `/Users/vasudha/Documents/videobuilder - Operator ` with `/vw:vw`. The operator always runs the **live server** `https://8-234-82-225.sslip.io` (set by `VW2_SERVER_URL` in that folder's `.claude/settings.json`) and the **pushed plugin** (`vw@vw-local`, installed at user scope from the GitHub marketplace `dsteamautomations/videowizard-claude-v2`, which reads `plugin/` on `main`). Never point the operator at this working copy. Operator-side guidance: `plugin/operator-CLAUDE.md`, `design/30-operator-handoff-live-server.md`.
+- **Operator.** Works in `/Users/vasudha/Documents/videobuilder - Operator ` with `/vw:vw`. The operator always runs the **live server** `https://8-234-82-225.sslip.io` (set by `VW2_SERVER_URL` in that folder's `.claude/settings.json`) and the **pushed plugin** (`vw@vw-local`, installed at user scope from the GitHub marketplace `dsteamautomations/videowizard-claude-v2`, which reads `plugin/` on `main`; enabled only in the operator folder by its `.claude/settings.json` and disabled at user scope, so its guard hook never runs in any other folder). Never point the operator at this working copy. Operator-side guidance: `plugin/operator-CLAUDE.md`, `design/30-operator-handoff-live-server.md`.
 - **Live server.** GCE VM `vw2`, project `sm-project-435806`, zone `asia-south1-a`; code in `/opt/vw2/app` (user `vw2`), venv `/opt/vw2/venv`, services `vw2-server` and `vw2-worker`, spool `/var/lib/vw2/spool`. SSH: `gcloud compute ssh vw2 --zone asia-south1-a --project sm-project-435806 --tunnel-through-iap`. Logs: `journalctl -u vw2-server` / `-u vw2-worker`. History: `design/25`, `design/26`, `design/29`.
 
 ## Working rules
@@ -35,7 +35,7 @@ This folder (`/Users/vasudha/Codex/videowizard-claude-v2`, GitHub `dsteamautomat
 Both refuse to run if the working tree is dirty or local `main` is not exactly `origin/main`.
 
 - `scripts/deploy-server.sh` (design/29 "UPDATES ON THE VM"): `git bundle` of `main` → `gcloud compute scp` to `/tmp` on the VM → on the VM `git pull` from the bundle, `pip install -r server/requirements.txt`, `systemctl restart vw2-server vw2-worker` → polls `/api/meta` and prints `server_version`. The VM holds no GitHub credential, which is why the code travels as a bundle. `server_version` is the constant in `server/app/config.py`; bump it when a release should be visible there.
-- `scripts/deploy-plugin.sh`: `python -m py_compile` on every `plugin/**/*.py`, then `claude plugin marketplace update vw-local` and `claude plugin update vw@vw-local --scope user` with the bundled binary. Nothing changes on the VM.
+- `scripts/deploy-plugin.sh`: `python -m py_compile` on every `plugin/**/*.py`, then with the bundled binary: `claude plugin marketplace update vw-local`, `plugin uninstall` + `plugin install vw@vw-local --scope user`, `plugin disable --scope user` again, and a check that the installed commit equals `main`. A plain `plugin update` is a no-op unless the version in `plugin.json` changes, which is why the script reinstalls. Nothing changes on the VM.
 
 A job stuck `running` after a crash or a forced kill: release it by hand (analysis: `POST /api/jobs/{id}/release`).
 

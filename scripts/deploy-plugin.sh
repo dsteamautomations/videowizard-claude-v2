@@ -30,10 +30,19 @@ while IFS= read -r f; do
   echo "compiled $f"
 done < <(find plugin -name '*.py' | sort)
 
-# 3. Refresh the marketplace clone and update the installed plugin.
+# 3. Refresh the marketplace clone, then reinstall. plugin update and plugin install are
+#    no-ops while the version in plugin.json is unchanged; only uninstall + install refreshes
+#    the installed copy (the plugin keeps nothing under ~/.claude/plugins/data). The install
+#    re-enables the plugin at user scope, so disable it there again: the plugin is enabled
+#    only by the operator folder (its .claude/settings.json, project scope).
 "$CLAUDE" plugin marketplace update vw-local
-"$CLAUDE" plugin update vw@vw-local --scope user
-"$CLAUDE" plugin list
+"$CLAUDE" plugin uninstall vw@vw-local --scope user
+"$CLAUDE" plugin install vw@vw-local --scope user
+"$CLAUDE" plugin disable vw@vw-local --scope user
+WANT=$(git rev-parse main)
+GOT=$(python -c "import json,sys; d=json.load(open(sys.argv[1])); sys.stdout.write(d[\"plugins\"][\"vw@vw-local\"][0][\"gitCommitSha\"])" "$HOME/.claude/plugins/installed_plugins.json")
+[ "$GOT" = "$WANT" ] || { echo "installed plugin is at $GOT, expected $WANT" >&2; exit 1; }
+(cd "/Users/vasudha/Documents/videobuilder - Operator " && "$CLAUDE" plugin list)
 
 echo
 echo "Plugin updated from main @ $(git rev-parse --short main)."
