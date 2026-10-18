@@ -202,6 +202,8 @@ def finish(payload, code):
         need_connect(payload['reason'])
     if code == 3:
         emit(payload, 3, 'The server needs the operator to decide: ' + ', '.join(payload.get('options', [])))
+    if isinstance(payload, dict) and payload.get('code') == 'DEFECT_OPEN':   # design/48 O.2
+        emit(payload, 2, f"A defect is open on this run ({payload.get('defect')}); the builder is on it. Nothing more can be recorded until it is fixed.")
     emit(payload, code)
 
 
@@ -304,12 +306,42 @@ def next_line(nxt):
         return ''
     if not nxt.get('stage'):
         return 'All stages done; close the run.'
-    return f"Next: {nxt['stage']}." + (f" This step uses a paid provider ({nxt['paid']}); tell the operator, do not ask." if nxt.get('paid') else '')
+    line = f"Next: {nxt['stage']}." + (f" This step uses a paid provider ({nxt['paid']}); tell the operator, do not ask." if nxt.get('paid') else '')
+    if nxt.get('open_defects'):   # design/48 O.2
+        line += ' · ' + ', '.join(f'defect {d} open' for d in nxt['open_defects'])
+    return line
+
+
+FORBIDDEN_PLACES = ('/etc', '/private/etc', '/usr', '/System', '/Library')   # not /var: temporary folders hold no secrets and tests live there
+
+
+def readable_place(path):
+    """design/48 O.3: a file the operator hands over may not come from a hidden folder or a system folder."""
+    path = Path(path).expanduser().resolve()
+    if any(part.startswith('.') for part in path.parts[1:]):
+        return False
+    home_library = (Path.home() / 'Library').resolve()
+    if path == home_library or home_library in path.parents:
+        return False
+    return not any(str(path) == place or str(path).startswith(place + '/') for place in FORBIDDEN_PLACES)
+
+
+def allowed_line(code, what, detail):
+    """An 'allowed' line in the run's guard log for a tool action the guard cannot see (design/48 O.3)."""
+    try:
+        path = workspace(code) / 'work' / 'guard.log'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('a', encoding='utf-8') as f:
+            f.write(f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} · {what} · allowed · {detail}\n")
+    except OSError:
+        pass
 
 
 def cmd_start(a):
     script = Path(a.script).expanduser() if a.script else None
     if script is not None:  # design/34 1.6: the operator's first message can carry the script
+        if not readable_place(script):   # design/48 O.3
+            emit({'action': 'refused', 'message': f'--script cannot read from {script.parent}; copy the file into runs/<code>/in/ by hand. The run was not created.'}, 2)
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from extraction import SUFFIXES
         if not script.is_file() or script.suffix.lower() not in SUFFIXES:
@@ -325,12 +357,25 @@ def cmd_start(a):
         try:
             shutil.copyfile(script, workspace(run['code']) / 'in' / script.name)
             copied = script.name
+            allowed_line(run['code'], 'vw start --script', str(script.resolve()))
         except OSError as exc:
             emit({**run, 'action': 'refused', 'workspace': str(workspace(run['code'])),
                   'message': f"Run {run['code']} was created, but {script.name} could not be copied into in/ ({exc.__class__.__name__}). Ask the operator to copy it by hand, then run `vw stage intake prepare`."}, 2)
     nxt = call('GET', f"/api/runs/{run['id']}/next")
     emit({**run, 'workspace': str(workspace(run['code'])), 'script_file': copied, 'next': nxt}, 0,
          f"Started {run['code']} for {run.get('client')} in {m['code']}/" + (f"; {copied} copied into in/" if copied else '') + '. ' + next_line(nxt))
+
+
+def cmd_web(a):
+    """design/48 O.1: the operator's yes to a web search, recorded for the guard; valid ten minutes."""
+    m = active()
+    if not (a.ok or '').strip():
+        emit({'action': 'refused', 'message': "Record the operator's words: --ok \"<their yes>\" (and --about \"<what the search is for>\")."}, 2)
+    rec = {'about': (a.about or '').strip(), 'ok': a.ok.strip(), 'at': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'by': 'operator', 'calls': []}
+    path = workspace(m['code']) / 'work' / 'web-ok.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding='utf-8')
+    emit(rec, 0, f"web permission recorded for {rec['about'] or 'the search'}; valid ten minutes; afterwards say what you searched and show what you found.")
 
 
 def cmd_clients(a):
@@ -400,8 +445,12 @@ def cmd_defect(a):
     m = active()
     log = ''
     if a.log:
+        ws = workspace(m['code']).resolve()
+        path = (ws / a.log).resolve() if not Path(a.log).is_absolute() else Path(a.log).resolve()
+        if ws not in path.parents:   # design/48 O.3
+            emit({'action': 'refused', 'message': f'--log must name a file inside the run folder ({ws}), not {a.log}.'}, 2)
         try:
-            log = Path(a.log).read_text(encoding='utf-8', errors='replace')[-4000:]
+            log = path.read_text(encoding='utf-8', errors='replace')[-4000:]
         except OSError:
             pass
     emit(write(f"/api/runs/{m['run_id']}/defects", {'stage': a.stage, 'error': a.error, 'log_excerpt': log}), 0,
@@ -1284,6 +1333,7 @@ def build_parser():
     s = sub.add_parser('decide'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--decision', required=True, choices=['retry', 'revise', 'defect', 'stop']); s.add_argument('--note'); s.set_defaults(fn=cmd_decide)
     s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('clients'); s.add_argument('--search'); s.set_defaults(fn=cmd_clients)
+    s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)

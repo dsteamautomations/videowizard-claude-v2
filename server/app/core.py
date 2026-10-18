@@ -157,12 +157,19 @@ def is_admin(user):
     return user['role'] == 'Admin'
 
 
+def open_defects(conn, run_id):
+    return [r['id'] for r in conn.execute("select id from vw2_defects where run_id=%s and status='open' order by id", (run_id,)).fetchall()]
+
+
 def load_run(conn, user, run_id, lock=False):
     row = conn.execute('select * from vw2_runs where id = %s', (run_id,)).fetchone()
     if not row or (row['owner_id'] != user['id'] and not is_admin(user)):
         raise Problem(404, 'NOT_FOUND', 'Run not found.')  # 404 so run ids are not probeable
     if lock:
         conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run_id),))
+        opened = open_defects(conn, run_id)   # design/48 O.2: every write waits for the builder while a defect is open
+        if opened:
+            raise Problem(409, 'DEFECT_OPEN', f'defect {opened[0]} is open on this run; the builder resolves it, then the run continues', defect=opened[0], defects=opened)
     return row
 
 
@@ -229,7 +236,8 @@ def compute_next(run, stages, outputs, attempts):
 
 
 def next_for(conn, run):
-    return compute_next(run, stage_table(run['procedure_version']), current_outputs(conn, run['id']), attempts_for(conn, run['id']))
+    nxt = compute_next(run, stage_table(run['procedure_version']), current_outputs(conn, run['id']), attempts_for(conn, run['id']))
+    return {**nxt, 'open_defects': open_defects(conn, run['id'])}   # design/48 O.2
 
 
 # ---------- output ----------

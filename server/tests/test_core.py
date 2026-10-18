@@ -340,3 +340,22 @@ def test_effective_rules_minus_waivers_plus_learned(client, alice, database):
         rules = core.effective_rules(conn, run, outputs)
         assert rules['waived_flags'] == ['ppe'] and rules['brief_effective'] == ['No competitor logos']
         assert rules['effective'] == ['No competitor logos', 'Rejected option #1: no close-ups'] and rules['learned'][0]['source_run'] == 'VW-0'
+
+
+def test_open_defect_stops_writes_until_fixed(client, alice, database):
+    """design/48 O.2: a write on a run with an open defect is refused; next names the defect; fixed → writes again."""
+    run = client.post('/api/runs', json={'request_id': rid(), 'title': 'd', 'client': 'c-vk'}, headers=alice).json()['id']
+    r = client.post(f'/api/runs/{run}/defects', json={'request_id': rid(), 'stage': 's1', 'error': 'boom', 'log_excerpt': ''}, headers=alice)
+    assert r.status_code == 201
+    ticket = r.json()['ticket']
+    assert client.get(f'/api/runs/{run}/next', headers=alice).json()['open_defects'] == [ticket]
+    r = client.post(f'/api/runs/{run}/output', json={'request_id': rid(), 'stage': 's1', 'files': [], 'summary': {}, 'accepted_quote': 'yes'}, headers=alice)
+    assert r.status_code == 409 and r.json()['code'] == 'DEFECT_OPEN' and r.json()['defect'] == ticket
+    r = client.post(f'/api/runs/{run}/defects', json={'request_id': rid(), 'stage': 's1', 'error': 'again', 'log_excerpt': ''}, headers=alice)
+    assert r.status_code == 201   # a second ticket is still possible
+    import psycopg
+    with psycopg.connect(database) as c:
+        c.execute("update vw2_defects set status='fixed' where run_id=%s", (run,))
+    assert client.get(f'/api/runs/{run}/next', headers=alice).json()['open_defects'] == []
+    r = client.post(f'/api/runs/{run}/output', json={'request_id': rid(), 'stage': 's1', 'files': [], 'summary': {}, 'accepted_quote': 'yes'}, headers=alice)
+    assert r.status_code == 201

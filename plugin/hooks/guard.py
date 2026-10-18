@@ -7,14 +7,19 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 SENTINEL = 'VW-PROCEDURE'   # the first line of every stage prompt (server/procedures/*.json)
 WRITE_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
 READ_TOOLS = ('Read', 'Glob', 'Grep')
-ALWAYS = ('AskUserQuestion', 'TodoWrite', 'TodoRead', 'WebSearch', 'WebFetch', 'ToolSearch',
+ALWAYS = ('AskUserQuestion', 'TodoWrite', 'TodoRead', 'ToolSearch',
           'mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_view__show_pane')
+WEB_TOOLS = ('WebSearch', 'WebFetch')
+WEB_MINUTES = 10   # design/48 O.1: one recorded yes covers the search and the fetches on that subject for ten minutes
+WEB_BLOCKED = ("Blocked: a web search needs the operator's yes. Say to them: 'I am deviating from the usual procedure. I want to search the web for X, "
+               "because Y. The result may affect Z.' On their yes run vw web --about \"X\" --ok \"<their words>\", then search.")
+RECORDS = ('guard.log', 'manifest.json', '.active')   # design/48 O.4: the tool's own records, read-only for the assistant
 VW_SKILLS = ('vw:vw', 'vw')
 NOT_HERE = ("Blocked: {tool} is not available to the operator assistant. It uses only the vw tool, files inside the active run folder, "
             "questions to the operator, and the web after the warning and the operator's yes.")
@@ -41,8 +46,41 @@ def active_run(cwd):
     return (runs / code).resolve() if code else None
 
 
+def web_permission(cwd, tool, inp):
+    """design/48 O.1: allowed only with the operator's yes recorded by `vw web` less than WEB_MINUTES ago; every allowed call is appended
+    to the permission file and to guard.log. Returns None when allowed, else the reason."""
+    run = active_run(cwd)
+    if run is None:
+        return WEB_BLOCKED
+    path = run / 'work' / 'web-ok.json'
+    try:
+        ok = json.loads(path.read_text(encoding='utf-8'))
+        at = datetime.fromisoformat(ok['at'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return WEB_BLOCKED
+    now = datetime.now(timezone.utc)
+    if at.tzinfo is None or now - at > timedelta(minutes=WEB_MINUTES):
+        return WEB_BLOCKED
+    detail = str(inp.get('query') or inp.get('url') or '')[:120]
+    ok.setdefault('calls', []).append({'tool': tool, **({'query': detail} if tool == 'WebSearch' else {'url': detail}), 'at': now.isoformat(timespec='seconds')})
+    try:
+        path.write_text(json.dumps(ok, ensure_ascii=False, indent=1), encoding='utf-8')
+    except OSError:
+        pass
+    log_block(cwd, tool, f"allowed ({ok.get('about', '')})", detail)
+    return None
+
+
+def own_record(target, cwd):
+    """design/48 O.4: guard.log anywhere, the run's manifest.json at its root, runs/.active."""
+    run = active_run(cwd)
+    return target.name == 'guard.log' or (run is not None and target == run / 'manifest.json') or target == runs_dir(cwd) / '.active'
+
+
 def decide(tool, inp, cwd, vw):
     """None when the call is allowed, otherwise the reason it is blocked."""
+    if tool in WEB_TOOLS:
+        return web_permission(cwd, tool, inp)
     if tool in WRITE_TOOLS or tool == 'Bash':
         if SENTINEL in json.dumps(inp, ensure_ascii=False):
             return "Blocked: the stage procedure text is the builder's; it is never written into a file or a command."
@@ -64,6 +102,8 @@ def decide(tool, inp, cwd, vw):
             return f'Blocked: give a path inside {allowed} (reads and searches are limited to the active run folder).'
         target = Path(raw).expanduser()
         target = (target if target.is_absolute() else cwd / target).resolve()
+        if tool in WRITE_TOOLS and own_record(target, cwd):
+            return f"Blocked: {target.name} is the tool's own record, read-only for the assistant."
         if target != allowed and allowed not in target.parents:
             return f'Blocked: files may only be read or written inside {allowed}.'
         return None

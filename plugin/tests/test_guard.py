@@ -102,19 +102,22 @@ def test_connectors_browser_and_subagents_are_blocked(tmp_path):
     assert guard('Skill', {'skill': 'vw:vw', 'args': 'what is next'}, tmp_path)[0] == 0
 
 
-def test_questions_task_list_and_web_tools_are_allowed(tmp_path):
-    active(tmp_path)
+def test_questions_task_list_and_tool_search_are_allowed_and_the_web_needs_a_yes(tmp_path):
+    runs = active(tmp_path)
     for tool, inp in (('AskUserQuestion', {'questions': []}), ('TodoWrite', {'todos': []}), ('TodoRead', {}),
                       ('mcp__ccd_turn__update_plan', {'items': []}), ('mcp__ccd_turn__wrap_up', {'recap': 'x'}), ('mcp__ccd_view__show_pane', {}),
-                      ('WebSearch', {'query': 'rat-trap bond'}), ('WebFetch', {'url': 'https://example.org', 'prompt': 'x'}), ('ToolSearch', {'query': 'select:WebSearch'})):
+                      ('ToolSearch', {'query': 'select:WebSearch'})):
         assert guard(tool, inp, tmp_path)[0] == 0, tool
+    assert guard('WebSearch', {'query': 'rat-trap bond'}, tmp_path)[0] == 2   # design/48 O.1: no recorded yes
+    web_ok(runs)
+    assert guard('WebSearch', {'query': 'rat-trap bond'}, tmp_path)[0] == 0 and guard('WebFetch', {'url': 'https://example.org', 'prompt': 'x'}, tmp_path)[0] == 0
 
 
 def test_blocked_calls_are_logged_and_allowed_calls_are_not(tmp_path):
     runs = active(tmp_path)
     log = runs / 'VW-3' / 'work' / 'guard.log'
     guard('Read', {'file_path': str(runs / 'VW-3' / 'out' / 'x.json')}, tmp_path)
-    guard('WebSearch', {'query': 'x'}, tmp_path)
+    guard('AskUserQuestion', {'questions': []}, tmp_path)
     assert not log.exists()
     guard('mcp__Claude_Browser__navigate', {'url': 'https://example.org/page'}, tmp_path)
     guard('Read', {'file_path': str(tmp_path / '.vw2' / 'session.json')}, tmp_path)
@@ -134,3 +137,53 @@ def test_blocked_call_without_an_active_run_is_logged_at_the_runs_root(tmp_path)
     (tmp_path / 'runs').mkdir()
     guard('mcp__Claude_Browser__navigate', {'url': 'x'}, tmp_path)
     assert (tmp_path / 'runs' / 'guard.log').read_text(encoding='utf-8').count('\n') == 1
+
+
+# ---------- design/48 O.1: the web gate ----------
+
+def web_ok(runs, minutes_ago=0, about='the client product'):
+    import json
+    from datetime import datetime, timedelta, timezone
+    (runs / 'VW-3' / 'work').mkdir(parents=True, exist_ok=True)
+    at = (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat(timespec='seconds')
+    (runs / 'VW-3' / 'work' / 'web-ok.json').write_text(json.dumps({'about': about, 'ok': 'yes, search', 'at': at, 'by': 'operator', 'calls': []}), encoding='utf-8')
+
+
+def test_web_tools_need_the_operators_recorded_yes(tmp_path):
+    import json
+    runs = tmp_path / 'runs'
+    (runs / 'VW-3' / 'work').mkdir(parents=True)
+    (runs / '.active').write_text('VW-3')
+    code, err = guard('WebSearch', {'query': 'rat trap bond'}, tmp_path)
+    assert code == 2 and 'I am deviating from the usual procedure' in err and 'vw web --about' in err
+    web_ok(runs)
+    assert guard('WebSearch', {'query': 'rat trap bond'}, tmp_path)[0] == 0
+    assert guard('WebFetch', {'url': 'https://example.org/bond', 'prompt': 'x'}, tmp_path)[0] == 0
+    ok = json.loads((runs / 'VW-3' / 'work' / 'web-ok.json').read_text(encoding='utf-8'))
+    assert [c['tool'] for c in ok['calls']] == ['WebSearch', 'WebFetch'] and ok['calls'][0]['query'] == 'rat trap bond'
+    log = (runs / 'VW-3' / 'work' / 'guard.log').read_text(encoding='utf-8').splitlines()
+    assert any(' · WebSearch · allowed (the client product) · rat trap bond' in l for l in log) and any(' · WebFetch · allowed' in l for l in log)
+    web_ok(runs, minutes_ago=11)
+    code, err = guard('WebSearch', {'query': 'again'}, tmp_path)
+    assert code == 2 and 'yes' in err
+
+
+def test_web_tools_are_blocked_without_an_active_run(tmp_path):
+    (tmp_path / 'runs').mkdir()
+    assert guard('WebSearch', {'query': 'x'}, tmp_path)[0] == 2
+
+
+# ---------- design/48 O.4: the tool's own records are read-only ----------
+
+def test_the_tools_own_records_are_read_only(tmp_path):
+    runs = tmp_path / 'runs'
+    (runs / 'VW-3' / 'work').mkdir(parents=True)
+    (runs / 'VW-3' / 'out').mkdir()
+    (runs / '.active').write_text('VW-3')
+    for target in (runs / 'VW-3' / 'work' / 'guard.log', runs / 'VW-3' / 'logs' / 'guard.log', runs / 'VW-3' / 'manifest.json', runs / '.active'):
+        for tool in ('Write', 'Edit'):
+            code, err = guard(tool, {'file_path': str(target)}, tmp_path)
+            assert code == 2 and 'read-only' in err, (tool, target)
+    assert guard('Write', {'file_path': str(runs / 'VW-3' / 'out' / 'manifest.json')}, tmp_path)[0] == 0
+    assert guard('Read', {'file_path': str(runs / 'VW-3' / 'work' / 'guard.log')}, tmp_path)[0] == 0
+    assert guard('Read', {'file_path': str(runs / 'VW-3' / 'manifest.json')}, tmp_path)[0] == 0

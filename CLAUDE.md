@@ -27,7 +27,7 @@ This folder (`/Users/vasudha/Codex/videowizard-claude-v2`, GitHub `dsteamautomat
 5. **Deploy** with the script that matches the change (both if both sides changed):
    - `./scripts/deploy-server.sh` — anything under `server/`. Tell SK first: the workers restart.
    - `./scripts/deploy-plugin.sh` — anything under `plugin/`. The operator must restart Claude Code in the operator folder afterwards.
-6. **Resolution note.** One line on the defect: what was wrong, what changed, which commit.
+6. **Resolution note.** One line on the defect: what was wrong, what changed, which commit; and set its `status` to `fixed` in `vw2_defects` (the run refuses every write while a defect is `open`, design/48).
 7. **Tell SK** the operator can resume with `/vw:vw what is next for <run code>`.
 
 ## Deploy scripts
