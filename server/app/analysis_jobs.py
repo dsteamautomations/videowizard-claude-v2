@@ -26,7 +26,11 @@ from .video_evidence.world import provider_schema
 PROVIDER = 'gemini'
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
 LEASE_MINUTES = 45
-GLOBAL_CAP = int(os.environ.get("VW2_ANALYSIS_CAP", "5"))  # concurrent Gemini analysis calls across all runs
+GLOBAL_CAP = None  # tests may pin the cap here; otherwise settings().ANALYSIS_CAP (VW2_ANALYSIS_CAP in the env or server/.env)
+
+
+def global_cap():
+    return GLOBAL_CAP if GLOBAL_CAP is not None else settings().ANALYSIS_CAP
 MAX_EXPLICIT_RETRIES = 3
 TERMINAL = ('retained', 'retained_unstructured', 'rejected', 'failed')
 
@@ -232,7 +236,7 @@ def release(conn, job_id):
 def claim(conn):
     """One queued job (or a storage_pending retry) with a lease; global cap; runs with fewer active jobs go first."""
     active = conn.execute("select count(*) from vw2_jobs where provider=%s and status='running' and lease_until > now()", (PROVIDER,)).fetchone()['count']
-    if active >= GLOBAL_CAP:
+    if active >= global_cap():
         return None
     return conn.execute('''update vw2_jobs set status='running', lease_until = now() + make_interval(mins => %s), attempt = attempt + 1, updated_at = now()
                            where id = (select j.id from vw2_jobs j where j.provider=%s and (j.status='queued' or (j.status='storage_pending' and (j.lease_until is null or j.lease_until < now()))

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.8.0'
+    SERVER_VERSION: str = '0.8.1'
     PLUGIN_MIN_VERSION: str = '0.1.0'
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: SecretStr = SecretStr('')
     GEMINI_API_KEY: SecretStr = SecretStr('')
     OPENAI_API_KEY: SecretStr = SecretStr('')
-    WORKERS: int = 5  # one process per concurrent job; analysis is capped by VW2_ANALYSIS_CAP (default 5)
+    WORKERS: int = 5  # one process per concurrent job; must be at least ANALYSIS_CAP plus room for voice, images, takes and renders
+    ANALYSIS_CAP: int = 5  # concurrent Gemini analysis calls across all runs; 15 on the live VM since 18 Oct 2026 (design/35 row 29: 10 and 20 at once tested clean)
     HF_API_KEY: SecretStr = SecretStr('')
     ANALYSIS_DEADLINE_SECONDS: int = 1800
     FFPROBE_EXECUTABLE: str = 'ffprobe'
