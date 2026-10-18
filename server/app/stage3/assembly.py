@@ -101,6 +101,8 @@ def prepare(conn, store, user, run, outputs):
         slot = placement['end_frame'] - placement['start_frame']
         if ref['name'].endswith('.png'):
             meta = {'kind': 'still', 'duration_s': None, 'fps': None, 'issues': []}
+        elif shot.get('media') and shot['media'].get('kind') == 'movie' and shot['media'].get('duration_s'):   # design/46 11.2: measured when the take was retained
+            meta = {**shot['media'], 'issues': shot['media'].get('issues') or []}
         else:
             meta = {'kind': 'movie', **probe_file(store, ref['key'], ref['name'])}
         avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
@@ -244,14 +246,15 @@ def render(conn, store, user, run):
     open_job = session['renders'].get('assembly')
     if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == entry['digest']:
         raise Problem(409, 'JOB_OPEN', 'The assembly film is already rendering.', job_id=open_job['job_id'])
-    plan = {'kind': 'master', 'items': items, 'timeline': pk['timeline'], 'narration_key': s2['package']['narration_key'], 'narration': s2['package'].get('narration'), 'version': entry['version'], 'digest': entry['digest'],
-            'out_key': key(run, f"assembly-v{entry['version']}-{entry['digest'][:8]}.mp4"), 'upload_normalised': True}
+    plan = {'kind': 'assembly', 'items': items, 'timeline': pk['timeline'], 'narration_key': s2['package']['narration_key'], 'narration': s2['package'].get('narration'), 'version': entry['version'], 'digest': entry['digest'],
+            'out_key': key(run, f"assembly-v{entry['version']}-{entry['digest'][:8]}.mp4"), 'upload_normalised': True}   # design/46 11.1: its own kind, the full size
+    frames = sum(int(it.get('timeline_frames') or 0) for it in items)   # design/46 11.4
     rk = S2.save_json(store, key(run, f"render-assembly-v{entry['version']}.json"), plan)
     job = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'assembly','assembly','render',%s, gen_random_uuid()) returning id",
                        (run['id'], Jsonb({'kind': 'render', 'film': 'assembly', 'plan_key': rk['key'], 'out_key': plan['out_key']}))).fetchone()
-    session['renders']['assembly'] = {'job_id': str(job['id']), 'status': 'queued', 'digest': entry['digest'], 'version': entry['version'], 'out_key': plan['out_key']}
+    session['renders']['assembly'] = {'job_id': str(job['id']), 'status': 'queued', 'digest': entry['digest'], 'version': entry['version'], 'out_key': plan['out_key'], 'frames': frames}
     save_session(store, run, session)
-    return {'job_id': str(job['id']), 'version': entry['version'], 'paid': False}
+    return {'job_id': str(job['id']), 'version': entry['version'], 'frames': frames, 'paid': False, 'next': 'wait with `vw assembly status --wait 900`, then fetch; the operator watches and listens'}
 
 
 def _refresh(conn, session):
@@ -268,7 +271,10 @@ def status(conn, store, run):
         return {'state': 'not_prepared'}
     _refresh(conn, session)
     save_session(store, run, session)
-    return {k: session.get(k) for k in ('fills', 'choices', 'stabilize', 'versions', 'current', 'renders', 'reviews', 'recorded', 'bundle', 'resolve', 'final')}
+    last = conn.execute("select result->'record'->>'frames_per_s' as rate from vw2_jobs where provider='render' and status='ready' and result->'record'->>'frames_per_s' is not null "
+                        "order by updated_at desc limit 1").fetchone()   # design/46 11.4
+    return {**{k: session.get(k) for k in ('fills', 'choices', 'stabilize', 'versions', 'current', 'renders', 'reviews', 'recorded', 'bundle', 'resolve', 'final')},
+            'render_rate_fps': float(last['rate']) if last and last['rate'] else None}
 
 
 def review(conn, store, user, run, decision, notes, frame_notes, quote):
@@ -301,7 +307,12 @@ def record(conn, store, user, run, quote):
         raise Problem(409, 'NOT_ALLOWED', 'The current assembly is not rendered.')
     last = session['reviews'][-1] if session['reviews'] else None
     if not last or last['decision'] != 'accepted' or last['film_sha256'] != film['result']['sha256']:
-        raise Problem(409, 'NOT_ALLOWED', 'The latest review must accept this exact film (`vw assembly review --decision accepted`).')
+        q = (quote or '').lower()
+        if 'watch' not in q or 'listen' not in q:   # design/46 11.5: one call records the review and the output when the words are there
+            raise Problem(409, 'NOT_ALLOWED', "The operator's yes must say they watched the film and listened to it (both words); or review it first (`vw assembly review --decision accepted`).")
+        last = {'decision': 'accepted', 'notes': '', 'frame_notes': [], 'quote': quote, 'version': entry['version'], 'film_sha256': film['result']['sha256'], 'by': user['id'],
+                'at': datetime.now(timezone.utc).isoformat()}
+        session['reviews'].append(last)
     files = [{'name': f"assembly-v{entry['version']}.json", **{k: entry['file'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True},
              {'name': 'assembly.mp4', 'key': film['result']['key'], 'sha256': film['result']['sha256'], 'bytes': film['result']['bytes'], 'location': 'storage', 'receipt': True}]
     for n in (film['result'].get('record') or {}).get('normalised') or []:
@@ -311,7 +322,7 @@ def record(conn, store, user, run, quote):
     rec = film['result'].get('record') or {}
     summary = {'version': entry['version'], 'assembly_digest': entry['digest'], 'master_digest': assembly['master_digest'], 'duration_frames': assembly['duration_frames'],
                'film': {'sha256': film['result']['sha256'], 'duration_s': film['result'].get('duration_s'), 'bytes': film['result']['bytes']},
-               'loudness': {'a1': rec.get('a1_measured'), 'a1_gain_db': rec.get('a1_gain_db'), 'mix': rec.get('mix')}, 'a2_pieces': rec.get('a2_pieces'),
+               'loudness': {'a1': rec.get('a1_measured'), 'a1_gain_db': rec.get('a1_gain_db'), 'mix': rec.get('mix'), 'check': rec.get('loudness_check')}, 'a2_pieces': rec.get('a2_pieces'),
                'stabilized': [e['sub_clip_id'] for e in assembly['events'] if e.get('stabilize')], 'fills': len([e for e in assembly['events'] if e['kind'] == 'fill']),
                'finishing': assembly['finishing'], 'sfx_cues': len(assembly['sfx_cues']), 'review': {k: last[k] for k in ('decision', 'notes', 'frame_notes', 'quote')}}
     out = core.output(conn, user, run, {'stage': 'assembly', 'files': files, 'accepted_quote': quote, 'summary': summary})

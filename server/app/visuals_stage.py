@@ -559,12 +559,16 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
             jobs.record_file(conn, run['id'], STAGE, sel['take']['key'], f"{s['id']}.mp4", sel['take']['sha256'], sel['take']['bytes'], 'video/mp4')
             if job and job['cost']:
                 cost.append(job['cost'])
+            ev = (job['result'] or {}).get('evidence', {}) if job else {}
+            media = ({'kind': 'movie', 'duration_s': ev.get('duration_seconds'), 'fps': ev.get('fps'), 'width': ev.get('width'), 'height': ev.get('height'),
+                      'color_transfer': ev.get('color_transfer'), 'color_primaries': ev.get('color_primaries'), 'rotation_deg': ev.get('rotation_deg') or 0, 'issues': ev['issues']}
+                     if 'issues' in ev else None)   # design/46 11.2: assembly reads this instead of downloading the take
             shots.append({'shot_id': s['id'], 'source': 'take', 'job_id': sel['job_id'], 'placement': {'start_frame': s['start_frame'], 'end_frame': s['end_frame']},
-                          'duration_s': (job['result'] or {}).get('evidence', {}).get('duration_seconds'), 'timing_matches_placement': (job['result'] or {}).get('evidence', {}).get('timing_matches_placement')})
+                          'duration_s': ev.get('duration_seconds'), 'timing_matches_placement': ev.get('timing_matches_placement'), **({'media': media} if media else {})})
         else:
             name = f"{s['id']}-asset{'.mp4' if asset['kind'] == 'movie' else '.png'}"
             files.append({'name': name, 'key': asset['key'], 'sha256': asset['sha256'], 'bytes': asset['bytes'], 'location': 'storage', 'receipt': True})
-            shots.append({'shot_id': s['id'], 'source': 'asset', 'kind': asset['kind'], 'placement': asset['placement']})
+            shots.append({'shot_id': s['id'], 'source': 'asset', 'kind': asset['kind'], 'placement': asset['placement'], **({'media': {'kind': 'still'}} if asset['kind'] == 'still' else {})})
         binding = session['bindings'].get(s['id']) or {}
         for eid, rows in binding.get('references', {}).items():
             for b in rows:

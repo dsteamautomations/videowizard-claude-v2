@@ -15,6 +15,11 @@ from test_visuals import png_bytes, scene, shot, vplan
 from test_voice_media import drain, fake  # noqa: F401
 
 
+def ffprobe_video(path):
+    out = subprocess.run(['ffprobe', '-v', 'error', '-show_streams', '-of', 'json', str(path)], capture_output=True, check=True).stdout
+    return next(s for s in json.loads(out)['streams'] if s['codec_type'] == 'video')
+
+
 def run_until_assembly(home, database, fake, gemini, scenes=False):
     """Through options, master, first cut, and the visuals gap BEAT_02 filled with a still asset. scenes: two scenes with a pause (design/19)."""
     code, ws, pk = run_until_options(home, database, fake, gemini)
@@ -64,17 +69,22 @@ def test_d1_d10_d12_d13_d15_d16_d17_d18_end_to_end(home, database, fake, gemini)
     assert rc == 0 and abs(out['duration_s'] - 2.0) < 0.15, (out, err)   # D1: duration = sum of beats
     rec = out['record']
     assert rec['a1_measured']['integrated_lufs'] is not None and rec['mix']['integrated_lufs'] is not None   # D9 measured
-    # D10: acceptance without watched + listened
-    rc, out, _ = vw(home, 'assembly', 'review', '--decision', 'accepted', '--notes', 'good', '--quote', 'yes')
+    assert rec['loudness_check']['peak_ceiling_dbtp'] == -3 and rec['loudness_check']['peak_inside'] is True   # design/46 11.6
+    assert ffprobe_video(ws / 'out' / 'assembly.mp4')['width'] == 1920   # design/46 11.1: the delivered film is the full one
+    # D10 (design/46 11.5): the record itself needs the watched-and-listened words; without them, refused
+    rc, out, _ = vw(home, 'assembly', 'record', '--quote', 'yes')
     assert rc == 2 and 'listened' in out['message']
-    rc, out, _ = vw(home, 'assembly', 'review', '--decision', 'changes', '--notes', 'hold the wall longer', '--frame-note', '40:too short', '--quote', 'change it')
+    rc, out, _ = vw(home, 'assembly', 'review', '--decision', 'changes', '--notes', 'hold the wall longer', '--frame-note', '0:01.6:too short', '--quote', 'change it')
     assert rc == 0 and out['frame_notes'][0]['frame'] == 40
     assert vw(home, 'assembly', 'build')[0] == 0   # a new version after changes
-    assert vw(home, 'assembly', 'render')[0] == 0
+    rc, out, _ = vw(home, 'assembly', 'render')
+    assert rc == 0 and out['frames'] == 50   # design/46 11.4
     drain()
-    assert vw(home, 'assembly', 'review', '--decision', 'accepted', '--notes', 'good', '--quote', 'yes, watched it and listened to it')[0] == 0
-    rc, out, err = vw(home, 'assembly', 'record', '--quote', 'yes assembly')
+    rc, st, err = vw(home, 'assembly', 'status')
+    assert rc == 0 and st['renders']['assembly']['status'] == 'ready' and st['renders']['assembly']['frames'] == 50 and st['render_rate_fps'] > 0 and 'assembly film ready' in err
+    rc, out, err = vw(home, 'assembly', 'record', '--quote', 'yes assembly, watched it and listened to it')   # one call: the accepted review and the output
     assert rc == 0, (out, err)
+    assert vw(home, 'view', '--stage', 'assembly')[1]['outputs'][0]['summary']['review']['decision'] == 'accepted'
     assert vw(home, 'next')[1]['stage'] == 'delivery'
     # D12: bundle manifest lists every file with hashes; D15/D16 SRT and checklist
     rc, out, err = vw(home, 'delivery', 'bundle')

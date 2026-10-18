@@ -97,10 +97,15 @@ WATCHED_SIZE = {'review': (1280, 720), 'master': (1280, 720)}   # design/43 7.1,
 SLATE_HEAD = re.compile(r'^(#\d+[A-Z]*)\s*\|\s*(.*)$')             # "#2 | ..." or "#2B | ...": the label shows large on its own line
 
 
+DELIVERED = ('master', 'assembly')       # films with the whole narration under them; the assembly film is the delivered one
+PEAK_CEILING_DB = -3.0                   # blueprint: −3 dBTP ceiling on the mix (design/46 11.6)
+A1_TOLERANCE_LU = 1.5
+
+
 class Renderer:
-    def __init__(self, work, timeline, fast=False):
+    def __init__(self, work, timeline, fast=False, cache=None):
         self.work = Path(work)
-        self.cache = self.work / 'cache'
+        self.cache = Path(cache) if cache else self.work / 'cache'   # design/46 11.7: master and assembly pieces live in a per-run cache
         self.cache.mkdir(parents=True, exist_ok=True)
         self.tl = timeline
         self.fast = fast   # review films: a fast preset, the pieces are never delivered
@@ -214,15 +219,17 @@ class Renderer:
         run([ffmpeg(), '-y', '-v', 'error', '-i', str(raw), '-af', f'volume={gain:.2f}dB,afade=t=in:st=0:d={fade:.4f},afade=t=out:st={max(0.0, end - start - fade):.4f}:d={fade:.4f},adelay={int(timeline_at_s * 1000)}|{int(timeline_at_s * 1000)}', str(out)])
         return out
 
-    def mix(self, a1, pieces, length_s, out):
+    def mix(self, a1, pieces, length_s, out, limit=False):
+        """A1 plus the A2 pieces; limit=True (design/46 11.6) holds the sample peak at −3 dBFS on a delivered film."""
         inputs = [a1] + [p for p in pieces if p]
         args = [ffmpeg(), '-y', '-v', 'error']
         for p in inputs:
             args += ['-i', str(p)]
+        limiter = f'alimiter=limit={10 ** (PEAK_CEILING_DB / 20):.4f}:attack=5:release=50:level=false'
         if len(inputs) == 1:
-            run(args + ['-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(out)])
+            run(args + (['-af', limiter] if limit else []) + ['-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(out)])
         else:
-            run(args + ['-filter_complex', f'amix=inputs={len(inputs)}:duration=first:normalize=0', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(out)])
+            run(args + ['-filter_complex', f'amix=inputs={len(inputs)}:duration=first:normalize=0' + (',' + limiter if limit else ''), '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(out)])
         return out
 
     def mux(self, picture, audio, out):
@@ -259,7 +266,7 @@ def timeline_narration(r, narration, pieces, total_frames, out):
     return out
 
 
-def render_film(kind, plan, sources, narration, work, timeline, narration_plan=None):
+def render_film(kind, plan, sources, narration, work, timeline, narration_plan=None, cache=None):
     """plan: {'items': [...]} where each item is {'kind': 'slate', 'lines': [...]} or
     {'kind': 'event', 'sub_clip_id', 'clip': {'id','name','sha256','fps','rotation_deg','hdr'}, 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop_rect', 'hold_last_frame',
      'a2': [{'in_frame','out_frame'}]} and, for the review film, {'kind': 'narration', 'start_s', 'end_s'} markers before each option; the master uses the whole narration.
@@ -268,7 +275,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     no copy pass; the review film also skips the loudness pass, the master keeps it (its sound is the first cut's)."""
     if kind in WATCHED_SIZE:
         timeline = {**timeline, 'width': WATCHED_SIZE[kind][0], 'height': WATCHED_SIZE[kind][1]}
-    r = Renderer(work, timeline, fast=kind in WATCHED_SIZE)
+    r = Renderer(work, timeline, fast=kind in WATCHED_SIZE, cache=cache)
     parts, a2_pieces, a1_parts, normalised = [], [], [], []
     recording = narration
     if narration_plan and narration_plan.get('pieces'):
@@ -313,7 +320,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     picture = r.concat(parts, r.work / f'{kind}-picture.mp4')
     length_s = float(cursor)
     gain, a1_measured = a1_gain(r, recording)
-    if kind == 'master':
+    if kind in DELIVERED:   # the whole narration, one measured gain (design/46 11.1: the assembly film too, never the small size)
         a1 = r.work / 'a1.wav'
         run([ffmpeg(), '-y', '-v', 'error', '-i', str(narration), '-af', f'volume={gain:.2f}dB,apad', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(a1)])
     else:
@@ -323,12 +330,17 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
         lst = r.work / 'a1.txt'
         lst.write_text(''.join(f"file '{Path(p).as_posix()}'\n" for p in a1_parts), encoding='utf-8')
         run([ffmpeg(), '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', str(lst), '-af', f'volume={gain:.2f}dB,apad', '-t', f'{length_s:.6f}', '-ar', '48000', '-ac', '2', str(a1)])
-    mixed = r.mix(a1, a2_pieces, length_s, r.work / f'{kind}-mix.wav')
+    mixed = r.mix(a1, a2_pieces, length_s, r.work / f'{kind}-mix.wav', limit=kind in DELIVERED)
     film = r.mux(picture, mixed, r.work / f'{kind}.mp4')
     codec = 'h264 high yuv420p bt709 / aac 48k stereo'
     if kind in WATCHED_SIZE:   # before design/43: a 1080p render then a 720p copy, 16 min on VW-3's third review round
         codec = f'h264 high yuv420p bt709 {r.W}x{r.H} veryfast crf 23 / aac 48k stereo ({kind}, made at this size)'
     master_loudness = r.loudness(film) if kind != 'review' else None
+    check = None
+    if kind in DELIVERED and master_loudness:   # design/46 11.6: the numbers against the targets
+        i, tp = master_loudness.get('integrated_lufs'), master_loudness.get('true_peak_dbfs')
+        check = {'integrated_lufs': i, 'true_peak_dbfs': tp, 'peak_ceiling_dbtp': int(PEAK_CEILING_DB), 'peak_inside': tp is not None and tp <= PEAK_CEILING_DB + 0.2,
+                 'integrated_target_lufs': int(A1_TARGET_LUFS), 'integrated_inside': i is not None and abs(i - A1_TARGET_LUFS) <= A1_TOLERANCE_LU}
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
-                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': codec,
+                  'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'loudness_check': check, 'codec': codec,
                   'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')]}

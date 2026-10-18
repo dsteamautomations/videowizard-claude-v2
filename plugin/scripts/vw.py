@@ -978,13 +978,16 @@ def cmd_options(a):
         emit(write(base + '/record', {'quote': a.quote}), 0, 'Options recorded; next the operator decides per option (`vw master decide`).')
 
 
-def wait_for_film(run, film, wait_s):
-    """design/43 7.2, design/44 8.2: poll the stage 2 status every 15 s until the film is ready or failed, or wait_s passes.
+FILM_COMMAND = {'review': 'options', 'master': 'master', 'assembly': 'assembly'}
+
+
+def wait_for_film(run, film, wait_s, path=None):
+    """design/43 7.2, design/44 8.2, design/46 11.4: poll the stage status every 15 s until the film is ready or failed, or wait_s passes.
     Returns the last status answer and the line to print."""
     started = time.monotonic()
     deadline = started + wait_s
     while True:
-        st = call('GET', f'/api/runs/{run}/stage2')
+        st = call('GET', path or f'/api/runs/{run}/stage2')
         r = (st.get('renders') or {}).get(film) or {}
         if r.get('status') not in ('queued', 'running') or time.monotonic() >= deadline:
             break
@@ -992,7 +995,7 @@ def wait_for_film(run, film, wait_s):
     if not r:
         line = f'no {film} film rendered yet'
     elif r.get('status') == 'ready':
-        line = f'{film} film ready: `vw {"options" if film == "review" else "master"} fetch`'
+        line = f'{film} film ready: `vw {FILM_COMMAND.get(film, film)} fetch`'
     elif r.get('status') in ('queued', 'running'):
         rate = float(st.get('render_rate_fps') or 20.0)
         left = max(0.0, float(r.get('frames') or 0) / rate - (time.monotonic() - started))
@@ -1061,34 +1064,75 @@ def cmd_first_cut(a):
     emit(write(f"/api/runs/{m['run_id']}/first-cut/record", {'quote': a.quote}), 0, 'First cut recorded.')
 
 
+def frame_note(text):
+    """design/46 11.3: 'mm:ss:note', 'mm:ss.f:note' (25 fps) or 'frames:note'."""
+    parts = str(text).split(':', 2)
+    if len(parts) == 3 and re.fullmatch(r'\d+', parts[0]) and re.fullmatch(r'\d+(\.\d+)?', parts[1]):
+        return {'frame': int((int(parts[0]) * 60 + float(parts[1])) * 25 + 0.5), 'note': parts[2]}
+    first, _, note = str(text).partition(':')
+    return {'frame': int(first), 'note': note}
+
+
 def cmd_assembly(a):
     m = active()
     run = m['run_id']
     base = f'/api/runs/{run}/assembly'
-    if a.what == 'prepare':   # ticket 12: it measures every generated take, which can take minutes
-        emit(write(base + '/prepare', {}, wait=600))
+    if a.what == 'prepare':   # design/46 11.2: the takes' evidence is read, only files without it are downloaded
+        out = write(base + '/prepare', {}, wait=600)
+        lines = []
+        for sid, f in sorted((out.get('fills') or {}).items()):
+            d = f.get('default') or {}
+            have = f"{'still' if f.get('available_frames') is None else str(f['available_frames']) + ' f available'}"
+            lines.append(f"{sid}: slot {f.get('slot_frames')} f, {have}, {'trim from 0' if d.get('end_policy') == 'trim' else 'hold the last frame'}" + (f"; issues: {', '.join(f['issues'])} (needs --accept-as-is or a swap)" if f.get('issues') else ''))
+        flagged = out.get('stabilization_flagged') or []
+        emit(out, 0, 'Fills:\n' + '\n'.join(lines) + ('\nFlagged shaky shots: ' + ', '.join(flagged) if flagged else '\nNo shaky shots flagged') + '\nShow this table and ask once; the defaults need no command.')
     if a.what == 'choose':
+        if a.file:   # design/46 11.3: the exceptions in one file
+            items = _json_file(m, a.file)
+            if not isinstance(items, list):
+                emit({'action': 'refused', 'message': f'{a.file} must be a list of {{shot, offset, end, accept_as_is}}.'}, 2)
+            recorded = []
+            for i, it in enumerate(items):
+                body = {'request_id': str(uuid.uuid4()), 'shot_id': it.get('shot'), 'offset_frames': int(it.get('offset') or 0), 'end_policy': it.get('end') or 'trim', 'accept_as_is': bool(it.get('accept_as_is'))}
+                payload, code = request('POST', base + '/choose', json=body)
+                if code:
+                    if code == 401:
+                        finish(payload, code)
+                    emit({'recorded': recorded, 'refused': {'shot': body['shot_id'], 'message': payload.get('message') or payload.get('action')},
+                          'remaining': [x.get('shot') for x in items[i + 1:]], 'action': 'refused'}, 2, f"{len(recorded)} recorded; {body['shot_id']} refused: {payload.get('message')}; fix it and run the file again")
+                recorded.append(body['shot_id'])
+            emit({'recorded': recorded}, 0, f'{len(recorded)} fill choices recorded; `vw assembly build`')
         emit(write(base + '/choose', {'shot_id': a.shot, 'offset_frames': int(a.offset or 0), 'end_policy': a.end or 'trim', 'accept_as_is': bool(a.accept_as_is)}))
     if a.what == 'stabilize':
         emit(write(base + '/stabilize', {'sub_clip_id': a.sub, 'choice': a.choice or 'leave'}))
     if a.what == 'build':
         emit(write(base + '/build', {}))
     if a.what == 'render':
-        emit(write(base + '/render', {}), 0, 'Assembly film rendering; poll `vw assembly status`.')
-    if a.what == 'status':
-        emit(call('GET', f'/api/runs/{run}/stage3'))
+        emit(write(base + '/render', {}), 0, 'Assembly film rendering; wait with `vw assembly status --wait 900`.')
+    if a.what == 'status':   # design/46 11.4
+        st, line = wait_for_film(run, 'assembly', a.wait or 0, path=f'/api/runs/{run}/stage3')
+        emit(st, 0, line)
     if a.what == 'fetch':
         st = call('GET', f'/api/runs/{run}/stage3')
         r = (st.get('renders') or {}).get('assembly') or {}
         if r.get('status') != 'ready':
             emit({'action': 'refused', 'message': f"The assembly film is {r.get('status') or 'not rendered'}: {r.get('error') or 'poll status'}"}, 2)
         path = _download(m, r['result']['key'], 'out/assembly.mp4')
-        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': r['result'].get('record')}, 0, f'Assembly film at {path}; the operator watches and listens.')
+        record = r['result'].get('record') or {}
+        lc = record.get('loudness_check') or {}
+        if lc:   # design/46 11.6: the numbers against the targets
+            outside = [x for x, ok in (('peak', lc.get('peak_inside')), ('loudness', lc.get('integrated_inside'))) if not ok]
+            loud = (f"; mix {lc.get('integrated_lufs')} LUFS (target {lc.get('integrated_target_lufs')}), peak {lc.get('true_peak_dbfs')} dBTP (ceiling {lc.get('peak_ceiling_dbtp')}): "
+                    + ('inside' if not outside else 'outside: ' + ', '.join(outside)))
+        else:
+            loud = ''
+        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': record}, 0, f'Assembly film at {path}; the operator watches and listens{loud}.')
     if a.what == 'review':
-        notes = [{'frame': int(x.split(':', 1)[0]), 'note': x.split(':', 1)[1]} for x in (a.frame_note or [])]
+        notes = [frame_note(x) for x in (a.frame_note or [])]
         emit(write(base + '/review', {'decision': a.decision, 'notes': a.notes or '', 'frame_notes': notes, 'quote': a.quote}))
-    if a.what == 'record':
-        emit(write(base + '/record', {'quote': a.quote}), 0, 'Assembly recorded; next `vw delivery bundle`.')
+    if a.what == 'record':   # design/46 11.5: the operator's yes (watched and listened) records the review and the output
+        out = write(base + '/record', {'quote': a.quote})
+        emit(out, 0, f"Assembly recorded (watched and listened); next {out.get('next') or '`vw delivery bundle`'}.")
 
 
 def cmd_delivery(a):
@@ -1255,8 +1299,9 @@ def build_parser():
     s.set_defaults(fn=cmd_master)
     s = sub.add_parser('first-cut'); s.add_argument('what', choices=['record']); s.add_argument('--quote'); s.set_defaults(fn=cmd_first_cut)
     s = sub.add_parser('assembly'); s.add_argument('what', choices=['prepare', 'choose', 'stabilize', 'build', 'render', 'status', 'fetch', 'review', 'record'])
-    for flag in ('--shot', '--offset', '--end', '--sub', '--choice', '--decision', '--notes', '--quote'):
+    for flag in ('--shot', '--offset', '--end', '--sub', '--choice', '--decision', '--notes', '--quote', '--file'):
         s.add_argument(flag)
+    s.add_argument('--wait', type=int, default=0)
     s.add_argument('--accept-as-is', action='store_true'); s.add_argument('--frame-note', action='append'); s.set_defaults(fn=cmd_assembly)
     s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'resolve', 'final'])
     s.add_argument('--check', action='store_true'); s.add_argument('--run', dest='run_it', action='store_true'); s.add_argument('--inspect', action='store_true'); s.add_argument('--close', action='store_true')

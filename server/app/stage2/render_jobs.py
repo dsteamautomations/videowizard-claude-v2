@@ -48,7 +48,8 @@ def process(job):
         items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"BLANK | {it['beat_id']} | {it['timeline_frames']} frames", 'for AI video or animation (visuals stage)']} if it.get('gap') else it)
                  for it in plan['items']]
         t0 = time.monotonic()
-        film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'], plan.get('narration'))
+        cache = (CACHE / str(job['run_id']) / 'cache') if plan['kind'] in R.DELIVERED else None   # design/46 11.7: reused across versions, removed at close
+        film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'], plan.get('narration'), cache=cache)
         record['elapsed_s'] = round(time.monotonic() - t0, 1)   # design/43 7.2: the measured speed feeds the tool's estimate
         record['frames_per_s'] = round(record['frames'] / record['elapsed_s'], 1) if record['elapsed_s'] > 0 else None
         data = film.read_bytes()

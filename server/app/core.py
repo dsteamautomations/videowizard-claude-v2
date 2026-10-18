@@ -357,7 +357,11 @@ def close(conn, user, run):
     missing = [f.get('name') for o in current_outputs(conn, run['id']) for f in o['files'] if not f.get('receipt')]
     if missing:
         raise Problem(409, 'UPLOAD_INCOMPLETE', 'Some retained files have no upload receipt yet.', files=missing)
-    return conn.execute("update vw2_runs set status='closed', closed_at=now() where id=%s returning *", (run['id'],)).fetchone()
+    row = conn.execute("update vw2_runs set status='closed', closed_at=now() where id=%s returning *", (run['id'],)).fetchone()
+    import shutil
+    from .stage2.render_jobs import CACHE
+    shutil.rmtree(CACHE / str(run['id']), ignore_errors=True)   # design/46 11.7: the run's render cache goes with the run
+    return row
 
 
 def adopt(conn, user, run, version):

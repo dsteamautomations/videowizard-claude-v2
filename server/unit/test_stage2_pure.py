@@ -156,3 +156,57 @@ def test_master_film_is_720p_and_still_measured(tmp_path, narration):
     film, record = R.render_film('master', plan, {}, narration, tmp_path / 'm', {'width': 1920, 'height': 1080, 'fps': 25})
     v = ffprobe_stream(film)
     assert v['width'] == 1280 and v['height'] == 720 and record['mix'] is not None and 'master, made at this size' in record['codec']
+
+
+# ---------- design/46 11.1: the assembly film is the full one; 11.6 the limiter; 11.7 the cache folder ----------
+
+def peak_db(path):
+    r = subprocess.run(['ffmpeg', '-i', str(path), '-af', 'volumedetect', '-f', 'null', '-'], capture_output=True)
+    import re
+    return float(re.search(r'max_volume: (-?[0-9.]+) dB', r.stderr.decode(errors='replace')).group(1))
+
+
+def test_assembly_film_is_1080p_with_the_whole_narration_and_a_loudness_check(tmp_path, narration):
+    pytest.importorskip('PIL')
+    from app.stage2 import render as R
+    plan = {'items': [{'kind': 'slate', 'lines': ['BLANK | BEAT_01 | 50 frames', 'for AI video'], 'frames': 50}]}   # no narration items: the whole recording runs under it
+    film, record = R.render_film('assembly', plan, {}, narration, tmp_path / 'a', {'width': 1920, 'height': 1080, 'fps': 25})
+    v = ffprobe_stream(film)
+    assert v['width'] == 1920 and v['height'] == 1080 and record['mix'] is not None and 'made at this size' not in record['codec']
+    lc = record['loudness_check']
+    assert lc['peak_ceiling_dbtp'] == -3 and lc['integrated_target_lufs'] == -16 and set(lc) >= {'integrated_lufs', 'true_peak_dbfs', 'peak_inside', 'integrated_inside'}
+
+
+def test_the_mix_of_a_delivered_film_is_limited_to_minus_three(tmp_path):
+    from app.stage2 import render as R
+    loud = tmp_path / 'loud.wav'
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', "aevalsrc=0.999*sin(2*PI*440*t):s=48000:c=stereo", '-t', '1', str(loud)], check=True, capture_output=True)
+    assert peak_db(loud) > -0.5
+    r = R.Renderer(tmp_path / 'w', {'width': 320, 'height': 180, 'fps': 25})
+    out = r.mix(loud, [], 1.0, tmp_path / 'mix.wav', limit=True)
+    assert peak_db(out) <= -2.9
+    plain = r.mix(loud, [], 1.0, tmp_path / 'plain.wav')
+    assert peak_db(plain) > -0.5
+
+
+def test_renderer_uses_the_cache_folder_it_is_given(tmp_path):
+    pytest.importorskip('PIL')
+    from app.stage2 import render as R
+    cache = tmp_path / 'run-cache'
+    r = R.Renderer(tmp_path / 'w', {'width': 320, 'height': 180, 'fps': 25}, cache=cache)
+    seg = r.slate(['x'], 5)
+    assert seg.parent == cache and (tmp_path / 'w' / 'cache').exists() is False
+
+
+# ---------- design/46 11.2: the take evidence carries colour tags and rotation ----------
+
+def test_probe_reports_colour_tags_and_rotation(tmp_path):
+    from app.visual_workers import probe
+    untagged = tmp_path / 'u.mp4'
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x204060:s=64x64:r=25:d=1', '-pix_fmt', 'yuv420p', str(untagged)], check=True, capture_output=True)
+    tagged = tmp_path / 't.mp4'
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=0x204060:s=64x64:r=25:d=1', '-vf', 'format=yuv420p,setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709',
+                    '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', str(tagged)], check=True, capture_output=True)
+    u, t = probe(untagged), probe(tagged)
+    assert u['issues'] == ['colour untagged'] and u['rotation_deg'] == 0 and u['duration_seconds'] == pytest.approx(1.0, abs=0.05)
+    assert t['issues'] == [] and t['color_transfer'] == 'bt709' and t['color_primaries'] == 'bt709'

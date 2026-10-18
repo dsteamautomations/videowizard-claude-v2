@@ -249,10 +249,10 @@
       "requires_files": true,
       "cap": 2,
       "steps": [
-        "`vw assembly prepare`: shows every gap fill (slot frames vs available, default offset/end policy, issues such as untagged colour or rotation) and shaky shots flagged by the logs.",
-        "Ask the operator per fill: start offset and end policy (trim or hold last frame); per flagged shot: leave it for the editor, or stabilise with FFmpeg (counted in the zoom cap). `vw assembly choose`, `vw assembly stabilize`.",
-        "`vw assembly build`, `vw assembly render` (A1 narration untouched, A2 nat sound at the blueprint band, no music), poll, `vw assembly fetch`. The operator watches AND listens.",
-        "`vw assembly review --decision accepted|changes|rejected …` with their words; on accepted (must say watched and listened) `vw assembly record --quote`."
+        "`vw assembly prepare`: it lists every gap fill on one line (slot frames, what the take or asset covers, the default: trim from frame 0, or hold the last frame when the take is short; issues such as untagged colour or rotation) and the shots the logs flagged as shaky.",
+        "Show the operator that table and ask once: any fill to change (start offset, trim or hold), any flagged shot to stabilise with FFmpeg (counted in the zoom cap), and for each fill with an issue whether to use it as it is or swap it in visuals. Record only the exceptions: `vw assembly choose --shot S --offset f --end trim|hold_last [--accept-as-is]`, or several in out/fills.json with `--file out/fills.json`; `vw assembly stabilize --sub X --choice ffmpeg`. The defaults need no command.",
+        "`vw assembly build`, `vw assembly render` (A1 narration with one measured gain, A2 nat sound at the blueprint band, a -3 dBTP ceiling on the mix, no music), `vw assembly status --wait 900` until the film is ready, `vw assembly fetch` (it prints the loudness against the targets). The operator watches AND listens.",
+        "On their yes (it must say watched and listened): `vw assembly record --quote \"<their words>\"` records the review and the output together. On changes: `vw assembly review --decision changes --notes \"…\" [--frame-note mm:ss:note] --quote \"…\"`, change the choices the notes name, build and render again (only the changed fills are re-encoded). On a no: `--decision rejected` and `vw revise --stage visuals` or `--stage master` as the notes say."
       ]
     },
     {

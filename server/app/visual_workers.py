@@ -140,8 +140,12 @@ def probe(path):
     out = subprocess.run([settings().FFPROBE_EXECUTABLE, '-v', 'error', '-show_format', '-show_streams', '-of', 'json', str(path)], capture_output=True, check=True, timeout=60).stdout
     data = json.loads(out)
     video = [s for s in data['streams'] if s.get('codec_type') == 'video']
-    return {'duration_seconds': float(data['format']['duration']), 'width': video[0].get('width'), 'height': video[0].get('height'), 'fps': video[0].get('avg_frame_rate'),
-            'has_audio': any(s.get('codec_type') == 'audio' for s in data['streams'])}
+    v = video[0]
+    rotation = next((int(sd['rotation']) for sd in v.get('side_data_list') or [] if 'rotation' in sd), 0) % 360
+    return {'duration_seconds': float(data['format']['duration']), 'width': v.get('width'), 'height': v.get('height'), 'fps': v.get('avg_frame_rate'),
+            'has_audio': any(s.get('codec_type') == 'audio' for s in data['streams']),
+            'color_transfer': v.get('color_transfer'), 'color_primaries': v.get('color_primaries'), 'rotation_deg': rotation,   # design/46 11.2: assembly reads these, no download
+            'issues': ([] if v.get('color_transfer') and v.get('color_primaries') else ['colour untagged']) + (['rotation metadata'] if rotation else [])}
 
 
 def process_take(job):
