@@ -264,6 +264,7 @@ def production_inputs(given):
 # ---------- script ----------
 
 DECISIONS = ('accepted', 'rejected', 'reworded')
+V4_REQUEST_LIMIT = 10000   # Eleven v4 characters per request (server/app/elevenlabs.py); narration segmentation is a later piece of work (design/39 4.3)
 
 
 def normalise(text):
@@ -351,6 +352,8 @@ def script_record(ws, procedure, prior):
     data.update({'spoken_text': text, 'passages': passages, 'beats': beats, 'content_digest': digest(text), 'parser': 'reference-paragraphs-v1'})
     (ws / 'out' / 'script.json').write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding='utf-8')
     summary = {'content_digest': data['content_digest'], 'passages': len(passages), 'beats': len(beats), 'characters': len(text),
+               **({'length_warning': f'The script has {len(text):,} characters; Eleven v4 narrates at most 10,000 per request and segmentation is not built yet. '
+                                     'Shorten or split the film before voice.'} if len(text) > V4_REQUEST_LIMIT else {}),
                'source_intake': intake['summary']['source_digest'], 'source_brief': brief['summary']['content_digest'],
                'assessment': data.get('assessment', ''), 'changes': accepted, 'changes_proposed': len(changes), 'changes_accepted': accepted,
                'changes_rejected': sum(1 for c in changes if c.get('decision') == 'rejected'), **stamps(ws, 'script')}   # design/38 3.2

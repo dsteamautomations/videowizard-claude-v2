@@ -194,6 +194,7 @@ def make_workspace(run, keep_logs=False, assembly_machine=None, files=None):
     m = {'code': run['code'], 'run_id': run['id'], 'title': run.get('title'), 'client': run.get('client'), 'client_id': run.get('client_id'), 'created': datetime.now(timezone.utc).isoformat(),
          'version': run.get('procedure_version'), 'client_runs': run.get('client_runs') or [],
          'last_brief': run.get('last_brief'), 'client_rules': run.get('client_rules') or [],   # design/37 2.2, 2.3
+         'last_voice': run.get('last_voice'),   # design/39 4.2
          'keep_logs': keep_logs, 'assembly_machine': assembly_machine, 'closed': False, 'files': files or []}
     save_json(manifest_path(run['code']), m)
     (RUNS / '.active').write_text(run['code'], encoding='utf-8')
@@ -383,7 +384,8 @@ def cmd_stage(a):
     try:
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
-                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or []} if a.stage == 'brief' else {}
+                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or []} if a.stage == 'brief' else \
+                {'last_voice': m.get('last_voice')} if a.stage == 'voice' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size))
@@ -416,7 +418,8 @@ def cmd_stage(a):
     for ref in refs:
         m['files'] = [f for f in m['files'] if f['name'] != ref['name']] + [{**ref, 'stage': a.stage, 'action': 'retain' if result.get('retain', True) else 'upload'}]
     save_json(manifest_path(m['code']), m)
-    emit(row, 0, f'Recorded {a.stage}. ' + (next_line(row['next']) if row.get('next') else 'Run `vw next`.'))
+    warning = (result.get('summary') or {}).get('length_warning')   # design/39 4.3: said out loud, not only stored
+    emit(row, 0, f'Recorded {a.stage}. ' + (next_line(row['next']) if row.get('next') else 'Run `vw next`.') + (f' WARNING: {warning}' if warning else ''))
 
 
 def run_and_procedure(m, stage, with_procedure):
@@ -524,14 +527,29 @@ def cmd_voice(a):
             if not 1 <= len(a.voice) <= 6:
                 emit({'action': 'refused', 'message': 'Audition one to six voices per batch.'}, 2)
         settings_ = json.loads(a.settings) if a.settings else None
-        rows = []
-        for voice in (a.voice if a.what == 'audition' else a.voice[:1]):
+        if a.what == 'narrate' and a.note:   # design/39 4.6: the operator's words on the choice, copied into the record
+            save_json(workspace(m['code']) / 'work' / 'voice-choice.json', {'choice_note': a.note})
+
+        def submit(voice):
             req = {'kind': 'audition' if a.what == 'audition' else 'narration', 'voice_id': voice, 'model_id': a.model, 'text': text, **({'settings': settings_} if settings_ else {})}
-            rows.append(write(f"/api/runs/{m['run_id']}/jobs", {'stage': 'voice', 'provider': 'elevenlabs', 'request': req}))
-        emit({'jobs': [{'id': r['id'], 'voice_id': r['request']['voice_id'], 'status': r['status']} for r in rows]}, 0,
-             f"Submitted {len(rows)} paid ElevenLabs {a.what} job(s); tell the operator, then poll with `vw voice jobs`.")
+            return write(f"/api/runs/{m['run_id']}/jobs", {'stage': 'voice', 'provider': 'elevenlabs', 'request': req})
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=3) as pool:   # three at a time, in voice order (design/39 4.5)
+            rows = list(pool.map(submit, a.voice if a.what == 'audition' else a.voice[:1]))
+        snap = rows[0]['request']
+        settings_line = ', '.join(f'{k} {v}' for k, v in (snap.get('settings') or {}).items())
+        emit({'jobs': [{'id': r['id'], 'voice_id': r['request']['voice_id'], 'status': r['status']} for r in rows], 'model_id': snap.get('model_id'), 'settings': snap.get('settings')}, 0,
+             f"Submitted {len(rows)} paid ElevenLabs {a.what} job(s) on {snap.get('model_id')} ({settings_line}); tell the operator, then `vw voice jobs --wait 180`.")
     if a.what == 'jobs':
-        emit(call('GET', f"/api/runs/{m['run_id']}/jobs", params={'stage': 'voice'}))
+        rows = wait_for_jobs(m, 'voice', a.wait or 0)
+        counts = {k: sum(1 for r in rows if r['status'] == k) for k in ('ready', 'failed', 'submission_unknown')}
+        still = [r for r in rows if r['status'] in OPEN_JOB_STATUSES and r['status'] != 'submission_unknown']
+        line = f"{counts['ready']} ready, {counts['failed']} failed, {counts['submission_unknown']} unknown, {len(still)} still open"
+        if counts['submission_unknown']:
+            line += '; recover the unknown job(s) with `vw voice recover --job ID`: ' + ', '.join(r['id'] for r in rows if r['status'] == 'submission_unknown')
+        elif still:
+            line += '; run again with --wait'
+        emit(rows, 0, line)
     if a.what == 'fetch':
         job = call('GET', f"/api/runs/{m['run_id']}/jobs/{a.job}")
         if job['status'] != 'ready':
@@ -553,6 +571,20 @@ def cmd_voice(a):
             save_json(ws / 'work' / 'voice-fetched.json', job)
         emit({'job': job['id'], 'files': [str(ws / 'out' / 'narration.mp3')], 'duration_s': res.get('duration_s')}, 0,
              'Fetched. Give the operator the file to listen to, ask for approval, then `vw stage voice record --quote`.')
+
+
+OPEN_JOB_STATUSES = ('queued', 'running', 'storage_pending', 'submission_unknown')
+
+
+def wait_for_jobs(m, stage, wait_s):
+    """design/39 4.4: read the run's jobs every 5 s inside the tool until none is open, a job needs recovery, or wait_s passes. Never submits."""
+    deadline = time.monotonic() + wait_s
+    while True:
+        rows = call('GET', f"/api/runs/{m['run_id']}/jobs", params={'stage': stage})
+        open_ = [r for r in rows if r['status'] in OPEN_JOB_STATUSES]
+        if not open_ or any(r['status'] == 'submission_unknown' for r in rows) or time.monotonic() >= deadline:
+            return rows
+        time.sleep(5)
 
 
 def cmd_analysis(a):
@@ -991,7 +1023,8 @@ def build_parser():
     s.add_argument('--scope', default='account'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
     s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')
-    s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note'); s.set_defaults(fn=cmd_voice)
+    s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note', help="narrate: the operator's words on the choice; resolve: a note")
+    s.add_argument('--wait', type=float, default=0, help='jobs: seconds to wait inside the tool for open voice jobs to settle (design/39 4.4)'); s.set_defaults(fn=cmd_voice)
     s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude', 'policy'])
     s.add_argument('--camera-audio', choices=['allowed', 'excluded']); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
     s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.add_argument('--waive', action='append'); s.set_defaults(fn=cmd_analysis)

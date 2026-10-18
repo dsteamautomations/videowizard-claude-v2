@@ -481,7 +481,8 @@ def create_run(body: NewRun, user=User, conn=DB):
         run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version))
         return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id']),            # earlier titles for this client (design/36 1.5)
                      'last_brief': core.last_brief(conn, run['client_id']),                    # what the client said last time (design/37 2.2)
-                     'client_rules': core.client_rules(conn, run['client_id'])}                # rules learned for the client (design/37 2.3)
+                     'client_rules': core.client_rules(conn, run['client_id']),               # rules learned for the client (design/37 2.3)
+                     'last_voice': core.last_voice(conn, run['client_id'])}                    # the client's narrator last time (design/39 4.2)
     status, resp = core.with_receipt(conn, user, body_dict(body), create)
     return Response(resp, status_code=status)
 

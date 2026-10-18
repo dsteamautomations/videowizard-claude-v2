@@ -96,6 +96,17 @@ def last_brief(conn, client_id):
     return {'run': row['code'], 'production': summary.get('production') or {}, 'answers': summary.get('answers') or {}, 'questions': questions}
 
 
+def last_voice(conn, client_id):
+    """The client's narrator last time (design/39 4.2): from the most recent run with a current voice output. None when there is none."""
+    row = conn.execute('''select r.code, o.summary from vw2_stage_outputs o join vw2_runs r on r.id = o.run_id
+                          where r.client_id=%s and o.stage='voice' and o.unit is null and not o.stale order by o.created_at desc limit 1''', (client_id,)).fetchone()
+    if not row:
+        return None
+    s = row['summary'] or {}
+    return {'run': row['code'], 'voice_id': s.get('voice_id'), 'name': s.get('name'), 'model_id': s.get('model_id'), 'settings': s.get('settings') or {},
+            'choice_note': s.get('choice_note') or ''}
+
+
 def client_rules(conn, client_id):
     """Rules learned from master rejections for this client (design/37 2.3)."""
     rows = conn.execute('select rule, source_run, created_at from vw2_client_rules where client_id=%s order by id', (client_id or '',)).fetchall()

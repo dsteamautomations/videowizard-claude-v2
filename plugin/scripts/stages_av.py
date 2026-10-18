@@ -99,13 +99,20 @@ def media_record(ws, procedure, prior, upload):
 
 # ---------- voice ----------
 
-def voice_prepare(ws, procedure, prior):
+def voice_prepare(ws, procedure, prior, last_voice=None):
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
+    brief = (prior('brief') or {}).get('summary') or {}   # design/39 4.2: the brief, the languages and the client's last voice
+    production = brief.get('production') or {}
+    message = 'Agree a voice with the operator (catalog/preview/audition), narrate, fetch, then record.'
+    if last_voice:
+        message = f"Last voice for this client: {last_voice.get('name')} ({last_voice.get('model_id')}, run {last_voice.get('run')}). Propose it first: same voice as last time, or compare? " + message
     return {'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
             'inputs': {'spoken_text': script['spoken_text'], 'characters': len(script['spoken_text']), 'content_digest': script['content_digest'],
-                       'passages': len(script['passages'])},
-            'output_file': 'out/voice.json', 'prepared_at': stamp(ws, 'voice'),
-            'message': 'Agree a voice with the operator (catalog/preview/audition), narrate, fetch, then record.'}
+                       'passages': len(script['passages']),
+                       'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
+                       'narration_language': production.get('narration_language'), 'field_speech_languages': production.get('field_speech_languages') or [],
+                       'last_voice': last_voice},
+            'output_file': 'out/voice.json', 'prepared_at': stamp(ws, 'voice'), 'message': message}
 
 
 BREATHING_PAUSE_S = 0.8
@@ -145,5 +152,9 @@ def voice_record(ws, procedure, prior, fetched):
     (ws / 'out' / 'voice.json').write_text(json.dumps(voice, indent=1), encoding='utf-8')
     stored = [{'name': 'narration.mp3', 'key': res['audio_key'], 'sha256': res['sha256'], 'bytes': res['bytes'], 'location': 'storage', 'receipt': True},
               {'name': 'timing.json', 'key': res['timing_key'], 'sha256': res['timing_sha256'], 'bytes': res['timing_bytes'], 'location': 'storage', 'receipt': True}]
-    summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest'], **stamps(ws, 'voice')}
+    try:
+        choice_note = str(json.loads((ws / 'work' / 'voice-choice.json').read_text(encoding='utf-8')).get('choice_note') or '')
+    except (OSError, ValueError):
+        choice_note = ''
+    summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest'], 'choice_note': choice_note, **stamps(ws, 'voice')}   # design/39 4.6
     return {'files': ['out/voice.json'], 'stored': stored, 'summary': summary, 'retain': True, 'upload': True}

@@ -108,13 +108,16 @@ def test_v1_auditions_then_narration_then_record(home, database, fake):
     rc, out, err = vw(home, 'voice', 'audition', '--voice', 'v1', '--voice', 'v2', '--excerpt', 'Earth blocks are pressed.')
     assert rc == 0 and len(out['jobs']) == 2, err
     drain()
-    jobs = vw(home, 'voice', 'jobs')[1]
-    assert [j['status'] for j in jobs] == ['ready', 'ready'] and all(j['cost']['characters'] == 25 for j in jobs)
+    rc, jobs, err = vw(home, 'voice', 'jobs', '--wait', '30')   # design/39 4.4: already settled, returns at once
+    assert rc == 0 and [j['status'] for j in jobs] == ['ready', 'ready'] and all(j['cost']['characters'] == 25 for j in jobs) and '2 ready' in err
     assert 'text' not in jobs[0]['request']
     rc, out, _ = vw(home, 'voice', 'fetch', '--job', jobs[0]['id'])
     assert rc == 0 and (ws / 'out' / 'audition-v1.mp3').stat().st_size > 1000
-    rc, out, err = vw(home, 'voice', 'narrate', '--voice', 'v2')
+    FakeEleven.calls.clear()
+    rc, out, err = vw(home, 'voice', 'narrate', '--voice', 'v2', '--note', 'warmer, clearer on the numbers')
     assert rc == 0, err
+    assert 'eleven_v4' in err and 'stability 0.5' in err   # design/39 4.6: the submission line names model and settings
+    assert FakeEleven.calls.count(('GET', '/v1/models')) <= 1   # design/39 4.5: the model list is cached on the server
     drain()
     job = [j for j in vw(home, 'voice', 'jobs')[1] if j['request']['kind'] == 'narration'][0]
     assert job['status'] == 'ready' and job['result']['timing_key'].endswith('.timing.json') and 1.9 < job['result']['duration_s'] < 2.2
@@ -129,7 +132,12 @@ def test_v1_auditions_then_narration_then_record(home, database, fake):
     assert all(b['target_beat_duration_s'] == round(b['measured_vo_duration_s'] + 0.8, 3) for b in beats)
     assert beats[0]['end_s'] <= beats[1]['start_s'] and beats[-1]['end_s'] <= out['summary']['duration_s']
     assert out['summary']['cost']['characters'] == len('Earth blocks are pressed.\n\nNot fired.\n')
+    assert out['summary']['choice_note'] == 'warmer, clearer on the numbers'   # design/39 4.6
     assert vw(home, 'next')[1]['stage'] == 'media'
+    # design/39 4.2: the next film for this client starts with last time's voice
+    rc, out, _ = vw(home, 'start', '--client', 'VK', '--need-gb', '0')
+    assert rc == 0 and out['last_voice'] == {'run': code, 'voice_id': 'v2', 'name': 'Voice v2', 'model_id': 'eleven_v4',
+                                             'settings': {'stability': 0.5, 'similarity_boost': 0.75}, 'choice_note': 'warmer, clearer on the numbers'}
 
 
 def test_v2_unknown_outcome_blocks_second_narration_until_resolved(home, database, fake):

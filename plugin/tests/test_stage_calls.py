@@ -148,7 +148,8 @@ def test_start_keeps_last_brief_and_client_rules_and_tolerates_their_absence(mon
     monkeypatch.setattr(vw, 'machine_id', lambda: 'mac-1')
     answers = [{'id': 'run-7', 'code': 'VW-7', 'client': 'VK', 'client_id': 'c-vk', 'procedure_version': '2', 'client_runs': [{'code': 'VW-3', 'title': 'T'}],
                 'last_brief': {'run': 'VW-3', 'production': {'narration_language': 'en'}, 'answers': {}, 'questions': []},
-                'client_rules': [{'rule': 'r1', 'source_run': 'VW-3', 'at': 'x'}]},
+                'client_rules': [{'rule': 'r1', 'source_run': 'VW-3', 'at': 'x'}],
+                'last_voice': {'run': 'VW-3', 'voice_id': 'v9', 'name': 'UD - Narrator', 'model_id': 'eleven_v4', 'settings': {}, 'choice_note': ''}},
                {'id': 'run-8', 'code': 'VW-8', 'client': 'VK', 'client_id': 'c-vk', 'procedure_version': '2'}]
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: answers.pop(0) if path == '/api/runs' else {})
     monkeypatch.setattr(vw, 'request', lambda method, path, wait=None, **kw: ({'stage': 'intake'}, 0))
@@ -160,3 +161,4 @@ def test_start_keeps_last_brief_and_client_rules_and_tolerates_their_absence(mon
         capsys.readouterr()
         m = vw.load_json(tmp_path / 'runs' / code / 'manifest.json')
         assert (m['last_brief'] is not None) is expect_brief and len(m['client_rules']) == expect_rules and m['version'] == '2'
+        assert (m['last_voice'] is not None) is expect_brief   # design/39 4.2: present with the brief, absent on an older server

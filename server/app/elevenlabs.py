@@ -8,6 +8,8 @@ from .config import settings
 from .errors import Problem
 
 MODELS = ('eleven_v4', 'eleven_multilingual_v2', 'eleven_v3')
+MODELS_CACHE_S = 600   # the account's model list changes with the plan, not per request (design/39 4.5)
+_MODELS_CACHE = {'at': 0.0, 'rows': None}
 DEFAULT_MODEL = 'eleven_v4'
 DEFAULT_SETTINGS = {'eleven_v4': {'stability': 0.5, 'similarity_boost': 0.75}, 'eleven_v3': {'stability': 0.5},
                     'eleven_multilingual_v2': {'stability': 0.5, 'similarity_boost': 0.75, 'style': 0, 'speed': 1, 'use_speaker_boost': True}}
@@ -67,10 +69,14 @@ class ElevenLabs:
         return response
 
     def models(self):
-        return [{'id': m['model_id'], 'name': m.get('name', m['model_id']),
+        if _MODELS_CACHE['rows'] is not None and time.time() - _MODELS_CACHE['at'] < MODELS_CACHE_S:
+            return _MODELS_CACHE['rows']
+        rows = [{'id': m['model_id'], 'name': m.get('name', m['model_id']),
                  'max_characters': min(m.get('maximum_text_length_per_request') or 10000, 10000) if m['model_id'] == 'eleven_v4' else m.get('maximum_text_length_per_request'),
                  'languages': m.get('languages', []), 'supported': m['model_id'] in MODELS}
                 for m in self.request('GET', '/v1/models').json() if m.get('can_do_text_to_speech')]
+        _MODELS_CACHE.update(at=time.time(), rows=rows)
+        return rows
 
     @staticmethod
     def public_voice(v):

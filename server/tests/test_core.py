@@ -316,7 +316,7 @@ def test_partial_client_name_resolves_only_when_unique(client, alice):
 def test_create_answer_carries_last_brief_and_client_rules(client, alice):
     """design/37 2.2, 2.3: null and empty on a client's first film."""
     r = client.post('/api/runs', json={'request_id': rid(), 'client': 'C', 'procedure_version': 'test'}, headers=alice)
-    assert r.status_code == 201 and r.json()['last_brief'] is None and r.json()['client_rules'] == []
+    assert r.status_code == 201 and r.json()['last_brief'] is None and r.json()['client_rules'] == [] and r.json()['last_voice'] is None   # design/39 4.2
 
 
 def test_effective_rules_minus_waivers_plus_learned(client, alice, database):
