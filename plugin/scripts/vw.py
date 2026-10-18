@@ -193,6 +193,7 @@ def make_workspace(run, keep_logs=False, assembly_machine=None, files=None):
         (ws / d).mkdir(parents=True, exist_ok=True)
     m = {'code': run['code'], 'run_id': run['id'], 'title': run.get('title'), 'client': run.get('client'), 'client_id': run.get('client_id'), 'created': datetime.now(timezone.utc).isoformat(),
          'version': run.get('procedure_version'), 'client_runs': run.get('client_runs') or [],
+         'last_brief': run.get('last_brief'), 'client_rules': run.get('client_rules') or [],   # design/37 2.2, 2.3
          'keep_logs': keep_logs, 'assembly_machine': assembly_machine, 'closed': False, 'files': files or []}
     save_json(manifest_path(run['code']), m)
     (RUNS / '.active').write_text(run['code'], encoding='utf-8')
@@ -381,7 +382,8 @@ def cmd_stage(a):
     prepare, record = scripts[a.stage]
     try:
         if a.step == 'prepare':
-            extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else {}
+            extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
+                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or []} if a.stage == 'brief' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size))

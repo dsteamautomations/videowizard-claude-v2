@@ -62,7 +62,8 @@ def test_t7_intake_brief_script_end_to_end(home, database):
     rc, out, err = vw(home, 'stage', 'brief', 'prepare')
     assert rc == 0 and 'keeps the carbon' in out['inputs']['script'] and out['inputs']['title'] == 'Pressed Earth - Explainer'
     write_proposal(ws, 'brief', {'purpose': 'Understand why earth blocks matter', 'audience': 'self-builders (recommendation)', 'message': 'Pressed, not fired',
-                                 'tone': 'calm', 'ending': 'invite to visit the yard', 'constraints': '', 'reasons': {'audience': 'subject suggests it'}, 'questions': []})
+                                 'tone': 'calm', 'ending': 'invite to visit the yard', 'constraints': '', 'reasons': {'audience': 'subject suggests it'}, 'questions': [],
+                                 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en', 'brand_and_safety_rules': ['PPE required on site']}})
     # a required question without the operator's answer blocks record; the answer is stored verbatim
     proposal = json.loads((ws / 'out' / 'brief.json').read_text(encoding='utf-8'))
     proposal['questions'] = [{'id': 'q1', 'question': 'Sales ending or awareness only?', 'why': 'changes the ending', 'recommendation': 'awareness', 'required': True}]
@@ -75,7 +76,8 @@ def test_t7_intake_brief_script_end_to_end(home, database):
     assert rc == 0, (out, err)
     assert out['summary']['answers'] == {'q1': 'awareness only, no sales'} and out['summary']['questions'] == 1
     prod = out['summary']['production']
-    assert prod['process_stages'][0] == 'Stage_1_Setup' and prod['show_speaker_video'] is False and prod['target_runtime_s'] is None and 'brand_and_safety_rules' in prod['defaults_applied']
+    assert prod['process_stages'] == [] and 'process_stages' in prod['defaults_applied']   # chapters: empty unless the script gives them (design/37 2.1)
+    assert prod['show_speaker_video'] is False and prod['target_runtime_s'] is None and prod['field_speech_languages'] == ['ta'] and 'field_speech_languages' not in prod['defaults_applied']
     assert vw(home, 'next')[1]['stage'] == 'script'
 
     rc, out, err = vw(home, 'stage', 'script', 'prepare')
@@ -151,6 +153,13 @@ def test_t4_malformed_proposals_refused(home, database):
     rc, out, _ = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
     assert rc == 2 and 'audience' in out['message']
     write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e'})
+    rc, out, _ = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
+    assert rc == 2 and 'every film' in out['message']   # languages are asked on every film (design/37 2.8)
+    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en',
+                                 'process_stages': ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', 'Stage_4_Result']}})
+    rc, out, _ = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
+    assert rc == 2 and 'chapters' in out['message']   # the generic names are refused (design/37 2.1)
+    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en'}})
     assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'script', {'spoken_text': '   ', 'notes': '', 'assessment': '', 'changes': []})
     rc, out, _ = vw(home, 'stage', 'script', 'record', '--quote', 'yes')
@@ -163,7 +172,7 @@ def test_t5_revise_brief_after_script_is_free(home, database):
     vw(home, 'stage', 'intake', 'prepare')
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Only'], 'notes': '', 'client': 'VK'})
     assert vw(home, 'stage', 'intake', 'record', '--title', 'Only', '--quote', 'yes')[0] == 0
-    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e'})
+    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en'}})
     assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'script', {'spoken_text': 'Just narration.', 'notes': '', 'assessment': '', 'changes': []})
     assert vw(home, 'stage', 'script', 'record', '--quote', 'yes')[0] == 0
@@ -243,3 +252,36 @@ def test_t12_start_with_script_copies_it(home, database, tmp_path):
     assert (home['runs'] / out['code'] / 'in' / 'client-script.txt').read_text(encoding='utf-8') == SOURCE
     rc, out, _ = vw(home, 'start', '--client', 'VK', '--need-gb', '0', '--script', str(tmp_path / 'missing.docx'))
     assert rc == 2 and 'not created' in out['message']
+
+
+def test_t13_last_brief_and_client_rules_reach_the_next_film(home, database):
+    """design/37 2.2, 2.3: a second film for the client starts with the first film's brief answers and the learned rules."""
+    import psycopg
+    code, ws = start_run(home, database)
+    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    vw(home, 'stage', 'intake', 'prepare')
+    write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth'], 'notes': ''})
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth', '--quote', 'yes')[0] == 0
+    rc, out, _ = vw(home, 'stage', 'brief', 'prepare')
+    assert rc == 0 and out['inputs']['last_brief'] is None and out['inputs']['client_rules'] == [] and out['prompt'].count('\nnone\n') == 2
+    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'constraints': '',
+                                 'questions': [{'id': 'brand-safety', 'question': 'Any brand or safety rules?', 'why': 'w', 'recommendation': '', 'required': True}],
+                                 'answers': {'brand-safety': 'PPE must be worn'},
+                                 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en', 'brand_and_safety_rules': ['PPE required on site'], 'process_stages': ['Plinth', 'Curing']}})
+    assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
+    with psycopg.connect(database) as conn:
+        conn.execute("insert into vw2_client_rules(client_id, rule, source_run) values ('c-vk', 'Rejected option #2: no unfinished walls', %s)", (code,))
+    rc, out, _ = vw(home, 'start', '--client', 'VK', '--need-gb', '0')
+    assert rc == 0, out
+    lb = out['last_brief']
+    assert lb['run'] == code and lb['production']['process_stages'] == ['Plinth', 'Curing'] and lb['answers'] == {'brand-safety': 'PPE must be worn'}
+    assert lb['questions'] == [{'id': 'brand-safety', 'question': 'Any brand or safety rules?'}]
+    assert [r['rule'] for r in out['client_rules']] == ['Rejected option #2: no unfinished walls']
+    ws2 = home['runs'] / out['code']
+    (ws2 / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    vw(home, 'stage', 'intake', 'prepare')
+    write_proposal(ws2, 'intake', {'remove': [], 'titles': ['Earth v2'], 'notes': ''})
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth v2', '--quote', 'yes')[0] == 0
+    rc, out, _ = vw(home, 'stage', 'brief', 'prepare')
+    assert rc == 0 and f'from run {code}:' in out['prompt'] and 'process_stages: Plinth, Curing' in out['prompt']
+    assert 'answer to brand-safety (Any brand or safety rules?): PPE must be worn' in out['prompt'] and 'no unfinished walls' in out['prompt']

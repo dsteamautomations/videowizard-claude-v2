@@ -29,7 +29,7 @@ def run_until_planning(home, database, fake, gemini, n_clips=1):
     vw(home, 'stage', 'intake', 'prepare')
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth Blocks'], 'notes': '', 'client': 'VK'})
     assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth Blocks', '--quote', 'yes')[0] == 0
-    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e'})
+    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en'}})
     assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'script', {'spoken_text': 'Earth blocks are pressed.\n\nNot fired.', 'notes': '', 'assessment': '', 'changes': []})
     assert vw(home, 'stage', 'script', 'record', '--quote', 'yes')[0] == 0

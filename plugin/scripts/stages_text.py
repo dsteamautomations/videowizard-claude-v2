@@ -175,10 +175,32 @@ def intake_record(ws, procedure, prior, title=None, client=''):
 
 # ---------- brief ----------
 
-def brief_prepare(ws, procedure, prior):
+def last_brief_text(lb):
+    """What this client said at their latest brief (design/37 2.2): shown to the model as recommendations, never as answers."""
+    if not lb:
+        return 'none'
+    prod = lb.get('production') or {}
+    lines = [f"from run {lb.get('run')}:"]
+    for k in ('process_stages', 'field_speech_languages', 'narration_language', 'show_speaker_video', 'brand_and_safety_rules', 'target_runtime_s'):
+        if k in prod:
+            v = prod[k]
+            shown = 'none' if v in (None, [], '') else (', '.join(str(x) for x in v) if isinstance(v, list) else str(v))
+            lines.append(f'  {k}: {shown}')
+    questions = {q.get('id'): q.get('question') for q in lb.get('questions') or [] if isinstance(q, dict)}
+    for qid, words in (lb.get('answers') or {}).items():
+        lines.append(f'  answer to {qid}' + (f' ({questions[qid]})' if questions.get(qid) else '') + f': {words}')
+    return '\n'.join(lines)
+
+
+def client_rules_text(rules):
+    return '\n'.join(f"- {r.get('rule')} (from {r.get('source_run')})" for r in rules or [] if r.get('rule')) or 'none'
+
+
+def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None):
     intake = prior('intake')
-    return {'prompt': procedure['prompt'], 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
-            'script': cleaned_script(ws, intake)}, 'prepared_at': stamp(ws, 'brief'),
+    prompt = procedure['prompt'].replace('{last_brief}', last_brief_text(last_brief)).replace('{client_rules}', client_rules_text(client_rules))
+    return {'prompt': prompt, 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
+            'script': cleaned_script(ws, intake), 'last_brief': last_brief, 'client_rules': client_rules or []}, 'prepared_at': stamp(ws, 'brief'),
             'output_file': 'out/brief.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
@@ -202,14 +224,26 @@ def brief_record(ws, procedure, prior):
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
-BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', 'Stage_4_Result'],
+GENERIC_STAGES = ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', 'Stage_4_Result']   # the old default: not allowed (design/37 2.1)
+BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': [],   # the chapters of the film, from the script, or empty
                       'brand_and_safety_rules': [],   # asked of the operator at brief; never filled with blueprint examples (VW-2, 15 Oct 2026)
-                      'field_speech_languages': ['en', 'ta', 'hi'], 'narration_language': 'en', 'show_speaker_video': False}
+                      'show_speaker_video': False}
+ASKED_EVERY_FILM = ('field_speech_languages', 'narration_language')   # no default: the operator answers on every film (design/37 2.8)
 
 
 def production_inputs(given):
     """Blueprint v3.2 project inputs (design/12 §A.1). Defaults apply only to keys the operator did not supply; nothing is invented per client."""
     out = {}
+    missing = [k for k in ASKED_EVERY_FILM if not given.get(k)]
+    if missing:
+        raise Refused('out/brief.json: production.field_speech_languages (languages spoken in the footage) and production.narration_language are asked of the operator on every film; '
+                      'record their answers (missing: ' + ', '.join(missing) + ').')
+    langs, narration = given['field_speech_languages'], given['narration_language']
+    if not isinstance(langs, list) or not all(isinstance(x, str) and x.strip() for x in langs):
+        raise Refused('out/brief.json: production.field_speech_languages must be a list of language codes.')
+    if not isinstance(narration, str) or not narration.strip():
+        raise Refused('out/brief.json: production.narration_language must be a language code.')
+    out['field_speech_languages'], out['narration_language'] = langs, narration
     for k, default in BLUEPRINT_DEFAULTS.items():
         v = given.get(k, default)
         if k == 'target_runtime_s':
@@ -218,12 +252,11 @@ def production_inputs(given):
         elif k == 'show_speaker_video':
             if not isinstance(v, bool):
                 raise Refused('out/brief.json: production.show_speaker_video must be true or false.')
-        elif k == 'narration_language':
-            if not isinstance(v, str) or not v.strip():
-                raise Refused('out/brief.json: production.narration_language must be a language code.')
         elif not isinstance(v, list) or not all(isinstance(x, str) and x.strip() for x in v):
             raise Refused(f'out/brief.json: production.{k} must be a list of strings (an empty list is allowed).')
         out[k] = v
+    if out['process_stages'] == GENERIC_STAGES:
+        raise Refused('out/brief.json: production.process_stages must be the chapters of the film, from the script, or empty; the generic names are not allowed.')
     out['defaults_applied'] = sorted(k for k in BLUEPRINT_DEFAULTS if k not in given)
     return out
 

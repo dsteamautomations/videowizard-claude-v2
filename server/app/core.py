@@ -71,9 +71,66 @@ def resolve_client(client):
 
 
 def client_runs(conn, client_id, limit=20):
-    """Earlier runs for a client, any owner, newest first: code and title only (design/34 1.5, shown at intake)."""
+    """Earlier runs for a client, any owner, newest first: code and title only (design/36 1.5, shown at intake)."""
     rows = conn.execute('select code, title from vw2_runs where client_id=%s order by created_at desc limit %s', (client_id, limit)).fetchall()
     return [{'code': r['code'], 'title': r['title']} for r in rows if r['title']]
+
+
+def last_brief(conn, client_id):
+    """What the client said at their latest brief, any owner (design/37 2.2): production values, answers, and the question texts from
+    brief.json in storage when it can be read. None when the client has no brief yet. Shown as recommendations, never as answers."""
+    row = conn.execute('''select r.code, o.summary, o.files from vw2_stage_outputs o join vw2_runs r on r.id = o.run_id
+                          where r.client_id=%s and o.stage='brief' and o.unit is null and not o.stale order by o.created_at desc limit 1''', (client_id,)).fetchone()
+    if not row:
+        return None
+    summary = row['summary'] or {}
+    questions = []
+    ref = next((f for f in (row['files'] or []) if f.get('name') == 'brief.json' and f.get('key')), None)
+    if ref:
+        try:
+            from .storage import storage
+            doc = json.loads(storage().get(ref['key']).decode('utf-8'))
+            questions = [{'id': q.get('id'), 'question': q.get('question')} for q in doc.get('questions') or [] if isinstance(q, dict) and q.get('id')]
+        except Exception:  # noqa: BLE001  the question texts are a convenience; a storage hiccup must never block a start
+            questions = []
+    return {'run': row['code'], 'production': summary.get('production') or {}, 'answers': summary.get('answers') or {}, 'questions': questions}
+
+
+def client_rules(conn, client_id):
+    """Rules learned from master rejections for this client (design/37 2.3)."""
+    rows = conn.execute('select rule, source_run, created_at from vw2_client_rules where client_id=%s order by id', (client_id or '',)).fetchall()
+    return [{'rule': r['rule'], 'source_run': r['source_run'], 'at': str(r['created_at'])} for r in rows]
+
+
+def analysis_waivers(conn, run):
+    """Risk flags the operator waived for this run: from the latest analysis job's policy (on the job row after start; in the stored
+    request after a re-solve)."""
+    row = conn.execute("select request from vw2_jobs where run_id=%s and stage='analysis' and request->>'kind' = 'analysis' order by created_at desc limit 1",
+                       (run['id'],)).fetchone()
+    if not row:
+        return []
+    req = row['request'] or {}
+    policy = req.get('policy')
+    if policy is None and req.get('request_key'):
+        try:
+            from .storage import storage
+            policy = json.loads(storage().get(req['request_key']).decode('utf-8')).get('policy') or {}
+        except Exception:  # noqa: BLE001
+            policy = {}
+    return [str(w) for w in (policy or {}).get('waived_risk_flags') or []]
+
+
+def effective_rules(conn, run, outputs):
+    """One answer for every stage that applies rules (design/37 2.7): the brief's rules minus the waived flags (matched inside the rule text,
+    as the solver matches flags), plus the rules learned for the client. Before analysis there are no waivers."""
+    brief_o = next((o for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
+    production = ((brief_o['summary'] if brief_o else None) or {}).get('production') or {}
+    brief_rules = [str(r) for r in production.get('brand_and_safety_rules') or []]
+    waived = analysis_waivers(conn, run)
+    brief_effective = [r for r in brief_rules if not any(w and w.lower() in r.lower() for w in waived)]
+    learned = client_rules(conn, run.get('client_id') or '')
+    return {'brief_rules': brief_rules, 'waived_flags': waived, 'brief_effective': brief_effective, 'learned': learned,
+            'effective': brief_effective + [l['rule'] for l in learned]}
 
 
 def create_run(conn, user, title, client, version):
@@ -185,12 +242,13 @@ def output(conn, user, run, body):
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     stages = stage_table(run['procedure_version'])
     st = _stage(stages, body['stage'])
-    nxt = next_for(conn, run)
+    outputs, attempts = current_outputs(conn, run['id']), attempts_for(conn, run['id'])   # read once; next is computed from these rows (design/37 2.9)
+    nxt = compute_next(run, stages, outputs, attempts)
     unit = body.get('unit')
     if nxt['stage'] != st['name']:
         raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not {st['name']!r}.", next=nxt)
     if st['per_unit'] and nxt['units_declared']:
-        if unit is None or unit not in declared_units(current_outputs(conn, run['id']), st['name']):
+        if unit is None or unit not in declared_units(outputs, st['name']):
             raise Problem(422, 'UNKNOWN_UNIT', 'This unit was not declared for this stage.', units_open=nxt['units_open'])
         if unit not in nxt['units_open']:
             raise Problem(409, 'NOT_ALLOWED', 'This unit already has an output. Use revise to redo it.', next=nxt)
@@ -228,6 +286,9 @@ def output(conn, user, run, body):
     if st['name'] == 'intake' and str(summary.get('title') or '').strip():
         conn.execute('update vw2_runs set title=%s where id=%s', (str(summary['title']).strip()[:160], run['id']))
     conn.execute('delete from vw2_attempts where run_id=%s and stage=%s and unit=%s', (run['id'], st['name'], unit or UNIT_NONE))
+    row = dict(row)
+    remaining = {k: v for k, v in attempts.items() if k != (st['name'], unit or UNIT_NONE)}
+    row['next'] = compute_next(run, stages, outputs + [row], remaining)   # the next stage comes back with the record (design/36 1.15), no re-read
     return row
 
 

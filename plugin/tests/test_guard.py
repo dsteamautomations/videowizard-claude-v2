@@ -74,3 +74,63 @@ def test_guard_stands_down_in_the_builder_checkout():
         assert guard('Bash', {'command': 'git status'}, cwd)[0] == 0, cwd
         assert guard('Write', {'file_path': str(REPO / 'README.md')}, cwd)[0] == 0, cwd
         assert guard('Read', {'file_path': str(REPO / 'README.md')}, cwd)[0] == 0, cwd
+
+
+# ---------- design/37 2.4: the allow-list ----------
+
+def active(tmp_path):
+    runs = tmp_path / 'runs'
+    (runs / 'VW-3' / 'out').mkdir(parents=True, exist_ok=True)
+    (runs / '.active').write_text('VW-3')
+    return runs
+
+
+def test_connectors_browser_and_subagents_are_blocked(tmp_path):
+    runs = active(tmp_path)
+    for tool, inp in (('mcp__f9783728-2460-4ddc-ad0b-aabb93fd9f53__execute_sql', {'project_id': 'x', 'query': 'select 1'}),
+                      ('mcp__57d87662-6036-43fc-a8ca-5d74f781cbfe__send_message', {'to': 'a@b'}),
+                      ('mcp__Claude_Browser__navigate', {'url': 'https://8-234-82-225.sslip.io/connect'}),
+                      ('mcp__claude-in-chrome__computer', {'action': 'left_click'}),
+                      ('mcp__computer-use__app_click', {}),
+                      ('mcp__ccd_session__start_session', {'title': 'x'}),
+                      ('Agent', {'prompt': 'run git status'}), ('Task', {'prompt': 'x'}),
+                      ('Workflow', {'script': 'x'}), ('SendMessage', {'to': 'x', 'message': 'y'}), ('CronCreate', {}), ('EnterWorktree', {}),
+                      ('SomethingNew', {})):
+        code, err = guard(tool, inp, tmp_path)
+        assert code == 2 and 'not available to the operator assistant' in err, tool
+    assert guard('Skill', {'skill': 'anthropic-skills:docs'}, tmp_path)[0] == 2
+    assert guard('Skill', {'skill': 'vw:vw', 'args': 'what is next'}, tmp_path)[0] == 0
+
+
+def test_questions_task_list_and_web_tools_are_allowed(tmp_path):
+    active(tmp_path)
+    for tool, inp in (('AskUserQuestion', {'questions': []}), ('TodoWrite', {'todos': []}), ('TodoRead', {}),
+                      ('mcp__ccd_turn__update_plan', {'items': []}), ('mcp__ccd_turn__wrap_up', {'recap': 'x'}), ('mcp__ccd_view__show_pane', {}),
+                      ('WebSearch', {'query': 'rat-trap bond'}), ('WebFetch', {'url': 'https://example.org', 'prompt': 'x'}), ('ToolSearch', {'query': 'select:WebSearch'})):
+        assert guard(tool, inp, tmp_path)[0] == 0, tool
+
+
+def test_blocked_calls_are_logged_and_allowed_calls_are_not(tmp_path):
+    runs = active(tmp_path)
+    log = runs / 'VW-3' / 'work' / 'guard.log'
+    guard('Read', {'file_path': str(runs / 'VW-3' / 'out' / 'x.json')}, tmp_path)
+    guard('WebSearch', {'query': 'x'}, tmp_path)
+    assert not log.exists()
+    guard('mcp__Claude_Browser__navigate', {'url': 'https://example.org/page'}, tmp_path)
+    guard('Read', {'file_path': str(tmp_path / '.vw2' / 'session.json')}, tmp_path)
+    guard('Bash', {'command': 'git status'}, tmp_path)
+    guard('Write', {'file_path': str(runs / 'VW-3' / 'out' / 'n.md'), 'content': 'VW-PROCEDURE secret text'}, tmp_path)
+    lines = log.read_text(encoding='utf-8').splitlines()
+    assert len(lines) == 4
+    assert ' · mcp__Claude_Browser__navigate · ' in lines[0] and lines[0].endswith('https://example.org/page')
+    assert ' · Read · ' in lines[1] and 'session.json' in lines[1]
+    assert ' · Bash · ' in lines[2] and lines[2].endswith('git status')
+    assert ' · Write · ' in lines[3] and lines[3].endswith('(procedure text)') and 'secret' not in lines[3]
+    for line in lines:
+        assert line[:4].isdigit() and ' · Blocked' in line
+
+
+def test_blocked_call_without_an_active_run_is_logged_at_the_runs_root(tmp_path):
+    (tmp_path / 'runs').mkdir()
+    guard('mcp__Claude_Browser__navigate', {'url': 'x'}, tmp_path)
+    assert (tmp_path / 'runs' / 'guard.log').read_text(encoding='utf-8').count('\n') == 1

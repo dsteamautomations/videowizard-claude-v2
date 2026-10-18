@@ -311,3 +311,32 @@ def test_partial_client_name_resolves_only_when_unique(client, alice):
     assert r.status_code == 422 and r.json()['code'] == 'CLIENT_UNKNOWN' and r.json()['candidates'] == ['VK', 'VK Textiles']
     r = client.post('/api/runs', json={'request_id': rid(), 'client': 'nobody', 'procedure_version': 'test'}, headers=alice)
     assert r.status_code == 422 and r.json()['candidates'] == []
+
+
+def test_create_answer_carries_last_brief_and_client_rules(client, alice):
+    """design/37 2.2, 2.3: null and empty on a client's first film."""
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'C', 'procedure_version': 'test'}, headers=alice)
+    assert r.status_code == 201 and r.json()['last_brief'] is None and r.json()['client_rules'] == []
+
+
+def test_effective_rules_minus_waivers_plus_learned(client, alice, database):
+    """design/37 2.7: brief rules, waived flags dropped by matching inside the rule text, learned rules added; no waivers before analysis."""
+    import psycopg
+    from psycopg.rows import dict_row
+    from psycopg.types.json import Jsonb
+    from app import core
+    run_id = new_run(client, alice)
+    out(client, alice, run_id, 's1', summary={'production': {'brand_and_safety_rules': ['PPE required on site', 'No competitor logos']}})
+    with psycopg.connect(database, row_factory=dict_row) as conn:
+        run = conn.execute('select * from vw2_runs where id=%s', (run_id,)).fetchone()
+        outputs = [dict(o, stage='brief') for o in core.current_outputs(conn, run_id)]   # the test procedure has no brief stage; treat s1 as it
+        rules = core.effective_rules(conn, run, outputs)
+        assert rules['brief_rules'] == ['PPE required on site', 'No competitor logos'] and rules['waived_flags'] == [] and rules['learned'] == []
+        assert rules['effective'] == ['PPE required on site', 'No competitor logos']
+        conn.execute("insert into vw2_client_rules(client_id, rule, source_run) values (%s, 'Rejected option #1: no close-ups', 'VW-0')", (run['client_id'],))
+        conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s, 'analysis', 'clip1', 'gemini', %s, gen_random_uuid())",
+                     (run_id, Jsonb({'kind': 'analysis', 'policy': {'camera_audio': 'allowed', 'waived_risk_flags': ['ppe']}})))
+        conn.commit()
+        rules = core.effective_rules(conn, run, outputs)
+        assert rules['waived_flags'] == ['ppe'] and rules['brief_effective'] == ['No competitor logos']
+        assert rules['effective'] == ['No competitor logos', 'Rejected option #1: no close-ups'] and rules['learned'][0]['source_run'] == 'VW-0'

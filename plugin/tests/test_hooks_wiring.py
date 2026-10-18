@@ -9,9 +9,7 @@ from conftest import PLUGIN
 def test_hooks_json_wires_guard_and_remind():
     doc = json.loads((PLUGIN / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))
     pre = doc['hooks']['PreToolUse']
-    assert len(pre) == 1
-    matcher = set(pre[0]['matcher'].split('|'))
-    assert {'Bash', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Read', 'Glob', 'Grep'} <= matcher
+    assert len(pre) == 1 and 'matcher' not in pre[0]   # design/37 2.4: every tool goes through the guard
     assert pre[0]['hooks'][0]['type'] == 'command' and 'hooks/guard.py' in pre[0]['hooks'][0]['command']
     submit = doc['hooks']['UserPromptSubmit']
     assert len(submit) == 1 and 'matcher' not in submit[0]

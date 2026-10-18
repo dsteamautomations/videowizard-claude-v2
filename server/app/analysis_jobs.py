@@ -65,7 +65,9 @@ def _inputs(conn, run, outputs):
         if not ref:
             raise Problem(409, 'FILE_MISSING', f'{name} is not recorded on the {output["stage"]} output; re-record that stage.')
         return json.loads(store.get(ref['key']).decode('utf-8'))
-    return file_of(by['brief'], 'brief.json') | {'content_digest': by['brief']['summary'].get('content_digest'), 'production': by['brief']['summary'].get('production') or {}}, \
+    rules = core.effective_rules(conn, run, outputs)   # design/37 2.3, 2.7: waived flags dropped, learned client rules filled
+    production = {**(by['brief']['summary'].get('production') or {}), 'brand_and_safety_rules': rules['brief_effective'], 'learned_client_rules': [l['rule'] for l in rules['learned']]}
+    return file_of(by['brief'], 'brief.json') | {'content_digest': by['brief']['summary'].get('content_digest'), 'production': production}, \
         file_of(by['script'], 'script.json'), by['media']
 
 

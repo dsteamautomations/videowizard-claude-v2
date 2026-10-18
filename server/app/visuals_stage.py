@@ -112,7 +112,8 @@ def prepare(conn, store, user, run, outputs):
                     world.append({'clip': o['unit'], 'world_markers': ev.get('world_markers'), 'evidence_limits': ev.get('evidence_limits')})
     save_session(store, run, session)
     package = {'source': session['source'], 'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
-               'brief': brief['summary'] if brief else None, 'script_digest': script['summary'].get('content_digest') if script else None,
+               'brief': ({**brief['summary'], 'effective_rules': core.effective_rules(conn, run, outputs)} if brief else None),   # design/37 2.7
+               'script_digest': script['summary'].get('content_digest') if script else None,
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog()}
     pk = save_json(store, key(run, 'package.json'), package)

@@ -479,7 +479,9 @@ def me(user=User):
 def create_run(body: NewRun, user=User, conn=DB):
     def create():
         run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version))
-        return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id'])}  # earlier titles for this client (design/34 1.5)
+        return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id']),            # earlier titles for this client (design/36 1.5)
+                     'last_brief': core.last_brief(conn, run['client_id']),                    # what the client said last time (design/37 2.2)
+                     'client_rules': core.client_rules(conn, run['client_id'])}                # rules learned for the client (design/37 2.3)
     status, resp = core.with_receipt(conn, user, body_dict(body), create)
     return Response(resp, status_code=status)
 
@@ -498,7 +500,9 @@ def list_runs(user=User, conn=DB):
 @app.get('/api/runs/{run_id}')
 def get_run(run_id: UUID, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
-    return Response({**run, 'outputs': core.current_outputs(conn, run_id), 'attempts': list(core.attempts_for(conn, run_id).values()), 'next': core.next_for(conn, run)})
+    outputs, attempts = core.current_outputs(conn, run_id), core.attempts_for(conn, run_id)
+    return Response({**run, 'outputs': outputs, 'attempts': list(attempts.values()),
+                     'next': core.compute_next(run, core.stage_table(run['procedure_version']), outputs, attempts)})   # from the rows in hand (design/37 2.9)
 
 
 @app.get('/api/runs/{run_id}/next')
@@ -518,10 +522,7 @@ def view_stage(run_id: UUID, stage: str, user=User, conn=DB):
 def post_output(run_id: UUID, body: Output, user=User, conn=DB):
     run = core.load_run(conn, user, run_id, lock=True)
 
-    def record():
-        row = dict(core.output(conn, user, run, body_dict(body)))
-        return 201, {**row, 'next': core.next_for(conn, run)}  # the next stage comes back with the record (design/34 1.15)
-    status, resp = core.with_receipt(conn, user, body_dict(body), record)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, core.output(conn, user, run, body_dict(body))))  # the row carries next (design/36 1.15, 37 2.9)
     return Response(resp, status_code=status)
 
 

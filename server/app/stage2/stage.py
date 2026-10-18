@@ -96,8 +96,7 @@ def _check_blocked(conn, run, stage):
 # ---------- options: prepare ----------
 
 def learned_rules(conn, run):
-    rows = conn.execute("select rule, source_run, created_at from vw2_client_rules where client_id=%s order by id", (run.get('client_id') or '',)).fetchall()
-    return [{'rule': r['rule'], 'source_run': r['source_run'], 'at': str(r['created_at'])} for r in rows]
+    return core.client_rules(conn, run.get('client_id') or '')   # one source for every stage (design/37 2.7)
 
 
 def prepare(conn, store, user, run, outputs):
@@ -156,7 +155,7 @@ def prepare(conn, store, user, run, outputs):
             r['primary_fits'] = list(by_stage.get(r.get('process_stage') or '', []))
             r['secondary_fits'] = []
             r['fit_source'] = 'scene process stage'
-    rules = learned_rules(conn, run)
+    rules = core.effective_rules(conn, run, outputs)['learned']   # design/37 2.7
     pk = P.build(run, production, windows, cards, rows, landmarks, entities, rules, TIMELINE, policy or {}, procedure.get('prompt') or '', narration)
     saved = save_json(store, key(run, 'package.json'), pk)
     session['package'] = {**saved, 'digest': digest({k: pk[k] for k in ('beats', 'sub_clips', 'timeline', 'policy', 'narration')}), 'beats': windows, 'timeline': TIMELINE, 'policy': policy or {},

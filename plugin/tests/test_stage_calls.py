@@ -139,3 +139,24 @@ def test_start_refuses_a_missing_script_before_creating_the_run(monkeypatch, tmp
         vw.cmd_start(a)
     out = json.loads(capsys.readouterr()[0])
     assert exc.value.code == 2 and 'not created' in out['message'] and created == []
+
+
+def test_start_keeps_last_brief_and_client_rules_and_tolerates_their_absence(monkeypatch, tmp_path, capsys):
+    """design/37 2.2, 2.3: the start answer's client memory lands in the manifest; an older server sends none."""
+    monkeypatch.setattr(vw, 'RUNS', tmp_path / 'runs')
+    monkeypatch.setattr(vw, 'preflight', lambda need: None)
+    monkeypatch.setattr(vw, 'machine_id', lambda: 'mac-1')
+    answers = [{'id': 'run-7', 'code': 'VW-7', 'client': 'VK', 'client_id': 'c-vk', 'procedure_version': '2', 'client_runs': [{'code': 'VW-3', 'title': 'T'}],
+                'last_brief': {'run': 'VW-3', 'production': {'narration_language': 'en'}, 'answers': {}, 'questions': []},
+                'client_rules': [{'rule': 'r1', 'source_run': 'VW-3', 'at': 'x'}]},
+               {'id': 'run-8', 'code': 'VW-8', 'client': 'VK', 'client_id': 'c-vk', 'procedure_version': '2'}]
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: answers.pop(0) if path == '/api/runs' else {})
+    monkeypatch.setattr(vw, 'request', lambda method, path, wait=None, **kw: ({'stage': 'intake'}, 0))
+    a = argparse.Namespace(client='VK', version=None, need_gb=0, keep_logs=False, script=None)
+    for code, expect_brief, expect_rules in (('VW-7', True, 1), ('VW-8', False, 0)):
+        with pytest.raises(SystemExit) as exc:
+            vw.cmd_start(a)
+        assert exc.value.code == 0, capsys.readouterr()
+        capsys.readouterr()
+        m = vw.load_json(tmp_path / 'runs' / code / 'manifest.json')
+        assert (m['last_brief'] is not None) is expect_brief and len(m['client_rules']) == expect_rules and m['version'] == '2'
