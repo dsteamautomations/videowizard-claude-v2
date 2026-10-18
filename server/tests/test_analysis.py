@@ -112,22 +112,23 @@ def run_until_analysis(home, database, fake, n_clips=3, seconds=1, rate=10):
     for i in range(n_clips):
         clip(ws / 'in' / f'c{i}.mp4', seconds=seconds, tone=440 + 110 * i, size='128x72', rate=rate)   # 16:9 like real footage; the crop solver is aspect-locked
     assert vw(home, 'stage', 'media', 'prepare')[0] == 0
-    rc, out, err = vw(home, 'stage', 'media', 'record', '--quote', 'yes')
+    rc, out, err = vw(home, 'stage', 'media', 'record', '--camera-audio', 'allowed', '--quote', 'yes')   # design/41 5.1: recorded at media
     assert rc == 0, err
     return code, ws, out['summary']['units']['analysis']
 
 
-START = ['analysis', 'start', '--camera-audio', 'allowed', '--film-type', 'documentary']
+START = ['analysis', 'start', '--film-type', 'documentary']   # design/42 6.2: no --camera-audio; the media stage's answer is used
 
 
 def test_a1_three_clips_succeed(home, database, fake, gemini):
     code, ws, units = run_until_analysis(home, database, fake)
     rc, out, err = vw(home, *START)
     assert rc == 0 and len(out['created']) == 3, err
+    assert out['camera_audio'] == 'allowed' and out['camera_audio_source'] == 'media'   # design/42 6.2
     assert vw(home, *START)[1]['reused'] == units  # A12: same inputs, no new jobs
     drain()
-    st = vw(home, 'analysis', 'status')[1]
-    assert st['counts'] == {'retained': 3}
+    rc, st, err = vw(home, 'analysis', 'status', '--wait', '30')
+    assert st['counts'] == {'retained': 3} and st['cap'] == 5 and 'done' in err   # design/42 6.1
     u = st['units'][0]
     assert u['recorded'] and u['summary']['contract_version'] == 'clip-log-v1' and u['summary']['sub_clips'] == 2 and u['summary']['by_eligibility'] == {'ELIGIBLE_AS_IS': 1, 'ELIGIBLE_WITH_CROP': 1}
     assert u['cost']['input_tokens'] == 1200 and u['summary']['descriptive_name'] == 'synthetic_test_clip' and len(u['summary']['summary_card']) == 10

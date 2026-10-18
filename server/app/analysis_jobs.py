@@ -78,6 +78,13 @@ def _inputs(conn, run, outputs):
 def start(conn, user, run, outputs, policy, again):
     """One job per clip in the media output (minus exclusions). Same inputs → same job reused unless `again`."""
     brief, script, media = _inputs(conn, run, outputs)
+    if policy.get('camera_audio'):   # design/42 6.2: the flag wins; otherwise the answer recorded at media
+        policy = {**policy, 'camera_audio_source': 'flag'}
+    else:
+        recorded = (media['summary'] or {}).get('camera_audio')
+        if recorded not in ('allowed', 'excluded'):
+            raise Problem(422, 'ANALYSIS_POLICY', 'Camera audio was not recorded at media; pass --camera-audio allowed|excluded.')
+        policy = {**policy, 'camera_audio': recorded, 'camera_audio_source': 'media'}
     procedure = core._stage(core.stage_table(run['procedure_version']), analysis.STAGE)
     excluded = set(policy.get('exclude') or [])
     clips = [c for c in media['summary']['clips'] if c['id'] not in excluded and c['name'] not in excluded]
@@ -107,7 +114,7 @@ def start(conn, user, run, outputs, policy, again):
                             uuid.uuid5(uuid.NAMESPACE_URL, req['analysis_key']))).fetchone()
         created.append({'unit': clip['id'], 'job_id': str(row['id'])})
     conn.execute("update vw2_jobs set request = request || %s where run_id=%s and stage='analysis' and status='queued'", (Jsonb({'policy': policy}), run['id']))
-    return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips)}
+    return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips), 'camera_audio': policy['camera_audio'], 'camera_audio_source': policy['camera_audio_source']}
 
 
 def repolicy(conn, user, run, outputs, policy):
@@ -175,7 +182,7 @@ def status(conn, run, outputs):
     counts = {}
     for u in units:
         counts[u['status']] = counts.get(u['status'], 0) + 1
-    return {'units': units, 'counts': counts}
+    return {'units': units, 'counts': counts, 'cap': global_cap()}   # the cap lets the tool estimate the queue (design/42 6.1)
 
 
 def _job(conn, run, unit):

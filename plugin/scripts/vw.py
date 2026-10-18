@@ -593,17 +593,36 @@ def wait_for_jobs(m, stage, wait_s):
 def cmd_analysis(a):
     m = active()
     run = m['run_id']
-    if a.what == 'start':
-        missing = [q for q, ok in (('May camera audio be used in the film? (--camera-audio allowed|excluded)', a.camera_audio),
-                                   ('What kind of film is this? (--film-type "…")', a.film_type)) if not ok]
-        if missing:
-            emit({'action': 'ask_operator', 'questions': missing + ['Should the model listen to the clips\' audio to understand them? (--understand-audio yes|no, default yes)', 'Any clip to leave out? (--exclude <name>, repeatable)']}, 2)
-        body = {'camera_audio': a.camera_audio, 'understand_audio': a.understand_audio != 'no', 'film_type': a.film_type, 'exclude': a.exclude or [], 'again': a.again}
-        emit(write(f'/api/runs/{run}/analysis/start', body), 0, 'Analysis started: one paid Gemini request per clip (model: from the analysis stage procedure, gemini-3.8-flash today). Tell the operator; poll with `vw analysis status`.')
-    if a.what == 'status':
-        st = call('GET', f'/api/runs/{run}/analysis')
-        c = st['counts']
-        emit(st, 0, 'Analysis: ' + ', '.join(f'{v} {k}' for k, v in sorted(c.items())))
+    if a.what == 'start':   # design/42 6.2: camera audio comes from the media stage unless given; the film type is optional
+        body = {'understand_audio': a.understand_audio != 'no', 'exclude': a.exclude or [], 'again': a.again,
+                **({'camera_audio': a.camera_audio} if a.camera_audio else {}), **({'film_type': a.film_type} if a.film_type else {})}
+        out = write(f'/api/runs/{run}/analysis/start', body)
+        source = 'from the media stage' if out.get('camera_audio_source') == 'media' else 'as given'
+        emit(out, 0, f"Analysis started: one paid Gemini request per clip (model from the analysis stage procedure, gemini-3.8-flash today); "
+                     f"camera audio: {out.get('camera_audio')} ({source}). Tell the operator; wait with `vw analysis status --wait 600`.")
+    if a.what == 'status':   # design/42 6.1: wait inside the tool and estimate the time left
+        import math
+        deadline = time.monotonic() + (a.wait or 0)
+        while True:
+            st = call('GET', f'/api/runs/{run}/analysis')
+            units = st.get('units') or []
+            open_ = [u for u in units if u['status'] in ('queued', 'running', 'storage_pending')]
+            decide = [u for u in units if u['status'] in ('submission_unknown', 'rejected', 'failed', 'retained_unstructured') and not u.get('excluded') and not u.get('recorded')]
+            if not open_ or decide or time.monotonic() >= deadline:
+                break
+            time.sleep(15)
+        c = st.get('counts') or {}
+        line = ', '.join(f'{v} {k}' for k, v in sorted(c.items()))
+        if decide:
+            line += f"; {len(decide)} need a decision: " + ', '.join(u['unit'] for u in decide)
+        elif open_:
+            done = [float(u['cost']['elapsed_seconds']) for u in units if u['status'] == 'retained' and (u.get('cost') or {}).get('elapsed_seconds')]
+            avg = sum(done) / len(done) if done else 288.0   # VW-3's average Gemini time per clip
+            cap = int(st.get('cap') or 15)
+            line += f'; about {max(1, round(math.ceil(len(open_) / cap) * avg / 60))} min left' + ('; run again with --wait' if a.wait else '')
+        else:
+            line += '; done'
+        emit(st, 0, 'Analysis: ' + line)
     if a.what == 'show':
         st = call('GET', f'/api/runs/{run}/analysis')
         u = next((x for x in st['units'] if x['unit'] == a.unit), None)
@@ -1031,7 +1050,8 @@ def build_parser():
     s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note', help="narrate: the operator's words on the choice; resolve: a note")
     s.add_argument('--wait', type=float, default=0, help='jobs: seconds to wait inside the tool for open voice jobs to settle (design/39 4.4)'); s.set_defaults(fn=cmd_voice)
     s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude', 'policy'])
-    s.add_argument('--camera-audio', choices=['allowed', 'excluded']); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
+    s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='optional since design/42: the media stage\'s answer is used when absent'); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
+    s.add_argument('--wait', type=float, default=0, help='status: seconds to wait inside the tool, polling every 15 s (design/42 6.1)')
     s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.add_argument('--waive', action='append'); s.set_defaults(fn=cmd_analysis)
     s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')

@@ -118,7 +118,7 @@ class AnalysisPolicy(Write):
 
 
 class AnalysisStart(Write):
-    camera_audio: Literal['allowed', 'excluded']
+    camera_audio: Literal['allowed', 'excluded'] | None = None   # design/42 6.2: the media stage's answer when absent
     understand_audio: bool = True
     film_type: str = ''
     exclude: list[str] = []
