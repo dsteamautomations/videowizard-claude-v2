@@ -76,10 +76,13 @@ def test_identity_depends_on_voice_model_settings_and_text():
 
 
 def test_pieces_of_rebuilds_texts_and_defaults_to_one_piece():
-    text = paragraphs([8000, 8000])
+    text = paragraphs([8000, 7000])   # two different texts: two identities (identical texts share one, by design)
     snap = {**SNAP, 'text': text, 'pieces': NP.split_for_narration(text, 10000)}
     pieces = NP.pieces_of(snap)
     assert len(pieces) == 2 and pieces[0]['text'] == text[:pieces[0]['characters']] and pieces[1]['identity'] != pieces[0]['identity']
+    same = paragraphs([8000, 8000])
+    twins = NP.pieces_of({**SNAP, 'text': same, 'pieces': NP.split_for_narration(same, 10000)})
+    assert twins[0]['identity'] == twins[1]['identity']   # the same words with the same voice are the same request
     assert NP.pieces_of({**SNAP, 'text': 'Just this.\n'})[0]['text'] == 'Just this.\n'
 
 
