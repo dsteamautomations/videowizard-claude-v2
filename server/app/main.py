@@ -296,7 +296,7 @@ class RenderBody(Write):
 
 
 class DecideBody(Write):
-    slide: int | None = None
+    slide: str | int | None = None   # design/44 8.1: a label such as '2' or '2B'; an integer from an older plugin is accepted
     option_number: int | None = None   # before design/21; the same as the slide number when a version has no decision or blank slides
     action: Literal['KEEP', 'REJECT', 'KEEP_WITH_EDIT', 'DROP']
     note: str = ''
@@ -1047,6 +1047,12 @@ def options_record(run_id: UUID, body: Quote, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/master/decide')
 def master_decide(run_id: UUID, body: DecideBody, user=User, conn=DB):
     return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.decide(storage(), user, run, body.slide if body.slide is not None else body.option_number, body.action, body.note, body.edit))
+
+
+@app.get('/api/runs/{run_id}/master/slides')
+def master_slides(run_id: UUID, user=User, conn=DB):
+    run, _ = _stage_run(conn, user, run_id, 'master')
+    return Response(stage2.slides_view(storage(), run))
 
 
 @app.post('/api/runs/{run_id}/master/rule')

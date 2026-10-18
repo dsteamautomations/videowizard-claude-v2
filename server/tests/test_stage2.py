@@ -259,16 +259,16 @@ def test_s1_s2_s12_s15_s16_s17_s18_s19_end_to_end(home, database, fake, gemini):
     rc, out, _ = vw(home, 'master', 'rule', '--add', 'no alternate takes for this client')
     assert rc == 2 and 'quote' in out['message'], out
     assert vw(home, 'master', 'rule', '--add', 'no alternate takes for this client', '--quote', 'yes, keep that')[0] == 0
-    rc, out, err = vw(home, 'master', 'record', '--quote', 'yes the master')
-    assert rc == 0 and out['learned_rules_added'] == 1, (out, err)
+    # design/44 8.4: one approval with the first cut's words records the master and the first cut
+    rc, out, _ = vw(home, 'master', 'record', '--quote', 'yes the master')
+    assert rc == 2 and 'listened' in out['message']
+    rc, out, err = vw(home, 'master', 'record', '--quote', 'yes the master, I watched it and listened to it')
+    assert rc == 0 and out['learned_rules_added'] == 1 and out['gaps'] == ['BEAT_02'] and out['first_cut_output'], (out, err)
     with psycopg.connect(database) as c:
         assert c.execute("select count(*) from vw2_client_rules where client_id='c-vk' and rule like 'Rejected option%%'").fetchone()[0] == 0
         assert c.execute("select count(*) from vw2_client_rules where client_id='c-vk' and rule='no alternate takes for this client'").fetchone()[0] == 1
-    # first cut: needs watched + listened
-    rc, out, _ = vw(home, 'first-cut', 'record', '--quote', 'yes')
-    assert rc == 2 and 'listened' in out['message']
-    rc, out, err = vw(home, 'first-cut', 'record', '--quote', 'yes, I watched it and listened to it')
-    assert rc == 0 and out['gaps'] == ['BEAT_02'], (out, err)
+    fc = vw(home, 'view', '--stage', 'first_cut')[1]['outputs'][0]['summary']
+    assert fc['master_output'] == out['output'] and [g['shot_id'] for g in fc['gaps']] == ['BEAT_02']
     # S17: the gap is the visuals unit; the visuals stage reads it from the master/first cut
     nxt = vw(home, 'next')[1]
     assert nxt['stage'] == 'visuals' and nxt['units_open'] == ['BEAT_02'], nxt

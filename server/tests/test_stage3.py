@@ -29,9 +29,8 @@ def run_until_assembly(home, database, fake, gemini, scenes=False):
     assert vw(home, 'master', 'build')[0] == 0
     assert vw(home, 'master', 'render')[0] == 0
     drain()
-    assert vw(home, 'master', 'record', '--quote', 'yes master')[0] == 0
-    rc, out, err = vw(home, 'first-cut', 'record', '--quote', 'yes, watched and listened')
-    assert rc == 0, (out, err)
+    rc, out, err = vw(home, 'master', 'record', '--quote', 'yes master, watched and listened')   # design/44 8.4: records the first cut too
+    assert rc == 0 and out['first_cut_output'], (out, err)
     gap = out['gaps'][0]
     fc = vw(home, 'view', '--stage', 'first_cut')[1]['outputs'][0]['summary']['gaps'][0]
     # visuals: one still for the gap

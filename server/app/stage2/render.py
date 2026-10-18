@@ -59,7 +59,7 @@ def slate_png(lines, width, height, path):
     draw = ImageDraw.Draw(img)
     size = max(12, height // 22)
     rows = [''.join(c if ord(c) < 127 else '?' for c in line) for line in lines]
-    m = re.match(r'^(#\d+)\s*\|\s*(.*)$', rows[0]) if rows else None
+    m = SLATE_HEAD.match(rows[0]) if rows else None
     head = None
     if m:
         head, rows = m.group(1), [m.group(2)] + rows[1:]
@@ -93,7 +93,8 @@ def draw_width(text, font):
         return len(text) * font.size * 0.6
 
 
-REVIEW_TIMELINE = {'width': 1280, 'height': 720}   # design/43 7.1: the review film is only for choosing; it is made at the size the operator watches
+WATCHED_SIZE = {'review': (1280, 720), 'master': (1280, 720)}   # design/43 7.1, design/44 8.3: films watched once and never delivered are made at the size the operator watches
+SLATE_HEAD = re.compile(r'^(#\d+[A-Z]*)\s*\|\s*(.*)$')             # "#2 | ..." or "#2B | ...": the label shows large on its own line
 
 
 class Renderer:
@@ -263,10 +264,11 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     {'kind': 'event', 'sub_clip_id', 'clip': {'id','name','sha256','fps','rotation_deg','hdr'}, 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop_rect', 'hold_last_frame',
      'a2': [{'in_frame','out_frame'}]} and, for the review film, {'kind': 'narration', 'start_s', 'end_s'} markers before each option; the master uses the whole narration.
     sources: {clip_id: Path}. Returns the film path and a record.
-    A review film (design/43 7.1) is rendered on a 1280x720 timeline with a fast preset from the first piece; no copy pass, no loudness pass."""
-    if kind == 'review':
-        timeline = {**timeline, **REVIEW_TIMELINE}
-    r = Renderer(work, timeline, fast=(kind == 'review'))
+    Review and master films (design/43 7.1, design/44 8.3) are rendered on a 1280x720 timeline with a fast preset from the first piece,
+    no copy pass; the review film also skips the loudness pass, the master keeps it (its sound is the first cut's)."""
+    if kind in WATCHED_SIZE:
+        timeline = {**timeline, 'width': WATCHED_SIZE[kind][0], 'height': WATCHED_SIZE[kind][1]}
+    r = Renderer(work, timeline, fast=kind in WATCHED_SIZE)
     parts, a2_pieces, a1_parts, normalised = [], [], [], []
     recording = narration
     if narration_plan and narration_plan.get('pieces'):
@@ -324,8 +326,8 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     mixed = r.mix(a1, a2_pieces, length_s, r.work / f'{kind}-mix.wav')
     film = r.mux(picture, mixed, r.work / f'{kind}.mp4')
     codec = 'h264 high yuv420p bt709 / aac 48k stereo'
-    if kind == 'review':   # design/43 7.1 (before: a 1080p render then a 720p copy, 16 min on VW-3's third round)
-        codec = f'h264 high yuv420p bt709 {r.W}x{r.H} veryfast crf 23 / aac 48k stereo (review, made at this size)'
+    if kind in WATCHED_SIZE:   # before design/43: a 1080p render then a 720p copy, 16 min on VW-3's third review round
+        codec = f'h264 high yuv420p bt709 {r.W}x{r.H} veryfast crf 23 / aac 48k stereo ({kind}, made at this size)'
     master_loudness = r.loudness(film) if kind != 'review' else None
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
                   'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': codec,

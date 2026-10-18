@@ -1,6 +1,7 @@
 """design/21: the review film's numbered slides and its item sequence.
 
-Every slide carries one running number in film order; the operator answers by number. Slide types:
+Labels (design/44 8.1, SK's rule): a scene's option and its backup take the running numbers (#2, #3), so the operator chooses
+between 2 and 3; the blanks and decision slides inside an option take its number and a letter in event order (#2A, #2B). Slide types:
 option (a scene's first edit), backup (an alternative edit of the same scene), decision (a placement that needs the
 operator's keep/drop: B-roll, reuse, check by eye, poor quality, an unsure join), blank (a stretch left for AI video or
 animation). Option, backup and decision slides are silent; a blank is a captioned card under the continuing narration."""
@@ -23,6 +24,15 @@ def _frames(ev):
     return ev.get('timeline_frames', ev.get('_timeline_frames', 0))
 
 
+def letter(n):
+    """1 → A, 26 → Z, 27 → AA."""
+    out = ''
+    while n > 0:
+        n, r = divmod(n - 1, 26)
+        out = chr(65 + r) + out
+    return out
+
+
 def clip_name(row, cards):
     card = cards.get(row['clip_id']) or {}
     return ascii_text((card.get('descriptive_name') or row['clip_name']).replace('_', ' '))
@@ -32,33 +42,37 @@ def slides(doc, pk, fps):
     beats = {b['beat_id']: (i + 1, b) for i, b in enumerate(pk['beats'])}
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     cards = {c['clip_id']: c for c in pk.get('cards') or []}
-    out, first = [], {}
+    out, first, number = [], {}, 0
     for o in doc['options']:
         n, b = beats[o['beat_id']]
         label = ascii_text(f"Scene {n}: {b.get('title') or b['beat_id']}")
         events = o.get('events') or []
         frames = sum(_frames(ev) for ev in events)
         shots = sum(1 for ev in events if not ev.get('blank'))
-        no = len(out) + 1
+        number += 1
+        no = str(number)
         backup_for = first.get(o['beat_id'])
-        head = f"#{no:02d} | {label} | " + (f"BACKUP for #{backup_for:02d} | " if backup_for else '') + f"{frames / fps:.1f} s | {shots} shot{'s' if shots != 1 else ''}"
+        head = f"#{no} | {label} | " + (f"BACKUP for #{backup_for} | " if backup_for else '') + f"{frames / fps:.1f} s | {shots} shot{'s' if shots != 1 else ''}"
         parts = [f"blank {_frames(ev) / fps:.1f} s" if ev.get('blank') else f"{clip_name(rows[ev['sub_clip_id']], cards)} ({_frames(ev) / fps:.1f} s)"
                  for ev in events if ev.get('blank') or ev.get('sub_clip_id') in rows]
-        out.append({'no': no, 'type': 'backup' if backup_for else 'option', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'scene': label,
+        out.append({'no': no, 'number': number, 'type': 'backup' if backup_for else 'option', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'scene': label,
                     'frames': frames, 'shots': shots, 'backup_for': backup_for, 'lines': [head] + wrap('Clips: ' + ' + '.join(parts))})
         first.setdefault(o['beat_id'], no)
+        inner = 0
         for i, ev in enumerate(events):
             if ev.get('blank'):
-                no = len(out) + 1
-                out.append({'no': no, 'type': 'blank', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'event_index': i, 'frames': _frames(ev),
-                            'intent': ev.get('intent', ''), 'lines': [f"#{no:02d} | BLANK | {label} | {_frames(ev) / fps:.1f} s", 'For AI video or animation'] + wrap(ev.get('intent', ''))})
+                inner += 1
+                lab = f'{no}{letter(inner)}'
+                out.append({'no': lab, 'number': number, 'type': 'blank', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'event_index': i, 'frames': _frames(ev),
+                            'intent': ev.get('intent', ''), 'lines': [f"#{lab} | BLANK | {label} | {_frames(ev) / fps:.1f} s", 'For AI video or animation'] + wrap(ev.get('intent', ''))})
             elif ev.get('decision'):
-                no = len(out) + 1
+                inner += 1
+                lab = f'{no}{letter(inner)}'
                 d = ev['decision']
                 name = clip_name(rows[ev['sub_clip_id']], cards) if ev.get('sub_clip_id') in rows else ev.get('sub_clip_id', '')
-                out.append({'no': no, 'type': 'decision', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'event_index': i, 'frames': _frames(ev),
+                out.append({'no': lab, 'number': number, 'type': 'decision', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'event_index': i, 'frames': _frames(ev),
                             'kind': d.get('kind'), 'question': d.get('question', ''),
-                            'lines': [f"#{no:02d} | DECISION | {label}"] + wrap(d.get('question', '')) + [ascii_text(f"Keep or drop: {name} ({_frames(ev) / fps:.1f} s)")]})
+                            'lines': [f"#{lab} | DECISION | {label}"] + wrap(d.get('question', '')) + [ascii_text(f"Keep or drop: {name} ({_frames(ev) / fps:.1f} s)")]})
     return out
 
 
@@ -84,7 +98,7 @@ def review_items(doc, pk, sl, event_items, fps):
             if ev.get('blank'):
                 pending.append({'kind': 'card', 'frames': _frames(ev), 'lines': s['lines'] if s else ['BLANK']})
             else:
-                label = f"#{s['no']:02d} DECISION" if s and s['type'] == 'decision' else f"#{head[o['option_number']]['no']:02d}"
+                label = f"#{s['no']} DECISION" if s and s['type'] == 'decision' else f"#{head[o['option_number']]['no']}"
                 pending += [{**it, 'label': label} for it in event_items([ev])]
             cursor += _frames(ev)
         items += [{'kind': 'narration', 'start_s': seg_start / fps, 'end_s': cursor / fps}] + pending

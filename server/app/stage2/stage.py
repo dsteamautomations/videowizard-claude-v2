@@ -483,36 +483,60 @@ def record_options(conn, store, user, run, quote):
 
 # ---------- master ----------
 
+def slide_label(value):
+    """design/44 8.1: slides are named 2, 3 (options and backups) and 2A, 2B (inside an option); '#2b' and an integer are accepted."""
+    return str(value).strip().lstrip('#').strip().upper()
+
+
+def slides_view(store, run):
+    """Every slide of the current version with the answer so far, and the labels still waiting (design/44 8.1)."""
+    session = session_of(store, run)
+    doc, entry = current(store, session)
+    sl = _slides(store, session, doc, entry)
+    decisions = session.get('decisions') or {}
+    rows = []
+    for s in sl:
+        lab = str(s['no'])
+        d = decisions.get(lab)
+        rows.append({'slide': lab, 'type': s['type'], 'scene': s.get('scene'), 'backup_for': s.get('backup_for'), 'kind': s.get('kind'), 'question': s.get('question'),
+                     'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': s['type'] != 'blank',
+                     'answer': ({k: d.get(k) for k in ('action', 'note', 'edit')} if d else None)})
+    waiting = [r['slide'] for r in rows if r['needs_answer'] and not r['answer']]
+    return {'version': entry['version'], 'slides': rows, 'answered': sum(1 for r in rows if r['needs_answer'] and r['answer']),
+            'of': sum(1 for r in rows if r['needs_answer']), 'waiting': waiting}
+
+
 def decide(store, user, run, slide_no, action, note, edit):
-    """design/21: the operator answers by slide number. Scene and backup slides: KEEP, REJECT, KEEP_WITH_EDIT. Decision slides: KEEP or DROP."""
+    """design/21: the operator answers by slide. Scene and backup slides: KEEP, REJECT, KEEP_WITH_EDIT. Decision slides: KEEP or DROP."""
     session = session_of(store, run)
     if not session.get('accepted'):
         raise Problem(409, 'NOT_ALLOWED', 'Record the options stage first.')
     doc, entry = current(store, session)
     sl = _slides(store, session, doc, entry)
-    s = next((x for x in sl if x['no'] == slide_no), None)
+    lab = slide_label(slide_no)
+    s = next((x for x in sl if str(x['no']).upper() == lab), None)
     if not s:
-        fail(f'No slide #{slide_no:02d}; the review film has #01 to #{len(sl):02d}.')
+        fail(f"No slide #{lab}; the review film has: " + ', '.join(f"#{x['no']}" for x in sl) + '.')
     if s['type'] == 'blank':
-        fail(f'Slide #{slide_no:02d} is a blank for AI video or animation; it needs no decision.')
+        fail(f'Slide #{lab} is a blank for AI video or animation; it needs no decision.')
+    stamp = {'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     if s['type'] == 'decision':
         if action not in ('KEEP', 'DROP'):
-            fail(f'Slide #{slide_no:02d} is a decision: answer KEEP or DROP.')
-        session['decisions'][str(slide_no)] = {'action': action, 'type': 'decision', 'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+            fail(f'Slide #{lab} is a decision: answer KEEP or DROP.')
+        session['decisions'][lab] = {'action': action, 'type': 'decision', **stamp}
         session['master'] = None
         save_session(store, run, session)
-        return {'slide': slide_no, 'type': 'decision', 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
+        return {'slide': lab, 'type': 'decision', 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
     if action not in ('KEEP', 'REJECT', 'KEEP_WITH_EDIT'):
         fail('action must be KEEP, REJECT or KEEP_WITH_EDIT')
     if action == 'KEEP_WITH_EDIT' and not edit:
-        fail('KEEP_WITH_EDIT needs --edit "shot:N,in:±frames,out:±frames" (source frames).')
+        fail('KEEP_WITH_EDIT needs --edit "shot:N,in:±frames,out:±frames" (source frames; a frame is 1/25 s on the timeline).')
     if action == 'REJECT' and not str(note or '').strip():
-        fail('REJECT needs the operator\'s reason (--note); it becomes a learned rule.')
-    session['decisions'][str(slide_no)] = {'action': action, 'type': s['type'], 'option_number': s['option_number'], 'note': note or '', 'edit': edit, 'by': user['id'],
-                                           'at': datetime.now(timezone.utc).isoformat()}
+        fail("REJECT needs the operator's reason (--note); it stays with this run's decisions.")   # design/44 8.5
+    session['decisions'][lab] = {'action': action, 'type': s['type'], 'option_number': s['option_number'], 'edit': edit, **stamp}
     session['master'] = None
     save_session(store, run, session)
-    return {'slide': slide_no, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
+    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
 
 
 def add_rule(store, user, run, text, quote=''):
@@ -569,7 +593,7 @@ def build_master(conn, store, user, run):
     beats = pk['beats']
     decisions = session['decisions']
     sl = _slides(store, session, doc, entry)
-    missing = [f"#{s['no']:02d}" for s in sl if s['type'] != 'blank' and str(s['no']) not in decisions]
+    missing = [f"#{s['no']}" for s in sl if s['type'] != 'blank' and str(s['no']) not in decisions]
     if missing:
         fail(f"Every numbered slide needs an answer; missing: {', '.join(missing)}")
     head = {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}
@@ -587,12 +611,12 @@ def build_master(conn, store, user, run):
             if total != target:
                 fail(f"option #{o['option_number']} after the edit is {total} frames; the beat needs {target}. Trim one shot and extend another in the same option.")
         if o['beat_id'] in kept:
-            fail(f"{o['beat_id']}: both options kept (#{head[kept[o['beat_id']]['option_number']]['no']:02d} and #{head[o['option_number']]['no']:02d}); keep one.")
+            fail(f"{o['beat_id']}: both options kept (#{head[kept[o['beat_id']]['option_number']]['no']} and #{head[o['option_number']]['no']}); keep one.")
         # design/21: a dropped placement becomes a blank; a kept reuse may repeat its clip; adjacent blanks merge
         for i, ev in enumerate(o['events']):
             ds = inner.get((o['option_number'], i))
             if ds and decisions[str(ds['no'])]['action'] == 'DROP':
-                o['events'][i] = {'blank': True, 'timeline_frames': ev['timeline_frames'], 'intent': f"in place of dropped #{ds['no']:02d}: {ds['question']}", 'dropped_from': ds['no']}
+                o['events'][i] = {'blank': True, 'timeline_frames': ev['timeline_frames'], 'intent': f"in place of dropped #{ds['no']}: {ds['question']}", 'dropped_from': ds['no']}
             elif ds and ds.get('kind') == 'reuse':
                 ev['reuse_approved'] = True
         merged = []
@@ -603,7 +627,7 @@ def build_master(conn, store, user, run):
                 merged.append(ev)
         for ev in merged:
             if ev.get('blank') and ev.get('dropped_from') and ev['timeline_frames'] < V.MIN_BLANK_S * fps:
-                fail(f"Dropping #{ev['dropped_from']:02d} leaves a blank of {ev['timeline_frames'] / fps:.1f} s, under {V.MIN_BLANK_S} s: keep it, or keep the scene with an edit that lengthens a neighbouring shot.")
+                fail(f"Dropping #{ev['dropped_from']} leaves a blank of {ev['timeline_frames'] / fps:.1f} s, under {V.MIN_BLANK_S} s: keep it, or keep the scene with an edit that lengthens a neighbouring shot.")
         o['events'] = merged
         kept[o['beat_id']] = o
     # collision audit: a sub-clip in two kept options → swap in the beat's other option if it is clean, else refuse
@@ -685,11 +709,26 @@ def _finishing(pk, events):
     return items
 
 
+FIRST_CUT_WORDS = "The approval must say the operator watched the film and listened to it (both words), e.g. 'yes, watched and listened'."
+
+
+def _first_cut_output(conn, user, run, master_id, film, summary, quote):
+    """The approved master film as the first cut: hash-bound to the film, the master's gaps and timeline (design/17 A50)."""
+    files = [{'name': 'first-cut.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}]
+    return core.output(conn, user, run, {'stage': 'first_cut', 'files': files, 'accepted_quote': quote,
+                                         'summary': {'movie_sha256': film['sha256'], 'master_output': str(master_id), 'plan_digest': summary['plan_digest'], 'fps': summary['fps'],
+                                                     'resolution': summary['resolution'], 'duration_frames': summary['duration_frames'], 'gaps': summary['gaps']}})
+
+
 def record_master(conn, store, user, run, quote):
+    """design/44 8.4: one approval records the master and the first cut; the quote must say watched and listened."""
     session = session_of(store, run)
     m = session.get('master')
     if not m:
         raise Problem(409, 'NOT_ALLOWED', 'Build the master first.')
+    q = (quote or '').lower()
+    if 'watch' not in q or 'listen' not in q:
+        fail(FIRST_CUT_WORDS)
     _refresh(conn, store, run, session)
     film = _ready_film(session, 'master', m['digest'])
     files = [{'name': f"master-v{m['version']}.json", **{k: m['file'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True},
@@ -706,9 +745,12 @@ def record_master(conn, store, user, run, quote):
                'gaps': plan['gaps'], 'units': {'visuals': [g['shot_id'] for g in plan['gaps']]}, 'events': m['events'], 'swaps': plan['swaps'], 'learned_rules_added': added,
                'film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s'), 'mix': (film.get('record') or {}).get('mix')}}
     out = core.output(conn, user, run, {'stage': 'master', 'files': files, 'accepted_quote': quote, 'summary': summary})
+    first = _first_cut_output(conn, user, run, out['id'], files[1], summary, quote)
     session['recorded']['master'] = str(out['id'])
+    session['recorded']['first_cut'] = str(first['id'])
     save_session(store, run, session)
-    return {'output': str(out['id']), 'version': m['version'], 'gaps': summary['gaps'], 'learned_rules_added': added, 'next': '`vw first-cut record --quote "<watched and listened, yes>"`'}
+    return {'output': str(out['id']), 'first_cut_output': str(first['id']), 'version': m['version'], 'gaps': [g['shot_id'] for g in summary['gaps']], 'learned_rules_added': added,
+            'next': 'visuals for each gap' if summary['gaps'] else 'assembly'}
 
 
 def record_first_cut(conn, store, user, run, outputs, quote):
@@ -716,11 +758,8 @@ def record_first_cut(conn, store, user, run, outputs, quote):
     master_o = _output(outputs, 'master')
     q = (quote or '').lower()
     if 'watch' not in q or 'listen' not in q:
-        fail("The first-cut approval must say the operator watched the film and listened to it (both words), e.g. 'yes, watched and listened'.")
+        fail(FIRST_CUT_WORDS)
     film = next((f for f in master_o['files'] if f['name'] == 'master.mp4'), None)
-    files = [{'name': 'first-cut.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}]
     s = master_o['summary']
-    out = core.output(conn, user, run, {'stage': 'first_cut', 'files': files, 'accepted_quote': quote,
-                                        'summary': {'movie_sha256': film['sha256'], 'master_output': str(master_o['id']), 'plan_digest': s['plan_digest'], 'fps': s['fps'], 'resolution': s['resolution'],
-                                                    'duration_frames': s['duration_frames'], 'gaps': s['gaps']}})
+    out = _first_cut_output(conn, user, run, master_o['id'], film, s, quote)
     return {'output': str(out['id']), 'gaps': [g['shot_id'] for g in s['gaps']], 'next': 'visuals for each gap' if s['gaps'] else 'assembly'}

@@ -891,25 +891,7 @@ def cmd_options(a):
     if a.what == 'render':
         emit(write(f'/api/runs/{run}/stage2/render', {'film': 'review'}), 0, 'Review film rendering; poll `vw options status`.')
     if a.what == 'status':   # design/43 7.2: wait inside the tool for the film and say about how long is left
-        film = a.film or 'review'
-        started = time.monotonic()
-        deadline = started + (a.wait or 0)
-        while True:
-            st = call('GET', f'/api/runs/{run}/stage2')
-            r = (st.get('renders') or {}).get(film) or {}
-            if r.get('status') not in ('queued', 'running') or time.monotonic() >= deadline:
-                break
-            time.sleep(15)
-        if not r:
-            line = f'no {film} film rendered yet'
-        elif r.get('status') == 'ready':
-            line = f'{film} film ready: `vw {"options" if film == "review" else "master"} fetch`'
-        elif r.get('status') in ('queued', 'running'):
-            rate = float(st.get('render_rate_fps') or 20.0)
-            left = max(0.0, float(r.get('frames') or 0) / rate - (time.monotonic() - started))
-            line = f'{film} film rendering, about {max(1, round(left / 60))} min left' + ('; still rendering; run again with --wait' if a.wait else '')
-        else:
-            line = f"{film} film {r.get('status')}: {r.get('error') or 'see the render record'}"
+        st, line = wait_for_film(run, a.film or 'review', a.wait or 0)
         emit(st, 0, line)
     if a.what == 'show':
         emit(call('GET', f'{base}/{a.option}'))
@@ -922,15 +904,65 @@ def cmd_options(a):
         emit(write(base + '/record', {'quote': a.quote}), 0, 'Options recorded; next the operator decides per option (`vw master decide`).')
 
 
+def wait_for_film(run, film, wait_s):
+    """design/43 7.2, design/44 8.2: poll the stage 2 status every 15 s until the film is ready or failed, or wait_s passes.
+    Returns the last status answer and the line to print."""
+    started = time.monotonic()
+    deadline = started + wait_s
+    while True:
+        st = call('GET', f'/api/runs/{run}/stage2')
+        r = (st.get('renders') or {}).get(film) or {}
+        if r.get('status') not in ('queued', 'running') or time.monotonic() >= deadline:
+            break
+        time.sleep(15)
+    if not r:
+        line = f'no {film} film rendered yet'
+    elif r.get('status') == 'ready':
+        line = f'{film} film ready: `vw {"options" if film == "review" else "master"} fetch`'
+    elif r.get('status') in ('queued', 'running'):
+        rate = float(st.get('render_rate_fps') or 20.0)
+        left = max(0.0, float(r.get('frames') or 0) / rate - (time.monotonic() - started))
+        line = f'{film} film rendering, about {max(1, round(left / 60))} min left' + ('; still rendering; run again with --wait' if wait_s else '')
+    else:
+        line = f"{film} film {r.get('status')}: {r.get('error') or 'see the render record'}"
+    return st, line
+
+
+def slide_label(value):
+    """design/44 8.1: '2', '3' for a scene's option and its backup, '2A', '2B' inside; '#2b' and a number are accepted."""
+    return str(value).strip().lstrip('#').strip().upper()
+
+
 def cmd_master(a):
     m = active()
     run = m['run_id']
     base = f'/api/runs/{run}/master'
+    if a.what == 'slides':   # design/44 8.1: what still needs an answer
+        out = call('GET', base + '/slides')
+        emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none'))
     if a.what == 'decide':
+        if a.file:   # design/44 8.1: every answer in one call, in order, stopping at the first refusal
+            answers = _json_file(m, a.file)
+            if not isinstance(answers, list):
+                emit({'action': 'refused', 'message': f'{a.file} must be a list of {{slide, action, note, edit}}.'}, 2)
+            recorded, last = [], {}
+            for i, ans in enumerate(answers):
+                body = {'request_id': str(uuid.uuid4()), 'slide': slide_label(ans.get('slide', '')), 'action': ans.get('action'), 'note': ans.get('note') or '',
+                        **({'edit': ans['edit']} if ans.get('edit') else {})}
+                payload, code = request('POST', base + '/decide', json=body)
+                if code:
+                    if code == 401:
+                        finish(payload, code)
+                    emit({'recorded': recorded, 'refused': {'slide': body['slide'], 'message': payload.get('message') or payload.get('action')},
+                          'remaining': [slide_label(x.get('slide', '')) for x in answers[i + 1:]], 'action': 'refused'}, 2,
+                         f"{len(recorded)} recorded; #{body['slide']} refused: {payload.get('message')}; fix it and run the file again")
+                recorded.append(body['slide'])
+                last = payload
+            emit({'recorded': recorded, 'decided': last.get('decided'), 'of': last.get('of')}, 0, f"{len(recorded)} answers recorded; {last.get('decided')} of {last.get('of')} decided")
         n = a.slide or a.option
         if not n:
-            emit({'action': 'refused', 'message': 'Give the slide number: --slide N'}, 2)
-        body = {'slide': int(str(n).lstrip('#')), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
+            emit({'action': 'refused', 'message': 'Give the slide label (--slide 2, --slide 2B) or a file of answers (--file out/decisions.json).'}, 2)
+        body = {'slide': slide_label(n), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
         emit(write(base + '/decide', body))
     if a.what == 'rule':   # design/43 7.5: a client rule is the operator's; their yes travels with it
         if not (a.quote or '').strip():
@@ -940,12 +972,14 @@ def cmd_master(a):
         emit(write(base + '/build', {}))
     if a.what == 'render':
         emit(write(f'/api/runs/{run}/stage2/render', {'film': 'master'}), 0, 'Master film rendering; poll `vw master status`.')
-    if a.what == 'status':
-        emit(call('GET', f'/api/runs/{run}/stage2'))
+    if a.what == 'status':   # design/44 8.2
+        st, line = wait_for_film(run, 'master', a.wait or 0)
+        emit(st, 0, line)
     if a.what == 'fetch':
         _s2_fetch(m, 'master', 'out/master.mp4')
-    if a.what == 'record':
-        emit(write(base + '/record', {'quote': a.quote}), 0, 'Master recorded; next `vw first-cut record`.')
+    if a.what == 'record':   # design/44 8.4: one approval records the master and the first cut
+        out = write(base + '/record', {'quote': a.quote})
+        emit(out, 0, f"Master and first cut recorded; next: {out.get('next')}.")
 
 
 def cmd_first_cut(a):
@@ -1138,9 +1172,10 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the film (status)')
     s.set_defaults(fn=cmd_options)
-    s = sub.add_parser('master'); s.add_argument('what', choices=['decide', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
-    for flag in ('--slide', '--option', '--action', '--note', '--edit', '--add', '--quote'):
+    s = sub.add_parser('master'); s.add_argument('what', choices=['slides', 'decide', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
+    for flag in ('--slide', '--option', '--action', '--note', '--edit', '--add', '--quote', '--file'):
         s.add_argument(flag)
+    s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the master film (status)')
     s.set_defaults(fn=cmd_master)
     s = sub.add_parser('first-cut'); s.add_argument('what', choices=['record']); s.add_argument('--quote'); s.set_defaults(fn=cmd_first_cut)
     s = sub.add_parser('assembly'); s.add_argument('what', choices=['prepare', 'choose', 'stabilize', 'build', 'render', 'status', 'fetch', 'review', 'record'])

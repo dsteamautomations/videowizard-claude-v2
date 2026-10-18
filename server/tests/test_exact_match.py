@@ -111,11 +111,12 @@ def test_slides_are_numbered_in_film_order_with_readable_ascii_text():
                   ev('clip1:SUB_01', 0, 12, match='b_roll', decision={'kind': 'b_roll', 'question': 'Site footage for "less material": keep it, or leave it for AI?'})],
                  [option(2, 'BEAT_01', 'SECONDARY', [ev('clip2:SUB_01', 0, 25), blank(87)])])
     sl = SL.slides(proposed(d, pk), pk, FPS)
-    assert [(s['no'], s['type']) for s in sl] == [(1, 'option'), (2, 'blank'), (3, 'decision'), (4, 'backup'), (5, 'blank')]
-    assert sl[0]['lines'][0] == '#01 | Scene 1: Pressing the blocks | 4.5 s | 2 shots'
-    assert sl[3]['lines'][0].startswith('#04 | Scene 1: Pressing the blocks | BACKUP for #01 | 4.5 s | 1 shot')
-    assert sl[1]['lines'][:2] == ['#02 | BLANK | Scene 1: Pressing the blocks | 3.0 s', 'For AI video or animation']
-    assert sl[2]['lines'][0] == '#03 | DECISION | Scene 1: Pressing the blocks' and sl[2]['lines'][-1].startswith('Keep or drop: synthetic test clip')
+    # design/44 8.1: running numbers for the scene's option and its backup, letters inside an option
+    assert [(s['no'], s['type']) for s in sl] == [('1', 'option'), ('1A', 'blank'), ('1B', 'decision'), ('2', 'backup'), ('2A', 'blank')]
+    assert sl[0]['lines'][0] == '#1 | Scene 1: Pressing the blocks | 4.5 s | 2 shots'
+    assert sl[3]['lines'][0].startswith('#2 | Scene 1: Pressing the blocks | BACKUP for #1 | 4.5 s | 1 shot')
+    assert sl[1]['lines'][:2] == ['#1A | BLANK | Scene 1: Pressing the blocks | 3.0 s', 'For AI video or animation']
+    assert sl[2]['lines'][0] == '#1B | DECISION | Scene 1: Pressing the blocks' and sl[2]['lines'][-1].startswith('Keep or drop: synthetic test clip')
     assert all(len(l) <= 80 and all(ord(c) < 127 for c in l) for s in sl for l in s['lines'])
     assert 'SUB_' not in json.dumps([s['lines'] for s in sl])   # readable names, not internal codes
 
@@ -125,10 +126,10 @@ def test_review_sequence_keeps_words_with_their_pictures():
     d = proposed(doc_with([ev('clip0:SUB_01', 0, 25), blank(75), ev('clip1:SUB_01', 0, 12, match='b_roll', decision={'kind': 'b_roll', 'question': 'keep?'})]), pk)
     items = SL.review_items(d, pk, SL.slides(d, pk, FPS), lambda evs: [{'kind': 'event', 'frames': e['timeline_frames']} for e in evs], FPS)
     assert [i['kind'] for i in items] == ['slate', 'narration', 'event', 'card', 'slate', 'narration', 'event']
-    assert items[2]['label'] == '#01' and items[6]['label'] == '#03 DECISION'   # every real shot shows which numbered slide it belongs to
+    assert items[2]['label'] == '#1' and items[6]['label'] == '#1B DECISION'   # every real shot shows which slide it belongs to
     n1, n2 = items[1], items[5]
     assert (n1['start_s'], n1['end_s']) == (0.0, 100 / FPS) and (n2['start_s'], n2['end_s']) == (100 / FPS, 112 / FPS)   # split at the decision; the blank keeps its words
-    assert items[3]['frames'] == 75 and items[3]['lines'][0].startswith('#02 | BLANK')
+    assert items[3]['frames'] == 75 and items[3]['lines'][0].startswith('#1A | BLANK')
 
 
 def test_render_a_blank_card_carries_the_narration_and_a_decision_slide_is_silent(tmp_path):
@@ -171,7 +172,7 @@ def test_exact_match_end_to_end(home, database, fake, gemini):
     assert (s1['real_s'], s1['blank_s'], s1['decisions']) == (round(n1 / FPS, 2), round(gap / FPS, 2), 1) and out['scenes'][1]['note'] == 'declared blank'
     rc, out, err = vw(home, 'options', 'propose', '--file', 'out/options.json')
     assert rc == 0, (out, err)
-    assert [(s['no'], s['type']) for s in out['slides']] == [(1, 'option'), (2, 'blank'), (3, 'decision')]
+    assert [(s['no'], s['type']) for s in out['slides']] == [('1', 'option'), ('1A', 'blank'), ('1B', 'decision')]
     assert vw(home, 'options', 'render')[0] == 0
     drain()
     rc, out, err = vw(home, 'options', 'fetch')
@@ -182,15 +183,22 @@ def test_exact_match_end_to_end(home, database, fake, gemini):
         Path(keep).mkdir(parents=True, exist_ok=True)
         shutil.copy(ws / 'out' / 'review.mp4', Path(keep) / 'synthetic-review-film.mp4')
     assert vw(home, 'options', 'record', '--quote', 'yes, these options')[0] == 0
-    # answers by slide number
-    rc, out, _ = vw(home, 'master', 'decide', '--slide', '2', '--action', 'KEEP')
+    # answers by slide label (design/44 8.1)
+    rc, out, err = vw(home, 'master', 'slides')
+    assert rc == 0 and out['waiting'] == ['1', '1B'] and out['of'] == 2 and 'waiting: 1, 1B' in err, (out, err)
+    rc, out, _ = vw(home, 'master', 'decide', '--slide', '1A', '--action', 'KEEP')
     assert rc == 2 and 'needs no decision' in out['message']
-    rc, out, _ = vw(home, 'master', 'decide', '--slide', '3', '--action', 'REJECT')
+    rc, out, _ = vw(home, 'master', 'decide', '--slide', '1b', '--action', 'REJECT')
     assert rc == 2 and 'KEEP or DROP' in out['message']
-    assert vw(home, 'master', 'decide', '--slide', '1', '--action', 'KEEP')[0] == 0
+    (ws / 'out' / 'decisions.json').write_text(json.dumps([{'slide': '1', 'action': 'KEEP'}, {'slide': '7', 'action': 'KEEP'}, {'slide': '#1b', 'action': 'DROP'}]), encoding='utf-8')
+    rc, out, _ = vw(home, 'master', 'decide', '--file', 'out/decisions.json')
+    assert rc == 2 and out['recorded'] == ['1'] and out['refused']['slide'] == '7' and 'No slide #7' in out['refused']['message'] and out['remaining'] == ['1B'], out
     rc, out, _ = vw(home, 'master', 'build')
-    assert rc == 2 and '#03' in out['message']
-    assert vw(home, 'master', 'decide', '--slide', '#03', '--action', 'DROP')[0] == 0
+    assert rc == 2 and '#1B' in out['message']
+    (ws / 'out' / 'decisions.json').write_text(json.dumps([{'slide': '#1b', 'action': 'DROP'}]), encoding='utf-8')
+    rc, out, _ = vw(home, 'master', 'decide', '--file', 'out/decisions.json')
+    assert rc == 0 and out['recorded'] == ['1B'] and out['decided'] == 2 and out['of'] == 2, out
+    assert vw(home, 'master', 'slides')[1]['waiting'] == []
     rc, out, err = vw(home, 'master', 'build')
     assert rc == 0 and out['gaps'] == ['BEAT_01-B1', 'BEAT_02'] and out['events'] == 1, (out, err)   # the dropped B-roll joined the blank
     assert vw(home, 'master', 'render')[0] == 0
@@ -199,11 +207,13 @@ def test_exact_match_end_to_end(home, database, fake, gemini):
     assert rc == 0 and abs(out['duration_s'] - pk['narration']['total_frames'] / FPS) < 0.15, (out, err)
     if keep:
         shutil.copy(ws / 'out' / 'master.mp4', Path(keep) / 'synthetic-master-film.mp4')
-    assert vw(home, 'master', 'record', '--quote', 'yes the master')[0] == 0
-    rc, out, err = vw(home, 'first-cut', 'record', '--quote', 'yes, watched and listened')
-    assert rc == 0 and out['gaps'] == ['BEAT_01-B1', 'BEAT_02'], (out, err)
+    rc, out, _ = vw(home, 'master', 'record', '--quote', 'yes the master')
+    assert rc == 2 and 'listened' in out['message']   # design/44 8.4: one approval, with the first cut's words
+    rc, out, err = vw(home, 'master', 'record', '--quote', 'yes the master, watched and listened')
+    assert rc == 0 and out['gaps'] == ['BEAT_01-B1', 'BEAT_02'] and out['first_cut_output'], (out, err)
     nxt = vw(home, 'next')[1]
     assert nxt['stage'] == 'visuals' and nxt['units_open'] == ['BEAT_01-B1', 'BEAT_02'], nxt
+    assert vw(home, 'view', '--stage', 'first_cut')[1]['outputs'][0]['summary']['master_output'] == out['output']
     rc, out, err = vw(home, 'visuals', 'prepare')
     assert rc == 0, (out, err)
 
@@ -253,7 +263,7 @@ def test_one_generated_shot_is_at_most_30_s_and_a_long_blank_is_several_shots():
 def test_slides_show_the_number_large_and_footage_carries_a_corner_label(tmp_path):
     from PIL import Image
     amber = lambda im, box: any(r > 200 and 150 < g < 230 and b < 120 for r, g, b in im.crop(box).convert('RGB').getdata())
-    R.slate_png(['#14 | DECISION | Scene 3: Why Rat-Trap Bond is different', 'Keep or drop?'], 640, 360, tmp_path / 's.png')
+    R.slate_png(['#3B | DECISION | Scene 3: Why Rat-Trap Bond is different', 'Keep or drop?'], 640, 360, tmp_path / 's.png')
     assert amber(Image.open(tmp_path / 's.png'), (0, 0, 640, 360))          # the number, drawn large in amber
     R.slate_png(['no number here'], 640, 360, tmp_path / 'p.png')
     assert not amber(Image.open(tmp_path / 'p.png'), (0, 0, 640, 360))
@@ -288,12 +298,11 @@ def test_blanks_inside_a_scene_go_through_visuals_and_assembly(home, database, f
     drain()
     assert vw(home, 'options', 'record', '--quote', 'yes, these options')[0] == 0
     assert vw(home, 'master', 'decide', '--slide', '1', '--action', 'KEEP')[0] == 0
-    assert vw(home, 'master', 'decide', '--slide', '3', '--action', 'DROP')[0] == 0
+    assert vw(home, 'master', 'decide', '--slide', '1B', '--action', 'DROP')[0] == 0
     assert vw(home, 'master', 'build')[0] == 0
     assert vw(home, 'master', 'render')[0] == 0
     drain()
-    assert vw(home, 'master', 'record', '--quote', 'yes the master')[0] == 0
-    rc, out, err = vw(home, 'first-cut', 'record', '--quote', 'yes, watched and listened')
+    rc, out, err = vw(home, 'master', 'record', '--quote', 'yes the master, watched and listened')
     assert rc == 0 and out['gaps'] == ['BEAT_01-B1', 'BEAT_02'], (out, err)
     gaps = {g['shot_id']: g for g in vw(home, 'view', '--stage', 'first_cut')[1]['outputs'][0]['summary']['gaps']}
     assert vw(home, 'visuals', 'prepare')[0] == 0
