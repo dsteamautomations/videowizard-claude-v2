@@ -13,6 +13,16 @@ from stages_text import Refused, digest, read_proposal, stamp, stamps
 
 VIDEO_SUFFIXES = ('.mp4', '.mov', '.m4v', '.mkv', '.webm', '.avi', '.mpg', '.mpeg')
 MAX_MEDIA_BYTES = 200 * 1024 * 1024
+HASH_CHUNK = 1024 * 1024
+
+
+def file_sha256(path):
+    """Hash in 1 MB chunks; a 200 MB clip is never read into memory whole (design/41 5.3)."""
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(HASH_CHUNK), b''):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def probe(path):
@@ -54,46 +64,83 @@ def to_cfr(src, dst, fps):
 
 # ---------- media ----------
 
+def _inspect(p):
+    """Size check, hash and probe of one clip; runs in the prepare pool."""
+    st = p.stat()
+    if st.st_size > MAX_MEDIA_BYTES:
+        raise Refused(f'{p.name} is {st.st_size / 1e6:.0f} MB; the limit is 200 MB per clip. Ask the operator to trim or re-encode it.')
+    return {'path': p, 'size': st.st_size, 'mtime': st.st_mtime, 'sha': file_sha256(p), 'meta': probe(p)}
+
+
 def media_prepare(ws, procedure, prior):
     files = sorted(p for p in (ws / 'in').iterdir() if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES)
     if not files:
         raise Refused(f"Put the source clips in {ws / 'in'} (mp4/mov/mkv/webm…), then run prepare again.")
-    clips, seen = [], {}
-    for p in files:
-        size = p.stat().st_size
-        if size > MAX_MEDIA_BYTES:
-            raise Refused(f'{p.name} is {size / 1e6:.0f} MB; the limit is 200 MB per clip. Ask the operator to trim or re-encode it.')
-        sha = hashlib.sha256(p.read_bytes()).hexdigest()
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as pool:   # design/41 5.3: three clips hashed and probed at a time; a Refused re-raises here
+        inspected = list(pool.map(_inspect, files))
+    clips, seen, to_convert = [], {}, []
+    for info in inspected:   # file-name order; the first name of identical content wins
+        p, sha = info['path'], info['sha']
         if sha in seen:
-            continue  # duplicate content: listed once
+            continue
         seen[sha] = p.name
-        meta = probe(p)
-        path = p
-        if meta['is_variable_frame_rate']:
-            from fractions import Fraction
-            fps = round(float(Fraction(meta['r_frame_rate'])))
-            path = ws / 'work' / 'cfr' / p.name
-            to_cfr(p, path, fps)
-            data = path.read_bytes()
-            meta = {**probe(path), 'transcoded_from_vfr': True, 'original_sha256': sha, 'original_fps': meta['fps']}
-            sha, size = hashlib.sha256(data).hexdigest(), len(data)
-        clips.append({'id': sha[:16], 'name': p.name, 'path': str(path.relative_to(ws).as_posix()), 'sha256': sha, 'bytes': size, **meta})
+        clip = {'id': sha[:16], 'name': p.name, 'path': str(p.relative_to(ws).as_posix()), 'sha256': sha, 'bytes': info['size'],
+                'source_bytes': info['size'], 'source_mtime': info['mtime'], **info['meta']}   # source_* : the file in in/, checked again at record (5.5)
+        clips.append(clip)
+        if info['meta']['is_variable_frame_rate']:
+            to_convert.append(clip)
+
+    def convert(clip):
+        from fractions import Fraction
+        src = ws / 'in' / clip['name']
+        fps = round(float(Fraction(clip['r_frame_rate'])))
+        dst = ws / 'work' / 'cfr' / clip['name']
+        to_cfr(src, dst, fps)
+        sha = file_sha256(dst)
+        clip.update({**probe(dst), 'transcoded_from_vfr': True, 'original_sha256': clip['sha256'], 'original_fps': clip['fps'],
+                     'path': str(dst.relative_to(ws).as_posix()), 'sha256': sha, 'id': sha[:16], 'bytes': dst.stat().st_size})
+    with ThreadPoolExecutor(max_workers=2) as pool:   # ffmpeg uses several cores itself: two conversions at a time
+        list(pool.map(convert, to_convert))
     (ws / 'work' / 'media-clips.json').write_text(json.dumps(clips, indent=1), encoding='utf-8')
+    total_bytes = sum(c['bytes'] for c in clips)
     return {'prompt': procedure.get('prompt') or '', 'clips': clips, 'duplicates_skipped': len(files) - len(clips), 'prepared_at': stamp(ws, 'media'),
-            'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'message': 'Confirm the clip list with the operator, then record.'}
+            'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
+            'output_file': 'out/media.json', 'steps': procedure.get('steps') or [],
+            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; confirm the list with the operator, then record. The upload reports when it is done.'}
 
 
-def media_record(ws, procedure, prior, upload):
+def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None):
     try:
         clips = json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         raise Refused('Run `vw stage media prepare` before record.')
+    changed = []   # design/41 5.5: the bytes about to go up must be the bytes prepare hashed
+    for c in clips:
+        if 'source_bytes' not in c:
+            continue
+        src = ws / 'in' / c['name']
+        if not src.is_file() or src.stat().st_size != c['source_bytes'] or src.stat().st_mtime != c['source_mtime']:
+            changed.append(c['name'])
+    if changed:
+        raise Refused(f"The clips changed since prepare ({', '.join(changed)}); run `vw stage media prepare` again.")
+    import itertools
+    import threading
+    counter, lock = itertools.count(1), threading.Lock()
+
+    def up(c):
+        ref = upload('media', ws / c.get('path', 'in/' + c['name']), c['sha256'], c['bytes'])   # skips files already receipted
+        if progress:
+            with lock:
+                progress(next(counter), len(clips), c['name'], c['bytes'])
+        return ref
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as pool:   # design/19 C2: three uploads at a time; each keeps its own retry
-        refs = list(pool.map(lambda c: upload('media', ws / c.get('path', 'in/' + c['name']), c['sha256'], c['bytes']), clips))  # skips files already receipted
+        refs = list(pool.map(up, clips))
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
     summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr')} for c in clips],
-               'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1), **stamps(ws, 'media')}
+               'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1),
+               'camera_audio': camera_audio, 'camera_audio_note': note or '', **stamps(ws, 'media')}   # design/41 5.1
     return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}
 
 

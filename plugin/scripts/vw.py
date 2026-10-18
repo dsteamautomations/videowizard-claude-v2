@@ -388,7 +388,10 @@ def cmd_stage(a):
                 {'last_voice': m.get('last_voice')} if a.stage == 'voice' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
-            result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size))
+            def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
+                print(f'uploaded {k}/{n} {name} ({size / 1e6:.0f} MB)', file=sys.stderr, flush=True)
+            result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
+                            camera_audio=a.camera_audio, note=a.note, progress=progress)
         elif a.stage == 'voice':
             result = record(ws, procedure, prior, None)
         elif a.stage == 'intake':
@@ -1017,7 +1020,9 @@ def build_parser():
     s = sub.add_parser('decide'); s.add_argument('--stage', required=True); s.add_argument('--unit'); s.add_argument('--decision', required=True, choices=['retry', 'revise', 'defect', 'stop']); s.add_argument('--note'); s.set_defaults(fn=cmd_decide)
     s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('clients'); s.add_argument('--search'); s.set_defaults(fn=cmd_clients)
-    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
+    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
+    s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
+    s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)
     s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve'])
     s.add_argument('--scope', default='account'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')

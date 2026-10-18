@@ -298,9 +298,10 @@ def test_m2_m4_m5_m6_media_upload_resume_dedupe_close(home, database, fake):
     assert not by['a.mp4'].get('transcoded_from_vfr') and by['a.mp4']['rotation_deg'] == 0
     # M2: one clip uploaded beforehand (simulating a previous, interrupted record) is skipped on record
     assert vw(home, 'upload', '--stage', 'media', '--file', 'in/a.mp4')[0] == 0
-    rc, out, err = vw(home, 'stage', 'media', 'record', '--quote', 'yes these clips')
+    rc, out, err = vw(home, 'stage', 'media', 'record', '--camera-audio', 'allowed', '--note', 'site noise only', '--quote', 'yes these clips')
     assert rc == 0, err
     assert out['summary']['units']['analysis'] == [c['id'] for c in out['summary']['clips']]
+    assert out['summary']['camera_audio'] == 'allowed' and out['summary']['camera_audio_note'] == 'site noise only' and 'uploaded ' in err   # design/41 5.1, 5.4
     assert next(c for c in out['summary']['clips'] if c['name'] == 'v.mp4')['transcoded_from_vfr'] is True
     with psycopg.connect(database) as c:
         assert c.execute("select count(*) from vw2_files where stage='media' and name like '%%.mp4'").fetchone()[0] == 4  # a.mp4 once (resumed), b, v (CFR copy), r; the copy deduped
