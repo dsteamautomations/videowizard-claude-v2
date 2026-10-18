@@ -2,9 +2,16 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Glob|Grep",
         "hooks": [
           { "type": "command", "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/guard.py\"" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python \"${CLAUDE_PLUGIN_ROOT}/hooks/remind.py\"" }
         ]
       }
     ]

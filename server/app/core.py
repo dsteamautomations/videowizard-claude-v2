@@ -63,8 +63,17 @@ def resolve_client(client):
     matches = [r for r in rows if term and (r['client_id'].lower() == term or r['client_name'].lower() == term)]
     if len(matches) == 1:
         return matches[0]
-    candidates = [r['client_name'] for r in rows if term and term in r['client_name'].lower()][:10]
+    containing = [r for r in rows if term and term in r['client_name'].lower()]
+    if len(containing) == 1 and not matches:  # design/34 1.17: a partial name that fits exactly one Active client resolves to it
+        return containing[0]
+    candidates = [r['client_name'] for r in containing][:10]
     raise Problem(422, 'CLIENT_UNKNOWN', 'The client must be one Active client of the directory; ask the operator which one.', candidates=candidates, ambiguous=len(matches) > 1)
+
+
+def client_runs(conn, client_id, limit=20):
+    """Earlier runs for a client, any owner, newest first: code and title only (design/34 1.5, shown at intake)."""
+    rows = conn.execute('select code, title from vw2_runs where client_id=%s order by created_at desc limit %s', (client_id, limit)).fetchall()
+    return [{'code': r['code'], 'title': r['title']} for r in rows if r['title']]
 
 
 def create_run(conn, user, title, client, version):

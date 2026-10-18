@@ -3,6 +3,8 @@ model's proposal in out/<stage>.json, derive files, record the stage output). Po
 import hashlib
 import json
 import re
+import textwrap
+from datetime import datetime, timezone
 from pathlib import Path
 
 from extraction import SUFFIXES, ExtractionError, extract
@@ -16,6 +18,39 @@ class Refused(Exception):
 
 def digest(text):
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
+def stamp(ws, stage):
+    """prepared_at for a stage (design/34 1.19): written by prepare, read back by record into the summary."""
+    path = ws / 'work' / f'{stage}-prepared.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    at = now_iso()
+    path.write_text(json.dumps({'prepared_at': at}), encoding='utf-8')
+    return at
+
+
+def stamps(ws, stage):
+    try:
+        prepared = json.loads((ws / 'work' / f'{stage}-prepared.json').read_text(encoding='utf-8')).get('prepared_at')
+    except (OSError, ValueError):
+        prepared = None
+    return {'prepared_at': prepared, 'recorded_at': now_iso()}
+
+
+def cleaned_script(ws, intake):
+    """out/source.txt as recorded at intake (design/34 1.14): the local copy must match the recorded digest."""
+    try:
+        text = (ws / 'out' / 'source.txt').read_text(encoding='utf-8')
+    except OSError:
+        raise Refused('out/source.txt is missing on this machine; restore it with `vw pull` or revise intake.')
+    expected = (intake.get('summary') or {}).get('source_digest')
+    if expected and digest(text) != expected:
+        raise Refused('The cleaned script on this machine (out/source.txt) differs from the recorded one; restore it with `vw pull` or revise intake.')
+    return text
 
 
 def numbered(source):
@@ -73,18 +108,37 @@ def need_text(data, keys, stage):
 
 # ---------- intake ----------
 
-def intake_prepare(ws, procedure, prior):
+def intake_prepare(ws, procedure, prior, file=None, earlier_titles=None):
     files = sorted(p for p in (ws / 'in').iterdir() if p.is_file() and p.suffix.lower() in SUFFIXES)
     if not files:
         raise Refused(f"Put the source script in {ws / 'in'} as TXT, MD, Fountain, DOCX or PDF, then run prepare again.")
-    source = files[0]
+    if file:
+        source = ws / 'in' / file
+        if source.name != file or source not in files:
+            raise Refused(f"--file must name one document in {ws / 'in'} (TXT, MD, Fountain, DOCX or PDF); {file!r} is not one of: " + ', '.join(p.name for p in files) + '.')
+    elif len(files) > 1:  # design/34 1.3: never pick silently
+        raise Refused(f"{ws / 'in'} holds more than one document: " + ', '.join(p.name for p in files) + '. Ask the operator which one is the script and run prepare again with --file <name>.')
+    else:
+        source = files[0]
+    data = source.read_bytes()
     try:
-        result = extract(source.name, source.read_bytes())
+        result = extract(source.name, data)
     except ExtractionError as exc:
         raise Refused(str(exc))
-    (ws / 'work' / 'intake-source.json').write_text(json.dumps({'file': source.name, **result}, indent=1), encoding='utf-8')
-    return {'prompt': procedure['prompt'].replace('{numbered_script}', numbered(result['text'])),
-            'source_file': source.name, 'warnings': result['warnings'], 'needs_readable_copy': result['needs_readable_copy'],
+    lines = numbered(result['text']).split('\n')
+    (ws / 'work').mkdir(parents=True, exist_ok=True)
+    # design/34 1.1: the numbered script goes to a file the assistant reads in parts; the prompt text itself is never written to disk
+    (ws / 'work' / 'intake-numbered.md').write_text('\n'.join(textwrap.fill(line, 160, subsequent_indent='    ') if len(line) > 160 else line for line in lines) + '\n', encoding='utf-8')
+    earlier = [{'code': r.get('code'), 'title': r.get('title')} for r in (earlier_titles or []) if r.get('title')]
+    titles_text = '\n'.join(f"{r['code']}: {r['title']}" for r in earlier) or 'none'
+    prompt = (procedure['prompt']
+              .replace('{numbered_script}', f"(read work/intake-numbered.md in parts: {len(lines)} lines, {len(result['text'])} characters; it is not pasted here)")
+              .replace('{earlier_titles}', titles_text))
+    prepared_at = stamp(ws, 'intake')
+    (ws / 'work' / 'intake-source.json').write_text(json.dumps({'file': source.name, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data),
+                                                                   'prepared_at': prepared_at, **result}, indent=1), encoding='utf-8')
+    return {'prompt': prompt, 'source_file': source.name, 'numbered_file': 'work/intake-numbered.md', 'lines': len(lines), 'characters': len(result['text']),
+            'earlier_titles': earlier, 'warnings': result['warnings'], 'needs_readable_copy': result['needs_readable_copy'], 'prepared_at': prepared_at,
             'output_file': 'out/intake.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
@@ -94,20 +148,28 @@ def intake_record(ws, procedure, prior, title=None, client=''):
         src = json.loads((ws / 'work' / 'intake-source.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         raise Refused('Run `vw stage intake prepare` before record.')
+    original = ws / 'in' / src['file']
+    if src.get('sha256'):  # design/34 1.8: the file record copies must be the one prepare extracted
+        if not original.is_file() or hashlib.sha256(original.read_bytes()).hexdigest() != src['sha256']:
+            raise Refused(f"The source file {src['file']} changed or is missing since prepare; run `vw stage intake prepare` again.")
     titles = data.get('titles')
-    if not isinstance(titles, list) or not titles or not all(isinstance(t, str) and 8 <= len(t.strip()) <= 70 or t.strip() for t in titles):
-        raise Refused('out/intake.json: `titles` must list at least one title (recommended first).')
-    chosen = (title or '').strip() or titles[0].strip()
-    if not 1 <= len(chosen) <= 160:
+    if not isinstance(titles, list) or not titles or not all(isinstance(t, str) and t.strip() for t in titles):  # design/34 1.4
+        raise Refused('out/intake.json: `titles` must list at least one non-empty title (recommended first).')
+    titles = [t.strip() for t in titles]
+    chosen = (title or '').strip()
+    if not chosen:  # design/34 1.2: the operator chooses; the tool never picks for them
+        raise Refused("Pass the operator's chosen title with --title; record does not pick one for them.")
+    if len(chosen) > 160:
         raise Refused('The chosen title must be 1-160 characters (`--title`).')
     cleaned = remove_lines(src['text'], data.get('remove', []))
     if not cleaned.strip():
         raise Refused('Nothing would remain of the source; check the removals.')
+    (ws / 'out').mkdir(parents=True, exist_ok=True)
     (ws / 'out' / 'source.txt').write_text(cleaned, encoding='utf-8')
-    original = ws / 'in' / src['file']
     (ws / 'out' / ('original' + original.suffix.lower())).write_bytes(original.read_bytes())
-    summary = {'title': chosen, 'titles': [t.strip() for t in titles], 'client': client, 'notes': data.get('notes', ''),
-               'removed_lines': len(data.get('remove', [])), 'warnings': src['warnings'], 'source_digest': digest(cleaned)}
+    summary = {'title': chosen, 'title_source': 'suggested' if chosen in titles else 'typed', 'titles': titles, 'client': client, 'notes': data.get('notes', ''),
+               'removed_lines': len(data.get('remove', [])), 'kept_lines': sum(1 for line in cleaned.split('\n') if line.strip()),
+               'warnings': src['warnings'], 'source_digest': digest(cleaned), 'source_file': src['file'], 'source_sha256': src.get('sha256'), **stamps(ws, 'intake')}
     return {'files': ['out/source.txt', 'out/original' + original.suffix.lower(), 'out/intake.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
@@ -116,7 +178,7 @@ def intake_record(ws, procedure, prior, title=None, client=''):
 def brief_prepare(ws, procedure, prior):
     intake = prior('intake')
     return {'prompt': procedure['prompt'], 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
-            'script': (ws / 'out' / 'source.txt').read_text(encoding='utf-8')},
+            'script': cleaned_script(ws, intake)}, 'prepared_at': stamp(ws, 'brief'),
             'output_file': 'out/brief.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
@@ -136,7 +198,7 @@ def brief_record(ws, procedure, prior):
     body = {k: data.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}
     body['answers'] = {k: str(v) for k, v in answers.items()}
     body['production'] = production_inputs(data.get('production') or {})
-    summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True))}
+    summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True)), **stamps(ws, 'brief')}
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
@@ -171,8 +233,8 @@ def production_inputs(given):
 def script_prepare(ws, procedure, prior):
     intake, brief = prior('intake'), prior('brief')
     return {'prompt': procedure['prompt'], 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
-            'script': (ws / 'out' / 'source.txt').read_text(encoding='utf-8'),
-            'brief': {k: brief['summary'][k] for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}},
+            'script': cleaned_script(ws, intake),
+            'brief': {k: brief['summary'][k] for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}}, 'prepared_at': stamp(ws, 'script'),
             'output_file': 'out/script.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
@@ -192,7 +254,7 @@ def script_record(ws, procedure, prior):
     (ws / 'out' / 'script.json').write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding='utf-8')
     summary = {'content_digest': data['content_digest'], 'passages': len(passages), 'beats': len(beats), 'characters': len(text),
                'source_intake': intake['summary']['source_digest'], 'source_brief': brief['summary']['content_digest'],
-               'assessment': data.get('assessment', ''), 'changes': len(data.get('changes') or [])}
+               'assessment': data.get('assessment', ''), 'changes': len(data.get('changes') or []), **stamps(ws, 'script')}
     return {'files': ['out/script.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 

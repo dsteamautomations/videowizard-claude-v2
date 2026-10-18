@@ -291,3 +291,23 @@ def test_next_lists_paid_provider_for_per_unit_stage(client, alice):
     out(client, alice, run, 's2', files=[FILE], summary={'units': {'s3': ['u1']}})
     n = nxt(client, alice, run)
     assert n['paid'] == 'fakeanalysis' and n['needs_acceptance'] is False
+
+
+def test_output_answer_carries_next_and_a_replay_returns_the_same(client, alice):
+    """design/34 1.15"""
+    run = new_run(client, alice)
+    r = out(client, alice, run, 's1', request_id='fixed-request-1')
+    assert r.status_code == 201 and r.json()['next']['stage'] == 's2'
+    again = out(client, alice, run, 's1', request_id='fixed-request-1')
+    assert again.status_code == 201 and again.json()['next']['stage'] == 's2'   # the receipt replays the stored answer, next included
+    assert nxt(client, alice, run)['stage'] == 's2'
+
+
+def test_partial_client_name_resolves_only_when_unique(client, alice):
+    """design/34 1.17 and 1.5"""
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'textiles', 'procedure_version': 'test'}, headers=alice)
+    assert r.status_code == 201 and r.json()['client'] == 'VK Textiles' and r.json()['client_runs'] == []
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'v', 'procedure_version': 'test'}, headers=alice)
+    assert r.status_code == 422 and r.json()['code'] == 'CLIENT_UNKNOWN' and r.json()['candidates'] == ['VK', 'VK Textiles']
+    r = client.post('/api/runs', json={'request_id': rid(), 'client': 'nobody', 'procedure_version': 'test'}, headers=alice)
+    assert r.status_code == 422 and r.json()['candidates'] == []

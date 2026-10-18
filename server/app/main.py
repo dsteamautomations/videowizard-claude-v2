@@ -477,7 +477,10 @@ def me(user=User):
 
 @app.post('/api/runs', status_code=201)
 def create_run(body: NewRun, user=User, conn=DB):
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, dict(core.create_run(conn, user, body.title, body.client, body.procedure_version))))
+    def create():
+        run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version))
+        return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id'])}  # earlier titles for this client (design/34 1.5)
+    status, resp = core.with_receipt(conn, user, body_dict(body), create)
     return Response(resp, status_code=status)
 
 
@@ -514,7 +517,11 @@ def view_stage(run_id: UUID, stage: str, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/output', status_code=201, dependencies=[Depends(size_guard)])
 def post_output(run_id: UUID, body: Output, user=User, conn=DB):
     run = core.load_run(conn, user, run_id, lock=True)
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, dict(core.output(conn, user, run, body_dict(body)))))
+
+    def record():
+        row = dict(core.output(conn, user, run, body_dict(body)))
+        return 201, {**row, 'next': core.next_for(conn, run)}  # the next stage comes back with the record (design/34 1.15)
+    status, resp = core.with_receipt(conn, user, body_dict(body), record)
     return Response(resp, status_code=status)
 
 

@@ -109,8 +109,29 @@ def run_page(request: Request, code: str, vw2_session: str | None = Cookie(defau
         stages = core.stage_table(run['procedure_version'])
         outputs = conn.execute('select * from vw2_stage_outputs where run_id=%s order by created_at', (run['id'],)).fetchall()
         nxt = core.next_for(conn, run)
+    outputs = [dict(o) for o in outputs]
+    _add_timing(run, outputs)
     by_stage = {s['name']: [o for o in outputs if o['stage'] == s['name']] for s in stages}
     return render(request, 'run.html', user=user, run=run, stages=stages, by_stage=by_stage, next=nxt)
+
+
+def _add_timing(run, outputs):
+    """Per output (design/34 1.19): minutes from the previous acceptance (or the run's creation) to the proposal, and from the
+    proposal to this acceptance, when the summary carries prepared_at. Unparseable values leave the fields empty."""
+    from datetime import datetime
+    previous = run['created_at']
+    for o in outputs:  # already ordered by created_at
+        o['to_proposal_min'] = o['to_approval_min'] = None
+        prepared = (o.get('summary') or {}).get('prepared_at')
+        try:
+            when = datetime.fromisoformat(str(prepared).replace('Z', '+00:00')) if prepared else None
+        except ValueError:
+            when = None
+        if when is not None and when.tzinfo is not None:
+            o['to_proposal_min'] = round((when - previous).total_seconds() / 60, 1)
+            o['to_approval_min'] = round((o['created_at'] - when).total_seconds() / 60, 1)
+        if not o.get('stale'):
+            previous = o['created_at']
 
 
 @router.get('/defects', response_class=HTMLResponse)

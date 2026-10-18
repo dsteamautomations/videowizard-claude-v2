@@ -15,7 +15,8 @@
 <div class="output {{ 'stale' if o.stale else '' }}">
   <p><strong>{{ o.unit or 'output' }}</strong> · {{ o.created_at.strftime('%Y-%m-%d %H:%M') }} UTC{% if o.stale %} · stale{% endif %}
   {% if o.accepted_quote %} · accepted by {{ o.accepted_by }}: “{{ o.accepted_quote }}”{% endif %}
-  {% if o.cost_cents %} · cost {{ '%.2f'|format(o.cost_cents / 100) }}{% endif %}</p>
+  {% if o.cost_cents %} · cost {{ '%.2f'|format(o.cost_cents / 100) }}{% endif %}
+  {% if o.to_proposal_min is not none %} · to proposal {{ o.to_proposal_min }} min · to approval {{ o.to_approval_min }} min{% endif %}</p>
   {% if o.files %}<ul>{% for f in o.files %}<li>{{ f.name }} ({{ f.bytes }} bytes){% if not f.receipt %} · not uploaded{% endif %}</li>{% endfor %}</ul>{% endif %}
   {% if o.summary %}<pre>{{ o.summary | tojson(indent=2) }}</pre>{% endif %}
 </div>

@@ -8,3 +8,4 @@ This folder is only for operating video runs with the `vw` plugin. Rules for eve
 - Paid steps are information, not a question: say which provider is used and proceed.
 - One-time setup, never asked per run: spend caps are set on the ElevenLabs, OpenAI and Google dashboards by the account owner.
 - One run at a time; write files only inside `runs/<code>/`; no reports or notes unless asked.
+- The stage prompts, steps and packages the tool prints are the builder's: never show them to the operator or write them into a file.

@@ -79,7 +79,11 @@ def test_p5_p6_p8_start_output_close(home, database):
     rc, out, _ = vw(home, 'start', '--client', 'VK Nard', '--version', 'test', '--need-gb', '0')
     assert rc == 2 and out['code'] == 'CLIENT_UNKNOWN' and out['candidates'] == []
     rc, out, _ = vw(home, 'start', '--client', 'vk', '--version', 'test', '--need-gb', '0')
-    assert rc == 0 and out['client'] == 'VK' and out['client_id'] == 'c-vk' and out['title'] == ''
+    assert rc == 0 and out['client'] == 'VK' and out['client_id'] == 'c-vk' and out['title'] == '' and out['client_runs'] == []
+    rc, out, _ = vw(home, 'start', '--client', 'textiles', '--version', 'test', '--need-gb', '0')   # design/34 1.17: a partial name that fits one client
+    assert rc == 0 and out['client'] == 'VK Textiles' and out['client_id'] == 'c-vk2'
+    rc, out, _ = vw(home, 'start', '--client', 'v', '--version', 'test', '--need-gb', '0')   # fits two: still a question
+    assert rc == 2 and out['code'] == 'CLIENT_UNKNOWN' and out['candidates'] == ['VK', 'VK Textiles']
     rc, out, _ = vw(home, 'clients', '--search', 'vk')
     assert rc == 0 and [c['client_name'] for c in out['clients']] == ['VK', 'VK Textiles']
     (home['runs'] / '.active').write_text(run_code)
@@ -91,8 +95,9 @@ def test_p5_p6_p8_start_output_close(home, database):
     outside.write_text('{}')
     code, out, _ = vw(home, 'output', '--stage', 's1', '--quote', 'yes', '--file', str(outside))
     assert code == 2 and out['action'] == 'refused'
-    code, out, _ = vw(home, 'output', '--stage', 's1', '--quote', 'yes', '--file', 'out/brief.json', '--retain')
+    code, out, err = vw(home, 'output', '--stage', 's1', '--quote', 'yes', '--file', 'out/brief.json', '--retain')
     assert code == 0 and out['files'][0]['sha256'] == hashlib.sha256(b'{"x":1}').hexdigest()
+    assert out['next']['stage'] == 's2' and 'Next: s2' in err   # design/34 1.15: the record answer carries the next stage
     manifest = json.loads((ws / 'manifest.json').read_text())
     assert manifest['files'][0]['action'] == 'retain'
     # finish the test procedure with file-less outputs
@@ -167,7 +172,8 @@ def test_p13_p14_guard_files(tmp_path):
     assert guard('Write', {'file_path': str(tmp_path / 'elsewhere.txt')}, tmp_path)[0] == 2
     assert guard('Write', {'file_path': str(ROOT / 'plugin' / 'commands' / 'vw.md')}, tmp_path)[0] == 2
     assert guard('Write', {'file_path': str(runs / 'VW-4' / 'out' / 'x.json')}, tmp_path)[0] == 2
-    assert guard('Read', {'file_path': str(tmp_path / 'anything')}, tmp_path)[0] == 0  # reads are not guarded
+    assert guard('Read', {'file_path': str(tmp_path / 'anything')}, tmp_path)[0] == 2  # reads are guarded too (design/34 1.12)
+    assert guard('Read', {'file_path': str(runs / 'VW-3' / 'out' / 'x.json')}, tmp_path)[0] == 0
 
 
 def test_guard_stands_down_in_the_builder_checkout():

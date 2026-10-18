@@ -17,3 +17,9 @@ Started 17 Oct 2026 at SK's request: every decision or suggestion SK makes is lo
 | 11 | 17 Oct | Before raising analysis concurrency, verify Gemini's limits from official documentation or a small test with about 10 ten-second videos. **No testing starts until SK says so.** | design/34 P3 |
 | 12 | 17 Oct | Parallel-work changes are discussion only for now; the quantum and time are estimates SK will not hold the builder to | design/34 |
 | 13 | 17 Oct | Every decision or suggestion SK makes is logged | This file |
+| 14 | 18 Oct | The workflow is reviewed stage by stage with one agreed prompt (eleven parameters, plus a twelfth on the enforcement layer after the gates/hooks/skills article); dropped from the list: cost before paid calls, cost of revising, a predefined edge-case dataset | The prompt is kept by the Mac builder session; one review file per stage |
+| 15 | 18 Oct | After each stage's findings list, the findings are taken one at a time with buttons; SK decides each individually | Applied from stage 1 |
+| 16 | 18 Oct | Stage prompts, steps and output shapes must never reach the operator; this is a standing check in every stage review | design/36 1.11 (instruction + hook + guard sentinel); a server-side intake call deferred |
+| 17 | 18 Oct | Stage 1 (intake): 20 findings reviewed; 17 go ahead, 3 stay as they are (free-disk check at start, unreadable-pages rule as instruction, no "copy the clips now" sentence); titles need only be non-empty strings; a version suffix is allowed when the same film is made again for a client | design/36, implemented and pushed 18 Oct; deploys await SK's yes |
+| 18 | 18 Oct | Implement stage 1 before reviewing stage 2 (stage 2 needs stage 1's changes in place and the timestamps they add) | This order from now on |
+| 19 | 18 Oct | Layer-one plugin tests run on the Mac with pytest in a `.venv`; server tests still need a Docker machine | plugin/tests; server/tests updated but not run on the Mac |

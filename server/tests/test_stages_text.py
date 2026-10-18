@@ -36,15 +36,20 @@ def test_t7_intake_brief_script_end_to_end(home, database):
     (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
     rc, out, err = vw(home, 'stage', 'intake', 'prepare')
     assert rc == 0, err
-    assert '{numbered_script}' not in out['prompt'] and '1: Scene 1: The yard' in out['prompt']
+    assert '{numbered_script}' not in out['prompt'] and 'Scene 1: The yard' not in out['prompt']   # design/34 1.1: the numbered script is a file
+    assert (ws / 'work' / 'intake-numbered.md').read_text(encoding='utf-8').startswith('1: Scene 1: The yard\n') and out['lines'] == 11
+    assert out['prompt'].startswith('VW-PROCEDURE') and out['not_shareable'] and out['earlier_titles'] == [] and out['prepared_at']
     assert out['needs_readable_copy'] is False and out['output_file'] == 'out/intake.json'
     write_proposal(ws, 'intake', {'remove': [{'line': 1, 'kind': 'scene_heading', 'why': 'heading'}, {'line': 5, 'kind': 'timing', 'why': 'duration'},
                                              {'line': 7, 'kind': 'section_label', 'why': 'label'}, {'line': 8, 'kind': 'visual_note', 'why': 'seen not said'}],
                                   'titles': ['Earth Blocks - Documentary Explainer', 'Pressed Earth - Explainer'], 'notes': 'removed plan lines'})
     # the operator picks the second suggestion; the client is the run's directory client
+    rc, out, _ = vw(home, 'stage', 'intake', 'record', '--quote', 'yes, approved, the second one')
+    assert rc == 2 and '--title' in out['message']   # design/34 1.2: the operator's choice is required
     rc, out, err = vw(home, 'stage', 'intake', 'record', '--title', 'Pressed Earth - Explainer', '--quote', 'yes, approved, the second one')
     assert rc == 0, (out, err)
-    assert out['summary']['title'] == 'Pressed Earth - Explainer' and out['summary']['client'] == 'VK'
+    assert out['summary']['title'] == 'Pressed Earth - Explainer' and out['summary']['client'] == 'VK' and out['summary']['title_source'] == 'suggested'
+    assert out['summary']['prepared_at'] and out['summary']['recorded_at'] and out['next']['stage'] == 'brief' and 'Next: brief' in err   # 1.15, 1.19
     import httpx
     tok = json.loads((home['home'] / 'session.json').read_text())['token']
     run = httpx.get(f"{home['env']['VW2_SERVER_URL']}/api/runs/{out['run_id']}", headers={'Authorization': 'Bearer ' + tok}).json()
@@ -136,7 +141,12 @@ def test_t4_malformed_proposals_refused(home, database):
     write_proposal(ws, 'intake', {'remove': [], 'titles': [], 'notes': ''})
     assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 2  # a title is required
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth'], 'notes': '', 'client': 'VK'})
-    assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 0
+    assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 2   # no --title
+    write_proposal(ws, 'intake', {'remove': [], 'titles': [42], 'notes': ''})
+    rc, out, _ = vw(home, 'stage', 'intake', 'record', '--title', 'Earth', '--quote', 'yes')
+    assert rc == 2 and out['action'] == 'refused' and 'titles' in out['message']   # a non-string is refused, never a traceback (design/34 1.4)
+    write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth'], 'notes': '', 'client': 'VK'})
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'brief', {'purpose': 'p', 'audience': '', 'message': 'm', 'tone': 't', 'ending': 'e'})
     rc, out, _ = vw(home, 'stage', 'brief', 'record', '--quote', 'yes')
     assert rc == 2 and 'audience' in out['message']
@@ -152,7 +162,7 @@ def test_t5_revise_brief_after_script_is_free(home, database):
     (ws / 'in' / 'source.txt').write_text('Just narration.\n', encoding='utf-8')
     vw(home, 'stage', 'intake', 'prepare')
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Only'], 'notes': '', 'client': 'VK'})
-    assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 0
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Only', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e'})
     assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'script', {'spoken_text': 'Just narration.', 'notes': '', 'assessment': '', 'changes': []})
@@ -169,3 +179,67 @@ def test_t6_procedures_executor_only(client, database):
     assert r.status_code == 200 and 'YOU NEVER REWRITE A LINE' in r.json()['prompt'] and r.json()['output_file'] == 'intake.json'
     assert client.get('/api/procedures/1/nope', headers=seed_session(database, 'y', kind='executor')).status_code == 422
     assert client.get('/api/procedures/9/intake', headers=seed_session(database, 'z', kind='executor')).status_code == 404
+
+
+def test_t8_two_documents_refuse_until_named(home, database):
+    """design/34 1.3"""
+    code, ws = start_run(home, database)
+    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    (ws / 'in' / 'brief.md').write_text('# not the script\n', encoding='utf-8')
+    rc, out, _ = vw(home, 'stage', 'intake', 'prepare')
+    assert rc == 2 and out['action'] == 'refused' and 'brief.md' in out['message'] and 'source.txt' in out['message']
+    rc, out, _ = vw(home, 'stage', 'intake', 'prepare', '--file', 'source.txt')
+    assert rc == 0 and out['source_file'] == 'source.txt'
+
+
+def test_t9_source_replaced_after_prepare(home, database):
+    """design/34 1.8"""
+    code, ws = start_run(home, database)
+    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    assert vw(home, 'stage', 'intake', 'prepare')[0] == 0
+    write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth'], 'notes': ''})
+    (ws / 'in' / 'source.txt').write_text(SOURCE + 'Narration: one more line.\n', encoding='utf-8')
+    rc, out, _ = vw(home, 'stage', 'intake', 'record', '--title', 'Earth', '--quote', 'yes')
+    assert rc == 2 and 'changed' in out['message'] and 'prepare' in out['message']
+    assert vw(home, 'stage', 'intake', 'prepare')[0] == 0
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth', '--quote', 'yes')[0] == 0
+
+
+def test_t10_cleaned_script_edited_before_brief(home, database):
+    """design/34 1.14"""
+    code, ws = start_run(home, database)
+    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    vw(home, 'stage', 'intake', 'prepare')
+    write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth'], 'notes': ''})
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth', '--quote', 'yes')[0] == 0
+    cleaned = ws / 'out' / 'source.txt'
+    cleaned.write_text(cleaned.read_text(encoding='utf-8').replace('pressed', 'PRESSED'), encoding='utf-8')
+    rc, out, _ = vw(home, 'stage', 'brief', 'prepare')
+    assert rc == 2 and 'differs from the recorded one' in out['message']
+
+
+def test_t11_earlier_titles_reach_the_next_film(home, database):
+    """design/34 1.5 and 1.17: the second film for a client sees the first one's title; a partial name resolves."""
+    code, ws = start_run(home, database)
+    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    vw(home, 'stage', 'intake', 'prepare')
+    write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth Blocks - Documentary Explainer'], 'notes': ''})
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth Blocks - Documentary Explainer', '--quote', 'yes')[0] == 0
+    rc, out, _ = vw(home, 'start', '--client', 'vk', '--need-gb', '0')
+    assert rc == 0 and out['client'] == 'VK' and out['client_runs'] == [{'code': code, 'title': 'Earth Blocks - Documentary Explainer'}]
+    ws2 = home['runs'] / out['code']
+    (ws2 / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    rc, out, _ = vw(home, 'stage', 'intake', 'prepare')
+    assert rc == 0 and f'{code}: Earth Blocks - Documentary Explainer' in out['prompt'] and out['earlier_titles'][0]['code'] == code
+
+
+def test_t12_start_with_script_copies_it(home, database, tmp_path):
+    """design/34 1.6"""
+    connected(home, database)
+    src = tmp_path / 'client-script.txt'
+    src.write_text(SOURCE, encoding='utf-8')
+    rc, out, _ = vw(home, 'start', '--client', 'VK', '--need-gb', '0', '--script', str(src))
+    assert rc == 0 and out['script_file'] == 'client-script.txt' and out['next']['stage'] == 'intake'
+    assert (home['runs'] / out['code'] / 'in' / 'client-script.txt').read_text(encoding='utf-8') == SOURCE
+    rc, out, _ = vw(home, 'start', '--client', 'VK', '--need-gb', '0', '--script', str(tmp_path / 'missing.docx'))
+    assert rc == 2 and 'not created' in out['message']

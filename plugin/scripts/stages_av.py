@@ -9,7 +9,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from stages_text import Refused, digest, read_proposal
+from stages_text import Refused, digest, read_proposal, stamp, stamps
 
 VIDEO_SUFFIXES = ('.mp4', '.mov', '.m4v', '.mkv', '.webm', '.avi', '.mpg', '.mpeg')
 MAX_MEDIA_BYTES = 200 * 1024 * 1024
@@ -79,7 +79,7 @@ def media_prepare(ws, procedure, prior):
             sha, size = hashlib.sha256(data).hexdigest(), len(data)
         clips.append({'id': sha[:16], 'name': p.name, 'path': str(path.relative_to(ws).as_posix()), 'sha256': sha, 'bytes': size, **meta})
     (ws / 'work' / 'media-clips.json').write_text(json.dumps(clips, indent=1), encoding='utf-8')
-    return {'prompt': procedure.get('prompt') or '', 'clips': clips, 'duplicates_skipped': len(files) - len(clips),
+    return {'prompt': procedure.get('prompt') or '', 'clips': clips, 'duplicates_skipped': len(files) - len(clips), 'prepared_at': stamp(ws, 'media'),
             'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'message': 'Confirm the clip list with the operator, then record.'}
 
 
@@ -93,7 +93,7 @@ def media_record(ws, procedure, prior, upload):
         refs = list(pool.map(lambda c: upload('media', ws / c.get('path', 'in/' + c['name']), c['sha256'], c['bytes']), clips))  # skips files already receipted
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
     summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr')} for c in clips],
-               'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1)}
+               'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1), **stamps(ws, 'media')}
     return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}
 
 
@@ -104,7 +104,7 @@ def voice_prepare(ws, procedure, prior):
     return {'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
             'inputs': {'spoken_text': script['spoken_text'], 'characters': len(script['spoken_text']), 'content_digest': script['content_digest'],
                        'passages': len(script['passages'])},
-            'output_file': 'out/voice.json',
+            'output_file': 'out/voice.json', 'prepared_at': stamp(ws, 'voice'),
             'message': 'Agree a voice with the operator (catalog/preview/audition), narrate, fetch, then record.'}
 
 
@@ -145,5 +145,5 @@ def voice_record(ws, procedure, prior, fetched):
     (ws / 'out' / 'voice.json').write_text(json.dumps(voice, indent=1), encoding='utf-8')
     stored = [{'name': 'narration.mp3', 'key': res['audio_key'], 'sha256': res['sha256'], 'bytes': res['bytes'], 'location': 'storage', 'receipt': True},
               {'name': 'timing.json', 'key': res['timing_key'], 'sha256': res['timing_sha256'], 'bytes': res['timing_bytes'], 'location': 'storage', 'receipt': True}]
-    summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest']}
+    summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest'], **stamps(ws, 'voice')}
     return {'files': ['out/voice.json'], 'stored': stored, 'summary': summary, 'retain': True, 'upload': True}

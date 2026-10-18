@@ -82,7 +82,7 @@ def run_until_voice(home, database):
     (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
     vw(home, 'stage', 'intake', 'prepare')
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth Blocks'], 'notes': '', 'client': 'VK'})
-    assert vw(home, 'stage', 'intake', 'record', '--quote', 'yes')[0] == 0
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth Blocks', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e'})
     assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
     write_proposal(ws, 'script', {'spoken_text': 'Earth blocks are pressed.\n\nNot fired.', 'notes': '', 'assessment': '', 'changes': []})
