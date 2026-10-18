@@ -79,7 +79,7 @@ def fake(monkeypatch):
 
 def run_until_voice(home, database):
     code, ws = start_run(home, database)
-    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    (ws / 'in' / 'source.txt').write_text('Earth blocks are pressed.\n\nNot fired.\n', encoding='utf-8')   # the script equals its source (design/38 3.1)
     vw(home, 'stage', 'intake', 'prepare')
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth Blocks'], 'notes': '', 'client': 'VK'})
     assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth Blocks', '--quote', 'yes')[0] == 0

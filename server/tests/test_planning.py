@@ -25,7 +25,7 @@ def run_until_planning(home, database, fake, gemini, n_clips=1):
     rc, out, err = vw(home, 'start', '--client', 'VK', '--version', '1', '--need-gb', '0')  # v1 evidence contract until step 4
     assert rc == 0, (out, err)
     ws = home['runs'] / out['code']
-    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    (ws / 'in' / 'source.txt').write_text('Earth blocks are pressed.\n\nNot fired.\n', encoding='utf-8')   # the script equals its source (design/38 3.1)
     vw(home, 'stage', 'intake', 'prepare')
     write_proposal(ws, 'intake', {'remove': [], 'titles': ['Earth Blocks'], 'notes': '', 'client': 'VK'})
     assert vw(home, 'stage', 'intake', 'record', '--title', 'Earth Blocks', '--quote', 'yes')[0] == 0

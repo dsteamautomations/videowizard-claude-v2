@@ -263,22 +263,87 @@ def production_inputs(given):
 
 # ---------- script ----------
 
+DECISIONS = ('accepted', 'rejected', 'reworded')
+
+
+def normalise(text):
+    """Whitespace is not wording: collapse runs and drop spaces before punctuation (a deletion may leave one)."""
+    return re.sub(r'\s+([.,;:!?])', r'\1', ' '.join(str(text or '').split()))
+
+
+def sentences(text):
+    return [t.strip() for t in re.split(r'(?<=[.!?])\s+', normalise(text)) if t.strip()]
+
+
+def first_difference(a, b):
+    """The first sentence that differs between two texts, as (a's, b's); None when they match up to whitespace."""
+    sa, sb = sentences(a), sentences(b)
+    for x, y in zip(sa, sb):
+        if x != y:
+            return x, y
+    if len(sa) != len(sb):
+        return (sa[len(sb)] if len(sa) > len(sb) else '(end of text)'), (sb[len(sa)] if len(sb) > len(sa) else '(end of text)')
+    return None
+
+
+def apply_changes(source, changes, spoken_text):
+    """design/38 3.1: rebuild the wording from the cleaned script plus the accepted changes. Returns (rebuilt, expected), both whitespace-
+    normalised: expected is the submitted text with insertions removed. Raises Refused for a change that cannot be applied."""
+    working, expected = normalise(source), normalise(spoken_text)
+    for i, c in enumerate(changes, 1):
+        decision = c.get('decision')
+        if decision not in DECISIONS:
+            raise Refused(f"out/script.json: change {i} needs the operator's decision (accepted, rejected or reworded) before record.")
+        if decision == 'rejected':
+            continue
+        after = c.get('operator_wording') if decision == 'reworded' else c.get('after', '')
+        if decision == 'reworded' and not normalise(after):
+            raise Refused(f'out/script.json: change {i} is reworded: give the operator_wording.')
+        before, after = normalise(c.get('before', '')), normalise(after)
+        if before:
+            n = working.count(before)
+            if n == 0:
+                raise Refused(f'out/script.json: change {i}: before not found in the current wording; quote it exactly.')
+            if n > 1:
+                raise Refused(f'out/script.json: change {i}: before occurs {n} times; quote more words so it occurs once.')
+            working = normalise(working.replace(before, after, 1))
+        else:
+            if not after:
+                raise Refused(f'out/script.json: change {i}: an insertion needs after text.')
+            n = expected.count(after)
+            if n != 1:
+                raise Refused(f'out/script.json: change {i}: the inserted wording must occur exactly once in spoken_text (found {n}); anchor it on a short before excerpt instead.')
+            expected = normalise(expected.replace(after, ' ', 1))
+    return working, expected
+
+
 def script_prepare(ws, procedure, prior):
     intake, brief = prior('intake'), prior('brief')
+    production = brief['summary'].get('production') or {}
     return {'prompt': procedure['prompt'], 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
             'script': cleaned_script(ws, intake),
-            'brief': {k: brief['summary'][k] for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}}, 'prepared_at': stamp(ws, 'script'),
+            'brief': {k: brief['summary'].get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
+            'answers': brief['summary'].get('answers') or {}, 'narration_language': production.get('narration_language'),   # design/38 3.4
+            'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'chapters': production.get('process_stages') or []},
+            'prepared_at': stamp(ws, 'script'),
             'output_file': 'out/script.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
 def script_record(ws, procedure, prior):
     data = read_proposal(ws, 'script')
     need_text(data, ['spoken_text'], 'script')
-    for c in data.get('changes') or []:
-        if not isinstance(c, dict) or set(c) - {'before', 'after', 'reason'} or not str(c.get('reason', '')).strip():
-            raise Refused('out/script.json: each change is {before, after, reason} with exact excerpts and a reason.')
+    changes = data.get('changes') or []
+    for c in changes:
+        if not isinstance(c, dict) or set(c) - {'before', 'after', 'reason', 'decision', 'operator_wording'} or not str(c.get('reason', '')).strip():
+            raise Refused('out/script.json: each change is {before, after, reason, decision[, operator_wording]} with exact excerpts and a reason.')
     intake, brief = prior('intake'), prior('brief')
     text = data['spoken_text'].replace('\r\n', '\n').strip() + '\n'
+    rebuilt, expected = apply_changes(cleaned_script(ws, intake), changes, text)   # design/38 3.1: the text is the source plus the accepted changes
+    if rebuilt != expected:
+        diff = first_difference(rebuilt, expected) or ('', '')
+        raise Refused('out/script.json: spoken_text is not the cleaned script plus the accepted changes. First difference, expected: '
+                      f'{diff[0]!r}; submitted: {diff[1]!r}. List every edit as a change with an exact before.')
+    accepted = sum(1 for c in changes if c.get('decision') in ('accepted', 'reworded'))
     passages = paragraphs(text)
     if not passages:
         raise Refused('out/script.json: spoken_text has no passages.')
@@ -287,7 +352,8 @@ def script_record(ws, procedure, prior):
     (ws / 'out' / 'script.json').write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding='utf-8')
     summary = {'content_digest': data['content_digest'], 'passages': len(passages), 'beats': len(beats), 'characters': len(text),
                'source_intake': intake['summary']['source_digest'], 'source_brief': brief['summary']['content_digest'],
-               'assessment': data.get('assessment', ''), 'changes': len(data.get('changes') or []), **stamps(ws, 'script')}
+               'assessment': data.get('assessment', ''), 'changes': accepted, 'changes_proposed': len(changes), 'changes_accepted': accepted,
+               'changes_rejected': sum(1 for c in changes if c.get('decision') == 'rejected'), **stamps(ws, 'script')}   # design/38 3.2
     return {'files': ['out/script.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 

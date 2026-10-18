@@ -82,17 +82,25 @@ def test_t7_intake_brief_script_end_to_end(home, database):
 
     rc, out, err = vw(home, 'stage', 'script', 'prepare')
     assert rc == 0 and out['inputs']['brief']['message'] == 'Pressed, not fired' and 'keeps the carbon' in out['inputs']['script']
+    # design/38 3.1: a text that is not the cleaned script plus the listed changes is refused
     write_proposal(ws, 'script', {'spoken_text': 'Earth blocks are made from the soil beneath our feet.\n\nEach block is pressed, not fired.',
-                                  'notes': '', 'assessment': 'fits', 'changes': [{'before': 'keeps the carbon', 'after': 'keeps the carbon in the ground', 'reason': 'brief tone'}]})
+                                  'notes': '', 'assessment': 'fits', 'changes': []})
+    rc, out, _ = vw(home, 'stage', 'script', 'record', '--quote', 'approved')
+    assert rc == 2 and 'not the cleaned script plus the accepted changes' in out['message']
+    write_proposal(ws, 'script', {'spoken_text': cleaned, 'notes': '', 'assessment': 'fits', 'changes': []})
     rc, out, err = vw(home, 'stage', 'script', 'record', '--quote', 'approved')
     assert rc == 0, err
-    assert out['summary']['passages'] == 2 and out['summary']['beats'] == 2 and len(out['summary']['content_digest']) == 64
+    assert out['summary']['passages'] == 2 and out['summary']['beats'] == 2 and len(out['summary']['content_digest']) == 64 and out['summary']['changes_accepted'] == 0
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
-    assert [b['beat_id'] for b in script['beats']] == ['BEAT_01', 'BEAT_02'] and script['beats'][1]['passage_id'] == 'P002' and script['beats'][1]['text'].startswith('Each block')
-    # beat ids are stable: recording the same script again yields the same beats
+    assert [b['beat_id'] for b in script['beats']] == ['BEAT_01', 'BEAT_02'] and script['beats'][1]['passage_id'] == 'P002' and script['beats'][1]['text'].startswith('Narration: Each block')
+    # one accepted change after a revise (design/38 3.2): the text is the source plus the change; beat ids are stable
     assert vw(home, 'revise', '--stage', 'script')[0] == 0
-    assert vw(home, 'stage', 'script', 'record', '--quote', 'approved again')[0] == 0
-    assert json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))['beats'] == script['beats']
+    write_proposal(ws, 'script', {'spoken_text': cleaned.replace('pressed, not fired', 'pressed rather than fired'), 'notes': '', 'assessment': 'fits',
+                                  'changes': [{'before': 'pressed, not fired', 'after': 'pressed rather than fired', 'reason': 'brief tone', 'decision': 'accepted'}]})
+    rc, out, err = vw(home, 'stage', 'script', 'record', '--quote', 'approved again')
+    assert rc == 0, err
+    assert out['summary']['changes_proposed'] == 1 and out['summary']['changes_accepted'] == 1 and out['summary']['changes_rejected'] == 0
+    assert [b['beat_id'] for b in json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))['beats']] == ['BEAT_01', 'BEAT_02']
     assert list(script['passages']) == ['P001', 'P002']
     nxt = vw(home, 'next')[1]
     assert nxt['stage'] == 'voice' and nxt['paid'] == 'elevenlabs'
