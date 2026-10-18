@@ -2,7 +2,9 @@
 import hashlib
 import json
 import os
+import shutil
 import tempfile
+import time
 from pathlib import Path
 
 from .. import jobs
@@ -45,7 +47,10 @@ def process(job):
         narration.write_bytes(store.get(plan['narration_key']))
         items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"BLANK | {it['beat_id']} | {it['timeline_frames']} frames", 'for AI video or animation (visuals stage)']} if it.get('gap') else it)
                  for it in plan['items']]
+        t0 = time.monotonic()
         film, record = R.render_film(plan['kind'], {'items': items}, sources, narration, work, plan['timeline'], plan.get('narration'))
+        record['elapsed_s'] = round(time.monotonic() - t0, 1)   # design/43 7.2: the measured speed feeds the tool's estimate
+        record['frames_per_s'] = round(record['frames'] / record['elapsed_s'], 1) if record['elapsed_s'] > 0 else None
         data = film.read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         store.put(req['out_key'], data, 'video/mp4')
@@ -60,6 +65,7 @@ def process(job):
             store.put(nk, blob, 'video/mp4')
             uploaded.append({'key': nk, 'sha256': hashlib.sha256(blob).hexdigest(), 'bytes': len(blob)})
         record['normalised'] = uploaded
+        shutil.rmtree(work, ignore_errors=True)   # design/43 7.7: the film is verified in storage; the pieces are never reused by a later version
         return 'ready', {'key': req['out_key'], 'sha256': sha, 'bytes': len(data), 'duration_s': record['duration_s'], 'record': record}, None
     except Problem as exc:
         return 'failed', {'phase': 'render'}, exc.message

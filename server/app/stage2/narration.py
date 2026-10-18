@@ -185,12 +185,21 @@ def beats(words, scenes, narration_plan, to_timeline, fps, ids=None):
     return out
 
 
+TITLE_WORDS = 6
+
+
+def default_title(text):
+    """design/43 7.3: a scene is named by its first words, never by a beat id (VW-3's slides read "Scene 1: BEAT_01")."""
+    words = str(text or '').split()
+    return ' '.join(words[:TITLE_WORDS]) + ('…' if len(words) > TITLE_WORDS else '')
+
+
 def paragraph_scenes(script_beats, words):
-    """The default when no scene split is approved: one scene per script paragraph, as before."""
+    """The default when no scene split is approved: one scene per script paragraph, titled by its first words."""
     out = []
     for b in script_beats:
         own = [w for w in words if w['passage_id'] == b['passage_id']]
         if not own:
             raise ValueError(f"narration timing has no words for {b['beat_id']}")
-        out.append({'first_word_id': own[0]['id'], 'title': b['beat_id'], 'process_stages': [], 'passage_id': b['passage_id']})
+        out.append({'first_word_id': own[0]['id'], 'title': default_title(b.get('text')) or b['beat_id'], 'process_stages': [], 'passage_id': b['passage_id']})
     return out

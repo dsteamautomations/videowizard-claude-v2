@@ -75,6 +75,56 @@ def readable_json(path, data):
     return sidecars
 
 
+READING_DROP = {'entities'}                        # design/43 7.4: never read by the assistant, kept in the stored package
+READING_DROP_ROW = {'sfx_cues', 'editorial_ideas'}   # per sub-clip row: used at master build and assembly, not here
+READING_ROWS = (('sub_clips',), ('narration', 'words'), ('narration', 'sentences'))   # tables written one row per line
+
+
+def reading_copy(path, data):
+    """The assistant's copy of the options package (design/43 7.4): without the keys it never reads, with the sub-clip table and
+    the word and sentence lists one row per line so the file is short and each row is one read. The data given is not changed;
+    long texts still move to .md files beside the file, as in readable_json."""
+    import textwrap
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    copy = {k: v for k, v in data.items() if k not in READING_DROP}
+    if isinstance(copy.get('sub_clips'), list):
+        copy['sub_clips'] = [{k: v for k, v in r.items() if k not in READING_DROP_ROW} if isinstance(r, dict) else r for r in copy['sub_clips']]
+    sidecars = []
+
+    def walk(x, trail):
+        if isinstance(x, dict):
+            return {k: walk(v, trail + [str(k)]) for k, v in x.items()}
+        if isinstance(x, list):
+            return [walk(v, trail + [str(i)]) for i, v in enumerate(x)]
+        if isinstance(x, str) and len(x) > LONG_TEXT:
+            side = path.with_name(f"{path.stem}.{'.'.join(trail) or 'text'}.md")
+            side.write_text('\n'.join(textwrap.fill(line, 160) if len(line) > 160 else line for line in x.split('\n')) + '\n', encoding='utf-8')
+            sidecars.append(side.name)
+            return f'(long text, {len(x)} characters: read {side.name} in the same folder)'
+        return x
+    copy = walk(copy, [])
+    marks = {}
+    for trail in READING_ROWS:
+        node = copy
+        for k in trail[:-1]:
+            node = node.get(k) if isinstance(node, dict) else None
+        if isinstance(node, dict) and isinstance(node.get(trail[-1]), list):
+            mark = f'@@ROWS-{len(marks)}@@'
+            marks[mark] = node[trail[-1]]
+            node[trail[-1]] = mark
+    text = json.dumps(copy, indent=1, ensure_ascii=False, default=str)
+    for mark, rows in marks.items():
+        quoted = json.dumps(mark)
+        i = text.index(quoted)
+        head = text[text.rfind('\n', 0, i) + 1:i]
+        indent = head[:len(head) - len(head.lstrip(' '))]
+        body = ',\n'.join(indent + ' ' + json.dumps(r, ensure_ascii=False, default=str) for r in rows)
+        text = text.replace(quoted, '[\n' + body + '\n' + indent + ']' if rows else '[]', 1)
+    path.write_text(text + '\n', encoding='utf-8')
+    return sidecars
+
+
 # ---------- session / server ----------
 
 def session():
@@ -661,6 +711,8 @@ def _download(m, key, rel):
         if data is not None:
             if rel in READ_BACK:
                 save_json(ws / rel, data)      # the tool reads this one back: line breaks only, values unchanged
+            elif rel == 'work/options-package.json':
+                reading_copy(ws / rel, data)   # design/43 7.4: the assistant's copy, without what it never reads
             else:
                 readable_json(ws / rel, data)  # read by the assistant only: long texts move to .md files beside it
             return str(ws / rel)
@@ -838,8 +890,27 @@ def cmd_options(a):
         emit(write(base + '/inspect', {'sub_clip_id': a.sub, 'edge': a.edge or 'in'}), 0, 'Paid Gemini boundary check queued; tell the operator, poll `vw options status`.')
     if a.what == 'render':
         emit(write(f'/api/runs/{run}/stage2/render', {'film': 'review'}), 0, 'Review film rendering; poll `vw options status`.')
-    if a.what == 'status':
-        emit(call('GET', f'/api/runs/{run}/stage2'))
+    if a.what == 'status':   # design/43 7.2: wait inside the tool for the film and say about how long is left
+        film = a.film or 'review'
+        started = time.monotonic()
+        deadline = started + (a.wait or 0)
+        while True:
+            st = call('GET', f'/api/runs/{run}/stage2')
+            r = (st.get('renders') or {}).get(film) or {}
+            if r.get('status') not in ('queued', 'running') or time.monotonic() >= deadline:
+                break
+            time.sleep(15)
+        if not r:
+            line = f'no {film} film rendered yet'
+        elif r.get('status') == 'ready':
+            line = f'{film} film ready: `vw {"options" if film == "review" else "master"} fetch`'
+        elif r.get('status') in ('queued', 'running'):
+            rate = float(st.get('render_rate_fps') or 20.0)
+            left = max(0.0, float(r.get('frames') or 0) / rate - (time.monotonic() - started))
+            line = f'{film} film rendering, about {max(1, round(left / 60))} min left' + ('; still rendering; run again with --wait' if a.wait else '')
+        else:
+            line = f"{film} film {r.get('status')}: {r.get('error') or 'see the render record'}"
+        emit(st, 0, line)
     if a.what == 'show':
         emit(call('GET', f'{base}/{a.option}'))
     if a.what == 'log':
@@ -861,8 +932,10 @@ def cmd_master(a):
             emit({'action': 'refused', 'message': 'Give the slide number: --slide N'}, 2)
         body = {'slide': int(str(n).lstrip('#')), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
         emit(write(base + '/decide', body))
-    if a.what == 'rule':
-        emit(write(base + '/rule', {'rule': a.add}))
+    if a.what == 'rule':   # design/43 7.5: a client rule is the operator's; their yes travels with it
+        if not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': "A client rule needs the operator's confirmation: --quote \"<their yes>\""}, 2)
+        emit(write(base + '/rule', {'rule': a.add, 'quote': a.quote}))
     if a.what == 'build':
         emit(write(base + '/build', {}))
     if a.what == 'render':
@@ -1061,8 +1134,9 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
-    for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote'):
+    for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film'):
         s.add_argument(flag)
+    s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the film (status)')
     s.set_defaults(fn=cmd_options)
     s = sub.add_parser('master'); s.add_argument('what', choices=['decide', 'rule', 'build', 'render', 'status', 'fetch', 'record'])
     for flag in ('--slide', '--option', '--action', '--note', '--edit', '--add', '--quote'):

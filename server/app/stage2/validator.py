@@ -1,5 +1,6 @@
 """Mechanical judge for options (2A) and master (2B): grammar G1–G17, editor rules R*, QC Q1–Q8 (design/15 §3 + design/17 §2).
 Returns {'refusals': [...], 'flags': [...]}: a refusal rejects the proposal; a flag is shown to the operator."""
+import re
 from fractions import Fraction
 
 from .package import SHOT_SIZES, GRID
@@ -213,6 +214,22 @@ def validate_options(doc, package, policy):
         if k not in qc or 'pass' not in (qc.get(k) or {}):
             refusals.append(f'qc_self.{k} missing (the model must state pass/fail with evidence; the validator decides)')
     return {'refusals': refusals, 'flags': flags}
+
+
+RULE_RE = re.compile(r'(?:^|: )(rule 11|[A-Z]\d{1,2})(?=[ :])')
+
+
+def group_flags(flags):
+    """design/43 7.6: the flags grouped by rule, most frequent first, three examples each (121 lines became a dozen on VW-3)."""
+    groups = {}
+    for f in flags:
+        m = RULE_RE.search(f)
+        rule = m.group(1) if m else 'other'
+        g = groups.setdefault(rule, {'rule': rule, 'count': 0, 'examples': []})
+        g['count'] += 1
+        if len(g['examples']) < 3:
+            g['examples'].append(f)
+    return sorted(groups.values(), key=lambda g: (-g['count'], g['rule']))
 
 
 def validate_master(master, package):

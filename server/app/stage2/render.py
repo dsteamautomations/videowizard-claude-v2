@@ -93,18 +93,23 @@ def draw_width(text, font):
         return len(text) * font.size * 0.6
 
 
+REVIEW_TIMELINE = {'width': 1280, 'height': 720}   # design/43 7.1: the review film is only for choosing; it is made at the size the operator watches
+
+
 class Renderer:
-    def __init__(self, work, timeline):
+    def __init__(self, work, timeline, fast=False):
         self.work = Path(work)
         self.cache = self.work / 'cache'
         self.cache.mkdir(parents=True, exist_ok=True)
         self.tl = timeline
+        self.fast = fast   # review films: a fast preset, the pieces are never delivered
         self.W, self.H, self.fps = int(timeline['width']), int(timeline['height']), Fraction(str(timeline['fps']))
 
     # ---------- picture ----------
 
     def video_args(self):
-        return ['-c:v', 'libx264', '-profile:v', 'high', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(self.fps), '-an']
+        preset, crf = ('veryfast', '23') if self.fast else ('medium', '18')
+        return ['-c:v', 'libx264', '-profile:v', 'high', '-preset', preset, '-crf', crf, '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(self.fps), '-an']
 
     def slate(self, lines, frames=SLATE_FRAMES):
         key = digest({'slate': lines, 'tl': self.tl, 'frames': frames})
@@ -253,19 +258,15 @@ def timeline_narration(r, narration, pieces, total_frames, out):
     return out
 
 
-def review_proxy(film, out, fps):
-    run([ffmpeg(), '-y', '-v', 'error', '-i', str(film), '-vf', 'scale=1280:720:flags=bicubic', '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'fast', '-crf', '28',
-         '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(fps),
-         '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2', '-movflags', '+faststart', str(out)])
-    return out
-
-
 def render_film(kind, plan, sources, narration, work, timeline, narration_plan=None):
     """plan: {'items': [...]} where each item is {'kind': 'slate', 'lines': [...]} or
     {'kind': 'event', 'sub_clip_id', 'clip': {'id','name','sha256','fps','rotation_deg','hdr'}, 'source_in_frame', 'source_out_frame', 'timeline_frames', 'crop_rect', 'hold_last_frame',
      'a2': [{'in_frame','out_frame'}]} and, for the review film, {'kind': 'narration', 'start_s', 'end_s'} markers before each option; the master uses the whole narration.
-    sources: {clip_id: Path}. Returns the film path and a record."""
-    r = Renderer(work, timeline)
+    sources: {clip_id: Path}. Returns the film path and a record.
+    A review film (design/43 7.1) is rendered on a 1280x720 timeline with a fast preset from the first piece; no copy pass, no loudness pass."""
+    if kind == 'review':
+        timeline = {**timeline, **REVIEW_TIMELINE}
+    r = Renderer(work, timeline, fast=(kind == 'review'))
     parts, a2_pieces, a1_parts, normalised = [], [], [], []
     recording = narration
     if narration_plan and narration_plan.get('pieces'):
@@ -323,10 +324,9 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     mixed = r.mix(a1, a2_pieces, length_s, r.work / f'{kind}-mix.wav')
     film = r.mux(picture, mixed, r.work / f'{kind}.mp4')
     codec = 'h264 high yuv420p bt709 / aac 48k stereo'
-    if kind == 'review':   # 15 Oct 2026: the full-quality review film was 513 MB and could not be uploaded; it is only for choosing options
-        film = review_proxy(film, r.work / 'review-720p.mp4', r.fps)
-        codec = 'h264 high yuv420p bt709 1280x720 crf 28 / aac 48k stereo (review copy)'
-    master_loudness = r.loudness(film)
+    if kind == 'review':   # design/43 7.1 (before: a 1080p render then a 720p copy, 16 min on VW-3's third round)
+        codec = f'h264 high yuv420p bt709 {r.W}x{r.H} veryfast crf 23 / aac 48k stereo (review, made at this size)'
+    master_loudness = r.loudness(film) if kind != 'review' else None
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
                   'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'codec': codec,
                   'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')]}

@@ -10,7 +10,7 @@ import pytest
 from app.stage3 import delivery as D
 from conftest import vw
 from test_analysis import FakeTransport, gemini  # noqa: F401
-from test_stage2 import approve_scenes, author, run_until_options, silences_in
+from test_stage2 import approve_default_scenes, approve_scenes, author, run_until_options, silences_in
 from test_visuals import png_bytes, scene, shot, vplan
 from test_voice_media import drain, fake  # noqa: F401
 
@@ -18,8 +18,7 @@ from test_voice_media import drain, fake  # noqa: F401
 def run_until_assembly(home, database, fake, gemini, scenes=False):
     """Through options, master, first cut, and the visuals gap BEAT_02 filled with a still asset. scenes: two scenes with a pause (design/19)."""
     code, ws, pk = run_until_options(home, database, fake, gemini)
-    if scenes:
-        _, pk = approve_scenes(home, ws)
+    _, pk = approve_scenes(home, ws) if scenes else approve_default_scenes(home, ws)   # design/43 7.3: scenes are always approved first
     (ws / 'out' / 'options.json').write_text(json.dumps(author(pk)), encoding='utf-8')
     assert vw(home, 'options', 'propose', '--file', 'out/options.json')[0] == 0
     assert vw(home, 'options', 'render')[0] == 0

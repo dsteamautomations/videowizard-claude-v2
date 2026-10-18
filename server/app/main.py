@@ -305,6 +305,7 @@ class DecideBody(Write):
 
 class RuleBody(Write):
     rule: str = Field(min_length=1, max_length=2000)
+    quote: str = ''   # design/43 7.5: the operator's confirmation
 
 
 class ChooseBody(Write):
@@ -1050,7 +1051,7 @@ def master_decide(run_id: UUID, body: DecideBody, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/master/rule')
 def master_rule(run_id: UUID, body: RuleBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.add_rule(storage(), user, run, body.rule))
+    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.add_rule(storage(), user, run, body.rule, body.quote))
 
 
 @app.post('/api/runs/{run_id}/master/build')

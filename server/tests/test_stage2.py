@@ -4,12 +4,13 @@ import json
 import re
 import subprocess
 from copy import deepcopy
+from pathlib import Path
 
 import psycopg
 import pytest
 
 from app.clip_log import solver
-from app.stage2 import package as P, validator as V
+from app.stage2 import package as P, render_jobs, validator as V
 from clip_log_fixture import synthetic_log
 from conftest import vw
 from test_analysis import FakeTransport, gemini, run_until_analysis, START as ANALYSIS_START  # noqa: F401
@@ -180,15 +181,32 @@ def author(pk):
             'qc_self': {f'Q{i}': {'pass': True, 'evidence': 'synthetic'} for i in range(1, 9)}}
 
 
+def approve_default_scenes(home, ws):
+    """design/43 7.3: the assistant always proposes the scenes; here the default, one per paragraph, titled, no pause."""
+    pk = json.loads((ws / 'work' / 'options-package.json').read_text(encoding='utf-8'))
+    doc = {'scenes': [{'first_word_id': b['first_word_id'], 'title': b['title'], 'process_stages': []} for b in pk['beats']], 'pauses': []}
+    (ws / 'out' / 'scenes.json').write_text(json.dumps(doc), encoding='utf-8')
+    rc, out, err = vw(home, 'options', 'scenes', '--file', 'out/scenes.json', '--quote', 'yes, these scenes')
+    assert rc == 0, (out, err)
+    return out, json.loads((ws / 'work' / 'options-package.json').read_text(encoding='utf-8'))
+
+
 def test_s1_s2_s12_s15_s16_s17_s18_s19_end_to_end(home, database, fake, gemini):
     code, ws, pk = run_until_options(home, database, fake, gemini)
+    assert not any(b['title'].startswith('BEAT_') for b in pk['beats'])   # design/43 7.3: titled by their first words
+    assert 'entities' not in pk and all('sfx_cues' not in r and 'editorial_ideas' not in r for r in pk['sub_clips'])   # 7.4: the reading copy
     # S2: coverage report names the zero-coverage beat
     rc, cov, _ = vw(home, 'options', 'coverage')
     assert rc == 0 and any('ZERO COVERAGE' in a for e in cov['coverage'] for a in e['alerts'])
     doc = author(pk)
     (ws / 'out' / 'options.json').write_text(json.dumps(doc), encoding='utf-8')
     rc, out, err = vw(home, 'options', 'check', '--file', 'out/options.json')
-    assert rc == 0 and out['status'] == 'valid', (out, err)
+    assert rc == 0 and out['status'] == 'valid' and 'flags' not in out and isinstance(out['flags_by_rule'], list) and out['flags_total'] >= 0, (out, err)   # 7.6
+    rc, out, _ = vw(home, 'options', 'propose', '--file', 'out/options.json')   # 7.3: scenes first
+    assert rc == 2 and 'scenes first' in out['message'], out
+    _, pk = approve_default_scenes(home, ws)
+    doc = author(pk)
+    (ws / 'out' / 'options.json').write_text(json.dumps(doc), encoding='utf-8')
     # S12: three refused proposals → decision
     bad = deepcopy(doc); bad['options'][0]['events'][1]['source_out_frame'] -= 1
     (ws / 'out' / 'bad.json').write_text(json.dumps(bad), encoding='utf-8')
@@ -199,11 +217,16 @@ def test_s1_s2_s12_s15_s16_s17_s18_s19_end_to_end(home, database, fake, gemini):
     assert rc == 3 and out['code'] == 'NEEDS_USER_DECISION'
     assert vw(home, 'decide', '--stage', 'options', '--decision', 'retry')[0] == 0
     rc, out, err = vw(home, 'options', 'propose', '--file', 'out/options.json')
-    assert rc == 0 and out['version'] == 1 and out['gaps'] == ['BEAT_02'], (out, err)
+    assert rc == 0 and out['version'] == 1 and out['gaps'] == ['BEAT_02'] and 'flags_by_rule' in out and 'flags' not in out, (out, err)
     assert vw(home, 'options', 'show', '--option', '2')[1]['rank'] == 'SECONDARY'
     # S19: review film: 2 slates of 75 frames + 2 × 37 beat frames = 224 frames = 8.96 s
-    assert vw(home, 'options', 'render')[0] == 0
+    rc, out, err = vw(home, 'options', 'render')
+    assert rc == 0 and out['frames'] == 2 * 75 + 2 * pk['beats'][0]['target_beat_frames'], (out, err)   # design/43 7.2
     drain()
+    rc, st, err = vw(home, 'options', 'status')
+    assert rc == 0 and st['renders']['review']['status'] == 'ready' and st['renders']['review']['frames'] == out['frames'] and st['render_rate_fps'] > 0, (st, err)
+    assert 'review film ready' in err
+    assert not (render_jobs.CACHE / Path(st['renders']['review']['out_key']).stem).exists()   # 7.7: the work folder is gone once the film is in storage
     rc, out, err = vw(home, 'options', 'fetch')
     assert rc == 0, (out, err)
     assert abs(out['duration_s'] - (2 * 75 + 2 * pk['beats'][0]['target_beat_frames']) / 25) < 0.15, out['duration_s']
@@ -232,10 +255,15 @@ def test_s1_s2_s12_s15_s16_s17_s18_s19_end_to_end(home, database, fake, gemini):
     drain()
     rc, out, err = vw(home, 'master', 'fetch')
     assert rc == 0 and abs(out['duration_s'] - 2.0) < 0.15, (out, err)   # S18: master = sum of beats, gap shown as a slate
+    # design/43 7.5: the rejection note stays on the run; a rule needs the operator's confirmation
+    rc, out, _ = vw(home, 'master', 'rule', '--add', 'no alternate takes for this client')
+    assert rc == 2 and 'quote' in out['message'], out
+    assert vw(home, 'master', 'rule', '--add', 'no alternate takes for this client', '--quote', 'yes, keep that')[0] == 0
     rc, out, err = vw(home, 'master', 'record', '--quote', 'yes the master')
     assert rc == 0 and out['learned_rules_added'] == 1, (out, err)
     with psycopg.connect(database) as c:
-        assert c.execute("select count(*) from vw2_client_rules where client_id='c-vk' and rule like 'Rejected option #2%%'").fetchone()[0] == 1
+        assert c.execute("select count(*) from vw2_client_rules where client_id='c-vk' and rule like 'Rejected option%%'").fetchone()[0] == 0
+        assert c.execute("select count(*) from vw2_client_rules where client_id='c-vk' and rule='no alternate takes for this client'").fetchone()[0] == 1
     # first cut: needs watched + listened
     rc, out, _ = vw(home, 'first-cut', 'record', '--quote', 'yes')
     assert rc == 2 and 'listened' in out['message']

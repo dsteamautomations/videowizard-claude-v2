@@ -221,7 +221,8 @@ def check(store, run, doc):
         return {'status': 'rejected', 'refusals': [f"contract must be {CONTRACT_OPTIONS}"], 'flags': []}
     work = deepcopy(doc)
     result = V.validate_options(work, pk, session['package']['policy'])
-    out = {'status': 'rejected' if result['refusals'] else 'valid', **result}
+    out = {'status': 'rejected' if result['refusals'] else 'valid', 'refusals': result['refusals'],
+           'flags_by_rule': V.group_flags(result['flags']), 'flags_total': len(result['flags'])}   # design/43 7.6
     if not result['refusals']:
         out['scenes'] = SL.scene_summary(work, pk, TIMELINE['fps'])
     return out
@@ -229,6 +230,8 @@ def check(store, run, doc):
 
 def propose(conn, store, user, run, doc):
     session = session_of(store, run)
+    if not session.get('scenes'):   # design/43 7.3: titles, chapters and pauses are approved before any option
+        raise Problem(409, 'NOT_ALLOWED', 'Propose the scenes first (`vw options scenes --file out/scenes.json --quote "…"`).')
     _check_blocked(conn, run, 'options')
     pk = _package(store, session)
     if doc.get('contract') != CONTRACT_OPTIONS:
@@ -256,7 +259,8 @@ def propose(conn, store, user, run, doc):
     session['renders'].pop('review', None)
     conn.execute("delete from vw2_attempts where run_id=%s and stage='options' and unit=%s", (run['id'], core.UNIT_NONE))
     save_session(store, run, session)
-    return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'], 'flags': result['flags'], 'scenes': scenes,
+    return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
+            'flags_by_rule': V.group_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
             'slides': [{k: s.get(k) for k in ('no', 'type', 'scene', 'backup_for', 'kind', 'question')} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
             **({'advice': round_advice(version)} if round_advice(version) else {}),
             'next': '`vw options render`, let the operator watch, then `vw options record --quote`'}
@@ -282,6 +286,13 @@ def current(store, session):
         raise Problem(409, 'NOT_ALLOWED', 'Propose options first.')
     entry = next(v for v in session['versions'] if v['digest'] == session['current'])
     return load_json(store, entry['file']['key'])['document'], entry
+
+
+def _same_package(store, session, entry):
+    """design/43 7.8: a version answers the package it was checked against; after a re-prepare that changed it, propose again."""
+    stored = load_json(store, entry['file']['key']).get('package_digest')
+    if stored and stored != session['package']['digest']:
+        raise Problem(409, 'NOT_ALLOWED', f"The package changed since version {entry['version']} (a clip was re-solved or excluded): `vw options check` and `propose` again.")
 
 
 def show(store, run, option_number):
@@ -393,6 +404,7 @@ def render(conn, store, user, run, kind):
     beats = {b['beat_id']: b for b in pk['beats']}
     if kind == 'review':
         doc, entry = current(store, session)
+        _same_package(store, session, entry)
         items = SL.review_items(doc, pk, _slides(store, session, doc, entry), lambda evs: _event_items(session, pk, evs, rows), TIMELINE['fps'])
         version, plan_digest = entry['version'], entry['digest']
     else:
@@ -413,9 +425,12 @@ def render(conn, store, user, run, kind):
     rk = save_json(store, key(run, f'render-{kind}-v{version}.json'), plan)
     job = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,%s,%s,'render',%s, gen_random_uuid()) returning id",
                        (run['id'], 'options' if kind == 'review' else 'master', kind, Jsonb({'kind': 'render', 'film': kind, 'plan_key': rk['key'], 'out_key': plan['out_key']}))).fetchone()
-    session['renders'][kind] = {'job_id': str(job['id']), 'status': 'queued', 'digest': plan_digest, 'version': version, 'out_key': plan['out_key']}
+    frames = sum((int(it.get('frames') or SLATE_FRAMES) if it['kind'] == 'slate' else int(it.get('frames') or it.get('timeline_frames') or 0))
+                 for it in items if it['kind'] != 'narration')   # design/43 7.2: the tool's estimate needs the length
+    session['renders'][kind] = {'job_id': str(job['id']), 'status': 'queued', 'digest': plan_digest, 'version': version, 'out_key': plan['out_key'], 'frames': frames}
     save_session(store, run, session)
-    return {'job_id': str(job['id']), 'film': kind, 'version': version, 'paid': False, 'next': 'poll `vw options status` (or `vw master status`), then fetch and let the operator watch'}
+    return {'job_id': str(job['id']), 'film': kind, 'version': version, 'frames': frames, 'paid': False,
+            'next': 'wait with `vw options status --wait 900` (or `vw master status`), then fetch and let the operator watch'}
 
 
 def status(conn, store, run):
@@ -425,7 +440,10 @@ def status(conn, store, run):
         return {'state': 'not_prepared', 'next': 'prepare'}
     _refresh(conn, store, run, session)
     save_session(store, run, session)
+    last = conn.execute("select result->'record'->>'frames_per_s' as rate from vw2_jobs where provider='render' and status='ready' and result->'record'->>'frames_per_s' is not null "
+                        "order by updated_at desc limit 1").fetchone()   # design/43 7.2: the speed of the last render on this server
     return {'state': 'prepared', 'versions': [{k: v[k] for k in ('version', 'options', 'gaps', 'flags')} for v in session['versions']], 'current': session.get('current'),
+            'render_rate_fps': float(last['rate']) if last and last['rate'] else None,
             'accepted': session.get('accepted'), 'renders': session['renders'], 'inspections': session['inspections'], 'decisions': session['decisions'],
             'master': {k: session['master'][k] for k in ('version', 'digest', 'gaps', 'events')} if session.get('master') else None, 'recorded': session['recorded']}
 
@@ -440,6 +458,7 @@ def _ready_film(session, kind, plan_digest):
 def record_options(conn, store, user, run, quote):
     session = session_of(store, run)
     doc, entry = current(store, session)
+    _same_package(store, session, entry)
     _refresh(conn, store, run, session)
     film = _ready_film(session, 'review', entry['digest'])
     files = [{'name': f"options-v{entry['version']}.json", **{k: entry['file'][k] for k in ('key', 'sha256', 'bytes')}, 'location': 'storage', 'receipt': True},
@@ -496,11 +515,14 @@ def decide(store, user, run, slide_no, action, note, edit):
     return {'slide': slide_no, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
 
 
-def add_rule(store, user, run, text):
+def add_rule(store, user, run, text, quote=''):
+    """design/43 7.5: the only way a client rule is made; the operator's confirmation travels with it."""
     session = session_of(store, run)
     if not str(text or '').strip():
         fail('A rule needs text.')
-    session['extra_rules'].append({'rule': text.strip(), 'by': user['id']})
+    if not str(quote or '').strip():
+        fail("A client rule needs the operator's confirmation (--quote).")
+    session['extra_rules'].append({'rule': text.strip(), 'quote': quote.strip(), 'by': user['id']})
     save_session(store, run, session)
     return {'rules': len(session['extra_rules'])}
 
@@ -674,13 +696,9 @@ def record_master(conn, store, user, run, quote):
              {'name': 'master.mp4', 'key': film['key'], 'sha256': film['sha256'], 'bytes': film['bytes'], 'location': 'storage', 'receipt': True}]
     for f in files:
         jobs.record_file(conn, run['id'], 'master', f['key'], f['name'], f['sha256'], f['bytes'], 'application/json' if f['name'].endswith('.json') else 'video/mp4')
-    # learned rules: every rejection reason and every explicit rule, per client, appended once per run
+    # learned rules (design/43 7.5): only the rules the operator confirmed; rejection notes stay on this run's decisions
     plan = m['plan']
     added = 0
-    for n, d in plan['decisions'].items():
-        if d['action'] == 'REJECT' and d.get('note'):
-            conn.execute("insert into vw2_client_rules(client_id, rule, source_run) values (%s,%s,%s)", (run.get('client_id') or '', f"Rejected option #{n}: {d['note']}", run['code']))
-            added += 1
     for r in plan['extra_rules']:
         conn.execute("insert into vw2_client_rules(client_id, rule, source_run) values (%s,%s,%s)", (run.get('client_id') or '', r['rule'], run['code']))
         added += 1
