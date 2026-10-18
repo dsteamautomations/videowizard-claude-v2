@@ -1135,6 +1135,29 @@ def cmd_assembly(a):
         emit(out, 0, f"Assembly recorded (watched and listened); next {out.get('next') or '`vw delivery bundle`'}.")
 
 
+def download_bundle(m, manifest):
+    """design/47 12.4: the originals, normalised copies and narration three at a time, one line per finished file; a failure stops before dispatch."""
+    from concurrent.futures import ThreadPoolExecutor
+    wanted = [f for f in manifest['files'] if f['role'] in ('original', 'normalised', 'narration')]
+    done, paths = [], {}
+
+    def one(f):
+        try:
+            p = _download(m, f['key'], 'bundle/' + f['name'])
+        except SystemExit:
+            raise RuntimeError(f['name'])
+        done.append(f['name'])
+        print(f"downloaded {len(done)}/{len(wanted)} {Path(f['name']).name} ({(f.get('bytes') or 0) / 1e6:.0f} MB)", file=sys.stderr, flush=True)
+        return f['name'], p
+    try:
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            for name, p in pool.map(one, wanted):
+                paths[name] = p
+    except RuntimeError as exc:
+        emit({'action': 'refused', 'message': f'Download of {exc} failed before dispatch; nothing was reserved for Resolve beyond the ledger. Check the line and run `vw delivery resolve --run` again.'}, 2)
+    return paths
+
+
 def cmd_delivery(a):
     m = active()
     run = m['run_id']
@@ -1160,16 +1183,11 @@ def cmd_delivery(a):
             emit(write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'closed', 'note': a.note or 'closed by operator'}))
         if a.run_it:
             led = write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': a.authorization or ''})
-            manifest = _json_file(m, 'work/manifest.json') if (ws / 'work' / 'manifest.json').exists() else None
-            if manifest is None:
-                manifest = call('GET', f"/api/runs/{run}/files/{st['bundle']['manifest']['key']}") if False else None
-            if manifest is None:
-                path = _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
-                manifest = _json_file(m, 'work/manifest.json')
+            if not (ws / 'work' / 'manifest.json').exists():
+                _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
+            manifest = _json_file(m, 'work/manifest.json')
             bundle_dir = ws / 'bundle'
-            for f in manifest['files']:
-                if f['role'] in ('original', 'normalised', 'narration'):
-                    _download(m, f['key'], 'bundle/' + f['name'])
+            download_bundle(m, manifest)   # design/47 12.4
             write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
             out_dir = ws / 'out' / 'delivery'
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -1208,9 +1226,11 @@ def cmd_close(a):
         emit({'action': 'refused', 'files': missing, 'message': 'These files are not uploaded yet; nothing was deleted.'}, 2)
     run = write(f"/api/runs/{m['run_id']}/close", {})
     ws = workspace(m['code'])
+    guard = ws / 'work' / 'guard.log'
+    if guard.exists():   # design/47 12.5: the record of blocked calls survives the run
+        (ws / 'logs').mkdir(parents=True, exist_ok=True)
+        shutil.move(str(guard), str(ws / 'logs' / 'guard.log'))
     shutil.rmtree(ws / 'work', ignore_errors=True)
-    if not m.get('keep_logs'):
-        shutil.rmtree(ws / 'logs', ignore_errors=True)
     keep = {f['name'] for f in m['files'] if f['action'] == 'retain'}
     for p in (ws / 'out').rglob('*'):
         if p.is_file() and p.relative_to(ws / 'out').as_posix() not in keep:
@@ -1218,7 +1238,7 @@ def cmd_close(a):
     m['closed'] = True
     save_json(manifest_path(m['code']), m)
     (RUNS / '.active').unlink(missing_ok=True)
-    emit(run, 0, f"Closed {m['code']}; scratch deleted, {len(keep)} retained file(s) kept in out/.")
+    emit(run, 0, f"Closed {m['code']}; scratch deleted, {len(keep)} retained file(s) kept in out/, logs/ kept (guard log inside when there was one).")
 
 
 def _pairs(items, flag, shape):

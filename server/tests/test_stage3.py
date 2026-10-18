@@ -94,6 +94,11 @@ def test_d1_d10_d12_d13_d15_d16_d17_d18_end_to_end(home, database, fake, gemini)
     assert {'approved_film', 'narration', 'original', 'normalised', 'plan', 'generated'} <= roles and all(len(f['sha256']) == 64 for f in manifest['files'])
     names = {f['name'] for f in manifest['files']}
     assert {'Subtitles.srt', 'Finishing-checklist.md', 'Media-pool.csv', 'OPEN-EDIT.md', 'Approved-film.mp4'} <= names
+    from app.storage import storage as _storage
+    gen = {f['name']: f['key'] for f in manifest['files'] if f['role'] == 'generated'}
+    checklist = _storage().get(gen['Finishing-checklist.md']).decode('utf-8')
+    assert 'measured ' in checklist and '-3 dBTP' in checklist and '-14 LUFS' not in checklist   # design/47 12.3
+    assert 'one cue per narrated sentence' in _storage().get(gen['OPEN-EDIT.md']).decode('utf-8')
     # D17: final before the Resolve step is refused, naming what is missing
     rc, out, _ = vw(home, 'delivery', 'final', '--quote', 'yes')
     assert rc == 2 and any('Resolve report' in m for m in out['missing'])

@@ -42,8 +42,12 @@ def checklist_of(assembly_summary, pk, master_summary):
         items.append({'where': c.get('start_tc', ''), 'item': f"A3 SFX to source: {c.get('sfx_type')} — {c.get('description')}"})
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     groups = sorted({r['color_group'] for r in rows.values() if r.get('color_group')})
+    check = ((assembly_summary.get('loudness') or {}).get('check') or {})   # design/47 12.3: what the film is, not the blueprint's figures for a film with music
+    measured = (f"measured {check['integrated_lufs']} LUFS, peak {check['true_peak_dbfs']} dBTP" if check.get('integrated_lufs') is not None and check.get('true_peak_dbfs') is not None
+                else 'not measured')
     items += [{'where': 'Fairlight', 'item': 'A2 nat-sound pieces are placed at unity in the timeline; the film used 4-frame fades and −27 dBFS peaks (API cannot set fades); match if re-rendering'},
-              {'where': 'Fairlight bus', 'item': 'Master limiter: −14 LUFS integrated, −1 dBTP true-peak ceiling'},
+              {'where': 'Fairlight bus', 'item': f"Master bus: the approved film is rendered to {check.get('integrated_target_lufs', -16)} LUFS integrated (the narration's target; v2 adds no music) "
+                                                f"with a {check.get('peak_ceiling_dbtp', -3)} dBTP ceiling; it {measured}. Keep that if re-rendering"},
               {'where': 'Deliver page', 'item': 'Subtitles: burn in or deliver the SRT alongside (SRT is in the package)'},
               {'where': 'Color page', 'item': 'Colour groups from the logs: ' + (', '.join(groups) if groups else 'none')},
               {'where': 'A4', 'item': 'Add background music on A4, ducked −28 to −32 dBFS under narration, swells to −18 dBFS in pauses (none in v2)'}]
@@ -102,9 +106,7 @@ def bundle(conn, store, user, run, outputs):
     checklist = checklist_of(asm_o['summary'], pk_flat, master_o['summary'])
     md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n'
     csv_text = media_pool_csv(pk).encode('utf-8')
-    open_edit = (f"# OPEN-EDIT\n\nRun {run['code']} — client {run.get('client')}.\n\n1. Open Approved-timeline.drt in DaVinci Resolve 21.1.1 (File > Import > Timeline) with Media/ next to it.\n"
-                 "2. Approved-film.mp4 is the film the operator approved; the timeline reproduces its cuts, crops and zooms. A2 fades are listed in the checklist.\n"
-                 "3. Subtitles.srt matches the narration beats. Finishing-checklist.md lists everything the API could not do.\n").encode('utf-8')
+    open_edit = open_edit_text(run).encode('utf-8')
     generated = {'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
                  'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown')}
     for name, (data, mime) in generated.items():
@@ -122,6 +124,13 @@ def bundle(conn, store, user, run, outputs):
     session['resolve'] = None if (session.get('resolve') or {}).get('film_sha256') != film['sha256'] else session['resolve']
     save_session(store, run, session)
     return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the Mac: `vw pull <code>` then `vw delivery resolve --check`, then `--run --authorization "<operator words>"`'}
+
+
+def open_edit_text(run):
+    """OPEN-EDIT.md (design/47 12.3: the subtitles are one cue per sentence since design/19)."""
+    return (f"# OPEN-EDIT\n\nRun {run['code']} — client {run.get('client')}.\n\n1. Open Approved-timeline.drt in DaVinci Resolve 21.1.1 (File > Import > Timeline) with Media/ next to it.\n"
+            "2. Approved-film.mp4 is the film the operator approved; the timeline reproduces its cuts, crops and zooms. A2 fades are listed in the checklist.\n"
+            "3. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do.\n")
 
 
 def resolve_events(assembly, pk, master):
