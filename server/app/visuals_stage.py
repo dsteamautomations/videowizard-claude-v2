@@ -22,7 +22,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text
-from .visual_contract import chosen_scenes, gap_digest, need, validate_plan
+from .visual_contract import FILE_TYPES, chosen_scenes, gap_digest, need, routes, validate_plan
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare', 'edit': 'gpt-image-2.5-sunburst'}
@@ -126,7 +126,7 @@ def check(store, run, outputs, document):
         plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session))
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
-    return {'status': 'valid', 'warnings': warnings, 'plan_digest': digest(plan)}
+    return {'status': 'valid', 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'plan_digest': digest(plan)}   # design/45 10.2
 
 
 def propose(conn, store, user, run, outputs, document):
@@ -145,7 +145,7 @@ def propose(conn, store, user, run, outputs, document):
         if not gap or acc['digest'] != gap_digest(plan, gap):
             session['accepted'].pop(gid)
     save_session(store, run, session)
-    return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'gaps': [g['gap_id'] for g in plan['gaps']]}
+    return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']]}
 
 
 def current_plan(store, session):
@@ -168,6 +168,10 @@ def select_choice(store, user, run, outputs, choices):
 def accept(store, user, run, outputs, gap_ids, quote):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
+    if list(gap_ids) == ['all']:   # design/45 10.4: every gap of the current version
+        gap_ids = [g['gap_id'] for g in plan['gaps']]
+        unresolved = [g['gap_id'] for g in plan['gaps'] if g.get('choices') and not session['choice_selections'].get(g['gap_id'])]
+        need(not unresolved, 'Select a choice for these gaps before accepting all: ' + ', '.join(unresolved))
     for gid in gap_ids:
         gap = next((g for g in plan['gaps'] if g['gap_id'] == gid), None)
         need(gap, f'Unknown gap {gid}.')
@@ -290,7 +294,8 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote):
     return row
 
 
-def bind(store, user, run, outputs, shot_id, references, selectors, quote):
+def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
+    """design/45 10.4: the approved references are the operator's yes; a quote is kept when given."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     need(set(references) == set(shot['element_ids']), 'Cover every required shot element with approved references: ' + ', '.join(sorted(set(shot['element_ids']) - set(references))))
@@ -307,7 +312,7 @@ def bind(store, user, run, outputs, shot_id, references, selectors, quote):
             need(row['element_kind'] == elements[eid]['kind'] or (depicted and sel), 'Reference subject type must match the element (or give a subject selector for an object inside a place reference).')
             rows.append({'id': rid, 'sha256': row['sha256'], **({'subject_selector': sel} if sel else {})})
         bindings[eid] = rows
-    session['bindings'][shot_id] = {'gap_digest': gap_digest(plan, gap), 'references': bindings, 'quote': quote, 'by': user['id']}
+    session['bindings'][shot_id] = {'gap_digest': gap_digest(plan, gap), 'references': bindings, 'quote': quote or '', 'by': user['id']}
     save_session(store, run, session)
     return {'shot_id': shot_id, 'elements': sorted(bindings)}
 
@@ -354,7 +359,9 @@ def prepare_take(store, user, run, outputs, body):
     cap = next(c for c in video_generators.CATALOG if c['provider'] == selected['provider'] and c['model'] == selected['model'])
     fps = Fraction(session['source']['fps'])
     exact = Fraction(shot['end_frame'] - shot['start_frame']) / fps
-    duration = body.get('duration_seconds') or max(cap['min_seconds'], min(cap['max_seconds'], -(-exact.numerator // exact.denominator)))  # ceil
+    need(exact <= cap['max_seconds'], f"shot {shot['id']} is {float(exact):.1f} s, longer than {cap['label'].split(' ·')[0]}'s maximum {cap['max_seconds']} s: "
+                                      "split the shot or choose another generator (`vw visuals generator`)")   # design/45 10.7: refuse, never clamp
+    duration = body.get('duration_seconds') or max(cap['min_seconds'], -(-exact.numerator // exact.denominator))  # ceil, at least the generator's minimum
     need(cap['min_seconds'] <= duration <= cap['max_seconds'], f"Duration {duration}s is outside {cap['label']} ({cap['min_seconds']}–{cap['max_seconds']}s).")
     images = {}
     for role in ('start_image', 'end_image'):
@@ -415,10 +422,16 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     return review
 
 
-def select_take(conn, store, user, run, outputs, job_id, quote):
+def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes=''):
+    """design/45 10.4: with notes, the accepted review and the selection are one call; without, the latest review must be accepted."""
     session = session_of(store, run, outputs)
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()
     need(job and job['status'] == 'ready', 'Select a ready take.')
+    if str(notes or '').strip():
+        ev = job['result']['evidence']
+        need(ev.get('timing_matches_placement') or str(timing_notes or '').strip(), 'The take is shorter than its placement; explain in timing_notes before accepting.')
+        session['reviews'].setdefault(str(job_id), []).append({'id': digest({'job': str(job_id), 'decision': 'accepted', 'notes': notes, 'at': datetime.now(timezone.utc).isoformat()}),
+                                                                 'decision': 'accepted', 'notes': notes, 'timing_notes': timing_notes or '', 'quote': quote, 'by': user['id'], 'sha256': job['result']['sha256']})
     reviews = session['reviews'].get(str(job_id), [])
     need(reviews and reviews[-1]['decision'] == 'accepted', 'Select only a take whose latest review is accepted.')
     live = packet(store, run, outputs, job['unit'], session)
@@ -428,6 +441,21 @@ def select_take(conn, store, user, run, outputs, job_id, quote):
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id']}
     save_session(store, run, session)
     return session['selections'][job['unit']]
+
+
+def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote):
+    """design/45 10.3: an approved reference becomes a still shot's asset; no download and upload."""
+    session = session_of(store, run, outputs)
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    need(shot['visual_type'] in FILE_TYPES, f"shot {shot_id} is a video shot: it takes a take (`vw visuals prepare-take`), not a still.")
+    row = session['references'].get(reference_id)
+    need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
+    need((quote or '').strip(), 'The operator reply is required.')
+    session['assets'][shot_id] = {'kind': 'still', 'key': row['key'], 'sha256': row['sha256'], 'bytes': row['bytes'], 'reference_id': reference_id, 'quote': quote, 'by': user['id'],
+                                  'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}}
+    session['selections'].pop(shot_id, None)
+    save_session(store, run, session)
+    return {'shot_id': shot_id, 'kind': 'still', 'reference_id': reference_id, 'sha256': row['sha256']}
 
 
 def add_asset(conn, store, user, run, outputs, shot_id, file_key, sha256, size, kind, quote):
@@ -488,6 +516,31 @@ def unique_by_name(files):
             seen.add(f['name'])
             out.append(f)
     return out
+
+
+def record_gaps(conn, store, user, run, outputs, gap_ids, quote):
+    """design/45 10.4: `all` records every accepted gap whose shots are done; named gaps are recorded as before (a gap not ready is refused)."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    recorded, skipped = [], {}
+    if list(gap_ids) == ['all']:
+        for gid in [g['gap_id'] for g in plan['gaps']]:
+            if gid in session['recorded_gaps']:
+                continue
+            if gid not in session['accepted']:
+                skipped[gid] = 'not accepted'
+                continue
+            missing = [s['id'] for s in shots_of(plan, session, gid) if not (session['selections'].get(s['id']) or session['assets'].get(s['id']))]
+            if missing:
+                skipped[gid] = 'shot ' + ', '.join(missing) + ' has no selection or asset'
+                continue
+            record_gap(conn, store, user, run, outputs, gid, quote)
+            recorded.append(gid)
+    else:
+        for gid in gap_ids:
+            record_gap(conn, store, user, run, outputs, gid, quote)
+            recorded.append(gid)
+    return {'recorded': recorded, 'skipped': skipped, 'next': 'vw next' if not skipped else 'finish the skipped gaps, then record again'}
 
 
 def record_gap(conn, store, user, run, outputs, gap_id, quote):

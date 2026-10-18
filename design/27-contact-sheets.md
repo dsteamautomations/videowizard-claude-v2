@@ -1,4 +1,4 @@
-# 27 — Contact sheets: let the assistant see the film as still frames (requirement list for SK's approval)
+# 27 — Contact sheets: let the assistant see the film as still frames (closed 18 Oct 2026: dropped by SK in the stage 10 review, design/45 10.8; never built)
 
 Date 16 Oct 2026. Agreed in principle by SK on 16 Oct; takes effect from the next run, not VW-2.
 

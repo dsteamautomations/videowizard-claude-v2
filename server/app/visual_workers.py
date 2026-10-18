@@ -124,6 +124,18 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
 
 # ---------- video takes ----------
 
+def timing_evidence(duration_s, placement_exact):
+    """design/45 10.6: a take at least as long as its placement matches (assembly trims); a shorter one is reported with its shortfall."""
+    duration, placement = Fraction(str(duration_s)), Fraction(str(placement_exact))
+    matches = duration >= placement - Fraction(1, 1000)
+    return {'timing_matches_placement': bool(matches), 'shortfall_seconds': 0.0 if matches else round(float(placement - duration), 3)}
+
+
+def backoff_minutes(polls):
+    """design/45 10.5: 30 s after the first poll, then every minute (was up to 5 minutes)."""
+    return min(1, 0.5 * polls)
+
+
 def probe(path):
     out = subprocess.run([settings().FFPROBE_EXECUTABLE, '-v', 'error', '-show_format', '-show_streams', '-of', 'json', str(path)], capture_output=True, check=True, timeout=60).stdout
     data = json.loads(out)
@@ -164,7 +176,7 @@ def process_take(job):
         state = provider.state(result)
         if state == 'in_progress':
             polls = ((job.get('result') or {}).get('polls') or 0) + 1
-            return 'submitted', {'provider_id': remote, 'polls': polls}, None, None, min(5, 0.5 * polls)  # backoff 30 s → 5 min
+            return 'submitted', {'provider_id': remote, 'polls': polls}, None, None, backoff_minutes(polls)
         if state != 'completed':
             return ('cancelled' if state in ('canceled', 'cancelled') else 'failed'), {'provider_id': remote, 'provider_status': state}, f'Provider reported {state}. No automatic regeneration.', None, None
         data = video_path.read_bytes() if video_path.exists() else provider.output(result)
@@ -176,9 +188,8 @@ def process_take(job):
         store.put(k, data, 'video/mp4')
         evidence = probe(video_path)
         placement = snapshot['placement']
-        evidence.update(requested_duration_seconds=snapshot['duration_seconds'], placement=placement,
-                        timing_matches_placement=abs(Fraction(str(evidence['duration_seconds'])) - Fraction(placement['duration_seconds'])) < Fraction(1, 1000),
-                        creative_approval=False)
+        evidence.update(requested_duration_seconds=snapshot['duration_seconds'], placement=placement, creative_approval=False,
+                        **timing_evidence(evidence['duration_seconds'], placement['duration_seconds']))
         cost = {'provider': snapshot['provider'], 'model': snapshot['model'], 'seconds': snapshot['duration_seconds']}
         return 'ready', {'provider_id': remote, 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence}, None, cost, None
     except (Problem, ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as exc:

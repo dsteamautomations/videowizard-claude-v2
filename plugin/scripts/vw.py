@@ -80,16 +80,16 @@ READING_DROP_ROW = {'sfx_cues', 'editorial_ideas'}   # per sub-clip row: used at
 READING_ROWS = (('sub_clips',), ('narration', 'words'), ('narration', 'sentences'))   # tables written one row per line
 
 
-def reading_copy(path, data):
-    """The assistant's copy of the options package (design/43 7.4): without the keys it never reads, with the sub-clip table and
-    the word and sentence lists one row per line so the file is short and each row is one read. The data given is not changed;
-    long texts still move to .md files beside the file, as in readable_json."""
+def reading_copy(path, data, drop=READING_DROP, drop_row=READING_DROP_ROW, rows=READING_ROWS):
+    """The assistant's copy of a package (design/43 7.4, design/45 10.9): without the keys it never reads, with the named tables
+    one row per line so the file is short and each row is one read. The data given is not changed; long texts still move to .md
+    files beside the file, as in readable_json."""
     import textwrap
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    copy = {k: v for k, v in data.items() if k not in READING_DROP}
-    if isinstance(copy.get('sub_clips'), list):
-        copy['sub_clips'] = [{k: v for k, v in r.items() if k not in READING_DROP_ROW} if isinstance(r, dict) else r for r in copy['sub_clips']]
+    copy = {k: v for k, v in data.items() if k not in drop}
+    if drop_row and isinstance(copy.get('sub_clips'), list):
+        copy['sub_clips'] = [{k: v for k, v in r.items() if k not in drop_row} if isinstance(r, dict) else r for r in copy['sub_clips']]
     sidecars = []
 
     def walk(x, trail):
@@ -105,7 +105,7 @@ def reading_copy(path, data):
         return x
     copy = walk(copy, [])
     marks = {}
-    for trail in READING_ROWS:
+    for trail in rows:
         node = copy
         for k in trail[:-1]:
             node = node.get(k) if isinstance(node, dict) else None
@@ -627,6 +627,7 @@ def cmd_voice(a):
 
 
 OPEN_JOB_STATUSES = ('queued', 'running', 'storage_pending', 'submission_unknown')
+VISUALS_OPEN = ('queued', 'running', 'submitted', 'storage_pending')   # design/45 10.5: a take is open while the provider works on it
 
 
 def wait_for_jobs(m, stage, wait_s):
@@ -713,6 +714,8 @@ def _download(m, key, rel):
                 save_json(ws / rel, data)      # the tool reads this one back: line breaks only, values unchanged
             elif rel == 'work/options-package.json':
                 reading_copy(ws / rel, data)   # design/43 7.4: the assistant's copy, without what it never reads
+            elif rel == 'work/visuals-package.json':
+                reading_copy(ws / rel, data, drop=(), drop_row=(), rows=(('world_evidence',),))   # design/45 10.9: one clip per line
             else:
                 readable_json(ws / rel, data)  # read by the assistant only: long texts move to .md files beside it
             return str(ws / rel)
@@ -805,15 +808,40 @@ def cmd_visuals(a):
         out = write(base + '/references', body)
         emit(out, 0, f"Reference {out['id']} ({out['kind']}) is a candidate; show it to the operator (`vw visuals fetch --ref {out['id']}`) and approve with its sha256.")
     if a.what == 'image':
+        if a.file:   # design/45 10.5: several images in one call, in order, stopping at the first refusal
+            items = _json_file(m, a.file)
+            if not isinstance(items, list):
+                emit({'action': 'refused', 'message': f'{a.file} must be a list of {{element, kind, prompt, name, parents, size, quality}}.'}, 2)
+            queued = []
+            for i, it in enumerate(items):
+                parents = it.get('parents') or []
+                body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
+                        'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt'), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
+                        **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {})}
+                payload, code = request('POST', base + '/images', json=body)
+                if code:
+                    if code == 401:
+                        finish(payload, code)
+                    emit({'queued': queued, 'refused': {'element': body['element_id'], 'message': payload.get('message') or payload.get('action')},
+                          'remaining': [x.get('element') for x in items[i + 1:]], 'action': 'refused'}, 2,
+                         f"{len(queued)} queued; {body['element_id']} refused: {payload.get('message')}; fix it and run the file again")
+                queued.append(payload['reference_id'])
+            emit({'queued': queued}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`.")
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {})}
         out = write(base + '/images', body)
-        emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, poll `vw visuals status`.")
+        emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`.")
     if a.what == 'approve':
         emit(write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote}))
-    if a.what == 'bind':
+    if a.what == 'bind':   # design/45 10.4: no quote needed; the approved references are the yes
         refs = {eid: text.split(',') for eid, text in _pairs(a.refs, '--refs', 'ELEMENT=REF1,REF2').items()}
-        emit(write(base + '/bind', {'shot_id': a.shot, 'references': refs, 'quote': a.quote}))
+        selectors = {}
+        for item in a.selector or []:   # design/33 A3: an object inside an approved place picture, named in words
+            m = re.match(r'^([A-Za-z0-9_-]+)=([A-Za-z0-9_-]+):(.+)$', item.strip())
+            if not m or not m.group(3).strip():
+                emit({'action': 'refused', 'message': f'--selector expects ELEMENT=REF:"what to look at", got {item!r}.'}, 2)
+            selectors.setdefault(m.group(1), {})[m.group(2)] = m.group(3).strip().strip('"')
+        emit(write(base + '/bind', {'shot_id': a.shot, 'references': refs, **({'subject_selectors': selectors} if selectors else {}), **({'quote': a.quote} if a.quote else {})}))
     if a.what == 'packet':
         out = call('GET', f'{base}/shots/{a.shot}/packet')
         (ws / 'work' / f'packet-{a.shot}.json').write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding='utf-8')
@@ -826,9 +854,48 @@ def cmd_visuals(a):
                 **({'end_image': a.end} if a.end else {}), **({'duration_seconds': int(a.seconds)} if a.seconds else {})}
         emit(write(base + '/prepare-take', body))
     if a.what == 'take':
-        emit(write(base + '/take', {'shot_id': a.shot}), 0, 'Paid video take submitted; tell the operator and poll `vw visuals status`.')
-    if a.what == 'status':
-        emit(call('GET', base))
+        shots = list(a.shots or ([a.shot] if a.shot else []))
+        if not shots:
+            emit({'action': 'refused', 'message': 'Give the shots: --shots S1 S2 … (or --shots all for every prepared shot without a take), or --shot S.'}, 2)
+        if shots == ['all']:   # design/45 10.5: every prepared shot that has neither a selection, an asset nor an open take
+            st = call('GET', base)
+            open_units = {j['unit'] for j in st.get('jobs') or [] if j.get('provider') == 'video' and j.get('status') in VISUALS_OPEN}
+            shots = [s['shot_id'] for g in st.get('gaps') or [] for s in g.get('shots') or []
+                     if s.get('prepared') and not s.get('selected') and not s.get('asset') and s['shot_id'] not in open_units]
+            if not shots:
+                emit({'queued': [], 'refused': {}}, 0, 'no prepared shot without a take; prepare a take first (`vw visuals prepare-take`)')
+        queued, refused = [], {}
+        for sid in shots:
+            payload, code = request('POST', base + '/take', json={'request_id': str(uuid.uuid4()), 'shot_id': sid})
+            if code == 401:
+                finish(payload, code)
+            if code:
+                refused[sid] = payload.get('message') or payload.get('action')
+            else:
+                queued.append(sid)
+        emit({'queued': queued, 'refused': refused}, 0 if queued or not refused else 2,
+             f"{len(queued)} paid video takes submitted" + (f"; refused: {', '.join(refused)}" if refused else '') + "; tell the operator, then `vw visuals status --wait 600`.")
+    if a.what == 'status':   # design/45 10.5: wait inside the tool until no image or take job is open
+        started = time.monotonic()
+        deadline = started + (a.wait or 0)
+        while True:
+            st = call('GET', base)
+            jobs_ = st.get('jobs') or []
+            open_ = [j for j in jobs_ if j.get('status') in VISUALS_OPEN]
+            decide = [j for j in jobs_ if j.get('status') in ('failed', 'rejected', 'cancelled', 'submission_unknown')]
+            if not open_ or decide or time.monotonic() >= deadline:
+                break
+            time.sleep(15)
+        ready = sum(1 for j in jobs_ if j.get('status') == 'ready')
+        if decide:
+            line = f"{len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
+        elif open_:
+            images, takes = sum(1 for j in open_ if j.get('provider') == 'openai'), sum(1 for j in open_ if j.get('provider') == 'video')
+            line = ', '.join(x for x in (f'{images} image{"s" if images != 1 else ""}' if images else '', f'{takes} take{"s" if takes != 1 else ""}' if takes else '') if x) + f' open; {ready} ready' + \
+                   ('; run again with --wait' if a.wait else '')
+        else:
+            line = f'all done: {ready} ready' if jobs_ else 'no image or take jobs yet'
+        emit(st, 0, 'Visuals: ' + line)
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)
@@ -845,15 +912,22 @@ def cmd_visuals(a):
             emit({'job': a.job, 'path': path, 'sha256': job['result']['sha256'], 'evidence': job['result']['evidence']}, 0, f'Take at {path}; let the operator watch it.')
     if a.what == 'review':
         emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes, 'timing_notes': a.timing or '', 'quote': a.quote}))
-    if a.what == 'select' and a.job:
-        emit(write(base + '/select-take', {'job_id': a.job, 'quote': a.quote}))
+    if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
+        emit(write(base + '/select-take', {'job_id': a.job, 'quote': a.quote, **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})}))
+    if a.what == 'still':   # design/45 10.3: an approved reference fills a still shot
+        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote}), 0, f'Still set for {a.shot} from reference {a.ref}.')
     if a.what == 'asset':
         entry = next((f for f in m['files'] if f.get('name') == Path(a.file).name and f.get('receipt')), None)
         if not entry:
             emit({'action': 'refused', 'message': 'Upload the asset first: `vw upload --stage visuals --file out/<name>`.'}, 2)
         emit(write(base + '/asset', {'shot_id': a.shot, 'key': entry['key'], 'sha256': entry['sha256'], 'bytes': entry['bytes'], 'kind': a.kind, 'quote': a.quote}))
-    if a.what == 'record':
-        emit(write(base + '/record', {'gap_id': a.gap, 'quote': a.quote}), 0, 'Gap recorded; `vw next`.')
+    if a.what == 'record':   # design/45 10.4: several gaps, or all that are ready
+        gaps = list(a.gaps or ([a.gap] if a.gap else []))
+        if not gaps:
+            emit({'action': 'refused', 'message': 'Give the gaps: --gaps G1 G2 … or --gaps all (or --gap G).'}, 2)
+        out = write(base + '/record', {'gap_ids': gaps, 'quote': a.quote})
+        skipped = out.get('skipped') or {}
+        emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
 
 
 def _s2_fetch(m, kind, out_name):
@@ -1163,10 +1237,12 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
-    s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'asset', 'record'])
+    s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record'])
     for flag in ('--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
         s.add_argument(flag)
-    s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
+    s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--wait', type=int, default=0)
+    s.add_argument('--selector', action='append')
+    s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film'):
         s.add_argument(flag)

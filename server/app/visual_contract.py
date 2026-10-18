@@ -163,6 +163,30 @@ def unique(rows, key, label):
 
 
 MAX_GENERATED_SHOT_S = 30   # design/21 E7: today's AI video tools make at most 30 s per shot; longer blanks are several shots
+FILE_TYPES = ('image', 'diagram', 'animation')   # design/45 10.2: the pipeline makes AI video and stills; these are the operator's files or an approved still
+
+
+def _default_generator():
+    from .video_generators import CATALOG, DEFAULT
+    default = next(c for c in CATALOG if c['provider'] == DEFAULT['provider'] and c['model'] == DEFAULT['model'])
+    longest = max(CATALOG, key=lambda c: c['max_seconds'])
+    return default, longest
+
+
+def routes(plan, fps=25):
+    """How many shots the pipeline makes itself (video) and how many need a still or the operator's file (design/45 10.2)."""
+    out = {'video': 0, 'still_or_file': 0, 'seconds': {'video': 0.0, 'still_or_file': 0.0}}
+    for gap in plan.get('gaps', []):
+        scenes = gap.get('scenes') or []
+        if gap.get('choices'):
+            chosen = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])
+            scenes = chosen['scenes']
+        for scene in scenes:
+            for shot in scene['shots']:
+                kind = 'video' if shot['visual_type'] == 'video' else 'still_or_file'
+                out[kind] += 1
+                out['seconds'][kind] = round(out['seconds'][kind] + (shot['end_frame'] - shot['start_frame']) / float(fps), 2)
+    return out
 
 
 def validate_plan(document, source_gaps, fps=None):
@@ -200,6 +224,16 @@ def validate_plan(document, source_gaps, fps=None):
                     if fps and shot.visual_type in ('video', 'animation'):
                         need((shot.end_frame - shot.start_frame) <= MAX_GENERATED_SHOT_S * float(fps),
                              f'A generated shot is at most {MAX_GENERATED_SHOT_S} s; split a longer stretch into several shots.')
+                    seconds = (shot.end_frame - shot.start_frame) / float(fps) if fps else None
+                    if shot.visual_type in FILE_TYPES:   # design/45 10.2
+                        length = f'{seconds:.1f} s' if seconds is not None else f'{shot.end_frame - shot.start_frame} frames'
+                        warnings.append({'shot_id': shot.id, 'kind': 'route', 'message': f'shot {shot.id} ({shot.visual_type}, {length}): the operator supplies this file '
+                                                                                        '(`vw visuals asset`), or an approved still fills it (`vw visuals still`)'})
+                    elif shot.visual_type == 'video' and seconds is not None:   # design/45 10.7
+                        default, longest = _default_generator()
+                        if seconds > default['max_seconds']:
+                            warnings.append({'shot_id': shot.id, 'kind': 'length', 'message': f"shot {shot.id} is {seconds:.1f} s; the default generator makes at most {default['max_seconds']} s: "
+                                                                                             f"split it, or choose {longest['label'].split(' ·')[0]} (up to {longest['max_seconds']} s) with `vw visuals generator`"})
                     need(set(shot.element_ids) <= elements, 'Shot names an unknown reference element.')
                     subjects = unique(shot.subjects, 'element_id', 'visible subject')
                     need(subjects <= set(shot.element_ids), 'Every visible subject must be a required shot element.')

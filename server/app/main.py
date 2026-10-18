@@ -221,6 +221,12 @@ class BindBody(Write):
     shot_id: str
     references: dict[str, list[str]]
     subject_selectors: dict[str, dict[str, str]] = {}
+    quote: str = ''   # design/45 10.4: the approved references are the yes
+
+
+class StillBody(Write):
+    shot_id: str
+    reference_id: str
     quote: str = Field(min_length=1)
 
 
@@ -257,6 +263,8 @@ class TakeReview(Write):
 class TakeSelect(Write):
     job_id: UUID
     quote: str = Field(min_length=1)
+    notes: str = ''          # design/45 10.4: with notes, the accepted review is recorded in the same call
+    timing_notes: str = ''
 
 
 class AssetBody(Write):
@@ -269,7 +277,8 @@ class AssetBody(Write):
 
 
 class GapBody(Write):
-    gap_id: str
+    gap_id: str | None = None
+    gap_ids: list[str] = []   # design/45 10.4: several gaps, or ['all']
     quote: str = Field(min_length=1)
 
 
@@ -948,7 +957,7 @@ def visuals_review(run_id: UUID, body: TakeReview, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/select-take')
 def visuals_select_take(run_id: UUID, body: TakeSelect, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_take(conn, storage(), user, run, outputs, body.job_id, body.quote))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_take(conn, storage(), user, run, outputs, body.job_id, body.quote, body.notes, body.timing_notes))
 
 
 @app.post('/api/runs/{run_id}/visuals/asset')
@@ -956,9 +965,17 @@ def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_asset(conn, storage(), user, run, outputs, body.shot_id, body.key, body.sha256, body.bytes, body.kind, body.quote))
 
 
+@app.post('/api/runs/{run_id}/visuals/still')
+def visuals_still(run_id: UUID, body: StillBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.still_from_reference(storage(), user, run, outputs, body.shot_id, body.reference_id, body.quote))
+
+
 @app.post('/api/runs/{run_id}/visuals/record', status_code=201)
 def visuals_record(run_id: UUID, body: GapBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.record_gap(conn, storage(), user, run, outputs, body.gap_id, body.quote), 201)
+    gap_ids = body.gap_ids or ([body.gap_id] if body.gap_id else [])
+    if not gap_ids:
+        raise Problem(422, 'VISUALS_CONTRACT', 'Name the gaps to record (gap_ids), or all.')
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.record_gaps(conn, storage(), user, run, outputs, gap_ids, body.quote), 201)
 
 
 # ---------- stage 2: options / master / first cut ----------

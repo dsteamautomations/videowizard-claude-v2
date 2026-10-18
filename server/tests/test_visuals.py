@@ -202,10 +202,13 @@ def test_v1_v2_v3_v4_v5_v6_v7_v8_v9_v11_v12_v14_v15_v16_v18_end_to_end(home, dat
     subj.update(behaviour='acts', hold_reason='', end=moved, beats=[{'id': 'B1', 'start_frame': 25, 'end_frame': 30, 'action': 'tilt', 'target': 'edge', 'path': 'up', 'result': 'tilted', 'start': moved, 'end': moved}])
     rc, out, _ = vw(home, 'visuals', 'check', '--file', vplan(ws, bad))
     assert out['status'] == 'rejected' and 'Beat starting state' in out['error']
-    # propose + accept both gaps
+    # design/45 10.2: the check counts the routes and warns on the image shot
+    rc, out, _ = vw(home, 'visuals', 'check', '--file', vplan(ws, good))
+    assert out['status'] == 'valid' and out['routes']['video'] == 1 and out['routes']['still_or_file'] == 1 and any(w.get('kind') == 'route' and w['shot_id'] == 'VS2' for w in out['warnings'])
+    # propose + accept both gaps (design/45 10.4: all)
     rc, out, err = vw(home, 'visuals', 'propose', '--file', vplan(ws, good))
-    assert rc == 0 and out['version'] == 1, err
-    rc, out, err = vw(home, 'visuals', 'accept', '--gaps', 'G1', 'G2', '--quote', 'yes both gaps')
+    assert rc == 0 and out['version'] == 1 and out['routes']['video'] == 1, err
+    rc, out, err = vw(home, 'visuals', 'accept', '--gaps', 'all', '--quote', 'yes both gaps')
     assert rc == 0 and out['accepted'] == ['G1', 'G2'], err
     # V3 foundation text edit keeps acceptance? No: foundation is part of the gap digest. An unrelated element edit keeps it.
     v2 = deepcopy(good); v2['elements'].append({'id': 'E9', 'name': 'Spare', 'kind': 'object', 'identity': 'representative', 'requirements': 'unused'})
@@ -251,10 +254,10 @@ def test_v1_v2_v3_v4_v5_v6_v7_v8_v9_v11_v12_v14_v15_v16_v18_end_to_end(home, dat
     assert path == '/images/edits' and len(kw['files']) == 2
     sheet = next(r for r in vw(home, 'visuals', 'status')[1]['references'] if r['id'] == out['reference_id'])
     assert sheet['status'] == 'candidate'
-    # V8 bind with an element lacking references
-    rc, out, _ = vw(home, 'visuals', 'bind', '--shot', 'VS1', '--refs', '--quote', 'bind')
+    # V8 bind with an element lacking references; design/45 10.4: no quote needed
+    rc, out, _ = vw(home, 'visuals', 'bind', '--shot', 'VS1', '--refs')
     assert rc == 2 and 'E1' in out['message']
-    rc, out, err = vw(home, 'visuals', 'bind', '--shot', 'VS1', '--refs', f'E1={gen_ref},{frame_ref}', '--quote', 'use these two')
+    rc, out, err = vw(home, 'visuals', 'bind', '--shot', 'VS1', '--refs', f'E1={gen_ref},{frame_ref}')
     assert rc == 0 and out['elements'] == ['E1'], err
     rc, out, err = vw(home, 'visuals', 'packet', '--shot', 'VS1')
     assert rc == 0 and len(out['preparation']['references']) == 2 and out['placement']['fps'] == '25'
@@ -263,33 +266,40 @@ def test_v1_v2_v3_v4_v5_v6_v7_v8_v9_v11_v12_v14_v15_v16_v18_end_to_end(home, dat
     assert rc == 2 and 'Reconcile every subject' in out['message']
     rc, out, err = vw(home, 'visuals', 'prepare-take', '--shot', 'VS1', '--start', gen_ref, '--motion', 'slow push in', '--subject-rec', 'E1=the block')
     assert rc == 0 and out['duration_seconds'] == 3 and abs(out['exact_seconds'] - 0.6) < 1e-9, err
-    # take; V12 second take while open
-    rc, out, err = vw(home, 'visuals', 'take', '--shot', 'VS1')
-    assert rc == 0, err
-    job = out['job_id']
-    rc, out, _ = vw(home, 'visuals', 'take', '--shot', 'VS1')
-    assert rc == 2 and out['code'] == 'JOB_OPEN'
+    # take (design/45 10.5: a list); V12 second take while open
+    rc, out, err = vw(home, 'visuals', 'take', '--shots', 'VS1')
+    assert rc == 0 and out['queued'] == ['VS1'], err
+    job = next(j['id'] for j in vw(home, 'visuals', 'status')[1]['jobs'] if j['unit'] == 'VS1' and j['provider'] == 'video')
+    rc, out, _ = vw(home, 'visuals', 'take', '--shots', 'VS1')
+    assert rc == 2 and 'still open' in out['refused']['VS1']
+    rc, out, _ = vw(home, 'visuals', 'take', '--shots', 'all')
+    assert rc == 0 and out['queued'] == []   # VS1 is open, VS2 is an image shot
     drain_takes(database)   # submit → in_progress → completed (two polls)
     assert FakeProvider.submits == 1
     rc, out, err = vw(home, 'visuals', 'fetch', '--job', job)
-    assert rc == 0 and out['evidence']['timing_matches_placement'] is False and abs(out['evidence']['duration_seconds'] - 3.0) < 0.1, (out, err)
-    # V11 accept without timing notes refused
-    rc, out, _ = vw(home, 'visuals', 'review', '--job', job, '--decision', 'accepted', '--notes', 'good', '--quote', 'yes')
-    assert rc == 2 and 'timing_notes' in out['message']
-    assert vw(home, 'visuals', 'review', '--job', job, '--decision', 'accepted', '--notes', 'good', '--timing', 'assembly trims to 0.6 s', '--quote', 'yes use it')[0] == 0
-    assert vw(home, 'visuals', 'select', '--job', job, '--quote', 'select this take')[0] == 0
-    # record G1 before G2 has anything → G2 refused later; G1 ok
-    rc, out, err = vw(home, 'visuals', 'record', '--gap', 'G1', '--quote', 'G1 done')
-    assert rc == 0 and out['shots'] == 1, err
+    # design/45 10.6: a 3.0 s take for a 0.6 s placement matches (assembly trims); the shortfall is zero
+    assert rc == 0 and out['evidence']['timing_matches_placement'] is True and out['evidence']['shortfall_seconds'] == 0 and abs(out['evidence']['duration_seconds'] - 3.0) < 0.1, (out, err)
+    # design/45 10.4: notes make the accepted review and the selection one call
+    rc, out, err = vw(home, 'visuals', 'select', '--job', job, '--notes', 'block in place, no text', '--quote', 'select this take')
+    assert rc == 0 and out['review_id'], (out, err)
+    st = vw(home, 'visuals', 'status')[1]
+    assert any(s['shot_id'] == 'VS1' and s['selected'] for g in st['gaps'] for s in g['shots'])
+    # design/45 10.4: record all records the gaps that are done and skips the rest with the reason
+    rc, out, err = vw(home, 'visuals', 'record', '--gaps', 'all', '--quote', 'done so far')
+    assert rc == 0 and out['recorded'] == ['G1'] and 'VS2' in out['skipped']['G2'], (out, err)
     rc, out, _ = vw(home, 'visuals', 'record', '--gap', 'G2', '--quote', 'G2 done')
     assert rc == 2 and 'VS2' in out['message']
-    # V14 local still asset for the image shot
+    # design/45 10.3: an approved reference fills the still shot; V14: a local still asset replaces it
+    rc, out, err = vw(home, 'visuals', 'still', '--shot', 'VS2', '--ref', gen_ref, '--quote', 'use that picture')
+    assert rc == 0 and out['kind'] == 'still' and out['sha256'] == gen['sha256'], (out, err)
+    rc, out, _ = vw(home, 'visuals', 'still', '--shot', 'VS1', '--ref', gen_ref, '--quote', 'x')
+    assert rc == 2 and 'video shot' in out['message']
     (ws / 'out' / 'wall.png').write_bytes(png_bytes((90, 90, 90), (1920, 1080)))
     assert vw(home, 'upload', '--stage', 'visuals', '--file', 'out/wall.png')[0] == 0
     rc, out, err = vw(home, 'visuals', 'asset', '--shot', 'VS2', '--file', 'out/wall.png', '--kind', 'still', '--quote', 'use the wall still')
     assert rc == 0 and out['placement'] == {'start_frame': 40, 'end_frame': frames}, err
-    rc, out, err = vw(home, 'visuals', 'record', '--gap', 'G2', '--quote', 'G2 done')
-    assert rc == 0, err
+    rc, out, err = vw(home, 'visuals', 'record', '--gaps', 'all', '--quote', 'G2 done')
+    assert rc == 0 and out['recorded'] == ['G2'] and out['skipped'] == {}, err
     # V15 stage complete → assembly
     assert vw(home, 'next')[1]['stage'] == 'assembly'
     outs = vw(home, 'view', '--stage', 'visuals')[1]['outputs']
