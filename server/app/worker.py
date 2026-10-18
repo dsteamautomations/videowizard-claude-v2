@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import signal
+import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ from pathlib import Path
 import httpx
 
 from . import jobs
+from . import narration_pieces as NP
 from .config import settings
 from .db import connect
 from .elevenlabs import ElevenLabs, identifier
@@ -47,59 +49,134 @@ def is_mp3(data):
     return bool(data) and len(data) <= 50 * 1024 * 1024 and (data.startswith(b'ID3') or (len(data) > 1 and data[0] == 255 and data[1] & 224 == 224))
 
 
-def process_voice(job, provider=None, store=None):
-    """Returns (status, result, error, cost, retry_in_minutes)."""
+def piece_paths(piece):
+    base = SPOOL / f"piece-{piece['identity']}"
+    return Path(f'{base}.response.json'), Path(f'{base}.mp3'), Path(f'{base}.meta.json')
+
+
+def journaled_any(job):
+    """True when a paid response of this job is retained on this server: a piece journal (design/40) or the older per-job files."""
+    snap, jid = job['request'], str(job['id'])
+    if snap.get('timing_mode') == 'generation':
+        if any(p.is_file() for piece in NP.pieces_of(snap) for p in piece_paths(piece)[:2]):
+            return True
+    return any((SPOOL / f'{jid}{suffix}').is_file() for suffix in ('.response.json', '.mp3'))
+
+
+def _headers(response):
+    return {k: response.headers[k] for k in ('request-id', 'history-item-id', 'character-cost') if k in response.headers}
+
+
+def _ensure_piece(piece, snap, provider, renew):
+    """Journal one piece: reuse a journaled response or audio, otherwise one paid request. The raw timed response is written before
+    it is parsed (a bad timing can never cause a second paid call)."""
+    raw_path, mp3_path, meta_path = piece_paths(piece)
+    if mp3_path.is_file() and meta_path.is_file():
+        return
+    if raw_path.is_file():
+        saved = json.loads(raw_path.read_text(encoding='utf-8'))
+        response = httpx.Response(200, content=saved['body'].encode('utf-8'), headers=saved['headers'])
+    else:
+        response = provider.synthesize({**snap, 'text': piece['text']})
+        durable(raw_path, json.dumps({'body': response.text, 'received_at': datetime.now(timezone.utc).isoformat(), 'headers': _headers(response)}, ensure_ascii=False).encode('utf-8'))
+    data, alignments = decode_response(response)
+    if not is_mp3(data):
+        raise Problem(502, 'PROVIDER_UNKNOWN', 'Provider response was not a usable MP3. The attempt is retained; check provider history.')
+    durable(mp3_path, data)
+    durable(meta_path, json.dumps({'headers': _headers(response), 'alignments': alignments, 'characters': len(piece['text'])}, ensure_ascii=False).encode('utf-8'))
+    if renew:
+        renew()
+
+
+def process_voice(job, provider=None, store=None, renew=None):
+    """Returns (status, result, error, cost, retry_in_minutes). A timed narration is one or more pieces (design/40); an audition is one request."""
     provider, store = provider or ElevenLabs(), store or storage()
     snap, jid = job['request'], str(job['id'])
     timed = snap.get('timing_mode') == 'generation'
-    raw_path, audio_path = SPOOL / f'{jid}.response.json', SPOOL / f'{jid}.mp3'
+    if not timed:
+        return _process_audition(job, provider, store)
+    pieces = NP.pieces_of(snap)
+    audio_path, legacy_meta = SPOOL / f'{jid}.mp3', SPOOL / f'{jid}.meta.json'
     key = f"{job['run_id']}/voice/{jid}.mp3"
     try:
-        if job['status'] == 'storage_pending' and not audio_path.is_file() and not raw_path.is_file():
+        legacy = audio_path.is_file() and legacy_meta.is_file() and not snap.get('pieces')   # a job journaled by the per-job scheme
+        if job['status'] == 'storage_pending' and not legacy and not all(any(p.is_file() for p in piece_paths(piece)[:2]) for piece in pieces):
             raise Problem(409, 'PROVIDER_UNKNOWN', 'Saved response is missing. Recover from provider history; do not regenerate.')
-        if timed and raw_path.is_file():
-            saved = json.loads(raw_path.read_text(encoding='utf-8'))
-            response = httpx.Response(200, content=saved['body'].encode('utf-8'), headers=saved['headers'])
-        elif audio_path.is_file():
-            response = None
+        piece_results = []
+        if legacy:
+            meta = json.loads(legacy_meta.read_text(encoding='utf-8'))
+            alignments, cost_chars, metas = meta.get('alignments') or {}, None, [meta]
         else:
+            for piece in pieces:
+                _ensure_piece(piece, snap, provider, renew)
+            if not audio_path.is_file():
+                NP.concat_mp3([piece_paths(piece)[1] for piece in pieces], audio_path, settings().FFMPEG_EXECUTABLE)
+            metas = [json.loads(piece_paths(piece)[2].read_text(encoding='utf-8')) for piece in pieces]
+            infos = [inspect_audio(piece_paths(piece)[1]) for piece in pieces]
+            merged = NP.merge_alignments(snap['text'], [{'offset': piece['offset'], 'text': piece['text'], 'alignment': (m['alignments'] or {}).get('alignment'),
+                                                          'normalized_alignment': (m['alignments'] or {}).get('normalized_alignment'), 'duration_s': i['duration_s']}
+                                                         for piece, m, i in zip(pieces, metas, infos)])
+            alignments = {'alignment': merged['alignment'], 'normalized_alignment': merged['normalized_alignment']}
+            piece_results = [{'identity': piece['identity'], 'characters': piece['characters'], 'duration_s': i['duration_s'], 'overshoot_s': x['overshoot_s'],
+                              'request_id': m['headers'].get('request-id'), 'history_item_id': m['headers'].get('history-item-id')}
+                             for piece, m, i, x in zip(pieces, metas, infos, merged['pieces'])]
+        data = audio_path.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        result = {'audio_key': key, 'sha256': sha, 'bytes': len(data), 'provider_request_id': metas[0]['headers'].get('request-id'),
+                  'history_item_id': metas[0]['headers'].get('history-item-id'), 'pieces': piece_results}
+        timing = timing_evidence(snap, alignments)
+        timing['audio'] = inspect_audio(audio_path)
+        check_words(clamp_words(timing, ALIGNMENT_TOLERANCE_S))
+        timing_key = key.removesuffix('.mp3') + '.timing.json'
+        timing_data = json.dumps(timing, ensure_ascii=False).encode('utf-8')
+        store.put(timing_key, timing_data, 'application/json')
+        result.update(timing_key=timing_key, timing_sha256=hashlib.sha256(timing_data).hexdigest(), timing_bytes=len(timing_data), duration_s=timing['audio']['duration_s'])
+        store.put(key, data, 'audio/mpeg')
+        if hashlib.sha256(store.get(key)).hexdigest() != sha:
+            raise Problem(502, 'STORAGE', 'Recording read-back failed.')
+        billed = [int(m['headers']['character-cost']) for m in metas if str(m['headers'].get('character-cost', '')).isdigit()]
+        cost = {'characters': sum(billed) if len(billed) == len(metas) else snap['characters'], 'model': snap['model_id'], 'pieces': len(pieces)}
+        return 'ready', result, None, cost, None
+    except (Problem, OSError, ValueError, subprocess.SubprocessError) as exc:
+        done = [piece for piece in pieces if any(p.is_file() for p in piece_paths(piece)[:2])]
+        journaled = audio_path.is_file() or len(done) == len(pieces)
+        rejected = isinstance(exc, Problem) and exc.code == 'PROVIDER_REJECTED'
+        timing_bad = isinstance(exc, ValueError)
+        status = 'storage_pending' if journaled and not timing_bad else 'failed' if rejected or timing_bad else 'submission_unknown'
+        message = exc.message if isinstance(exc, Problem) else ('Timing validation failed; the original response and audio are retained. Do not regenerate.' if timing_bad else str(exc))
+        result = {'pieces_done': len(done), 'pieces': len(pieces)} if status == 'submission_unknown' else None
+        return status, result, message, None, 10 if status == 'storage_pending' else None
+
+
+def _process_audition(job, provider, store):
+    snap, jid = job['request'], str(job['id'])
+    audio_path = SPOOL / f'{jid}.mp3'
+    key = f"{job['run_id']}/voice/{jid}.mp3"
+    try:
+        if job['status'] == 'storage_pending' and not audio_path.is_file():
+            raise Problem(409, 'PROVIDER_UNKNOWN', 'Saved response is missing. Recover from provider history; do not regenerate.')
+        if not audio_path.is_file():
             response = provider.synthesize(snap)
-            if timed:
-                durable(raw_path, json.dumps({'body': response.text, 'received_at': datetime.now(timezone.utc).isoformat(),
-                                              'headers': {k: response.headers[k] for k in ('request-id', 'history-item-id', 'character-cost') if k in response.headers}}, ensure_ascii=False).encode('utf-8'))
-        if response is not None:
-            data, alignments = decode_response(response) if timed else (response.content, None)
+            data = response.content
             if not is_mp3(data):
                 raise Problem(502, 'PROVIDER_UNKNOWN', 'Provider response was not a usable MP3. The attempt is retained; check provider history.')
             durable(audio_path, data)
-            headers = {k: response.headers[k] for k in ('request-id', 'history-item-id', 'character-cost') if k in response.headers}
-            durable(SPOOL / f'{jid}.meta.json', json.dumps({'headers': headers, 'alignments': alignments}, ensure_ascii=False).encode('utf-8'))
+            durable(SPOOL / f'{jid}.meta.json', json.dumps({'headers': _headers(response), 'alignments': None}, ensure_ascii=False).encode('utf-8'))
         meta = json.loads((SPOOL / f'{jid}.meta.json').read_text(encoding='utf-8'))
         data = audio_path.read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         result = {'audio_key': key, 'sha256': sha, 'bytes': len(data), 'provider_request_id': meta['headers'].get('request-id'),
-                  'history_item_id': meta['headers'].get('history-item-id')}
-        if timed:
-            timing = timing_evidence(snap, meta.get('alignments') or {})
-            timing['audio'] = inspect_audio(audio_path)
-            check_words(clamp_words(timing, ALIGNMENT_TOLERANCE_S))
-            timing_key = key.removesuffix('.mp3') + '.timing.json'
-            timing_data = json.dumps(timing, ensure_ascii=False).encode('utf-8')
-            store.put(timing_key, timing_data, 'application/json')
-            result.update(timing_key=timing_key, timing_sha256=hashlib.sha256(timing_data).hexdigest(), timing_bytes=len(timing_data), duration_s=timing['audio']['duration_s'])
-        else:
-            result['duration_s'] = inspect_audio(audio_path)['duration_s']
+                  'history_item_id': meta['headers'].get('history-item-id'), 'duration_s': inspect_audio(audio_path)['duration_s']}
         store.put(key, data, 'audio/mpeg')
         if hashlib.sha256(store.get(key)).hexdigest() != sha:
             raise Problem(502, 'STORAGE', 'Recording read-back failed.')
         cost = {'characters': int(meta['headers']['character-cost']) if str(meta['headers'].get('character-cost', '')).isdigit() else snap['characters'], 'model': snap['model_id']}
         return 'ready', result, None, cost, None
     except (Problem, OSError, ValueError) as exc:
-        journaled = audio_path.is_file() or (timed and raw_path.is_file())
+        journaled = audio_path.is_file()
         rejected = isinstance(exc, Problem) and exc.code == 'PROVIDER_REJECTED'
-        timing_bad = timed and isinstance(exc, ValueError)
-        status = 'storage_pending' if journaled and not timing_bad else 'failed' if rejected or timing_bad else 'submission_unknown'
-        message = exc.message if isinstance(exc, Problem) else ('Timing validation failed; the original response and audio are retained. Do not regenerate.' if timing_bad else str(exc))
+        status = 'storage_pending' if journaled else 'failed' if rejected else 'submission_unknown'
+        message = exc.message if isinstance(exc, Problem) else str(exc)
         return status, None, message, None, 10 if status == 'storage_pending' else None
 
 
@@ -116,7 +193,8 @@ def recover_voice(job, provider=None):
     provider = provider or ElevenLabs()
     snap, jid = job['request'], str(job['id'])
     if snap.get('timing_mode') == 'generation':
-        raise Problem(409, 'TIMING_RECOVERY', 'Narration needs its original timed response; history audio has no alignment. Start narration again (the server never reuses an unknown attempt).')
+        raise Problem(409, 'TIMING_RECOVERY', 'Narration needs its original timed response; history audio has no alignment. Narrate again: pieces already '
+                                              'journaled on this server are reused without a second charge (design/40).')
     start = job['created_at'].timestamp() - 5
     end = job['updated_at'].timestamp() + 600
     found, cursor, seen = [], None, set()
@@ -144,6 +222,12 @@ def recover_voice(job, provider=None):
     durable(SPOOL / f'{jid}.meta.json', json.dumps({'headers': {'request-id': found[0].get('request_id'), 'history-item-id': hid}, 'alignments': None}).encode('utf-8'))
 
 
+def renew_lease(job_id):
+    """A narration renews its lease after every piece (design/40 S5) so a long job is never re-claimed while it works."""
+    with connect() as conn:
+        conn.execute("update vw2_jobs set lease_until = now() + interval '20 minutes', updated_at = now() where id=%s", (job_id,))
+
+
 def tick():
     """One pass over every provider family: voice, then analysis. Returns True when anything was processed."""
     busy = False
@@ -152,7 +236,7 @@ def tick():
     with connect() as conn:
         job = jobs.claim(conn, 'elevenlabs')
     if job:
-        status, result, error, cost, retry_in = process_voice(job)
+        status, result, error, cost, retry_in = process_voice(job, renew=lambda: renew_lease(job['id']))
         with connect() as conn:
             finalize_voice(conn, job, status, result, error, cost, retry_in)
         busy = True

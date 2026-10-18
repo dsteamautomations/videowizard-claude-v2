@@ -53,7 +53,7 @@ class FakeEleven:
                 from app.errors import Problem
                 err = Problem(502, 'PROVIDER_REJECTED', 'ElevenLabs did not complete the request (HTTP 429).')
                 raise err
-            if cls.mode == 'unknown':
+            if cls.mode == 'unknown' or (cls.mode == 'unknown_after_1' and len([c for c in cls.calls if c[0] == 'POST']) > 1):
                 from app.errors import Problem
                 raise Problem(502, 'PROVIDER_UNKNOWN', 'Provider connection interrupted (ReadTimeout, 480s).')
             text = kw['json']['text']
@@ -356,3 +356,71 @@ def test_m7_upload_retries_a_dropped_connection_and_receipt_checks_size_only_for
     st.put('r/voice/small.json', b'{}')
     with pytest.raises(Exception):
         S.verify(st, 'r/voice/small.json', '0' * 64, 2)                     # small file: still hashed
+
+
+# ---------- design/40: narration in pieces ----------
+
+def long_text(sizes, sentence='Earth blocks are pressed. '):
+    out = []
+    for size in sizes:
+        t = (sentence * (size // len(sentence) + 1))[:size].rstrip()
+        out.append(t if t.endswith('.') else t.rsplit('.', 1)[0] + '.')
+    return '\n\n'.join(out) + '\n'
+
+
+def run_until_voice_with(home, database, text):
+    code, ws = start_run(home, database)
+    (ws / 'in' / 'source.txt').write_text(text, encoding='utf-8')
+    vw(home, 'stage', 'intake', 'prepare')
+    write_proposal(ws, 'intake', {'remove': [], 'titles': ['Long'], 'notes': ''})
+    assert vw(home, 'stage', 'intake', 'record', '--title', 'Long', '--quote', 'yes')[0] == 0
+    write_proposal(ws, 'brief', {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'production': {'field_speech_languages': ['ta'], 'narration_language': 'en'}})
+    assert vw(home, 'stage', 'brief', 'record', '--quote', 'yes')[0] == 0
+    write_proposal(ws, 'script', {'spoken_text': text, 'notes': '', 'assessment': '', 'changes': []})
+    rc, out, err = vw(home, 'stage', 'script', 'record', '--quote', 'yes')
+    assert rc == 0, err
+    return code, ws, out
+
+
+def test_v5_long_script_is_narrated_in_pieces_and_joined(home, database, fake):
+    text = long_text([8000, 8000, 8000])
+    code, ws, out = run_until_voice_with(home, database, text)
+    assert 'requests and joined' in out['summary']['length_warning']   # design/39 4.3 as reworded by design/40
+    FakeEleven.calls.clear()
+    assert vw(home, 'voice', 'narrate', '--voice', 'v1')[0] == 0
+    drain()
+    job = vw(home, 'voice', 'jobs')[1][0]
+    assert job['status'] == 'ready', job
+    assert len(job['result']['pieces']) == 3 and job['cost']['pieces'] == 3 and job['cost']['characters'] == sum(p['characters'] for p in job['result']['pieces'])
+    assert len([c for c in FakeEleven.calls if c[0] == 'POST']) == 3 and 5.7 < job['result']['duration_s'] < 6.6
+    from app.storage import storage
+    timing = json.loads(storage().get(job['result']['timing_key']).decode('utf-8'))
+    assert timing['script_characters_match'] and {w['passage_id'] for w in timing['words']} == {'P001', 'P002', 'P003'}
+    assert all(w['end_s'] <= timing['audio']['duration_s'] for w in timing['words']) and timing['words'][-1]['start_s'] > 4.0
+    assert vw(home, 'voice', 'fetch', '--job', job['id'])[0] == 0 and vw(home, 'stage', 'voice', 'record', '--quote', 'yes, listened')[0] == 0
+
+
+def test_v6_unknown_outcome_on_a_piece_keeps_the_journaled_pieces(home, database, fake):
+    text = long_text([8000, 8000, 8000])
+    run_until_voice_with(home, database, text)
+    fake.mode = 'unknown_after_1'
+    assert vw(home, 'voice', 'narrate', '--voice', 'v1')[0] == 0
+    drain()
+    job = vw(home, 'voice', 'jobs')[1][0]
+    assert job['status'] == 'submission_unknown' and job['result'] == {'pieces_done': 1, 'pieces': 3}
+    rc, out, _ = vw(home, 'voice', 'recover', '--job', job['id'])
+    assert rc == 2 and out['code'] == 'TIMING_RECOVERY' and 'reused' in out['message']
+    assert vw(home, 'voice', 'resolve', '--job', job['id'], '--note', 'checked')[0] == 0
+    fake.mode = 'ok'
+    FakeEleven.calls.clear()
+    assert vw(home, 'voice', 'narrate', '--voice', 'v1')[0] == 0
+    drain()
+    job = [j for j in vw(home, 'voice', 'jobs')[1] if j['status'] == 'ready'][0]
+    assert len(job['result']['pieces']) == 3 and len([c for c in FakeEleven.calls if c[0] == 'POST']) == 2   # piece 1 reused, never paid twice
+
+
+def test_v7_one_sentence_over_the_limit_is_refused_at_submission(home, database, fake):
+    text = 'a' * 10500 + '.\n'
+    run_until_voice_with(home, database, text)
+    rc, out, _ = vw(home, 'voice', 'narrate', '--voice', 'v1')
+    assert rc == 2 and out['code'] == 'VOICE_LENGTH' and 'one sentence' in out['message']

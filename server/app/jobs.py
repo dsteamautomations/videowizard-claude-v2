@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from psycopg.types.json import Json, Jsonb
 
-from . import elevenlabs
+from . import elevenlabs, narration_pieces
 from .config import settings
 from .errors import Problem
 
@@ -37,8 +37,15 @@ def submit_voice(conn, user, run, outputs, request, request_id):
     available = next((m for m in provider.models() if m['id'] == model and m['supported']), None)
     if not available:
         raise Problem(422, 'VOICE_MODEL', f'Model {model} is not available on the connected account.')
-    if isinstance(available.get('max_characters'), int) and len(text) > available['max_characters']:
-        raise Problem(422, 'VOICE_LENGTH', f"Text has {len(text)} characters; {model} accepts {available['max_characters']} per request.")
+    limit = available.get('max_characters') if isinstance(available.get('max_characters'), int) else 10000
+    pieces = None
+    if kind == 'narration':   # design/40: a long script is narrated in pieces, split at paragraph and sentence ends
+        try:
+            pieces = narration_pieces.split_for_narration(text, limit)
+        except ValueError as exc:
+            raise Problem(422, 'VOICE_LENGTH', str(exc))
+    elif len(text) > limit:
+        raise Problem(422, 'VOICE_LENGTH', f"Text has {len(text)} characters; {model} accepts {limit} per request.")
     voice = provider.voice(request.get('voice_id'))  # exact identity/access check, no substitution
     if kind == 'narration':
         open_jobs = conn.execute("select id from vw2_jobs where run_id=%s and stage='voice' and status = any(%s)", (run['id'], list(OPEN))).fetchall()
@@ -46,7 +53,7 @@ def submit_voice(conn, user, run, outputs, request, request_id):
             raise Problem(409, 'JOB_OPEN', 'Finish or recover the open voice job before starting narration.', jobs=[str(j['id']) for j in open_jobs])
     snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text,
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
-                **({'timing_mode': 'generation'} if kind == 'narration' else {})}
+                **({'timing_mode': 'generation', 'pieces': pieces} if kind == 'narration' else {})}
     row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'voice',%s,'elevenlabs',%s,%s) returning *''',
                        (run['id'], voice['voice_id'] if kind == 'audition' else None, Json(snapshot), request_id)).fetchone()
     return row

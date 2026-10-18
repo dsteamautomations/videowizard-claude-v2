@@ -53,7 +53,7 @@ def test_script_record_warns_over_the_v4_limit(ws):
         s = script_record(ws, STAGES['script'], prior)['summary']
         assert s['characters'] == n and (('length_warning' in s) is warned), n
         if warned:
-            assert '10,000' in s['length_warning'] and 'segmentation' in s['length_warning']
+            assert '10,000' in s['length_warning'] and 'requests and joined' in s['length_warning']
 
 
 # ---------- 4.4 wait inside the tool ----------

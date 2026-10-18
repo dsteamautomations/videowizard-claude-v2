@@ -649,7 +649,7 @@ def recover_job(run_id: UUID, job_id: UUID, body: Write, user=User, conn=DB):
     """Reconcile a submission_unknown voice job from provider history; never synthesizes."""
     run = core.load_run(conn, user, run_id, lock=True)
     row = conn.execute('select * from vw2_jobs where id=%s and run_id=%s', (job_id, run['id'])).fetchone()
-    journaled = row and row['status'] == 'failed' and any((worker.SPOOL / f"{job_id}{suffix}").is_file() for suffix in ('.response.json', '.mp3'))
+    journaled = row and row['status'] == 'failed' and worker.journaled_any(row)   # the paid response is retained (per piece since design/40)
     if journaled:
         # The paid response is retained on this server: re-process it (e.g. after a validation rule change). No synthesis.
         message = 'Re-processing the retained response; no new synthesis.'
