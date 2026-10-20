@@ -40,6 +40,23 @@ def status_answer(units, cap=15):
     return {'counts': counts, 'units': units, 'cap': cap}
 
 
+# ---------- design/59 L15: the printout is what the assistant acts on ----------
+
+def test_status_prints_counts_and_the_units_that_need_attention_only(harness, monkeypatch, capsys):
+    units = [unit('r1', 'retained', 280, summary={'summary_card': ['a long card'] * 40}), unit('r2', 'retained', 300, summary={'summary_card': ['x'] * 40}),
+             unit('o1', 'running', phase='generate'), unit('q1', 'queued', phase=None),
+             unit('f1', 'failed', error='Provider did not complete with STOP; partial output cannot satisfy intake.'),
+             {**unit('x1', 'failed', error='old'), 'excluded': True}]
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: status_answer(units, cap=15))
+    code, out, err = run(args(), capsys)
+    assert code == 0 and 'need a decision: f1' in err
+    assert out['counts'] == {'retained': 2, 'running': 1, 'queued': 1, 'failed': 2} and out['cap'] == 15 and out['units'] == 6
+    assert out['open'] == [{'unit': 'o1', 'status': 'running', 'phase': 'generate'}, {'unit': 'q1', 'status': 'queued', 'phase': None}]
+    assert out['decide'] == [{'unit': 'f1', 'status': 'failed', 'error': 'Provider did not complete with STOP; partial output cannot satisfy intake.'}]
+    assert out['recorded'] == 2 and out['excluded'] == 1
+    assert 'summary' not in json.dumps(out) and 'cost' not in json.dumps(out) and len(json.dumps(out)) < 1500
+
+
 # ---------- 6.1 wait with an estimate ----------
 
 def test_wait_returns_when_settled_and_says_done(harness, monkeypatch, capsys):

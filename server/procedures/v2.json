@@ -166,7 +166,7 @@
       "steps": [
         "The operator copies the clips into runs/<code>/in/ (up to 200 MB each). `vw stage media prepare` prints one line per clip (name, length, size, sound) as `listing`; show it to the operator as it is; the full probe is in work/media-clips.json, never needed in chat; identical files are listed once; a variable-frame-rate clip is converted here before upload (reported as transcoded_from_vfr); rotated clips report their displayed width and height. Prepare reports the clip count and total MB: tell the operator, and that the tool reports when the upload is done.",
         "Confirm the list with the operator (names preserved, nothing analysed yet). Ask once: may the camera sound be used in the film, allowed or excluded? Record exactly what they say.",
-        "`vw stage media record --camera-audio allowed|excluded --note \"<their words>\" --quote \"<their reply>\"` uploads with receipts, prints one line per finished clip, and records the clips as the analysis units. Re-run record to resume an interrupted upload. A clip changed since prepare is refused: run prepare again."
+        "`vw stage media record --camera-audio allowed|excluded --note \"<their words>\" --quote \"<their reply>\"` uploads with receipts, prints one line per finished clip and the receipt at the end, and records the clips as the analysis units. Run it in the foreground with a timeout of at least 30 minutes, never as a background command: a background command's output cannot be read. Re-run record to resume an interrupted upload. A clip changed since prepare is refused: run prepare again."
       ]
     },
     {

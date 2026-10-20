@@ -917,7 +917,11 @@ def cmd_analysis(a):
             line += f'; about {max(1, round(math.ceil(len(open_) / cap) * avg / 60))} min left' + ('; run again with --wait' if a.wait else '')
         else:
             line += '; done'
-        emit(st, 0, 'Analysis: ' + line)
+        shown = {'counts': c, 'cap': st.get('cap'), 'units': len(units),   # design/59 L15: what the assistant acts on; the card of a clip is `show --unit`
+                 'open': [{'unit': u['unit'], 'status': u['status'], 'phase': u.get('phase')} for u in open_],
+                 'decide': [{'unit': u['unit'], 'status': u['status'], 'error': u.get('error')} for u in decide],
+                 'recorded': sum(1 for u in units if u.get('recorded')), 'excluded': sum(1 for u in units if u.get('excluded'))}
+        emit(shown, 0, 'Analysis: ' + line)
     if a.what == 'show':
         st = call('GET', f'/api/runs/{run}/analysis')
         u = next((x for x in st['units'] if x['unit'] == a.unit), None)

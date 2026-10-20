@@ -169,3 +169,4 @@ def test_media_prompt_and_steps_are_v2():
     steps = ' '.join(PROC['steps'])
     assert '--camera-audio' in steps and 'total MB' in steps and 'reports when the upload is done' in steps and 'changed since prepare' in steps
     assert 'one line per clip' in steps and 'work/media-clips.json' in steps   # design/57
+    assert 'in the foreground' in steps and 'at least 30 minutes' in steps and 'never as a background command' in steps   # design/59 L16
