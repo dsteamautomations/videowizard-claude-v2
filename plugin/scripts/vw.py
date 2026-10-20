@@ -172,18 +172,31 @@ def api():
     return httpx.Client(base_url=server_url(), headers={'Authorization': 'Bearer ' + tok} if tok else {}, timeout=60)
 
 
+RETRY_S, RETRY_EVERY_S = 180, 15   # design/58 L14: a broken connection is tried again every 15 s for three minutes before the tool gives up
+
+
 def request(method, path, wait=None, **kw):
     """One server call without the exit, so it can run in a thread: returns (payload, code). code 0: payload is the body.
-    Otherwise finish(payload, code) on the main thread produces the same outcome call() always did."""
-    try:
-        with api() as c:
-            r = c.request(method, path, **({'timeout': wait} if wait else {}), **kw)
-    except httpx.ReadTimeout:
-        if wait:
-            return {'action': 'refused', 'message': f'The server is still working on this after {wait} s. It may finish on its own: check status in a minute before repeating.'}, 2
-        return {'action': 'tell_builder', 'message': f'VideoWizard server at {server_url()} did not answer in time (ReadTimeout). Tell the builder; do not debug.'}, 2
-    except httpx.RequestError as exc:
-        return {'action': 'tell_builder', 'message': f'VideoWizard server not reachable at {server_url()} ({exc.__class__.__name__}). Tell the builder; do not debug.'}, 2
+    Otherwise finish(payload, code) on the main thread produces the same outcome call() always did.
+    A connection that cannot be made or breaks (ConnectError, ConnectTimeout, ReadError, …) is retried (design/58): a write carries
+    its request_id, so a repeated request is the same request to the server. ReadTimeout is not retried: the server has the request."""
+    started = time.monotonic()
+    while True:
+        try:
+            with api() as c:
+                r = c.request(method, path, **({'timeout': wait} if wait else {}), **kw)
+            break
+        except httpx.ReadTimeout:
+            if wait:
+                return {'action': 'refused', 'message': f'The server is still working on this after {wait} s. It may finish on its own: check status in a minute before repeating.'}, 2
+            return {'action': 'tell_builder', 'message': f'VideoWizard server at {server_url()} did not answer in time (ReadTimeout). Tell the builder; do not debug.'}, 2
+        except httpx.RequestError as exc:
+            cause = f'{exc.__class__.__name__}: {exc}'
+            if time.monotonic() - started + RETRY_EVERY_S > RETRY_S:
+                return {'action': 'unreachable', 'message': f"VideoWizard server not reachable from this Mac for {RETRY_S // 60} minutes ({cause}). Tell the operator to check "
+                                                            "this Mac's network, wait a minute, and run the same command again. File a defect only if it is unreachable again."}, 2
+            print(f'server not reachable ({cause}); trying again in {RETRY_EVERY_S} s', file=sys.stderr, flush=True)
+            time.sleep(RETRY_EVERY_S)
     if r.status_code == 401:
         return {'action': 'connect', 'reason': f'{method} {path} returned 401'}, 401
     body = r.json() if r.headers.get('content-type', '').startswith('application/json') else {'message': r.text[:300]}
