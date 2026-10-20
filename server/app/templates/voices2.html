@@ -62,9 +62,10 @@
 .v2 .foot .status.ok{color:var(--ok)}
 .v2 .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:v2spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes v2spin{to{transform:rotate(360deg)}}
-.v2 .player{flex:0 0 330px;font-size:13px;display:flex;gap:10px;align-items:center;min-width:0}
-.v2 .player span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px}
-.v2 .player audio{width:210px;height:32px}
+.v2 .player{display:flex;gap:12px;align-items:center;margin:0 0 8px;font-size:13px}
+.v2 .player[hidden]{display:none}
+.v2 .player span{flex:0 0 220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--fg)}
+.v2 .player audio{flex:1;width:100%;height:40px}
 .v2 .tray{flex:1;font-size:13px;color:var(--muted);min-width:120px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .v2 .pill{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 6px 2px 10px;color:var(--fg);font-size:12.5px;background:var(--card)}
 .v2 .pill button{border:none;background:none;padding:0 4px;font-size:14px;line-height:1;cursor:pointer;color:var(--muted)}
@@ -74,7 +75,7 @@
 .v2 .why{font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap}
 .v2 .words{min-width:260px;padding:8px 10px}
 .v2 h3{font-size:13px;color:var(--muted);font-weight:500;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
-.v2 .spacer{height:110px}
+.v2 .spacer{height:150px}
 </style>
 <div class="v2" id="app" data-code="{{ run.code }}">
 <div class="top">
@@ -108,8 +109,9 @@
 <section id="s-final" hidden><div id="final-body"></div></section>
 <div class="spacer"></div>
 
-<div class="foot"><div class="in"><div class="status" id="fmsg"></div><div class="row">
-  <div class="player"><span id="pl-name" class="ds">nothing playing</span><audio id="pl" controls preload="none"></audio></div>
+<div class="foot"><div class="in"><div class="status" id="fmsg"></div>
+<div class="player" id="player" hidden><span id="pl-name" class="ds">nothing playing</span><audio id="pl" controls preload="none"></audio></div>
+<div class="row">
   <div class="tray" id="tray"></div>
   <span id="action"></span>
 </div></div></div>
@@ -127,7 +129,7 @@ function busy(btn,label){if(!btn)return;btn.disabled=true;btn.dataset.label=btn.
 async function act(body){const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let j=null;try{j=await r.json();}catch(e){j=null;}if(!r.ok)throw new Error((j&&j.message)||(r.status>=500?'The server failed (HTTP '+r.status+'); the builder has the log. Nothing was charged unless a job appears on Try.':'HTTP '+r.status));return j;}
 function nm(id){return names[id]||id;}
 const HUES=['#5b6cff','#1d9e75','#d85a30','#d4537e','#378add','#639922','#ba7517','#7f77dd'];function hue(n){let h=0;for(const c of String(n||'')){h=(h*31+c.charCodeAt(0))>>>0;}return HUES[h%HUES.length];}
-function play(id,name,url){if(!url){msg('No sample for this voice.',true);return;}const pl=$('pl');if(playing===id&&!pl.paused){pl.pause();return;}playing=id;pl.src=url;pl.play();$('pl-name').textContent=name;document.querySelectorAll('.ic.play').forEach(b=>b.textContent=(b.dataset.id===id)?'⏸':'▶');}
+function play(id,name,url){if(!url){msg('No sample for this voice.',true);return;}const pl=$('pl');$('player').hidden=false;if(playing===id&&!pl.paused){pl.pause();return;}playing=id;pl.src=url;pl.play();$('pl-name').textContent=name;document.querySelectorAll('.ic.play').forEach(b=>b.textContent=(b.dataset.id===id)?'⏸':'▶');}
 $('pl').addEventListener('pause',()=>document.querySelectorAll('.ic.play').forEach(b=>b.textContent='▶'));
 $('pl').addEventListener('play',()=>document.querySelectorAll('.ic.play').forEach(b=>b.textContent=(b.dataset.id===playing)?'⏸':'▶'));
 // ---------- frame ----------
