@@ -21,3 +21,12 @@ def test_checklist_without_a_check_says_not_measured():
 def test_open_edit_names_one_cue_per_sentence():
     text = D.open_edit_text({'code': 'VW-9', 'client': 'C'})
     assert 'one cue per narrated sentence' in text and 'approved pauses' in text and 'narration beats' not in text
+
+
+def test_checklist_deliver_line_carries_the_format(monkeypatch):
+    items = D.checklist_of({'finishing': []}, PK, {}, brief={'production': {'format': {'frame': '9:16', 'destinations': ['Instagram', 'TikTok'], 'watched_muted': True}}})
+    line = next(i for i in items if i['where'] == 'Deliver page' and 'frame' in i['item'])
+    assert 'frame 9:16' in line['item'] and 'Instagram, TikTok' in line['item'] and 'burn the subtitles in' in line['item']
+    items = D.checklist_of({'finishing': []}, PK, {})
+    line = next(i for i in items if i['where'] == 'Deliver page' and 'frame' in i['item'])
+    assert 'frame 16:9' in line['item'] and 'destinations not given' in line['item']

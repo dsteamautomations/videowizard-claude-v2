@@ -142,6 +142,25 @@ def intake_prepare(ws, procedure, prior, file=None, earlier_titles=None):
             'output_file': 'out/intake.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
+def intake_preview(ws):
+    """design/53 L1: the script as it will be kept, written to work/intake-preview.txt for the operator to read before approving."""
+    try:
+        src = json.loads((ws / 'work' / 'intake-source.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        raise Refused('Run `vw stage intake prepare` before preview.')
+    data = read_proposal(ws, 'intake')
+    removals = data.get('remove', [])
+    kept = remove_lines(src['text'], removals)
+    (ws / 'work' / 'intake-preview.txt').write_text(kept, encoding='utf-8')
+    return {'file': 'work/intake-preview.txt', 'kept': sum(1 for line in kept.split('\n') if line.strip()), 'removed': len(removals), 'characters': len(kept)}
+
+
+def timing_lines(text, removals):
+    """design/53 L2: the document's own timing lines, removed at intake, kept as words for the brief."""
+    rows = text.split('\n')
+    return [rows[r['line'] - 1].strip() for r in removals if isinstance(r, dict) and r.get('kind') == 'timing' and isinstance(r.get('line'), int) and 1 <= r['line'] <= len(rows)]
+
+
 def intake_record(ws, procedure, prior, title=None, client=''):
     data = read_proposal(ws, 'intake')
     try:
@@ -169,6 +188,7 @@ def intake_record(ws, procedure, prior, title=None, client=''):
     (ws / 'out' / ('original' + original.suffix.lower())).write_bytes(original.read_bytes())
     summary = {'title': chosen, 'title_source': 'suggested' if chosen in titles else 'typed', 'titles': titles, 'client': client, 'notes': data.get('notes', ''),
                'removed_lines': len(data.get('remove', [])), 'kept_lines': sum(1 for line in cleaned.split('\n') if line.strip()),
+               'timing_lines': timing_lines(src['text'], data.get('remove', [])),   # design/53 L2
                'warnings': src['warnings'], 'source_digest': digest(cleaned), 'source_file': src['file'], 'source_sha256': src.get('sha256'), **stamps(ws, 'intake')}
     return {'files': ['out/source.txt', 'out/original' + original.suffix.lower(), 'out/intake.json'], 'summary': summary, 'retain': True, 'upload': True}
 
@@ -196,15 +216,72 @@ def client_rules_text(rules):
     return '\n'.join(f"- {r.get('rule')} (from {r.get('source_run')})" for r in rules or [] if r.get('rule')) or 'none'
 
 
-def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None):
+CARD_GROUPS = (('identity', ('company_legal_name', 'dba_names')), ('industry', ('industry', 'business_model')), ('about', ('client_description', 'services_products', 'usp', 'competitive_positioning', 'core_values', 'founding_story', 'notes')),
+               ('audience', ('target_audience', 'client_persona', 'geographic_markets_served')), ('place', ('client_location', 'country_addresses', 'time_zone')),
+               ('cta', ('client_cta_instructions',)), ('competitors', ('competitors',)), ('learnings', ('client_past_learnings',)))
+CONTACT = ('website_url', 'phone_number', 'email_address', 'map_url')
+SOCIAL = ('youtube_url', 'instagram_url', 'tiktok_url', 'facebook_url', 'linkedin_url', 'pinterest_url', 'twitter_x_url', 'social_sharing_platforms')
+
+
+def _shown(v):
+    return ', '.join(str(x) for x in v) if isinstance(v, list) else str(v)
+
+
+def client_card_text(card):
+    """design/50 D: what the directory says about this client, one line per group; context for the recommendations, never answers."""
+    card = {k: v for k, v in (card or {}).items() if k != 'client_name' and v not in (None, '', [])}
+    if not card:
+        return 'the directory has nothing on this client beyond its name'
+    lines = []
+    for group, keys in CARD_GROUPS:
+        parts = [(_shown(card[k]) if k in ('target_audience', 'industry', 'client_location', 'client_cta_instructions', 'competitors', 'client_past_learnings', 'client_description') and len(keys) and k == keys[0]
+                  else f"{k}: {_shown(card[k])}") for k in keys if k in card]
+        if parts:
+            lines.append(f'{group}: ' + '; '.join(parts))
+    brand = []
+    if card.get('client_logo_url'):
+        brand.append('logo on file')
+    for k, label in (('color_palette', 'palette'), ('typography_fonts', 'fonts'), ('client_brand_guidelines', 'guidelines'), ('trademark_patterns', 'trademark patterns')):
+        if card.get(k):
+            brand.append(f'{label}: {_shown(card[k])}')
+    if brand:
+        lines.append('brand: ' + '; '.join(brand))
+    dests = [f"{k.replace('_url', '').replace('twitter_x', 'x')} {_shown(card[k])}" for k in ('website_url',) + SOCIAL if card.get(k)]
+    if dests:
+        lines.append('destinations: ' + ', '.join(dests))
+    contact = [f"{k.replace('_url', '')}: {card[k]}" for k in CONTACT[1:] if card.get(k)]
+    if contact:
+        lines.append('contact: ' + ', '.join(contact))
+    return '\n'.join(lines)
+
+
+DECIDED_BY = ('operator', 'script')
+
+
+def directory_differences(data):
+    """design/50 E: where the operator's words or the script overrode the directory; recorded with the brief. Absent is fine."""
+    rows = data.get('directory_differences') or []
+    if not isinstance(rows, list):
+        raise Refused('out/brief.json: directory_differences must be a list of {field, directory_says, chosen, decided_by, operator_words}.')
+    out = []
+    for i, d in enumerate(rows, 1):
+        if not isinstance(d, dict) or not all(str(d.get(k, '')).strip() for k in ('field', 'directory_says', 'chosen')) or d.get('decided_by') not in DECIDED_BY:
+            raise Refused(f'out/brief.json: directory_differences[{i}] needs field, directory_says, chosen and decided_by (operator or script).')
+        out.append({'field': str(d['field']), 'directory_says': str(d['directory_says']), 'chosen': str(d['chosen']), 'decided_by': d['decided_by'], 'operator_words': str(d.get('operator_words') or '')})
+    return out
+
+
+def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None, client_card=None):
     intake = prior('intake')
-    prompt = procedure['prompt'].replace('{last_brief}', last_brief_text(last_brief)).replace('{client_rules}', client_rules_text(client_rules))
+    timing = intake['summary'].get('timing_lines') or []   # design/53 L2
+    prompt = (procedure['prompt'].replace('{last_brief}', last_brief_text(last_brief)).replace('{client_rules}', client_rules_text(client_rules))
+              .replace('{document_timing}', '\n'.join(f'- {t}' for t in timing) or 'none').replace('{client_card}', client_card_text(client_card)))   # design/50
     return {'prompt': prompt, 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
-            'script': cleaned_script(ws, intake), 'last_brief': last_brief, 'client_rules': client_rules or []}, 'prepared_at': stamp(ws, 'brief'),
+            'script': cleaned_script(ws, intake), 'last_brief': last_brief, 'client_rules': client_rules or [], 'document_timing': timing, 'client_card': client_card or {}}, 'prepared_at': stamp(ws, 'brief'),
             'output_file': 'out/brief.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
-def brief_record(ws, procedure, prior):
+def brief_record(ws, procedure, prior, client_card=None):
     data = read_proposal(ws, 'brief')
     need_text(data, ['purpose', 'audience', 'message', 'tone', 'ending'], 'brief')
     intake = prior('intake')
@@ -220,7 +297,8 @@ def brief_record(ws, procedure, prior):
     body = {k: data.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}
     body['answers'] = {k: str(v) for k, v in answers.items()}
     body['production'] = production_inputs(data.get('production') or {})
-    summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True)), **stamps(ws, 'brief')}
+    summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True)),
+               'client_card': client_card or {}, 'directory_differences': directory_differences(data), **stamps(ws, 'brief')}   # design/50 C, E
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
@@ -229,6 +307,26 @@ BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': [],   # the ch
                       'brand_and_safety_rules': [],   # asked of the operator at brief; never filled with blueprint examples (VW-2, 15 Oct 2026)
                       'show_speaker_video': False}
 ASKED_EVERY_FILM = ('field_speech_languages', 'narration_language')   # no default: the operator answers on every film (design/37 2.8)
+FRAMES = ('16:9', '9:16', '1:1', '4:5')   # design/53 L7
+FORMAT_DEFAULT = {'frame': '16:9', 'destinations': [], 'watched_muted': False}
+
+
+def format_inputs(given):
+    """design/53 L7: where the film plays and its frame shape; defaults when the operator said nothing."""
+    if given is None:
+        return dict(FORMAT_DEFAULT)
+    if not isinstance(given, dict):
+        raise Refused('out/brief.json: production.format must be an object {frame, destinations, watched_muted}.')
+    frame = given.get('frame', FORMAT_DEFAULT['frame'])
+    if frame not in FRAMES:
+        raise Refused('out/brief.json: production.format.frame must be one of ' + ', '.join(FRAMES) + '.')
+    dests = given.get('destinations', [])
+    if not isinstance(dests, list) or not all(isinstance(x, str) and x.strip() for x in dests):
+        raise Refused('out/brief.json: production.format.destinations must be a list of names (YouTube, Instagram …), empty when not given.')
+    muted = given.get('watched_muted', False)
+    if not isinstance(muted, bool):
+        raise Refused('out/brief.json: production.format.watched_muted must be true or false.')
+    return {'frame': frame, 'destinations': [d.strip() for d in dests], 'watched_muted': muted}
 
 
 def production_inputs(given):
@@ -257,7 +355,8 @@ def production_inputs(given):
         out[k] = v
     if out['process_stages'] == GENERIC_STAGES:
         raise Refused('out/brief.json: production.process_stages must be the chapters of the film, from the script, or empty; the generic names are not allowed.')
-    out['defaults_applied'] = sorted(k for k in BLUEPRINT_DEFAULTS if k not in given)
+    out['format'] = format_inputs(given.get('format'))   # design/53 L7
+    out['defaults_applied'] = sorted(k for k in list(BLUEPRINT_DEFAULTS) + ['format'] if k not in given)
     return out
 
 
@@ -318,6 +417,19 @@ def apply_changes(source, changes, spoken_text):
     return working, expected
 
 
+def directory_for_script(card):
+    """design/50 D: the only directory facts the script pass may use: CTA instructions, the contact details for an ending that wants one, and trademark patterns."""
+    out = {}
+    if card.get('client_cta_instructions'):
+        out['cta'] = card['client_cta_instructions']
+    contact = {k: card[k] for k in CONTACT if card.get(k)}
+    if contact:
+        out['contact'] = contact
+    if card.get('trademark_patterns'):
+        out['trademark_patterns'] = card['trademark_patterns']
+    return out
+
+
 def script_prepare(ws, procedure, prior):
     intake, brief = prior('intake'), prior('brief')
     production = brief['summary'].get('production') or {}
@@ -325,7 +437,8 @@ def script_prepare(ws, procedure, prior):
             'script': cleaned_script(ws, intake),
             'brief': {k: brief['summary'].get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
             'answers': brief['summary'].get('answers') or {}, 'narration_language': production.get('narration_language'),   # design/38 3.4
-            'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'chapters': production.get('process_stages') or []},
+            'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'chapters': production.get('process_stages') or [],
+            'directory': directory_for_script(brief['summary'].get('client_card') or {})},   # design/50 D
             'prepared_at': stamp(ws, 'script'),
             'output_file': 'out/script.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 

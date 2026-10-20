@@ -148,3 +148,33 @@ def test_record_before_prepare(ws):
     with pytest.raises(Refused) as exc:
         intake_record(ws, PROC, prior, title='T', client='VK')
     assert 'prepare' in str(exc.value)
+
+
+# ---------- design/53 L1, L2: the preview of the kept text; the document's timing lines ----------
+
+def test_preview_writes_the_kept_text_and_refuses_before_prepare(ws):
+    from stages_text import intake_preview
+    (ws / 'in' / 'script.txt').write_text(SOURCE, encoding='utf-8')
+    with pytest.raises(Refused):
+        intake_preview(ws)
+    intake_prepare(ws, PROC, prior)
+    (ws / 'out' / 'intake.json').write_text(json.dumps({'remove': [{'line': 1, 'kind': 'scene_heading', 'why': 'h'}, {'line': 5, 'kind': 'timing', 'why': 't'}], 'titles': ['T']}), encoding='utf-8')
+    out = intake_preview(ws)
+    text = (ws / 'work' / 'intake-preview.txt').read_text(encoding='utf-8')
+    assert 'Scene 1' not in text and 'Duration' not in text and 'Earth blocks are made' in text and 'Each block is pressed' in text
+    assert out['removed'] == 2 and out['kept'] == text.count('\n') - text.count('\n\n') or out['kept'] > 0
+    assert out['file'] == 'work/intake-preview.txt'
+
+
+def test_record_keeps_the_documents_timing_lines(ws):
+    (ws / 'in' / 'script.txt').write_text(SOURCE, encoding='utf-8')
+    intake_prepare(ws, PROC, prior)
+    (ws / 'out' / 'intake.json').write_text(json.dumps({'remove': [{'line': 1, 'kind': 'scene_heading', 'why': 'h'}, {'line': 5, 'kind': 'timing', 'why': 't'}], 'titles': ['T']}), encoding='utf-8')
+    s = intake_record(ws, PROC, prior, title='T', client='VK')['summary']
+    assert s['timing_lines'] == ['Duration: 30 seconds']
+    (ws / 'out' / 'intake.json').write_text(json.dumps({'remove': [], 'titles': ['T']}), encoding='utf-8')
+    assert intake_record(ws, PROC, prior, title='T', client='VK')['summary']['timing_lines'] == []
+
+
+def test_intake_steps_name_the_preview():
+    assert 'vw stage intake preview' in ' '.join(PROC['steps']) and 'work/intake-preview.txt' in ' '.join(PROC['steps'])

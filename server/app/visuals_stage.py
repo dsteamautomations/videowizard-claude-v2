@@ -349,6 +349,13 @@ def select_generator(store, user, run, outputs, shot_id, provider, model):
     return session['generator_choices'][shot_id]
 
 
+def default_aspect(brief_summary, body):
+    """design/53 L7: a take's aspect ratio is the body's, else the brief's frame, else 16:9."""
+    if body.get('aspect_ratio'):
+        return body['aspect_ratio']
+    return (((brief_summary or {}).get('production') or {}).get('format') or {}).get('frame') or '16:9'
+
+
 def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
     base = packet(store, run, outputs, body['shot_id'], session)
@@ -374,7 +381,8 @@ def prepare_take(store, user, run, outputs, body):
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}
     record = {'contract': 'videowizard-video-request-v1', 'run_id': str(run['id']), 'shot_id': body['shot_id'], 'plan_digest': base['plan_digest'],
               'base_preparation_digest': base['preparation_digest'], 'motion_prompt': body['motion_prompt'], 'subject_reconciliation': body['subject_reconciliation'],
-              'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration), 'aspect_ratio': body.get('aspect_ratio') or '16:9',
+              'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration),
+              'aspect_ratio': default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), body),   # design/53 L7
               'resolution': body.get('resolution') or ('720p' if selected['model'] != video_generators.CATALOG[1]['model'] else None),
               **images, 'provider': selected['provider'], 'model': selected['model'],
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},

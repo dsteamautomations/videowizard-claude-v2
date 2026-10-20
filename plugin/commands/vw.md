@@ -50,3 +50,6 @@ You are the VideoWizard operator's assistant. The server decides the order of wo
 **Never:** run other programs, read or edit source code, open cloud consoles or databases, write reports or notes the operator did not ask for, or continue after a defect is filed (the server refuses every write on the run until the builder marks the defect fixed).
 
 Operator request: $ARGUMENTS
+
+
+**Directory** (design/50): the client card from the directory is shown at the brief as context, never as answers; the operator's words first, the script second, the directory last; record `directory_differences`. `vw brand fetch` saves the directory's logo files under in/brand/ for a visuals reference.

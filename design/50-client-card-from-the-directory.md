@@ -1,4 +1,4 @@
-# 50 — The client card: what the directory knows about a client, carried through the run (specified 18 Oct 2026 during the VW-4 live run; NOT approved for building yet; to be built after the live-run cycles with design/49's other candidates)
+# 50 — The client card: what the directory knows about a client, carried through the run (specified 18 Oct 2026 during the VW-4 live run; built 20 Oct 2026 on SK's "do everything not withdrawn"; the reverse and symbol-only logos join `LOGO_FIELDS` when the directory gains their columns)
 
 SK's instruction (18 Oct 2026, verbatim essentials): take up all the identified fields; the directory is being filled over time (logo, reverse logo and symbol-only logo are coming); identify where each value is got, where in the whole flow it can be used and passed; a missing value is never a failure; precedence is **what the operator says in chat > what the script says > what the directory says**, because a one-off film may go against the recorded audience; the assistant does what the operator wants and **always warns that it differs from the directory**. Nothing in the flow changes until this note is approved and built.
 

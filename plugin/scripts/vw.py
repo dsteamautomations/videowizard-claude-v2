@@ -247,6 +247,7 @@ def make_workspace(run, keep_logs=False, assembly_machine=None, files=None):
          'version': run.get('procedure_version'), 'client_runs': run.get('client_runs') or [],
          'last_brief': run.get('last_brief'), 'client_rules': run.get('client_rules') or [],   # design/37 2.2, 2.3
          'last_voice': run.get('last_voice'),   # design/39 4.2
+         'client_card': run.get('client_card') or {},   # design/50
          'keep_logs': keep_logs, 'assembly_machine': assembly_machine, 'closed': False, 'files': files or []}
     save_json(manifest_path(run['code']), m)
     (RUNS / '.active').write_text(run['code'], encoding='utf-8')
@@ -369,7 +370,35 @@ def cmd_start(a):
                   'message': f"Run {run['code']} was created, but {script.name} could not be copied into in/ ({exc.__class__.__name__}). Ask the operator to copy it by hand, then run `vw stage intake prepare`."}, 2)
     nxt = call('GET', f"/api/runs/{run['id']}/next")
     emit({**run, 'workspace': str(workspace(run['code'])), 'script_file': copied, 'next': nxt}, 0,
-         f"Started {run['code']} for {run.get('client')} in {m['code']}/" + (f"; {copied} copied into in/" if copied else '') + '. ' + next_line(nxt))
+         f"Started {run['code']} for {run.get('client')} in {m['code']}/" + (f"; {copied} copied into in/" if copied else '') + f"; {directory_line(run.get('client_card'))}. " + next_line(nxt))
+
+
+def directory_line(card):
+    """design/50: how much the directory holds on this client, for the start line."""
+    n = len(card or {})
+    return f'directory: {n} fields on this client' if n else 'directory: name only'
+
+
+def cmd_brand(a):
+    """design/50 D: the directory's logo files, fetched by the server into the run and saved here under in/brand/ (a visuals reference)."""
+    m = active()
+    got = call('GET', f"/api/runs/{m['run_id']}/brand")
+    ws = workspace(m['code'])
+    (ws / 'in' / 'brand').mkdir(parents=True, exist_ok=True)
+    saved = []
+    for f in got.get('files') or []:
+        try:
+            with api() as c:
+                r = c.get(f"/api/runs/{m['run_id']}/files/{f['key']}", follow_redirects=True)
+        except httpx.RequestError as exc:
+            emit({'action': 'tell_builder', 'message': f'Download failed ({exc.__class__.__name__}).'}, 2)
+        if r.status_code != 200:
+            emit({'action': 'tell_builder', 'message': f"Download of {f['name']} failed: HTTP {r.status_code}."}, 2)
+        (ws / 'in' / 'brand' / f['name']).write_bytes(r.content)
+        saved.append('in/brand/' + f['name'])
+    emit({'saved': saved, 'skipped': got.get('skipped') or []}, 0,
+         ('saved ' + ', '.join(saved) if saved else 'no logo file in the directory for this client') + (('; skipped: ' + '; '.join(got['skipped'])) if got.get('skipped') else '')
+         + '. Use one as a reference element with `vw visuals supply --element E --file in/brand/<name>`.')
 
 
 def cmd_web(a):
@@ -495,9 +524,14 @@ def cmd_stage(a):
     ws = workspace(m['code'])
     prepare, record = scripts[a.stage]
     try:
+        if a.step == 'preview':   # design/53 L1
+            if a.stage != 'intake':
+                emit({'action': 'refused', 'message': 'preview exists for the intake stage only.'}, 2)
+            out = stages_text.intake_preview(ws)
+            emit(out, 0, f"{out['file']}: the script as it will be kept, {out['kept']} lines ({out['removed']} removed); ask the operator to read it before approving.")
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
-                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or []} if a.stage == 'brief' else \
+                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}} if a.stage == 'brief' else \
                 {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': nxt.get('voice_page')} if a.stage == 'voice' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
@@ -515,6 +549,8 @@ def cmd_stage(a):
             result = record(ws, procedure, prior, job)
         elif a.stage == 'intake':
             result = record(ws, procedure, prior, a.title, m.get('client') or '')
+        elif a.stage == 'brief':
+            result = record(ws, procedure, prior, client_card=m.get('client_card') or {})   # design/50 C
         else:
             result = record(ws, procedure, prior)
     except stages_text.Refused as exc:
@@ -1439,11 +1475,12 @@ def build_parser():
     s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('clients'); s.add_argument('--search'); s.set_defaults(fn=cmd_clients)
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
-    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
+    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
     s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)
+    s = sub.add_parser('brand'); s.add_argument('what', choices=['fetch']); s.set_defaults(fn=cmd_brand)   # design/50 D
     s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak', 'history'])
     s.add_argument('step', nargs='?', choices=['prepare', 'record'], help='direct: prepare | record (design/52 D)')
     s.add_argument('--choice', choices=['best_fit', 'experimental', 'none'], help="direct record: the operator's choice"); s.add_argument('--quote', help="direct record: the operator's words")

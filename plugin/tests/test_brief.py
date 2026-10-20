@@ -42,7 +42,7 @@ def test_prompt_is_clean_of_v1_machinery_and_carries_the_client_memory(ws):
 def test_first_film_shows_none(ws):
     (ws / 'out' / 'source.txt').write_text(CLEANED, encoding='utf-8')
     p = brief_prepare(ws, PROC, prior_of())['prompt']
-    assert p.count('\nnone\n') == 2 and '{last_brief}' not in p
+    assert p.count('\nnone\n') == 3 and '{last_brief}' not in p   # last brief, rules, document timing (design/53 L2)
 
 
 def test_steps_carry_chapters_production_block_and_the_web_rule():
@@ -86,3 +86,29 @@ def test_record_refuses_without_languages_and_records_with_them(ws):
     (ws / 'out' / 'brief.json').write_text(json.dumps(base(production={'process_stages': ['Plinth']})), encoding='utf-8')
     s = brief_record(ws, PROC, prior_of())['summary']
     assert s['production']['process_stages'] == ['Plinth'] and s['production']['field_speech_languages'] == ['ta'] and s['prepared_at']
+
+
+# ---------- design/53 L2, L3, L4, L7 ----------
+
+def test_prompt_shows_the_document_timing_and_says_what_chapters_are(ws):
+    (ws / 'out' / 'source.txt').write_text(CLEANED, encoding='utf-8')
+    intake = {'summary': {'title': 'Earth Blocks', 'client': 'VK', 'source_digest': digest(CLEANED), 'timing_lines': ['Suggested Duration: 5–6 Minutes', 'Duration: 30 seconds']}}
+    out = brief_prepare(ws, PROC, lambda s: {'intake': intake}[s])
+    assert 'Suggested Duration: 5–6 Minutes' in out['prompt'] and out['inputs']['document_timing'] == intake['summary']['timing_lines']
+    assert 'what the footage will show' in out['prompt'] and 'never an argument of the script' in out['prompt']
+    assert 'Do not recreate ten mandatory fields' not in out['prompt'] and 'Do not add coverage, feasibility' not in out['prompt']
+    assert 'frame shape' in out['prompt'] and 'watched muted' in out['prompt']
+    out = brief_prepare(ws, PROC, prior_of())
+    assert 'DOCUMENT' in out['prompt'] and 'none' in out['prompt'] and out['inputs']['document_timing'] == []
+    assert 'chapters are what the footage' in ' '.join(PROC['steps']).lower() or 'what the footage will show' in ' '.join(PROC['steps'])
+    assert 'frame shape' in ' '.join(PROC['steps'])
+
+
+def test_format_is_validated_and_defaulted():
+    out = production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en'})
+    assert out['format'] == {'frame': '16:9', 'destinations': [], 'watched_muted': False} and 'format' in out['defaults_applied']
+    out = production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'format': {'frame': '9:16', 'destinations': ['Instagram', 'TikTok'], 'watched_muted': True}})
+    assert out['format'] == {'frame': '9:16', 'destinations': ['Instagram', 'TikTok'], 'watched_muted': True} and 'format' not in out['defaults_applied']
+    for bad in ({'frame': '21:9'}, {'frame': '16:9', 'destinations': 'YouTube'}, {'frame': '16:9', 'watched_muted': 'yes'}, 'vertical'):
+        with pytest.raises(Refused):
+            production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'format': bad})

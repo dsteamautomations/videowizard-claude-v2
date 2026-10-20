@@ -20,6 +20,14 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False, default=str).encode()).hexdigest()
 
 
+def client_profile(card):
+    """design/50 D: the identity and brand strings the clip model may use (competitor names for the brand flag, trademark patterns for on-screen text)."""
+    if not card:
+        return {}
+    return {'industry': card.get('industry') or '', 'description': card.get('client_description') or '', 'services': card.get('services_products') or [],
+            'competitors': card.get('competitors') or [], 'trademark_patterns': card.get('trademark_patterns') or ''}
+
+
 def passages_of(script):
     return [{'passage_id': pid, 'text': text} for pid, text in script['passages'].items()]
 
@@ -63,7 +71,8 @@ def build_request_clip_log(run, procedure, brief, script, clip, policy, *, gener
                       'speaker_policy': {**sp, 'mode': P.MODES[P.mode_of(sp)]},
                       'language_config': {'expected_field_speech_languages': production.get('field_speech_languages') or ['en'], 'final_vo_language': production.get('narration_language') or 'en'},
                       'script_mode': 'SCRIPTED', 'script_beats': beats, 'process_stages': production.get('process_stages') or [],
-                      'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'learned_client_rules': production.get('learned_client_rules') or []}
+                      'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'learned_client_rules': production.get('learned_client_rules') or [],
+                      'client_profile': client_profile(brief.get('client_card') or {})}   # design/50 D
     ffprobe_meta = {'clip_id': clip_tag, 'filename': clip['name'], 'source_resolution_width': clip.get('width'), 'source_resolution_height': clip.get('height'),
                     'source_fps': float(fps), 'is_variable_frame_rate_vfr': False, 'transcoded_from_vfr': bool(clip.get('transcoded_from_vfr')), 'rotation_flag_deg': clip.get('rotation_deg') or 0,
                     'color_transfer': clip.get('color_transfer') or 'unknown', 'duration_seconds': round(duration, 3), 'duration_frames': frames,

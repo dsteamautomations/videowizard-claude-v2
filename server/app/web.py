@@ -112,7 +112,9 @@ def run_page(request: Request, code: str, vw2_session: str | None = Cookie(defau
     outputs = [dict(o) for o in outputs]
     _add_timing(run, outputs)
     by_stage = {s['name']: [o for o in outputs if o['stage'] == s['name']] for s in stages}
-    return render(request, 'run.html', user=user, run=run, stages=stages, by_stage=by_stage, next=nxt)
+    brief = next((o for o in by_stage.get('brief', []) if not o.get('stale')), None)   # design/50: how much the directory held, as the brief saw it
+    directory_fields = len((brief.get('summary') or {}).get('client_card') or {}) if brief else None
+    return render(request, 'run.html', user=user, run=run, stages=stages, by_stage=by_stage, next=nxt, directory_fields=directory_fields)
 
 
 def _add_timing(run, outputs):

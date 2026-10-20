@@ -61,3 +61,10 @@ def test_timing_matches_when_the_take_is_at_least_as_long():
 
 def test_backoff_is_thirty_seconds_then_a_minute():
     assert [backoff_minutes(n) for n in (1, 2, 3, 10)] == [0.5, 1, 1, 1]
+
+
+def test_default_aspect_comes_from_the_brief_unless_the_body_says():
+    from app.visuals_stage import default_aspect
+    assert default_aspect({'production': {'format': {'frame': '9:16'}}}, {}) == '9:16'
+    assert default_aspect({'production': {'format': {'frame': '9:16'}}}, {'aspect_ratio': '1:1'}) == '1:1'
+    assert default_aspect({}, {}) == '16:9' and default_aspect(None, {}) == '16:9'

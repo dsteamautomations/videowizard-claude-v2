@@ -59,3 +59,6 @@ Pauses (design/19): at options, before any option, the child proposes scenes and
 
 ## 20 Oct: the voice stage rebuilt (design/52)
 Built and tested at layer one (plugin 156 tests, server unit 58): the Voices page and directory, the register and usage directory, the compact catalog, one question per message, the delivery direction with its prompt (two lists), every narration kept, the final click as the record, tags stripped from the alignment, V3 (fetch names its file), V4 (quoted "&" allowed), V5 (files inside the run may be shown). Not deployed; the alignment check (one ~20-character paid call) and the deploy wait for SK's word. Layer two (server/tests/test_voices_page.py) needs Docker.
+
+## 20 Oct: L1–L4, L7 (design/53) and L8–L9 (design/50) built
+Layer one: plugin 168 tests, server unit 64. Not deployed yet; server/tests (Docker) untouched for these. Server 0.17.0, plugin 0.16.0 when deployed.

@@ -36,7 +36,15 @@ def srt_of(beats, sentences=None, fps=25):
     return '\n'.join(lines) + '\n'
 
 
-def checklist_of(assembly_summary, pk, master_summary):
+def format_line(fmt):
+    """design/53 L7: the frame shape and destinations from the brief, for the editor."""
+    fmt = fmt or {}
+    dests = ', '.join(fmt.get('destinations') or []) or 'destinations not given'
+    line = f"Format: frame {fmt.get('frame') or '16:9'} for {dests}" if fmt.get('destinations') else f"Format: frame {fmt.get('frame') or '16:9'}; {dests}"
+    return line + ('; watched muted: burn the subtitles in' if fmt.get('watched_muted') else '')
+
+
+def checklist_of(assembly_summary, pk, master_summary, brief=None):
     items = [{'where': f"frame {i.get('timeline_in_frame', 0)}", 'item': i['item']} for i in assembly_summary.get('finishing') or []]
     for c in pk.get('sfx_cues_flat') or []:
         items.append({'where': c.get('start_tc', ''), 'item': f"A3 SFX to source: {c.get('sfx_type')} — {c.get('description')}"})
@@ -49,6 +57,7 @@ def checklist_of(assembly_summary, pk, master_summary):
               {'where': 'Fairlight bus', 'item': f"Master bus: the approved film is rendered to {check.get('integrated_target_lufs', -16)} LUFS integrated (the narration's target; v2 adds no music) "
                                                 f"with a {check.get('peak_ceiling_dbtp', -3)} dBTP ceiling; it {measured}. Keep that if re-rendering"},
               {'where': 'Deliver page', 'item': 'Subtitles: burn in or deliver the SRT alongside (SRT is in the package)'},
+              {'where': 'Deliver page', 'item': format_line(((brief or {}).get('production') or {}).get('format'))},   # design/53 L7
               {'where': 'Color page', 'item': 'Colour groups from the logs: ' + (', '.join(groups) if groups else 'none')},
               {'where': 'A4', 'item': 'Add background music on A4, ducked −28 to −32 dBFS under narration, swells to −18 dBFS in pauses (none in v2)'}]
     return items
@@ -103,10 +112,17 @@ def bundle(conn, store, user, run, outputs):
     files.append({'role': 'plan', 'name': 'Plans/options-package.json', **{k: s2['package'][k] for k in ('key', 'sha256', 'bytes')}})
     srt = srt_of(pk['beats'], (pk.get('narration') or {}).get('sentences'), pk['timeline']['fps']).encode('utf-8')
     pk_flat = {**pk, 'sfx_cues_flat': assembly.get('sfx_cues') or []}
-    checklist = checklist_of(asm_o['summary'], pk_flat, master_o['summary'])
+    brief_summary = (S2._output(outputs, 'brief') or {}).get('summary') or {}
+    from .. import auth
+    card = auth.client_card(run['client_id']) if run.get('client_id') else {}   # design/50: the brand group re-read live; the rest as the brief saw it
+    card = {**(brief_summary.get('client_card') or {}), **{k: v for k, v in card.items() if k in auth.CARD_COLUMNS['brand'] or k in auth.CARD_COLUMNS['contact']}}
+    brand = fetch_brand_files(conn, store, run, card)
+    for f in brand['files']:
+        files.append({'role': 'brand', 'name': 'Graphics/' + f['name'], 'key': f['key'], 'sha256': f['sha256'], 'bytes': f['bytes']})
+    checklist = checklist_of(asm_o['summary'], pk_flat, master_o['summary'], brief=brief_summary) + brand_lines(card, {f['kind']: 'Graphics/' + f['name'] for f in brand['files']})
     md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n'
     csv_text = media_pool_csv(pk).encode('utf-8')
-    open_edit = open_edit_text(run).encode('utf-8')
+    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or []).encode('utf-8')
     generated = {'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
                  'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown')}
     for name, (data, mime) in generated.items():
@@ -126,11 +142,81 @@ def bundle(conn, store, user, run, outputs):
     return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the Mac: `vw pull <code>` then `vw delivery resolve --check`, then `--run --authorization "<operator words>"`'}
 
 
-def open_edit_text(run):
-    """OPEN-EDIT.md (design/47 12.3: the subtitles are one cue per sentence since design/19)."""
-    return (f"# OPEN-EDIT\n\nRun {run['code']} — client {run.get('client')}.\n\n1. Open Approved-timeline.drt in DaVinci Resolve 21.1.1 (File > Import > Timeline) with Media/ next to it.\n"
+NAMES = {'youtube': 'YouTube', 'tiktok': 'TikTok', 'linkedin': 'LinkedIn', 'twitter': 'X'}
+FRAME_OF = {'youtube': '16:9', 'instagram': '9:16 or 1:1', 'tiktok': '9:16', 'facebook': '16:9 or 1:1', 'linkedin': '16:9 or 1:1', 'pinterest': '2:3 or 9:16', 'twitter': '16:9', 'x': '16:9'}
+
+
+def brand_lines(card, fetched):
+    """design/50 D: Brand lines for the editor from the directory card; fetched maps logo kinds to bundle paths."""
+    if not card:
+        return []
+    items = []
+    if card.get('client_logo_url'):
+        items.append({'where': 'Brand', 'item': (f"Logo: {fetched['logo']} (place and size it in Resolve; never in the rendered film)" if fetched.get('logo')
+                                                 else 'Logo: not fetched (URL unreachable or not a file); take it from the directory')})
+    for k, label in (('client_brand_guidelines', 'Brand guidelines'), ('color_palette', 'Palette'), ('typography_fonts', 'Fonts'), ('trademark_patterns', 'Trademark patterns')):
+        if card.get(k):
+            v = card[k]
+            items.append({'where': 'Brand', 'item': f"{label}: {', '.join(v) if isinstance(v, list) else v}"})
+    if card.get('client_cta_instructions'):
+        items.append({'where': 'Brand', 'item': f"CTA instructions (directory): {card['client_cta_instructions']}"})
+    contact = [card[k] for k in ('website_url', 'phone_number', 'email_address') if card.get(k)]
+    if contact:
+        items.append({'where': 'Brand', 'item': 'End card details (directory): ' + ', '.join(contact)})
+    dests = []
+    for k in ('youtube_url', 'instagram_url', 'tiktok_url', 'facebook_url', 'linkedin_url', 'pinterest_url', 'twitter_x_url'):
+        if card.get(k):
+            name = k.split('_')[0]
+            dests.append(f"{NAMES.get(name, name.capitalize())} ({FRAME_OF.get(name, '16:9')})")
+    for pf in card.get('social_sharing_platforms') or []:
+        if not any(pf.lower().split()[0] in d.lower() for d in dests):
+            dests.append(f"{pf} ({FRAME_OF.get(pf.lower().split()[0], '16:9')})")
+    if dests:
+        items.append({'where': 'Brand', 'item': 'Destinations (directory) with their frame shapes: ' + ', '.join(dests)})
+    return items
+
+
+def open_edit_text(run, card=None, differences=None):
+    """OPEN-EDIT.md (design/47 12.3: the subtitles are one cue per sentence since design/19; design/50: the brand section and the recorded differences)."""
+    text = (f"# OPEN-EDIT\n\nRun {run['code']} — client {run.get('client')}.\n\n1. Open Approved-timeline.drt in DaVinci Resolve 21.1.1 (File > Import > Timeline) with Media/ next to it.\n"
             "2. Approved-film.mp4 is the film the operator approved; the timeline reproduces its cuts, crops and zooms. A2 fades are listed in the checklist.\n"
             "3. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do.\n")
+    if card:
+        text += '\n## Brand\n\nFrom the client directory, for the end card and the graphics (Graphics/ holds the logo files when the directory had them): see the Brand lines of the checklist.\n'
+    if differences:
+        text += '\n## Where this film departs from the directory\n\n' + ''.join(
+            f"- {d.get('field')}: the directory says \"{d.get('directory_says')}\"; this film uses \"{d.get('chosen')}\" (decided by the {d.get('decided_by')}"
+            + (f": \"{d['operator_words']}\"" if d.get('operator_words') else '') + ')\n' for d in differences)
+    return text
+
+
+def fetch_brand_files(conn, store, run, card):
+    """design/50 D: the logo files named in the directory, fetched live into <run>/brand/; a failed fetch is skipped and named, never fatal."""
+    import httpx
+    from .. import auth
+    files, skipped = [], []
+    for field in auth.LOGO_FIELDS:
+        url = (card or {}).get(field)
+        kind = field.replace('client_', '').replace('_url', '')
+        if not url:
+            skipped.append(f'{kind}: no URL in the directory')
+            continue
+        try:
+            r = httpx.get(url, follow_redirects=True, timeout=30)
+            ok = r.status_code == 200 and r.content and (r.headers.get('content-type', '').startswith('image/') or url.lower().endswith(('.png', '.jpg', '.jpeg', '.svg', '.webp')))
+        except httpx.HTTPError:
+            ok = False
+        if not ok:
+            skipped.append(f'{kind}: URL unreachable or not an image')
+            continue
+        ext = '.' + url.rsplit('.', 1)[-1].lower().split('?')[0] if '.' in url.rsplit('/', 1)[-1] else '.png'
+        name = kind + ext
+        k = f"{run['id']}/brand/{name}"
+        store.put(k, r.content, r.headers.get('content-type') or 'application/octet-stream')
+        sha = hashlib.sha256(r.content).hexdigest()
+        jobs.record_file(conn, run['id'], 'brand', k, name, sha, len(r.content), r.headers.get('content-type') or 'application/octet-stream')
+        files.append({'name': name, 'kind': kind, 'key': k, 'sha256': sha, 'bytes': len(r.content)})
+    return {'files': files, 'skipped': skipped}
 
 
 def resolve_events(assembly, pk, master):

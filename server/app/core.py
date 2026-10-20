@@ -55,14 +55,18 @@ def with_receipt(conn, user, body, fn):
 
 # ---------- runs ----------
 
-def resolve_client(client):
-    """Exactly one Active directory client by id or exact name (case-insensitive); otherwise refuse with candidates."""
-    from .auth import client_directory
-    rows = client_directory()
+def resolve_client(client, rows=None):
+    """Exactly one Active directory client by id or exact name, trade name or legal name (case-insensitive); otherwise refuse with candidates."""
+    if rows is None:
+        from .auth import client_directory
+        rows = client_directory()
     term = (client or '').strip().lower()
-    matches = [r for r in rows if term and (r['client_id'].lower() == term or r['client_name'].lower() == term)]
+    matches = [r for r in rows if term and (r['client_id'].lower() == term or r['client_name'].lower() == term
+                                            or term in [x.lower() for x in r.get('dba_names') or []] or (r.get('company_legal_name') or '').lower() == term)]   # design/50 D
     if len(matches) == 1:
         return matches[0]
+    if len(matches) > 1:
+        raise Problem(422, 'CLIENT_UNKNOWN', 'That name belongs to more than one Active client; ask the operator which one.', candidates=[r['client_name'] for r in matches][:10], ambiguous=True)
     containing = [r for r in rows if term and term in r['client_name'].lower()]
     if len(containing) == 1 and not matches:  # design/34 1.17: a partial name that fits exactly one Active client resolves to it
         return containing[0]

@@ -546,7 +546,8 @@ def create_run(body: NewRun, user=User, conn=DB):
         return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id']),            # earlier titles for this client (design/36 1.5)
                      'last_brief': core.last_brief(conn, run['client_id']),                    # what the client said last time (design/37 2.2)
                      'client_rules': core.client_rules(conn, run['client_id']),               # rules learned for the client (design/37 2.3)
-                     'last_voice': core.last_voice(conn, run['client_id'])}                    # the client's narrator last time (design/39 4.2)
+                     'last_voice': core.last_voice(conn, run['client_id']),                   # the client's narrator last time (design/39 4.2)
+                     'client_card': auth.client_card(run['client_id'])}                       # what the directory knows (design/50)
     status, resp = core.with_receipt(conn, user, body_dict(body), create)
     return Response(resp, status_code=status)
 
@@ -681,6 +682,13 @@ def voice_restore(body: VoiceId, user=User, conn=DB):
 @app.get('/api/voice/history')
 def voice_history(user=User, conn=DB, voice_id: str = ''):
     return Response({'voices': voices.history(conn, voice_id or None)})
+
+
+@app.get('/api/runs/{run_id}/brand')
+def run_brand(run_id: UUID, user=User, conn=DB):
+    """design/50 D: the directory's logo files fetched into the run's storage (for a visuals reference and the delivery bundle)."""
+    run = core.load_run(conn, user, run_id)
+    return Response(deliv.fetch_brand_files(conn, storage(), run, auth.client_card(run['client_id'])))
 
 
 # ---------- a run's voice page (design/52 B) ----------
