@@ -5,19 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}VideoWizard{% endblock %}</title>
 <link rel="stylesheet" href="/static/style.css">
+<script>(function(){try{var t=localStorage.getItem('vw2-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
 </head>
 <body>
 <header>
   <a href="/runs"><strong>VideoWizard</strong></a>
   {% if user %}
-  <nav>
+  <nav style="margin-left:auto;margin-right:14px">
     <a href="/runs">Runs</a>
     <a href="/voices">Voices</a>
     {% if user.role == 'Admin' %}<a href="/defects">Defects</a>{% endif %}
     <form method="post" action="/logout"><button>Sign out {{ user.name }}</button></form>
   </nav>
   {% endif %}
+  <button class="theme" id="theme-toggle" type="button" title="Light or dark">Theme</button>
 </header>
+<script>(function(){var b=document.getElementById('theme-toggle');function cur(){var t=document.documentElement.getAttribute('data-theme');if(t)return t;return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}function label(){b.textContent=cur()==='dark'?'☾ Dark':'☼ Light';}b.addEventListener('click',function(){var n=cur()==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);try{localStorage.setItem('vw2-theme',n);}catch(e){}label();});label();})();</script>
 <main>
 {% block body %}{% endblock %}
 </main>
