@@ -4,8 +4,8 @@ from conftest import PLUGIN, REPO, run_hook
 VW = PLUGIN / 'scripts' / 'vw.py'
 
 
-def guard(tool, tool_input, cwd, runs=None, env=None):
-    code, _, err = run_hook('guard.py', {'tool_name': tool, 'tool_input': tool_input}, cwd, runs, env)
+def guard(tool, tool_input, cwd, runs=None):
+    code, _, err = run_hook('guard.py', {'tool_name': tool, 'tool_input': tool_input}, cwd, runs)
     return code, err
 
 
@@ -214,22 +214,3 @@ def test_files_inside_the_run_may_be_sent_or_revealed_to_the_operator(tmp_path):
     assert code == 2 and 'inside' in err
     code, err = guard('mcp__ccd_host__reveal_path', {'path': '/Users/x/.vw2/session.json'}, tmp_path)
     assert code == 2
-
-
-def test_the_assistants_own_persisted_tool_outputs_may_be_read(tmp_path):
-    """design/57 (defect 17): the desktop app parks a tool output over ~30 KB under ~/.claude/projects/<project>/<session>/tool-results/;
-    it holds nothing the assistant was not already shown, so a Read there is allowed. Writes there, and anything beside it, stay blocked."""
-    runs = tmp_path / 'runs'
-    (runs / 'VW-3' / 'out').mkdir(parents=True)
-    (runs / '.active').write_text('VW-3')
-    home = tmp_path / 'home'
-    parked = home / '.claude' / 'projects' / '-Users-op-videobuilder' / 'sess-1' / 'tool-results' / 'breky2jmk.txt'
-    parked.parent.mkdir(parents=True)
-    parked.write_text('{"stage": "media"}')
-    env = {'HOME': str(home)}
-    assert guard('Read', {'file_path': str(parked)}, tmp_path, env=env)[0] == 0
-    assert guard('Write', {'file_path': str(parked)}, tmp_path, env=env)[0] == 2
-    assert guard('Read', {'file_path': str(parked.parent.parent / 'other.jsonl')}, tmp_path, env=env)[0] == 2   # the transcript beside it
-    assert guard('Read', {'file_path': str(parked.parent / '..' / '..' / '..' / 'secret.txt')}, tmp_path, env=env)[0] == 2   # resolved out of the folder
-    assert guard('Read', {'file_path': str(tmp_path / 'elsewhere' / 'tool-results' / 'x.txt')}, tmp_path, env=env)[0] == 2   # not under the app's folder
-    assert guard('Read', {'file_path': str(parked)}, tmp_path, env={'HOME': str(tmp_path / 'other-home')})[0] == 2

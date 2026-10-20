@@ -27,9 +27,9 @@ def ws(tmp_path):
     return root
 
 
-def run_hook(name, payload, cwd, runs=None, env=None):
+def run_hook(name, payload, cwd, runs=None):
     """Run a hook the way Claude Code does: JSON on stdin, CLAUDE_PLUGIN_ROOT set. Returns (exit code, stdout, stderr)."""
-    env = {**os.environ, 'CLAUDE_PLUGIN_ROOT': str(PLUGIN), **(env or {})}
+    env = {**os.environ, 'CLAUDE_PLUGIN_ROOT': str(PLUGIN)}
     if runs is not None:
         env['VW2_RUNS'] = str(runs)
     p = subprocess.run([sys.executable, str(PLUGIN / 'hooks' / name)], input=json.dumps({**payload, 'cwd': str(cwd)}),
