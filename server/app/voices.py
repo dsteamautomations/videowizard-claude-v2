@@ -92,6 +92,16 @@ def set_step(state, step):
     state['step'] = step
 
 
+def sub_request_id(request_id, i):
+    """One idempotency id per voice of a multi-voice action, as a UUID (the column's type): derived from the action's id, so a retry maps to the same jobs."""
+    import uuid
+    try:
+        base = uuid.UUID(str(request_id))
+    except ValueError:
+        base = uuid.uuid5(uuid.NAMESPACE_URL, str(request_id))
+    return str(uuid.uuid5(base, str(i)))
+
+
 def check_cap(voice_ids, cap, what):
     names = {6: 'six', 3: 'three'}
     if not voice_ids:
@@ -542,7 +552,7 @@ def audition_shortlist(conn, store, user, run, outputs, request_id):
     for i, entry in enumerate(state['shortlist']):   # the page and the chat path share one road: submit_voice saves a library voice to the account itself
         if entry.get('library'):
             remember(conn, {'voice_id': entry['voice_id'], 'name': entry.get('name') or '', 'library': entry['library']}, 'library')
-        rows.append(jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': entry['voice_id'], 'text': excerpt}, f'{request_id}-{i}', store=store))
+        rows.append(jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': entry['voice_id'], 'text': excerpt}, sub_request_id(request_id, i), store=store))
         entry['voice_id'] = rows[-1]['request']['voice_id']
     state['excerpt'] = excerpt
     save_doc(store, run, 'page.json', state)
@@ -562,7 +572,7 @@ def tryout(conn, store, user, run, outputs, voice_ids, request_id):
     for i, vid in enumerate(voice_ids):
         tweaks = (doc.get('tweaks') or {}).get(vid) or []
         text = VD.directed_passage(script['spoken_text'], doc.get('base') or [], doc.get('register') or '', pp['first_word'], pp['last_word'], tweaks) if doc.get('chosen') != 'none' else pp['text']
-        row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': vid, 'text': text, 'directed': doc.get('chosen') != 'none', 'passage': pp['n']}, f'{request_id}-{i}', store=store)
+        row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': vid, 'text': text, 'directed': doc.get('chosen') != 'none', 'passage': pp['n']}, sub_request_id(request_id, i), store=store)
         rows.append(row)
         state['tried'] = [t for t in state['tried'] if t['voice_id'] != row['request']['voice_id']] + \
             [{'voice_id': row['request']['voice_id'], 'asked_as': vid, 'name': row['request'].get('name'), 'job_id': str(row['id']), 'at': datetime.now(timezone.utc).isoformat()}]
@@ -574,7 +584,7 @@ def tryout(conn, store, user, run, outputs, voice_ids, request_id):
 def narrate_many(conn, store, user, run, outputs, voice_ids, request_id, by='page'):
     """design/54 step 3: up to three voices read the whole script with the direction; every narration is kept."""
     check_cap(voice_ids, NARRATE_MAX, 'narration')
-    rows = [narrate(conn, store, user, run, outputs, vid, f'{request_id}-{i}', by) for i, vid in enumerate(voice_ids)]
+    rows = [narrate(conn, store, user, run, outputs, vid, sub_request_id(request_id, i), by) for i, vid in enumerate(voice_ids)]
     state = page_state(store, run)
     state['step'] = 'narrations'
     save_doc(store, run, 'page.json', state)

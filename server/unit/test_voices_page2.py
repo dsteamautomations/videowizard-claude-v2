@@ -118,3 +118,11 @@ def test_the_procedure_route_serves_every_prompt_of_a_stage():
         for k in st:
             if k.endswith('prompt') or k in ('steps', 'output_shape', 'output_file'):
                 assert k in core.PROCEDURE_KEYS, (st['name'], k)
+
+
+def test_sub_request_ids_are_valid_uuids_and_stable():
+    """VW-6, 20 Oct: the tryout gave each voice's job '<request id>-<n>', which the uuid column refused (500 on the page)."""
+    import uuid
+    base = str(uuid.uuid4())
+    a, b = V.sub_request_id(base, 0), V.sub_request_id(base, 1)
+    assert uuid.UUID(a) and uuid.UUID(b) and a != b and a == V.sub_request_id(base, 0) and a != base
