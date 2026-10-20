@@ -32,7 +32,8 @@ def test_prompt_is_clean_of_v1_machinery_and_carries_the_client_memory(ws):
     for stale in ('save_brief', 'accept_brief', 'employee', 'connector', 'backend', 'browser', 'legacy', 'research a client from its name'):
         assert stale not in p, stale
     assert p.startswith('VW-PROCEDURE') and 'PRODUCTION VALUES' in p and 'propose a web search' in p
-    assert 'from run VW-3:' in p and 'field_speech_languages: ta' in p and 'process_stages: Plinth, Curing' in p
+    assert 'from run VW-3:' in p and 'field_speech_languages: ta' in p
+    assert 'process_stages' not in p.split('from run VW-3:')[1].split('\n\n')[0] and 'Plinth' not in p   # design/56 L10: chapters are this film's, never a recommendation
     assert 'answer to brand-safety (Any brand or safety rules?): NO Brand and safety rules' in p and 'answer to field-languages: Tamil' in p
     assert '- Rejected option #4: no close-ups of unfinished walls (from VW-3)' in p
     assert out['inputs']['last_brief'] == LAST and out['inputs']['client_rules'] == RULES
@@ -48,6 +49,7 @@ def test_first_film_shows_none(ws):
 def test_steps_carry_chapters_production_block_and_the_web_rule():
     steps = ' '.join(PROC['steps'])
     assert 'chapters of the film' in steps and 'production block' in steps and 'I am deviating from the usual procedure' in steps
+    assert 'never taken from a previous brief' in steps and 'not an identifier' in steps   # design/56 L10
     assert 'on every film' in steps and 'same as last time' in steps
 
 
@@ -72,6 +74,21 @@ def test_chapters_default_empty_generic_refused_script_names_accepted():
     assert 'chapters' in str(exc.value)
     out = production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'process_stages': ['Plinth', 'Curing']})
     assert out['process_stages'] == ['Plinth', 'Curing'] and 'process_stages' not in out['defaults_applied']
+
+
+@pytest.mark.parametrize('names', [['Chapter_1_The_Need_For_Better_Building', 'Mixing the mortar'], ['Stage 2 Mixing'], ['Scene1: the site'], ['Part 4'],
+                                   ['3. Curing'], ['3) Curing'], ['Curing', 'curing'], ['---'], ['Mixing_the_mortar']])
+def test_chapter_identifiers_numbering_and_duplicates_are_refused(names):
+    """design/56 L10: a chapter is the plain name of what the footage shows; the list is numbered when presented."""
+    with pytest.raises(Refused) as exc:
+        production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'process_stages': names})
+    assert 'plain names' in str(exc.value) and 'no numbering' in str(exc.value)
+
+
+def test_plain_chapter_names_are_accepted():
+    names = ['Mixing the mortar', 'Pointing the joints', 'Sill course at the window', 'Curing for 7 days', 'Chapter house visit']
+    out = production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'process_stages': names})
+    assert out['process_stages'] == names
 
 
 def test_record_refuses_without_languages_and_records_with_them(ws):

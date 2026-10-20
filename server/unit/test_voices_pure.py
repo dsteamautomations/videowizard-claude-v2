@@ -91,6 +91,17 @@ def test_ensure_on_account_explains_when_no_identity_is_known(monkeypatch):
     monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {})
     with pytest.raises(Problem) as exc:
         V.ensure_on_account(None, FakeProvider(set()), 'lib2')
-    assert exc.value.code == 'VOICE_NOT_ON_ACCOUNT' and 'vw voice catalog' in exc.value.message
+    assert exc.value.code == 'VOICE_NOT_ON_ACCOUNT' and 'never listed lib2' in exc.value.message and '`vw voice catalog`' in exc.value.message
+    assert 'add-library --owner <id> --voice <id>' in exc.value.message
+
+
+def test_ensure_on_account_names_the_search_command_when_the_register_knows_the_name(monkeypatch):
+    """design/56 L11: the register knows the voice by name but holds no library identity; the refusal names the exact command."""
+    import pytest
+    from app.errors import Problem
+    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {'lib3': {'voice_id': 'lib3', 'name': 'Santhi', 'source': 'account', 'public_owner_id': None}})
+    with pytest.raises(Problem) as exc:
+        V.ensure_on_account(None, FakeProvider(set()), 'lib3')
+    assert exc.value.code == 'VOICE_NOT_ON_ACCOUNT' and 'vw voice catalog --search "Santhi"' in exc.value.message and 'submit again' in exc.value.message
 
 

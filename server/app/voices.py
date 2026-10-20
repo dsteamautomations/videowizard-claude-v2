@@ -306,9 +306,10 @@ def ensure_on_account(conn, provider, voice_id):
         if 'voice_not_found' not in (exc.message or ''):
             raise
     row = register_rows(conn, [voice_id]).get(voice_id) or {}
-    if not row.get('public_owner_id'):
-        raise Problem(409, 'VOICE_NOT_ON_ACCOUNT', f'{voice_id} is not on the ElevenLabs account and the tool knows no library identity for it. '
-                                                    'Run `vw voice catalog` with filters that list it (the tool remembers library voices it lists), or `vw voice add-library --owner <id> --voice <id>`.')
+    if not row.get('public_owner_id'):   # design/56 L11: the refusal names the exact command
+        how = (f'Run `vw voice catalog --search "{row["name"]}"` (the tool remembers the library voices it lists), then submit again.' if row.get('name') else
+               f'The tool has never listed {voice_id}: run `vw voice catalog` with filters that show it, or `vw voice add-library --owner <id> --voice <id>`.')
+        raise Problem(409, 'VOICE_NOT_ON_ACCOUNT', f'{voice_id} is not on the ElevenLabs account and the tool knows no library identity for it. {how}')
     voice = elevenlabs.add_library_voice(provider, row['public_owner_id'], row.get('original_voice_id') or voice_id)
     remember(conn, voice, 'library')
     return voice, True

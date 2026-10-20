@@ -196,12 +196,13 @@ def intake_record(ws, procedure, prior, title=None, client=''):
 # ---------- brief ----------
 
 def last_brief_text(lb):
-    """What this client said at their latest brief (design/37 2.2): shown to the model as recommendations, never as answers."""
+    """What this client said at their latest brief (design/37 2.2): shown to the model as recommendations, never as answers.
+    The chapters are left out (design/56 L10): they belong to the film, not the client; VW-5 and VW-6 copied VW-4's."""
     if not lb:
         return 'none'
     prod = lb.get('production') or {}
     lines = [f"from run {lb.get('run')}:"]
-    for k in ('process_stages', 'field_speech_languages', 'narration_language', 'show_speaker_video', 'brand_and_safety_rules', 'target_runtime_s'):
+    for k in ('field_speech_languages', 'narration_language', 'show_speaker_video', 'brand_and_safety_rules', 'target_runtime_s'):
         if k in prod:
             v = prod[k]
             shown = 'none' if v in (None, [], '') else (', '.join(str(x) for x in v) if isinstance(v, list) else str(v))
@@ -302,6 +303,14 @@ def brief_record(ws, procedure, prior, client_card=None):
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
+IDENTIFIER_START = re.compile(r'^\s*(?:(?:chapter|stage|scene|part|section)\s*\d+\b|\d+\s*[.):]?(?:\s|$))', re.I)   # "Chapter 3", "Stage_2", "3.", "3)"
+
+
+def plain_chapter_name(name):
+    """design/56 L10: a chapter is words ("Pointing the joints"), not an identifier; the list is numbered when presented."""
+    return bool(re.search(r'[^\W\d_]', name)) and '_' not in name and not IDENTIFIER_START.match(name.replace('_', ' '))
+
+
 GENERIC_STAGES = ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', 'Stage_4_Result']   # the old default: not allowed (design/37 2.1)
 BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': [],   # the chapters of the film, from the script, or empty
                       'brand_and_safety_rules': [],   # asked of the operator at brief; never filled with blueprint examples (VW-2, 15 Oct 2026)
@@ -355,6 +364,9 @@ def production_inputs(given):
         out[k] = v
     if out['process_stages'] == GENERIC_STAGES:
         raise Refused('out/brief.json: production.process_stages must be the chapters of the film, from the script, or empty; the generic names are not allowed.')
+    if any(not plain_chapter_name(x) for x in out['process_stages']) or len({x.strip().lower() for x in out['process_stages']}) < len(out['process_stages']):
+        raise Refused('out/brief.json: production.process_stages are the plain names of what the footage shows ("Mixing the mortar"), in film order: '
+                      'no Chapter_N or Stage N prefixes, no underscores, no numbering, no duplicates.')
     out['format'] = format_inputs(given.get('format'))   # design/53 L7
     out['defaults_applied'] = sorted(k for k in list(BLUEPRINT_DEFAULTS) + ['format'] if k not in given)
     return out
