@@ -52,7 +52,7 @@ def test_release_rules_are_decided_from_the_register_row():
 
 def test_page_state_starts_empty_and_keeps_every_narration():
     state = V.new_page_state()
-    assert state == {'contract': 'vw2-voice-page-v1', 'shortlist': [], 'excerpt': None, 'pick': None, 'narrations': [], 'final': None}
+    assert state == {'contract': 'vw2-voice-page-v2', 'shortlist': [], 'excerpt': None, 'pick': None, 'narrations': [], 'final': None, 'step': 'browse', 'tried': []}
     V.add_narration(state, {'job_id': 'j1', 'voice_id': 'v1', 'name': 'A', 'direction_digest': 'd1', 'tweaks': [], 'by': 'SK', 'at': '2026-10-20T10:00:00+00:00'})
     V.add_narration(state, {'job_id': 'j2', 'voice_id': 'v1', 'name': 'A', 'direction_digest': 'd1', 'tweaks': [], 'by': 'SK', 'at': '2026-10-20T10:05:00+00:00'})
     assert [n['number'] for n in state['narrations']] == [1, 2]

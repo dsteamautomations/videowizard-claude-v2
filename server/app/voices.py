@@ -11,8 +11,12 @@ from . import voice_direction as VD
 from .errors import Problem
 
 DESCRIPTION_CHARS = 160
-PAGE_CONTRACT = 'vw2-voice-page-v1'
+PAGE_CONTRACT = 'vw2-voice-page-v2'
 SHORTLIST_MAX = 6
+TRYOUT_MAX, NARRATE_MAX = 6, 3   # design/54
+STEPS = ('browse', 'try', 'choose', 'narrations', 'finalise', 'download')
+MIRROR_CACHE_S = 300
+_MIRROR = {'at': 0.0, 'rows': None}
 
 
 # ---------- pure ----------
@@ -81,7 +85,140 @@ def release_refusal(row):
 
 
 def new_page_state():
-    return {'contract': PAGE_CONTRACT, 'shortlist': [], 'excerpt': None, 'pick': None, 'narrations': [], 'final': None}
+    return {'contract': PAGE_CONTRACT, 'shortlist': [], 'excerpt': None, 'pick': None, 'narrations': [], 'final': None, 'step': 'browse', 'tried': []}
+
+
+def set_step(state, step):
+    if step not in STEPS:
+        raise Problem(422, 'STEP', 'step must be one of ' + ', '.join(STEPS))
+    state['step'] = step
+
+
+def check_cap(voice_ids, cap, what):
+    names = {6: 'six', 3: 'three'}
+    if not voice_ids:
+        raise Problem(422, 'VOICES', f'Pick at least one voice for the {what}.')
+    if len(voice_ids) > cap:
+        raise Problem(422, 'VOICES', f'At most {names.get(cap, cap)} voices per {what}; {len(voice_ids)} given.')
+    if len(set(voice_ids)) != len(voice_ids):
+        raise Problem(422, 'VOICES', 'The same voice is listed twice.')
+
+
+# ---------- the catalogue mirror (design/54 A) ----------
+
+MIRROR_COLUMNS = ('voice_id', 'name', 'scope', 'public_owner_id', 'original_voice_id', 'language', 'accent', 'gender', 'age', 'use_case', 'descriptive', 'description',
+                  'preview_url', 'category', 'on_account')
+
+
+def mirror_row(raw, scope):
+    labels = raw.get('labels') or {}
+    sharing = raw.get('sharing') or {}
+    desc = (raw.get('description') or '').strip()
+    if len(desc) > 600:
+        desc = desc[:600].rstrip() + '…'
+
+    def lab(k):
+        return str(raw.get(k) or labels.get(k) or '')
+    return {'voice_id': raw['voice_id'], 'name': raw.get('name') or '', 'scope': scope, 'public_owner_id': raw.get('public_owner_id') or sharing.get('public_owner_id'),
+            'original_voice_id': sharing.get('original_voice_id') or raw['voice_id'], 'language': lab('language'), 'accent': lab('accent'), 'gender': lab('gender'), 'age': lab('age'),
+            'use_case': lab('use_case'), 'descriptive': lab('descriptive'), 'description': desc, 'preview_url': raw.get('preview_url') or '', 'category': raw.get('category') or '',
+            'on_account': scope == 'account'}
+
+
+def mirror_rows_from_provider(provider):
+    """Every library voice (100 a page, all pages) then every account voice."""
+    rows, page = [], 0
+    while True:
+        data = provider.request('GET', '/v1/shared-voices', params={'page_size': 100, 'page': page}).json()
+        rows.extend(mirror_row(v, 'library') for v in data.get('voices', []))
+        if not data.get('has_more') or page > 500:
+            break
+        page += 1
+    cursor, seen = '', set()
+    while True:
+        data = provider.request('GET', '/v2/voices', params={'page_size': 100, **({'next_page_token': cursor} if cursor else {})}).json()
+        rows.extend(mirror_row(v, 'account') for v in data.get('voices', []))
+        cursor = data.get('next_page_token') if data.get('has_more') else None
+        if not cursor or cursor in seen:
+            break
+        seen.add(cursor)
+    return rows
+
+
+def refresh_catalog(conn, provider):
+    """Rebuild the mirror: upsert every listed voice, mark the rest withdrawn. One refresh at a time (an advisory lock)."""
+    if not conn.execute("select pg_try_advisory_xact_lock(hashtext('vw2_catalog_refresh')) as ok").fetchone()['ok']:
+        raise Problem(409, 'REFRESH_RUNNING', 'A catalogue refresh is already running; wait for it to finish.')
+    rows = mirror_rows_from_provider(provider)
+    now = datetime.now(timezone.utc)
+    merged = {}
+    for r in rows:   # a voice listed in the library and on the account: one row, on_account true
+        if r['voice_id'] in merged:
+            merged[r['voice_id']]['on_account'] = merged[r['voice_id']]['on_account'] or r['on_account']
+            continue
+        merged[r['voice_id']] = dict(r)
+    seen = set(merged)
+    with conn.cursor() as cur:   # one batched statement (psycopg pipelines executemany); row by row would take minutes over a remote database
+        cur.executemany('''insert into vw2_voice_catalog(voice_id, name, scope, public_owner_id, original_voice_id, language, accent, gender, age, use_case, descriptive, description,
+                           preview_url, category, on_account, seen_at, refreshed_at, withdrawn_at)
+                           values (%(voice_id)s, %(name)s, %(scope)s, %(public_owner_id)s, %(original_voice_id)s, %(language)s, %(accent)s, %(gender)s, %(age)s, %(use_case)s, %(descriptive)s,
+                           %(description)s, %(preview_url)s, %(category)s, %(on_account)s, %(now)s, %(now)s, null)
+                           on conflict (voice_id) do update set name = excluded.name, scope = excluded.scope, public_owner_id = coalesce(excluded.public_owner_id, vw2_voice_catalog.public_owner_id),
+                           original_voice_id = excluded.original_voice_id, language = excluded.language, accent = excluded.accent, gender = excluded.gender, age = excluded.age,
+                           use_case = excluded.use_case, descriptive = excluded.descriptive, description = excluded.description, preview_url = excluded.preview_url, category = excluded.category,
+                           on_account = excluded.on_account, seen_at = excluded.seen_at, refreshed_at = excluded.refreshed_at, withdrawn_at = null''',
+                        [{**r, 'now': now} for r in merged.values()])
+    withdrawn = conn.execute('update vw2_voice_catalog set withdrawn_at = %s where seen_at < %s and withdrawn_at is null', (now, now)).rowcount
+    _MIRROR['rows'] = None
+    return {'voices': len(seen), 'withdrawn': withdrawn, 'at': now.isoformat()}
+
+
+def refresh_if_due(conn, provider, hours=24):
+    """The worker's nightly refresh: when the mirror is empty or older than `hours`."""
+    row = conn.execute('select max(refreshed_at) as at from vw2_voice_catalog').fetchone()
+    if row and row['at'] and (datetime.now(timezone.utc) - row['at']).total_seconds() < hours * 3600:
+        return None
+    try:
+        return refresh_catalog(conn, provider)
+    except Problem:
+        return None
+
+
+def mirror_rows(conn):
+    """The compact rows the page filters in the browser, with the register and the usage; cached five minutes."""
+    import time
+    if _MIRROR['rows'] is not None and time.time() - _MIRROR['at'] < MIRROR_CACHE_S:
+        return _MIRROR['rows']
+    usage = history(conn)
+    reg = register_rows(conn)
+    rows = []
+    for r in conn.execute('select * from vw2_voice_catalog where withdrawn_at is null order by name').fetchall():
+        f = reg.get(r['voice_id']) or {}
+        u = usage.get(r['voice_id']) or {}
+        rows.append({'voice_id': r['voice_id'], 'name': r['name'], 'language': r['language'], 'accent': r['accent'], 'gender': r['gender'], 'age': r['age'], 'use_case': r['use_case'],
+                     'descriptive': r['descriptive'], 'description': (r['description'] or '')[:DESCRIPTION_CHARS], 'on_account': bool(r['on_account']), 'favourite': bool(f.get('favourite')),
+                     'note': f.get('note') or '', 'narrations': u.get('narrations') or 0, 'auditions': u.get('auditions') or 0, 'last_used': u.get('last_used') or '',
+                     'library': {'public_owner_id': r['public_owner_id'], 'original_voice_id': r['original_voice_id']} if r['public_owner_id'] else None})
+    meta = conn.execute('select max(refreshed_at) as at, count(*) as n from vw2_voice_catalog where withdrawn_at is null').fetchone()
+    _MIRROR.update(at=time.time(), rows={'voices': rows, 'refreshed_at': meta['at'].isoformat() if meta and meta['at'] else None, 'count': meta['n'] if meta else 0})
+    return _MIRROR['rows']
+
+
+def filter_rows(rows, q):
+    """The server twin of the page's filter (used by the chat catalog): equality on labels, a search over name, description and descriptive, two flags; favourites first."""
+    out = []
+    term = (q.get('search') or '').strip().lower()
+    for r in rows:
+        if any(q.get(k) and r.get(k) != q[k] for k in ('language', 'accent', 'gender', 'age', 'use_case')):
+            continue
+        if term and term not in ' '.join(str(r.get(k) or '') for k in ('name', 'description', 'descriptive')).lower():
+            continue
+        if q.get('favourites_only') and not r.get('favourite'):
+            continue
+        if q.get('on_account') and not r.get('on_account'):
+            continue
+        out.append(r)
+    return sorted(out, key=lambda r: not r.get('favourite'))
 
 
 def add_narration(state, narration):
@@ -176,6 +313,14 @@ def ensure_on_account(conn, provider, voice_id):
     voice = elevenlabs.add_library_voice(provider, row['public_owner_id'], row.get('original_voice_id') or voice_id)
     remember(conn, voice, 'library')
     return voice, True
+
+
+def preview_link(conn, provider, voice_id):
+    """The sample link: from the mirror when the voice is there (library voices are not readable through the account endpoint), else from the provider."""
+    row = conn.execute('select preview_url from vw2_voice_catalog where voice_id = %s', (voice_id,)).fetchone()
+    if row and row['preview_url']:
+        return row['preview_url']
+    return provider.voice(voice_id).get('preview_url') or ''
 
 
 def account(provider):
@@ -313,16 +458,28 @@ def record_direction(store, run, outputs, body, user):
         if problems:
             raise Problem(422, 'DIRECTION', 'The direction list was refused: ' + '; '.join(problems[:6]), problems=problems)
     digest = VD.digest(items, register)
-    doc = {'contract': 'vw2-voice-direction-v1', 'kind_of_film': body.get('kind_of_film') or '', 'options': body.get('options') or {}, 'registers': body.get('registers') or {},
+    passages = body.get('test_passages') or []   # design/54 B: three test passages proposed by the assistant, one chosen by the operator
+    problems = VD.validate_passages(passages, script['spoken_text'])
+    if problems:
+        raise Problem(422, 'DIRECTION', 'The test passages were refused: ' + '; '.join(problems[:4]), problems=problems)
+    choice = body.get('passage')
+    if passages and not (isinstance(choice, int) and 1 <= choice <= len(passages)):
+        raise Problem(422, 'DIRECTION', f'passage must be 1 to {len(passages)}: the test passage the operator chose.')
+    chosen_passage = None
+    if passages:
+        pp = passages[choice - 1]
+        chosen_passage = {'n': choice, **pp, 'words': pp['last_word'] - pp['first_word'] + 1, 'text': VD.passage_text(script['spoken_text'], pp['first_word'], pp['last_word'])}
+    doc = {'contract': 'vw2-voice-direction-v2', 'kind_of_film': body.get('kind_of_film') or '', 'options': body.get('options') or {}, 'registers': body.get('registers') or {},
            'chosen': chosen, 'register': register, 'base': items, 'digest': digest, 'approved_by': user['name'], 'at': datetime.now(timezone.utc).isoformat(),
-           'quote': body.get('quote') or '', 'tweaks': (direction_of(store, run) or {}).get('tweaks') or {}}
+           'quote': body.get('quote') or '', 'tweaks': (direction_of(store, run) or {}).get('tweaks') or {},
+           'test_passages': passages, 'passage': chosen_passage, 'sentences': len(VD.sentences_of(script['spoken_text']))}
     state = page_state(store, run)
     previous = direction_of(store, run)
     if previous and previous.get('digest') != digest and state['narrations']:
         mark_direction_change(state, digest)
         save_doc(store, run, 'page.json', state)
     save_doc(store, run, 'direction.json', doc)
-    return {'chosen': chosen, 'digest': digest, 'items': len(items), 'register': register}
+    return {'chosen': chosen, 'digest': digest, 'items': len(items), 'register': register, 'passage': choice if passages else None, 'sentences': doc['sentences']}
 
 
 def set_tweaks(store, run, outputs, voice_id, tweaks):
@@ -395,6 +552,38 @@ def audition_shortlist(conn, store, user, run, outputs, request_id):
     return rows
 
 
+def tryout(conn, store, user, run, outputs, voice_ids, request_id):
+    """design/54 step 2: up to six voices read the chosen test passage with the direction's register and tags; a library voice is saved to the account by the submission."""
+    check_cap(voice_ids, TRYOUT_MAX, 'tryout')
+    doc = direction_of(store, run)
+    if not doc or not doc.get('passage'):
+        raise Problem(409, 'NOT_ALLOWED', 'Ask the assistant for the direction and the test passage first (vw voice direct); the tryout reads that passage.')
+    script, _ = script_text(store, outputs)
+    pp = doc['passage']
+    state = page_state(store, run)
+    rows = []
+    for i, vid in enumerate(voice_ids):
+        tweaks = (doc.get('tweaks') or {}).get(vid) or []
+        text = VD.directed_passage(script['spoken_text'], doc.get('base') or [], doc.get('register') or '', pp['first_word'], pp['last_word'], tweaks) if doc.get('chosen') != 'none' else pp['text']
+        row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': vid, 'text': text, 'directed': doc.get('chosen') != 'none', 'passage': pp['n']}, f'{request_id}-{i}', store=store)
+        rows.append(row)
+        state['tried'] = [t for t in state['tried'] if t['voice_id'] != row['request']['voice_id']] + \
+            [{'voice_id': row['request']['voice_id'], 'asked_as': vid, 'name': row['request'].get('name'), 'job_id': str(row['id']), 'at': datetime.now(timezone.utc).isoformat()}]
+    state['step'] = 'try'
+    save_doc(store, run, 'page.json', state)
+    return rows
+
+
+def narrate_many(conn, store, user, run, outputs, voice_ids, request_id, by='page'):
+    """design/54 step 3: up to three voices read the whole script with the direction; every narration is kept."""
+    check_cap(voice_ids, NARRATE_MAX, 'narration')
+    rows = [narrate(conn, store, user, run, outputs, vid, f'{request_id}-{i}', by) for i, vid in enumerate(voice_ids)]
+    state = page_state(store, run)
+    state['step'] = 'narrations'
+    save_doc(store, run, 'page.json', state)
+    return rows
+
+
 def excerpt_default(text):
     """The first passage of 45 to 70 words, or the first passage, for the shortlist's auditions."""
     best = None
@@ -433,4 +622,5 @@ def finalise(conn, store, user, run, outputs, job_id, quote, recorded_from='page
 def page_summary(store, run):
     state = page_state(store, run)
     direction = direction_of(store, run)
-    return {'pick': state.get('pick'), 'narrations': len(state['narrations']), 'final': bool(state.get('final')), 'direction': (direction or {}).get('chosen') or None}
+    return {'pick': state.get('pick'), 'narrations': len(state['narrations']), 'final': bool(state.get('final')), 'direction': (direction or {}).get('chosen') or None,
+            'passage': ((direction or {}).get('passage') or {}).get('n'), 'step': state.get('step') or 'browse', 'tried': len(state.get('tried') or [])}

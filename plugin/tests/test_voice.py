@@ -171,4 +171,4 @@ def test_voice_prompt_is_the_core():
         assert stale not in p, stale
     assert p.startswith('VW-PROCEDURE') and 'same voice as last time' in p and 'vw voice jobs --wait' in p and len(p.split()) < 700
     steps = ' '.join(STAGES['voice']['steps'])
-    assert '--wait' in steps and 'same voice as last time' in steps and '--note' in steps and 'save_voice_plan' not in steps
+    assert '--wait' in steps and 'last voice' in steps and '--note' in steps and 'save_voice_plan' not in steps   # design/54: the page is the default, the last voice a recommendation

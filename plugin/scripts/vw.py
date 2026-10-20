@@ -419,7 +419,7 @@ def cmd_clients(a):
 
 
 def voice_page_url(code):
-    return f"{server_url()}/runs/{code}/voices"
+    return f"{server_url()}/runs/{code}/voices2"   # design/54: the end-to-end page
 
 
 def cmd_next(a):
@@ -665,14 +665,17 @@ SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s+')
 
 
 def script_sentences(text):
-    """design/52 D: the accepted script's sentences by passage (paragraph) with a running number inside each, as the server counts them."""
-    rows, p = [], 0
+    """design/52 D: the accepted script's sentences by passage (paragraph) with a running number inside each, as the server counts them,
+    and (design/54 B) the first and last word numbers of each sentence, counted over the whole script as the narration timing counts them."""
+    rows, p, w = [], 0, 0
     for para in re.split(r'\n\s*\n', text):
         if not para.strip():
             continue
         p += 1
         for n, sent in enumerate([t for t in SENTENCE_SPLIT.split(para.strip()) if t.strip()], 1):
-            rows.append({'passage_id': f'P{p:03d}', 'sentence': n, 'text': sent.strip()})
+            k = len(sent.split())
+            rows.append({'passage_id': f'P{p:03d}', 'sentence': n, 'text': sent.strip(), 'first_word': w + 1, 'last_word': w + k})
+            w += k
     return rows
 
 
@@ -725,10 +728,11 @@ def cmd_voice(a):
             brief = (current.get('brief') or {}).get('summary') or {}
             page = (full.get('next') or {}).get('voice_page') or {}
             emit({'stage': 'voice', 'step': 'direction', 'not_shareable': NOT_SHAREABLE, 'prompt': procedure.get('direction_prompt') or '',
-                  'inputs': {'sentences': script_sentences(script['spoken_text']), 'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
+                  'inputs': {'sentences': script_sentences(script['spoken_text']), 'words': len(script['spoken_text'].split()),
+                             'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
                              'production': brief.get('production') or {}, 'voice': page.get('pick')},
                   'output_file': 'out/direction.json'}, 0,
-                 'direction: sentences, brief and prompt ready; write out/direction.json (two lists), present both, then `vw voice direct record --choice best_fit|experimental|none --quote "<their words>"`')
+                 'direction: sentences (with word numbers), brief and prompt ready; write out/direction.json (two lists and three test passages), present both and the passages, then `vw voice direct record --choice best_fit|experimental|none --passage 1|2|3 --quote "<their words>"`')
         if a.step == 'record':
             doc = load_json(ws / 'out' / 'direction.json')
             if not isinstance(doc, dict):
@@ -741,11 +745,19 @@ def cmd_voice(a):
             for name in ('best_fit', 'experimental'):
                 if not isinstance(options.get(name), list):
                     emit({'action': 'refused', 'message': f'out/direction.json: options.{name} must be a list of {{passage_id, sentence, tag, reason}}.'}, 2)
+            passages = doc.get('test_passages') or []   # design/54 B
+            if not isinstance(passages, list) or not passages:
+                emit({'action': 'refused', 'message': 'out/direction.json: test_passages must list one to three passages {passage_id, first_word, last_word, why}.'}, 2)
+            if a.passage is None:
+                emit({'action': 'refused', 'message': '--passage 1|2|3 is required: the test passage the operator chose.'}, 2)
+            if not 1 <= a.passage <= len(passages):
+                emit({'action': 'refused', 'message': f'--passage must be 1 to {len(passages)}.'}, 2)
             body = {'chosen': a.choice, 'register': '' if a.choice == 'none' else str((registers.get(a.choice) if isinstance(registers, dict) else '') or ''),
                     'items': [] if a.choice == 'none' else options[a.choice], 'options': options, 'registers': registers if isinstance(registers, dict) else {},
-                    'kind_of_film': doc.get('kind_of_film') or '', 'quote': a.quote.strip()}
+                    'kind_of_film': doc.get('kind_of_film') or '', 'quote': a.quote.strip(), 'test_passages': passages, 'passage': a.passage}
             out = write(f"/api/runs/{m['run_id']}/voice/direction", body)
-            emit(out, 0, f"direction recorded: {a.choice} ({out.get('items', 0)} tag(s)); it applies to every narration of this run. " + next_line(out.get('next')))
+            emit(out, 0, f"direction recorded: {a.choice} ({out.get('items', 0)} tag(s)) and test passage {a.passage}; both apply to every tryout and narration of this run. "
+                 f"Give the operator the voices page: {voice_page_url(m['code'])} (everything else happens there; say 'what is next' when a narration is final).")
         emit({'action': 'refused', 'message': 'vw voice direct prepare | record'}, 2)
     if a.what == 'tweak':
         if not a.voice or not a.file:
@@ -1502,6 +1514,7 @@ def build_parser():
     s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak', 'history'])
     s.add_argument('step', nargs='?', choices=['prepare', 'record'], help='direct: prepare | record (design/52 D)')
     s.add_argument('--choice', choices=['best_fit', 'experimental', 'none'], help="direct record: the operator's choice"); s.add_argument('--quote', help="direct record: the operator's words")
+    s.add_argument('--passage', type=int, help='direct record: the test passage the operator chose (1, 2 or 3; design/54)')
     s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag} inside the run folder')
     s.add_argument('--scope', default='library'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')

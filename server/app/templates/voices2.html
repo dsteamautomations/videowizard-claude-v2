@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Voices · {{ run.code }} · VideoWizard{% endblock %}
+{% block body %}
+<style>
+.v2 .bar{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:12px 0}
+.v2 .bar button{padding:8px 4px;font-size:14px}
+.v2 .bar button.on{background:var(--fg);color:var(--bg)}
+.v2 .head{border:1px solid var(--line);padding:8px 12px;margin:8px 0;font-size:14px}
+.v2 .browse{display:grid;grid-template-columns:200px 1fr;gap:12px}
+.v2 .filters label{margin:6px 0;font-size:13px}
+.v2 .filters input,.v2 .filters select{min-width:0;width:100%}
+.v2 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-content:start}
+.v2 .card{border:1px solid var(--line);padding:10px 12px;font-size:13px}
+.v2 .card .n{font-weight:600;font-size:14px}
+.v2 .card .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.v2 .card button{padding:3px 8px;font-size:12px}
+.v2 .card.tried{border-color:var(--fg)}
+.v2 .row{border:1px solid var(--line);padding:8px 12px;margin:6px 0;font-size:14px}
+.v2 .msg{margin:8px 0;min-height:1.2em}
+.v2 .err{color:var(--err)}
+.v2 .ok{color:var(--ok)}
+.v2 audio{width:100%;max-width:360px;height:32px;margin-top:6px}
+.v2 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.v2 details pre{max-height:360px;overflow:auto}
+.v2 .muted{color:var(--muted)}
+</style>
+<div class="v2" id="app" data-code="{{ run.code }}">
+<h1>Voices for {{ run.code }} — {{ run.title }}</h1>
+<div class="head" id="head">loading…</div>
+<div class="bar" id="bar"></div>
+<div class="msg" id="msg"></div>
+<div id="step-browse">
+  <div class="browse">
+    <div class="filters">
+      <label>Language <input id="f-language" placeholder="en"></label>
+      <label>Accent <input id="f-accent" placeholder="indian"></label>
+      <label>Gender <select id="f-gender"><option value="">any</option><option>male</option><option>female</option><option>neutral</option></select></label>
+      <label>Age <select id="f-age"><option value="">any</option><option value="young">young</option><option value="middle_aged">middle aged</option><option value="old">old</option></select></label>
+      <label>Use case <select id="f-use_case"><option value="">any</option><option>narrative_story</option><option>informative_educational</option><option>conversational</option><option>advertisement</option><option>characters_animation</option><option>social_media</option><option>entertainment_tv</option></select></label>
+      <label>Search <input id="f-search" placeholder="measured"></label>
+      <label><input type="checkbox" id="f-fav"> favourites only</label>
+      <label><input type="checkbox" id="f-acc"> in my voices</label>
+      <p class="muted" id="count"></p>
+      <button id="refresh">Refresh catalogue</button>
+      <p class="muted" id="refreshed"></p>
+    </div>
+    <div class="cards" id="cards"></div>
+  </div>
+  <div class="foot"><span id="trylist" class="muted"></span><button id="to-try">Next: try these voices →</button></div>
+</div>
+<div id="step-try" hidden>
+  <div class="row" id="try-passage"></div>
+  <div class="row"><span id="try-voices"></span><br><button id="do-try"></button></div>
+  <div id="try-results"></div>
+  <div class="foot"><button class="go" data-go="browse">← Browse</button><button class="go" data-go="choose">Next: choose for the full script →</button></div>
+</div>
+<div id="step-choose" hidden>
+  <div id="choose-list"></div>
+  <div class="row"><button id="do-narrate"></button></div>
+  <div class="foot"><button class="go" data-go="try">← Try</button><button class="go" data-go="narrations">Next: narrations →</button></div>
+</div>
+<div id="step-narrations" hidden>
+  <div id="narr-list"></div>
+  <div class="foot"><button class="go" data-go="choose">← Choose</button><button class="go" data-go="finalise">Next: finalise →</button></div>
+</div>
+<div id="step-finalise" hidden>
+  <div id="final-list"></div>
+  <div class="foot"><button class="go" data-go="narrations">← Narrations</button><button class="go" data-go="download">Next: download →</button></div>
+</div>
+<div id="step-download" hidden>
+  <div id="dl"></div>
+  <div class="foot"><button class="go" data-go="finalise">← Finalise</button><span></span></div>
+</div>
+</div>
+<script>
+(function(){
+const code=document.getElementById('app').dataset.code, base='/runs/'+code+'/voices2';
+const STEPS=['browse','try','choose','narrations','finalise','download'];
+const LABELS={browse:'1 Browse',try:'2 Try',choose:'3 Choose',narrations:'4 Narrations',finalise:'5 Finalise',download:'6 Download'};
+let mirror={voices:[]}, data=null, tryout=[], chosen=[], step='browse', timer=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function msg(t,err){const m=$('msg');m.textContent=t||'';m.className='msg '+(err?'err':'ok');}
+async function act(body){const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok){throw new Error(j.message||('HTTP '+r.status));}return j;}
+async function load(){const r=await fetch(base+'/data');data=await r.json();if(!tryout.length&&data.state.tried)tryout=data.state.tried.map(t=>t.asked_as||t.voice_id);if(data.state.step&&!timer)step=data.state.step;render();const open=data.jobs.some(j=>['queued','running','storage_pending'].includes(j.status));clearTimeout(timer);timer=open?setTimeout(load,10000):null;}
+async function loadMirror(){const r=await fetch('/voices2/mirror');mirror=await r.json();$('refreshed').textContent=mirror.refreshed_at?('last refresh '+mirror.refreshed_at.slice(0,16).replace('T',' ')+' · '+mirror.count+' voices'):'no catalogue yet: press Refresh catalogue';renderCards();}
+function filters(){return {language:$('f-language').value.trim().toLowerCase(),accent:$('f-accent').value.trim().toLowerCase(),gender:$('f-gender').value,age:$('f-age').value,use_case:$('f-use_case').value,search:$('f-search').value.trim().toLowerCase(),fav:$('f-fav').checked,acc:$('f-acc').checked};}
+function matches(r,q){for(const k of ['language','accent','gender','age','use_case']){if(q[k]&&(r[k]||'').toLowerCase()!==q[k])return false;}if(q.search&&!((r.name||'')+' '+(r.description||'')+' '+(r.descriptive||'')).toLowerCase().includes(q.search))return false;if(q.fav&&!r.favourite)return false;if(q.acc&&!r.on_account)return false;return true;}
+function renderCards(){const q=filters();const last=data&&data.last_voice?data.last_voice.voice_id:null;const rows=mirror.voices.filter(r=>matches(r,q)).sort((a,b)=>(b.voice_id===last)-(a.voice_id===last)||(b.favourite-a.favourite)||a.name.localeCompare(b.name));$('count').textContent=rows.length+' of '+mirror.voices.length+' voices match';const show=rows.slice(0,200);$('cards').innerHTML=show.map(r=>`<div class="card ${tryout.includes(r.voice_id)?'tried':''}" data-id="${esc(r.voice_id)}"><div class="n">${r.favourite?'★ ':''}${esc(r.name)}${r.voice_id===last?' <small>(last film)</small>':''}</div><div class="muted">${esc([r.accent,r.gender,r.age,r.use_case,r.descriptive].filter(Boolean).join(' · '))}</div><div>${esc(r.description)}</div><div class="muted">${r.on_account?'in my voices':'library'}${r.narrations||r.auditions?' · '+r.narrations+' narr. '+r.auditions+' aud.':''}${r.last_used?' · '+r.last_used:''}</div><div class="acts"><button data-act="sample">▶ sample</button><button data-act="try">${tryout.includes(r.voice_id)?'remove from tryout':'try'}</button>${!r.on_account&&r.library?'<button data-act="save">save to my voices</button>':''}<button data-act="fav">${r.favourite?'unmark favourite':'★ favourite'}</button></div><div class="player"></div></div>`).join('')+(rows.length>200?'<p class="muted">showing the first 200; narrow the filters</p>':'');$('trylist').textContent='Tryout list: '+(tryout.length?tryout.map(id=>name(id)).join(', '):'none')+' ('+tryout.length+' of 6)';}
+function name(id){const r=mirror.voices.find(v=>v.voice_id===id);if(r)return r.name;const t=data&&data.state.tried.find(t=>t.voice_id===id||t.asked_as===id);return t?t.name:id;}
+$('cards').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const card=b.closest('.card'),id=card.dataset.id,row=mirror.voices.find(v=>v.voice_id===id);try{if(b.dataset.act==='sample'){const j=await act({action:'preview',voice_id:id});card.querySelector('.player').innerHTML=j.url?`<audio controls autoplay src="${esc(j.url)}"></audio>`:'<span class="muted">no sample</span>';}
+else if(b.dataset.act==='try'){if(tryout.includes(id))tryout=tryout.filter(x=>x!==id);else if(tryout.length>=6){msg('At most six voices in a tryout; remove one first.',true);return;}else tryout.push(id);renderCards();}
+else if(b.dataset.act==='save'){msg('saving '+row.name+' to my voices…');const j=await act({action:'save',voice_id:id,library:row.library});row.on_account=true;msg(j.name+' is in my voices');renderCards();}
+else if(b.dataset.act==='fav'){const j=await act({action:'favourite',voice_id:id,on:!row.favourite});row.favourite=j.favourite;renderCards();}}catch(err){msg(err.message,true);}});
+['f-language','f-accent','f-gender','f-age','f-use_case','f-search','f-fav','f-acc'].forEach(id=>$(id).addEventListener('input',renderCards));
+$('refresh').addEventListener('click',async()=>{msg('refreshing the catalogue, under a minute…');try{const j=await act({action:'refresh'});msg('catalogue refreshed: '+j.voices+' voices');await loadMirror();}catch(err){msg(err.message,true);}});
+$('to-try').addEventListener('click',()=>go('try'));
+document.querySelectorAll('.go').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
+async function go(s){step=s;render();try{await act({action:'step',step:s});}catch(e){}}
+function render(){if(!data)return;const st=data.state,d=data.direction;const tagged=d&&d.chosen!=='none';$('head').innerHTML=`<strong>${esc(data.run.client)}</strong> · voice stage${data.run.stage!=='voice'?' <span class="ok">(recorded; the run is at '+esc(data.run.stage)+')</span>':''}<br>Direction: ${d?esc(d.chosen)+(tagged?' · register '+esc(d.register)+' · '+d.base.length+' of '+d.sentences+' sentences tagged':''):'<span class="err">none recorded yet: ask the assistant (vw voice direct)</span>'}${d&&d.passage?' · test passage '+d.passage.n+' ('+d.passage.words+' words)':''}${d?' · <a href="#" id="showscript">show the directed script</a>':''}<br><span class="muted">Account: ${data.account.error?esc(data.account.error):'slots '+data.account.voice_slots_used+' of '+data.account.voice_limit+' · operations '+data.account.voice_add_edit_counter+(data.account.max_voice_add_edits?' of '+data.account.max_voice_add_edits:'')+' · characters '+data.account.character_count+' of '+data.account.character_limit}</span><details id="scriptbox" hidden><summary>the directed script</summary><pre>${esc(data.directed_script)}</pre></details>`;const sb=$('showscript');if(sb)sb.addEventListener('click',e=>{e.preventDefault();const x=$('scriptbox');x.hidden=false;x.open=true;});
+const counts={try:st.tried.length+' of 6',choose:chosen.length+' of 3',narrations:String(st.narrations.length)};$('bar').innerHTML=STEPS.map(s=>`<button class="${s===step?'on':''}" data-s="${s}">${LABELS[s]}${counts[s]?' <small>('+counts[s]+')</small>':''}</button>`).join('');$('bar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.s==='download'&&!st.final){msg('No final narration yet.',true);return;}go(b.dataset.s);}));
+STEPS.forEach(s=>$('step-'+s).hidden=(s!==step));renderCards();
+const auds=data.jobs.filter(j=>j.kind==='audition');
+$('try-passage').innerHTML=d&&d.passage?`<strong>Test passage ${d.passage.n}</strong> (${d.passage.words} words, ${tagged?'with the direction tags':'no tags: direction is none'}): <span class="muted">${esc(d.passage.text)}</span>`:'<span class="err">No test passage yet: ask the assistant for the direction and the test passage first.</span>';
+const chars=d&&d.passage?d.passage.text.length:0;$('try-voices').textContent='Tryout: '+(tryout.length?tryout.map(name).join(', '):'none chosen yet (tick "try" on cards in Browse)');const tb=$('do-try');tb.textContent='Try these '+tryout.length+' voices — paid, about '+(chars*tryout.length).toLocaleString()+' characters';tb.disabled=!(d&&d.passage&&tryout.length);
+$('try-results').innerHTML=auds.length?'<h3>Results</h3>'+auds.map(j=>`<div class="row"><strong>${esc(j.name)}</strong> ${j.directed?'<small>with the direction tags</small>':''}${j.saved_from_library?' <small>· saved to my voices</small>':''} · ${esc(j.status)}${j.error?' <span class="err">'+esc(j.error)+'</span>':''}${j.audio_key?'<br><audio controls preload="none" src="/runs/'+code+'/audio/'+esc(j.audio_key)+'"></audio>':''}</div>`).join(''):'';
+const tried=st.tried;$('choose-list').innerHTML=tried.length?tried.map(t=>{const j=auds.filter(a=>a.voice_id===t.voice_id).slice(-1)[0];return `<div class="row"><label><input type="checkbox" class="pick" value="${esc(t.voice_id)}" ${chosen.includes(t.voice_id)?'checked':''}> <strong>${esc(t.name)}</strong></label>${j&&j.audio_key?'<audio controls preload="none" src="/runs/'+code+'/audio/'+esc(j.audio_key)+'"></audio>':'<span class="muted"> tryout not ready</span>'}</div>`;}).join(''):'<p class="muted">Try some voices first.</p>';
+document.querySelectorAll('.pick').forEach(c=>c.addEventListener('change',()=>{chosen=[...document.querySelectorAll('.pick:checked')].map(x=>x.value);if(chosen.length>3){c.checked=false;chosen=chosen.filter(x=>x!==c.value);msg('At most three voices get the full script.',true);}render();}));
+const nb=$('do-narrate');nb.textContent='Narrate the full script with these '+chosen.length+' voices — paid, about '+(data.characters*chosen.length).toLocaleString()+' characters'+(tagged?', with the direction tags':'');nb.disabled=!chosen.length;
+const narrs=st.narrations.map(n=>({...n,job:data.jobs.find(j=>j.id===n.job_id)||{}}));
+$('narr-list').innerHTML=narrs.length?narrs.map(n=>`<div class="row"><strong>${esc(n.name)}</strong> #${n.number} · ${esc(n.job.status||'?')}${tagged?' · with the direction tags':''}${n.tweaks&&n.tweaks.length?' · '+n.tweaks.length+' tweak(s)':''}${n.made_before_direction_change?' · <span class="muted">made before the direction changed</span>':''}${n.job.error?' <span class="err">'+esc(n.job.error)+'</span>':''}${n.job.audio_key?'<br><audio controls preload="none" src="/runs/'+code+'/audio/'+esc(n.job.audio_key)+'"></audio>':''}<details><summary>tweak one sentence for this voice and narrate again</summary><select class="tw-s" data-v="${esc(n.voice_id)}">${data.sentences.map(s=>`<option value="${s.passage_id}|${s.sentence}">${s.passage_id} ${s.sentence}: ${esc(s.text.slice(0,70))}</option>`).join('')}</select> <input class="tw-t" placeholder="[softly]"> <button class="tw-go" data-v="${esc(n.voice_id)}">narrate again — paid, about ${data.characters.toLocaleString()} characters</button></details></div>`).join(''):'<p class="muted">No narration yet.</p>';
+document.querySelectorAll('.tw-go').forEach(b=>b.addEventListener('click',async()=>{const row=b.closest('.row'),sel=row.querySelector('.tw-s').value.split('|'),tag=row.querySelector('.tw-t').value.trim();const tweaks=tag?[{passage_id:sel[0],sentence:parseInt(sel[1]),tag:tag}]:[];try{msg('narrating again…');await act({action:'narrate-again',voice_id:b.dataset.v,tweaks});msg('narration submitted');load();}catch(err){msg(err.message,true);}}));
+const ready=narrs.filter(n=>n.job.status==='ready');$('final-list').innerHTML=st.final?`<div class="row ok">Final: <strong>${esc(st.final.name)}</strong> · by ${esc(st.final.by)} · the run is at media.</div>`:(ready.length?ready.map(n=>`<div class="row"><strong>${esc(n.name)}</strong> #${n.number}<br><audio controls preload="none" src="/runs/${code}/audio/${esc(n.job.audio_key)}"></audio><br><input class="fq" placeholder="your words (required)" style="min-width:320px"> <button class="fin" data-j="${esc(n.job_id)}">Make this the final narration</button></div>`).join(''):'<p class="muted">No ready narration yet.</p>');
+document.querySelectorAll('.fin').forEach(b=>b.addEventListener('click',async()=>{const q=b.closest('.row').querySelector('.fq').value.trim();if(!q){msg('Your words are required.',true);return;}try{await act({action:'final',job_id:b.dataset.j,quote:q});msg('recorded; the run moves to media');await load();go('download');}catch(err){msg(err.message,true);}}));
+const fj=st.final?data.jobs.find(j=>j.id===st.final.job_id):null;$('dl').innerHTML=fj?`<div class="row">Final narration: <strong>${esc(fj.name)}</strong><br><a href="/runs/${code}/audio/${esc(fj.audio_key)}">narration.mp3</a> · <a href="/runs/${code}/audio/${esc(fj.audio_key.replace(/\.mp3$/,'.timing.json'))}">timing.json</a><br><a href="/runs/${code}">the run page</a></div>`:'<p class="muted">The download appears after the final click.</p>';}
+$('do-try').addEventListener('click',async()=>{try{msg('submitting the tryout…');const j=await act({action:'tryout',voice_ids:tryout});msg(j.jobs.length+' tryouts submitted'+(j.saved.length?'; saved to my voices: '+j.saved.join(', '):''));await load();}catch(err){msg(err.message,true);}});
+$('do-narrate').addEventListener('click',async()=>{try{msg('submitting the narrations…');const j=await act({action:'narrate',voice_ids:chosen});msg(j.jobs.length+' narrations submitted; this takes a few minutes');chosen=[];await load();go('narrations');}catch(err){msg(err.message,true);}});
+load().then(loadMirror).catch(err=>msg(err.message,true));
+})();
+</script>
+{% endblock %}

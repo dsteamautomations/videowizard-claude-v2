@@ -28,6 +28,7 @@ ALIGNMENT_TOLERANCE_S = 1.0  # MP3 frame padding: the provider's last character 
 
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
 
+_MIRROR_CHECKED = 0.0
 STOP = False  # set by SIGTERM: finish the current job, claim nothing new, exit (design/25)
 
 
@@ -243,6 +244,15 @@ def tick():
         with connect() as conn:
             finalize_voice(conn, job, status, result, error, cost, retry_in)
         busy = True
+    global _MIRROR_CHECKED
+    if time.time() - _MIRROR_CHECKED > 600 and os.environ.get('VW2_WORKER_CHILD') != '1':   # design/54 A: the parent worker refreshes the catalogue mirror once a day
+        _MIRROR_CHECKED = time.time()
+        try:
+            with connect() as conn:
+                from . import voices
+                voices.refresh_if_due(conn, ElevenLabs())
+        except Exception:  # noqa: BLE001  the mirror is a convenience; it must never stop the worker
+            pass
     from . import analysis_jobs, visual_workers
     from .stage2 import render_jobs
     for family in (analysis_jobs.tick, visual_workers.tick, render_jobs.tick):

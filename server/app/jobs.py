@@ -59,9 +59,10 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
     from . import voices
     voice, saved_now = voices.ensure_on_account(conn, provider, request.get('voice_id'))  # exact identity; a library voice is saved to the account first (defect 16)
     if kind == 'narration':
-        open_jobs = conn.execute("select id from vw2_jobs where run_id=%s and stage='voice' and status = any(%s)", (run['id'], list(OPEN))).fetchall()
+        open_jobs = conn.execute("""select id from vw2_jobs where run_id=%s and stage='voice' and status = any(%s)
+                                    and request->>'kind' = 'narration' and request->>'voice_id' = %s""", (run['id'], list(OPEN), voice['voice_id'])).fetchall()   # design/54: up to three voices at once
         if open_jobs:
-            raise Problem(409, 'JOB_OPEN', 'Finish or recover the open voice job before starting narration.', jobs=[str(j['id']) for j in open_jobs])
+            raise Problem(409, 'JOB_OPEN', 'Finish or recover the open narration in this voice before starting another.', jobs=[str(j['id']) for j in open_jobs])
     snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text, **({'saved_from_library': True} if saved_now else {}),
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
                 **({'timing_mode': 'generation', 'pieces': pieces, **directed} if kind == 'narration' else {})}

@@ -23,7 +23,7 @@ DIRECTION = {'kind_of_film': 'a documentary explainer', 'register': {'best_fit':
 def args(**kw):
     base = {'what': 'direct', 'step': None, 'wait': 0, 'voice': [], 'excerpt': None, 'model': 'eleven_v4', 'settings': None, 'job': None, 'note': None, 'scope': 'account',
             'search': '', 'cursor': '', 'language': '', 'accent': '', 'gender': '', 'age': '', 'use_case': None, 'high_quality': False, 'owner': None,
-            'choice': None, 'quote': None, 'file': None}
+            'choice': None, 'quote': None, 'file': None, 'passage': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -58,12 +58,15 @@ def test_direct_prepare_prints_the_sentences_the_brief_and_the_direction_prompt(
 
 # ---------- direct record ----------
 
+PASSAGES = [{'passage_id': 'P001', 'first_word': 1, 'last_word': 6, 'why': 'the turn'}]
+
+
 def test_direct_record_sends_the_chosen_list_and_the_words(harness, monkeypatch, capsys):
     ws = harness
-    (ws / 'out' / 'direction.json').write_text(json.dumps(DIRECTION), encoding='utf-8')
+    (ws / 'out' / 'direction.json').write_text(json.dumps({**DIRECTION, 'test_passages': PASSAGES}), encoding='utf-8')
     posted = []
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'chosen': 'experimental', 'digest': 'dd', 'items': 1, 'next': {'stage': 'voice'}})
-    code, out, err = run(args(step='record', choice='experimental', quote='the quieter one'), capsys)
+    code, out, err = run(args(step='record', choice='experimental', passage=1, quote='the quieter one'), capsys)
     assert code == 0 and posted[0][0] == '/api/runs/run-1/voice/direction'
     body = posted[0][1]
     assert body['chosen'] == 'experimental' and body['register'] == '[warm, unhurried]' and body['items'] == DIRECTION['options']['experimental'] and body['quote'] == 'the quieter one'
@@ -73,10 +76,10 @@ def test_direct_record_sends_the_chosen_list_and_the_words(harness, monkeypatch,
 
 def test_direct_record_none_sends_an_empty_list(harness, monkeypatch, capsys):
     ws = harness
-    (ws / 'out' / 'direction.json').write_text(json.dumps(DIRECTION), encoding='utf-8')
+    (ws / 'out' / 'direction.json').write_text(json.dumps({**DIRECTION, 'test_passages': PASSAGES}), encoding='utf-8')
     posted = []
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append(body) or {'chosen': 'none', 'digest': 'dd', 'items': 0})
-    code, out, err = run(args(step='record', choice='none', quote='read it plain'), capsys)
+    code, out, err = run(args(step='record', choice='none', passage=1, quote='read it plain'), capsys)
     assert code == 0 and posted[0]['chosen'] == 'none' and posted[0]['items'] == [] and posted[0]['register'] == ''
 
 
@@ -205,7 +208,7 @@ def test_next_carries_the_page_link_at_the_voice_stage(harness, monkeypatch, cap
     with pytest.raises(SystemExit) as exc:
         vw.cmd_next(argparse.Namespace(take_over=False))
     out, err = capsys.readouterr()
-    assert exc.value.code == 0 and json.loads(out)['voice_page_url'] == 'https://x.example/runs/VW-9/voices' and 'https://x.example/runs/VW-9/voices' in err
+    assert exc.value.code == 0 and json.loads(out)['voice_page_url'] == 'https://x.example/runs/VW-9/voices2' and 'https://x.example/runs/VW-9/voices2' in err
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'media'})
     with pytest.raises(SystemExit):
         vw.cmd_next(argparse.Namespace(take_over=False))
@@ -221,10 +224,43 @@ def test_catalog_offers_the_page_link_with_the_same_filters(harness, monkeypatch
     monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'voices': [], 'has_more': False})
     code, out, err = run(args(what='catalog', scope='library', gender='male', age='middle_aged', accent='indian', language='en', search='measured'), capsys)
-    assert code == 0 and out['voice_page_url'] == 'https://x.example/runs/VW-9/voices?browse=1&scope=library&language=en&accent=indian&gender=male&age=middle_aged&search=measured'
+    assert code == 0 and out['voice_page_url'] == 'https://x.example/runs/VW-9/voices2?browse=1&scope=library&language=en&accent=indian&gender=male&age=middle_aged&search=measured'
     assert 'voices page with these filters' in err
 
 
 def test_voice_steps_make_the_page_the_default():
     steps = ' '.join(STAGES['voice']['steps'])
     assert 'the voices page is the default' in steps.lower()
+
+
+# ---------- design/54: test passages with the direction; the page link goes to /voices2; direction comes first ----------
+
+def test_direct_prepare_numbers_the_words_for_passages(harness, monkeypatch, capsys):
+    full = {'procedure_version': '2', 'next': {'stage': 'voice', 'voice_page': {}}, 'outputs': [{'stage': 'brief', 'unit': None, **BRIEF}]}
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: full if '/api/runs/' in path else STAGES['voice'])
+    code, out, err = run(args(step='prepare'), capsys)
+    rows = out['inputs']['sentences']
+    assert [(r['first_word'], r['last_word']) for r in rows] == [(1, 4), (5, 6), (7, 9)] and out['inputs']['words'] == 9
+    assert 'test passages' in out['prompt'].lower() or 'TEST PASSAGES' in out['prompt']
+
+
+def test_direct_record_sends_the_passages_and_the_choice(harness, monkeypatch, capsys):
+    ws = harness
+    doc = {**DIRECTION, 'test_passages': [{'passage_id': 'P001', 'first_word': 1, 'last_word': 6, 'why': 'the turn'}, {'passage_id': 'P002', 'first_word': 7, 'last_word': 9, 'why': 'the close'}]}
+    (ws / 'out' / 'direction.json').write_text(json.dumps(doc), encoding='utf-8')
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append(body) or {'chosen': 'best_fit', 'digest': 'dd', 'items': 1, 'passage': 2})
+    code, out, err = run(args(step='record', choice='best_fit', passage=2, quote='the careful one, passage two'), capsys)
+    assert code == 0 and posted[0]['passage'] == 2 and posted[0]['test_passages'] == doc['test_passages']
+    code, out, _ = run(args(step='record', choice='best_fit', passage=5, quote='x'), capsys)
+    assert code == 2 and 'passage' in out['message']
+    code, out, _ = run(args(step='record', choice='best_fit', passage=None, quote='x'), capsys)
+    assert code == 2 and '--passage' in out['message']
+
+
+def test_page_link_points_at_the_new_page_and_the_steps_put_the_direction_first():
+    assert vw.voice_page_url('VW-9').endswith('/runs/VW-9/voices2')
+    steps = STAGES['voice']['steps']
+    assert 'direct prepare' in steps[1] and 'test passage' in steps[1].lower() and '--passage' in steps[1]
+    assert 'voices page' in steps[2].lower() and 'default' in steps[2].lower()
+    assert 'TEST PASSAGES' in STAGES['voice']['direction_prompt'] and '"test_passages"' in STAGES['voice']['direction_prompt']

@@ -305,3 +305,123 @@ async def voices_action(request: Request, action: str, code: str | None = None, 
             raise Problem(404, 'NOT_FOUND', 'Page not found.')
     except Problem as exc:
         return _back(request, code, error=exc.message)
+
+
+# ---------- design/54: the Voices page end to end (/runs/<code>/voices2), served as data for the page's own JavaScript ----------
+
+@router.get('/runs/{code}/voices2', response_class=HTMLResponse)
+def voices2_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+    return render(request, 'voices2.html', user=user, run=run)
+
+
+def _voices2_state(conn, user, run):
+    from . import core, elevenlabs, voices
+    from .storage import storage
+    store = storage()
+    outputs = core.current_outputs(conn, run['id'])
+    state = voices.page_state(store, run)
+    direction = voices.direction_of(store, run)
+    job_rows = conn.execute("select id, status, request, result, error, created_at from vw2_jobs where run_id=%s and stage='voice' order by created_at", (run['id'],)).fetchall()
+    jobs_ = [{'id': str(j['id']), 'status': j['status'], 'kind': j['request'].get('kind'), 'voice_id': j['request'].get('voice_id'), 'name': j['request'].get('name'),
+              'directed': bool(j['request'].get('directed')), 'passage': j['request'].get('passage'), 'saved_from_library': bool(j['request'].get('saved_from_library')),
+              'audio_key': (j['result'] or {}).get('audio_key'), 'duration_s': (j['result'] or {}).get('duration_s'), 'error': j['error'], 'created_at': j['created_at'].isoformat()}
+             for j in job_rows]
+    try:
+        script, _ = voices.script_text(store, outputs)
+        from . import voice_direction as VD
+        directed = VD.apply(script['spoken_text'], (direction or {}).get('base') or [], (direction or {}).get('register') or '')[0] if direction and direction.get('chosen') != 'none' else script['spoken_text']
+        sentences = [{'passage_id': r['passage_id'], 'sentence': r['sentence'], 'text': r['text']} for r in VD.sentences_of(script['spoken_text'])]
+        characters = len(script['spoken_text'])
+    except Problem:
+        directed, sentences, characters = '', [], 0
+    try:
+        account = voices.account(elevenlabs.ElevenLabs())
+    except Problem as exc:
+        account = {'error': exc.message}
+    nxt = core.next_for(conn, run)
+    return {'run': {'code': run['code'], 'title': run.get('title'), 'client': run.get('client'), 'stage': nxt.get('stage')}, 'state': state, 'direction': direction, 'jobs': jobs_,
+            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account,
+            'last_voice': core.last_voice(conn, run.get('client_id')) if run.get('client_id') else None}
+
+
+@router.get('/runs/{code}/voices2/data')
+def voices2_data(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    from fastapi.responses import JSONResponse
+    from . import core
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+        return JSONResponse(core.jsonable(_voices2_state(conn, user, run)))
+
+
+@router.get('/voices2/mirror')
+def voices2_mirror(request: Request, vw2_session: str | None = Cookie(default=None)):
+    from fastapi.responses import JSONResponse
+    from . import voices
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    with db_connect() as conn:
+        return JSONResponse(voices.mirror_rows(conn))
+
+
+@router.post('/runs/{code}/voices2/act')
+async def voices2_act(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """One JSON post per button: {action, ...}. Every action calls the same server function the vw tool calls."""
+    import uuid
+    from fastapi.responses import JSONResponse
+    from . import core, elevenlabs, voices
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    body = await request.json()
+    action = body.get('action')
+    rid = str(uuid.uuid4())
+    provider = elevenlabs.ElevenLabs()
+    with db_connect() as conn:
+        if action == 'refresh':
+            return JSONResponse(voices.refresh_catalog(conn, provider))
+        if action == 'favourite':
+            row = voices.set_favourite(conn, provider, user, body['voice_id'], bool(body.get('on', True)), body.get('note') or '')
+            voices._MIRROR['rows'] = None
+            return JSONResponse({'voice_id': row['voice_id'], 'favourite': row['favourite']})
+        if action == 'save':
+            lib = body.get('library') or {}
+            v = elevenlabs.add_library_voice(provider, lib['public_owner_id'], lib['original_voice_id'])
+            voices.remember(conn, v, 'library')
+            conn.execute('update vw2_voice_catalog set on_account = true where voice_id in (%s, %s)', (body.get('voice_id'), v['voice_id']))
+            voices._MIRROR['rows'] = None
+            return JSONResponse({'voice_id': v['voice_id'], 'name': v.get('name')})
+        if action == 'preview':
+            return JSONResponse({'url': voices.preview_link(conn, provider, body['voice_id'])})
+        run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True)
+        outputs = core.current_outputs(conn, run['id'])
+        store = storage()
+        if action == 'step':
+            state = voices.page_state(store, run)
+            voices.set_step(state, body['step'])
+            voices.save_doc(store, run, 'page.json', state)
+            return JSONResponse({'step': state['step']})
+        if action == 'tryout':
+            rows = voices.tryout(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid)
+            return JSONResponse({'jobs': [str(r['id']) for r in rows], 'saved': [r['request'].get('name') for r in rows if r['request'].get('saved_from_library')]})
+        if action == 'narrate':
+            rows = voices.narrate_many(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid, 'page')
+            return JSONResponse({'jobs': [str(r['id']) for r in rows]})
+        if action == 'tweaks':
+            return JSONResponse(voices.set_tweaks(store, run, outputs, body['voice_id'], list(body.get('tweaks') or [])))
+        if action == 'narrate-again':
+            row = voices.narrate(conn, store, user, run, outputs, body['voice_id'], rid, 'page', list(body.get('tweaks') or []) or None)
+            return JSONResponse({'job': str(row['id'])})
+        if action == 'final':
+            out = voices.finalise(conn, store, user, run, outputs, body['job_id'], body.get('quote') or '', 'page')
+            return JSONResponse({'recorded': True, 'next': (out.get('next') or {}).get('stage')})
+        raise Problem(404, 'NOT_FOUND', 'No such action.')

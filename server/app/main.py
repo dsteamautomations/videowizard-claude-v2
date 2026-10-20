@@ -441,12 +441,23 @@ class Excerpt(Write):
 
 class Direction(Write):
     chosen: Literal['best_fit', 'experimental', 'none']
-    register: str = ''
+    register_tag: str = Field(default='', alias='register')   # design/49 L13: no shadowing of the base model's attribute
     items: list[dict[str, Any]] = []
     options: dict[str, Any] = {}
     registers: dict[str, Any] = {}
     kind_of_film: str = ''
     quote: str = ''
+    test_passages: list[dict[str, Any]] = []   # design/54 B
+    passage: int | None = None
+    model_config = ConfigDict(extra='forbid', populate_by_name=True)
+
+
+class VoiceIds(Write):
+    voice_ids: list[str] = Field(min_length=1, max_length=6)
+
+
+class Step(Write):
+    step: str
 
 
 class Tweaks(Write):
@@ -744,7 +755,42 @@ def voice_audition_shortlist(run_id: UUID, body: Write, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/voice/direction')
 def voice_direction_record(run_id: UUID, body: Direction, user=User, conn=DB):
-    return _voice_write(run_id, body, user, conn, lambda run, outputs: voices.record_direction(storage(), run, outputs, body_dict(body), user))
+    def fn(run, outputs):
+        d = body_dict(body)
+        d['register'] = d.pop('register_tag', '')
+        return voices.record_direction(storage(), run, outputs, d, user)
+    return _voice_write(run_id, body, user, conn, fn)
+
+
+@app.get('/api/voice/mirror')
+def voice_mirror(user=User, conn=DB):
+    """design/54 A: the whole catalogue as compact rows, filtered in the browser."""
+    return Response(voices.mirror_rows(conn))
+
+
+@app.post('/api/voice/refresh')
+def voice_refresh(user=User, conn=DB):
+    return Response(voices.refresh_catalog(conn, elevenlabs.ElevenLabs()))
+
+
+@app.post('/api/runs/{run_id}/voice/tryout', status_code=201)
+def voice_tryout(run_id: UUID, body: VoiceIds, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: [dict(r) for r in voices.tryout(conn, storage(), user, run, outputs, body.voice_ids, body_dict(body)['request_id'])], 201)
+
+
+@app.post('/api/runs/{run_id}/voice/narrate-many', status_code=201)
+def voice_narrate_many(run_id: UUID, body: VoiceIds, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: [dict(r) for r in voices.narrate_many(conn, storage(), user, run, outputs, body.voice_ids, body_dict(body)['request_id'], 'chat')], 201)
+
+
+@app.post('/api/runs/{run_id}/voice/step')
+def voice_step(run_id: UUID, body: Step, user=User, conn=DB):
+    def fn(run, outputs):
+        state = voices.page_state(storage(), run)
+        voices.set_step(state, body.step)
+        voices.save_doc(storage(), run, 'page.json', state)
+        return {'step': state['step']}
+    return _voice_write(run_id, body, user, conn, fn)
 
 
 @app.post('/api/runs/{run_id}/voice/tweaks')
@@ -773,12 +819,11 @@ def voice_models(user=User):
 
 
 @app.get('/api/voice/preview/{voice_id}')
-def voice_preview(voice_id: str, user=User):
-    voice = elevenlabs.ElevenLabs().voice(voice_id)
-    url = voice.get('preview_url') or ''
+def voice_preview(voice_id: str, user=User, conn=DB):
+    url = voices.preview_link(conn, elevenlabs.ElevenLabs(), voice_id)
     if not url.startswith('https://'):
         raise Problem(404, 'NO_PREVIEW', 'No catalog preview is available for this voice.')
-    return Response({'voice_id': voice_id, 'name': voice['name'], 'url': url})
+    return Response({'voice_id': voice_id, 'url': url})
 
 
 @app.post('/api/voice/library-add')
