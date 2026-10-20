@@ -94,3 +94,15 @@ def test_mirror_page_filters_server_side_and_caps_the_answer(monkeypatch):
     page = V.mirror_page(None, {'accent': 'indian'})
     assert page['matched'] == 250 and len(page['voices']) == 200 and page['voices'][0]['voice_id'] == 'v3' and page['count'] == 500 and page['refreshed_at']
     assert V.mirror_page(None, {'search': 'voice 499'})['matched'] == 1
+
+
+def test_the_procedure_route_serves_every_prompt_of_a_stage():
+    """VW-6, 20 Oct: the direction prompt was missing from the keys the procedure route serves, so the assistant improvised the direction."""
+    import json
+    from pathlib import Path
+    from app import core
+    stages = json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v2.json').read_text(encoding='utf-8'))['stages']
+    for st in stages:
+        for k in st:
+            if k.endswith('prompt') or k in ('steps', 'output_shape', 'output_file'):
+                assert k in core.PROCEDURE_KEYS, (st['name'], k)

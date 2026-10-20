@@ -53,6 +53,9 @@ def with_receipt(conn, user, body, fn):
     return status, response
 
 
+PROCEDURE_KEYS = ('name', 'prompt', 'direction_prompt', 'steps', 'output_shape', 'output_file', 'needs_acceptance', 'paid', 'per_unit', 'cap')   # what the procedure route serves the plugin (every prompt of a stage)
+
+
 # ---------- runs ----------
 
 def resolve_client(client, rows=None):

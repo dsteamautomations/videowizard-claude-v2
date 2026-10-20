@@ -1383,7 +1383,7 @@ def procedure(version: str, stage: str, user=User):
     if stages is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
     st = core._stage(stages, stage)
-    return Response({k: st.get(k) for k in ('name', 'prompt', 'steps', 'output_shape', 'output_file', 'needs_acceptance', 'paid', 'per_unit', 'cap')})
+    return Response({k: st.get(k) for k in core.PROCEDURE_KEYS})
 
 
 @app.get('/api/meta')
