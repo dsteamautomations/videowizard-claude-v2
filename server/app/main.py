@@ -763,9 +763,10 @@ def voice_direction_record(run_id: UUID, body: Direction, user=User, conn=DB):
 
 
 @app.get('/api/voice/mirror')
-def voice_mirror(user=User, conn=DB):
-    """design/54 A: the whole catalogue as compact rows, filtered in the browser."""
-    return Response(voices.mirror_rows(conn))
+def voice_mirror(user=User, conn=DB, language: str = '', accent: str = '', gender: str = '', age: str = '', use_case: str = '', search: str = '', fav: bool = False, acc: bool = False):
+    """design/54 A: the catalogue filtered on the server (20,000 voices); the first 200 matches and the count."""
+    q = {'language': language.lower(), 'accent': accent.lower(), 'gender': gender, 'age': age, 'use_case': use_case, 'search': search.lower(), 'favourites_only': fav, 'on_account': acc}
+    return Response(voices.mirror_page(conn, q))
 
 
 @app.post('/api/voice/refresh')

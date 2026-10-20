@@ -368,8 +368,11 @@ def voices2_mirror(request: Request, vw2_session: str | None = Cookie(default=No
     user = page_user(vw2_session)
     if not user:
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    qp = request.query_params
+    q = {k: (qp.get(k) or '').strip().lower() for k in ('language', 'accent', 'gender', 'age', 'use_case', 'search')}
+    q.update(favourites_only=qp.get('fav') == '1', on_account=qp.get('acc') == '1')
     with db_connect() as conn:
-        return JSONResponse(voices.mirror_rows(conn))
+        return JSONResponse(voices.mirror_page(conn, q))
 
 
 @router.post('/runs/{code}/voices2/act')

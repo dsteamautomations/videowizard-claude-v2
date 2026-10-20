@@ -85,3 +85,12 @@ def test_page_state_has_a_step_and_a_tried_list():
     assert state['step'] == 'try'
     with pytest.raises(Problem):
         V.set_step(state, 'sideways')
+
+
+def test_mirror_page_filters_server_side_and_caps_the_answer(monkeypatch):
+    rows = [{'voice_id': f'v{i}', 'name': f'Voice {i}', 'accent': 'indian' if i % 2 else 'british', 'gender': 'male', 'age': 'middle_aged', 'use_case': '', 'descriptive': '', 'description': '',
+             'language': 'en', 'on_account': False, 'favourite': i == 3} for i in range(500)]
+    monkeypatch.setattr(V, 'mirror_rows', lambda conn: {'voices': rows, 'refreshed_at': '2026-10-20T07:47:00', 'count': 500})
+    page = V.mirror_page(None, {'accent': 'indian'})
+    assert page['matched'] == 250 and len(page['voices']) == 200 and page['voices'][0]['voice_id'] == 'v3' and page['count'] == 500 and page['refreshed_at']
+    assert V.mirror_page(None, {'search': 'voice 499'})['matched'] == 1

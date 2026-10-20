@@ -204,6 +204,16 @@ def mirror_rows(conn):
     return _MIRROR['rows']
 
 
+MIRROR_PAGE = 200
+
+
+def mirror_page(conn, q):
+    """What the page shows for one set of filters: the first 200 matches and how many matched (design/54 A; 20,000 voices are too many to send whole)."""
+    mirror = mirror_rows(conn)
+    found = filter_rows(mirror['voices'], q)
+    return {'voices': found[:MIRROR_PAGE], 'matched': len(found), 'count': mirror['count'], 'refreshed_at': mirror['refreshed_at'], 'limit': MIRROR_PAGE}
+
+
 def filter_rows(rows, q):
     """The server twin of the page's filter (used by the chat catalog): equality on labels, a search over name, description and descriptive, two flags; favourites first."""
     out = []
