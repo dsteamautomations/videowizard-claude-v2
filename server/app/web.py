@@ -13,6 +13,7 @@ from .errors import Problem
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
+templates.env.globals['version'] = settings().SERVER_VERSION   # cache-busts the stylesheet on every release (the browser kept an old style.css on 20 Oct)
 COOKIE = 'vw2_session'
 
 

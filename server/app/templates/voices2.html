@@ -188,6 +188,7 @@ else{tray.textContent=st&&st.final?'Done. The run is at media.':'No final yet.';
 function render(){frame();['browse','try','narrations','final'].forEach(s=>$('s-'+s).hidden=(s!==step));if(!data)return;if(step==='browse')renderBrowse();if(step==='try')renderTry();if(step==='narrations')renderNarr();if(step==='final')renderFinal();footer();}
 async function load(){const r=await fetch(base+'/data');data=await r.json();(data.state.tried||[]).forEach(t=>names[t.voice_id]=t.name);(data.known||[]).forEach(k=>names[k.voice_id]=k.name);if(!timer&&data.state.step&&['browse','try','narrations','final'].includes(data.state.step)&&!touched)step=data.state.step;render();const open=data.jobs.some(j=>['queued','running','storage_pending'].includes(j.status));clearTimeout(timer);timer=open?setTimeout(load,10000):null;}
 const u=new URLSearchParams(location.search);['tab','search','language','accent','gender','age','use_case','category','sort'].forEach(k=>{if(u.get(k))q[k]=u.get(k);});
+if(anyFilter())touched=true;   // a link with filters opens Browse, whatever step was remembered
 syncControls();load().then(()=>{if(anyFilter())searchNow();}).catch(err=>msg(err.message,true));
 })();
 </script>
