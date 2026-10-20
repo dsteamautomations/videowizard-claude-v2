@@ -4,24 +4,9 @@ from datetime import datetime, timezone
 
 from app import voices as V
 
-RAW = {'voice_id': 'v1', 'name': 'Adamya Sharma', 'labels': {'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'informative_educational', 'descriptive': 'confident'},
+RAW_UNUSED = {'voice_id': 'v1', 'name': 'Adamya Sharma', 'labels': {'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'informative_educational', 'descriptive': 'confident'},
        'description': 'A 30-year-old Indian male, ' + 'authoritative voice, ' * 20, 'preview_url': 'https://x/p.mp3', 'category': 'professional', 'scope': 'library',
        'high_quality_base_model_ids': ['eleven_v4'], 'verified_languages': [{'language': 'en'}], 'sharing': {'public_owner_id': 'o1', 'original_voice_id': 'v1'}, 'public_owner_id': 'o1'}
-
-
-def test_compact_row_keeps_the_identifying_fields_and_cuts_the_description():
-    row = V.compact(RAW, register={'v1': {'favourite': True, 'note': 'warm'}}, usage={'v1': {'narrations': 2, 'auditions': 5, 'last_used': '2026-10-18'}}, account_ids={'v1'})
-    assert row['voice_id'] == 'v1' and row['accent'] == 'indian' and row['gender'] == 'male' and row['age'] == 'middle_aged' and row['use_case'] == 'informative_educational'
-    assert len(row['description']) <= 161 and row['description'].endswith('…') and row['preview_url'] == 'https://x/p.mp3'
-    assert row['favourite'] is True and row['note'] == 'warm' and row['on_account'] is True and row['narrations'] == 2 and row['auditions'] == 5
-    assert row['library'] == {'public_owner_id': 'o1', 'original_voice_id': 'v1'}
-    assert set(row) <= {'voice_id', 'name', 'accent', 'gender', 'age', 'use_case', 'descriptive', 'description', 'preview_url', 'scope', 'on_account', 'favourite', 'note',
-                        'narrations', 'auditions', 'last_used', 'library', 'category'}
-
-
-def test_compact_row_without_register_or_usage():
-    row = V.compact({'voice_id': 'v2', 'name': 'X', 'labels': {}, 'description': None}, register={}, usage={}, account_ids=set())
-    assert row['favourite'] is False and row['on_account'] is False and row['narrations'] == 0 and row['description'] == ''
 
 
 def when(day):
@@ -109,15 +94,3 @@ def test_ensure_on_account_explains_when_no_identity_is_known(monkeypatch):
     assert exc.value.code == 'VOICE_NOT_ON_ACCOUNT' and 'vw voice catalog' in exc.value.message
 
 
-def test_catalog_remembers_library_identities(monkeypatch):
-    from app import elevenlabs
-    found = {'voices': [{'voice_id': 'lib1', 'name': 'A', 'labels': {}, 'scope': 'library', 'public_owner_id': 'o1', 'sharing': {'public_owner_id': 'o1', 'original_voice_id': 'lib1'}},
-                        {'voice_id': 'cus1', 'name': 'B', 'labels': {}, 'scope': 'library'}], 'has_more': False, 'next_page_token': None, 'total_count': 2, 'scope': 'library'}
-    monkeypatch.setattr(elevenlabs, 'discover', lambda provider, q: found)
-    monkeypatch.setattr(V, 'history', lambda conn, voice_id=None: {})
-    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {})
-    monkeypatch.setattr(V, 'account_ids', lambda provider: set())
-    remembered = []
-    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: remembered.append((voice['voice_id'], source)))
-    out = V.catalog(None, None, {'scope': 'library'})
-    assert remembered == [('lib1', 'library')] and len(out['voices']) == 2

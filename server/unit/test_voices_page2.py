@@ -41,7 +41,7 @@ def test_search_explore_returns_compact_rows_with_the_register_and_usage(monkeyp
     monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {'lib0a': {'favourite': True, 'note': 'warm'}})
     monkeypatch.setattr(V, 'history', lambda conn, voice_id=None: {'lib0b': {'narrations': 1, 'auditions': 2, 'last_used': '2026-10-18'}})
     remembered = []
-    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: remembered.append(voice['voice_id']))
+    monkeypatch.setattr(V, 'remember_many', lambda conn, rows: remembered.extend(r['voice_id'] for r in rows))
     prov = FakeProvider()
     out = V.search(None, prov, {'tab': 'explore', 'gender': 'male', 'page': 0})
     assert out['total'] == 6 and out['has_more'] is True and out['page'] == 0 and [r['voice_id'] for r in out['voices']] == ['lib0a', 'lib0b', 'lib0c']
@@ -57,7 +57,7 @@ def test_search_mine_and_favourites(monkeypatch):
     V._SEARCH.clear()
     monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {'acc1': {'favourite': True, 'note': ''}, 'gone1': {'favourite': True, 'name': 'Gone', 'public_owner_id': 'o9'}})
     monkeypatch.setattr(V, 'history', lambda conn, voice_id=None: {})
-    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: None)
+    monkeypatch.setattr(V, 'remember_many', lambda conn, rows: None)
     prov = FakeProvider()
     mine = V.search(None, prov, {'tab': 'mine'})
     assert [r['voice_id'] for r in mine['voices']] == ['acc1'] and mine['voices'][0]['on_account'] is True and mine['total'] == 1

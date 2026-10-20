@@ -1,93 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Voices{% if run %} · {{ run.code }}{% endif %} · VideoWizard{% endblock %}
+{% block title %}Voices · VideoWizard{% endblock %}
 {% block body %}
-{% set base = '/runs/' ~ run.code ~ '/voices' if run else '/voices' %}
-<h1>Voices{% if run %} for <a href="/runs/{{ run.code }}">{{ run.code }}</a> — {{ run.title }}{% else %} directory{% endif %}</h1>
-{% if message %}<p class="ok">{{ message }}</p>{% endif %}
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
-<p class="muted">Account: {% if account.error %}{{ account.error }}{% else %}{{ account.tier or '' }} · voice slots {{ account.voice_slots_used }} of {{ account.voice_limit }} (library voices use none)
- · add/edit operations this month {{ account.voice_add_edit_counter }}{% if account.max_voice_add_edits %} of {{ account.max_voice_add_edits }}{% endif %}
- · characters {{ account.character_count }} of {{ account.character_limit }}{% endif %}</p>
-
-{% if run %}
-<section class="output">
-<h2>This run</h2>
-<p><strong>Pick:</strong> {% if state.pick %}{{ state.pick.name or state.pick.voice_id }} (provisional, {{ state.pick.by }} {{ state.pick.at[:16] }}){% else %}none yet{% endif %}
- · <strong>Direction:</strong> {% if direction %}{{ direction.chosen }}{% if direction.register %} — register {{ direction.register }}, {{ direction.base|length }} tag(s){% endif %}{% else %}none recorded yet: ask the assistant (vw voice direct){% endif %}
- · <strong>Final:</strong> {% if state.final %}{{ state.final.name }}{% else %}not yet{% endif %}</p>
-{% if direction and direction.base %}<details><summary>The direction list</summary><table><tr><th>Passage</th><th>Sentence</th><th>Tag</th><th>Reason</th></tr>
-{% for i in direction.base %}<tr><td>{{ i.passage_id }}</td><td>{{ i.sentence }}</td><td>{{ i.tag }}</td><td>{{ i.reason or '' }}</td></tr>{% endfor %}</table></details>{% endif %}
-<p><strong>Shortlist</strong> ({{ state.shortlist|length }} of 6): {% for v in state.shortlist %}{{ v.name or v.voice_id }}{% if not loop.last %}, {% endif %}{% else %}empty{% endfor %}</p>
-<form method="post" action="{{ base }}/excerpt"><label>Audition excerpt (one passage of the script; the first 45–70 word passage when empty)
-<input name="text" value="{{ state.excerpt or '' }}" style="min-width:60%"></label><button>Set excerpt</button></form>
-<form method="post" action="{{ base }}/audition"><button {% if not state.shortlist %}disabled{% endif %}>Audition the shortlist ({{ state.shortlist|length }} voices, paid: about {{ (state.excerpt or '')|length or 400 }} characters each)</button></form>
-{% if auditions %}<h3>Auditions</h3><table><tr><th>Voice</th><th>When</th><th>Status</th><th>Listen</th><th></th></tr>
-{% for j in auditions %}<tr><td>{{ j.request.name }}{% if j.request.directed %} <small>with tags</small>{% endif %}</td><td>{{ j.created_at.strftime('%m-%d %H:%M') }}</td><td>{{ j.status }}{% if j.error %} <span class="error">{{ j.error }}</span>{% endif %}</td>
-<td>{% if j.status == 'ready' %}<audio controls preload="none" src="/runs/{{ run.code }}/audio/{{ j.result.audio_key }}"></audio>{% endif %}</td>
-<td><form method="post" action="{{ base }}/pick"><input type="hidden" name="voice_id" value="{{ j.request.voice_id }}"><input type="hidden" name="name" value="{{ j.request.name }}"><button>Pick this voice</button></form></td></tr>{% endfor %}</table>{% endif %}
-{% if state.pick %}
-<h3>Full narration with {{ state.pick.name or state.pick.voice_id }}</h3>
-<form method="post" action="{{ base }}/direction-audition"><input type="hidden" name="voice_id" value="{{ state.pick.voice_id }}">
-<label>Try one passage with its tags first (optional, paid) <select name="passage_id">{% for p in passages %}<option>{{ p }}</option>{% endfor %}</select></label>
-<button {% if not direction or direction.chosen == 'none' %}disabled{% endif %}>Try one passage in this voice</button></form>
-<form method="post" action="{{ base }}/narrate"><input type="hidden" name="voice_id" value="{{ state.pick.voice_id }}">
-<label>Tweaks for this voice only, JSON list of {passage_id, sentence, tag}; empty keeps the base list <input name="tweaks" value="" style="min-width:60%"></label>
-<button>Full narration with this voice (paid: {{ characters }} characters, the whole script)</button></form>
-{% endif %}
-{% if state.narrations %}<h3>Narrations kept on this run</h3><table><tr><th>Voice</th><th>#</th><th>When</th><th>Status</th><th>Listen</th><th>Make final</th></tr>
-{% for n in state.narrations %}<tr><td>{{ n.name }}{% if n.tweaks %} <small>{{ n.tweaks|length }} tweak(s)</small>{% endif %}{% if n.made_before_direction_change %} <small class="muted">made before the direction changed</small>{% endif %}</td>
-<td>{{ n.number }}</td><td>{{ n.at[:16] }}</td><td>{{ n.job.status if n.job else '?' }}{% if n.job and n.job.error %} <span class="error">{{ n.job.error }}</span>{% endif %}</td>
-<td>{% if n.job and n.job.status == 'ready' %}<audio controls preload="none" src="/runs/{{ run.code }}/audio/{{ n.job.result.audio_key }}"></audio>{% endif %}</td>
-<td>{% if n.job and n.job.status == 'ready' and not state.final %}<form method="post" action="{{ base }}/final"><input type="hidden" name="job_id" value="{{ n.job_id }}">
-<input name="quote" placeholder="your words (required)" required><button>Make this the final narration</button></form>{% elif state.final and state.final.job_id == n.job_id %}<strong>final</strong>{% endif %}</td></tr>{% endfor %}</table>{% endif %}
-</section>
-{% endif %}
-
-<section>
-<h2>{% if run %}Browse{% else %}Every voice we know{% endif %}</h2>
-{% if run %}
-<form method="get" action="{{ base }}">
-<input type="hidden" name="browse" value="1">
-<label>Scope <select name="scope"><option value="library" {% if q.scope == 'library' %}selected{% endif %}>library</option><option value="account" {% if q.scope == 'account' %}selected{% endif %}>account</option><option value="favourites" {% if q.scope == 'favourites' %}selected{% endif %}>favourites</option></select></label>
-<label>Language <input name="language" value="{{ q.language }}" style="min-width:80px"></label>
-<label>Accent <input name="accent" value="{{ q.accent }}" style="min-width:120px"></label>
-<label>Gender <select name="gender"><option value="">any</option>{% for g in ('male', 'female', 'neutral') %}<option {% if q.gender == g %}selected{% endif %}>{{ g }}</option>{% endfor %}</select></label>
-<label>Age <select name="age"><option value="">any</option>{% for g in ('young', 'middle_aged', 'old') %}<option {% if q.age == g %}selected{% endif %}>{{ g }}</option>{% endfor %}</select></label>
-<label>Use case <select name="use_case"><option value="">any</option>{% for u in use_cases %}<option {% if u in q.use_cases %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></label>
-<label>Search <input name="search" value="{{ q.search }}"></label>
-<button>Browse</button></form>
-{% endif %}
-{% if catalog %}
-<form method="post" action="{{ base }}/shortlist">
-<table><tr><th></th><th>Voice</th><th>Labels</th><th>Description</th><th>Sample</th><th>Used</th><th>Favourite</th><th></th></tr>
-{% for v in catalog.voices %}<tr>
-<td>{% if run %}<input type="checkbox" name="voice" value='{{ {"voice_id": v.voice_id, "name": v.name, "library": v.library}|tojson }}'>{% endif %}</td>
-<td>{% if v.favourite %}★ {% endif %}{{ v.name }}<br><small class="muted">{{ v.voice_id }}{% if v.on_account %} · on the account{% endif %}{% if v.missing %} · <span class="error">missing from the account</span>{% endif %}</small></td>
-<td><small>{{ v.accent }} {{ v.gender }} {{ v.age }} {{ v.use_case }} {{ v.descriptive }}</small></td><td><small>{{ v.description }}</small>{% if v.note %}<br><small class="muted">note: {{ v.note }}</small>{% endif %}</td>
-<td>{% if v.preview_url %}<audio controls preload="none" src="{{ v.preview_url }}"></audio>{% endif %}</td>
-<td><small>{{ v.narrations }} narr. {{ v.auditions }} aud.{% if v.last_used %} · {{ v.last_used }}{% endif %}</small></td>
-<td><small>{% if v.favourite %}★{% else %}—{% endif %}</small></td>
-<td><small>
-{% if v.favourite %}<a href="#" onclick="document.getElementById('unfav-{{ loop.index }}').submit();return false">unmark</a>{% else %}<a href="#" onclick="document.getElementById('fav-{{ loop.index }}').submit();return false">mark favourite</a>{% endif %}
-{% if v.missing %} · <a href="#" onclick="document.getElementById('restore-{{ loop.index }}').submit();return false">save again</a>{% elif v.on_account and v.library and not v.favourite %} · <a href="#" onclick="document.getElementById('release-{{ loop.index }}').submit();return false">release</a>{% endif %}
-</small></td></tr>{% endfor %}</table>
-{% if run %}<button>Shortlist the ticked voices (up to 6)</button>{% endif %}
-</form>
-{% for v in catalog.voices %}
-<form id="fav-{{ loop.index }}" method="post" action="{{ base }}/favourite"><input type="hidden" name="voice_id" value="{{ v.voice_id }}"><input type="hidden" name="on" value="1"></form>
-<form id="unfav-{{ loop.index }}" method="post" action="{{ base }}/favourite"><input type="hidden" name="voice_id" value="{{ v.voice_id }}"><input type="hidden" name="on" value="0"></form>
-<form id="restore-{{ loop.index }}" method="post" action="{{ base }}/restore"><input type="hidden" name="voice_id" value="{{ v.voice_id }}"></form>
-<form id="release-{{ loop.index }}" method="post" action="{{ base }}/release"><input type="hidden" name="voice_id" value="{{ v.voice_id }}"></form>
-{% endfor %}
-{% if catalog.has_more and catalog.next_page_token %}<p><a href="{{ base }}?browse=1&scope={{ q.scope }}&language={{ q.language }}&accent={{ q.accent }}&gender={{ q.gender }}&age={{ q.age }}&use_case={{ q.use_cases|join(',') }}&search={{ q.search }}&cursor={{ catalog.next_page_token }}">more</a></p>{% endif %}
-{% elif run %}<p class="muted">Set the filters and press Browse. Favourites come first.</p>{% endif %}
-{% if not run %}
-<table><tr><th>Voice</th><th>Source</th><th>Favourite</th><th>Final in</th><th>Narrated in</th><th>Auditioned in</th><th>Last used</th></tr>
-{% for vid, h in history.items() %}{% set r = register.get(vid) %}<tr><td>{{ h.name }}<br><small class="muted">{{ vid }}</small></td><td>{{ r.source if r else '' }}</td><td>{% if r and r.favourite %}★ since {{ r.favourite_at.strftime('%Y-%m-%d') }} by {{ r.favourite_by }}{% endif %}</td>
+<h1>Voices</h1>
+<p class="muted">Every voice this account has used or marked, and where. Favourites first. Voices are chosen per run on that run's voices page.</p>
+{% set rows = [] %}
+{% if not history and not register %}<p class="muted">No voice has been used or marked yet.</p>{% else %}
+<table>
+<tr><th>Voice</th><th>Favourite</th><th>Final narration in</th><th>Narrations</th><th>Tryouts</th><th>Last used</th></tr>
+{% for vid, h in history.items() %}{% set r = register.get(vid) %}
+<tr><td><strong>{{ h.name }}</strong><br><small>{{ vid }}{% if r and r.note %} · {{ r.note }}{% endif %}</small></td>
+<td>{% if r and r.favourite %}★ since {{ r.favourite_at.strftime('%Y-%m-%d') }} by {{ r.favourite_by }}{% endif %}</td>
 <td>{% for p in h.final_in %}<a href="/runs/{{ p.code }}">{{ p.code }}</a> {{ p.title }} ({{ p.client }}, {{ p.date }})<br>{% endfor %}</td>
-<td>{{ h.narrations }}{% for p in h.narrated_in %}<br><small>{{ p.code }} {{ p.date }}</small>{% endfor %}</td><td>{{ h.auditions }}{% for p in h.auditioned_in %}<br><small>{{ p.code }} {{ p.date }}</small>{% endfor %}</td><td>{{ h.last_used }}</td></tr>{% endfor %}
-{% for vid, r in register.items() if vid not in history %}<tr><td>{{ r.name }}<br><small class="muted">{{ vid }}</small></td><td>{{ r.source }}</td><td>{% if r.favourite %}★{% endif %}</td><td colspan="4" class="muted">never used</td></tr>{% endfor %}
+<td>{{ h.narrations }}</td><td>{{ h.auditions }}</td><td>{{ h.last_used }}</td></tr>
+{% endfor %}
+{% for vid, r in register.items() if vid not in history and r.favourite %}
+<tr><td><strong>{{ r.name }}</strong><br><small>{{ vid }}{% if r.note %} · {{ r.note }}{% endif %}</small></td><td>★ since {{ r.favourite_at.strftime('%Y-%m-%d') }} by {{ r.favourite_by }}</td><td colspan="4" class="muted">not used yet</td></tr>
+{% endfor %}
 </table>
 {% endif %}
-</section>
 {% endblock %}

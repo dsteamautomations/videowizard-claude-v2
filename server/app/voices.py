@@ -12,32 +12,11 @@ from .errors import Problem
 
 DESCRIPTION_CHARS = 160
 PAGE_CONTRACT = 'vw2-voice-page-v2'
-SHORTLIST_MAX = 6
 TRYOUT_MAX, NARRATE_MAX = 6, 3   # design/54
 STEPS = ('browse', 'try', 'narrations', 'final')   # design/55: four steps
 
 
 # ---------- pure ----------
-
-def compact(raw, register, usage, account_ids):
-    """One catalog row the assistant and the page can read: identity, labels, a short description, the preview link and what we know."""
-    labels = raw.get('labels') or {}
-    desc = (raw.get('description') or '').strip()
-    if len(desc) > DESCRIPTION_CHARS:
-        desc = desc[:DESCRIPTION_CHARS].rstrip() + '…'
-    reg = register.get(raw['voice_id']) or {}
-    use = usage.get(raw['voice_id']) or {}
-    sharing = raw.get('sharing') or {}
-    owner = raw.get('public_owner_id') or sharing.get('public_owner_id')
-    row = {'voice_id': raw['voice_id'], 'name': raw.get('name') or '', 'accent': labels.get('accent') or '', 'gender': labels.get('gender') or '', 'age': labels.get('age') or '',
-           'use_case': labels.get('use_case') or '', 'descriptive': labels.get('descriptive') or '', 'description': desc, 'preview_url': raw.get('preview_url') or '',
-           'scope': raw.get('scope') or '', 'category': raw.get('category') or '', 'on_account': raw['voice_id'] in account_ids,
-           'favourite': bool(reg.get('favourite')), 'note': reg.get('note') or '', 'narrations': use.get('narrations') or 0, 'auditions': use.get('auditions') or 0,
-           'last_used': use.get('last_used') or ''}
-    if owner:
-        row['library'] = {'public_owner_id': owner, 'original_voice_id': sharing.get('original_voice_id') or raw['voice_id']}
-    return row
-
 
 def _day(value):
     return value.date().isoformat() if isinstance(value, datetime) else str(value)[:10]
@@ -199,8 +178,7 @@ def _decorate(conn, rows):
     for r in rows:
         f, u = reg.get(r['voice_id']) or {}, usage.get(r['voice_id']) or {}
         r.update(favourite=bool(f.get('favourite')), note=f.get('note') or '', narrations=u.get('narrations') or 0, auditions=u.get('auditions') or 0, last_used=u.get('last_used') or '')
-        if r.get('library'):
-            remember(conn, {'voice_id': r['voice_id'], 'name': r['name'], 'library': r['library']}, 'library')   # defect 16: the identity an audition needs
+    remember_many(conn, [r for r in rows if r.get('library')])   # defect 16: the identity an audition needs, one statement for the page
     return rows
 
 
@@ -292,6 +270,17 @@ def remember(conn, voice, source=None):
                  (voice['voice_id'], voice.get('name') or '', source, lib.get('public_owner_id'), lib.get('original_voice_id')))
 
 
+def remember_many(conn, rows):
+    """The register rows of listed library voices in one batched statement (a search lists up to 100)."""
+    if not rows:
+        return
+    with conn.cursor() as cur:
+        cur.executemany('''insert into vw2_voices(voice_id, name, source, public_owner_id, original_voice_id) values (%(voice_id)s, %(name)s, 'library', %(owner)s, %(orig)s)
+                           on conflict (voice_id) do update set name = excluded.name, public_owner_id = coalesce(vw2_voices.public_owner_id, excluded.public_owner_id),
+                           original_voice_id = coalesce(vw2_voices.original_voice_id, excluded.original_voice_id), updated_at = now()''',
+                        [{'voice_id': r['voice_id'], 'name': r.get('name') or '', 'owner': r['library'].get('public_owner_id'), 'orig': r['library'].get('original_voice_id')} for r in rows])
+
+
 def event(conn, voice_id, what, user, note=''):
     conn.execute('insert into vw2_voice_events(voice_id, event, by_id, by_name, note) values (%s,%s,%s,%s,%s)', (voice_id, what, user['id'], user['name'], note or ''))
 
@@ -330,21 +319,18 @@ def preview_link(conn, provider, voice_id):
     return provider.voice(voice_id).get('preview_url') or ''
 
 
+_ACCOUNT = {'at': 0.0, 'row': None}
+
+
 def account(provider):
+    """The plan's slots, operations and characters; cached a minute (the page polls every ten seconds)."""
+    import time
+    if _ACCOUNT['row'] is not None and time.time() - _ACCOUNT['at'] < 60:
+        return _ACCOUNT['row']
     d = provider.request('GET', '/v1/user/subscription').json()
     keys = ('tier', 'voice_limit', 'voice_slots_used', 'voice_add_edit_counter', 'max_voice_add_edits', 'character_count', 'character_limit', 'next_character_count_reset_unix')
-    return {k: d.get(k) for k in keys}
-
-
-def account_ids(provider):
-    ids, cursor, seen = set(), '', set()
-    while True:
-        data = provider.request('GET', '/v2/voices', params={'page_size': 100, **({'next_page_token': cursor} if cursor else {})}).json()
-        ids.update(v['voice_id'] for v in data.get('voices', []))
-        cursor = data.get('next_page_token') if data.get('has_more') else None
-        if not cursor or cursor in seen:
-            return ids
-        seen.add(cursor)
+    _ACCOUNT.update(at=time.time(), row={k: d.get(k) for k in keys})
+    return _ACCOUNT['row']
 
 
 def release(conn, provider, user, voice_id):
@@ -383,33 +369,6 @@ def history(conn, voice_id=None):
                    where o.stage = 'voice' and o.unit is null and not o.stale{' and o.summary->>%s = %s' if voice_id else ''} order by o.created_at'''
     params = ('voice_id', voice_id) if voice_id else ()
     return aggregate(conn.execute(jobs_sql, params).fetchall(), conn.execute(outs_sql, params).fetchall())
-
-
-def catalog(conn, provider, q):
-    """Compact rows with the register, the usage and the account mark; favourites first in the 'favourites' scope."""
-    usage = history(conn)
-    if q.get('scope') == 'favourites':
-        reg = {k: v for k, v in register_rows(conn).items() if v.get('favourite')}
-        acc = account_ids(provider)
-        rows = []
-        for vid, r in reg.items():
-            try:
-                raw = provider.voice(vid)
-            except Problem:
-                raw = {'voice_id': vid, 'name': r['name'], 'labels': {}, 'description': ''}
-            row = compact({**raw, 'scope': 'favourites'}, reg, usage, acc)
-            row['missing'] = vid not in acc
-            rows.append(row)
-        return {'voices': rows, 'has_more': False, 'next_page_token': None, 'scope': 'favourites'}
-    found = elevenlabs.discover(provider, q)
-    for v in found['voices']:   # defect 16: the tool remembers every library voice it lists, so an audition can save it to the account
-        owner = v.get('public_owner_id') or (v.get('sharing') or {}).get('public_owner_id')
-        if owner:
-            remember(conn, {'voice_id': v['voice_id'], 'name': v.get('name') or '', 'library': {'public_owner_id': owner, 'original_voice_id': (v.get('sharing') or {}).get('original_voice_id') or v['voice_id']}}, 'library')
-    reg = register_rows(conn, [v['voice_id'] for v in found['voices']])
-    acc = {v['voice_id'] for v in found['voices']} if q.get('scope') == 'account' else account_ids(provider)
-    found['voices'] = sorted((compact(v, reg, usage, acc) for v in found['voices']), key=lambda r: not r['favourite'])
-    return found
 
 
 # ---------- a run's voice page state and direction (storage) ----------
@@ -524,41 +483,6 @@ def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tw
     return row
 
 
-def direction_audition(conn, store, user, run, outputs, voice_id, passage_id, request_id):
-    """One passage with its tags in one voice: a paid audition, no timing."""
-    direction = direction_for(store, run, voice_id)
-    if not direction:
-        raise Problem(409, 'NOT_ALLOWED', 'No direction is recorded for this run; audition without tags with vw voice audition.')
-    script, _ = script_text(store, outputs)
-    rows = [r for r in VD.sentences_of(script['spoken_text']) if r['passage_id'] == passage_id]
-    if not rows:
-        raise Problem(422, 'DIRECTION', f'{passage_id} is not a passage of the accepted script.')
-    start, end = rows[0]['start'], rows[-1]['end']
-    tagged, _ = VD.apply(script['spoken_text'], direction['items'], direction['register'], direction['tweaks'])
-    items = [i for i in direction['items'] if i['passage_id'] == passage_id]
-    piece, _ = VD.apply(script['spoken_text'][start:end], [{**i, 'passage_id': 'P001'} for i in items], direction['register'],
-                        [{**t, 'passage_id': 'P001'} for t in direction['tweaks'] if t['passage_id'] == passage_id])
-    return jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': voice_id, 'text': piece, 'directed': True}, request_id, store=store)
-
-
-def audition_shortlist(conn, store, user, run, outputs, request_id):
-    """The shortlist's auditions on the run's excerpt: a library voice is saved to the account first (no custom slot), then one paid job each."""
-    state = page_state(store, run)
-    if not state['shortlist']:
-        raise Problem(409, 'NOT_ALLOWED', 'Shortlist one to six voices first.')
-    script, _ = script_text(store, outputs)
-    excerpt = state.get('excerpt') or excerpt_default(script['spoken_text'])
-    rows = []
-    for i, entry in enumerate(state['shortlist']):   # the page and the chat path share one road: submit_voice saves a library voice to the account itself
-        if entry.get('library'):
-            remember(conn, {'voice_id': entry['voice_id'], 'name': entry.get('name') or '', 'library': entry['library']}, 'library')
-        rows.append(jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': entry['voice_id'], 'text': excerpt}, sub_request_id(request_id, i), store=store))
-        entry['voice_id'] = rows[-1]['request']['voice_id']
-    state['excerpt'] = excerpt
-    save_doc(store, run, 'page.json', state)
-    return rows
-
-
 def tryout(conn, store, user, run, outputs, voice_ids, request_id):
     """design/54 step 2: up to six voices read the chosen test passage with the direction's register and tags; a library voice is saved to the account by the submission."""
     check_cap(voice_ids, TRYOUT_MAX, 'tryout')
@@ -589,19 +513,6 @@ def narrate_many(conn, store, user, run, outputs, voice_ids, request_id, by='pag
     state['step'] = 'narrations'
     save_doc(store, run, 'page.json', state)
     return rows
-
-
-def excerpt_default(text):
-    """The first passage of 45 to 70 words, or the first passage, for the shortlist's auditions."""
-    best = None
-    from .narration_pieces import paragraph_spans
-    for s, e in paragraph_spans(text):
-        n = len(text[s:e].split())
-        if best is None:
-            best = text[s:e]
-        if 45 <= n <= 70:
-            return text[s:e]
-    return best or text[:300]
 
 
 def finalise(conn, store, user, run, outputs, job_id, quote, recorded_from='page'):

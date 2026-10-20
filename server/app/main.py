@@ -426,19 +426,6 @@ class VoiceId(Strict):
     voice_id: str
 
 
-class Shortlist(Write):
-    voices: list[dict[str, Any]] = Field(max_length=voices.SHORTLIST_MAX)
-
-
-class Pick(Write):
-    voice_id: str
-    name: str = ''
-
-
-class Excerpt(Write):
-    text: str = Field(min_length=1, max_length=3000)
-
-
 class Direction(Write):
     chosen: Literal['best_fit', 'experimental', 'none']
     register_tag: str = Field(default='', alias='register')   # design/49 L13: no shadowing of the base model's attribute
@@ -468,11 +455,6 @@ class Tweaks(Write):
 class Narrate(Write):
     voice_id: str
     tweaks: list[dict[str, Any]] | None = None
-
-
-class DirectionAudition(Write):
-    voice_id: str
-    passage_id: str
 
 
 class Final(Write):
@@ -661,15 +643,6 @@ def post_receipt(run_id: UUID, body: Receipt, user=User, conn=DB):
 
 # ---------- voice catalog (read-only provider access; no run needed) ----------
 
-@app.get('/api/voice/catalog')
-def voice_catalog(user=User, conn=DB, scope: str = 'library', search: str = '', cursor: str = '', language: str = '', accent: str = '',
-                  gender: str = '', age: str = '', use_cases: str = '', high_quality: bool = False):
-    """Compact rows (design/52 A): identity, labels, a short description, the preview link, the register and the usage."""
-    q = {'scope': scope if scope in ('library', 'account', 'favourites') else 'library', 'search': search[:200], 'cursor': cursor[:1000], 'language': language[:30],
-         'accent': accent[:80], 'gender': gender, 'age': age, 'use_cases': [u for u in use_cases.split(',') if u in elevenlabs.USE_CASES], 'high_quality': high_quality}
-    return Response(voices.catalog(conn, elevenlabs.ElevenLabs(), q))
-
-
 @app.get('/api/voice/account')
 def voice_account(user=User):
     return Response(voices.account(elevenlabs.ElevenLabs()))
@@ -718,41 +691,6 @@ def voice_page(run_id: UUID, user=User, conn=DB):
     return Response({'page': voices.page_state(store, run), 'direction': voices.direction_of(store, run)})
 
 
-@app.post('/api/runs/{run_id}/voice/shortlist')
-def voice_shortlist(run_id: UUID, body: Shortlist, user=User, conn=DB):
-    def fn(run, outputs):
-        state = voices.page_state(storage(), run)
-        state['shortlist'] = [{'voice_id': v['voice_id'], 'name': v.get('name') or '', 'library': v.get('library')} for v in body.voices]
-        voices.save_doc(storage(), run, 'page.json', state)
-        return {'shortlist': state['shortlist']}
-    return _voice_write(run_id, body, user, conn, fn)
-
-
-@app.post('/api/runs/{run_id}/voice/pick')
-def voice_pick(run_id: UUID, body: Pick, user=User, conn=DB):
-    def fn(run, outputs):
-        state = voices.page_state(storage(), run)
-        state['pick'] = {'voice_id': body.voice_id, 'name': body.name, 'by': user['name'], 'at': datetime.now(timezone.utc).isoformat()}
-        voices.save_doc(storage(), run, 'page.json', state)
-        return {'pick': state['pick']}
-    return _voice_write(run_id, body, user, conn, fn)
-
-
-@app.post('/api/runs/{run_id}/voice/excerpt')
-def voice_excerpt(run_id: UUID, body: Excerpt, user=User, conn=DB):
-    def fn(run, outputs):
-        state = voices.page_state(storage(), run)
-        state['excerpt'] = body.text
-        voices.save_doc(storage(), run, 'page.json', state)
-        return {'excerpt': body.text}
-    return _voice_write(run_id, body, user, conn, fn)
-
-
-@app.post('/api/runs/{run_id}/voice/audition', status_code=201)
-def voice_audition_shortlist(run_id: UUID, body: Write, user=User, conn=DB):
-    return _voice_write(run_id, body, user, conn, lambda run, outputs: [dict(r) for r in voices.audition_shortlist(conn, storage(), user, run, outputs, body_dict(body)['request_id'])], 201)
-
-
 @app.post('/api/runs/{run_id}/voice/direction')
 def voice_direction_record(run_id: UUID, body: Direction, user=User, conn=DB):
     def fn(run, outputs):
@@ -799,11 +737,6 @@ def voice_tweaks(run_id: UUID, body: Tweaks, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/voice/narrate', status_code=201)
 def voice_narrate(run_id: UUID, body: Narrate, user=User, conn=DB):
     return _voice_write(run_id, body, user, conn, lambda run, outputs: dict(voices.narrate(conn, storage(), user, run, outputs, body.voice_id, body_dict(body)['request_id'], 'page', body.tweaks)), 201)
-
-
-@app.post('/api/runs/{run_id}/voice/direction-audition', status_code=201)
-def voice_direction_audition(run_id: UUID, body: DirectionAudition, user=User, conn=DB):
-    return _voice_write(run_id, body, user, conn, lambda run, outputs: dict(voices.direction_audition(conn, storage(), user, run, outputs, body.voice_id, body.passage_id, body_dict(body)['request_id'])), 201)
 
 
 @app.post('/api/runs/{run_id}/voice/final', status_code=201)
