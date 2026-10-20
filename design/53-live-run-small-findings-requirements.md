@@ -1,4 +1,4 @@
-# 53 — Live-run findings L1, L2, L3, L4 and L7 from design/49 (SK, 20 Oct 2026: "do everything not withdrawn"; built the same day)
+# 53 — Live-run findings L1, L2, L3, L4 and L7 from design/49 (SK, 20 Oct 2026: "do everything not withdrawn"; built and deployed the same day: server 0.17.0, plugin 0.16.0)
 
 Small changes to the intake and the brief found during the VW-4 live run (design/49), plus the format decision (L7, design/49 after SK's genre question). L5 and L6 were withdrawn; L8 and L9 are design/50.
 
