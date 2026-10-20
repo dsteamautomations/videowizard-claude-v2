@@ -1,4 +1,4 @@
-# 52 — Voice stage: the Voices page, the voice register, the chat path, and delivery direction on Eleven v4 (requirements for SK's approval, 20 Oct 2026)
+# 52 — Voice stage: the Voices page, the voice register, the chat path, and delivery direction on Eleven v4 (approved by SK 20 Oct 2026; built and deployed the same day: server 0.16.0, plugin 0.15.0)
 
 Consolidates design/51 (research and the trail of decisions, sections A to M) and SK's three side-thread decisions of 20 Oct 2026 into one buildable note. Where the side threads and the first draft differed, section N says what was chosen and why. Nothing here is built. The runs that exist today are disposable trials (memory: trial-runs-are-disposable): no section covers old runs or old flows.
 
@@ -156,7 +156,7 @@ Return only JSON:
 Layer one, server unit (no database): compact rows; `voice_direction` validator (ids, vocabulary, reactions, pauses, one per sentence); `apply` (tags before sentences, pieces keep tags); `strip` for both alignment cases and the mismatch; the final-record summary shape; the directory aggregation from job rows (pure function over dicts). Layer one, plugin: `vw voice direct prepare/record`, `tweak`, `history`, `stage voice record --job`; the one-question steps and the direction prompt present in v2.json with the sentinel. Layer two (Docker): page endpoints with the provider faked (catalog, account, favourite, release rules, restore, shortlist, audition, narrate, direction-audition, final, `next.voice_page`).
 
 ## I. Not covered
-- Which alignment branch the provider takes: checked with one ~20-character paid call from the VM when building starts (settled as a check, not a decision).
+- Checked 20 Oct from the VM: the provider returns the tag characters in the alignment (a 21-character tagged text came back with all 21, billed as 9), so the stripping branch runs.
 - How well any voice follows tags: the direction audition and the operator's listening, every time.
 - The desktop app's inline playing of a sent mp3; the page is the way to listen.
 - `server/tests` cannot run on this Mac.
