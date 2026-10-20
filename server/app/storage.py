@@ -108,7 +108,8 @@ class SupabaseStorage:
             return False
 
     def signed_upload(self, key):
-        data = self._call('POST', f'/storage/v1/object/upload/sign/{self.bucket}/{quote(key, safe="/")}').json()
+        # defect 15 (VW-5, 20 Oct 2026): a revised stage re-uploads at the same key; without x-upsert on the sign request Supabase answers 400
+        data = self._call('POST', f'/storage/v1/object/upload/sign/{self.bucket}/{quote(key, safe="/")}', headers={'x-upsert': 'true'}).json()
         return self.url + '/storage/v1' + data['url'], {'x-upsert': 'true'}
 
     def size(self, key):

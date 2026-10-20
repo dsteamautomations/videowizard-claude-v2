@@ -30,3 +30,20 @@ def test_checklist_deliver_line_carries_the_format(monkeypatch):
     items = D.checklist_of({'finishing': []}, PK, {})
     line = next(i for i in items if i['where'] == 'Deliver page' and 'frame' in i['item'])
     assert 'frame 16:9' in line['item'] and 'destinations not given' in line['item']
+
+
+def test_signed_upload_asks_storage_for_an_overwritable_url(monkeypatch):
+    """Defect 15 (VW-5): a revised stage re-uploads brief.json at the same key; the sign request itself must carry x-upsert."""
+    from app import storage as S
+    calls = []
+
+    class R:
+        @staticmethod
+        def json():
+            return {'url': '/object/upload/sign/b/k?token=t'}
+    store = S.SupabaseStorage.__new__(S.SupabaseStorage)
+    store.url, store.bucket, store.headers = 'https://x.supabase.co', 'b', {}
+    monkeypatch.setattr(store, '_call', lambda method, path, **kw: calls.append((method, path, kw.get('headers'))) or R())
+    url, headers = store.signed_upload('r/brief/brief.json')
+    assert calls[0][0] == 'POST' and calls[0][1].endswith('/object/upload/sign/b/r/brief/brief.json') and calls[0][2] == {'x-upsert': 'true'}
+    assert headers == {'x-upsert': 'true'} and url.startswith('https://x.supabase.co/storage/v1/')

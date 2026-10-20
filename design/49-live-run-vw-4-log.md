@@ -62,3 +62,7 @@ Built and tested at layer one (plugin 156 tests, server unit 58): the Voices pag
 
 ## 20 Oct: L1–L4, L7 (design/53) and L8–L9 (design/50) built
 Layer one: plugin 168 tests, server unit 64. Not deployed yet; server/tests (Docker) untouched for these. Server 0.17.0, plugin 0.16.0 when deployed.
+
+## 20 Oct, VW-5 (the second live run, on server 0.17.0 / plugin 0.16.0)
+- Start: "directory: 14 fields on this client"; the card is in the manifest. Intake: the preview was run unasked; the timing lines reached the intake summary. Brief: the card was used (YouTube recommended from the directory), the audience difference was warned and recorded (decided by the script), the timing hint and the format question appeared with the other production values.
+- Gap L10: the chapters were copied from VW-4's brief ("same as VW-4") as the nine narrative scenes with Chapter_N_ identifiers; the new definition did not override the last brief's recommendation. Candidate: the brief step checks the last brief's chapters against the definition (what the footage shows) instead of carrying them, and names chapters plainly (no Chapter_N_ prefix). Text only.
