@@ -237,7 +237,15 @@ def compute_next(run, stages, outputs, attempts):
 
 def next_for(conn, run):
     nxt = compute_next(run, stage_table(run['procedure_version']), current_outputs(conn, run['id']), attempts_for(conn, run['id']))
-    return {**nxt, 'open_defects': open_defects(conn, run['id'])}   # design/48 O.2
+    nxt = {**nxt, 'open_defects': open_defects(conn, run['id'])}   # design/48 O.2
+    if nxt.get('stage') == 'voice':   # design/52 B: what the voices page holds (pick, narrations, direction, final)
+        try:
+            from . import voices
+            from .storage import storage
+            nxt['voice_page'] = voices.page_summary(storage(), run)
+        except Problem:
+            nxt['voice_page'] = None
+    return nxt
 
 
 # ---------- output ----------

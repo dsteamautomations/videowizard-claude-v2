@@ -1,5 +1,6 @@
 """VideoWizard v2 server. Routes are thin: auth, body checks, one transaction, delegate to core."""
 import json
+from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import UUID
 
@@ -9,7 +10,7 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, visuals_stage, web, worker
+from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, planning_stage, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -415,6 +416,59 @@ class LibraryAdd(Strict):
     voice_id: str
 
 
+class Favourite(Strict):   # design/52 A
+    voice_id: str
+    on: bool = True
+    note: str = ''
+
+
+class VoiceId(Strict):
+    voice_id: str
+
+
+class Shortlist(Write):
+    voices: list[dict[str, Any]] = Field(max_length=voices.SHORTLIST_MAX)
+
+
+class Pick(Write):
+    voice_id: str
+    name: str = ''
+
+
+class Excerpt(Write):
+    text: str = Field(min_length=1, max_length=3000)
+
+
+class Direction(Write):
+    chosen: Literal['best_fit', 'experimental', 'none']
+    register: str = ''
+    items: list[dict[str, Any]] = []
+    options: dict[str, Any] = {}
+    registers: dict[str, Any] = {}
+    kind_of_film: str = ''
+    quote: str = ''
+
+
+class Tweaks(Write):
+    voice_id: str
+    tweaks: list[dict[str, Any]] = []
+
+
+class Narrate(Write):
+    voice_id: str
+    tweaks: list[dict[str, Any]] | None = None
+
+
+class DirectionAudition(Write):
+    voice_id: str
+    passage_id: str
+
+
+class Final(Write):
+    job_id: UUID
+    quote: str
+
+
 class Output(Write):
     stage: str
     unit: str | None = None
@@ -596,11 +650,113 @@ def post_receipt(run_id: UUID, body: Receipt, user=User, conn=DB):
 # ---------- voice catalog (read-only provider access; no run needed) ----------
 
 @app.get('/api/voice/catalog')
-def voice_catalog(user=User, scope: str = 'account', search: str = '', cursor: str = '', language: str = '', accent: str = '',
+def voice_catalog(user=User, conn=DB, scope: str = 'library', search: str = '', cursor: str = '', language: str = '', accent: str = '',
                   gender: str = '', age: str = '', use_cases: str = '', high_quality: bool = False):
-    q = {'scope': scope, 'search': search[:200], 'cursor': cursor[:1000], 'language': language[:30], 'accent': accent[:80], 'gender': gender, 'age': age,
-         'use_cases': [u for u in use_cases.split(',') if u in elevenlabs.USE_CASES], 'high_quality': high_quality}
-    return Response(elevenlabs.discover(elevenlabs.ElevenLabs(), q))
+    """Compact rows (design/52 A): identity, labels, a short description, the preview link, the register and the usage."""
+    q = {'scope': scope if scope in ('library', 'account', 'favourites') else 'library', 'search': search[:200], 'cursor': cursor[:1000], 'language': language[:30],
+         'accent': accent[:80], 'gender': gender, 'age': age, 'use_cases': [u for u in use_cases.split(',') if u in elevenlabs.USE_CASES], 'high_quality': high_quality}
+    return Response(voices.catalog(conn, elevenlabs.ElevenLabs(), q))
+
+
+@app.get('/api/voice/account')
+def voice_account(user=User):
+    return Response(voices.account(elevenlabs.ElevenLabs()))
+
+
+@app.post('/api/voice/favourite')
+def voice_favourite(body: Favourite, user=User, conn=DB):
+    return Response(voices.set_favourite(conn, elevenlabs.ElevenLabs(), user, body.voice_id, body.on, body.note))
+
+
+@app.post('/api/voice/release')
+def voice_release(body: VoiceId, user=User, conn=DB):
+    return Response(voices.release(conn, elevenlabs.ElevenLabs(), user, body.voice_id))
+
+
+@app.post('/api/voice/restore')
+def voice_restore(body: VoiceId, user=User, conn=DB):
+    return Response(voices.restore(conn, elevenlabs.ElevenLabs(), user, body.voice_id))
+
+
+@app.get('/api/voice/history')
+def voice_history(user=User, conn=DB, voice_id: str = ''):
+    return Response({'voices': voices.history(conn, voice_id or None)})
+
+
+# ---------- a run's voice page (design/52 B) ----------
+
+def _voice_write(run_id, body, user, conn, fn, status=200):
+    run = core.load_run(conn, user, run_id, lock=True)
+    outputs = core.current_outputs(conn, run['id'])
+    st, resp = core.with_receipt(conn, user, body_dict(body), lambda: (status, fn(run, outputs)))
+    return Response(resp, status_code=st)
+
+
+@app.get('/api/runs/{run_id}/voice/page')
+def voice_page(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    store = storage()
+    return Response({'page': voices.page_state(store, run), 'direction': voices.direction_of(store, run)})
+
+
+@app.post('/api/runs/{run_id}/voice/shortlist')
+def voice_shortlist(run_id: UUID, body: Shortlist, user=User, conn=DB):
+    def fn(run, outputs):
+        state = voices.page_state(storage(), run)
+        state['shortlist'] = [{'voice_id': v['voice_id'], 'name': v.get('name') or '', 'library': v.get('library')} for v in body.voices]
+        voices.save_doc(storage(), run, 'page.json', state)
+        return {'shortlist': state['shortlist']}
+    return _voice_write(run_id, body, user, conn, fn)
+
+
+@app.post('/api/runs/{run_id}/voice/pick')
+def voice_pick(run_id: UUID, body: Pick, user=User, conn=DB):
+    def fn(run, outputs):
+        state = voices.page_state(storage(), run)
+        state['pick'] = {'voice_id': body.voice_id, 'name': body.name, 'by': user['name'], 'at': datetime.now(timezone.utc).isoformat()}
+        voices.save_doc(storage(), run, 'page.json', state)
+        return {'pick': state['pick']}
+    return _voice_write(run_id, body, user, conn, fn)
+
+
+@app.post('/api/runs/{run_id}/voice/excerpt')
+def voice_excerpt(run_id: UUID, body: Excerpt, user=User, conn=DB):
+    def fn(run, outputs):
+        state = voices.page_state(storage(), run)
+        state['excerpt'] = body.text
+        voices.save_doc(storage(), run, 'page.json', state)
+        return {'excerpt': body.text}
+    return _voice_write(run_id, body, user, conn, fn)
+
+
+@app.post('/api/runs/{run_id}/voice/audition', status_code=201)
+def voice_audition_shortlist(run_id: UUID, body: Write, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: [dict(r) for r in voices.audition_shortlist(conn, storage(), user, run, outputs, body_dict(body)['request_id'])], 201)
+
+
+@app.post('/api/runs/{run_id}/voice/direction')
+def voice_direction_record(run_id: UUID, body: Direction, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: voices.record_direction(storage(), run, outputs, body_dict(body), user))
+
+
+@app.post('/api/runs/{run_id}/voice/tweaks')
+def voice_tweaks(run_id: UUID, body: Tweaks, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: voices.set_tweaks(storage(), run, outputs, body.voice_id, body.tweaks))
+
+
+@app.post('/api/runs/{run_id}/voice/narrate', status_code=201)
+def voice_narrate(run_id: UUID, body: Narrate, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: dict(voices.narrate(conn, storage(), user, run, outputs, body.voice_id, body_dict(body)['request_id'], 'page', body.tweaks)), 201)
+
+
+@app.post('/api/runs/{run_id}/voice/direction-audition', status_code=201)
+def voice_direction_audition(run_id: UUID, body: DirectionAudition, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: dict(voices.direction_audition(conn, storage(), user, run, outputs, body.voice_id, body.passage_id, body_dict(body)['request_id'])), 201)
+
+
+@app.post('/api/runs/{run_id}/voice/final', status_code=201)
+def voice_final(run_id: UUID, body: Final, user=User, conn=DB):
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: voices.finalise(conn, storage(), user, run, outputs, body.job_id, body.quote, 'chat'), 201)
 
 
 @app.get('/api/voice/models')
@@ -631,7 +787,11 @@ def post_job(run_id: UUID, body: Job, user=User, conn=DB):
     if nxt['stage'] != body.stage:
         raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not {body.stage!r}.", next=nxt)
     outputs = core.current_outputs(conn, run['id'])
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, dict(jobs.submit_voice(conn, user, run, outputs, body.request, body.request_id))))
+    if body.request.get('kind') == 'narration':   # design/52: a chat narration carries the run's direction and is kept on the page like any other
+        fn = lambda: (201, dict(voices.narrate(conn, storage(), user, run, outputs, body.request.get('voice_id'), str(body.request_id), 'chat')))
+    else:
+        fn = lambda: (201, dict(jobs.submit_voice(conn, user, run, outputs, body.request, body.request_id, store=storage())))
+    status, resp = core.with_receipt(conn, user, body_dict(body), fn)
     return Response(resp, status_code=status)
 
 

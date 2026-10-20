@@ -71,9 +71,14 @@ def piece_identity(snapshot, text):
     return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
 
 
+def provider_text(snapshot):
+    """What the provider is asked to read: the directed text when the narration carries tags (design/52), else the accepted script."""
+    return snapshot.get('text_tagged') or snapshot['text']
+
+
 def pieces_of(snapshot):
     """The pieces of a narration snapshot with their texts and identities; a snapshot without `pieces` is one piece."""
-    text = snapshot['text']
+    text = provider_text(snapshot)
     rows = snapshot.get('pieces') or [{'offset': 0, 'characters': len(text)}]
     out = []
     for r in rows:

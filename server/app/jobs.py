@@ -8,15 +8,16 @@ from datetime import datetime, timedelta, timezone
 
 from psycopg.types.json import Json, Jsonb
 
-from . import elevenlabs, narration_pieces
+from . import elevenlabs, narration_pieces, voice_direction
 from .config import settings
 from .errors import Problem
 
 OPEN = ('queued', 'running', 'storage_pending', 'submission_unknown')
 
 
-def submit_voice(conn, user, run, outputs, request, request_id):
-    """Validate an audition/narration request against the accepted script, then queue it. Paid; informed, not gated."""
+def submit_voice(conn, user, run, outputs, request, request_id, store=None):
+    """Validate an audition/narration request against the accepted script, then queue it. Paid; informed, not gated.
+    A narration carries the run's recorded direction (design/52 D): the provider reads the tagged text, the record keeps the accepted one."""
     kind = request.get('kind')
     if kind not in ('audition', 'narration'):
         raise Problem(422, 'VOICE_REQUEST', "kind must be 'audition' or 'narration'.")
@@ -38,10 +39,19 @@ def submit_voice(conn, user, run, outputs, request, request_id):
     if not available:
         raise Problem(422, 'VOICE_MODEL', f'Model {model} is not available on the connected account.')
     limit = available.get('max_characters') if isinstance(available.get('max_characters'), int) else 10000
-    pieces = None
+    pieces, directed = None, {}
     if kind == 'narration':   # design/40: a long script is narrated in pieces, split at paragraph and sentence ends
+        direction = None
+        if store is not None:
+            from . import voices
+            direction = voices.direction_for(store, run, request.get('voice_id'))
+        provider_text = text
+        if direction:
+            tagged, spans = voice_direction.apply(text, direction['items'], direction['register'], direction['tweaks'])
+            provider_text = tagged
+            directed = {'text_tagged': tagged, 'tag_spans': spans, 'direction_digest': direction['digest'], 'direction_register': direction['register'], 'tweaks': direction['tweaks']}
         try:
-            pieces = narration_pieces.split_for_narration(text, limit)
+            pieces = narration_pieces.split_for_narration(provider_text, limit)
         except ValueError as exc:
             raise Problem(422, 'VOICE_LENGTH', str(exc))
     elif len(text) > limit:
@@ -53,7 +63,7 @@ def submit_voice(conn, user, run, outputs, request, request_id):
             raise Problem(409, 'JOB_OPEN', 'Finish or recover the open voice job before starting narration.', jobs=[str(j['id']) for j in open_jobs])
     snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text,
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
-                **({'timing_mode': 'generation', 'pieces': pieces} if kind == 'narration' else {})}
+                **({'timing_mode': 'generation', 'pieces': pieces, **directed} if kind == 'narration' else {})}
     row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'voice',%s,'elevenlabs',%s,%s) returning *''',
                        (run['id'], voice['voice_id'] if kind == 'audition' else None, Json(snapshot), request_id)).fetchone()
     return row

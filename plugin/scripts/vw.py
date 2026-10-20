@@ -309,6 +309,12 @@ def next_line(nxt):
     line = f"Next: {nxt['stage']}." + (f" This step uses a paid provider ({nxt['paid']}); tell the operator, do not ask." if nxt.get('paid') else '')
     if nxt.get('open_defects'):   # design/48 O.2
         line += ' · ' + ', '.join(f'defect {d} open' for d in nxt['open_defects'])
+    page = nxt.get('voice_page')
+    if page:   # design/52 B: what the voices page holds
+        bits = [f"picked {page['pick'].get('name') or page['pick'].get('voice_id')} on the voices page" if page.get('pick') else 'nothing picked on the voices page',
+                f"{page.get('narrations') or 0} narrations kept", (f"direction {page['direction']}" if page.get('direction') and page['direction'] != 'none' else 'no direction recorded'),
+                'final narration made' if page.get('final') else 'no final narration']
+        line += ' · ' + ', '.join(bits)
     return line
 
 
@@ -457,6 +463,14 @@ def cmd_defect(a):
          'Defect filed. Tell the operator the ticket number and stop; the builder takes it from here.')
 
 
+def favourites():
+    """design/52 M: the favourite voices with their usage, for the voice stage's prepare; a provider hiccup leaves the list empty."""
+    try:
+        return (call('GET', '/api/voice/catalog', params={'scope': 'favourites'}) or {}).get('voices') or []
+    except SystemExit:
+        return []
+
+
 def cmd_stage(a):
     """Stage scripts: prepare (inputs + prompt for the model) and record (validate out/<stage>.json, record output)."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -484,7 +498,7 @@ def cmd_stage(a):
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
                 {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or []} if a.stage == 'brief' else \
-                {'last_voice': m.get('last_voice')} if a.stage == 'voice' else {}
+                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': nxt.get('voice_page')} if a.stage == 'voice' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
@@ -492,7 +506,13 @@ def cmd_stage(a):
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
                             camera_audio=a.camera_audio, note=a.note, progress=progress)
         elif a.stage == 'voice':
-            result = record(ws, procedure, prior, None)
+            job = None
+            if a.job:   # design/52 D: the record from a kept narration, fetched for the operator to listen to
+                job = call('GET', f"/api/runs/{m['run_id']}/jobs/{a.job}")
+                if job.get('status') != 'ready' or (job.get('request') or {}).get('kind') != 'narration':
+                    emit({'action': 'refused', 'message': f"Job {a.job} is not a ready narration ({job.get('status')})."}, 2)
+                fetch_job_files(m, job)
+            result = record(ws, procedure, prior, job)
         elif a.stage == 'intake':
             result = record(ws, procedure, prior, a.title, m.get('client') or '')
         else:
@@ -599,8 +619,106 @@ def cmd_upload(a):
     emit(upload_file(m, a.stage, path, hashlib.sha256(data).hexdigest(), len(data)), 0, f'Uploaded {path.name}')
 
 
+SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s+')
+
+
+def script_sentences(text):
+    """design/52 D: the accepted script's sentences by passage (paragraph) with a running number inside each, as the server counts them."""
+    rows, p = [], 0
+    for para in re.split(r'\n\s*\n', text):
+        if not para.strip():
+            continue
+        p += 1
+        for n, sent in enumerate([t for t in SENTENCE_SPLIT.split(para.strip()) if t.strip()], 1):
+            rows.append({'passage_id': f'P{p:03d}', 'sentence': n, 'text': sent.strip()})
+    return rows
+
+
+def catalog_lines(found):
+    lines = []
+    for v in found.get('voices') or []:
+        used = f"{v.get('narrations') or 0} narration{'s' if (v.get('narrations') or 0) != 1 else ''}, {v.get('auditions') or 0} audition{'s' if (v.get('auditions') or 0) != 1 else ''}"
+        parts = [('★ ' if v.get('favourite') else '') + v['voice_id'], v.get('name') or '', v.get('accent') or '', v.get('gender') or '', v.get('age') or '', v.get('use_case') or '',
+                 v.get('descriptive') or '', 'on the account' if v.get('on_account') else 'library', used]
+        lines.append(' · '.join(x for x in parts if x))
+    if found.get('has_more') and found.get('next_page_token'):
+        lines.append(f"more: --cursor {found['next_page_token']}")
+    return '\n'.join(lines) or 'no voices match; widen the filters'
+
+
+def fetch_job_files(m, job):
+    """Download a ready voice job's audio (and timing for a narration) into out/; returns the paths written."""
+    ws = workspace(m['code'])
+    res = job['result']
+    narration = job['request']['kind'] == 'narration'
+    audio_name = 'narration.mp3' if narration else 'audition-' + re.sub(r'[^A-Za-z0-9]+', '-', job['request'].get('name') or job['request']['voice_id']).strip('-') + '.mp3'
+    written = []
+    for name, key in ((audio_name, res['audio_key']), ('timing.json', res.get('timing_key'))):
+        if not key:
+            continue
+        try:
+            with api() as c:
+                r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
+        except httpx.RequestError as exc:
+            emit({'action': 'tell_builder', 'message': f'Download failed ({exc.__class__.__name__}).'}, 2)
+        if r.status_code != 200:
+            emit({'action': 'tell_builder', 'message': f'Download of {name} failed: HTTP {r.status_code}.'}, 2)
+        (ws / 'out' / name).write_bytes(r.content)
+        written.append(str(ws / 'out' / name))
+    if narration:
+        save_json(ws / 'work' / 'voice-fetched.json', job)
+    return written
+
+
 def cmd_voice(a):
-    m = active() if a.what in ('audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve') else None
+    m = active() if a.what in ('audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak') else None
+    if a.what == 'direct':   # design/52 D: the delivery direction, proposed once per run as two lists
+        ws = workspace(m['code'])
+        if a.step == 'prepare':
+            full, procedure = run_and_procedure(m, 'voice', True)
+            script = load_json(ws / 'out' / 'script.json') or {}
+            if not script.get('spoken_text'):
+                emit({'action': 'refused', 'message': 'out/script.json is missing; the direction is proposed on the accepted script.'}, 2)
+            current = {o['stage']: o for o in full.get('outputs') or [] if o.get('unit') is None}
+            brief = (current.get('brief') or {}).get('summary') or {}
+            page = (full.get('next') or {}).get('voice_page') or {}
+            emit({'stage': 'voice', 'step': 'direction', 'not_shareable': NOT_SHAREABLE, 'prompt': procedure.get('direction_prompt') or '',
+                  'inputs': {'sentences': script_sentences(script['spoken_text']), 'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
+                             'production': brief.get('production') or {}, 'voice': page.get('pick')},
+                  'output_file': 'out/direction.json'}, 0,
+                 'direction: sentences, brief and prompt ready; write out/direction.json (two lists), present both, then `vw voice direct record --choice best_fit|experimental|none --quote "<their words>"`')
+        if a.step == 'record':
+            doc = load_json(ws / 'out' / 'direction.json')
+            if not isinstance(doc, dict):
+                emit({'action': 'refused', 'message': 'out/direction.json is missing or not an object; run `vw voice direct prepare` and write it first.'}, 2)
+            if a.choice not in ('best_fit', 'experimental', 'none'):
+                emit({'action': 'refused', 'message': '--choice must be best_fit, experimental or none (the operator\'s decision).'}, 2)
+            if not (a.quote or '').strip():
+                emit({'action': 'refused', 'message': '--quote must carry the operator\'s words on the direction.'}, 2)
+            options, registers = doc.get('options') or {}, doc.get('register') or {}
+            for name in ('best_fit', 'experimental'):
+                if not isinstance(options.get(name), list):
+                    emit({'action': 'refused', 'message': f'out/direction.json: options.{name} must be a list of {{passage_id, sentence, tag, reason}}.'}, 2)
+            body = {'chosen': a.choice, 'register': '' if a.choice == 'none' else str((registers.get(a.choice) if isinstance(registers, dict) else '') or ''),
+                    'items': [] if a.choice == 'none' else options[a.choice], 'options': options, 'registers': registers if isinstance(registers, dict) else {},
+                    'kind_of_film': doc.get('kind_of_film') or '', 'quote': a.quote.strip()}
+            out = write(f"/api/runs/{m['run_id']}/voice/direction", body)
+            emit(out, 0, f"direction recorded: {a.choice} ({out.get('items', 0)} tag(s)); it applies to every narration of this run. " + next_line(out.get('next')))
+        emit({'action': 'refused', 'message': 'vw voice direct prepare | record'}, 2)
+    if a.what == 'tweak':
+        if not a.voice or not a.file:
+            emit({'action': 'refused', 'message': 'vw voice tweak --voice ID --file out/<tweaks>.json (a list of {passage_id, sentence, tag}).'}, 2)
+        tweaks = load_json(workspace(m['code']) / a.file)
+        if not isinstance(tweaks, list):
+            emit({'action': 'refused', 'message': f'{a.file} must hold a list of {{passage_id, sentence, tag}}.'}, 2)
+        emit(write(f"/api/runs/{m['run_id']}/voice/tweaks", {'voice_id': a.voice[0], 'tweaks': tweaks}), 0, f'{len(tweaks)} tweak(s) kept for {a.voice[0]}; they apply to that voice\'s narrations only.')
+    if a.what == 'history':
+        found = call('GET', '/api/voice/history', params={'voice_id': a.voice[0]} if a.voice else {})
+        lines = []
+        for vid, h in (found.get('voices') or {}).items():
+            places = ', '.join(f"{p['code']} {p['title']} ({p['client']}, {p['date']})" for p in h.get('final_in') or [])
+            lines.append(f"{vid} · {h.get('name')} · {h.get('narrations', 0)} narration(s), {h.get('auditions', 0)} audition(s) · last used {h.get('last_used') or 'never'}" + (f" · final in {places}" if places else ''))
+        emit(found, 0, '\n'.join(lines) or ('never used' if a.voice else 'no voice has been used yet'))
     if a.what == 'recover':
         emit(write(f"/api/runs/{m['run_id']}/jobs/{a.job}/recover", {}))
     if a.what == 'resolve':
@@ -608,7 +726,8 @@ def cmd_voice(a):
     if a.what == 'catalog':
         params = {k: v for k, v in (('scope', a.scope), ('search', a.search), ('cursor', a.cursor), ('language', a.language), ('accent', a.accent),
                                     ('gender', a.gender), ('age', a.age), ('use_cases', ','.join(a.use_case or [])), ('high_quality', 'true' if a.high_quality else '')) if v}
-        emit(call('GET', '/api/voice/catalog', params=params))
+        found = call('GET', '/api/voice/catalog', params=params)
+        emit(found, 0, catalog_lines(found))
     if a.what == 'models':
         emit(call('GET', '/api/voice/models'))
     if a.what == 'preview':
@@ -656,23 +775,9 @@ def cmd_voice(a):
         job = call('GET', f"/api/runs/{m['run_id']}/jobs/{a.job}")
         if job['status'] != 'ready':
             emit({'action': 'refused', 'message': f"Job is {job['status']}: {job.get('error') or 'not ready yet'}.", 'job': job}, 2)
-        ws = workspace(m['code'])
-        res = job['result']
-        for name, key in (('narration.mp3' if job['request']['kind'] == 'narration' else f"audition-{job['request']['voice_id']}.mp3", res['audio_key']), ('timing.json', res.get('timing_key'))):
-            if not key:
-                continue
-            try:
-                with api() as c:
-                    r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
-            except httpx.RequestError as exc:
-                emit({'action': 'tell_builder', 'message': f'Download failed ({exc.__class__.__name__}).'}, 2)
-            if r.status_code != 200:
-                emit({'action': 'tell_builder', 'message': f'Download of {name} failed: HTTP {r.status_code}.'}, 2)
-            (ws / 'out' / name).write_bytes(r.content)
-        if job['request']['kind'] == 'narration':
-            save_json(ws / 'work' / 'voice-fetched.json', job)
-        emit({'job': job['id'], 'files': [str(ws / 'out' / 'narration.mp3')], 'duration_s': res.get('duration_s')}, 0,
-             'Fetched. Give the operator the file to listen to, ask for approval, then `vw stage voice record --quote`.')
+        written = fetch_job_files(m, job)   # design/49 V3: the message names the file it wrote
+        emit({'job': job['id'], 'files': written, 'duration_s': job['result'].get('duration_s')}, 0,
+             f"Fetched {Path(written[0]).name}. Give the operator the path to listen to" + (", ask for approval, then `vw stage voice record --job ID --quote`." if job['request']['kind'] == 'narration' else '.'))
 
 
 OPEN_JOB_STATUSES = ('queued', 'running', 'storage_pending', 'submission_unknown')
@@ -1336,10 +1441,14 @@ def build_parser():
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
+    s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)
-    s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve'])
-    s.add_argument('--scope', default='account'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
+    s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak', 'history'])
+    s.add_argument('step', nargs='?', choices=['prepare', 'record'], help='direct: prepare | record (design/52 D)')
+    s.add_argument('--choice', choices=['best_fit', 'experimental', 'none'], help="direct record: the operator's choice"); s.add_argument('--quote', help="direct record: the operator's words")
+    s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag} inside the run folder')
+    s.add_argument('--scope', default='library'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
     s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')
     s.add_argument('--model', default='eleven_v4'); s.add_argument('--settings'); s.add_argument('--excerpt'); s.add_argument('--job'); s.add_argument('--note', help="narrate: the operator's words on the choice; resolve: a note")

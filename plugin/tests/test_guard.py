@@ -187,3 +187,30 @@ def test_the_tools_own_records_are_read_only(tmp_path):
     assert guard('Write', {'file_path': str(runs / 'VW-3' / 'out' / 'manifest.json')}, tmp_path)[0] == 0
     assert guard('Read', {'file_path': str(runs / 'VW-3' / 'work' / 'guard.log')}, tmp_path)[0] == 0
     assert guard('Read', {'file_path': str(runs / 'VW-3' / 'manifest.json')}, tmp_path)[0] == 0
+
+
+# ---------- design/49 V4, V5: an operator quote may hold shell characters; files inside the run may be shown ----------
+
+def test_shell_characters_inside_a_quoted_argument_are_not_chaining(tmp_path):
+    (tmp_path / 'runs' / 'VW-9').mkdir(parents=True)
+    (tmp_path / 'runs' / '.active').write_text('VW-9', encoding='utf-8')
+    vw_path = str(PLUGIN / 'scripts' / 'vw.py')
+    code, err = guard('Bash', {'command': f'python "{vw_path}" stage brief record --quote "same as last time & I approve <all of it> | yes"'}, tmp_path)
+    assert code == 0, err
+    code, err = guard('Bash', {'command': f'python "{vw_path}" stage brief record --quote "yes" && rm -rf /'}, tmp_path)
+    assert code == 2 and 'chaining' in err
+    code, err = guard('Bash', {'command': f'python "{vw_path}" next > /tmp/x'}, tmp_path)
+    assert code == 2 and 'chaining' in err
+
+
+def test_files_inside_the_run_may_be_sent_or_revealed_to_the_operator(tmp_path):
+    (tmp_path / 'runs' / 'VW-9' / 'out').mkdir(parents=True)
+    (tmp_path / 'runs' / '.active').write_text('VW-9', encoding='utf-8')
+    inside = str(tmp_path / 'runs' / 'VW-9' / 'out' / 'audition-A.mp3')
+    for tool, inp in (('SendUserFile', {'files': [inside]}), ('mcp__ccd_host__reveal_path', {'path': 'runs/VW-9/out/audition-A.mp3'})):
+        code, err = guard(tool, inp, tmp_path)
+        assert code == 0, (tool, err)
+    code, err = guard('SendUserFile', {'files': [inside, str(tmp_path / 'other.mp3')]}, tmp_path)
+    assert code == 2 and 'inside' in err
+    code, err = guard('mcp__ccd_host__reveal_path', {'path': '/Users/x/.vw2/session.json'}, tmp_path)
+    assert code == 2

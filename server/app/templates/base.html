@@ -12,6 +12,7 @@
   {% if user %}
   <nav>
     <a href="/runs">Runs</a>
+    <a href="/voices">Voices</a>
     {% if user.role == 'Admin' %}<a href="/defects">Defects</a>{% endif %}
     <form method="post" action="/logout"><button>Sign out {{ user.name }}</button></form>
   </nav>

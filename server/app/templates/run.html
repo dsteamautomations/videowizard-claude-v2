@@ -5,7 +5,8 @@
 <p>{{ run.client or '' }} · owner {{ run.owner_name }} · procedure {{ run.procedure_version }} · {{ run.status }}
 {% if run.active_machine %} · active on {{ run.active_machine }}{% endif %}</p>
 <p class="next">{% if next.stage %}Next: <strong>{{ next.stage }}</strong>{% if next.units_open %} ({{ next.units_open|length }} units open){% endif %}
-{% if next.actor == 'operator_decision' %} — waiting for the operator's decision{% endif %}{% else %}All stages done.{% endif %}</p>
+{% if next.actor == 'operator_decision' %} — waiting for the operator's decision{% endif %}{% else %}All stages done.{% endif %}
+{% if next.stage == 'voice' %} · <a href="/runs/{{ run.code }}/voices">Voices page</a>{% if next.voice_page and next.voice_page.pick %} (picked {{ next.voice_page.pick.name }}){% endif %}{% endif %}</p>
 {% for s in stages %}
 <section>
 <h2>{{ s.name }}{% if s.paid %} <small>paid: {{ s.paid }}</small>{% endif %}</h2>

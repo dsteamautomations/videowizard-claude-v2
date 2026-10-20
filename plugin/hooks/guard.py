@@ -13,6 +13,7 @@ from pathlib import Path
 SENTINEL = 'VW-PROCEDURE'   # the first line of every stage prompt (server/procedures/*.json)
 WRITE_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
 READ_TOOLS = ('Read', 'Glob', 'Grep')
+FILE_TOOLS = ('SendUserFile', 'mcp__ccd_host__reveal_path')   # design/49 V5: show a run file to the operator
 ALWAYS = ('AskUserQuestion', 'TodoWrite', 'TodoRead', 'ToolSearch',
           'mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_view__show_pane')
 WEB_TOOLS = ('WebSearch', 'WebFetch')
@@ -90,8 +91,20 @@ def decide(tool, inp, cwd, vw):
         script = m and (m.group(1) or m.group(2) or m.group(3))
         if not m or Path(script).resolve() != vw:
             return f'Blocked: the operator may only run the vw tool: python "{vw}" <command>. For anything else, tell the operator or file a defect.'
-        if re.search(r'[;&|`<>]|\$\(', m.group(4)):
+        bare = re.sub(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'', '""', m.group(4))   # design/49 V4: an operator's quoted words may hold & | < >
+        if re.search(r'[;&|`<>]|\$\(', bare):
             return 'Blocked: no command chaining or redirection; run one vw command at a time.'
+        return None
+    if tool in FILE_TOOLS:   # design/49 V5: a file inside the run may be shown to the operator
+        allowed = active_run(cwd)
+        if allowed is None:
+            return 'Blocked: no active run; only files inside runs/<code>/ can be shown.'
+        raw = inp.get('files') if isinstance(inp.get('files'), list) else [inp.get('path') or inp.get('file_path') or '']
+        for item in raw:
+            target = Path(str(item)).expanduser()
+            target = (target if target.is_absolute() else cwd / target).resolve()
+            if target != allowed and allowed not in target.parents:
+                return f'Blocked: only files inside {allowed} can be shown to the operator.'
         return None
     if tool in WRITE_TOOLS or tool in READ_TOOLS:
         allowed = active_run(cwd)

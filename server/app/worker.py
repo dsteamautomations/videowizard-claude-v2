@@ -16,6 +16,7 @@ import httpx
 
 from . import jobs
 from . import narration_pieces as NP
+from . import voice_direction as VD
 from .config import settings
 from .db import connect
 from .elevenlabs import ElevenLabs, identifier
@@ -113,10 +114,12 @@ def process_voice(job, provider=None, store=None, renew=None):
                 NP.concat_mp3([piece_paths(piece)[1] for piece in pieces], audio_path, settings().FFMPEG_EXECUTABLE)
             metas = [json.loads(piece_paths(piece)[2].read_text(encoding='utf-8')) for piece in pieces]
             infos = [inspect_audio(piece_paths(piece)[1]) for piece in pieces]
-            merged = NP.merge_alignments(snap['text'], [{'offset': piece['offset'], 'text': piece['text'], 'alignment': (m['alignments'] or {}).get('alignment'),
+            merged = NP.merge_alignments(NP.provider_text(snap), [{'offset': piece['offset'], 'text': piece['text'], 'alignment': (m['alignments'] or {}).get('alignment'),
                                                           'normalized_alignment': (m['alignments'] or {}).get('normalized_alignment'), 'duration_s': i['duration_s']}
                                                          for piece, m, i in zip(pieces, metas, infos)])
             alignments = {'alignment': merged['alignment'], 'normalized_alignment': merged['normalized_alignment']}
+            if snap.get('tag_spans'):   # design/52 E: the tags never reach the timing; the remainder must be the accepted script
+                alignments = {'alignment': VD.strip(merged['alignment'], snap['text_tagged'], [tuple(x) for x in snap['tag_spans']], snap['text']), 'normalized_alignment': None}
             piece_results = [{'identity': piece['identity'], 'characters': piece['characters'], 'duration_s': i['duration_s'], 'overshoot_s': x['overshoot_s'],
                               'request_id': m['headers'].get('request-id'), 'history_item_id': m['headers'].get('history-item-id')}
                              for piece, m, i, x in zip(pieces, metas, infos, merged['pieces'])]
@@ -204,7 +207,7 @@ def recover_voice(job, provider=None):
         data = provider.request('GET', '/v1/history', params=params).json()
         items = data.get('history', [])
         for h in items:
-            if h.get('voice_id') == snap['voice_id'] and h.get('model_id') == snap['model_id'] and h.get('text') == snap['text']:
+            if h.get('voice_id') == snap['voice_id'] and h.get('model_id') == snap['model_id'] and h.get('text') == NP.provider_text(snap):
                 found.append(h)
         if not data.get('has_more'):
             break

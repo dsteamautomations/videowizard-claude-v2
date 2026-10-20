@@ -146,19 +146,25 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
 
 # ---------- voice ----------
 
-def voice_prepare(ws, procedure, prior, last_voice=None):
+def voice_prepare(ws, procedure, prior, last_voice=None, favourites=None, voice_page=None):
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
     brief = (prior('brief') or {}).get('summary') or {}   # design/39 4.2: the brief, the languages and the client's last voice
     production = brief.get('production') or {}
-    message = 'Agree a voice with the operator (catalog/preview/audition), narrate, fetch, then record.'
+    message = 'Agree a voice with the operator (one question per message, the voices page or the catalog), then the direction, then narrate and record.'
     if last_voice:
         message = f"Last voice for this client: {last_voice.get('name')} ({last_voice.get('model_id')}, run {last_voice.get('run')}). Propose it first: same voice as last time, or compare? " + message
-    return {'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
+    if favourites:   # design/52 M: proposed after the last voice, before the catalogue
+        names = ', '.join(f"{f.get('name')} ({f.get('narrations', 0)} narration(s), last used {f.get('last_used') or 'never'})" for f in favourites[:8])
+        message += f' Favourites: {names}.'
+    page = voice_page or {}
+    if page.get('pick'):
+        message += f" On the voices page the operator picked {page['pick'].get('name') or page['pick'].get('voice_id')} (provisional); {page.get('narrations', 0)} narration(s) kept; direction {page.get('direction') or 'none'}."
+    return {'prompt': procedure.get('prompt') or '', 'direction_prompt': procedure.get('direction_prompt') or '', 'steps': procedure.get('steps') or [],
             'inputs': {'spoken_text': script['spoken_text'], 'characters': len(script['spoken_text']), 'content_digest': script['content_digest'],
                        'passages': len(script['passages']),
                        'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
                        'narration_language': production.get('narration_language'), 'field_speech_languages': production.get('field_speech_languages') or [],
-                       'last_voice': last_voice},
+                       'last_voice': last_voice, 'favourites': favourites or [], 'voice_page': voice_page},
             'output_file': 'out/voice.json', 'prepared_at': stamp(ws, 'voice'), 'message': message}
 
 
@@ -183,19 +189,20 @@ def beat_durations(script, ws):
     return rows
 
 
-def voice_record(ws, procedure, prior, fetched):
-    """fetched: the ready narration job (dict with result keys) saved by `vw voice fetch` into work/voice-fetched.json."""
-    try:
-        job = json.loads((ws / 'work' / 'voice-fetched.json').read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        raise Refused('Run `vw voice fetch <job-id>` for the ready narration before record.')
+def voice_record(ws, procedure, prior, job=None):
+    """job: the ready narration the operator listened to (`--job`, design/52 D); without it, the one saved by `vw voice fetch` in work/voice-fetched.json."""
+    if job is None:
+        try:
+            job = json.loads((ws / 'work' / 'voice-fetched.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            raise Refused('Run `vw voice fetch --job <id>` for the ready narration, or pass --job <id>, before record.')
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
     if job['request']['source_script'] != script['content_digest']:
         raise Refused('The narration was generated for a different script version. Narrate again.')
     res = job['result']
     voice = {'job_id': job['id'], 'voice_id': job['request']['voice_id'], 'name': job['request']['name'], 'model_id': job['request']['model_id'],
              'settings': job['request']['settings'], 'duration_s': res.get('duration_s'), 'source_script': job['request']['source_script'],
-             'beats': beat_durations(script, ws)}
+             'beats': beat_durations(script, ws), 'direction_digest': job['request'].get('direction_digest'), 'tweaks': job['request'].get('tweaks') or []}
     (ws / 'out' / 'voice.json').write_text(json.dumps(voice, indent=1), encoding='utf-8')
     stored = [{'name': 'narration.mp3', 'key': res['audio_key'], 'sha256': res['sha256'], 'bytes': res['bytes'], 'location': 'storage', 'receipt': True},
               {'name': 'timing.json', 'key': res['timing_key'], 'sha256': res['timing_sha256'], 'bytes': res['timing_bytes'], 'location': 'storage', 'receipt': True}]
@@ -203,5 +210,5 @@ def voice_record(ws, procedure, prior, fetched):
         choice_note = str(json.loads((ws / 'work' / 'voice-choice.json').read_text(encoding='utf-8')).get('choice_note') or '')
     except (OSError, ValueError):
         choice_note = ''
-    summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest'], 'choice_note': choice_note, **stamps(ws, 'voice')}   # design/39 4.6
+    summary = {**voice, 'cost': job.get('cost'), 'content_digest': script['content_digest'], 'choice_note': choice_note, 'recorded_from': 'chat', **stamps(ws, 'voice')}   # design/39 4.6
     return {'files': ['out/voice.json'], 'stored': stored, 'summary': summary, 'retain': True, 'upload': True}

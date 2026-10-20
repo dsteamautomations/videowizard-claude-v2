@@ -12,6 +12,16 @@ SK drives the operator's assistant in the operator folder; the builder watches t
 | intake | record | 4 s | — | source.txt 4,787 bytes to storage |
 | brief | prepare | 1 s | — | last brief (VW-3) and no client rules |
 | brief | proposal written and presented | — | 48 s | five decisions, four production questions, nine chapters |
+| brief | record | 4 s | — | first try refused: the quote held "&", which the guard reads as command chaining (V4); SK retyped |
+| script | prepare | 1 s | — | |
+| script | proposal written and presented | — | 35 s | no wording changes |
+| script | web check (2 searches, 3 fetches, after `vw web`) | — | 61 s | first live use of the web gate; every call logged as allowed |
+| script | record | 4 s | — | 9 beats |
+| voice | prepare, preview of last voice | 1 s, 1 s | — | last narrator proposed first, as the step says |
+| voice | browsing before asking preferences | 8 calls, 2–3 s each | 96 s | 8 catalog calls of about 400 KB each, persisted outside the run folder where the child cannot read them (V1, V2) |
+| voice | shortlist after preferences | 2 calls | 19 s | |
+| voice | 3 auditions on Eleven v4 (paid) | 17 s | — | submitted together, all ready in one wait |
+| voice | fetch ×3 | 3 s each | — | saved as audition-<voice id>.mp3; the message named narration.mp3 (V3) |
 
 ## Observations
 
@@ -21,6 +31,9 @@ SK drives the operator's assistant in the operator folder; the builder watches t
 - Intake titles: the recommended title repeats the document's own title and drops the deliverable, against the prompt's "subject and deliverable" rule. SK chose it.
 - Brief: grounded decisions, audience labelled a recommendation, no call to action added, the four production values offered as last time's answers and asked once. The chapters proposed are the nine narrative scenes; VW-3 used nine construction steps. Chapters tag every clip at analysis and map scenes at options, so they must be things the camera can see.
 - The document's "Suggested Duration: 5–6 Minutes" was removed at intake as timing and the brief cannot see it; target length falls back to the narration (about 800 words, so near 5–6 min anyway).
+
+- Subagent check (13:33): the child refused by instruction without calling the Agent tool, so the hook was not exercised live. A synthetic run of the installed guard (temp folder, not VW-4) blocks Agent, a Read of ~/.vw2/session.json and SendUserFile, each with a guard.log line. The live hook fired for Bash, Read, WebSearch, WebFetch and an mcp host tool; SendUserFile's call failed on its own input check (the file did not exist) before any hook, so whether the hook runs for it is unproven.
+- Voice (13:48–13:52): asked to compare, the child browsed first and asked for preferences after; the catalog answers were too large to read; the three auditions were fetched into three files but reported as one.
 
 ## Candidate changes (not built; batched at stage boundaries or after the run)
 
@@ -38,3 +51,11 @@ SK drives the operator's assistant in the operator folder; the builder watches t
 
 ## Confirmed in the workflow (SK's question on action without voice)
 Pauses (design/19): at options, before any option, the child proposes scenes and pauses; a pause sits after a sentence-ending word (or after the last word), states the total silence wanted, at most 4 s, with a reason ("a step of an activity should finish on screen before the next is spoken"); the recording's own gap counts toward it; the narration is cut only in the silence after a sentence, never inside a word; the picture runs on under the silence; subtitles shift by the approved pauses; the assembly render inserts the silence. Approved with one quote (`vw options scenes`). No pause before the first word.
+| V1 | Superseded by design/51 (chat path, one question per message). Was: voice step and prompt: on "compare", ask one message first (the brief's recommended register, then accent, gender, age, any names the operator likes), then one filtered `vw voice catalog` (account scope first); never browse unfiltered | the child browsed eight times before asking; SK: ask first, then search | text only |
+| V2 | Folded into design/51 C. Compact catalog rows: id, name, accent, gender, age, use case, descriptive, description cut at 160 chars, preview URL, scope; the plugin prints one line per voice on stderr; page of 20 | 30 full provider records are about 400 KB; Claude Code persists them outside the run folder, which the guard rightly refuses, so the child saw 2 KB of each | small, server + plugin |
+| V3 | `vw voice fetch` message names the file it wrote (audition-<voice name>.mp3 or narration.mp3); audition files carry the voice name | the message said narration.mp3 for every audition, which did not exist; the child told the operator all three landed in one file | one line, plugin |
+| V4 | Guard: the chaining check ignores characters inside quoted arguments (an operator quote may hold "&", "|" or ">") | the brief record was refused for an "&" in SK's own words | small, guard + test |
+| V5 | Kept as a guard rule for every stage (SK, 18 Oct); listening itself moves to the Voices page of design/51. Guard: `SendUserFile` allowed for files inside the active run folder (a path tool like Read), blocked elsewhere | the operator could hear an audition inline instead of finding the file; today the tool is unlisted | small, guard + test |
+
+## 20 Oct: the voice stage rebuilt (design/52)
+Built and tested at layer one (plugin 156 tests, server unit 58): the Voices page and directory, the register and usage directory, the compact catalog, one question per message, the delivery direction with its prompt (two lists), every narration kept, the final click as the record, tags stripped from the alignment, V3 (fetch names its file), V4 (quoted "&" allowed), V5 (files inside the run may be shown). Not deployed; the alignment check (one ~20-character paid call) and the deploy wait for SK's word. Layer two (server/tests/test_voices_page.py) needs Docker.
