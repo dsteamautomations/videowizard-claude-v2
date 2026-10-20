@@ -23,7 +23,7 @@ DIRECTION = {'kind_of_film': 'a documentary explainer', 'register': {'best_fit':
 def args(**kw):
     base = {'what': 'direct', 'step': None, 'wait': 0, 'voice': [], 'excerpt': None, 'model': 'eleven_v4', 'settings': None, 'job': None, 'note': None, 'scope': 'account',
             'search': '', 'cursor': '', 'language': '', 'accent': '', 'gender': '', 'age': '', 'use_case': None, 'high_quality': False, 'owner': None,
-            'choice': None, 'quote': None, 'file': None, 'passage': None}
+            'choice': None, 'quote': None, 'file': None, 'passage': None, 'page': 0, 'tab': None, 'sort': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -145,11 +145,13 @@ def test_fetch_message_names_the_audition_file(harness, monkeypatch, capsys):
 
 def test_catalog_prints_one_line_per_voice(harness, monkeypatch, capsys):
     rows = {'voices': [{'voice_id': 'v1', 'name': 'Adamya Sharma', 'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'informative_educational', 'descriptive': 'confident',
-                        'description': 'Authoritative.', 'favourite': True, 'on_account': True, 'narrations': 2, 'auditions': 1}], 'has_more': True, 'next_page_token': 'p2'}
-    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: rows)
-    code, out, err = run(args(what='catalog', scope='library', gender='male'), capsys)
-    assert code == 0 and '★ v1 · Adamya Sharma · indian · male · middle_aged · informative_educational · confident · on the account · 2 narrations, 1 audition' in err
-    assert 'more: --cursor p2' in err
+                        'description': 'Authoritative.', 'favourite': True, 'on_account': True, 'narrations': 2, 'auditions': 1}] * 25, 'total': 412, 'has_more': True, 'page': 0}
+    seen = []
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: seen.append((path, kw.get('params'))) or rows)
+    code, out, err = run(args(what='catalog', scope='library', gender='male', page=0), capsys)
+    assert code == 0 and seen[0][0] == '/api/voice/search' and seen[0][1]['tab'] == 'explore' and seen[0][1]['gender'] == 'male'
+    assert '★ v1 · Adamya Sharma · indian · male · middle_aged · informative_educational · confident · on the account · 2 narrations, 1 audition' in err
+    assert err.count('Adamya Sharma') == 20 and 'of 412' in err and 'next: --page 1' in err
 
 
 # ---------- the record from a job; prepare shows favourites and the page ----------
@@ -222,9 +224,9 @@ def test_voice_steps_say_the_link_and_the_automatic_save():
 
 def test_catalog_offers_the_page_link_with_the_same_filters(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
-    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'voices': [], 'has_more': False})
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'voices': [], 'has_more': False, 'total': 0, 'page': 0})
     code, out, err = run(args(what='catalog', scope='library', gender='male', age='middle_aged', accent='indian', language='en', search='measured'), capsys)
-    assert code == 0 and out['voice_page_url'] == 'https://x.example/runs/VW-9/voices2?browse=1&scope=library&language=en&accent=indian&gender=male&age=middle_aged&search=measured'
+    assert code == 0 and out['voice_page_url'] == 'https://x.example/runs/VW-9/voices2?tab=explore&language=en&accent=indian&gender=male&age=middle_aged&search=measured'
     assert 'voices page with these filters' in err
 
 
@@ -264,3 +266,8 @@ def test_page_link_points_at_the_new_page_and_the_steps_put_the_direction_first(
     assert 'direct prepare' in steps[1] and 'test passage' in steps[1].lower() and '--passage' in steps[1]
     assert 'voices page' in steps[2].lower() and 'default' in steps[2].lower()
     assert 'TEST PASSAGES' in STAGES['voice']['direction_prompt'] and '"test_passages"' in STAGES['voice']['direction_prompt']
+
+
+def test_voice_steps_name_the_four_steps():
+    steps = ' '.join(STAGES['voice']['steps'])
+    assert 'Browse, Try, Narrations, Final' in steps and 'without a tryout' in steps

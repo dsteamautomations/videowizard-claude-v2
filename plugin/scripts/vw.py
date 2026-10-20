@@ -679,16 +679,21 @@ def script_sentences(text):
     return rows
 
 
-def catalog_lines(found):
+def catalog_lines(found, page=0):
+    """design/55: 20 lines a page from the 100 the search answers; the next page within the 100 is the same call with --page."""
     lines = []
-    for v in found.get('voices') or []:
+    rows = found.get('voices') or []
+    start = (page % 5) * 20
+    shown = rows[start:start + 20]
+    for v in shown:
         used = f"{v.get('narrations') or 0} narration{'s' if (v.get('narrations') or 0) != 1 else ''}, {v.get('auditions') or 0} audition{'s' if (v.get('auditions') or 0) != 1 else ''}"
         parts = [('★ ' if v.get('favourite') else '') + v['voice_id'], v.get('name') or '', v.get('accent') or '', v.get('gender') or '', v.get('age') or '', v.get('use_case') or '',
                  v.get('descriptive') or '', 'on the account' if v.get('on_account') else 'library', used]
         lines.append(' · '.join(x for x in parts if x))
-    if found.get('has_more') and found.get('next_page_token'):
-        lines.append(f"more: --cursor {found['next_page_token']}")
-    return '\n'.join(lines) or 'no voices match; widen the filters'
+    total = found.get('total') or len(rows)
+    if shown:
+        lines.append(f"showing {start + 1}-{start + len(shown)} of {total}" + (f" · next: --page {page + 1}" if start + 20 < len(rows) or found.get('has_more') else ''))
+    return '\n'.join(lines) or 'no voices match; loosen a filter or search by name'
 
 
 def fetch_job_files(m, job):
@@ -777,20 +782,22 @@ def cmd_voice(a):
         emit(write(f"/api/runs/{m['run_id']}/jobs/{a.job}/recover", {}))
     if a.what == 'resolve':
         emit(write(f"/api/runs/{m['run_id']}/jobs/{a.job}/resolve", {'note': a.note or ''}), 0, 'Attempt set aside; a new narration may be submitted.')
-    if a.what == 'catalog':
-        params = {k: v for k, v in (('scope', a.scope), ('search', a.search), ('cursor', a.cursor), ('language', a.language), ('accent', a.accent),
-                                    ('gender', a.gender), ('age', a.age), ('use_cases', ','.join(a.use_case or [])), ('high_quality', 'true' if a.high_quality else '')) if v}
-        found = call('GET', '/api/voice/catalog', params=params)
+    if a.what == 'catalog':   # design/55: a thin client of the live search; 20 lines a page
+        page = int(a.page or 0)
+        tab = a.tab or ('mine' if a.scope == 'account' else 'favourites' if a.scope == 'favourites' else 'explore')
+        params = {'tab': tab, 'page': page // 5, **{k: v for k, v in (('search', a.search), ('language', a.language), ('accent', a.accent), ('gender', a.gender), ('age', a.age),
+                                                        ('use_case', (a.use_case or [''])[0]), ('sort', a.sort), ('category', 'high_quality' if a.high_quality else '')) if v}}
+        found = call('GET', '/api/voice/search', params=params)
         if m is None:
             try:
                 m = active()
             except SystemExit:   # no active run: the catalog still answers, without a page link
                 m = None
-        if m:   # the voices page with the same filters: the default place to listen, shortlist, audition and pick
+        if m:   # the voices page with the same filters: the default place to listen, try and choose
             from urllib.parse import urlencode
-            q = {'browse': '1', 'scope': a.scope or 'library', **{k: v for k, v in (('language', a.language), ('accent', a.accent), ('gender', a.gender), ('age', a.age), ('use_case', ','.join(a.use_case or [])), ('search', a.search)) if v}}
+            q = {'tab': tab, **{k: v for k, v in (('language', a.language), ('accent', a.accent), ('gender', a.gender), ('age', a.age), ('use_case', (a.use_case or [''])[0]), ('search', a.search)) if v}}
             found['voice_page_url'] = voice_page_url(m['code']) + '?' + urlencode(q)
-        emit(found, 0, catalog_lines(found) + (f"\nvoices page with these filters (the default; give the operator this link): {found['voice_page_url']}" if found.get('voice_page_url') else ''))
+        emit(found, 0, catalog_lines(found, page) + (f"\nvoices page with these filters (the default; give the operator this link): {found['voice_page_url']}" if found.get('voice_page_url') else ''))
     if a.what == 'models':
         emit(call('GET', '/api/voice/models'))
     if a.what == 'preview':
@@ -1515,6 +1522,8 @@ def build_parser():
     s.add_argument('step', nargs='?', choices=['prepare', 'record'], help='direct: prepare | record (design/52 D)')
     s.add_argument('--choice', choices=['best_fit', 'experimental', 'none'], help="direct record: the operator's choice"); s.add_argument('--quote', help="direct record: the operator's words")
     s.add_argument('--passage', type=int, help='direct record: the test passage the operator chose (1, 2 or 3; design/54)')
+    s.add_argument('--page', type=int, default=0, help='catalog: 20 voices a page'); s.add_argument('--tab', choices=['explore', 'mine', 'favourites'], help='catalog: the library, my voices or the favourites')
+    s.add_argument('--sort', choices=['trending', 'created_date', 'usage_character_count_1y', 'cloned_by_count'], help='catalog: trending (default), latest, most used, most cloned')
     s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag} inside the run folder')
     s.add_argument('--scope', default='library'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')

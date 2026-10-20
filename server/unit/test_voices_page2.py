@@ -5,18 +5,9 @@ from app import voices as V
 from app import voice_direction as VD
 from app.errors import Problem
 
-LIB = {'voice_id': 'lib1', 'name': 'Santhi', 'labels': {'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'narrative_story', 'descriptive': 'warm'},
-       'description': 'd' * 700, 'preview_url': 'https://p/1.mp3', 'category': 'professional', 'public_owner_id': 'o1', 'language': 'en', 'accent': 'indian', 'gender': 'male', 'age': 'middle_aged'}
-ACC = {'voice_id': 'acc1', 'name': 'UD - Narrator', 'labels': {'accent': 'indian', 'gender': 'male'}, 'description': 'x', 'preview_url': 'https://p/2.mp3', 'category': 'cloned',
-       'sharing': {'public_owner_id': 'o2', 'original_voice_id': 'orig2'}}
-
-
-def test_mirror_row_from_a_library_voice_and_an_account_voice():
-    r = V.mirror_row(LIB, 'library')
-    assert r['voice_id'] == 'lib1' and r['scope'] == 'library' and r['public_owner_id'] == 'o1' and r['original_voice_id'] == 'lib1' and r['accent'] == 'indian' and r['language'] == 'en'
-    assert len(r['description']) == 601 and r['preview_url'] == 'https://p/1.mp3' and r['on_account'] is False
-    r = V.mirror_row(ACC, 'account')
-    assert r['scope'] == 'account' and r['on_account'] is True and r['public_owner_id'] == 'o2' and r['original_voice_id'] == 'orig2' and r['language'] == ''
+SHARED = {'voice_id': 'lib1', 'name': 'Santhi Prakash', 'description': 'Warm, clear, measured', 'preview_url': 'https://p/1.mp3', 'category': 'professional', 'public_owner_id': 'o1',
+          'language': 'en', 'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'narrative_story', 'descriptive': 'warm', 'is_added_by_user': True,
+          'cloned_by_count': 120, 'usage_character_count_1y': 50000}
 
 
 class FakeProvider:
@@ -25,30 +16,60 @@ class FakeProvider:
 
     def request(self, method, path, **kw):
         import httpx
-        self.calls.append((path, kw.get('params')))
-        page = int((kw.get('params') or {}).get('page', 0))
+        params = kw.get('params') or {}
+        self.calls.append((path, params))
         if path == '/v1/shared-voices':
-            voices = [{**LIB, 'voice_id': f'lib{page}a'}, {**LIB, 'voice_id': f'lib{page}b'}]
-            return httpx.Response(200, json={'voices': voices, 'has_more': page < 1})
+            page = int(params.get('page', 0))
+            voices = [{**SHARED, 'voice_id': f'lib{page}{k}', 'is_added_by_user': k == 'a'} for k in 'abc']
+            return httpx.Response(200, json={'voices': voices, 'has_more': page < 1, 'total_count': 6})
         if path == '/v2/voices':
-            return httpx.Response(200, json={'voices': [ACC], 'has_more': False})
+            return httpx.Response(200, json={'voices': [{'voice_id': 'acc1', 'name': 'UD - Narrator', 'labels': {'accent': 'indian', 'gender': 'male'}, 'description': 'x', 'preview_url': 'https://p/2.mp3',
+                                                        'category': 'cloned'}], 'has_more': False})
         return httpx.Response(404)
 
 
-def test_refresh_walks_every_library_page_and_the_account():
-    rows = V.mirror_rows_from_provider(FakeProvider())
-    ids = [r['voice_id'] for r in rows]
-    assert ids == ['lib0a', 'lib0b', 'lib1a', 'lib1b', 'acc1'] and rows[-1]['on_account'] is True
+def test_search_params_follow_the_tab_and_the_filters():
+    p = V.search_params({'tab': 'explore', 'language': 'en', 'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'narrative_story', 'search': 'measured', 'sort': 'trending', 'page': 2})
+    assert p == {'page_size': 100, 'page': 2, 'language': 'en', 'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_cases': 'narrative_story', 'search': 'measured', 'sort': 'trending'}
+    p = V.search_params({'tab': 'explore'})
+    assert p == {'page_size': 100, 'page': 0, 'sort': 'trending'}
+    assert V.search_params({'tab': 'explore', 'sort': 'weird'})['sort'] == 'trending'
 
 
-def test_filter_rows_matches_labels_search_and_flags():
-    rows = [{'voice_id': 'a', 'name': 'Santhi Prakash', 'accent': 'indian', 'gender': 'male', 'age': 'middle_aged', 'use_case': 'narrative_story', 'descriptive': 'warm', 'description': 'measured and clear', 'language': 'en', 'on_account': True, 'favourite': False},
-            {'voice_id': 'b', 'name': 'Asha', 'accent': 'indian', 'gender': 'female', 'age': 'young', 'use_case': 'conversational', 'descriptive': 'bright', 'description': 'quick', 'language': 'en', 'on_account': False, 'favourite': True}]
-    assert [r['voice_id'] for r in V.filter_rows(rows, {'gender': 'male'})] == ['a']
-    assert [r['voice_id'] for r in V.filter_rows(rows, {'search': 'MEASURED'})] == ['a']
-    assert [r['voice_id'] for r in V.filter_rows(rows, {'favourites_only': True})] == ['b']
-    assert [r['voice_id'] for r in V.filter_rows(rows, {'on_account': True})] == ['a']
-    assert [r['voice_id'] for r in V.filter_rows(rows, {})] == ['b', 'a']   # favourites first
+def test_search_explore_returns_compact_rows_with_the_register_and_usage(monkeypatch):
+    V._SEARCH.clear()
+    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {'lib0a': {'favourite': True, 'note': 'warm'}})
+    monkeypatch.setattr(V, 'history', lambda conn, voice_id=None: {'lib0b': {'narrations': 1, 'auditions': 2, 'last_used': '2026-10-18'}})
+    remembered = []
+    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: remembered.append(voice['voice_id']))
+    prov = FakeProvider()
+    out = V.search(None, prov, {'tab': 'explore', 'gender': 'male', 'page': 0})
+    assert out['total'] == 6 and out['has_more'] is True and out['page'] == 0 and [r['voice_id'] for r in out['voices']] == ['lib0a', 'lib0b', 'lib0c']
+    r = out['voices'][0]
+    assert r['favourite'] is True and r['on_account'] is True and r['preview_url'] == 'https://p/1.mp3' and r['accent'] == 'indian' and r['library']['public_owner_id'] == 'o1'
+    assert out['voices'][1]['narrations'] == 1 and out['voices'][1]['on_account'] is False
+    assert remembered == ['lib0a', 'lib0b', 'lib0c']
+    V.search(None, prov, {'tab': 'explore', 'gender': 'male', 'page': 0})
+    assert len([c for c in prov.calls if c[0] == '/v1/shared-voices']) == 1   # the second call is served from the two-minute cache
+
+
+def test_search_mine_and_favourites(monkeypatch):
+    V._SEARCH.clear()
+    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {'acc1': {'favourite': True, 'note': ''}, 'gone1': {'favourite': True, 'name': 'Gone', 'public_owner_id': 'o9'}})
+    monkeypatch.setattr(V, 'history', lambda conn, voice_id=None: {})
+    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: None)
+    prov = FakeProvider()
+    mine = V.search(None, prov, {'tab': 'mine'})
+    assert [r['voice_id'] for r in mine['voices']] == ['acc1'] and mine['voices'][0]['on_account'] is True and mine['total'] == 1
+    fav = V.search(None, prov, {'tab': 'favourites'})
+    ids = {r['voice_id']: r for r in fav['voices']}
+    assert ids['acc1']['favourite'] is True and ids['gone1'].get('missing') is True and ids['gone1']['name'] == 'Gone'
+
+
+def test_known_voices_list_last_voice_favourites_and_my_voices(monkeypatch):
+    rows = V.known_voices(last_voice={'voice_id': 'acc1', 'name': 'UD - Narrator'}, favourites=[{'voice_id': 'lib0a', 'name': 'Santhi', 'missing': False}],
+                          mine=[{'voice_id': 'acc1', 'name': 'UD - Narrator'}, {'voice_id': 'acc2', 'name': 'Other'}])
+    assert [(r['voice_id'], r['why']) for r in rows] == [('acc1', 'last film'), ('lib0a', 'favourite'), ('acc2', 'in my voices')]
 
 
 def test_caps_for_tryout_and_narration():
@@ -85,15 +106,6 @@ def test_page_state_has_a_step_and_a_tried_list():
     assert state['step'] == 'try'
     with pytest.raises(Problem):
         V.set_step(state, 'sideways')
-
-
-def test_mirror_page_filters_server_side_and_caps_the_answer(monkeypatch):
-    rows = [{'voice_id': f'v{i}', 'name': f'Voice {i}', 'accent': 'indian' if i % 2 else 'british', 'gender': 'male', 'age': 'middle_aged', 'use_case': '', 'descriptive': '', 'description': '',
-             'language': 'en', 'on_account': False, 'favourite': i == 3} for i in range(500)]
-    monkeypatch.setattr(V, 'mirror_rows', lambda conn: {'voices': rows, 'refreshed_at': '2026-10-20T07:47:00', 'count': 500})
-    page = V.mirror_page(None, {'accent': 'indian'})
-    assert page['matched'] == 250 and len(page['voices']) == 200 and page['voices'][0]['voice_id'] == 'v3' and page['count'] == 500 and page['refreshed_at']
-    assert V.mirror_page(None, {'search': 'voice 499'})['matched'] == 1
 
 
 def test_the_procedure_route_serves_every_prompt_of_a_stage():

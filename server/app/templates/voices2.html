@@ -2,121 +2,178 @@
 {% block title %}Voices · {{ run.code }} · VideoWizard{% endblock %}
 {% block body %}
 <style>
-.v2 .bar{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:12px 0}
-.v2 .bar button{padding:8px 4px;font-size:14px}
-.v2 .bar button.on{background:var(--fg);color:var(--bg)}
-.v2 .head{border:1px solid var(--line);padding:8px 12px;margin:8px 0;font-size:14px}
-.v2 .browse{display:grid;grid-template-columns:200px 1fr;gap:12px}
-.v2 .filters label{margin:6px 0;font-size:13px}
-.v2 .filters input,.v2 .filters select{min-width:0;width:100%}
-.v2 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-content:start}
-.v2 .card{border:1px solid var(--line);padding:10px 12px;font-size:13px}
-.v2 .card .n{font-weight:600;font-size:14px}
-.v2 .card .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.v2 .card button{padding:3px 8px;font-size:12px}
-.v2 .card.tried{border-color:var(--fg)}
-.v2 .row{border:1px solid var(--line);padding:8px 12px;margin:6px 0;font-size:14px}
-.v2 .msg{margin:8px 0;min-height:1.2em}
-.v2 .err{color:var(--err)}
-.v2 .ok{color:var(--ok)}
-.v2 audio{width:100%;max-width:360px;height:32px;margin-top:6px}
-.v2 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
-.v2 details pre{max-height:360px;overflow:auto}
-.v2 .muted{color:var(--muted)}
+.v2{--z:rgba(127,127,127,.07)}
+.v2 .top{position:sticky;top:0;background:var(--bg);z-index:5;padding:8px 0 6px;border-bottom:1px solid var(--line)}
+.v2 .steps{display:flex;gap:18px;font-size:15px}
+.v2 .steps a{color:var(--muted);text-decoration:none;cursor:pointer}
+.v2 .steps a.on{color:var(--fg);font-weight:700}
+.v2 .steps a.off{opacity:.5;cursor:default}
+.v2 .dir{font-size:13px;color:var(--muted);margin-top:4px}
+.v2 .dir a{color:var(--fg)}
+.v2 .tabs{display:flex;gap:4px;margin:14px 0 8px}
+.v2 .tabs button{border:1px solid var(--line);background:none;padding:6px 14px}
+.v2 .tabs button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.v2 .search{display:flex;gap:8px;align-items:center;margin:6px 0}
+.v2 .search input{flex:1;min-width:0;padding:9px 12px;font-size:15px}
+.v2 .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0 10px;font-size:13px}
+.v2 .chips select{padding:5px 8px;font-size:13px}
+.v2 .chip{border:1px solid var(--line);border-radius:14px;padding:4px 11px;background:none;font-size:13px;cursor:pointer}
+.v2 .chip.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.v2 .panel{border:1px solid var(--line);padding:10px 12px;margin:6px 0;font-size:13px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.v2 .panel .seg button{border:1px solid var(--line);background:none;padding:3px 9px;font-size:12px;margin-left:-1px}
+.v2 .panel .seg button.on{background:var(--fg);color:var(--bg)}
+.v2 table{width:100%;border-collapse:collapse;font-size:14px}
+.v2 th{font-weight:normal;color:var(--muted);font-size:12px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.v2 td{padding:8px;vertical-align:middle;border-bottom:0}
+.v2 tbody tr:nth-child(even){background:var(--z)}
+.v2 tbody tr.sel{outline:1px solid var(--fg)}
+.v2 .av{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--z);align-items:center;justify-content:center;font-weight:700;font-size:13px;margin-right:8px}
+.v2 .nm{font-weight:600}
+.v2 .ds{color:var(--muted);font-size:12px}
+.v2 .ic{border:none;background:none;font-size:17px;cursor:pointer;padding:2px 6px;color:var(--fg)}
+.v2 .ic.on{color:var(--ok)}
+.v2 .pager{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin:8px 0}
+.v2 .pager button{padding:3px 10px}
+.v2 .empty{color:var(--muted);padding:28px 8px;font-size:15px}
+.v2 .msg{min-height:1.2em;font-size:13px;margin:6px 0}
+.v2 .err{color:var(--err)}.v2 .ok{color:var(--ok)}
+.v2 .foot{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:10px 0;display:flex;gap:16px;align-items:center;z-index:5;margin-top:16px}
+.v2 .player{flex:0 0 300px;font-size:13px;display:flex;gap:8px;align-items:center}
+.v2 .player audio{width:220px;height:30px}
+.v2 .tray{flex:1;font-size:13px;color:var(--muted)}
+.v2 .foot .go{background:var(--fg);color:var(--bg);border:1px solid var(--fg);padding:9px 16px;font-size:14px}
+.v2 .foot .go:disabled{opacity:.45}
+.v2 .why{font-size:12px;color:var(--muted);margin-left:8px}
+.v2 .words{min-width:280px;padding:7px 10px}
+.v2 details.tw{font-size:13px}
+.v2 h3{font-size:14px;color:var(--muted);font-weight:normal;margin:16px 0 4px}
+.v2 .spacer{height:70px}
 </style>
 <div class="v2" id="app" data-code="{{ run.code }}">
-<h1>Voices for {{ run.code }} — {{ run.title }}</h1>
-<div class="head" id="head">loading…</div>
-<div class="bar" id="bar"></div>
+<div class="top">
+  <div class="steps" id="steps"></div>
+  <div class="dir" id="dir">loading…</div>
+  <details id="scriptbox" hidden><summary>the directed script</summary><pre id="script" style="max-height:300px;overflow:auto;font-size:13px"></pre><div id="acct" class="ds"></div></details>
+</div>
 <div class="msg" id="msg"></div>
-<div id="step-browse">
-  <div class="browse">
-    <div class="filters">
-      <label>Language <input id="f-language" placeholder="en"></label>
-      <label>Accent <input id="f-accent" placeholder="indian"></label>
-      <label>Gender <select id="f-gender"><option value="">any</option><option>male</option><option>female</option><option>neutral</option></select></label>
-      <label>Age <select id="f-age"><option value="">any</option><option value="young">young</option><option value="middle_aged">middle aged</option><option value="old">old</option></select></label>
-      <label>Use case <select id="f-use_case"><option value="">any</option><option>narrative_story</option><option>informative_educational</option><option>conversational</option><option>advertisement</option><option>characters_animation</option><option>social_media</option><option>entertainment_tv</option></select></label>
-      <label>Search <input id="f-search" placeholder="measured"></label>
-      <label><input type="checkbox" id="f-fav"> favourites only</label>
-      <label><input type="checkbox" id="f-acc"> in my voices</label>
-      <p class="muted" id="count"></p>
-      <button id="refresh">Refresh catalogue</button>
-      <p class="muted" id="refreshed"></p>
-    </div>
-    <div class="cards" id="cards"></div>
+
+<section id="s-browse">
+  <div class="tabs"><button data-tab="explore" class="on">Explore</button><button data-tab="mine">My voices</button><button data-tab="favourites">Favourites</button></div>
+  <div class="search"><input id="q" placeholder="Search voices by name or description…"><button id="filters-btn">Filters</button><select id="sort"><option value="trending">Trending</option><option value="created_date">Latest</option><option value="usage_character_count_1y">Most used</option></select></div>
+  <div class="panel" id="filters" hidden>
+    <span>Gender <span class="seg" data-f="gender"><button data-v="">any</button><button data-v="male">male</button><button data-v="female">female</button><button data-v="neutral">neutral</button></span></span>
+    <span>Age <span class="seg" data-f="age"><button data-v="">any</button><button data-v="young">young</button><button data-v="middle_aged">middle aged</button><button data-v="old">old</button></span></span>
+    <span>Quality <span class="seg" data-f="category"><button data-v="">any</button><button data-v="high_quality">high quality</button><button data-v="professional">professional</button></span></span>
+    <button id="clear">clear all</button>
   </div>
-  <div class="foot"><span id="trylist" class="muted"></span><button id="to-try">Next: try these voices →</button></div>
-</div>
-<div id="step-try" hidden>
-  <div class="row" id="try-passage"></div>
-  <div class="row"><span id="try-voices"></span><br><button id="do-try"></button></div>
-  <div id="try-results"></div>
-  <div class="foot"><button class="go" data-go="browse">← Browse</button><button class="go" data-go="choose">Next: choose for the full script →</button></div>
-</div>
-<div id="step-choose" hidden>
-  <div id="choose-list"></div>
-  <div class="row"><button id="do-narrate"></button></div>
-  <div class="foot"><button class="go" data-go="try">← Try</button><button class="go" data-go="narrations">Next: narrations →</button></div>
-</div>
-<div id="step-narrations" hidden>
-  <div id="narr-list"></div>
-  <div class="foot"><button class="go" data-go="choose">← Choose</button><button class="go" data-go="finalise">Next: finalise →</button></div>
-</div>
-<div id="step-finalise" hidden>
-  <div id="final-list"></div>
-  <div class="foot"><button class="go" data-go="narrations">← Narrations</button><button class="go" data-go="download">Next: download →</button></div>
-</div>
-<div id="step-download" hidden>
-  <div id="dl"></div>
-  <div class="foot"><button class="go" data-go="finalise">← Finalise</button><span></span></div>
+  <div class="chips">
+    <select id="language"><option value="">Language: any</option><option value="en">English</option><option value="hi">Hindi</option><option value="ta">Tamil</option><option value="te">Telugu</option><option value="kn">Kannada</option><option value="ml">Malayalam</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option></select>
+    <select id="accent"><option value="">Accent: any</option><option value="indian">Indian</option><option value="american">American</option><option value="british">British</option><option value="australian">Australian</option><option value="standard">Standard</option></select>
+    <span id="usecases"></span>
+  </div>
+  <div id="browse-body"><div class="empty">Set a filter or search to see voices.</div></div>
+  <div class="pager" id="pager" hidden></div>
+</section>
+
+<section id="s-try" hidden><div id="try-body"></div></section>
+<section id="s-narrations" hidden><div id="narr-body"></div></section>
+<section id="s-final" hidden><div id="final-body"></div></section>
+<div class="spacer"></div>
+
+<div class="foot">
+  <div class="player"><span id="pl-name" class="ds">nothing playing</span><audio id="pl" controls preload="none"></audio></div>
+  <div class="tray" id="tray"></div>
+  <span id="action"></span>
 </div>
 </div>
 <script>
 (function(){
 const code=document.getElementById('app').dataset.code, base='/runs/'+code+'/voices2';
-const STEPS=['browse','try','choose','narrations','finalise','download'];
-const LABELS={browse:'1 Browse',try:'2 Try',choose:'3 Choose',narrations:'4 Narrations',finalise:'5 Finalise',download:'6 Download'};
-let mirror={voices:[]}, data=null, tryout=[], chosen=[], step='browse', timer=null;
+const STEPS=[['browse','Browse'],['try','Try'],['narrations','Narrations'],['final','Final']];
+const USE=[['narrative_story','Narration'],['informative_educational','Educational'],['conversational','Conversational'],['advertisement','Advertisement'],['characters_animation','Characters'],['social_media','Social media'],['entertainment_tv','Entertainment']];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let data=null, step='browse', timer=null, q={tab:'explore',search:'',language:'',accent:'',gender:'',age:'',use_case:'',category:'',sort:'trending',page:0}, result=null, sub=0, tryout=[], chosen=[], finalPick=null, playing=null, names={}, qtimer=null, touched=false;
 function msg(t,err){const m=$('msg');m.textContent=t||'';m.className='msg '+(err?'err':'ok');}
-async function act(body){const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok){throw new Error(j.message||('HTTP '+r.status));}return j;}
-async function load(){const r=await fetch(base+'/data');data=await r.json();if(!tryout.length&&data.state.tried)tryout=data.state.tried.map(t=>t.asked_as||t.voice_id);if(data.state.step&&!timer)step=data.state.step;render();const open=data.jobs.some(j=>['queued','running','storage_pending'].includes(j.status));clearTimeout(timer);timer=open?setTimeout(load,10000):null;}
-let mtimer=null;
-async function loadMirror(){const q=filters();const p=new URLSearchParams({language:q.language,accent:q.accent,gender:q.gender,age:q.age,use_case:q.use_case,search:q.search,fav:q.fav?'1':'',acc:q.acc?'1':''});const r=await fetch('/voices2/mirror?'+p);mirror=await r.json();$('refreshed').textContent=mirror.refreshed_at?('last refresh '+mirror.refreshed_at.slice(0,16).replace('T',' ')+' · '+mirror.count+' voices in the catalogue'):'no catalogue yet: press Refresh catalogue';renderCards();}
-function scheduleMirror(){clearTimeout(mtimer);mtimer=setTimeout(()=>loadMirror().catch(err=>msg(err.message,true)),250);}
-function filters(){return {language:$('f-language').value.trim().toLowerCase(),accent:$('f-accent').value.trim().toLowerCase(),gender:$('f-gender').value,age:$('f-age').value,use_case:$('f-use_case').value,search:$('f-search').value.trim().toLowerCase(),fav:$('f-fav').checked,acc:$('f-acc').checked};}
-function renderCards(){const last=data&&data.last_voice?data.last_voice.voice_id:null;const rows=(mirror.voices||[]).slice().sort((a,b)=>(b.voice_id===last)-(a.voice_id===last)||(b.favourite-a.favourite)||a.name.localeCompare(b.name));$('count').textContent=(mirror.matched||0)+' of '+(mirror.count||0)+' voices match'+((mirror.matched||0)>rows.length?' (showing the first '+rows.length+'; narrow the filters)':'');const show=rows;$('cards').innerHTML=show.map(r=>`<div class="card ${tryout.includes(r.voice_id)?'tried':''}" data-id="${esc(r.voice_id)}"><div class="n">${r.favourite?'★ ':''}${esc(r.name)}${r.voice_id===last?' <small>(last film)</small>':''}</div><div class="muted">${esc([r.accent,r.gender,r.age,r.use_case,r.descriptive].filter(Boolean).join(' · '))}</div><div>${esc(r.description)}</div><div class="muted">${r.on_account?'in my voices':'library'}${r.narrations||r.auditions?' · '+r.narrations+' narr. '+r.auditions+' aud.':''}${r.last_used?' · '+r.last_used:''}</div><div class="acts"><button data-act="sample">▶ sample</button><button data-act="try">${tryout.includes(r.voice_id)?'remove from tryout':'try'}</button>${!r.on_account&&r.library?'<button data-act="save">save to my voices</button>':''}<button data-act="fav">${r.favourite?'unmark favourite':'★ favourite'}</button></div><div class="player"></div></div>`).join('');$('trylist').textContent='Tryout list: '+(tryout.length?tryout.map(id=>name(id)).join(', '):'none')+' ('+tryout.length+' of 6)';}
-const names={};function name(id){const r=(mirror.voices||[]).find(v=>v.voice_id===id);if(r){names[id]=r.name;return r.name;}if(names[id])return names[id];const t=data&&data.state.tried.find(t=>t.voice_id===id||t.asked_as===id);return t?t.name:id;}
-$('cards').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const card=b.closest('.card'),id=card.dataset.id,row=mirror.voices.find(v=>v.voice_id===id);try{if(b.dataset.act==='sample'){const j=await act({action:'preview',voice_id:id});card.querySelector('.player').innerHTML=j.url?`<audio controls autoplay src="${esc(j.url)}"></audio>`:'<span class="muted">no sample</span>';}
-else if(b.dataset.act==='try'){if(tryout.includes(id))tryout=tryout.filter(x=>x!==id);else if(tryout.length>=6){msg('At most six voices in a tryout; remove one first.',true);return;}else tryout.push(id);renderCards();}
-else if(b.dataset.act==='save'){msg('saving '+row.name+' to my voices…');const j=await act({action:'save',voice_id:id,library:row.library});row.on_account=true;msg(j.name+' is in my voices');renderCards();}
-else if(b.dataset.act==='fav'){const j=await act({action:'favourite',voice_id:id,on:!row.favourite});row.favourite=j.favourite;renderCards();}}catch(err){msg(err.message,true);}});
-['f-language','f-accent','f-gender','f-age','f-use_case','f-search','f-fav','f-acc'].forEach(id=>$(id).addEventListener('input',scheduleMirror));
-$('refresh').addEventListener('click',async()=>{msg('refreshing the catalogue from ElevenLabs: about 20,000 voices, three to four minutes; keep this page open…');try{const j=await act({action:'refresh'});msg('catalogue refreshed: '+j.voices+' voices');await loadMirror();}catch(err){msg(err.message,true);}});
-$('to-try').addEventListener('click',()=>go('try'));
-document.querySelectorAll('.go').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
+async function act(body){const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw new Error(j.message||('HTTP '+r.status));return j;}
+function nm(id){return names[id]||id;}
+function play(id,name,url){if(!url){msg('No sample for this voice.',true);return;}const pl=$('pl');if(playing===id&&!pl.paused){pl.pause();return;}playing=id;pl.src=url;pl.play();$('pl-name').textContent=name;document.querySelectorAll('.ic.play').forEach(b=>b.textContent=(b.dataset.id===id)?'⏸':'▶');}
+$('pl').addEventListener('pause',()=>document.querySelectorAll('.ic.play').forEach(b=>b.textContent='▶'));
+$('pl').addEventListener('play',()=>document.querySelectorAll('.ic.play').forEach(b=>b.textContent=(b.dataset.id===playing)?'⏸':'▶'));
+// ---------- frame ----------
+function frame(){const st=data&&data.state, d=data&&data.direction;
+$('steps').innerHTML=STEPS.map(([k,l])=>`<a data-s="${k}" class="${k===step?'on':''} ${k==='final'&&!(st&&st.final)?'off':''}">${l}</a>`).join('<span class="ds">›</span>');
+$('steps').querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{if(a.classList.contains('off')){msg('No final narration yet. Pick one on Narrations.',true);return;}go(a.dataset.s);}));
+if(!data)return;const tagged=d&&d.chosen!=='none';
+$('dir').innerHTML=(d?`Direction: ${esc(d.chosen)}${tagged?' · '+d.base.length+' of '+d.sentences+' sentences tagged':''}${d.passage?' · test passage '+d.passage.n+' ('+d.passage.words+' words)':''}`:'<span class="err">Direction not recorded yet: ask the assistant (vw voice direct).</span>')+(data.last_voice?' · last voice '+esc(data.last_voice.name):'')+(data.run.stage!=='voice'?' · <span class="ok">voice recorded; the run is at '+esc(data.run.stage)+'</span>':'')+' · <a href="#" id="show">show</a>';
+$('show').addEventListener('click',e=>{e.preventDefault();const x=$('scriptbox');x.hidden=!x.hidden;x.open=!x.hidden;});
+$('script').textContent=data.directed_script||'';const a=data.account||{};$('acct').textContent=a.error?a.error:`Account: slots ${a.voice_slots_used} of ${a.voice_limit} · operations ${a.voice_add_edit_counter}${a.max_voice_add_edits?' of '+a.max_voice_add_edits:''} · characters ${a.character_count} of ${a.character_limit}`;}
 async function go(s){step=s;render();try{await act({action:'step',step:s});}catch(e){}}
-function render(){if(!data)return;const st=data.state,d=data.direction;const tagged=d&&d.chosen!=='none';$('head').innerHTML=`<strong>${esc(data.run.client)}</strong> · voice stage${data.run.stage!=='voice'?' <span class="ok">(recorded; the run is at '+esc(data.run.stage)+')</span>':''}<br>Direction: ${d?esc(d.chosen)+(tagged?' · register '+esc(d.register)+' · '+d.base.length+' of '+d.sentences+' sentences tagged':''):'<span class="err">none recorded yet: ask the assistant (vw voice direct)</span>'}${d&&d.passage?' · test passage '+d.passage.n+' ('+d.passage.words+' words)':''}${d?' · <a href="#" id="showscript">show the directed script</a>':''}<br><span class="muted">Account: ${data.account.error?esc(data.account.error):'slots '+data.account.voice_slots_used+' of '+data.account.voice_limit+' · operations '+data.account.voice_add_edit_counter+(data.account.max_voice_add_edits?' of '+data.account.max_voice_add_edits:'')+' · characters '+data.account.character_count+' of '+data.account.character_limit}</span><details id="scriptbox" hidden><summary>the directed script</summary><pre>${esc(data.directed_script)}</pre></details>`;const sb=$('showscript');if(sb)sb.addEventListener('click',e=>{e.preventDefault();const x=$('scriptbox');x.hidden=false;x.open=true;});
-const counts={try:st.tried.length+' of 6',choose:chosen.length+' of 3',narrations:String(st.narrations.length)};$('bar').innerHTML=STEPS.map(s=>`<button class="${s===step?'on':''}" data-s="${s}">${LABELS[s]}${counts[s]?' <small>('+counts[s]+')</small>':''}</button>`).join('');$('bar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.s==='download'&&!st.final){msg('No final narration yet.',true);return;}go(b.dataset.s);}));
-STEPS.forEach(s=>$('step-'+s).hidden=(s!==step));renderCards();
-const auds=data.jobs.filter(j=>j.kind==='audition');
-$('try-passage').innerHTML=d&&d.passage?`<strong>Test passage ${d.passage.n}</strong> (${d.passage.words} words, ${tagged?'with the direction tags':'no tags: direction is none'}): <span class="muted">${esc(d.passage.text)}</span>`:'<span class="err">No test passage yet: ask the assistant for the direction and the test passage first.</span>';
-const chars=d&&d.passage?d.passage.text.length:0;$('try-voices').textContent='Tryout: '+(tryout.length?tryout.map(name).join(', '):'none chosen yet (tick "try" on cards in Browse)');const tb=$('do-try');tb.textContent='Try these '+tryout.length+' voices — paid, about '+(chars*tryout.length).toLocaleString()+' characters';tb.disabled=!(d&&d.passage&&tryout.length);
-$('try-results').innerHTML=auds.length?'<h3>Results</h3>'+auds.map(j=>`<div class="row"><strong>${esc(j.name)}</strong> ${j.directed?'<small>with the direction tags</small>':''}${j.saved_from_library?' <small>· saved to my voices</small>':''} · ${esc(j.status)}${j.error?' <span class="err">'+esc(j.error)+'</span>':''}${j.audio_key?'<br><audio controls preload="none" src="/runs/'+code+'/audio/'+esc(j.audio_key)+'"></audio>':''}</div>`).join(''):'';
-const tried=st.tried;$('choose-list').innerHTML=tried.length?tried.map(t=>{const j=auds.filter(a=>a.voice_id===t.voice_id).slice(-1)[0];return `<div class="row"><label><input type="checkbox" class="pick" value="${esc(t.voice_id)}" ${chosen.includes(t.voice_id)?'checked':''}> <strong>${esc(t.name)}</strong></label>${j&&j.audio_key?'<audio controls preload="none" src="/runs/'+code+'/audio/'+esc(j.audio_key)+'"></audio>':'<span class="muted"> tryout not ready</span>'}</div>`;}).join(''):'<p class="muted">Try some voices first.</p>';
-document.querySelectorAll('.pick').forEach(c=>c.addEventListener('change',()=>{chosen=[...document.querySelectorAll('.pick:checked')].map(x=>x.value);if(chosen.length>3){c.checked=false;chosen=chosen.filter(x=>x!==c.value);msg('At most three voices get the full script.',true);}render();}));
-const nb=$('do-narrate');nb.textContent='Narrate the full script with these '+chosen.length+' voices — paid, about '+(data.characters*chosen.length).toLocaleString()+' characters'+(tagged?', with the direction tags':'');nb.disabled=!chosen.length;
-const narrs=st.narrations.map(n=>({...n,job:data.jobs.find(j=>j.id===n.job_id)||{}}));
-$('narr-list').innerHTML=narrs.length?narrs.map(n=>`<div class="row"><strong>${esc(n.name)}</strong> #${n.number} · ${esc(n.job.status||'?')}${tagged?' · with the direction tags':''}${n.tweaks&&n.tweaks.length?' · '+n.tweaks.length+' tweak(s)':''}${n.made_before_direction_change?' · <span class="muted">made before the direction changed</span>':''}${n.job.error?' <span class="err">'+esc(n.job.error)+'</span>':''}${n.job.audio_key?'<br><audio controls preload="none" src="/runs/'+code+'/audio/'+esc(n.job.audio_key)+'"></audio>':''}<details><summary>tweak one sentence for this voice and narrate again</summary><select class="tw-s" data-v="${esc(n.voice_id)}">${data.sentences.map(s=>`<option value="${s.passage_id}|${s.sentence}">${s.passage_id} ${s.sentence}: ${esc(s.text.slice(0,70))}</option>`).join('')}</select> <input class="tw-t" placeholder="[softly]"> <button class="tw-go" data-v="${esc(n.voice_id)}">narrate again — paid, about ${data.characters.toLocaleString()} characters</button></details></div>`).join(''):'<p class="muted">No narration yet.</p>';
-document.querySelectorAll('.tw-go').forEach(b=>b.addEventListener('click',async()=>{const row=b.closest('.row'),sel=row.querySelector('.tw-s').value.split('|'),tag=row.querySelector('.tw-t').value.trim();const tweaks=tag?[{passage_id:sel[0],sentence:parseInt(sel[1]),tag:tag}]:[];try{msg('narrating again…');await act({action:'narrate-again',voice_id:b.dataset.v,tweaks});msg('narration submitted');load();}catch(err){msg(err.message,true);}}));
-const ready=narrs.filter(n=>n.job.status==='ready');$('final-list').innerHTML=st.final?`<div class="row ok">Final: <strong>${esc(st.final.name)}</strong> · by ${esc(st.final.by)} · the run is at media.</div>`:(ready.length?ready.map(n=>`<div class="row"><strong>${esc(n.name)}</strong> #${n.number}<br><audio controls preload="none" src="/runs/${code}/audio/${esc(n.job.audio_key)}"></audio><br><input class="fq" placeholder="your words (required)" style="min-width:320px"> <button class="fin" data-j="${esc(n.job_id)}">Make this the final narration</button></div>`).join(''):'<p class="muted">No ready narration yet.</p>');
-document.querySelectorAll('.fin').forEach(b=>b.addEventListener('click',async()=>{const q=b.closest('.row').querySelector('.fq').value.trim();if(!q){msg('Your words are required.',true);return;}try{await act({action:'final',job_id:b.dataset.j,quote:q});msg('recorded; the run moves to media');await load();go('download');}catch(err){msg(err.message,true);}}));
-const fj=st.final?data.jobs.find(j=>j.id===st.final.job_id):null;$('dl').innerHTML=fj?`<div class="row">Final narration: <strong>${esc(fj.name)}</strong><br><a href="/runs/${code}/audio/${esc(fj.audio_key)}">narration.mp3</a> · <a href="/runs/${code}/audio/${esc(fj.audio_key.replace(/\.mp3$/,'.timing.json'))}">timing.json</a><br><a href="/runs/${code}">the run page</a></div>`:'<p class="muted">The download appears after the final click.</p>';}
-$('do-try').addEventListener('click',async()=>{try{msg('submitting the tryout…');const j=await act({action:'tryout',voice_ids:tryout});msg(j.jobs.length+' tryouts submitted'+(j.saved.length?'; saved to my voices: '+j.saved.join(', '):''));await load();}catch(err){msg(err.message,true);}});
-$('do-narrate').addEventListener('click',async()=>{try{msg('submitting the narrations…');const j=await act({action:'narrate',voice_ids:chosen});msg(j.jobs.length+' narrations submitted; this takes a few minutes');chosen=[];await load();go('narrations');}catch(err){msg(err.message,true);}});
-load().then(loadMirror).catch(err=>msg(err.message,true));
+// ---------- browse ----------
+function syncControls(){document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===q.tab));$('q').value=q.search;$('sort').value=q.sort;$('language').value=q.language;$('accent').value=q.accent;
+document.querySelectorAll('.seg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===(q[seg.dataset.f]||''))));
+$('usecases').innerHTML=USE.map(([v,l])=>`<button class="chip ${q.use_case===v?'on':''}" data-u="${v}">${l}</button>`).join('');$('usecases').querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{q.use_case=(q.use_case===b.dataset.u)?'':b.dataset.u;changed();}));
+const n=['gender','age','category'].filter(k=>q[k]).length;$('filters-btn').textContent='Filters'+(n?' ('+n+')':'');}
+function anyFilter(){return !!(q.search||q.language||q.accent||q.gender||q.age||q.use_case||q.category||q.tab!=='explore');}
+function changed(){q.page=0;sub=0;touched=true;syncControls();pushUrl();clearTimeout(qtimer);qtimer=setTimeout(searchNow,400);}
+function pushUrl(){const p=new URLSearchParams(Object.entries(q).filter(([k,v])=>v&&k!=='page'));history.replaceState(null,'',base+(p.toString()?'?'+p:''));}
+async function searchNow(){if(!anyFilter()){result=null;renderBrowse();return;}$('browse-body').innerHTML='<div class="empty">searching…</div>';try{const p=new URLSearchParams(Object.entries(q).filter(([k,v])=>v!==''&&v!==null));const r=await fetch('/voices2/search?'+p);const j=await r.json();if(!r.ok)throw new Error(j.message||('HTTP '+r.status));result=j;(j.voices||[]).forEach(v=>names[v.voice_id]=v.name);renderBrowse();}catch(err){msg('The voice library did not answer: '+err.message,true);}}
+function renderBrowse(){const body=$('browse-body'),pg=$('pager');if(!result){body.innerHTML='<div class="empty">'+(anyFilter()?'searching…':'Set a filter or search to see voices.')+'</div>';pg.hidden=true;return;}
+const rows=result.voices||[];if(!rows.length){body.innerHTML='<div class="empty">No voices match. Loosen a filter or <a href="#" id="clr2">clear all</a>.</div>';pg.hidden=true;const c=$('clr2');if(c)c.addEventListener('click',e=>{e.preventDefault();clearAll();});return;}
+const show=rows.slice(sub*20,sub*20+20);const first=q.page*100+sub*20+1;
+body.innerHTML=`<table><thead><tr><th>Voice</th><th>Language · accent</th><th>Use case</th><th style="width:40px">Play</th><th style="width:40px">Try</th><th style="width:40px">Fav</th></tr></thead><tbody>${show.map(v=>`<tr class="${tryout.includes(v.voice_id)?'sel':''}"><td><span class="av">${esc((v.name||'?')[0])}</span><span class="nm">${esc(v.name)}</span>${v.missing?' <span class="ds err">missing from my voices</span>':''}<div class="ds">${esc(v.description)}${v.last_used?' · used '+esc(v.last_used):''}${v.on_account?' · in my voices':(v.library?' · <a href="#" class="save" data-id="'+esc(v.voice_id)+'">save to my voices</a>':'')}</div></td><td class="ds">${esc([v.language,v.accent].filter(Boolean).join(' · '))}</td><td class="ds">${esc(v.use_case)}</td><td><button class="ic play" data-id="${esc(v.voice_id)}" data-url="${esc(v.preview_url)}" data-name="${esc(v.name)}">${playing===v.voice_id&&!$('pl').paused?'⏸':'▶'}</button></td><td><button class="ic try ${tryout.includes(v.voice_id)?'on':''}" data-id="${esc(v.voice_id)}" title="add to the tryout">${tryout.includes(v.voice_id)?'✓':'+'}</button></td><td><button class="ic fav ${v.favourite?'on':''}" data-id="${esc(v.voice_id)}" data-on="${v.favourite?1:0}">${v.favourite?'★':'☆'}</button></td></tr>`).join('')}</tbody></table>`;
+const total=result.total||rows.length;pg.hidden=false;pg.innerHTML=`<span>${first}–${first+show.length-1} of ${total}</span><span><button id="prev" ${(q.page===0&&sub===0)?'disabled':''}>‹ previous</button> <button id="next" ${(sub*20+20>=rows.length&&!result.has_more)?'disabled':''}>next ›</button></span>`;
+$('prev').addEventListener('click',()=>{if(sub>0){sub--;renderBrowse();}else if(q.page>0){q.page--;sub=4;searchNow();}});
+$('next').addEventListener('click',()=>{if(sub*20+20<rows.length){sub++;renderBrowse();}else if(result.has_more){q.page++;sub=0;searchNow();}});
+body.querySelectorAll('.play').forEach(b=>b.addEventListener('click',()=>play(b.dataset.id,b.dataset.name,b.dataset.url)));
+body.querySelectorAll('.try').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.id;if(tryout.includes(id))tryout=tryout.filter(x=>x!==id);else if(tryout.length>=6){msg('At most six voices in a tryout; remove one first.',true);return;}else tryout.push(id);renderBrowse();footer();}));
+body.querySelectorAll('.save').forEach(a=>a.addEventListener('click',async e=>{e.preventDefault();const v=rows.find(x=>x.voice_id===a.dataset.id);try{msg('saving '+v.name+' to my voices…');const j=await act({action:'save',voice_id:v.voice_id,library:v.library});v.on_account=true;msg(j.name+' is in my voices');renderBrowse();}catch(err){msg(err.message,true);}}));
+body.querySelectorAll('.fav').forEach(b=>b.addEventListener('click',async()=>{try{const j=await act({action:'favourite',voice_id:b.dataset.id,on:b.dataset.on!=='1'});const v=rows.find(x=>x.voice_id===b.dataset.id);v.favourite=j.favourite;renderBrowse();}catch(err){msg(err.message,true);}}));}
+function clearAll(){q={...q,search:'',language:'',accent:'',gender:'',age:'',use_case:'',category:'',page:0};changed();}
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{q.tab=b.dataset.tab;changed();}));
+$('q').addEventListener('input',()=>{q.search=$('q').value.trim();changed();});$('q').addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(qtimer);searchNow();}});
+$('sort').addEventListener('change',()=>{q.sort=$('sort').value;changed();});$('language').addEventListener('change',()=>{q.language=$('language').value;changed();});$('accent').addEventListener('change',()=>{q.accent=$('accent').value;changed();});
+$('filters-btn').addEventListener('click',()=>{$('filters').hidden=!$('filters').hidden;});$('clear').addEventListener('click',clearAll);
+document.querySelectorAll('.seg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{q[seg.dataset.f]=b.dataset.v;changed();})));
+// ---------- try ----------
+function renderTry(){const st=data.state,d=data.direction;const auds=data.jobs.filter(j=>j.kind==='audition');const tried=st.tried||[];
+const row=(id,name,why,j)=>`<tr><td><span class="av">${esc((name||'?')[0])}</span><span class="nm">${esc(name)}</span><div class="ds">${esc(why||'')}</div></td><td class="ds">${j?esc(j.status)+(j.directed?' · with the direction tags':''):''}${j&&j.error?' <span class="err">'+esc(j.error)+'</span>':''}</td><td>${j&&j.audio_key?`<button class="ic play" data-id="${esc(id)}" data-name="${esc(name)}" data-url="/runs/${code}/audio/${esc(j.audio_key)}">▶</button>`:(j?'<span class="ds">◌</span>':'')}</td><td><label><input type="checkbox" class="pick" value="${esc(id)}" ${chosen.includes(id)?'checked':''}> narrate</label></td></tr>`;
+let h='';
+if(tried.length){h+=`<h3>Your tryouts on test passage ${d&&d.passage?d.passage.n:''} (with the direction tags)</h3><table><thead><tr><th>Voice</th><th>Status</th><th style="width:40px">Play</th><th style="width:160px">Full script?</th></tr></thead><tbody>${tried.map(t=>{names[t.voice_id]=t.name;const j=auds.filter(a=>a.voice_id===t.voice_id).slice(-1)[0];return row(t.voice_id,t.name,'',j);}).join('')}</tbody></table>`;}
+else h+=`<div class="empty">No tryout yet. Add voices with + on Browse and press the button below${d&&d.passage?'':'; the direction and the test passage must be recorded first'}.</div>`;
+const known=(data.known||[]).filter(k=>!tried.some(t=>t.voice_id===k.voice_id));
+if(known.length){h+=`<h3>Known voices: narrate without a tryout</h3><table><thead><tr><th>Voice</th><th>Why</th><th style="width:40px">Play</th><th style="width:160px">Full script?</th></tr></thead><tbody>${known.map(k=>{names[k.voice_id]=k.name;return `<tr><td><span class="av">${esc(k.name[0])}</span><span class="nm">${esc(k.name)}</span></td><td class="ds">${esc(k.why)}</td><td>${k.preview_url?`<button class="ic play" data-id="${esc(k.voice_id)}" data-name="${esc(k.name)}" data-url="${esc(k.preview_url)}">▶</button>`:''}</td><td><label><input type="checkbox" class="pick" value="${esc(k.voice_id)}" ${chosen.includes(k.voice_id)?'checked':''}> narrate</label></td></tr>`;}).join('')}</tbody></table>`;}
+$('try-body').innerHTML=h;
+$('try-body').querySelectorAll('.play').forEach(b=>b.addEventListener('click',()=>play(b.dataset.id,b.dataset.name,b.dataset.url)));
+$('try-body').querySelectorAll('.pick').forEach(c=>c.addEventListener('change',()=>{const all=[...document.querySelectorAll('#try-body .pick:checked')].map(x=>x.value);if(all.length>3){c.checked=false;msg('At most three voices get the full script.',true);return;}chosen=all;footer();}));}
+// ---------- narrations ----------
+function renderNarr(){const st=data.state,tagged=data.direction&&data.direction.chosen!=='none';const narrs=st.narrations.map(n=>({...n,job:data.jobs.find(j=>j.id===n.job_id)||{}}));
+if(!narrs.length){$('narr-body').innerHTML='<div class="empty">No narration yet. Tick voices on Try and press Narrate.</div>';return;}
+$('narr-body').innerHTML=`<table><thead><tr><th style="width:30px"></th><th>Voice</th><th>Made</th><th>Status</th><th style="width:40px">Play</th><th style="width:60px"></th></tr></thead><tbody>${narrs.map(n=>`<tr><td>${n.job.status==='ready'&&!st.final?`<input type="radio" name="fin" value="${esc(n.job_id)}" ${finalPick===n.job_id?'checked':''}>`:(st.final&&st.final.job_id===n.job_id?'<span class="ok">final</span>':'')}</td><td><span class="nm">${esc(n.name)}</span> <span class="ds">#${n.number}${tagged?' · with the direction tags':''}${n.tweaks&&n.tweaks.length?' · '+n.tweaks.length+' tweak(s)':''}${n.made_before_direction_change?' · made before the direction changed':''}${n.from==='chat'?'':''}</span></td><td class="ds">${esc((n.at||'').slice(0,16).replace('T',' '))}</td><td class="ds">${esc(n.job.status||'?')}${n.job.duration_s?' · '+Math.round(n.job.duration_s)+' s':''}${n.job.error?' <span class="err">'+esc(n.job.error)+'</span>':''}</td><td>${n.job.audio_key?`<button class="ic play" data-id="${esc(n.job_id)}" data-name="${esc(n.name)} #${n.number}" data-url="/runs/${code}/audio/${esc(n.job.audio_key)}">▶</button>`:'<span class="ds">◌</span>'}</td><td><details class="tw"><summary>⋯</summary><div style="padding:6px 0">Tweak one sentence for ${esc(n.name)} and narrate again:<br><select class="tw-s">${data.sentences.map(s=>`<option value="${s.passage_id}|${s.sentence}">${s.passage_id} ${s.sentence}: ${esc(s.text.slice(0,60))}</option>`).join('')}</select> <input class="tw-t" placeholder="[softly]" style="min-width:140px"> <button class="tw-go" data-v="${esc(n.voice_id)}">narrate again — paid, ~${data.characters.toLocaleString()} characters</button></div></details></td></tr>`).join('')}</tbody></table>`;
+$('narr-body').querySelectorAll('.play').forEach(b=>b.addEventListener('click',()=>play(b.dataset.id,b.dataset.name,b.dataset.url)));
+$('narr-body').querySelectorAll('input[name=fin]').forEach(r=>r.addEventListener('change',()=>{finalPick=r.value;footer();}));
+$('narr-body').querySelectorAll('.tw-go').forEach(b=>b.addEventListener('click',async()=>{const box=b.closest('details'),sel=box.querySelector('.tw-s').value.split('|'),tag=box.querySelector('.tw-t').value.trim();const tweaks=tag?[{passage_id:sel[0],sentence:parseInt(sel[1]),tag}]:[];try{msg('narrating again…');await act({action:'narrate-again',voice_id:b.dataset.v,tweaks});msg('narration submitted; a few minutes');load();}catch(err){msg(err.message,true);}}));}
+// ---------- final ----------
+function renderFinal(){const st=data.state;const fj=st.final?data.jobs.find(j=>j.id===st.final.job_id):null;
+$('final-body').innerHTML=fj?`<table><thead><tr><th>Final narration</th><th>By</th><th style="width:40px">Play</th><th>Download</th></tr></thead><tbody><tr><td><span class="nm">${esc(fj.name)}</span></td><td class="ds">${esc(st.final.by)} · ${esc((st.final.at||'').slice(0,16).replace('T',' '))}</td><td><button class="ic play" data-id="${esc(fj.id)}" data-name="${esc(fj.name)}" data-url="/runs/${code}/audio/${esc(fj.audio_key)}">▶</button></td><td><a href="/runs/${code}/audio/${esc(fj.audio_key)}">narration.mp3</a> · <a href="/runs/${code}/audio/${esc(fj.audio_key.replace(/\.mp3$/,'.timing.json'))}">timing.json</a></td></tr></tbody></table><p class="ds">The run is at media. <a href="/runs/${code}">The run page</a>.</p>`:'<div class="empty">No final yet. Pick one on Narrations.</div>';
+$('final-body').querySelectorAll('.play').forEach(b=>b.addEventListener('click',()=>play(b.dataset.id,b.dataset.name,b.dataset.url)));}
+// ---------- footer ----------
+function footer(){const st=data&&data.state,d=data&&data.direction;const tray=$('tray'),act_=$('action');
+if(step==='browse'){const chars=d&&d.passage?d.passage.text.length:0;tray.textContent='Tryout: '+(tryout.length?tryout.map(nm).join(', '):'none')+' ('+tryout.length+' of 6)'+(d&&d.passage?' · test passage '+d.passage.n+' with the tags':'');
+act_.innerHTML=`<button class="go" id="do-try" ${(!tryout.length||!(d&&d.passage))?'disabled':''}>Try ${tryout.length||''} voice${tryout.length===1?'':'s'} — paid, ~${(chars*tryout.length).toLocaleString()} characters</button>${!(d&&d.passage)?'<span class="why">needs the direction and the test passage first</span>':(!tryout.length?'<span class="why">add voices with +</span>':'')}`;
+const b=$('do-try');if(b)b.addEventListener('click',async()=>{try{msg('submitting the tryout…');const j=await act({action:'tryout',voice_ids:tryout});msg(j.jobs.length+' tryouts submitted'+(j.saved.length?'; saved to my voices: '+j.saved.join(', '):'')+'; results appear on Try');tryout=[];await load();go('try');}catch(err){msg(err.message,true);}});}
+else if(step==='try'){tray.textContent='Full script: '+(chosen.length?chosen.map(nm).join(', '):'none')+' ('+chosen.length+' of 3)';
+act_.innerHTML=`<button class="go" id="do-narr" ${chosen.length?'':'disabled'}>Narrate the full script with ${chosen.length||''} voice${chosen.length===1?'':'s'} — paid, ~${((data?data.characters:0)*chosen.length).toLocaleString()} characters${d&&d.chosen!=='none'?', with the direction tags':''}</button>${chosen.length?'':'<span class="why">tick one to three voices</span>'}`;
+const b=$('do-narr');if(b)b.addEventListener('click',async()=>{try{msg('submitting the narrations…');const j=await act({action:'narrate',voice_ids:chosen});msg(j.jobs.length+' narrations submitted; this takes a few minutes');chosen=[];await load();go('narrations');}catch(err){msg(err.message,true);}});}
+else if(step==='narrations'){const ready=st?st.narrations.filter(n=>(data.jobs.find(j=>j.id===n.job_id)||{}).status==='ready'):[];tray.innerHTML=st&&st.final?'<span class="ok">A final narration exists.</span>':(finalPick?'Final: '+esc(nm((st.narrations.find(n=>n.job_id===finalPick)||{}).voice_id))+' <input class="words" id="words" placeholder="your words (required)">':'Tick the narration you want as final');
+act_.innerHTML=st&&st.final?'':`<button class="go" id="do-final" ${finalPick?'':'disabled'}>Make this the final narration</button>${finalPick?'':(ready.length?'<span class="why">tick one on the left</span>':'<span class="why">wait for a narration to be ready</span>')}`;
+const b=$('do-final');if(b)b.addEventListener('click',async()=>{const w=($('words')||{}).value||'';if(!w.trim()){msg('Your words are required.',true);return;}try{await act({action:'final',job_id:finalPick,quote:w.trim()});msg('recorded; the run moves to media');finalPick=null;await load();go('final');}catch(err){msg(err.message,true);}});}
+else{tray.textContent=st&&st.final?'Done. The run is at media.':'No final yet.';act_.innerHTML='';}}
+// ---------- render ----------
+function render(){frame();['browse','try','narrations','final'].forEach(s=>$('s-'+s).hidden=(s!==step));if(!data)return;if(step==='browse')renderBrowse();if(step==='try')renderTry();if(step==='narrations')renderNarr();if(step==='final')renderFinal();footer();}
+async function load(){const r=await fetch(base+'/data');data=await r.json();(data.state.tried||[]).forEach(t=>names[t.voice_id]=t.name);(data.known||[]).forEach(k=>names[k.voice_id]=k.name);if(!timer&&data.state.step&&['browse','try','narrations','final'].includes(data.state.step)&&!touched)step=data.state.step;render();const open=data.jobs.some(j=>['queued','running','storage_pending'].includes(j.status));clearTimeout(timer);timer=open?setTimeout(load,10000):null;}
+const u=new URLSearchParams(location.search);['tab','search','language','accent','gender','age','use_case','category','sort'].forEach(k=>{if(u.get(k))q[k]=u.get(k);});
+syncControls();load().then(()=>{if(anyFilter())searchNow();}).catch(err=>msg(err.message,true));
 })();
 </script>
 {% endblock %}

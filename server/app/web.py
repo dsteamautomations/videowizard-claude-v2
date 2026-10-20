@@ -344,9 +344,16 @@ def _voices2_state(conn, user, run):
     except Problem as exc:
         account = {'error': exc.message}
     nxt = core.next_for(conn, run)
+    last_voice = core.last_voice(conn, run.get('client_id')) if run.get('client_id') else None
+    try:   # design/55: known voices, narratable without a tryout
+        provider = elevenlabs.ElevenLabs()
+        mine = voices.my_voices(provider)
+        favs = voices.search(conn, provider, {'tab': 'favourites'})['voices']
+        known = voices.known_voices(last_voice, favs, mine)
+    except Problem:
+        known = voices.known_voices(last_voice, [], [])
     return {'run': {'code': run['code'], 'title': run.get('title'), 'client': run.get('client'), 'stage': nxt.get('stage')}, 'state': state, 'direction': direction, 'jobs': jobs_,
-            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account,
-            'last_voice': core.last_voice(conn, run.get('client_id')) if run.get('client_id') else None}
+            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account, 'last_voice': last_voice, 'known': known}
 
 
 @router.get('/runs/{code}/voices2/data')
@@ -361,18 +368,20 @@ def voices2_data(request: Request, code: str, vw2_session: str | None = Cookie(d
         return JSONResponse(core.jsonable(_voices2_state(conn, user, run)))
 
 
-@router.get('/voices2/mirror')
-def voices2_mirror(request: Request, vw2_session: str | None = Cookie(default=None)):
+@router.get('/voices2/search')
+def voices2_search(request: Request, vw2_session: str | None = Cookie(default=None)):
     from fastapi.responses import JSONResponse
-    from . import voices
+    from . import elevenlabs, voices
     user = page_user(vw2_session)
     if not user:
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
     qp = request.query_params
-    q = {k: (qp.get(k) or '').strip().lower() for k in ('language', 'accent', 'gender', 'age', 'use_case', 'search')}
-    q.update(favourites_only=qp.get('fav') == '1', on_account=qp.get('acc') == '1')
+    q = {'tab': qp.get('tab') if qp.get('tab') in ('explore', 'mine', 'favourites') else 'explore', 'search': (qp.get('search') or '')[:200], 'language': (qp.get('language') or '')[:30],
+         'accent': (qp.get('accent') or '')[:80], 'gender': (qp.get('gender') or '')[:20], 'age': (qp.get('age') or '')[:20],
+         'use_case': qp.get('use_case') if qp.get('use_case') in elevenlabs.USE_CASES else '', 'category': qp.get('category') if qp.get('category') in ('professional', 'famous', 'high_quality') else '',
+         'sort': qp.get('sort') or 'trending', 'page': max(0, min(int(qp.get('page') or 0), 500))}
     with db_connect() as conn:
-        return JSONResponse(voices.mirror_page(conn, q))
+        return JSONResponse(voices.search(conn, elevenlabs.ElevenLabs(), q))
 
 
 @router.post('/runs/{code}/voices2/act')
@@ -390,18 +399,16 @@ async def voices2_act(request: Request, code: str, vw2_session: str | None = Coo
     rid = str(uuid.uuid4())
     provider = elevenlabs.ElevenLabs()
     with db_connect() as conn:
-        if action == 'refresh':
-            return JSONResponse(voices.refresh_catalog(conn, provider))
         if action == 'favourite':
             row = voices.set_favourite(conn, provider, user, body['voice_id'], bool(body.get('on', True)), body.get('note') or '')
-            voices._MIRROR['rows'] = None
+            voices._SEARCH.clear()
             return JSONResponse({'voice_id': row['voice_id'], 'favourite': row['favourite']})
         if action == 'save':
             lib = body.get('library') or {}
             v = elevenlabs.add_library_voice(provider, lib['public_owner_id'], lib['original_voice_id'])
             voices.remember(conn, v, 'library')
-            conn.execute('update vw2_voice_catalog set on_account = true where voice_id in (%s, %s)', (body.get('voice_id'), v['voice_id']))
-            voices._MIRROR['rows'] = None
+            voices._SEARCH.clear()
+            voices._MINE['rows'] = None
             return JSONResponse({'voice_id': v['voice_id'], 'name': v.get('name')})
         if action == 'preview':
             return JSONResponse({'url': voices.preview_link(conn, provider, body['voice_id'])})

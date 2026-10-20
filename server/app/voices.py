@@ -14,9 +14,7 @@ DESCRIPTION_CHARS = 160
 PAGE_CONTRACT = 'vw2-voice-page-v2'
 SHORTLIST_MAX = 6
 TRYOUT_MAX, NARRATE_MAX = 6, 3   # design/54
-STEPS = ('browse', 'try', 'choose', 'narrations', 'finalise', 'download')
-MIRROR_CACHE_S = 300
-_MIRROR = {'at': 0.0, 'rows': None}
+STEPS = ('browse', 'try', 'narrations', 'final')   # design/55: four steps
 
 
 # ---------- pure ----------
@@ -104,133 +102,6 @@ def check_cap(voice_ids, cap, what):
         raise Problem(422, 'VOICES', 'The same voice is listed twice.')
 
 
-# ---------- the catalogue mirror (design/54 A) ----------
-
-MIRROR_COLUMNS = ('voice_id', 'name', 'scope', 'public_owner_id', 'original_voice_id', 'language', 'accent', 'gender', 'age', 'use_case', 'descriptive', 'description',
-                  'preview_url', 'category', 'on_account')
-
-
-def mirror_row(raw, scope):
-    labels = raw.get('labels') or {}
-    sharing = raw.get('sharing') or {}
-    desc = (raw.get('description') or '').strip()
-    if len(desc) > 600:
-        desc = desc[:600].rstrip() + '…'
-
-    def lab(k):
-        return str(raw.get(k) or labels.get(k) or '')
-    return {'voice_id': raw['voice_id'], 'name': raw.get('name') or '', 'scope': scope, 'public_owner_id': raw.get('public_owner_id') or sharing.get('public_owner_id'),
-            'original_voice_id': sharing.get('original_voice_id') or raw['voice_id'], 'language': lab('language'), 'accent': lab('accent'), 'gender': lab('gender'), 'age': lab('age'),
-            'use_case': lab('use_case'), 'descriptive': lab('descriptive'), 'description': desc, 'preview_url': raw.get('preview_url') or '', 'category': raw.get('category') or '',
-            'on_account': scope == 'account'}
-
-
-def mirror_rows_from_provider(provider):
-    """Every library voice (100 a page, all pages) then every account voice."""
-    rows, page = [], 0
-    while True:
-        data = provider.request('GET', '/v1/shared-voices', params={'page_size': 100, 'page': page}).json()
-        rows.extend(mirror_row(v, 'library') for v in data.get('voices', []))
-        if not data.get('has_more') or page > 500:
-            break
-        page += 1
-    cursor, seen = '', set()
-    while True:
-        data = provider.request('GET', '/v2/voices', params={'page_size': 100, **({'next_page_token': cursor} if cursor else {})}).json()
-        rows.extend(mirror_row(v, 'account') for v in data.get('voices', []))
-        cursor = data.get('next_page_token') if data.get('has_more') else None
-        if not cursor or cursor in seen:
-            break
-        seen.add(cursor)
-    return rows
-
-
-def refresh_catalog(conn, provider):
-    """Rebuild the mirror: upsert every listed voice, mark the rest withdrawn. One refresh at a time (an advisory lock)."""
-    if not conn.execute("select pg_try_advisory_xact_lock(hashtext('vw2_catalog_refresh')) as ok").fetchone()['ok']:
-        raise Problem(409, 'REFRESH_RUNNING', 'A catalogue refresh is already running; wait for it to finish.')
-    rows = mirror_rows_from_provider(provider)
-    now = datetime.now(timezone.utc)
-    merged = {}
-    for r in rows:   # a voice listed in the library and on the account: one row, on_account true
-        if r['voice_id'] in merged:
-            merged[r['voice_id']]['on_account'] = merged[r['voice_id']]['on_account'] or r['on_account']
-            continue
-        merged[r['voice_id']] = dict(r)
-    seen = set(merged)
-    with conn.cursor() as cur:   # one batched statement (psycopg pipelines executemany); row by row would take minutes over a remote database
-        cur.executemany('''insert into vw2_voice_catalog(voice_id, name, scope, public_owner_id, original_voice_id, language, accent, gender, age, use_case, descriptive, description,
-                           preview_url, category, on_account, seen_at, refreshed_at, withdrawn_at)
-                           values (%(voice_id)s, %(name)s, %(scope)s, %(public_owner_id)s, %(original_voice_id)s, %(language)s, %(accent)s, %(gender)s, %(age)s, %(use_case)s, %(descriptive)s,
-                           %(description)s, %(preview_url)s, %(category)s, %(on_account)s, %(now)s, %(now)s, null)
-                           on conflict (voice_id) do update set name = excluded.name, scope = excluded.scope, public_owner_id = coalesce(excluded.public_owner_id, vw2_voice_catalog.public_owner_id),
-                           original_voice_id = excluded.original_voice_id, language = excluded.language, accent = excluded.accent, gender = excluded.gender, age = excluded.age,
-                           use_case = excluded.use_case, descriptive = excluded.descriptive, description = excluded.description, preview_url = excluded.preview_url, category = excluded.category,
-                           on_account = excluded.on_account, seen_at = excluded.seen_at, refreshed_at = excluded.refreshed_at, withdrawn_at = null''',
-                        [{**r, 'now': now} for r in merged.values()])
-    withdrawn = conn.execute('update vw2_voice_catalog set withdrawn_at = %s where seen_at < %s and withdrawn_at is null', (now, now)).rowcount
-    _MIRROR['rows'] = None
-    return {'voices': len(seen), 'withdrawn': withdrawn, 'at': now.isoformat()}
-
-
-def refresh_if_due(conn, provider, hours=24):
-    """The worker's nightly refresh: when the mirror is empty or older than `hours`."""
-    row = conn.execute('select max(refreshed_at) as at from vw2_voice_catalog').fetchone()
-    if row and row['at'] and (datetime.now(timezone.utc) - row['at']).total_seconds() < hours * 3600:
-        return None
-    try:
-        return refresh_catalog(conn, provider)
-    except Problem:
-        return None
-
-
-def mirror_rows(conn):
-    """The compact rows the page filters in the browser, with the register and the usage; cached five minutes."""
-    import time
-    if _MIRROR['rows'] is not None and time.time() - _MIRROR['at'] < MIRROR_CACHE_S:
-        return _MIRROR['rows']
-    usage = history(conn)
-    reg = register_rows(conn)
-    rows = []
-    for r in conn.execute('select * from vw2_voice_catalog where withdrawn_at is null order by name').fetchall():
-        f = reg.get(r['voice_id']) or {}
-        u = usage.get(r['voice_id']) or {}
-        rows.append({'voice_id': r['voice_id'], 'name': r['name'], 'language': r['language'], 'accent': r['accent'], 'gender': r['gender'], 'age': r['age'], 'use_case': r['use_case'],
-                     'descriptive': r['descriptive'], 'description': (r['description'] or '')[:DESCRIPTION_CHARS], 'on_account': bool(r['on_account']), 'favourite': bool(f.get('favourite')),
-                     'note': f.get('note') or '', 'narrations': u.get('narrations') or 0, 'auditions': u.get('auditions') or 0, 'last_used': u.get('last_used') or '',
-                     'library': {'public_owner_id': r['public_owner_id'], 'original_voice_id': r['original_voice_id']} if r['public_owner_id'] else None})
-    meta = conn.execute('select max(refreshed_at) as at, count(*) as n from vw2_voice_catalog where withdrawn_at is null').fetchone()
-    _MIRROR.update(at=time.time(), rows={'voices': rows, 'refreshed_at': meta['at'].isoformat() if meta and meta['at'] else None, 'count': meta['n'] if meta else 0})
-    return _MIRROR['rows']
-
-
-MIRROR_PAGE = 200
-
-
-def mirror_page(conn, q):
-    """What the page shows for one set of filters: the first 200 matches and how many matched (design/54 A; 20,000 voices are too many to send whole)."""
-    mirror = mirror_rows(conn)
-    found = filter_rows(mirror['voices'], q)
-    return {'voices': found[:MIRROR_PAGE], 'matched': len(found), 'count': mirror['count'], 'refreshed_at': mirror['refreshed_at'], 'limit': MIRROR_PAGE}
-
-
-def filter_rows(rows, q):
-    """The server twin of the page's filter (used by the chat catalog): equality on labels, a search over name, description and descriptive, two flags; favourites first."""
-    out = []
-    term = (q.get('search') or '').strip().lower()
-    for r in rows:
-        if any(q.get(k) and r.get(k) != q[k] for k in ('language', 'accent', 'gender', 'age', 'use_case')):
-            continue
-        if term and term not in ' '.join(str(r.get(k) or '') for k in ('name', 'description', 'descriptive')).lower():
-            continue
-        if q.get('favourites_only') and not r.get('favourite'):
-            continue
-        if q.get('on_account') and not r.get('on_account'):
-            continue
-        out.append(r)
-    return sorted(out, key=lambda r: not r.get('favourite'))
-
-
 def add_narration(state, narration):
     same = [n for n in state['narrations'] if n['voice_id'] == narration['voice_id']]
     state['narrations'].append({**narration, 'number': len(same) + 1})
@@ -272,6 +143,125 @@ def beat_rows(script, timing):
         rows.append({'beat_id': b['beat_id'], 'passage_id': b['passage_id'], 'start_s': own[0]['start_s'], 'end_s': own[-1]['end_s'], 'measured_vo_duration_s': measured,
                      'breathing_pause_s': BREATHING_PAUSE_S, 'target_beat_duration_s': round(measured + BREATHING_PAUSE_S, 3), 'words': len(own)})
     return rows
+
+
+# ---------- live search of the provider's library (design/55) ----------
+
+SORTS = ('trending', 'created_date', 'usage_character_count_1y', 'cloned_by_count')
+SEARCH_PAGE, SEARCH_CACHE_S = 100, 120
+_SEARCH = {}
+
+
+def search_params(q):
+    """The provider's query for one search: 100 a page, the operator's filters, trending unless asked otherwise."""
+    p = {'page_size': SEARCH_PAGE, 'page': int(q.get('page') or 0)}
+    for ours, theirs in (('language', 'language'), ('accent', 'accent'), ('gender', 'gender'), ('age', 'age'), ('use_case', 'use_cases'), ('search', 'search'), ('category', 'category')):
+        v = (q.get(ours) or '').strip()
+        if v:
+            p[theirs] = v
+    p['sort'] = q.get('sort') if q.get('sort') in SORTS else 'trending'
+    return p
+
+
+def _row_from_shared(v):
+    desc = (v.get('description') or '').strip()
+    return {'voice_id': v['voice_id'], 'name': v.get('name') or '', 'accent': v.get('accent') or '', 'gender': v.get('gender') or '', 'age': v.get('age') or '',
+            'use_case': v.get('use_case') or '', 'descriptive': v.get('descriptive') or '', 'language': v.get('language') or '',
+            'description': desc[:DESCRIPTION_CHARS].rstrip() + ('…' if len(desc) > DESCRIPTION_CHARS else ''), 'preview_url': v.get('preview_url') or '',
+            'category': v.get('category') or '', 'on_account': bool(v.get('is_added_by_user')), 'popularity': v.get('cloned_by_count') or 0,
+            'library': {'public_owner_id': v.get('public_owner_id'), 'original_voice_id': v['voice_id']} if v.get('public_owner_id') else None}
+
+
+def _row_from_account(v):
+    labels = v.get('labels') or {}
+    sharing = v.get('sharing') or {}
+    desc = (v.get('description') or '').strip()
+    return {'voice_id': v['voice_id'], 'name': v.get('name') or '', 'accent': labels.get('accent') or '', 'gender': labels.get('gender') or '', 'age': labels.get('age') or '',
+            'use_case': labels.get('use_case') or '', 'descriptive': labels.get('descriptive') or '', 'language': labels.get('language') or '',
+            'description': desc[:DESCRIPTION_CHARS].rstrip() + ('…' if len(desc) > DESCRIPTION_CHARS else ''), 'preview_url': v.get('preview_url') or '',
+            'category': v.get('category') or '', 'on_account': True, 'popularity': 0,
+            'library': {'public_owner_id': sharing['public_owner_id'], 'original_voice_id': sharing.get('original_voice_id') or v['voice_id']} if sharing.get('public_owner_id') else None}
+
+
+def _decorate(conn, rows):
+    reg = register_rows(conn, [r['voice_id'] for r in rows]) if rows else {}
+    usage = history(conn)
+    for r in rows:
+        f, u = reg.get(r['voice_id']) or {}, usage.get(r['voice_id']) or {}
+        r.update(favourite=bool(f.get('favourite')), note=f.get('note') or '', narrations=u.get('narrations') or 0, auditions=u.get('auditions') or 0, last_used=u.get('last_used') or '')
+        if r.get('library'):
+            remember(conn, {'voice_id': r['voice_id'], 'name': r['name'], 'library': r['library']}, 'library')   # defect 16: the identity an audition needs
+    return rows
+
+
+def _label_match(r, q):
+    return all(not q.get(k) or (r.get(k) or '').lower() == q[k].lower() for k in ('language', 'accent', 'gender', 'age', 'use_case')) and \
+        (not q.get('search') or q['search'].lower() in f"{r.get('name', '')} {r.get('description', '')} {r.get('descriptive', '')}".lower())
+
+
+_MINE = {'at': 0.0, 'rows': None}
+
+
+def my_voices(provider):
+    """Every voice on the account, as rows (one or two pages of 100); cached a minute, the page polls every ten seconds."""
+    import time
+    if _MINE['rows'] is not None and time.time() - _MINE['at'] < 60:
+        return _MINE['rows']
+    rows, cursor, seen = [], '', set()
+    while True:
+        data = provider.request('GET', '/v2/voices', params={'page_size': 100, **({'next_page_token': cursor} if cursor else {})}).json()
+        rows.extend(_row_from_account(v) for v in data.get('voices', []))
+        cursor = data.get('next_page_token') if data.get('has_more') else None
+        if not cursor or cursor in seen:
+            _MINE.update(at=time.time(), rows=rows)
+            return rows
+        seen.add(cursor)
+
+
+def search(conn, provider, q):
+    """One search of the library, the account or the favourites with the operator's filters: 100 rows a page, compact, joined with the register and the usage;
+    cached two minutes per query so paging through the 100 is instant."""
+    import json as _json
+    import time
+    tab = q.get('tab') or 'explore'
+    key = _json.dumps({**q, 'tab': tab}, sort_keys=True, default=str)
+    hit = _SEARCH.get(key)
+    if hit and time.time() - hit['at'] < SEARCH_CACHE_S:
+        return hit['out']
+    if tab == 'explore':
+        data = provider.request('GET', '/v1/shared-voices', params=search_params(q)).json()
+        rows = [_row_from_shared(v) for v in data.get('voices', [])]
+        out = {'voices': _decorate(conn, rows), 'total': data.get('total_count') or len(rows), 'has_more': bool(data.get('has_more')), 'page': int(q.get('page') or 0), 'tab': tab}
+    elif tab == 'mine':
+        rows = [r for r in my_voices(provider) if _label_match(r, q)]
+        out = {'voices': _decorate(conn, rows), 'total': len(rows), 'has_more': False, 'page': 0, 'tab': tab}
+    else:
+        reg = {k: v for k, v in register_rows(conn).items() if v.get('favourite')}
+        mine = {r['voice_id']: r for r in my_voices(provider)}
+        rows = []
+        for vid, f in reg.items():
+            if vid in mine:
+                rows.append(mine[vid])
+            else:
+                rows.append({'voice_id': vid, 'name': f.get('name') or vid, 'accent': '', 'gender': '', 'age': '', 'use_case': '', 'descriptive': '', 'language': '', 'description': '',
+                             'preview_url': '', 'category': '', 'on_account': False, 'popularity': 0, 'missing': True,
+                             'library': {'public_owner_id': f['public_owner_id'], 'original_voice_id': f.get('original_voice_id') or vid} if f.get('public_owner_id') else None})
+        rows = [r for r in rows if _label_match(r, q)]
+        out = {'voices': _decorate(conn, rows), 'total': len(rows), 'has_more': False, 'page': 0, 'tab': tab}
+    _SEARCH[key] = {'at': time.time(), 'out': out}
+    if len(_SEARCH) > 200:
+        _SEARCH.pop(next(iter(_SEARCH)))
+    return out
+
+
+def known_voices(last_voice, favourites, mine):
+    """design/55: voices the operator already knows, narratable without a tryout: last film's narrator, the favourites, the account's voices."""
+    out, seen = [], set()
+    for row, why in ([(last_voice, 'last film')] if last_voice else []) + [(f, 'favourite') for f in favourites or [] if not f.get('missing')] + [(m, 'in my voices') for m in mine or []]:
+        if row and row.get('voice_id') and row['voice_id'] not in seen:
+            seen.add(row['voice_id'])
+            out.append({'voice_id': row['voice_id'], 'name': row.get('name') or row['voice_id'], 'why': why, 'preview_url': row.get('preview_url') or ''})
+    return out
 
 
 # ---------- the register and the account (database + provider) ----------
@@ -326,10 +316,7 @@ def ensure_on_account(conn, provider, voice_id):
 
 
 def preview_link(conn, provider, voice_id):
-    """The sample link: from the mirror when the voice is there (library voices are not readable through the account endpoint), else from the provider."""
-    row = conn.execute('select preview_url from vw2_voice_catalog where voice_id = %s', (voice_id,)).fetchone()
-    if row and row['preview_url']:
-        return row['preview_url']
+    """The sample link of a voice on the account; a library voice carries its link in every search row, so the page never needs this for one."""
     return provider.voice(voice_id).get('preview_url') or ''
 
 

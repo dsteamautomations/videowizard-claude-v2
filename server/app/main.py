@@ -762,16 +762,13 @@ def voice_direction_record(run_id: UUID, body: Direction, user=User, conn=DB):
     return _voice_write(run_id, body, user, conn, fn)
 
 
-@app.get('/api/voice/mirror')
-def voice_mirror(user=User, conn=DB, language: str = '', accent: str = '', gender: str = '', age: str = '', use_case: str = '', search: str = '', fav: bool = False, acc: bool = False):
-    """design/54 A: the catalogue filtered on the server (20,000 voices); the first 200 matches and the count."""
-    q = {'language': language.lower(), 'accent': accent.lower(), 'gender': gender, 'age': age, 'use_case': use_case, 'search': search.lower(), 'favourites_only': fav, 'on_account': acc}
-    return Response(voices.mirror_page(conn, q))
-
-
-@app.post('/api/voice/refresh')
-def voice_refresh(user=User, conn=DB):
-    return Response(voices.refresh_catalog(conn, elevenlabs.ElevenLabs()))
+@app.get('/api/voice/search')
+def voice_search(user=User, conn=DB, tab: str = 'explore', search: str = '', language: str = '', accent: str = '', gender: str = '', age: str = '', use_case: str = '',
+                 category: str = '', sort: str = 'trending', page: int = 0):
+    """design/55: one live search of the provider's library (or the account, or the favourites) with the operator's filters; 100 a page."""
+    q = {'tab': tab if tab in ('explore', 'mine', 'favourites') else 'explore', 'search': search[:200], 'language': language[:30], 'accent': accent[:80], 'gender': gender[:20], 'age': age[:20],
+         'use_case': use_case if use_case in elevenlabs.USE_CASES else '', 'category': category if category in ('professional', 'famous', 'high_quality') else '', 'sort': sort, 'page': max(0, min(page, 500))}
+    return Response(voices.search(conn, elevenlabs.ElevenLabs(), q))
 
 
 @app.post('/api/runs/{run_id}/voice/tryout', status_code=201)
