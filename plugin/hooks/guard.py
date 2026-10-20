@@ -117,6 +117,8 @@ def decide(tool, inp, cwd, vw):
         target = (target if target.is_absolute() else cwd / target).resolve()
         if tool in WRITE_TOOLS and own_record(target, cwd):
             return f"Blocked: {target.name} is the tool's own record, read-only for the assistant."
+        if tool in READ_TOOLS and parked_tool_output(target):
+            return None
         if target != allowed and allowed not in target.parents:
             return f'Blocked: files may only be read or written inside {allowed}.'
         return None
@@ -140,6 +142,14 @@ def detail_of(tool, inp, reason):
     if inp.get('command'):
         return str(inp['command'])[:80]
     return ''
+
+
+def parked_tool_output(target):
+    """design/57 (defect 17): a tool output over ~30 KB is parked by the app under ~/.claude/projects/<project>/<session>/tool-results/
+    and only its first lines are shown. The file holds nothing but the output of a call this guard allowed, so reading it is allowed."""
+    root = (Path.home() / '.claude' / 'projects').resolve()
+    rel = target.relative_to(root).parts if root in target.parents else ()
+    return len(rel) == 4 and rel[2] == 'tool-results'
 
 
 def log_block(cwd, tool, reason, detail):

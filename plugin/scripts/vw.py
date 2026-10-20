@@ -583,6 +583,10 @@ def cmd_stage(a):
         m['files'] = [f for f in m['files'] if f['name'] != ref['name']] + [{**ref, 'stage': a.stage, 'action': 'retain' if result.get('retain', True) else 'upload'}]
     save_json(manifest_path(m['code']), m)
     warning = (result.get('summary') or {}).get('length_warning')   # design/39 4.3: said out loud, not only stored
+    if a.stage == 'media':   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
+        clips = (row.get('summary') or {}).get('clips') or []
+        row = {**row, 'files': f"{len(row.get('files') or [])} file references, kept on the server", 'summary': {k: v for k, v in (row.get('summary') or {}).items() if k != 'clips'},
+               'clips_recorded': len(clips), 'total_mb': round(sum(c.get('bytes') or 0 for c in clips) / 1e6)}
     emit(row, 0, f'Recorded {a.stage}. ' + (next_line(row['next']) if row.get('next') else 'Run `vw next`.') + (f' WARNING: {warning}' if warning else ''))
 
 

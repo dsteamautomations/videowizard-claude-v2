@@ -50,12 +50,21 @@ def test_prepare_keeps_name_order_reports_size_and_stores_stat(ws):
     out = media_prepare(ws, PROC, prior)
     names = [c['name'] for c in out['clips']]
     assert names == ['a.mp4', 'b.mp4', 'c.mp4', 'd.mp4', 'e.mp4', 'f.mp4'] and out['duplicates_skipped'] == 0
-    assert out['total_bytes'] == sum(c['bytes'] for c in out['clips']) and out['total_mb'] == round(out['total_bytes'] / 1e6)
+    detail = json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))   # design/57: the full probe lives here, not in the output
+    assert out['detail_file'] == 'work/media-clips.json' and [c['name'] for c in detail] == names
+    assert out['total_bytes'] == sum(c['bytes'] for c in detail) and out['total_mb'] == round(out['total_bytes'] / 1e6)
     assert '6 clips' in out['message'] and 'MB' in out['message'] and 'reports when it is done' in out['message']
-    for c in out['clips']:
+    for c in detail:
         st = (ws / 'in' / c['name']).stat()
         assert c['source_bytes'] == st.st_size and c['source_mtime'] == st.st_mtime and c['sha256'] == file_sha256(ws / 'in' / c['name']) and c['id'] == c['sha256'][:16]
-    assert not out['clips'][1]['has_audio'] and out['clips'][0]['has_audio']
+    assert not detail[1]['has_audio'] and detail[0]['has_audio']
+    for c in out['clips']:   # what the operator confirms, nothing else
+        assert set(c) == {'name', 'duration_s', 'mb', 'sound'} and isinstance(c['sound'], bool) and c['mb'] >= 0
+    assert out['clips'][1]['sound'] is False and out['clips'][0]['sound'] is True
+    lines = out['listing'].split('\n')
+    assert len(lines) == 7 and lines[0].startswith('a.mp4 · ') and ' s · ' in lines[0] and lines[0].endswith(' MB · sound') and lines[1].endswith(' MB · no sound')
+    assert lines[6].startswith('6 clips · ') and lines[6].endswith(' MB')
+    assert len(json.dumps(out)) < 4000
 
 
 def test_prepare_dedupes_first_name_wins_and_converts_vfr(ws):
@@ -63,10 +72,13 @@ def test_prepare_dedupes_first_name_wins_and_converts_vfr(ws):
     (ws / 'in' / 'z-copy.mp4').write_bytes((ws / 'in' / 'a.mp4').read_bytes())
     clip(ws / 'in' / 'v.mp4', seconds=2, rate=25, vfr=True)
     out = media_prepare(ws, PROC, prior)
-    by = {c['name']: c for c in out['clips']}
+    by = {c['name']: c for c in json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))}
     assert set(by) == {'a.mp4', 'v.mp4'} and out['duplicates_skipped'] == 1
     assert by['v.mp4']['transcoded_from_vfr'] and by['v.mp4']['path'] == 'work/cfr/v.mp4' and by['v.mp4']['is_variable_frame_rate'] is False
     assert by['v.mp4']['source_bytes'] == (ws / 'in' / 'v.mp4').stat().st_size   # the stat is of the original in in/, not the copy
+    shown = {c['name']: c for c in out['clips']}
+    assert shown['v.mp4']['transcoded_from_vfr'] is True and 'transcoded_from_vfr' not in shown['a.mp4']
+    assert 'converted from variable frame rate' in out['listing'].split('\n')[1] and '1 duplicate skipped' in out['listing']
 
 
 def test_prepare_refuses_an_oversized_clip_before_reading_it(ws):
@@ -135,7 +147,7 @@ def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, c
 
     def write(path, body, wait=None):
         posted.update(body)
-        return {'id': 'out-1', 'next': {'stage': 'analysis', 'paid': 'gemini-3.8-flash'}}
+        return {'id': 'out-1', 'stage': 'media', 'files': body['files'], 'summary': body['summary'], 'next': {'stage': 'analysis', 'paid': 'gemini-3.8-flash'}}
     monkeypatch.setattr(vw, 'write', write)
     a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound')
     with pytest.raises(SystemExit) as exc:
@@ -143,7 +155,10 @@ def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, c
     out, err = capsys.readouterr()
     assert exc.value.code == 0, err
     assert 'uploaded 1/2 ' in err and 'uploaded 2/2 ' in err and '(0 MB)' in err and 'Recorded media. Next: analysis.' in err
-    assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound'
+    assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound' and len(posted['summary']['clips']) == 2
+    shown = json.loads(out)   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
+    assert shown['id'] == 'out-1' and shown['next']['stage'] == 'analysis' and shown['clips_recorded'] == 2 and 'total_mb' in shown
+    assert 'clips' not in shown['summary'] and shown['summary']['camera_audio'] == 'excluded' and isinstance(shown['files'], str) and '3 file' in shown['files']   # out/media.json and the two clips
 
 
 def test_media_prompt_and_steps_are_v2():
@@ -153,3 +168,4 @@ def test_media_prompt_and_steps_are_v2():
     assert p.startswith('VW-PROCEDURE') and 'names and bytes' in p and 'not an analysis' in p and '--camera-audio' in p and len(p.split()) < 160
     steps = ' '.join(PROC['steps'])
     assert '--camera-audio' in steps and 'total MB' in steps and 'reports when the upload is done' in steps and 'changed since prepare' in steps
+    assert 'one line per clip' in steps and 'work/media-clips.json' in steps   # design/57

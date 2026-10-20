@@ -104,10 +104,17 @@ def media_prepare(ws, procedure, prior):
         list(pool.map(convert, to_convert))
     (ws / 'work' / 'media-clips.json').write_text(json.dumps(clips, indent=1), encoding='utf-8')
     total_bytes = sum(c['bytes'] for c in clips)
-    return {'prompt': procedure.get('prompt') or '', 'clips': clips, 'duplicates_skipped': len(files) - len(clips), 'prepared_at': stamp(ws, 'media'),
-            'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
+    skipped = len(files) - len(clips)
+    shown = [{'name': c['name'], 'duration_s': c['duration_s'], 'mb': round(c['bytes'] / 1e6, 1), 'sound': bool(c['has_audio']),
+              **({'transcoded_from_vfr': True} if c.get('transcoded_from_vfr') else {})} for c in clips]   # design/57: what the operator confirms; the probe stays in the work file
+    lines = [f"{c['name']} · {c['duration_s']:.1f} s · {c['mb']:.1f} MB · {'sound' if c['sound'] else 'no sound'}" + (' · converted from variable frame rate' if c.get('transcoded_from_vfr') else '')
+             for c in shown]
+    total_s = sum(c['duration_s'] for c in clips)
+    lines.append(f"{len(clips)} clips · {int(total_s // 60)} min {round(total_s % 60)} s" + (f' · {skipped} duplicate skipped' if skipped else '') + f' · {round(total_bytes / 1e6)} MB')
+    return {'prompt': procedure.get('prompt') or '', 'clips': shown, 'listing': '\n'.join(lines), 'detail_file': 'work/media-clips.json',
+            'duplicates_skipped': skipped, 'prepared_at': stamp(ws, 'media'), 'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
             'output_file': 'out/media.json', 'steps': procedure.get('steps') or [],
-            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; confirm the list with the operator, then record. The upload reports when it is done.'}
+            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then record. The upload reports when it is done.'}
 
 
 def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None):
