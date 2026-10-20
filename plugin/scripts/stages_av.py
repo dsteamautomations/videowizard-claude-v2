@@ -146,7 +146,7 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
 
 # ---------- voice ----------
 
-def voice_prepare(ws, procedure, prior, last_voice=None, favourites=None, voice_page=None):
+def voice_prepare(ws, procedure, prior, last_voice=None, favourites=None, voice_page=None, page_url=None):
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
     brief = (prior('brief') or {}).get('summary') or {}   # design/39 4.2: the brief, the languages and the client's last voice
     production = brief.get('production') or {}
@@ -159,7 +159,9 @@ def voice_prepare(ws, procedure, prior, last_voice=None, favourites=None, voice_
     page = voice_page or {}
     if page.get('pick'):
         message += f" On the voices page the operator picked {page['pick'].get('name') or page['pick'].get('voice_id')} (provisional); {page.get('narrations', 0)} narration(s) kept; direction {page.get('direction') or 'none'}."
-    return {'prompt': procedure.get('prompt') or '', 'direction_prompt': procedure.get('direction_prompt') or '', 'steps': procedure.get('steps') or [],
+    if page_url:
+        message += f' The voices page: {page_url} (the operator signs in; give them this link when they want it).'
+    return {'prompt': procedure.get('prompt') or '', 'direction_prompt': procedure.get('direction_prompt') or '', 'steps': procedure.get('steps') or [], 'voice_page_url': page_url,
             'inputs': {'spoken_text': script['spoken_text'], 'characters': len(script['spoken_text']), 'content_digest': script['content_digest'],
                        'passages': len(script['passages']),
                        'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},

@@ -56,12 +56,13 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
             raise Problem(422, 'VOICE_LENGTH', str(exc))
     elif len(text) > limit:
         raise Problem(422, 'VOICE_LENGTH', f"Text has {len(text)} characters; {model} accepts {limit} per request.")
-    voice = provider.voice(request.get('voice_id'))  # exact identity/access check, no substitution
+    from . import voices
+    voice, saved_now = voices.ensure_on_account(conn, provider, request.get('voice_id'))  # exact identity; a library voice is saved to the account first (defect 16)
     if kind == 'narration':
         open_jobs = conn.execute("select id from vw2_jobs where run_id=%s and stage='voice' and status = any(%s)", (run['id'], list(OPEN))).fetchall()
         if open_jobs:
             raise Problem(409, 'JOB_OPEN', 'Finish or recover the open voice job before starting narration.', jobs=[str(j['id']) for j in open_jobs])
-    snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text,
+    snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text, **({'saved_from_library': True} if saved_now else {}),
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
                 **({'timing_mode': 'generation', 'pieces': pieces, **directed} if kind == 'narration' else {})}
     row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'voice',%s,'elevenlabs',%s,%s) returning *''',

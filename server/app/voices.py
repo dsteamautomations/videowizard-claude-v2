@@ -161,6 +161,23 @@ def set_favourite(conn, provider, user, voice_id, on, note=''):
     return register_rows(conn, [voice_id])[voice_id]
 
 
+def ensure_on_account(conn, provider, voice_id):
+    """Defect 16 (VW-6): a voice the operator chose is checked with the provider; a library voice not yet on the account is saved there
+    from its remembered identity (no custom slot used), on both front ends. Returns (voice, saved_now)."""
+    try:
+        return provider.voice(voice_id), False
+    except Problem as exc:
+        if 'voice_not_found' not in (exc.message or ''):
+            raise
+    row = register_rows(conn, [voice_id]).get(voice_id) or {}
+    if not row.get('public_owner_id'):
+        raise Problem(409, 'VOICE_NOT_ON_ACCOUNT', f'{voice_id} is not on the ElevenLabs account and the tool knows no library identity for it. '
+                                                    'Run `vw voice catalog` with filters that list it (the tool remembers library voices it lists), or `vw voice add-library --owner <id> --voice <id>`.')
+    voice = elevenlabs.add_library_voice(provider, row['public_owner_id'], row.get('original_voice_id') or voice_id)
+    remember(conn, voice, 'library')
+    return voice, True
+
+
 def account(provider):
     d = provider.request('GET', '/v1/user/subscription').json()
     keys = ('tier', 'voice_limit', 'voice_slots_used', 'voice_add_edit_counter', 'max_voice_add_edits', 'character_count', 'character_limit', 'next_character_count_reset_unix')
@@ -233,6 +250,10 @@ def catalog(conn, provider, q):
             rows.append(row)
         return {'voices': rows, 'has_more': False, 'next_page_token': None, 'scope': 'favourites'}
     found = elevenlabs.discover(provider, q)
+    for v in found['voices']:   # defect 16: the tool remembers every library voice it lists, so an audition can save it to the account
+        owner = v.get('public_owner_id') or (v.get('sharing') or {}).get('public_owner_id')
+        if owner:
+            remember(conn, {'voice_id': v['voice_id'], 'name': v.get('name') or '', 'library': {'public_owner_id': owner, 'original_voice_id': (v.get('sharing') or {}).get('original_voice_id') or v['voice_id']}}, 'library')
     reg = register_rows(conn, [v['voice_id'] for v in found['voices']])
     acc = {v['voice_id'] for v in found['voices']} if q.get('scope') == 'account' else account_ids(provider)
     found['voices'] = sorted((compact(v, reg, usage, acc) for v in found['voices']), key=lambda r: not r['favourite'])
@@ -363,18 +384,12 @@ def audition_shortlist(conn, store, user, run, outputs, request_id):
         raise Problem(409, 'NOT_ALLOWED', 'Shortlist one to six voices first.')
     script, _ = script_text(store, outputs)
     excerpt = state.get('excerpt') or excerpt_default(script['spoken_text'])
-    provider = elevenlabs.ElevenLabs()
-    on_account = account_ids(provider)
     rows = []
-    for i, entry in enumerate(state['shortlist']):
-        voice_id, lib = entry['voice_id'], entry.get('library')
-        if voice_id not in on_account and lib:
-            saved = elevenlabs.add_library_voice(provider, lib['public_owner_id'], lib['original_voice_id'])
-            voice_id = saved['voice_id']
-            entry['voice_id'] = voice_id
-            remember(conn, saved, 'library')
-        rows.append(jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': voice_id, 'text': excerpt}, f'{request_id}-{i}', store=store))
-        remember(conn, {'voice_id': voice_id, 'name': rows[-1]['request'].get('name'), 'library': lib}, 'library' if lib else 'custom')
+    for i, entry in enumerate(state['shortlist']):   # the page and the chat path share one road: submit_voice saves a library voice to the account itself
+        if entry.get('library'):
+            remember(conn, {'voice_id': entry['voice_id'], 'name': entry.get('name') or '', 'library': entry['library']}, 'library')
+        rows.append(jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': entry['voice_id'], 'text': excerpt}, f'{request_id}-{i}', store=store))
+        entry['voice_id'] = rows[-1]['request']['voice_id']
     state['excerpt'] = excerpt
     save_doc(store, run, 'page.json', state)
     return rows

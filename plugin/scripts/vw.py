@@ -418,11 +418,17 @@ def cmd_clients(a):
     emit({'clients': rows}, 0, f'{len(rows)} active client(s)' + (f" matching {a.search!r}" if a.search else '') + '; the operator picks one, then `vw start --client "<name>"`.')
 
 
+def voice_page_url(code):
+    return f"{server_url()}/runs/{code}/voices"
+
+
 def cmd_next(a):
     m = active()
     nxt = call('GET', f"/api/runs/{m['run_id']}/next")
     ensure_mine(nxt, a.take_over, m['run_id'])
-    emit(nxt, 0, next_line(nxt))
+    if nxt.get('stage') == 'voice':   # VW-6: the link the operator asks for
+        nxt['voice_page_url'] = voice_page_url(m['code'])
+    emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else ''))
 
 
 def file_refs(m, paths, stage, retain):
@@ -532,7 +538,7 @@ def cmd_stage(a):
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
                 {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}} if a.stage == 'brief' else \
-                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': nxt.get('voice_page')} if a.stage == 'voice' else {}
+                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': nxt.get('voice_page'), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
@@ -763,7 +769,16 @@ def cmd_voice(a):
         params = {k: v for k, v in (('scope', a.scope), ('search', a.search), ('cursor', a.cursor), ('language', a.language), ('accent', a.accent),
                                     ('gender', a.gender), ('age', a.age), ('use_cases', ','.join(a.use_case or [])), ('high_quality', 'true' if a.high_quality else '')) if v}
         found = call('GET', '/api/voice/catalog', params=params)
-        emit(found, 0, catalog_lines(found))
+        if m is None:
+            try:
+                m = active()
+            except SystemExit:   # no active run: the catalog still answers, without a page link
+                m = None
+        if m:   # the voices page with the same filters: the default place to listen, shortlist, audition and pick
+            from urllib.parse import urlencode
+            q = {'browse': '1', 'scope': a.scope or 'library', **{k: v for k, v in (('language', a.language), ('accent', a.accent), ('gender', a.gender), ('age', a.age), ('use_case', ','.join(a.use_case or [])), ('search', a.search)) if v}}
+            found['voice_page_url'] = voice_page_url(m['code']) + '?' + urlencode(q)
+        emit(found, 0, catalog_lines(found) + (f"\nvoices page with these filters (the default; give the operator this link): {found['voice_page_url']}" if found.get('voice_page_url') else ''))
     if a.what == 'models':
         emit(call('GET', '/api/voice/models'))
     if a.what == 'preview':
@@ -795,8 +810,11 @@ def cmd_voice(a):
             rows = list(pool.map(submit, a.voice if a.what == 'audition' else a.voice[:1]))
         snap = rows[0]['request']
         settings_line = ', '.join(f'{k} {v}' for k, v in (snap.get('settings') or {}).items())
-        emit({'jobs': [{'id': r['id'], 'voice_id': r['request']['voice_id'], 'status': r['status']} for r in rows], 'model_id': snap.get('model_id'), 'settings': snap.get('settings')}, 0,
-             f"Submitted {len(rows)} paid ElevenLabs {a.what} job(s) on {snap.get('model_id')} ({settings_line}); tell the operator, then `vw voice jobs --wait 180`.")
+        saved = [r['request'].get('name') or r['request']['voice_id'] for r in rows if r['request'].get('saved_from_library')]
+        emit({'jobs': [{'id': r['id'], 'voice_id': r['request']['voice_id'], 'status': r['status'], 'saved_from_library': bool(r['request'].get('saved_from_library'))} for r in rows],
+              'model_id': snap.get('model_id'), 'settings': snap.get('settings')}, 0,
+             f"Submitted {len(rows)} paid ElevenLabs {a.what} job(s) on {snap.get('model_id')} ({settings_line}); tell the operator, then `vw voice jobs --wait 180`."
+             + (f" Saved to the account from the library: {', '.join(saved)}." if saved else ''))
     if a.what == 'jobs':
         rows = wait_for_jobs(m, 'voice', a.wait or 0)
         counts = {k: sum(1 for r in rows if r['status'] == k) for k in ('ready', 'failed', 'submission_unknown')}

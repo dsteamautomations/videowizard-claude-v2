@@ -70,3 +70,54 @@ def test_final_summary_names_the_voice_the_direction_and_the_words():
     assert [f['name'] for f in body['files']] == ['narration.mp3', 'timing.json'] and all(f['location'] == 'storage' for f in body['files'])
     s = body['summary']
     assert s['voice_id'] == 'v1' and s['job_id'] == 'j1' and s['direction'] == {'chosen': 'best_fit', 'digest': 'd1'} and s['beats'] == [{'beat_id': 'BEAT_01'}] and s['recorded_from'] == 'page'
+
+
+# ---------- defect 16 (VW-6): a library voice is saved to the account when auditioned, on both front ends ----------
+
+class FakeProvider:
+    def __init__(self, known):
+        self.known = known
+
+    def voice(self, voice_id):
+        from app.errors import Problem
+        if voice_id in self.known:
+            return {'voice_id': voice_id, 'name': 'Voice ' + voice_id}
+        raise Problem(502, 'PROVIDER_REJECTED', f"ElevenLabs did not complete the request (HTTP 400). ElevenLabs says: voice_not_found: A voice with ID '{voice_id}' was not found.")
+
+
+def test_ensure_on_account_passes_an_account_voice_through(monkeypatch):
+    voice, saved = V.ensure_on_account(None, FakeProvider({'v1'}), 'v1')
+    assert voice['voice_id'] == 'v1' and saved is False
+
+
+def test_ensure_on_account_saves_a_library_voice_from_its_remembered_identity(monkeypatch):
+    from app import elevenlabs
+    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {'lib1': {'voice_id': 'lib1', 'source': 'library', 'public_owner_id': 'o1', 'original_voice_id': 'lib1'}})
+    added, remembered = [], []
+    monkeypatch.setattr(elevenlabs, 'add_library_voice', lambda provider, owner, vid: added.append((owner, vid)) or {'voice_id': 'acc9', 'name': 'Santhi', 'library_identity': {'public_owner_id': owner, 'original_voice_id': vid}})
+    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: remembered.append((voice['voice_id'], source)))
+    voice, saved = V.ensure_on_account(None, FakeProvider(set()), 'lib1')
+    assert saved is True and voice['voice_id'] == 'acc9' and added == [('o1', 'lib1')] and remembered == [('acc9', 'library')]
+
+
+def test_ensure_on_account_explains_when_no_identity_is_known(monkeypatch):
+    import pytest
+    from app.errors import Problem
+    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {})
+    with pytest.raises(Problem) as exc:
+        V.ensure_on_account(None, FakeProvider(set()), 'lib2')
+    assert exc.value.code == 'VOICE_NOT_ON_ACCOUNT' and 'vw voice catalog' in exc.value.message
+
+
+def test_catalog_remembers_library_identities(monkeypatch):
+    from app import elevenlabs
+    found = {'voices': [{'voice_id': 'lib1', 'name': 'A', 'labels': {}, 'scope': 'library', 'public_owner_id': 'o1', 'sharing': {'public_owner_id': 'o1', 'original_voice_id': 'lib1'}},
+                        {'voice_id': 'cus1', 'name': 'B', 'labels': {}, 'scope': 'library'}], 'has_more': False, 'next_page_token': None, 'total_count': 2, 'scope': 'library'}
+    monkeypatch.setattr(elevenlabs, 'discover', lambda provider, q: found)
+    monkeypatch.setattr(V, 'history', lambda conn, voice_id=None: {})
+    monkeypatch.setattr(V, 'register_rows', lambda conn, ids=None: {})
+    monkeypatch.setattr(V, 'account_ids', lambda provider: set())
+    remembered = []
+    monkeypatch.setattr(V, 'remember', lambda conn, voice, source=None: remembered.append((voice['voice_id'], source)))
+    out = V.catalog(None, None, {'scope': 'library'})
+    assert remembered == [('lib1', 'library')] and len(out['voices']) == 2

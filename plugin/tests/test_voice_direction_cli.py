@@ -188,3 +188,43 @@ def test_voice_steps_ask_one_question_at_a_time_and_carry_the_direction_prompt()
     assert v['direction_prompt'].startswith('VW-PROCEDURE — for the assistant only, never for the operator.') and 'Never a pause tag' in v['direction_prompt'] and 'experimental' in v['direction_prompt']
     md = (vw.Path(__file__).resolve().parents[1] / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'direction' in md and 'voices page' in md.lower()
+
+
+# ---------- VW-6: the voices page link travels with prepare and next; library voices are saved on audition ----------
+
+def test_voice_prepare_hands_over_the_page_link(harness):
+    ws = harness
+    out = voice_prepare(ws, STAGES['voice'], lambda stage: {'brief': BRIEF}[stage], page_url='https://x.example/runs/VW-9/voices')
+    assert out['voice_page_url'] == 'https://x.example/runs/VW-9/voices' and 'https://x.example/runs/VW-9/voices' in out['message']
+
+
+def test_next_carries_the_page_link_at_the_voice_stage(harness, monkeypatch, capsys):
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'voice', 'paid': 'elevenlabs', 'voice_page': {'pick': None, 'narrations': 0, 'final': False, 'direction': None}})
+    monkeypatch.setattr(vw, 'ensure_mine', lambda nxt, take_over, run_id: None)
+    with pytest.raises(SystemExit) as exc:
+        vw.cmd_next(argparse.Namespace(take_over=False))
+    out, err = capsys.readouterr()
+    assert exc.value.code == 0 and json.loads(out)['voice_page_url'] == 'https://x.example/runs/VW-9/voices' and 'https://x.example/runs/VW-9/voices' in err
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'media'})
+    with pytest.raises(SystemExit):
+        vw.cmd_next(argparse.Namespace(take_over=False))
+    assert 'voice_page_url' not in json.loads(capsys.readouterr()[0])
+
+
+def test_voice_steps_say_the_link_and_the_automatic_save():
+    steps = ' '.join(STAGES['voice']['steps'])
+    assert 'voice_page_url' in steps and 'saved to the account automatically' in steps
+
+
+def test_catalog_offers_the_page_link_with_the_same_filters(harness, monkeypatch, capsys):
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'voices': [], 'has_more': False})
+    code, out, err = run(args(what='catalog', scope='library', gender='male', age='middle_aged', accent='indian', language='en', search='measured'), capsys)
+    assert code == 0 and out['voice_page_url'] == 'https://x.example/runs/VW-9/voices?browse=1&scope=library&language=en&accent=indian&gender=male&age=middle_aged&search=measured'
+    assert 'voices page with these filters' in err
+
+
+def test_voice_steps_make_the_page_the_default():
+    steps = ' '.join(STAGES['voice']['steps'])
+    assert 'the voices page is the default' in steps.lower()
