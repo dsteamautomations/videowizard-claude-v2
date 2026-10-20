@@ -51,7 +51,13 @@
 .v2 .msg{min-height:1.2em;font-size:13px;margin:8px 0}
 .v2 .err{color:var(--err)}.v2 .ok{color:var(--ok)}
 .v2 .foot{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:6}
-.v2 .foot .in{max-width:1100px;margin:0 auto;padding:10px 20px;display:flex;gap:16px;align-items:center}
+.v2 .foot .in{max-width:1100px;margin:0 auto;padding:8px 20px 10px}
+.v2 .foot .row{display:flex;gap:16px;align-items:center}
+.v2 .foot .status{font-size:13px;min-height:1.3em;margin-bottom:6px;color:var(--muted)}
+.v2 .foot .status.err{color:var(--err)}
+.v2 .foot .status.ok{color:var(--ok)}
+.v2 .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:v2spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes v2spin{to{transform:rotate(360deg)}}
 .v2 .player{flex:0 0 330px;font-size:13px;display:flex;gap:10px;align-items:center;min-width:0}
 .v2 .player span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px}
 .v2 .player audio{width:210px;height:32px}
@@ -64,7 +70,7 @@
 .v2 .why{font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap}
 .v2 .words{min-width:260px;padding:8px 10px}
 .v2 h3{font-size:13px;color:var(--muted);font-weight:500;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
-.v2 .spacer{height:84px}
+.v2 .spacer{height:110px}
 </style>
 <div class="v2" id="app" data-code="{{ run.code }}">
 <div class="top">
@@ -98,11 +104,11 @@
 <section id="s-final" hidden><div id="final-body"></div></section>
 <div class="spacer"></div>
 
-<div class="foot"><div class="in">
+<div class="foot"><div class="in"><div class="status" id="fmsg"></div><div class="row">
   <div class="player"><span id="pl-name" class="ds">nothing playing</span><audio id="pl" controls preload="none"></audio></div>
   <div class="tray" id="tray"></div>
   <span id="action"></span>
-</div></div>
+</div></div></div>
 </div>
 <script>
 (function(){
@@ -112,7 +118,8 @@ const USE=[['narrative_story','Narration'],['informative_educational','Education
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let data=null, step='browse', timer=null, q={tab:'explore',search:'',language:'',accent:'',gender:'',age:'',use_case:'',category:'',sort:'trending',page:0}, result=null, sub=0, tryout=[], chosen=[], finalPick=null, playing=null, names={}, qtimer=null, touched=false;
-function msg(t,err){const m=$('msg');m.textContent=t||'';m.className='msg '+(err?'err':'ok');}
+function msg(t,err,busy){const m=$('msg');m.textContent='';const f=$('fmsg');f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');f.className='status '+(err?'err':(busy?'':'ok'));}
+function busy(btn,label){if(!btn)return;btn.disabled=true;btn.dataset.label=btn.textContent;btn.innerHTML='<span class="spin"></span>'+label;}
 async function act(body){const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let j=null;try{j=await r.json();}catch(e){j=null;}if(!r.ok)throw new Error((j&&j.message)||(r.status>=500?'The server failed (HTTP '+r.status+'); the builder has the log. Nothing was charged unless a job appears on Try.':'HTTP '+r.status));return j;}
 function nm(id){return names[id]||id;}
 const HUES=['#5b6cff','#1d9e75','#d85a30','#d4537e','#378add','#639922','#ba7517','#7f77dd'];function hue(n){let h=0;for(const c of String(n||'')){h=(h*31+c.charCodeAt(0))>>>0;}return HUES[h%HUES.length];}
@@ -124,7 +131,8 @@ function frame(){const st=data&&data.state, d=data&&data.direction;
 $('steps').innerHTML=STEPS.map(([k,l])=>`<a data-s="${k}" class="${k===step?'on':''} ${k==='final'&&!(st&&st.final)?'off':''}">${l}</a>`).join('<span class="ds">›</span>');
 $('steps').querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{if(a.classList.contains('off')){msg('No final narration yet. Pick one on Narrations.',true);return;}go(a.dataset.s);}));
 if(!data)return;const tagged=d&&d.chosen!=='none';
-$('dir').innerHTML=(d?`Direction: ${esc(d.chosen)}${tagged?' · '+d.base.length+' of '+d.sentences+' sentences tagged':''}${d.passage?' · test passage '+d.passage.n+' ('+d.passage.words+' words)':''}`:'<span class="err">Direction not recorded yet: ask the assistant (vw voice direct).</span>')+(data.last_voice?' · last voice '+esc(data.last_voice.name):'')+(data.run.stage!=='voice'?' · <span class="ok">voice recorded; the run is at '+esc(data.run.stage)+'</span>':'')+' · <a href="#" id="show">show</a>';
+const listName={best_fit:'the best-fit direction',experimental:'the experimental direction',none:'no direction'}[d?d.chosen:'none']||'the direction';
+$('dir').innerHTML=(d?`This run uses ${listName}${tagged?', with '+d.base.length+' of its '+d.sentences+' sentences tagged':''}${d.passage?', and test passage '+d.passage.n+' ('+d.passage.words+' words) for the tryouts':''}.`:'<span class="err">The direction is not recorded yet: ask the assistant for it before any tryout.</span>')+(data.last_voice?' Last film\'s narrator was '+esc(data.last_voice.name)+'.':'')+(data.run.stage!=='voice'?' <span class="ok">The voice is recorded; the run is at '+esc(data.run.stage)+'.</span>':'')+' <a href="#" id="show">Show the directed script</a>';
 $('show').addEventListener('click',e=>{e.preventDefault();const x=$('scriptbox');x.hidden=!x.hidden;x.open=!x.hidden;});
 $('script').textContent=data.directed_script||'';const a=data.account||{};$('acct').textContent=a.error?a.error:`Account: slots ${a.voice_slots_used} of ${a.voice_limit} · operations ${a.voice_add_edit_counter}${a.max_voice_add_edits?' of '+a.max_voice_add_edits:''} · characters ${a.character_count} of ${a.character_limit}`;}
 async function go(s){step=s;render();try{await act({action:'step',step:s});}catch(e){}}
@@ -155,12 +163,13 @@ $('filters-btn').addEventListener('click',()=>{$('filters').hidden=!$('filters')
 document.querySelectorAll('.seg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{q[seg.dataset.f]=b.dataset.v;changed();})));
 // ---------- try ----------
 function renderTry(){const st=data.state,d=data.direction;const auds=data.jobs.filter(j=>j.kind==='audition');const tried=st.tried||[];
-const row=(id,name,why,j)=>`<tr><td><div class="who"><span class="av" style="background:${hue(name)}">${esc((name||'?')[0])}</span><div><span class="nm">${esc(name)}</span><div class="ds">${esc(why||'')}</div></div></div></td><td class="ds">${j?esc(j.status)+(j.directed?' · with the direction tags':''):''}${j&&j.error?' <span class="err">'+esc(j.error)+'</span>':''}</td><td class="c">${j&&j.audio_key?`<button class="ic play" data-id="${esc(id)}" data-name="${esc(name)}" data-url="/runs/${code}/audio/${esc(j.audio_key)}">▶</button>`:(j?'<span class="ds">◌</span>':'')}</td><td class="c"><label><input type="checkbox" class="pick" value="${esc(id)}" ${chosen.includes(id)?'checked':''}> narrate</label></td></tr>`;
+const row=(id,name,why,j)=>`<tr><td><div class="who"><span class="av" style="background:${hue(name)}">${esc((name||'?')[0])}</span><div><span class="nm">${esc(name)}</span><div class="ds">${esc(why||'')}</div></div></div></td><td class="ds">${j?({queued:'waiting',running:'generating…',ready:'ready'+(j.duration_s?' · '+Math.round(j.duration_s)+' s':''),failed:'failed',submission_unknown:'unknown; the assistant can recover it',storage_pending:'saving…'}[j.status]||esc(j.status))+(j.directed?' · with the tags':''):'not tried yet'}${j&&j.error?' <span class="err">'+esc(j.error)+'</span>':''}</td><td class="c">${j&&j.audio_key?`<button class="ic play" data-id="${esc(id)}" data-name="${esc(name)}" data-url="/runs/${code}/audio/${esc(j.audio_key)}">▶</button>`:(j?'<span class="ds">◌</span>':'')}</td><td class="c"><label><input type="checkbox" class="pick" value="${esc(id)}" ${chosen.includes(id)?'checked':''}> yes</label></td></tr>`;
 let h='';
-if(tried.length){h+=`<h3>Your tryouts on test passage ${d&&d.passage?d.passage.n:''} (with the direction tags)</h3><table><thead><tr><th>Voice</th><th>Status</th><th class="c">Play</th><th class="c">Full script?</th></tr></thead><tbody>${tried.map(t=>{names[t.voice_id]=t.name;const j=auds.filter(a=>a.voice_id===t.voice_id).slice(-1)[0];return row(t.voice_id,t.name,'',j);}).join('')}</tbody></table>`;}
-else h+=`<div class="empty">No tryout yet. Add voices with + on Browse and press the button below${d&&d.passage?'':'; the direction and the test passage must be recorded first'}.</div>`;
+h+=`<p class="ds" style="font-size:14px;margin:14px 0 4px">Listen to each voice reading test passage ${d&&d.passage?d.passage.n:''}${d&&d.chosen!=='none'?' with the direction tags':''}. Tick up to three voices you want to hear read the whole script, then press the button at the foot.</p>`;
+if(tried.length){h+=`<h3>Your tryouts</h3><table><thead><tr><th>Voice</th><th>Status</th><th class="c">Play</th><th class="c">Read the whole script?</th></tr></thead><tbody>${tried.map(t=>{names[t.voice_id]=t.name;const j=auds.filter(a=>a.voice_id===t.voice_id).slice(-1)[0];return row(t.voice_id,t.name,'',j);}).join('')}</tbody></table>`;}
+else h+=`<div class="empty">No tryout yet. Add voices with + on Browse and press the button at the foot${d&&d.passage?'':'; the direction and the test passage must be recorded first'}.</div>`;
 const known=(data.known||[]).filter(k=>!tried.some(t=>t.voice_id===k.voice_id));
-if(known.length){h+=`<h3>Known voices: narrate without a tryout</h3><table><thead><tr><th>Voice</th><th>Why</th><th class="c">Play</th><th class="c">Full script?</th></tr></thead><tbody>${known.map(k=>{names[k.voice_id]=k.name;return `<tr><td><div class="who"><span class="av" style="background:${hue(k.name)}">${esc(k.name[0])}</span><span class="nm">${esc(k.name)}</span></div></td><td class="ds">${esc(k.why)}</td><td class="c">${k.preview_url?`<button class="ic play" data-id="${esc(k.voice_id)}" data-name="${esc(k.name)}" data-url="${esc(k.preview_url)}">▶</button>`:''}</td><td class="c"><label><input type="checkbox" class="pick" value="${esc(k.voice_id)}" ${chosen.includes(k.voice_id)?'checked':''}> narrate</label></td></tr>`;}).join('')}</tbody></table>`;}
+if(known.length){h+=`<h3>Or a voice you already know (no tryout needed)</h3><table><thead><tr><th>Voice</th><th>Why</th><th class="c">Play</th><th class="c">Read the whole script?</th></tr></thead><tbody>${known.map(k=>{names[k.voice_id]=k.name;return `<tr><td><div class="who"><span class="av" style="background:${hue(k.name)}">${esc(k.name[0])}</span><span class="nm">${esc(k.name)}</span></div></td><td class="ds">${esc(k.why)}</td><td class="c">${k.preview_url?`<button class="ic play" data-id="${esc(k.voice_id)}" data-name="${esc(k.name)}" data-url="${esc(k.preview_url)}">▶</button>`:''}</td><td class="c"><label><input type="checkbox" class="pick" value="${esc(k.voice_id)}" ${chosen.includes(k.voice_id)?'checked':''}> yes</label></td></tr>`;}).join('')}</tbody></table>`;}
 $('try-body').innerHTML=h;
 $('try-body').querySelectorAll('.play').forEach(b=>b.addEventListener('click',()=>play(b.dataset.id,b.dataset.name,b.dataset.url)));
 $('try-body').querySelectorAll('.pick').forEach(c=>c.addEventListener('change',()=>{const all=[...document.querySelectorAll('#try-body .pick:checked')].map(x=>x.value);if(all.length>3){c.checked=false;msg('At most three voices get the full script.',true);return;}chosen=all;footer();}));}
@@ -180,14 +189,14 @@ function footer(){const st=data&&data.state,d=data&&data.direction;const tray=$(
 if(step==='browse'){const chars=d&&d.passage?d.passage.text.length:0;tray.innerHTML='<span>Tryout '+tryout.length+' of 6'+(d&&d.passage?' · passage '+d.passage.n+(d.chosen!=='none'?' with tags':''):'')+':</span>'+(tryout.length?tryout.map(id=>`<span class="pill">${esc(nm(id))}<button data-rm="${esc(id)}" title="remove from the tryout">×</button></span>`).join(''):'<span>none yet</span>');
 tray.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{tryout=tryout.filter(x=>x!==b.dataset.rm);renderBrowse();footer();}));
 act_.innerHTML=`<button class="go" id="do-try" ${(!tryout.length||!(d&&d.passage))?'disabled':''}>Try ${tryout.length||''} voice${tryout.length===1?'':'s'}${tryout.length?' · ~'+(chars*tryout.length).toLocaleString()+' chars, paid':''}</button>${!(d&&d.passage)?'<span class="why">needs the direction and the test passage first</span>':(!tryout.length?'<span class="why">add voices with +</span>':'')}`;
-const b=$('do-try');if(b)b.addEventListener('click',async()=>{try{msg('submitting the tryout…');const j=await act({action:'tryout',voice_ids:tryout});msg(j.jobs.length+' tryouts submitted'+(j.saved.length?'; saved to my voices: '+j.saved.join(', '):'')+'; results appear on Try');tryout=[];await load();go('try');}catch(err){msg(err.message,true);}});}
+const b=$('do-try');if(b)b.addEventListener('click',async()=>{busy(b,'Submitting the tryout…');msg('Submitting '+tryout.length+' tryouts to ElevenLabs…',false,true);try{const j=await act({action:'tryout',voice_ids:tryout});msg(j.jobs.length+' tryouts submitted'+(j.saved.length?' (saved to my voices: '+j.saved.join(', ')+')':'')+'. Listen to them here as they finish; each takes about half a minute.');tryout=[];await load();go('try');}catch(err){msg(err.message,true);render();}});}
 else if(step==='try'){tray.innerHTML='<span>Full script '+chosen.length+' of 3:</span>'+(chosen.length?chosen.map(id=>`<span class="pill">${esc(nm(id))}<button data-rm="${esc(id)}" title="remove">×</button></span>`).join(''):'<span>none yet</span>');
 tray.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{chosen=chosen.filter(x=>x!==b.dataset.rm);renderTry();footer();}));
 act_.innerHTML=`<button class="go" id="do-narr" ${chosen.length?'':'disabled'}>Narrate ${chosen.length||''} voice${chosen.length===1?'':'s'}${chosen.length?' · ~'+((data?data.characters:0)*chosen.length).toLocaleString()+' chars, paid':''}</button>${chosen.length?'':'<span class="why">tick one to three voices</span>'}`;
-const b=$('do-narr');if(b)b.addEventListener('click',async()=>{try{msg('submitting the narrations…');const j=await act({action:'narrate',voice_ids:chosen});msg(j.jobs.length+' narrations submitted; this takes a few minutes');chosen=[];await load();go('narrations');}catch(err){msg(err.message,true);}});}
+const b=$('do-narr');if(b)b.addEventListener('click',async()=>{busy(b,'Submitting…');msg('Submitting '+chosen.length+' full narrations to ElevenLabs…',false,true);try{const j=await act({action:'narrate',voice_ids:chosen});msg(j.jobs.length+' narrations submitted. Each takes a few minutes; they appear here as they finish.');chosen=[];await load();go('narrations');}catch(err){msg(err.message,true);render();}});}
 else if(step==='narrations'){const ready=st?st.narrations.filter(n=>(data.jobs.find(j=>j.id===n.job_id)||{}).status==='ready'):[];tray.innerHTML=st&&st.final?'<span class="ok">A final narration exists.</span>':(finalPick?'Final: '+esc(nm((st.narrations.find(n=>n.job_id===finalPick)||{}).voice_id))+' <input class="words" id="words" placeholder="your words (required)">':'Tick the narration you want as final');
 act_.innerHTML=st&&st.final?'':`<button class="go" id="do-final" ${finalPick?'':'disabled'}>Make this the final narration</button>${finalPick?'':(ready.length?'<span class="why">tick one on the left</span>':'<span class="why">wait for a narration to be ready</span>')}`;
-const b=$('do-final');if(b)b.addEventListener('click',async()=>{const w=($('words')||{}).value||'';if(!w.trim()){msg('Your words are required.',true);return;}try{await act({action:'final',job_id:finalPick,quote:w.trim()});msg('recorded; the run moves to media');finalPick=null;await load();go('final');}catch(err){msg(err.message,true);}});}
+const b=$('do-final');if(b)b.addEventListener('click',async()=>{const w=($('words')||{}).value||'';if(!w.trim()){msg('Your words are required.',true);return;}busy(b,'Recording…');try{await act({action:'final',job_id:finalPick,quote:w.trim()});msg('recorded; the run moves to media');finalPick=null;await load();go('final');}catch(err){msg(err.message,true);}});}
 else{tray.textContent=st&&st.final?'Done. The run is at media.':'No final yet.';act_.innerHTML='';}}
 // ---------- render ----------
 function render(){frame();['browse','try','narrations','final'].forEach(s=>$('s-'+s).hidden=(s!==step));if(!data)return;if(step==='browse')renderBrowse();if(step==='try')renderTry();if(step==='narrations')renderNarr();if(step==='final')renderFinal();footer();}
