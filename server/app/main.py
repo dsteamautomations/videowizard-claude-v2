@@ -211,6 +211,7 @@ class ImageGenerate(Write):
     model: str | None = None
     size: str | None = None
     quality: str | None = None
+    answer: dict | None = None   # design/68 L5: the library's answer form
 
 
 class ReferenceApprove(Write):
@@ -263,6 +264,7 @@ class PrepareTake(Write):
     duration_seconds: int | None = None
     aspect_ratio: Literal['16:9', '9:16'] = '16:9'
     resolution: Literal['720p', '1080p'] | None = None
+    answer: dict | None = None   # design/68 L5
 
 
 class ShotBody(Write):
@@ -1041,10 +1043,19 @@ def visuals_status(run_id: UUID, user=User, conn=DB):
     return Response(visuals_stage.status(conn, storage(), run, core.current_outputs(conn, run['id'])))
 
 
+@app.get('/api/runs/{run_id}/visuals/library')
+def visuals_library(run_id: UUID, user=User, conn=DB):
+    """design/68 L3: the library files per step for the run's version."""
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.library_pack(storage(), run, outputs))
+
+
 @app.get('/api/runs/{run_id}/visuals/shots/{shot_id}/packet')
 def visuals_packet(run_id: UUID, shot_id: str, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
-    return Response(visuals_stage.packet(storage(), run, core.current_outputs(conn, run['id']), shot_id))
+    outputs = core.current_outputs(conn, run['id'])
+    card = auth.client_card(run['client_id'])   # design/68: the job form's industry and brand lines; {} when the directory does not answer
+    return Response(visuals_stage.packet(storage(), run, outputs, shot_id, card=card, rules=core.effective_rules(conn, run, outputs)['effective']))
 
 
 @app.post('/api/runs/{run_id}/visuals/prepare')

@@ -17,7 +17,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import core, jobs, video_generators
+from . import core, jobs, library, video_generators
 from .config import settings
 from .errors import Problem
 from .planning.digest import digest
@@ -97,6 +97,7 @@ def gaps_source(store, outputs):
 
 def prepare(conn, store, user, run, outputs):
     session = session_of(store, run, outputs, create=True)
+    session.setdefault('library_version', library.latest())   # design/68 L2: the library a run reads, kept like the procedure version
     procedure = core._stage(core.stage_table(run['procedure_version']), STAGE)
     brief = next((o for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     script = next((o for o in outputs if o['stage'] == 'script' and o['unit'] is None), None)
@@ -122,7 +123,17 @@ def prepare(conn, store, user, run, outputs):
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog()}
     pk = save_json(store, key(run, 'package.json'), package)
-    return {'package': pk, 'gaps': list(session['source']['gaps']), 'next': 'write out/visual-plan.json then `vw visuals check`'}
+    return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'next': 'write out/visual-plan.json then `vw visuals check`'}
+
+
+def library_version_of(session):
+    """design/68 L2: the library a run reads; a session from before the release reads the latest."""
+    return session.get('library_version') or library.latest()
+
+
+def library_pack(store, run, outputs):
+    """design/68 L3: every step's library files with their text, for the plugin to write once per step."""
+    return library.steps(library_version_of(session_of(store, run, outputs)))
 
 
 def check(store, run, outputs, document):
@@ -495,6 +506,12 @@ def generate_image(conn, store, user, run, outputs, body):
                 row = session['references'].get(inherited.get('id'))
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
+    answer = body.get('answer')
+    if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
+        try:
+            library.check_answer(answer, body['prompt'])
+        except ValueError as exc:
+            need(False, str(exc))
     check_cap(conn, run, session, prices()['image_inr'], 'one image')   # design/65 B7
     op = 'edit' if parents else 'generate'
     ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
@@ -503,7 +520,8 @@ def generate_image(conn, store, user, run, outputs, body):
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': body['name'], 'kind': body['kind'], 'subject': body['subject']}}
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
                        (run['id'], ref_id, Jsonb(request), body['request_id'])).fetchone()
-    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents')}}
+    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents')},
+                                     **({'answer': answer} if answer is not None else {})}
     save_session(store, run, session)
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
 
@@ -543,7 +561,7 @@ def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
     return {'shot_id': shot_id, 'elements': sorted(bindings)}
 
 
-def packet(store, run, outputs, shot_id, session=None):
+def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
     session = session or session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     binding = session['bindings'].get(shot_id)
@@ -553,7 +571,7 @@ def packet(store, run, outputs, shot_id, session=None):
         for b in rows:
             row = session['references'][b['id']]
             need(row['status'] == 'approved' and row['sha256'] == b['sha256'], 'A bound reference changed or lost approval.')
-            refs.append({'element_id': eid, 'reference_id': b['id'], 'sha256': b['sha256'], 'key': row['key'], 'subject': row['subject'], **({'subject_selector': b['subject_selector']} if 'subject_selector' in b else {})})
+            refs.append({'element_id': eid, 'reference_id': b['id'], 'sha256': b['sha256'], 'key': row['key'], 'subject': row['subject'], 'kind': row.get('kind'), **({'subject_selector': b['subject_selector']} if 'subject_selector' in b else {})})
     generator = session['generator_choices'].get(shot_id) or video_generators.DEFAULT
     start_instruction = ('Write the start prompt and the end prompt together before generating either. Compose the start for the whole segment: every visible subject, '
                          'including secondary/background subjects, in its start state in the named scene layout, what the motion heads for already in frame, room in the frame '
@@ -570,7 +588,14 @@ def packet(store, run, outputs, shot_id, session=None):
               'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are.',
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
               'provider': {k: generator[k] for k in ('provider', 'model')}}
-    return {'plan_digest': session['current'], 'gap_id': gap['gap_id'], 'shot_id': shot_id, 'preparation_digest': digest(prompt), 'preparation': prompt,
+    identity = digest(prompt)   # the composition only: the library block below carries the card and the rules, which must not make a prepared take stale
+    brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
+    steps_ = library.steps_of(shot)   # design/68 L3: the library beside the three instructions; the texts are in work/visuals/library/, written at prepare
+    prompt['library'] = {'version': library_version_of(session),
+                         'steps': [{'step': st, 'task': library.STEPS[st]['task'], 'playbook': library.STEPS[st]['playbook'], 'files': library.step_files(st, generator)} for st in steps_],
+                         'job_forms': {st: library.job_form(st, run=run, plan=plan, gap=gap, scene=scene, shot=shot, refs=refs, generator=generator, brief=brief, card=card, rules=list(rules or []),
+                                                            fps=float(Fraction(session['source']['fps']))) for st in steps_}}
+    return {'plan_digest': session['current'], 'gap_id': gap['gap_id'], 'shot_id': shot_id, 'preparation_digest': identity, 'preparation': prompt,
             'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'fps': session['source']['fps']}}
 
 
@@ -609,6 +634,12 @@ def prepare_take(store, user, run, outputs, body):
     need(body.get('end_image'), 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
                                 'approve both, then `--start R --end R2`.')   # design/66 C2
     need(body['start_image'] != body['end_image'], 'The start and end images are distinct pictures: the end is the start one small action further on.')
+    answer = body.get('answer')
+    if answer is not None:   # design/68 L5
+        try:
+            library.check_answer(answer, body['motion_prompt'])
+        except ValueError as exc:
+            need(False, str(exc))
     base = packet(store, run, outputs, body['shot_id'], session)
     shot = base['preparation']['shot']
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))
@@ -633,7 +664,7 @@ def prepare_take(store, user, run, outputs, body):
               'resolution': body.get('resolution') or ('720p' if selected['model'] != video_generators.CATALOG[1]['model'] else None),
               **images, 'provider': selected['provider'], 'model': selected['model'],
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},
-              'generated_audio_policy': 'retain original output; never replace narration automatically'}
+              'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {})}
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)

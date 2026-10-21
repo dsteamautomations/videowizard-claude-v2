@@ -1,0 +1,198 @@
+{
+  "version": "vwlib-2026-10-21-4f88379be109",
+  "created": "2026-10-21",
+  "library_master": "C:/Rev/DS/image-prompt-library 2 (not under git; this snapshot is identified by its fingerprint)",
+  "fingerprint_sha256": "4f88379be109b4aab9be0c11b192bc28d90a954ba600a8320a34b27df498956d",
+  "fingerprint_rule": "sha256 over the files in path order, each contributing \"<path>\" NUL \"<file sha256>\" newline",
+  "files": [
+    {
+      "path": "FIELD-SOURCES.md",
+      "sha256": "a822b9ef5979ecabfab16046ed039791e97fa364b794a3cab3f8da5399bad54b",
+      "bytes": 3831,
+      "library_source": null,
+      "status": "videowizard-specific"
+    },
+    {
+      "path": "VW-MAP.md",
+      "sha256": "3e3ced83d2dcd798f50f575c79d213f79a3d1b68c87c9a3563d526c9ba186556",
+      "bytes": 5249,
+      "library_source": null,
+      "status": "videowizard-specific"
+    },
+    {
+      "path": "library/00-method/craft.md",
+      "sha256": "c965de6dbe6a8d6840bfafe1f94196b2bd91a68e6a9699b089f30dc7aab5b770",
+      "bytes": 17181,
+      "library_source": "00-method/craft.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/00-method/de-slop.md",
+      "sha256": "183c8df529ececa9b36e47a0fef034d73e2426893a61c168002c1414a864f28f",
+      "bytes": 7549,
+      "library_source": "00-method/de-slop.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/RULEBOOK.md",
+      "sha256": "ebfa1e7a17ed595fc1544ff9a3431c4c3699d388ebe776de385012e792abe39a",
+      "bytes": 10155,
+      "library_source": "RULEBOOK.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/agency/compliance-checklist.md",
+      "sha256": "d3c764757858a8498c088ff133e76f852855867c5021e5fce9e14ef47d9b2b6b",
+      "bytes": 4607,
+      "library_source": "agency/compliance-checklist.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/agency/deterministic-checks.md",
+      "sha256": "46dcd3d92497c2e570ea3fe5b30bde068f23d06e7c6bd26d9cceaa3fddc31c2e",
+      "bytes": 17902,
+      "library_source": "agency/deterministic-checks.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/feedback/README.md",
+      "sha256": "e586a5d6c28d337c6031fbbc6a5539280bde0ce6bf5a7960404d1edc6c12d1f3",
+      "bytes": 3636,
+      "library_source": "feedback/README.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/feedback/record-template.videowizard.yaml",
+      "sha256": "dea231baed27bb6ae8c4aa6fe1d42e11c4bb3677a6b9e6676a86c7533be5fd91",
+      "bytes": 1865,
+      "library_source": null,
+      "status": "draft, untested (new 2026-10-21)"
+    },
+    {
+      "path": "library/feedback/record-template.yaml",
+      "sha256": "115e3bb6f3639d35b000f26027eb82e745994e8fe00c825912e0f184286f8daf",
+      "bytes": 975,
+      "library_source": "feedback/record-template.yaml",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/forms/answer-form.md",
+      "sha256": "2a7f28849001707c0f4e85ae1e51056fa75a601d035b6b658da8137367acd8bc",
+      "bytes": 13395,
+      "library_source": "forms/answer-form.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/forms/job-form.md",
+      "sha256": "4510c916e0c6f91e3b7e61b82668bc042f2f7c6aa61e3b24a47aa31c223fca62",
+      "bytes": 11780,
+      "library_source": "forms/job-form.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/models/gpt-image/FACT-SHEET.md",
+      "sha256": "abe5c8328f9cf58fefc0fc343489a18a7f60a3d4a6feeba43737b402c36ad84d",
+      "bytes": 17298,
+      "library_source": "models/gpt-image/FACT-SHEET.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/playbooks/video-clip.md",
+      "sha256": "85985fa12bde713aa467b1df8c816b94c75d6b04824f355d530e9861945acc01",
+      "bytes": 12002,
+      "library_source": "playbooks/video-clip.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/playbooks/video-frame.md",
+      "sha256": "927ed7c38084b7c1fb917351d10676fd44e07371b4fc5a001623a92b1ba96da1",
+      "bytes": 11093,
+      "library_source": "playbooks/video-frame.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/playbooks/web-app.md",
+      "sha256": "b3abbd611563c0aecab57eb58eb123bba9e2b97e63cb5893215623dd38ecbfda",
+      "bytes": 11586,
+      "library_source": "playbooks/web-app.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/prompts/05-information.md",
+      "sha256": "a3dc1e6300c7c20f28b3efc848f8afbc41ebd782fd7cbbf2ac2a7be9400c1682",
+      "bytes": 9431,
+      "library_source": "prompts/05-information.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/consistent-character-frames.md",
+      "sha256": "ef0f7003468f91e0553bdfa015ec651af11b54b930129d8d24fc42db70b0ff6e",
+      "bytes": 31181,
+      "library_source": "video/consistent-character-frames.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/craft/animatic-keyframes.md",
+      "sha256": "1490a0b242770bbf1eeecd4e856d60f8fa0d85d885bb6f2203311cbaae2ee02e",
+      "bytes": 29990,
+      "library_source": "video/craft/animatic-keyframes.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/craft/camera-lighting-vocabulary.md",
+      "sha256": "ef4782149978952ddbbdc86c281712cb7678dfdbdfc093aed3cf5a935fedccfc",
+      "bytes": 7729,
+      "library_source": "video/craft/camera-lighting-vocabulary.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/diagram-in-states.md",
+      "sha256": "246424423d528e6089f4ec0847778a33249bd9e6fa9a7683edd0f933b45fdb0b",
+      "bytes": 5989,
+      "library_source": "video/diagram-in-states.md",
+      "status": "draft, untested (new 2026-10-21)"
+    },
+    {
+      "path": "library/video/gap-fill.md",
+      "sha256": "65197c13742bbc24a9697d96db4a85a305e311bd59b096d0ed299b8d0e132e25",
+      "bytes": 4479,
+      "library_source": "video/gap-fill.md",
+      "status": "draft, untested (new 2026-10-21)"
+    },
+    {
+      "path": "library/video/models/gemini-omni-1-1/FACT-SHEET.md",
+      "sha256": "3221e279b21dd8b2eb1bb82b896812d47cc06971da97f3b97c6d5115069394aa",
+      "bytes": 26248,
+      "library_source": "video/models/gemini-omni-1-1/FACT-SHEET.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/models/higgsfield/NOTES.md",
+      "sha256": "65ce14ea138e148a46f372eab274cd2847fb975311f399e42f213b33676deb5d",
+      "bytes": 3731,
+      "library_source": "video/models/higgsfield/NOTES.md",
+      "status": "draft, untested (new 2026-10-21)"
+    },
+    {
+      "path": "library/video/models/kling/FACT-SHEET.md",
+      "sha256": "ffc88d8dbb88ae38501118d2fbcf0660a0eb242a8c068e57de2df33a136b8b5f",
+      "bytes": 5638,
+      "library_source": "video/models/kling/FACT-SHEET.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/models/seedance/FACT-SHEET.md",
+      "sha256": "9e4877d189e106a83ae9f38c50d77d8a7f5e6dfe425762d5949295c9987bee10",
+      "bytes": 22008,
+      "library_source": "video/models/seedance/FACT-SHEET.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/video/still-to-motion-pipeline.md",
+      "sha256": "157ead8cebb8b8fcfc4d1cd909bf71522ea9c37f8cac43c47a023079f01415b9",
+      "bytes": 12024,
+      "library_source": "video/still-to-motion-pipeline.md",
+      "status": "snapshot"
+    }
+  ]
+}

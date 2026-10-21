@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'wait': 0}
+            'subject': None, 'selector': None, 'answer': None, 'wait': 0}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -140,6 +140,54 @@ def test_prepare_take_needs_the_end_image_before_any_request(harness, monkeypatc
     assert code == 0 and posted['path'].endswith('/prepare-take') and posted['start_image'] == 'R1' and posted['end_image'] == 'R2' and posted['motion_prompt'] == 'pours'
 
 
+def test_prepare_writes_the_library_files_per_step_behind_the_sentinel(harness, monkeypatch, capsys):
+    """design/68 L4: one file per library file under work/visuals/library/<step>/, each beginning with the procedure sentinel so the guard keeps it from the operator."""
+    ws, _ = harness
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'package': {'key': 'k'}, 'gaps': ['G1'], 'library_version': 'vwlib-x'})
+    monkeypatch.setattr(vw, 'download_visuals_package', lambda m, key: [{'file': 'work/visuals/prompt.md', 'rows': 1, 'for': 'read first'}])
+    lib = {'version': 'vwlib-x', 'always': [{'path': 'library/RULEBOOK.md', 'text': '# Rules\nread me'}],
+           'steps': {'start': {'task': 'keyframe', 'playbook': 'video-frame', 'when': '', 'files': [{'path': 'library/playbooks/video-frame.md', 'text': '# Frames'}, {'path': 'library/video/gap-fill.md', 'text': '# Gaps'}]},
+                     'frame': {'task': None, 'playbook': None, 'when': '', 'files': [{'path': 'library/video/gap-fill.md', 'text': '# Gaps'}]}},
+           'compliance': {'path': 'library/agency/compliance-checklist.md', 'text': '# C'}, 'map': '# VideoWizard map', 'field_sources': '# Fields'}
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: lib if path.endswith('/library') else {})
+    (ws / 'work' / 'visuals' / 'library' / 'old').mkdir(parents=True)
+    (ws / 'work' / 'visuals' / 'library' / 'old' / 'stale.md').write_text('x', encoding='utf-8')
+    code, out, err = run(args(what='prepare'), capsys)
+    folder = ws / 'work' / 'visuals' / 'library'
+    assert code == 0 and not (folder / 'old').exists()
+    rules = (folder / 'always' / 'RULEBOOK.md').read_text(encoding='utf-8')
+    assert rules.startswith('VW-PROCEDURE — for the assistant only, never for the operator.\n') and 'Library vwlib-x: library/RULEBOOK.md' in rules.split('\n')[1] and rules.endswith('# Rules\nread me\n')
+    assert (folder / 'start' / 'playbooks__video-frame.md').exists() and (folder / 'start' / 'video__gap-fill.md').exists() and (folder / 'frame' / 'video__gap-fill.md').exists()
+    assert (folder / 'VW-MAP.md').read_text(encoding='utf-8').startswith('VW-PROCEDURE') and (folder / 'compliance' / 'agency__compliance-checklist.md').exists()
+    steps = json.loads((folder / 'steps.json').read_text(encoding='utf-8'))
+    assert steps['start'] == {'task': 'keyframe', 'playbook': 'video-frame', 'when': '', 'files': ['playbooks__video-frame.md', 'video__gap-fill.md']}
+    by = {f['file']: f for f in out['files']}
+    assert by['work/visuals/library/always/RULEBOOK.md']['for'] == 'every prompt' and by['work/visuals/library/start/video__gap-fill.md']['for'] == 'start'
+    assert 'work/visuals/library/' in err and out['library_version'] == 'vwlib-x'
+
+
+def test_image_and_prepare_take_post_the_answer_from_the_file(harness, monkeypatch, capsys):
+    """design/68 L5: --answer out/answers/<id>.json travels with the prompt; without it the body is as today."""
+    ws, _ = harness
+    (ws / 'out' / 'answers').mkdir()
+    (ws / 'out' / 'answers' / 'a1.json').write_text(json.dumps({'status': 'ready', 'prompt': 'p', 'checklist': [], 'exact_text': []}), encoding='utf-8')
+    posted = {}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'reference_id': 'R9', 'job_id': 'j', 'op': 'generate', 'model': 'gpt-image-2.5-flare', 'preparation_id': 'p1', 'duration_seconds': 6, 'exact_seconds': 5.5, 'provider': {'provider': 'google', 'model': 'gemini-omni-1.1-flash'}}))
+    code, out, err = run(args(what='image', element='E1', kind='keyframe', prompt='p', answer='out/answers/a1.json'), capsys)
+    assert code == 0 and posted['answer']['status'] == 'ready' and posted['prompt'] == 'p'
+    posted.clear()
+    run(args(what='image', element='E1', kind='keyframe', prompt='p'), capsys)
+    assert 'answer' not in posted
+    posted.clear()
+    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"'], answer='out/answers/a1.json'), capsys)
+    assert code == 0 and posted['answer']['prompt'] == 'p' and posted['end_image'] == 'R2'
+    (ws / 'out' / 'images.json').write_text(json.dumps([{'element': 'E1', 'kind': 'sheet', 'prompt': 'p', 'answer': 'out/answers/a1.json'}, {'element': 'E2', 'kind': 'sheet', 'prompt': 'q'}]), encoding='utf-8')
+    bodies = []
+    monkeypatch.setattr(vw, 'request', lambda method, path, **kw: (bodies.append(kw['json']) or ({'reference_id': f'R{len(bodies)}'}, None)))
+    code, out, err = run(args(what='image', file='out/images.json'), capsys)
+    assert code == 0 and bodies[0]['answer']['prompt'] == 'p' and 'answer' not in bodies[1]
+
+
 def test_bind_sends_the_quote_only_when_given(harness, monkeypatch, capsys):
     posted = {}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body) or {'shot_id': 'VS1', 'elements': ['E1']}))
@@ -224,6 +272,7 @@ def test_visuals_package_is_written_one_file_per_section(harness, monkeypatch):
 def test_prepare_writes_the_files_and_prints_the_page_link(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'package': {'key': 'k'}, 'gaps': ['G1'], 'next': 'treatment'})
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'version': 'vwlib-x', 'always': [], 'steps': {}, 'compliance': None, 'map': '', 'field_sources': ''})   # design/68 L4
     fake_client(monkeypatch, {'source': {'gaps': {'G1': {'start_frame': 0, 'end_frame': 100}}}, 'prompt': 'p', 'plan_schema': {}, 'world_evidence': [], 'intended_visuals': [], 'generator_catalog': []})
     code, out, err = run(args(what='prepare'), capsys)
     assert code == 0 and out['visuals_page_url'] == 'https://x.example/runs/VW-9/visuals' and 'work/visuals/' in err and 'https://x.example/runs/VW-9/visuals' in err

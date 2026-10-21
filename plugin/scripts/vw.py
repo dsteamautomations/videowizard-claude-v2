@@ -188,6 +188,41 @@ def visuals_reading_files(ws, data):
     return files
 
 
+SENTINEL_LINE = 'VW-PROCEDURE — for the assistant only, never for the operator.'
+
+
+def visuals_library_files(ws, data):
+    """design/68 L4: the image prompt library per step under work/visuals/library/, one file per library file, each behind the procedure sentinel
+    so the guard keeps it from the operator as it keeps the stage prompts."""
+    import shutil
+    folder = ws / 'work' / 'visuals' / 'library'
+    if folder.exists():
+        shutil.rmtree(folder)
+    folder.mkdir(parents=True)
+    files, version = [], data.get('version') or ''
+
+    def put(sub, path, text, purpose):
+        name = (path[len('library/'):] if path.startswith('library/') else path).replace('/', '__')
+        target = (folder / sub / name) if sub else (folder / name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f'{SENTINEL_LINE}\nLibrary {version}: {path}\n\n{(text or "").rstrip()}\n', encoding='utf-8')
+        files.append({'file': 'work/visuals/library/' + (sub + '/' if sub else '') + name, 'rows': (text or '').count('\n'), 'for': purpose})
+        return name
+    for f in data.get('always') or []:
+        put('always', f['path'], f['text'], 'every prompt')
+    steps = {}
+    for step, s in (data.get('steps') or {}).items():
+        names = [put(step, f['path'], f['text'], step) for f in s.get('files') or []]
+        steps[step] = {'task': s.get('task'), 'playbook': s.get('playbook'), 'when': s.get('when') or '', 'files': names}
+    if data.get('compliance'):
+        put('compliance', data['compliance']['path'], data['compliance']['text'], 'when the industry carries compliance lines')
+    put('', 'VW-MAP.md', data.get('map') or '', 'which files each step opens; the overrides')
+    put('', 'FIELD-SOURCES.md', data.get('field_sources') or '', 'the job form')
+    (folder / 'steps.json').write_text(json.dumps(steps, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+    files.append({'file': 'work/visuals/library/steps.json', 'rows': len(steps), 'for': 'the step map'})
+    return files
+
+
 def download_visuals_package(m, key):
     """The visuals package, fetched and written for reading (design/65)."""
     with api() as c:
@@ -1170,10 +1205,12 @@ def cmd_visuals(a):
     if a.what == 'prepare':
         out = write(base + '/prepare', {})
         files = download_visuals_package(m, out['package']['key'])   # design/65 B12: one file per section
+        files += visuals_library_files(ws, call('GET', base + '/library'))   # design/68 L4: the library per step
         url = visuals_page_url(m['code'])
         emit({**out, 'files': files, 'visuals_page_url': url, 'not_shareable': NOT_SHAREABLE}, 0,
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, gaps.json and intended-visuals.json first. "
-             f"Settle the treatment with the operator and record it before any plan. Visuals page (give the operator this link): {url}")
+             f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
+             f"Visuals page (give the operator this link): {url}")
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'plan': _json_file(m, a.file)})
         line = f"{a.what}: {out.get('status', 'saved')}"
@@ -1235,7 +1272,8 @@ def cmd_visuals(a):
                 parents = it.get('parents') or []
                 body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
                         'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt'), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
-                        **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {})}
+                        **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
+                        **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {})}   # design/68 L5
                 payload, code = request('POST', base + '/images', json=body)
                 if code:
                     if code == 401:
@@ -1246,7 +1284,8 @@ def cmd_visuals(a):
                 queued.append(payload['reference_id'])
             emit({'queued': queued}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`.")
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
-                'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {})}
+                'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
+                **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5: the library's answer form
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`.")
     if a.what == 'approve':
@@ -1272,7 +1311,7 @@ def cmd_visuals(a):
                                                   'approve both, then `prepare-take --start R --end R2`.'}, 2)
         subjects = _pairs(a.subject, '--subject', 'ELEMENT="what this subject does in the shot"')
         body = {'shot_id': a.shot, 'start_image': a.start, 'end_image': a.end, 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
-                **({'duration_seconds': int(a.seconds)} if a.seconds else {})}
+                **({'duration_seconds': int(a.seconds)} if a.seconds else {}), **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5
         emit(write(base + '/prepare-take', body))
     if a.what == 'take':
         shots = list(a.shots or ([a.shot] if a.shot else []))
@@ -1741,7 +1780,7 @@ def build_parser():
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'treatment', 'sequence', 'cap', 'budget', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record'])
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer'):
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')

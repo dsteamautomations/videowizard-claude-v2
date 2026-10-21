@@ -300,6 +300,51 @@ def test_the_packet_carries_the_start_end_and_motion_instructions():
     assert 'from the approved start image as its parent' in end and "the server sends the start's own references with it" in end
     assert 'its position against its landmark and its side of the frame, its facing' in end and 'Change nothing else' in end and 'result of its last beat' in end
     assert motion.startswith('Read the actual accepted starting image')
+    lib = prep['library']   # design/68 L3
+    assert lib['version'] == VS.library.latest() and [s['step'] for s in lib['steps']] == ['start', 'end', 'take'] and lib['steps'][2]['task'] == 'clip-from-frame'
+    assert 'library/video/models/gemini-omni-1-1/FACT-SHEET.md' in lib['steps'][2]['files'] and all(isinstance(p, str) for s in lib['steps'] for p in s['files'])
+    assert lib['job_forms']['take']['video_seconds'] == 10 and lib['job_forms']['take']['job_id'] == 'VW-9-VS1-1' and lib['job_forms']['start']['task'] == 'keyframe'
+    assert lib['job_forms']['start']['images'] == [{'id': 'R1', 'tag': 'approved', 'element_id': 'E1', 'keep': 'a cut wall'}]
+    from app.planning.digest import digest
+    full = VS.packet(store_with(sess, doc), RUN, [], 'VS1')
+    assert full['preparation_digest'] == digest({k: v for k, v in full['preparation'].items() if k != 'library'})   # the card and the rules never make a take stale
+    with_card = VS.packet(store_with(sess, doc), RUN, [], 'VS1', card={'industry': 'education'}, rules=['no PPE claims'])
+    assert with_card['preparation_digest'] == full['preparation_digest'] and with_card['preparation']['library']['job_forms']['take']['industry'] == 'education'
+
+
+def test_library_version_is_recorded_at_prepare_and_an_older_session_reads_the_latest():
+    assert VS.library_version_of(session()) == VS.library.latest()
+    assert VS.library_version_of(session(library_version='vwlib-2026-01-01-aaaaaaaaaaaa')) == 'vwlib-2026-01-01-aaaaaaaaaaaa'
+    pack = VS.library_pack(store_with(session()), RUN, [])
+    assert pack['version'] == VS.library.latest() and 'start' in pack['steps']
+
+
+def test_an_answer_is_linted_and_stored_with_the_image_and_the_take(monkeypatch):
+    """design/68 L5: the answer form travels with the prompt; without it the call works as today."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved')},
+                   bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    answer = {'status': 'ready', 'prompt': 'a wall section', 'checklist': [{'check': 'c', 'pass_when': 'p', 'weight': 'must'}], 'exact_text': []}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'a wall section', 'answer': answer}
+    store = store_with(sess, doc)
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
+    assert saved(store)['references'][out['reference_id']]['answer'] == answer
+    with pytest.raises(Problem, match='prompt differs'):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r2', 'prompt': 'another wall'}))
+    out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r3', 'answer': None})   # as today
+    assert out['op'] == 'generate'
+    take = {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2'}
+    store = store_with(sess, doc)
+    VS.prepare_take(store, USER, RUN, [], {**take, 'answer': {**answer, 'prompt': 'water poured'}})
+    record = json.loads(store.files[saved(store)['preparations']['VS1']['key']])
+    assert record['answer']['prompt'] == 'water poured' and record['motion_prompt'] == 'water poured'
+    with pytest.raises(Problem, match='at least one must line'):
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**take, 'answer': {**answer, 'prompt': 'water poured', 'checklist': []}}))
+    out = VS.prepare_take(store_with(sess, doc), USER, RUN, [], take)   # as today
+    assert out['duration_seconds'] == 10
 
 
 def test_an_end_keyframe_carries_the_start_keyframes_own_references(monkeypatch):
