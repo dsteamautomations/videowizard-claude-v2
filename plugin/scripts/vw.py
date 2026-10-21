@@ -1267,9 +1267,12 @@ def cmd_visuals(a):
     if a.what == 'generator':
         emit(write(base + '/generator', {'shot_id': a.shot, 'provider': a.provider, 'model': a.model}))
     if a.what == 'prepare-take':
+        if not a.start or not a.end:   # design/66 D1: every take has a start and an end image
+            emit({'action': 'refused', 'message': 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
+                                                  'approve both, then `prepare-take --start R --end R2`.'}, 2)
         subjects = _pairs(a.subject, '--subject', 'ELEMENT="what this subject does in the shot"')
-        body = {'shot_id': a.shot, 'start_image': a.start, 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
-                **({'end_image': a.end} if a.end else {}), **({'duration_seconds': int(a.seconds)} if a.seconds else {})}
+        body = {'shot_id': a.shot, 'start_image': a.start, 'end_image': a.end, 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
+                **({'duration_seconds': int(a.seconds)} if a.seconds else {})}
         emit(write(base + '/prepare-take', body))
     if a.what == 'take':
         shots = list(a.shots or ([a.shot] if a.shot else []))

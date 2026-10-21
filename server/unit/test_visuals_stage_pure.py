@@ -157,7 +157,8 @@ def test_spend_counts_images_and_take_seconds_at_the_configured_prices(monkeypat
 def test_the_cap_refuses_a_paid_call_that_would_pass_it_and_the_operator_raises_it(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     conn = FakeConn([job('openai') for _ in range(49)])   # ₹980 spent
-    sess = session()
+    assert VS.cap_of(session()) == 5000.0   # design/66 C4: the default cap
+    sess = session(cap_inr=1000.0)
     VS.check_cap(conn, RUN, sess, 20.0, 'one image')       # exactly the cap: allowed
     with pytest.raises(Problem) as exc:
         VS.check_cap(conn, RUN, sess, 40.0, 'a 5 s take')
@@ -178,8 +179,8 @@ def test_budget_reports_spend_cap_and_what_the_plan_still_needs(monkeypatch):
     doc = plan_doc([shot('AN1', 0, 500, 'animation', states=[{'what_appears': 'a', 'hold_s': 10}, {'what_appears': 'b', 'hold_s': 10}])], [shot('VS1', 900, 1150, 'video')])
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1')
     b = VS.budget(FakeConn([job('openai')]), store_with(sess, doc), RUN, [])
-    assert b['spent_inr'] == 20.0 and b['cap_inr'] == 1000.0 and b['planned'] == {'images': 3, 'video_seconds': 10.0, 'inr': 3 * 20.0 + 10 * 8.0}
-    assert b['left_inr'] == 980.0
+    assert b['spent_inr'] == 20.0 and b['cap_inr'] == 5000.0 and b['planned'] == {'images': 4, 'video_seconds': 10.0, 'inr': 4 * 20.0 + 10 * 8.0}   # two states, a start and an end image
+    assert b['left_inr'] == 4980.0
 
 
 def test_generate_image_and_submit_take_check_the_cap_first(monkeypatch):
@@ -200,7 +201,7 @@ def test_generate_image_and_submit_take_check_the_cap_first(monkeypatch):
 # ---------- the graphic sequence (B2') and the gates (B3) ----------
 
 def ref(rid, status='candidate', parents=()):
-    return {'id': rid, 'name': rid, 'kind': 'state' if parents else 'keyframe', 'element_id': 'E1', 'status': status, 'key': f'run-1/visuals/references/{rid}.png', 'sha256': 'sha-' + rid, 'bytes': 100,
+    return {'id': rid, 'name': rid, 'kind': 'state' if parents else 'keyframe', 'element_id': 'E1', 'status': status, 'key': f'run-1/visuals/references/{rid}.png', 'sha256': 'sha-' + rid, 'bytes': 100, 'subject': 'the wall',
             'generation': {'op': 'edit' if parents else 'generate', 'parents': [{'id': p} for p in parents]}}
 
 
@@ -246,12 +247,52 @@ def test_still_and_prepare_take_gates_follow_the_routes():
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'DG1', 'motion_prompt': 'm', 'subject_reconciliation': {}, 'start_image': 'R1'}))
 
 
+def test_prepare_take_needs_a_start_and_a_distinct_end_image_and_freezes_both():
+    """design/66 C2: every take is driven by two approved pictures; consecutive segments share their boundary picture."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])   # subjects as validation would default them
+    plan, gap = doc, doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved'), 'R3': ref('R3')},
+                   bindings={'VS1': {'gap_digest': gap_digest(plan, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    body = {'shot_id': 'VS1', 'motion_prompt': 'water poured along the top', 'subject_reconciliation': {}, 'start_image': 'R1'}
+    with pytest.raises(Problem, match='start and an end image') as exc:
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], body))
+    assert '--kind keyframe --parents <start>' in exc.value.message and '--start R --end R2' in exc.value.message
+    with pytest.raises(Problem, match='distinct'):
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'R1'}))
+    with pytest.raises(Problem, match='end_image must be an approved reference'):
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'R3'}))
+    store = store_with(sess, doc)
+    out = VS.prepare_take(store, USER, RUN, [], {**body, 'end_image': 'R2'})
+    assert out['duration_seconds'] == 10 and out['exact_seconds'] == 10.0
+    record = json.loads(store.files[saved(store)['preparations']['VS1']['key']])
+    assert record['start_image']['reference_id'] == 'R1' and record['end_image']['reference_id'] == 'R2' and 'second image as the ending frame' in record['effective_prompt']
+
+
+def test_a_keyframe_may_be_generated_from_a_candidate_keyframe(monkeypatch):
+    """design/66 C3: the end keyframe is made from the start keyframe before either is approved, so the pair is approved together."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1',
+                   references={'K1': ref('K1'), 'S1': {**ref('S1'), 'kind': 'sheet'}, 'A1': ref('A1', 'approved')})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the same yard, the bucket now empty', 'parents': ['K1']}
+    store = store_with(sess, doc)
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
+    assert out['op'] == 'edit' and saved(store)['references'][out['reference_id']]['generation']['parents'] == [{'id': 'K1', 'key': 'run-1/visuals/references/K1.png', 'sha256': 'sha-K1'}]
+    with pytest.raises(Problem, match='Parents must be approved'):   # a candidate sheet is not a start keyframe
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r2', 'parents': ['S1']}))
+    with pytest.raises(Problem, match='Parents must be approved'):   # only a keyframe is made from a candidate
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r3', 'kind': 'isolated', 'parents': ['K1']}))
+    out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r4', 'kind': 'isolated', 'parents': ['A1']})
+    assert out['op'] == 'edit'
+
+
 def test_status_carries_the_treatment_and_the_budget(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     store = store_with(session())
     VS.treatment(store, USER, RUN, [], TREATMENT, 'yes')
     st = VS.status(FakeConn([job('openai')]), store, RUN, [])
-    assert st['treatment']['totals']['images'] == 4 and st['treatment']['quote'] == 'yes' and st['budget']['spent_inr'] == 20.0 and st['budget']['cap_inr'] == 1000.0
+    assert st['treatment']['totals']['images'] == 4 and st['treatment']['quote'] == 'yes' and st['budget']['spent_inr'] == 20.0 and st['budget']['cap_inr'] == 5000.0
 
 
 # ---------- design/65 §8: the draft and the page view ----------
@@ -289,5 +330,5 @@ def test_page_view_carries_the_gaps_shots_pictures_takes_and_budget(monkeypatch)
     assert g2['shots'][0]['takes'][0]['selected'] is True and g2['shots'][0]['takes'][0]['reviews'][0]['decision'] == 'accepted' and g2['shots'][0]['takes'][0]['duration_s'] == 10.0
     refs = {r['id']: r for r in view['references']}
     assert refs['R2']['parents'] == ['R1'] and refs['R2']['url'].endswith('/R2.png') and refs['R1']['status'] == 'approved'
-    assert view['budget']['spent_inr'] == 20.0 + 10 * 8.0 and view['budget']['cap_inr'] == 1000.0
+    assert view['budget']['spent_inr'] == 20.0 + 10 * 8.0 and view['budget']['cap_inr'] == 5000.0
     assert VS.page_view(FakeConn([]), FakeStore({}), RUN, [], 'VW-9') == {'state': 'not_prepared'}

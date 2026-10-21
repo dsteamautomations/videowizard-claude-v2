@@ -486,8 +486,9 @@ def generate_image(conn, store, user, run, outputs, body):
     if body['kind'] == 'state':   # design/65: a state is made from the previous state, which is approved only when the whole sequence is
         need(len(parents) == 1, 'A state is generated from the previous state: give one parent.')
         need(parents[0] and parents[0]['status'] in ('approved', 'candidate'), 'The parent must be a candidate or approved reference of this run.')
-    else:
-        need(all(p and p['status'] == 'approved' for p in parents), 'Parents must be approved references of this run.')
+    else:   # design/66 C3: an end keyframe is made from the start keyframe before either is approved, so the pair is approved together
+        need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate')) for p in parents),
+             'Parents must be approved references of this run (an end keyframe may be made from a candidate start keyframe).')
     check_cap(conn, run, session, prices()['image_inr'], 'one image')   # design/65 B7
     op = 'edit' if parents else 'generate'
     ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
@@ -589,6 +590,10 @@ def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
     _, _, _, planned = guarded(lambda: locate(store, session, body['shot_id']))
     _route_gate(planned, 'video')
+    need(body.get('start_image'), 'A start image is required.')
+    need(body.get('end_image'), 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
+                                'approve both, then `--start R --end R2`.')   # design/66 C2
+    need(body['start_image'] != body['end_image'], 'The start and end images are distinct pictures: the end is the start one small action further on.')
     base = packet(store, run, outputs, body['shot_id'], session)
     shot = base['preparation']['shot']
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))
@@ -602,10 +607,7 @@ def prepare_take(store, user, run, outputs, body):
     need(cap['min_seconds'] <= duration <= cap['max_seconds'], f"Duration {duration}s is outside {cap['label']} ({cap['min_seconds']}–{cap['max_seconds']}s).")
     images = {}
     for role in ('start_image', 'end_image'):
-        rid = body.get(role)
-        if not rid:
-            need(role == 'end_image', 'A start image is required.')
-            continue
+        rid = body[role]
         row = session['references'].get(rid)
         need(row and row['status'] == 'approved', f'{role} must be an approved reference.')
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}

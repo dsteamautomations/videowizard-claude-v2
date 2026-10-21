@@ -130,6 +130,16 @@ def test_still_posts_shot_and_reference(harness, monkeypatch, capsys):
     assert code == 0 and posted['path'].endswith('/visuals/still') and posted['shot_id'] == 'IS1' and posted['reference_id'] == 'R1' and posted['quote'] == 'yes, that picture'
 
 
+def test_prepare_take_needs_the_end_image_before_any_request(harness, monkeypatch, capsys):
+    """design/66 D1: every take has a start and an end image; the plugin refuses without one and posts nothing."""
+    posted = {}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'preparation_id': 'p1', 'duration_seconds': 6}))
+    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', motion='pours', subject=['E1="pours water"']), capsys)
+    assert code == 2 and 'start and an end image' in out['message'] and '--end' in out['message'] and not posted
+    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"']), capsys)
+    assert code == 0 and posted['path'].endswith('/prepare-take') and posted['start_image'] == 'R1' and posted['end_image'] == 'R2' and posted['motion_prompt'] == 'pours'
+
+
 def test_bind_sends_the_quote_only_when_given(harness, monkeypatch, capsys):
     posted = {}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body) or {'shot_id': 'VS1', 'elements': ['E1']}))
@@ -272,8 +282,14 @@ def test_visuals_prompt_is_rewritten_for_v2():
     for gone in ('hand-made', 'editor makes', 'Nothing in this pipeline draws', 'shall the editor make them', 'the animation answer'):
         assert gone not in prompt, gone
     for kept in ('graphic sequence', 'two to four states', 'as its parent', 'on their instruction; never plan one', 'intended visuals', 'A plan is refused until the treatment is recorded',
-                 'Text is not a reason', 'Footage first', 'no quota', 'three to five seconds', '--start` and `--end`', 'do not add a new rule while keeping shots that contradict it'):
+                 'Text is not a reason', 'Footage first', 'no quota', 'three to five seconds', 'do not add a new rule while keeping shots that contradict it',
+                 # design/66: segments at action boundaries, a start and an end image per take, the shared boundary picture, the cap
+                 '--start R --end R2', 'cut where an action begins or ends', 'the end image of one segment is the start image of the next', 'segments plus one for video', '₹5,000'):
         assert kept in prompt, kept
+    for gone in ('final state matters', 'a shot that needs a middle state is two shots', '₹1,000'):
+        assert gone not in prompt, gone
+    assert 'design/66' in STAGES['visuals']['prompt_origin']
+    assert '--start R --end R2' in STAGES['visuals']['steps'][4] and '--kind keyframe --parents <start keyframe>' in STAGES['visuals']['steps'][3] and 'segments plus one' in STAGES['visuals']['steps'][1]
 
 
 def test_steps_and_command_text_carry_the_new_flow():

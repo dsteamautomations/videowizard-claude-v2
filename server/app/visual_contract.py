@@ -190,7 +190,8 @@ def route_of(shot):
 
 def routes(plan, fps=25):
     """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
-    graphics, and the images the plan will need (a keyframe per video shot, one picture per still, one per state of a sequence)."""
+    graphics, and the images the plan will need: a start and an end image per video shot, where consecutive video shots in a scene share their
+    boundary picture (design/66: a run of n segments needs n + 1), one picture per still, one per state of a sequence."""
     out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0}
     for gap in plan.get('gaps', []):
         scenes = gap.get('scenes') or []
@@ -198,6 +199,7 @@ def routes(plan, fps=25):
             chosen = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])
             scenes = chosen['scenes']
         for scene in scenes:
+            segments = 0   # consecutive video shots so far
             for shot in scene['shots']:
                 kind = route_of(shot)
                 seconds = (shot['end_frame'] - shot['start_frame']) / float(fps)
@@ -205,7 +207,12 @@ def routes(plan, fps=25):
                 out['seconds'][kind] = round(out['seconds'][kind] + seconds, 2)
                 if shot['visual_type'] in GRAPHIC_TYPES:
                     out['graphic_seconds'] = round(out['graphic_seconds'] + seconds, 2)
-                out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
+                if kind == 'video':
+                    out['images_estimated'] += 2 if segments == 0 else 1
+                    segments += 1
+                else:
+                    segments = 0
+                    out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
     return out
 
 
