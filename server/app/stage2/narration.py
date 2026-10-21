@@ -127,6 +127,8 @@ def validate_scenes(words, scenes, process_stages=()):
     starts = {a for a, _ in sentence_ranges(words)}
     previous = -1
     allowed = set(process_stages or [])
+    if allowed and not any(s.get('process_stages') for s in scenes if isinstance(s, dict)):   # design/60 L18: coverage matches footage by chapter
+        raise ValueError(f"Every scene names the chapter it covers under process_stages, from the brief's list ({', '.join(process_stages)}); none of the scenes has one.")
     for n, s in enumerate(scenes, 1):
         wid = s.get('first_word_id')
         if wid not in index:

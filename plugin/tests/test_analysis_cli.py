@@ -118,6 +118,27 @@ def test_start_without_flags_posts_nothing_for_camera_audio_and_says_the_source(
     assert 'camera audio: allowed (from the media stage)' in err and '--wait 600' in err
 
 
+def test_start_says_which_flags_the_brief_waived(harness, monkeypatch, capsys):
+    """design/60 L20: the server waives PPE flags when the brief recorded no rules; the operator hears it at once."""
+    answer = {'created': [{'unit': 'a', 'job_id': 'j'}], 'reused': [], 'excluded': [], 'clips': 1, 'camera_audio': 'excluded', 'camera_audio_source': 'media',
+              'waived_risk_flags': ['ppe', 'glove', 'sandal'], 'waiver_note': 'the brief recorded no brand or safety rules'}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: answer)
+    code, out, err = run(args(what='start'), capsys)
+    assert code == 0 and 'risk flags waived from the brief (no safety rules): ppe, glove, sandal' in err
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {k: v for k, v in answer.items() if k not in ('waived_risk_flags', 'waiver_note')})
+    code, out, err = run(args(what='start'), capsys)
+    assert code == 0 and 'waived' not in err
+
+
+def test_policy_reply_says_to_rebuild_the_options_package(harness, monkeypatch, capsys):
+    """design/60 L19: the options check reads the package built before the waiver."""
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'resolved': [{'unit': 'a', 'job_id': 'j'}]})
+    code, out, err = run(args(what='policy', waive=['ppe'], note='training yard'), capsys)
+    assert code == 0 and '`vw options prepare` again' in err and 'the check reads the package' in err
+    steps = ' '.join(STAGES['analysis']['steps'])
+    assert 'vw options prepare' in steps and 'the check reads the package' in steps
+
+
 def test_start_with_flags_posts_them(harness, monkeypatch, capsys):
     posted = {}
 

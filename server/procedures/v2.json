@@ -190,7 +190,7 @@
         "Wait with `vw analysis status --wait 600`; report its line (counts and about how long is left); repeat until every clip is retained or excluded, or a clip needs a decision. Do not read the evidence files.",
         "A failed clip: tell the operator the reason from status. On their instruction run `vw analysis retry --unit <id> --note \"<their words>\"` (terminal failures) or `vw analysis recover --unit <id>` (unknown outcome). `vw analysis exclude --unit <id> --note` leaves a clip out of the film.",
         "When every clip is retained or excluded, `vw next` moves to options. Nothing to approve: analysis has no acceptance step.",
-        "`vw analysis show --unit <id>` prints the clip's 10-line summary card; never read the full log. `vw analysis policy [--camera-audio …] [--show-speaker-video] [--waive <risk flag> … --note \"<operator's words>\"]` re-checks eligibility without a paid call: a waived risk flag (e.g. ppe) no longer makes a sub-clip unsafe for this run."
+        "`vw analysis show --unit <id>` prints the clip's 10-line summary card; never read the full log. `vw analysis policy [--camera-audio …] [--show-speaker-video] [--waive <risk flag> … --note \"<operator's words>\"]` re-checks eligibility without a paid call: a waived risk flag (e.g. ppe) no longer makes a sub-clip unsafe for this run. When the brief recorded no brand or safety rules, the PPE flags are waived from the start and `analysis start` says so. After a policy change, when it is done, run `vw options prepare` again if the options package exists: the check reads the package."
       ],
       "output_file": null,
       "inspection": {

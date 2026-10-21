@@ -893,8 +893,9 @@ def cmd_analysis(a):
                 **({'camera_audio': a.camera_audio} if a.camera_audio else {}), **({'film_type': a.film_type} if a.film_type else {})}
         out = write(f'/api/runs/{run}/analysis/start', body)
         source = 'from the media stage' if out.get('camera_audio_source') == 'media' else 'as given'
+        waived = f"; risk flags waived from the brief (no safety rules): {', '.join(out['waived_risk_flags'])}" if out.get('waived_risk_flags') else ''   # design/60 L20
         emit(out, 0, f"Analysis started: one paid Gemini request per clip (model from the analysis stage procedure, gemini-3.8-flash today); "
-                     f"camera audio: {out.get('camera_audio')} ({source}). Tell the operator; wait with `vw analysis status --wait 600`.")
+                     f"camera audio: {out.get('camera_audio')} ({source}){waived}. Tell the operator; wait with `vw analysis status --wait 600`.")
     if a.what == 'status':   # design/42 6.1: wait inside the tool and estimate the time left
         import math
         deadline = time.monotonic() + (a.wait or 0)
@@ -930,7 +931,7 @@ def cmd_analysis(a):
     if a.what == 'policy':
         body = {**({'camera_audio': a.camera_audio} if a.camera_audio else {}), **({'show_speaker_video': bool(a.show_speaker_video)} if a.show_speaker_video is not None else {}),
                 **({'waived_risk_flags': a.waive, 'note': a.note or ''} if a.waive is not None else {})}
-        emit(write(f'/api/runs/{run}/analysis/policy', body, wait=600), 0, 'Eligibility re-checked on the retained logs with the new policy; no paid call. Poll `vw analysis status`.')
+        emit(write(f'/api/runs/{run}/analysis/policy', body, wait=600), 0, 'Eligibility re-checked on the retained logs with the new policy; no paid call. Poll `vw analysis status`; when it is done, run `vw options prepare` again if the options package exists: the check reads the package.')   # design/60 L19
     if a.what in ('retry', 'recover', 'resolve', 'exclude'):
         emit(write(f'/api/runs/{run}/analysis/{a.unit}/{a.what}', {'note': a.note or ''}))
 

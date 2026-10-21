@@ -26,6 +26,8 @@ from .video_evidence.world import provider_schema
 PROVIDER = 'gemini'
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
 LEASE_MINUTES = 45
+PPE_WAIVERS = ('ppe', 'glove', 'helmet', 'hard_hat', 'hardhat', 'footwear', 'sandal', 'barefoot', 'boot', 'goggle', 'eye_protection', 'mask', 'harness', 'vest', 'high_vis')
+# design/60 L20: substrings matched by solver.waived against the model's risk-flag names when the brief recorded no brand or safety rules
 GLOBAL_CAP = None  # tests may pin the cap here; otherwise settings().ANALYSIS_CAP (VW2_ANALYSIS_CAP in the env or server/.env)
 
 
@@ -75,9 +77,18 @@ def _inputs(conn, run, outputs):
         file_of(by['script'], 'script.json'), by['media']
 
 
+def start_policy(policy, production):
+    """design/60 L20: "no brand or safety rules" at the brief waives the PPE risk flags from the start; a rule at the brief or a waiver
+    given on the command leaves the policy as it is. The operator can still narrow or widen it with `vw analysis policy`."""
+    if (production or {}).get('brand_and_safety_rules') or policy.get('waived_risk_flags'):
+        return policy
+    return {**policy, 'waived_risk_flags': list(PPE_WAIVERS), 'waiver_note': 'the brief recorded no brand or safety rules'}
+
+
 def start(conn, user, run, outputs, policy, again):
     """One job per clip in the media output (minus exclusions). Same inputs → same job reused unless `again`."""
     brief, script, media = _inputs(conn, run, outputs)
+    policy = start_policy(policy, brief.get('production') or {})
     if policy.get('camera_audio'):   # design/42 6.2: the flag wins; otherwise the answer recorded at media
         policy = {**policy, 'camera_audio_source': 'flag'}
     else:
@@ -114,7 +125,8 @@ def start(conn, user, run, outputs, policy, again):
                             uuid.uuid5(uuid.NAMESPACE_URL, req['analysis_key']))).fetchone()
         created.append({'unit': clip['id'], 'job_id': str(row['id'])})
     conn.execute("update vw2_jobs set request = request || %s where run_id=%s and stage='analysis' and status='queued'", (Jsonb({'policy': policy}), run['id']))
-    return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips), 'camera_audio': policy['camera_audio'], 'camera_audio_source': policy['camera_audio_source']}
+    return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips), 'camera_audio': policy['camera_audio'], 'camera_audio_source': policy['camera_audio_source'],
+            **({'waived_risk_flags': list(policy['waived_risk_flags']), 'waiver_note': policy.get('waiver_note') or ''} if policy.get('waived_risk_flags') else {})}
 
 
 def repolicy(conn, user, run, outputs, policy):

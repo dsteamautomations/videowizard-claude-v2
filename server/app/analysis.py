@@ -49,6 +49,16 @@ def speaker_policy(policy, production):
     return {'allow_speaker_audio': allow, 'show_speaker_video': show}
 
 
+def request_policy(policy, production):
+    """The speaker policy plus the waived risk flags (design/60 L20): the solver reads both from the request's policy, and the waivers
+    are part of the analysis identity, as they are after a re-policy."""
+    sp = speaker_policy(policy, production)
+    if policy.get('waived_risk_flags'):
+        sp['waived_risk_flags'] = list(policy['waived_risk_flags'])
+        sp['waiver_note'] = policy.get('waiver_note') or policy.get('note') or ''
+    return sp
+
+
 def build_request_clip_log(run, procedure, brief, script, clip, policy, *, generation=None):
     from .clip_log import CONTRACT, prompt as P, schema as S
     duration = float(clip.get('duration_s') or 0)
@@ -62,7 +72,7 @@ def build_request_clip_log(run, procedure, brief, script, clip, policy, *, gener
     beats = [{'beat_id': b['beat_id'], 'text': b['text']} for b in (script.get('beats') or [])] or \
         [{'beat_id': f'BEAT_{i + 1:02d}', 'text': t} for i, t in enumerate(passages_of(script) and [p['text'] for p in passages_of(script)])]
     production = brief.get('production') or {}
-    sp = speaker_policy(policy, production)
+    sp = request_policy(policy, production)
     clip_tag = clip['id'].upper()[:12]
     project_config = {'project_id': run.get('code') or str(run['id']), 'client_name': run.get('client') or 'unspecified',
                       'video_purpose': brief.get('purpose', ''), 'target_audience': brief.get('audience', ''), 'tone_and_mood': brief.get('tone', ''), 'intended_takeaway': brief.get('message', ''),

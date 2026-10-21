@@ -46,6 +46,19 @@ def test_paragraph_scenes_are_titled_by_their_first_six_words():
     assert scenes[0]['first_word_id'] == 'P001-0' and scenes[0]['process_stages'] == []
 
 
+# ---------- design/60 L18: scenes must name chapters when the brief has them ----------
+
+def test_scenes_without_chapters_are_refused_when_the_brief_has_them():
+    beats = [{'beat_id': 'BEAT_01', 'passage_id': 'P001', 'text': 'Walls are cured for seven days.'}]
+    words = words_for(beats)
+    untagged = [{'first_word_id': 'P001-0', 'title': 'Curing', 'process_stages': []}]
+    with pytest.raises(ValueError) as exc:
+        NR.validate_scenes(words, untagged, ['Mixing the mortar', 'Curing the wall'])
+    assert 'process_stages' in str(exc.value) and 'Mixing the mortar, Curing the wall' in str(exc.value) and 'none of the scenes' in str(exc.value)
+    NR.validate_scenes(words, [{'first_word_id': 'P001-0', 'title': 'Curing', 'process_stages': ['Curing the wall']}], ['Mixing the mortar', 'Curing the wall'])
+    NR.validate_scenes(words, untagged, [])   # a film without chapters: untagged scenes are fine
+
+
 # ---------- 7.1 review films at 1280×720, master at 1920×1080 ----------
 
 def ffprobe_stream(path):
