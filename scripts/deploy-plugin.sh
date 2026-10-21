@@ -6,7 +6,7 @@
 # update the installed copy. Nothing changes on the VM.
 set -euo pipefail
 
-CLAUDE="/Users/vasudha/Library/Application Support/Claude/claude-code/2.1.295/9d6405864fdc/claude.app/Contents/MacOS/claude"
+CLAUDE="/Users/vasudha/Library/Application Support/Claude/claude-code/2.1.304/6bbba6adc37f/claude.app/Contents/MacOS/claude"
 if command -v claude >/dev/null 2>&1; then CLAUDE=claude; fi
 [ -x "$CLAUDE" ] || { echo "refusing: claude binary not found at $CLAUDE (update the path in this script and CLAUDE.md)" >&2; exit 1; }
 

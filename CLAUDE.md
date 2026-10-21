@@ -48,6 +48,6 @@ A job stuck `running` after a crash or a forced kill: release it by hand (analys
 
 ## Tools on this Mac
 
-- Claude Code CLI (no `claude` on PATH): `/Users/vasudha/Library/Application Support/Claude/claude-code/2.1.295/9d6405864fdc/claude.app/Contents/MacOS/claude`. The version segment changes when the desktop app updates; fix the path in `scripts/deploy-plugin.sh` when it does.
+- Claude Code CLI (no `claude` on PATH): `/Users/vasudha/Library/Application Support/Claude/claude-code/2.1.304/6bbba6adc37f/claude.app/Contents/MacOS/claude`. The version segment changes when the desktop app updates; fix the path in `scripts/deploy-plugin.sh` when it does.
 - `gcloud` lives in `~/google-cloud-sdk` (PATH and `CLOUDSDK_PYTHON` are set in `~/.zprofile`; the SDK needs Python 3.10+ and uses the standalone CPython in `~/google-cloud-sdk/platform/python3`). Account and project are SK's (`gcloud auth login`, project `sm-project-435806`).
 - No `gh`, `brew`, `node` or `docker` on PATH. Git talks to GitHub over HTTPS with the token in the macOS Keychain.
