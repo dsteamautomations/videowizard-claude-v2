@@ -1,5 +1,6 @@
 """Stage 2 pieces that need no database (design/43): grouped flags (7.6), default scene titles (7.3), the review film at 720p (7.1)."""
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -223,3 +224,31 @@ def test_probe_reports_colour_tags_and_rotation(tmp_path):
     u, t = probe(untagged), probe(tagged)
     assert u['issues'] == ['colour untagged'] and u['rotation_deg'] == 0 and u['duration_seconds'] == pytest.approx(1.0, abs=0.05)
     assert t['issues'] == [] and t['color_transfer'] == 'bt709' and t['color_primaries'] == 'bt709'
+
+
+# ---------- design/65 B8: a graphic sequence of stills ----------
+
+def png(path, colour):
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', f'color=c={colour}:s=64x48', '-frames:v', '1', str(path)], check=True)
+
+
+def frames_of(path):
+    out = subprocess.run(['ffprobe', '-v', 'error', '-count_frames', '-select_streams', 'v:0', '-show_entries', 'stream=nb_read_frames', '-of', 'csv=p=0', str(path)], capture_output=True, text=True, check=True).stdout
+    return int(out.strip())
+
+
+@pytest.mark.skipif(not (shutil.which('ffmpeg') and shutil.which('ffprobe')), reason='ffmpeg not installed')
+def test_a_graphic_sequence_renders_exactly_the_shot_frames_with_dissolves(tmp_path):
+    from app.stage2.render import Renderer
+    pngs = [tmp_path / f's{i}.png' for i in range(3)]
+    for p, c in zip(pngs, ('red', 'green', 'blue')):
+        png(p, c)
+    r = Renderer(tmp_path / 'work', {'width': 64, 'height': 48, 'fps': 25})
+    out = r.sequence([(pngs[0], 'a', 25), (pngs[1], 'b', 25), (pngs[2], 'c', 25)], dissolve=5, n_tl=75)
+    assert out.exists() and frames_of(out) == 75
+    again = r.sequence([(pngs[0], 'a', 25), (pngs[1], 'b', 25), (pngs[2], 'c', 25)], dissolve=5, n_tl=75)
+    assert again == out   # cached by the states, the holds, the dissolve and the length
+    single = r.sequence([(pngs[0], 'a', 30)], dissolve=5, n_tl=30)
+    assert frames_of(single) == 30
+    plain = r.sequence([(pngs[0], 'a', 10), (pngs[1], 'b', 15)], dissolve=0, n_tl=25)
+    assert frames_of(plain) == 25

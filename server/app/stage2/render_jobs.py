@@ -43,6 +43,9 @@ def process(job):
                 sources[item['clip']['id']] = _source(store, job['run_id'], item['clip'], work)
             elif item['kind'] == 'still':
                 sources[item['file']['sha256']] = _source(store, job['run_id'], {**item['file'], 'key': item['file']['key']}, work)
+            elif item['kind'] == 'sequence':   # design/65 B8
+                for st in item['states']:
+                    sources[st['file']['sha256']] = _source(store, job['run_id'], {**st['file'], 'key': st['file']['key']}, work)
         narration = work / 'narration.mp3'
         narration.write_bytes(store.get(plan['narration_key']))
         items = [({'kind': 'slate', 'frames': it['timeline_frames'], 'lines': [f"BLANK | {it['beat_id']} | {it['timeline_frames']} frames", 'for AI video or animation (visuals stage)']} if it.get('gap') else it)

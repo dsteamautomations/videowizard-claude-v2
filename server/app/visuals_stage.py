@@ -18,15 +18,18 @@ from pathlib import Path
 from psycopg.types.json import Jsonb
 
 from . import core, jobs, video_generators
+from .config import settings
 from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text
-from .visual_contract import STILL_TYPES, chosen_scenes, gap_digest, need, routes, validate_plan
+from .visual_contract import STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare', 'edit': 'gpt-image-2.5-sunburst'}
-REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe')
+REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state')   # design/65: a state of a graphic sequence, generated from the previous state
+TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video')
+DISSOLVE_S = 0.5   # between the states of a graphic sequence
 
 
 def fail(message):
@@ -132,6 +135,17 @@ def check(store, run, outputs, document):
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
     plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session)))
+    need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
+    for gap in plan['gaps']:   # a route that departs from the recorded treatment needs a new treatment, with the reason
+        said = set()
+        for e in session['treatment']['gaps']:
+            if e['gap_id'] == gap['gap_id']:
+                said = set(e['routes']) | ({'still'} if 'footage' in e['routes'] else set())   # a frame shown in the film is a still in the plan
+        scenes = gap.get('scenes') or []
+        if gap.get('choices'):   # as routes() counts: the recommended choice, else the first
+            scenes = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])['scenes']
+        used = {route_of(sh) for sc in scenes for sh in sc['shots']}
+        need(used <= said, f"gap {gap['gap_id']}: the plan uses {sorted(used)} but the treatment says {sorted(said)}; record a new treatment with the reason, or change the plan.")
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'source_plan_digest': session['source']['plan_digest'], 'document': plan,
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
@@ -146,6 +160,134 @@ def propose(conn, store, user, run, outputs, document):
             session['accepted'].pop(gid)
     save_session(store, run, session)
     return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']]}
+
+
+# ---------- design/65 B7: the cap ----------
+
+def prices():
+    s = settings()
+    return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S)}
+
+
+def visuals_spend(conn, run):
+    """What this film's visuals have cost so far, at the configured prices: every image job and every take job that ran or is running."""
+    rows = conn.execute("select provider, status, request from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'video')", (run['id'],)).fetchall()
+    live = [r for r in rows if r['status'] not in ('failed', 'rejected', 'cancelled')]
+    pr = prices()
+    images = sum(1 for r in live if r['provider'] == 'openai')
+    seconds = float(sum(float((r.get('request') or {}).get('duration_seconds') or 0) for r in live if r['provider'] == 'video'))
+    return {'images': images, 'take_seconds': seconds, 'spent_inr': round(images * pr['image_inr'] + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
+
+
+def cap_of(session):
+    return float(session.get('cap_inr') or settings().VISUALS_CAP_INR)
+
+
+def check_cap(conn, run, session, estimate_inr, what):
+    """Before any paid call: refuse when the spend so far plus this call would pass the film's cap."""
+    spent, cap = visuals_spend(conn, run)['spent_inr'], cap_of(session)
+    if spent + float(estimate_inr) > cap + 1e-9:
+        raise Problem(409, 'VISUALS_CAP', f"₹{spent:,.0f} spent of ₹{cap:,.0f} on this film's visuals; {what} needs about ₹{float(estimate_inr):,.0f}. "
+                                          "Only the operator raises the cap, with their words (`vw visuals cap --inr N --quote \"…\"`).",
+                      spent_inr=spent, cap_inr=cap, estimate_inr=float(estimate_inr))
+
+
+def set_cap(store, user, run, outputs, inr, quote):
+    session = session_of(store, run, outputs)
+    need(str(quote or '').strip(), "The operator's words are required to change the cap.")
+    need(isinstance(inr, (int, float)) and float(inr) > 0, 'The cap is more than ₹0.')
+    session['cap_inr'] = float(inr)
+    session.setdefault('cap_history', []).append({'cap_inr': float(inr), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    save_session(store, run, session)
+    return {'cap_inr': float(inr)}
+
+
+def budget(conn, store, run, outputs):
+    """Spend, cap and what the current plan still needs, in INR."""
+    session = session_of(store, run, outputs)
+    sp = visuals_spend(conn, run)
+    planned = {'images': 0, 'video_seconds': 0.0, 'inr': 0.0}
+    if session.get('current'):
+        r = routes(current_plan(store, session), _fps(session) or 25)
+        planned = {'images': r['images_estimated'], 'video_seconds': r['seconds']['video'],
+                   'inr': round(r['images_estimated'] * sp['prices']['image_inr'] + r['seconds']['video'] * sp['prices']['video_inr_per_s'], 2)}
+    cap = cap_of(session)
+    return {**sp, 'cap_inr': cap, 'left_inr': round(cap - sp['spent_inr'], 2), 'planned': planned}
+
+
+# ---------- design/65 B6: the treatment as a record ----------
+
+def treatment(store, user, run, outputs, document, quote):
+    """One entry per gap: the team's intended visuals cited or departed from, the picture in a line, the routes, the seconds, the images.
+    Recorded with the operator's words; `propose` is refused without it and when a route departs from it."""
+    session = session_of(store, run, outputs)
+    need(str(quote or '').strip(), "The operator's words are required to record the treatment.")
+    entries = (document or {}).get('gaps')
+    need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
+    gaps = session['source']['gaps']
+    seen, totals = set(), {'gaps': 0, 'images': 0, 'routes': {}, 'seconds': {}}
+    video_seconds = 0.0
+    for e in entries:
+        need(isinstance(e, dict) and e.get('gap_id') in gaps, f"The treatment names an unknown gap: {(e or {}).get('gap_id')!r}.")
+        need(e['gap_id'] not in seen, f"gap {e['gap_id']} appears twice in the treatment.")
+        seen.add(e['gap_id'])
+        routes_ = e.get('routes') or ([e['route']] if e.get('route') else [])
+        need(routes_ and all(r in TREATMENT_ROUTES for r in routes_), f"gap {e['gap_id']}: each route is one of {', '.join(TREATMENT_ROUTES)}.")
+        e['routes'] = list(routes_)
+        need(str(e.get('picture') or '').strip(), f"gap {e['gap_id']}: say the picture in one line.")
+        need(isinstance(e.get('seconds'), (int, float)) and e['seconds'] > 0, f"gap {e['gap_id']}: seconds must be a number above zero.")
+        need(isinstance(e.get('images'), int) and e['images'] >= 0, f"gap {e['gap_id']}: images must be a whole number.")
+        totals['gaps'] += 1
+        totals['images'] += e['images']
+        first = routes_[0]
+        totals['routes'][first] = totals['routes'].get(first, 0) + 1
+        totals['seconds'][first] = round(totals['seconds'].get(first, 0.0) + float(e['seconds']), 2)
+        if 'video' in routes_:
+            video_seconds += float(e['seconds'])
+    missing = sorted(set(gaps) - seen)
+    need(not missing, 'The treatment covers every gap; missing: ' + ', '.join(missing) + '.')
+    pr = prices()
+    estimate = round(totals['images'] * pr['image_inr'] + video_seconds * pr['video_inr_per_s'], 2)
+    session['treatment'] = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries)}
+    save_session(store, run, session)
+    return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': session['treatment']['digest']}
+
+
+# ---------- design/65 B2': the graphic sequence ----------
+
+def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
+    """An animation shot's states, approved in one call with the operator's words; each state's hash is recorded; the asset holds them for the shot."""
+    session = session_of(store, run, outputs)
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    _route_gate(shot, 'animation')
+    states = shot.get('states') or []
+    need(len(reference_ids) == len(states), f'shot {shot_id} plans {len(states)} states; {len(reference_ids)} references given.')
+    need(str(quote or '').strip(), 'The operator reply is required.')
+    rows = []
+    for rid in reference_ids:
+        row = session['references'].get(rid)
+        need(row and row.get('status') in ('candidate', 'approved') and row.get('sha256'), f'{rid} is not a candidate or approved reference of this run.')
+        rows.append(row)
+    warnings = []
+    for i, row in enumerate(rows[1:], 2):
+        parents = [p.get('id') for p in (row.get('generation') or {}).get('parents') or []]
+        if rows[i - 2]['id'] not in parents:
+            warnings.append(f"state {i} ({row['id']}) was not generated from state {i - 1} ({rows[i - 2]['id']}); check the drawing is the same")
+    stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
+    for row in rows:
+        row.update(status='approved', approval={**stamp, 'sha256': row['sha256']})
+    fps = _fps(session) or Fraction(25)
+    total = shot['end_frame'] - shot['start_frame']
+    holds = [int(round(float(st['hold_s']) * float(fps))) for st in states]
+    holds[-1] += total - sum(holds)   # the rounding lands on the last state so the states fill the shot exactly
+    session['assets'][shot_id] = {'kind': 'sequence', 'quote': quote, 'by': user['id'],
+                                  'states': [{'reference_id': r['id'], 'key': r['key'], 'sha256': r['sha256'], 'bytes': r.get('bytes'), 'hold_frames': h, 'what_appears': st.get('what_appears', '')}
+                                             for r, h, st in zip(rows, holds, states)],
+                                  'dissolve_frames': int(round(DISSOLVE_S * float(fps))), 'motion': 'none',
+                                  'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}}
+    session['selections'].pop(shot_id, None)
+    save_session(store, run, session)
+    return {'shot_id': shot_id, 'kind': 'sequence', 'states': len(rows), 'warnings': warnings}
 
 
 def current_plan(store, session):
@@ -267,9 +409,14 @@ def generate_image(conn, store, user, run, outputs, body):
     plan = guarded(lambda: current_plan(store, session))
     element = next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
-    need(body['kind'] in ('isolated', 'sheet', 'keyframe'), 'Generated references are isolated, sheet or keyframe.')
+    need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state'), 'Generated references are isolated, sheet, keyframe or state.')
     parents = [session['references'].get(p) for p in body.get('parents') or []]
-    need(all(p and p['status'] == 'approved' for p in parents), 'Parents must be approved references of this run.')
+    if body['kind'] == 'state':   # design/65: a state is made from the previous state, which is approved only when the whole sequence is
+        need(len(parents) == 1, 'A state is generated from the previous state: give one parent.')
+        need(parents[0] and parents[0]['status'] in ('approved', 'candidate'), 'The parent must be a candidate or approved reference of this run.')
+    else:
+        need(all(p and p['status'] == 'approved' for p in parents), 'Parents must be approved references of this run.')
+    check_cap(conn, run, session, prices()['image_inr'], 'one image')   # design/65 B7
     op = 'edit' if parents else 'generate'
     ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
     request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': body.get('size') or '1536x864',
@@ -356,11 +503,22 @@ def default_aspect(brief_summary, body):
     return (((brief_summary or {}).get('production') or {}).get('format') or {}).get('frame') or '16:9'
 
 
+def _route_gate(shot, wanted):
+    """design/65 B2', B3: a video shot takes a take, a still shot a still, an animation shot a graphic sequence."""
+    vt = shot['visual_type']
+    if vt == wanted or (wanted == 'still' and vt in STILL_TYPES):
+        return
+    takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)'}.get(vt, 'a still (`vw visuals still`)')
+    article = 'an' if vt in ('animation', 'image') else 'a'
+    need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
+
+
 def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
+    _, _, _, planned = guarded(lambda: locate(store, session, body['shot_id']))
+    _route_gate(planned, 'video')
     base = packet(store, run, outputs, body['shot_id'], session)
     shot = base['preparation']['shot']
-    need(shot['visual_type'] == 'video', f"shot {shot['id']} is a {shot['visual_type']} shot: " + ('an animation shot takes a graphic sequence (`vw visuals sequence`)' if shot['visual_type'] == 'animation' else 'it takes a still (`vw visuals still`)') + ', not a take.')
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))
     selected = base['preparation']['provider']
     cap = next(c for c in video_generators.CATALOG if c['provider'] == selected['provider'] and c['model'] == selected['model'])
@@ -404,8 +562,11 @@ def submit_take(conn, store, user, run, outputs, shot_id):
     if open_job:
         raise Problem(409, 'JOB_OPEN', 'A take for this shot is still open; wait, recover or resolve it first.', job_id=str(open_job['id']))
     request = load_json(store, prep['key'])
+    seconds = int(request.get('duration_seconds') or 0)
+    check_cap(conn, run, session, seconds * prices()['video_inr_per_s'], f'a {seconds} s take')   # design/65 B7
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'video',%s, gen_random_uuid()) returning id",
-                       (run['id'], shot_id, Jsonb({'kind': 'take', 'preparation_id': prep['preparation_id'], 'request_key': prep['key'], 'provider': request['provider'], 'model': request['model']}))).fetchone()
+                       (run['id'], shot_id, Jsonb({'kind': 'take', 'preparation_id': prep['preparation_id'], 'request_key': prep['key'], 'provider': request['provider'], 'model': request['model'],
+                                                   'duration_seconds': seconds}))).fetchone()
     return {'job_id': str(row['id']), 'shot_id': shot_id, 'provider': request['provider'], 'model': request['model']}
 
 
@@ -455,8 +616,7 @@ def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote
     """design/45 10.3: an approved reference becomes a still shot's asset; no download and upload."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
-    need(shot['visual_type'] != 'animation', f'shot {shot_id} is an animation shot: it takes a graphic sequence (`vw visuals sequence`), not a still.')
-    need(shot['visual_type'] in STILL_TYPES, f"shot {shot_id} is a video shot: it takes a take (`vw visuals prepare-take`), not a still.")
+    _route_gate(shot, 'still')
     row = session['references'].get(reference_id)
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
     need((quote or '').strip(), 'The operator reply is required.')
@@ -514,7 +674,11 @@ def status(conn, store, run, outputs):
         gaps.append(entry)
     refs = [{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')} for r in session['references'].values()]
     jobs_ = [{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')} for j in take_jobs(conn, run)]
-    return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_}
+    t = session.get('treatment')
+    sp = visuals_spend(conn, run)
+    return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+            'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
+            'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 
 def unique_by_name(files):
@@ -574,6 +738,15 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
                      if 'issues' in ev else None)   # design/46 11.2: assembly reads this instead of downloading the take
             shots.append({'shot_id': s['id'], 'source': 'take', 'job_id': sel['job_id'], 'placement': {'start_frame': s['start_frame'], 'end_frame': s['end_frame']},
                           'duration_s': ev.get('duration_seconds'), 'timing_matches_placement': ev.get('timing_matches_placement'), **({'media': media} if media else {})})
+        elif asset['kind'] == 'sequence':   # design/65: one file per state; assembly plays them as a build
+            media_states = []
+            for i, st in enumerate(asset['states'], 1):
+                name = f"{s['id']}-state{i}.png"
+                files.append({'name': name, 'key': st['key'], 'sha256': st['sha256'], 'bytes': st.get('bytes'), 'location': 'storage', 'receipt': True})
+                jobs.record_file(conn, run['id'], STAGE, st['key'], name, st['sha256'], st.get('bytes') or 0, 'image/png')
+                media_states.append({'name': name, 'key': st['key'], 'sha256': st['sha256'], 'hold_frames': st['hold_frames']})
+            shots.append({'shot_id': s['id'], 'source': 'asset', 'kind': 'sequence', 'placement': asset['placement'],
+                          'media': {'kind': 'sequence', 'states': media_states, 'dissolve_frames': asset['dissolve_frames'], 'motion': asset.get('motion') or 'none'}})
         else:
             name = f"{s['id']}-asset{'.mp4' if asset['kind'] == 'movie' else '.png'}"
             files.append({'name': name, 'key': asset['key'], 'sha256': asset['sha256'], 'bytes': asset['bytes'], 'location': 'storage', 'receipt': True})

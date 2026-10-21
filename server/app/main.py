@@ -204,7 +204,7 @@ class ReferenceAdd(Write):
 class ImageGenerate(Write):
     element_id: str
     name: str
-    kind: Literal['isolated', 'sheet', 'keyframe']
+    kind: Literal['isolated', 'sheet', 'keyframe', 'state']   # design/65: a state of a graphic sequence
     subject: str
     prompt: str = Field(min_length=1, max_length=8000)
     parents: list[str] = []
@@ -228,6 +228,22 @@ class BindBody(Write):
 class StillBody(Write):
     shot_id: str
     reference_id: str
+    quote: str = Field(min_length=1)
+
+
+class TreatmentBody(Write):   # design/65 B6
+    document: dict[str, Any]
+    quote: str = Field(min_length=1)
+
+
+class SequenceBody(Write):    # design/65 B2'
+    shot_id: str
+    reference_ids: list[str] = Field(min_length=1, max_length=12)
+    quote: str = Field(min_length=1)
+
+
+class CapBody(Write):         # design/65 B7
+    inr: float
     quote: str = Field(min_length=1)
 
 
@@ -1107,6 +1123,27 @@ def visuals_select_take(run_id: UUID, body: TakeSelect, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/asset')
 def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_asset(conn, storage(), user, run, outputs, body.shot_id, body.key, body.sha256, body.bytes, body.kind, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/treatment')
+def visuals_treatment(run_id: UUID, body: TreatmentBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.treatment(storage(), user, run, outputs, body.document, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/sequence')
+def visuals_sequence(run_id: UUID, body: SequenceBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.sequence(storage(), user, run, outputs, body.shot_id, body.reference_ids, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/cap')
+def visuals_cap(run_id: UUID, body: CapBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_cap(storage(), user, run, outputs, body.inr, body.quote))
+
+
+@app.get('/api/runs/{run_id}/visuals/budget')
+def visuals_budget(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: visuals_stage.budget(conn, storage(), run, core.current_outputs(conn, run['id']))))
 
 
 @app.post('/api/runs/{run_id}/visuals/still')

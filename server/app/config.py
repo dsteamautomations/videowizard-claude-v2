@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     HF_API_KEY: SecretStr = SecretStr('')
     ANALYSIS_DEADLINE_SECONDS: int = 1800
     FFPROBE_EXECUTABLE: str = 'ffprobe'
+    # design/65 B7: the visuals cap. No job records a money amount (tokens, characters, seconds only), so the ledger is computed from these prices in INR.
+    # The defaults are the builder's estimates (21 Oct 2026); SK sets the real figures in server/.env (VW2_VISUALS_PRICE_IMAGE_INR, VW2_VISUALS_PRICE_VIDEO_INR_PER_S).
+    VISUALS_PRICE_IMAGE_INR: float = 20.0          # one GPT Image 2.5 picture at 1536×864, high quality
+    VISUALS_PRICE_VIDEO_INR_PER_S: float = 8.0     # one second of a generated take, any generator
+    VISUALS_CAP_INR: float = 1000.0                # per film, unless the operator raises it with their words
     FFMPEG_EXECUTABLE: str = 'ffmpeg'
 
 

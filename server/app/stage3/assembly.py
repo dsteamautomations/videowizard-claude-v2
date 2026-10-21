@@ -86,6 +86,13 @@ def prepare(conn, store, user, run, outputs):
         if not vo:
             raise Problem(409, 'NOT_ALLOWED', f"Gap {g['shot_id']} has no recorded visuals output.")
         for shot in vo['summary']['shots']:
+            if shot.get('kind') == 'sequence':   # design/65 B8: one file per state; the fill carries them all
+                names = [st['name'] for st in shot['media']['states']]
+                refs = [next((f for f in vo['files'] if f['name'] == n), None) for n in names]
+                if not all(refs):
+                    fail(f"Visuals output for {g['shot_id']} lacks a state file of {shot['shot_id']}: " + ', '.join(n for n, r in zip(names, refs) if not r))
+                found.append((g, shot, names[0], {**refs[0], 'states': [{'file': {k: r[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'hold_frames': st['hold_frames']} for r, st in zip(refs, shot['media']['states'])]}))
+                continue
             name = f"{shot['shot_id']}.mp4" if shot['source'] == 'take' else f"{shot['shot_id']}-asset{'.mp4' if shot.get('kind') == 'movie' else '.png'}"
             if shot['source'] == 'asset' and visuals_assets is None and not any(f['name'] == name for f in vo['files']):
                 try:
@@ -99,7 +106,10 @@ def prepare(conn, store, user, run, outputs):
     for g, shot, name, ref in found:
         placement = shot['placement']
         slot = placement['end_frame'] - placement['start_frame']
-        if ref['name'].endswith('.png'):
+        if ref.get('states'):   # design/65 B8: a graphic sequence
+            meta = {'kind': 'sequence', 'duration_s': None, 'fps': None, 'issues': [], 'states': ref['states'],
+                    'dissolve_frames': shot['media'].get('dissolve_frames') or 0, 'motion': shot['media'].get('motion') or 'none'}
+        elif ref['name'].endswith('.png'):
             meta = {'kind': 'still', 'duration_s': None, 'fps': None, 'issues': []}
         elif shot.get('media') and shot['media'].get('kind') == 'movie' and shot['media'].get('duration_s'):   # design/46 11.2: measured when the take was retained
             meta = {**shot['media'], 'issues': shot['media'].get('issues') or []}
@@ -236,6 +246,9 @@ def render(conn, store, user, run):
             fps = m.get('fps') or str(pk['timeline']['fps'])
             if m['kind'] == 'still':
                 items.append({'kind': 'still', 'file': ev['file'], 'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
+            elif m['kind'] == 'sequence':   # design/65 B8
+                items.append({'kind': 'sequence', 'states': m['states'], 'dissolve_frames': m.get('dissolve_frames') or 0, 'motion': m.get('motion') or 'none',
+                              'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
             else:
                 n_src = int(Fraction(ev['timeline_frames']) * Fraction(str(fps)) / Fraction(str(pk['timeline']['fps'])))
                 avail = ev.get('offset_frames', 0) + n_src

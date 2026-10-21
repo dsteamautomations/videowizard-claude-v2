@@ -135,6 +135,31 @@ class Renderer:
                  '-vf', f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease,pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2,format=yuv420p', *self.video_args(), str(out)])
         return out
 
+    def sequence(self, states, dissolve, n_tl, motion='none'):
+        """design/65 B8: a graphic sequence. states: [(png_path, sha, hold_frames)] in order; each state holds its frames, a dissolve of
+        `dissolve` frames joins neighbours, and the whole is exactly n_tl frames, contain-padded to the timeline. motion is reserved ('none')."""
+        key = digest({'seq': [(sha, int(h)) for _, sha, h in states], 'd': int(dissolve), 'n': int(n_tl), 'tl': self.tl, 'motion': motion})
+        out = self.cache / f'seq-{key[:16]}.mp4'
+        if out.exists():
+            return out
+        fit = f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease,pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setsar=1'
+        if len(states) == 1 or dissolve <= 0:   # no join to make: the states one after another
+            pieces = [self.still(p, sha, int(h)) for p, sha, h in states]
+            return self.concat(pieces, out) if len(pieces) > 1 else pieces[0]
+        args, filters, last = [], [], len(states) - 1
+        for i, (png, sha, hold) in enumerate(states):
+            frames = int(hold) + (int(dissolve) if i < last else 0)   # each state but the last also covers the dissolve into the next
+            args += ['-loop', '1', '-framerate', str(self.fps), '-t', f'{frames / float(self.fps):.6f}', '-i', str(png)]
+            filters.append(f'[{i}:v]{fit}[v{i}]')
+        chain, offset = '[v0]', 0.0
+        for i in range(1, len(states)):
+            offset += int(states[i - 1][2]) / float(self.fps)   # the dissolve starts when the previous state's hold ends
+            label = f'[x{i}]' if i < last else '[out]'
+            filters.append(f'{chain}[v{i}]xfade=transition=fade:duration={int(dissolve) / float(self.fps):.6f}:offset={offset:.6f}{label}')
+            chain = label
+        run([ffmpeg(), '-y', '-v', 'error', *args, '-filter_complex', ';'.join(filters), '-map', '[out]', '-frames:v', str(int(n_tl)), *self.video_args(), str(out)])
+        return out
+
     def stabilized(self, seg):
         """vidstab two-pass on one segment only (design/16): the 1.08 zoom is applied here and counted by the assembly stage."""
         out = seg.with_name(seg.stem + '-stab.mp4')
@@ -299,6 +324,13 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             a1_parts.append(r.narration_window(narration, item['start_s'], item['end_s'], r.work / f'a1-{i}.wav'))
         elif item['kind'] == 'still':
             seg = r.still(sources[item['file']['sha256']], item['file']['sha256'], item['timeline_frames'])
+            parts.append(seg)
+            normalised.append((item, seg))
+            cursor += Fraction(item['timeline_frames']) / r.fps
+            continue
+        elif item['kind'] == 'sequence':   # design/65 B8: a graphic sequence of stills
+            seg = r.sequence([(sources[st['file']['sha256']], st['file']['sha256'], st['hold_frames']) for st in item['states']], item.get('dissolve_frames') or 0,
+                             item['timeline_frames'], item.get('motion') or 'none')
             parts.append(seg)
             normalised.append((item, seg))
             cursor += Fraction(item['timeline_frames']) / r.fps
