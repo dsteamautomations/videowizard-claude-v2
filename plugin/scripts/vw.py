@@ -517,13 +517,20 @@ def voice_page_url(code):
     return f"{server_url()}/runs/{code}/voices2"   # design/54: the end-to-end page
 
 
+def review_page_url(code):
+    return f"{server_url()}/runs/{code}/review"   # design/62: the review film with each slide's buttons; approve the options and decide there
+
+
 def cmd_next(a):
     m = active()
     nxt = call('GET', f"/api/runs/{m['run_id']}/next")
     ensure_mine(nxt, a.take_over, m['run_id'])
     if nxt.get('stage') == 'voice':   # VW-6: the link the operator asks for
         nxt['voice_page_url'] = voice_page_url(m['code'])
-    emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else ''))
+    if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
+        nxt['review_page_url'] = review_page_url(m['code'])
+    emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
+         + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else ''))
 
 
 def file_refs(m, paths, stage, retain):
@@ -1265,7 +1272,11 @@ def _s2_fetch(m, kind, out_name):
     if r.get('status') != 'ready':
         emit({'action': 'refused', 'message': f"The {kind} film is {r.get('status') or 'not rendered'}: {r.get('error') or 'poll status'}", 'render': r}, 2)
     path = _download(m, r['result']['key'], out_name)
-    emit({'film': kind, 'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': r['result'].get('record')}, 0, f'{kind} film at {path}; let the operator watch it.')
+    out = {'film': kind, 'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': r['result'].get('record')}
+    if kind == 'review':   # design/62: the page shows the film with each slide's buttons; the operator approves and decides there
+        out['review_page_url'] = review_page_url(m['code'])
+        emit(out, 0, f"{kind} film at {path}. Review page (the default: the film with each slide's buttons, where the operator approves the options): {out['review_page_url']}")
+    emit(out, 0, f'{kind} film at {path}; let the operator watch it.')
 
 
 def cmd_options(a):
@@ -1347,7 +1358,8 @@ def cmd_master(a):
     base = f'/api/runs/{run}/master'
     if a.what == 'slides':   # design/44 8.1: what still needs an answer
         out = call('GET', base + '/slides')
-        emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none'))
+        out['review_page_url'] = review_page_url(m['code'])   # design/62: the default place to decide
+        emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none') + f". Review page: {out['review_page_url']}")
     if a.what == 'decide':
         if a.file:   # design/44 8.1: every answer in one call, in order, stopping at the first refusal
             answers = _json_file(m, a.file)

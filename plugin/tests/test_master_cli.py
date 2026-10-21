@@ -117,10 +117,50 @@ def test_record_says_both_are_recorded(harness, monkeypatch, capsys):
 
 # ---------- the steps and the command text ----------
 
+def test_slides_prints_the_review_page_link(harness, monkeypatch, capsys):
+    """design/62: the page is the default place to decide; the slides line names it."""
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'slides': [{'slide': '1', 'type': 'option', 'needs_answer': True, 'answer': None}], 'answered': 0, 'of': 1, 'waiting': ['1']})
+    code, out, err = run(args(what='slides'), capsys)
+    assert code == 0 and out['review_page_url'] == 'https://x.example/runs/VW-9/review' and 'Review page: https://x.example/runs/VW-9/review' in err
+
+
+def test_next_carries_the_review_page_link_at_the_options_and_master_stages(harness, monkeypatch, capsys):
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'ensure_mine', lambda nxt, take_over, run_id: None)
+    for stage in ('options', 'master'):
+        monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': stage, 'paid': None})
+        with pytest.raises(SystemExit) as exc:
+            vw.cmd_next(argparse.Namespace(take_over=False))
+        out, err = capsys.readouterr()
+        assert exc.value.code == 0 and json.loads(out)['review_page_url'] == 'https://x.example/runs/VW-9/review' and 'Review page: https://x.example/runs/VW-9/review' in err
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'media'})
+    with pytest.raises(SystemExit):
+        vw.cmd_next(argparse.Namespace(take_over=False))
+    assert 'review_page_url' not in json.loads(capsys.readouterr()[0])
+
+
+def test_review_fetch_names_the_page(harness, monkeypatch, capsys, tmp_path):
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'renders': {'review': {'status': 'ready', 'result': {'key': 'k', 'sha256': 's', 'duration_s': 7.0}}}})
+    monkeypatch.setattr(vw, '_download', lambda m, key, rel: str(tmp_path / rel))
+    with pytest.raises(SystemExit) as exc:
+        vw._s2_fetch({'code': 'VW-9', 'run_id': 'run-1'}, 'review', 'out/review.mp4')
+    out, err = capsys.readouterr()
+    assert exc.value.code == 0 and json.loads(out)['review_page_url'] == 'https://x.example/runs/VW-9/review' and 'Review page' in err and 'the default' in err
+    with pytest.raises(SystemExit):
+        vw._s2_fetch({'code': 'VW-9', 'run_id': 'run-1'}, 'master', 'out/master.mp4')
+    out, err = capsys.readouterr()
+    assert 'review_page_url' not in json.loads(out)
+
+
 def test_steps_and_command_text_carry_the_labels_and_the_one_approval():
     master = STAGES['master']['steps']
     assert 'vw master slides' in master[0] and '--file out/decisions.json' in master[0] and '2B' in master[0] and 'between 2 and 3' in master[0] and '1/25 s' in master[0]
     assert 'question tool' in master[0] and 'one slide per question' in master[0] and 'at most four questions' in master[0] and 'as buttons' in master[0] and 'Never ask for labels typed' in master[0]   # design/62 A
+    assert 'review page' in master[0] and 'default place to decide' in master[0] and 'review page' in STAGES['options']['steps'][4] and 'approve' in STAGES['options']['steps'][4]   # design/62 B
+    assert vw.review_page_url('VW-9').endswith('/runs/VW-9/review')
+    assert 'review page' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8').lower()
     assert '--wait 600' in master[1] and 'say every swap' in master[1] and 'watch' in master[1] and 'listen' in master[1] and 'records the master and the first cut together' in master[1]
     assert 'design/44' in STAGES['first_cut']['steps'][0]
     assert '#2A' in STAGES['options']['prompt'] and 'running numbers' in STAGES['options']['prompt']

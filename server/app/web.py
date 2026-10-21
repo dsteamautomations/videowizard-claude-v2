@@ -226,6 +226,96 @@ def _voices2_state(conn, user, run):
             'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account, 'last_voice': last_voice, 'known': known}
 
 
+# ---------- design/62: the review page (watch the film, decide by button); the audio route voices2 plays from (lost in the 0.20.0 cleanup) ----------
+
+def _stored_file(request, code, key, vw2_session):
+    """A file of this run, served to the signed-in page by a redirect to the storage link (byte ranges work there, so the player seeks)."""
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+    store = storage()
+    if not key.startswith(f"{run['id']}/") or not store.exists(key):
+        raise Problem(404, 'FILE_MISSING', 'No such file on this run.')
+    return RedirectResponse(store.signed_download(key), status_code=307)
+
+
+@router.get('/runs/{code}/audio/{key:path}')
+def run_audio(request: Request, code: str, key: str, vw2_session: str | None = Cookie(default=None)):
+    return _stored_file(request, code, key, vw2_session)
+
+
+@router.get('/runs/{code}/film/{key:path}')
+def run_film(request: Request, code: str, key: str, vw2_session: str | None = Cookie(default=None)):
+    return _stored_file(request, code, key, vw2_session)
+
+
+@router.get('/runs/{code}/review', response_class=HTMLResponse)
+def review_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+    return render(request, 'review.html', user=user, run=run)
+
+
+@router.get('/runs/{code}/review/data')
+def review_data(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    from fastapi.responses import JSONResponse
+    from . import stage2
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+        nxt = core.next_for(conn, run)
+        view = stage2.review_view(conn, storage(), run)
+    return JSONResponse(core.jsonable({'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
+                                       **view}))
+
+
+def _run_at(conn, user, code, stage):
+    """The run, locked, when its next step is `stage`: the same gate the API applies (main._stage_run), so the page can never act at the wrong stage."""
+    run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    nxt = core.next_for(conn, run)
+    if nxt['stage'] != stage:
+        raise Problem(409, 'NOT_ALLOWED', f"The run is at {nxt['stage']!r}, not {stage!r}; reload the page.")
+    return run
+
+
+@router.post('/runs/{code}/review/act')
+async def review_act(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """One JSON post per button: {action: 'record', quote} at the options stage; {action: 'decide', slide, decision, note, edit} at the master stage.
+    Each calls the server function the vw tool calls (`vw options record`, `vw master decide`)."""
+    from fastapi.responses import JSONResponse
+    from . import stage2
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    body = await request.json()
+    action = body.get('action')
+    with db_connect() as conn:
+        if action == 'record':
+            quote = str(body.get('quote') or '').strip()
+            if not quote:
+                raise Problem(422, 'ACCEPTANCE_REQUIRED', "The operator's words are required to approve the options.")
+            run = _run_at(conn, user, code, 'options')
+            out = stage2.record_options(conn, storage(), user, run, quote)
+            return JSONResponse(core.jsonable({'recorded': True, 'version': out['version']}))
+        if action == 'decide':
+            run = _run_at(conn, user, code, 'master')
+            out = stage2.decide(storage(), user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None)
+            return JSONResponse(core.jsonable(out))
+    raise Problem(404, 'NOT_FOUND', 'No such action.')
+
+
 @router.get('/runs/{code}/voices2/data')
 def voices2_data(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
     from fastapi.responses import JSONResponse

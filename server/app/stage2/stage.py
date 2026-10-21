@@ -2,6 +2,7 @@
 stage outputs are the record. Validator decides; the chat model proposes; the operator decides per option in chat."""
 import hashlib
 import json
+import re
 import subprocess
 import tempfile
 from copy import deepcopy
@@ -488,22 +489,79 @@ def slide_label(value):
     return str(value).strip().lstrip('#').strip().upper()
 
 
+def _slide_rows(sl, decisions):
+    """One row per slide with the answer so far; the slide's own lines travel too (design/62: the chat asks each slide with them, the page shows them)."""
+    rows = []
+    scene_of = {s['option_number']: s.get('scene') for s in sl if s['type'] in ('option', 'backup')}   # the inner slides (decision, blank) belong to that scene
+    for s in sl:
+        lab = str(s['no'])
+        d = decisions.get(lab)
+        rows.append({'slide': lab, 'type': s['type'], 'scene': s.get('scene') or scene_of.get(s.get('option_number')), 'backup_for': s.get('backup_for'), 'kind': s.get('kind'), 'question': s.get('question'),
+                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': s['type'] != 'blank',
+                     'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
+    return rows
+
+
+def _progress(rows):
+    return {'answered': sum(1 for r in rows if r['needs_answer'] and r['answer']), 'of': sum(1 for r in rows if r['needs_answer']),
+            'waiting': [r['slide'] for r in rows if r['needs_answer'] and not r['answer']]}
+
+
 def slides_view(store, run):
     """Every slide of the current version with the answer so far, and the labels still waiting (design/44 8.1)."""
     session = session_of(store, run)
     doc, entry = current(store, session)
-    sl = _slides(store, session, doc, entry)
-    decisions = session.get('decisions') or {}
-    rows = []
-    for s in sl:
-        lab = str(s['no'])
-        d = decisions.get(lab)
-        rows.append({'slide': lab, 'type': s['type'], 'scene': s.get('scene'), 'backup_for': s.get('backup_for'), 'kind': s.get('kind'), 'question': s.get('question'),
-                     'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': s['type'] != 'blank',
-                     'answer': ({k: d.get(k) for k in ('action', 'note', 'edit')} if d else None)})
-    waiting = [r['slide'] for r in rows if r['needs_answer'] and not r['answer']]
-    return {'version': entry['version'], 'slides': rows, 'answered': sum(1 for r in rows if r['needs_answer'] and r['answer']),
-            'of': sum(1 for r in rows if r['needs_answer']), 'waiting': waiting}
+    rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {})
+    return {'version': entry['version'], 'slides': rows, **_progress(rows)}
+
+
+SLIDE_LABEL = re.compile(r'^#(\S+) \|')
+
+
+def slide_cues(plan, fps):
+    """design/62: when each slide's card starts in the review film, in seconds, from the saved render plan. Slates and blank cards carry
+    their label in their first line ('#2B | …'); narration items take no screen time; a slate without a frame count is the standard slate."""
+    cues, at = {}, 0
+    for it in plan.get('items') or []:
+        kind = it.get('kind')
+        if kind == 'narration':
+            continue
+        frames = int(it.get('frames') or SLATE_FRAMES) if kind == 'slate' else int(it.get('frames') or it.get('timeline_frames') or 0)
+        lines = it.get('lines') or []
+        m = SLIDE_LABEL.match(str(lines[0])) if lines and kind in ('slate', 'card') else None
+        if m and m.group(1) not in cues:
+            cues[m.group(1)] = round(at / fps, 2)
+        at += frames
+    return cues
+
+
+def review_view(conn, store, run):
+    """design/62: what the review page shows. The current version's slides with their answers and lines, the review film of that version
+    when it is rendered (with the cue of every slide), the render state otherwise, and whether the options are recorded."""
+    try:
+        session = session_of(store, run)
+    except Problem:
+        return {'state': 'not_prepared'}
+    if not session.get('current'):
+        return {'state': 'no_version'}
+    doc, entry = current(store, session)
+    _refresh(conn, store, run, session)
+    save_session(store, run, session)
+    rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {})
+    r = session['renders'].get('review') or {}
+    film, cues = None, {}
+    is_current = bool(r) and r.get('digest') == entry['digest']
+    if is_current and r.get('status') == 'ready' and (r.get('result') or {}).get('key'):
+        film = {'key': r['result']['key'], 'duration_s': r['result'].get('duration_s'), 'sha256': r['result'].get('sha256')}
+        try:
+            plan = load_json(store, key(run, f"render-review-v{entry['version']}.json"))
+            cues = slide_cues(plan, TIMELINE['fps']) if plan.get('digest') == entry['digest'] else {}
+        except Problem:
+            cues = {}
+    accepted = session.get('accepted') or {}
+    return {'state': 'prepared', 'version': entry['version'], 'digest': entry['digest'], 'slides': rows, **_progress(rows), 'film': film, 'cues': cues,
+            'render': ({'status': r.get('status'), 'error': r.get('error'), 'current': is_current} if r else None),
+            'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'master_built': bool(session.get('master'))}
 
 
 def decide(store, user, run, slide_no, action, note, edit):
