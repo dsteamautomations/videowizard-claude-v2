@@ -6,7 +6,7 @@
 .rv .top h1{font-size:20px;margin:0 0 2px}
 .rv .line{font-size:13px;color:var(--muted)}
 .rv .line strong{color:var(--fg)}
-.rv .grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;margin-top:14px;align-items:start}
+.rv .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:14px;align-items:start}
 @media (max-width:980px){.rv .grid{grid-template-columns:1fr}}
 .rv .left{position:sticky;top:64px}
 .rv video{width:100%;max-height:70vh;background:#000;border-radius:12px;display:block}
@@ -22,13 +22,13 @@
 .rv tbody tr.cue:hover td{background:var(--hover)}
 .rv tbody tr.cur td{background:var(--sel)}
 .rv th.n,.rv td.n{width:44px;font-weight:700;white-space:nowrap}
-.rv th.a,.rv td.a{width:236px}
+.rv th.a,.rv td.a{width:190px}
 .rv .badge{display:inline-block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px}
 .rv .badge.dec{border-color:var(--accent);color:var(--fg)}
 .rv .sc{font-weight:600}
-.rv .ds{color:var(--muted);font-size:12.5px;margin-top:3px;white-space:pre-wrap}
+.rv .ds{color:var(--muted);font-size:12.5px;margin-top:3px}
 .rv .btns{display:flex;gap:6px;flex-wrap:wrap}
-.rv .btns button{padding:5px 11px;font-size:13px;border-radius:999px}
+.rv .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px}
 .rv .btns button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .rv .btns button:disabled{opacity:.5;cursor:default}
 .rv .ans{font-size:12px;color:var(--muted);margin-top:5px}
@@ -133,8 +133,10 @@ function draw(){
   $('slides').innerHTML=d.slides.map(s=>{
     const cue=d.cues&&d.cues[s.slide]!=null;
     const badge=s.type==='backup'?'<span class="badge">backup for #'+esc(s.backup_for)+'</span>':s.type==='decision'?'<span class="badge dec">decision</span>':s.type==='blank'?'<span class="badge">blank</span>':'';
-    const rest=(s.lines||[]).slice(1).join('\n');
-    const info='<div>'+badge+'<span class="sc">'+esc(s.scene||'')+'</span>'+(s.type==='decision'&&s.question?'<div class="ds">'+esc(s.question)+'</div>':'')+(rest?'<div class="ds">'+esc(rest)+'</div>':'')+'<div class="ds">'+fmt(s.seconds)+(cue?' · at '+fmt(d.cues[s.slide]):'')+'</div></div>';
+    const lines=(s.lines||[]).slice(1).map(l=>String(l).trim());
+    // the slide's lines come wrapped for the film card: joined back into running text; a decision's question is shown once, with its last line (keep or drop: the clip)
+    const rest=s.type==='decision'?[s.question||'',lines.length&&/^keep or drop/i.test(lines[lines.length-1])?lines[lines.length-1]:''].filter(Boolean).join(' '):lines.join(' ');
+    const info='<div>'+badge+'<span class="sc">'+esc(s.scene||'')+'</span>'+(rest?'<div class="ds">'+esc(rest)+'</div>':'')+'<div class="ds">'+fmt(s.seconds)+(cue?' · at '+fmt(d.cues[s.slide]):'')+'</div></div>';
     let ans='';
     if(s.type==='blank'){ans='<span class="ds">no decision: a blank for AI video or animation</span>';}
     else{
