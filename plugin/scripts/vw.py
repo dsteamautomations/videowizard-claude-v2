@@ -78,7 +78,8 @@ def readable_json(path, data):
 READING_DROP = {'entities'}                        # design/43 7.4: never read by the assistant, kept in the stored package
 READING_DROP_ROW = {'sfx_cues', 'editorial_ideas'}   # per sub-clip row: used at master build and assembly, not here
 READING_ROWS = (('sub_clips',), ('narration', 'words'), ('narration', 'sentences'))   # tables written one row per line
-OPTIONS_ROWS_PER_FILE = 25   # design/61 L17: a sub-clips file of 25 rows is about 22 KB, under the reader's limit with room
+OPTIONS_ROWS_PER_FILE = 25        # design/61 L17: at most 25 sub-clip rows a file (about 40 KB, some 17k tokens on VW-6's rows)
+OPTIONS_FILE_BYTES = 44_000       # and no table file over this: the reader refuses about 25k tokens; VW-6 measured 0.43 tokens a character
 OPTIONS_DROP_ROW = READING_DROP_ROW | {'ui_path', 'crop_rect', 'position', 'zoom', 'source_width', 'source_height', 'source_fps', 'horizon_rotation_deg',
                                        'stabilization_needed', 'log_sub_clip_id', 'fit_source', 'risk_flags_waived'}   # the master build's and the UI's, never a placement decision
 
@@ -86,6 +87,25 @@ OPTIONS_DROP_ROW = READING_DROP_ROW | {'ui_path', 'crop_rect', 'position', 'zoom
 def rows_file(path, rows):
     """A table one row per line: each row is one read."""
     path.write_text('[\n' + ',\n'.join(' ' + json.dumps(r, ensure_ascii=False, default=str) for r in rows) + '\n]\n', encoding='utf-8')
+
+
+def rows_files(folder, stem, rows, cap=None, budget=OPTIONS_FILE_BYTES):
+    """A table as numbered files (stem-1.json, stem-2.json, …), each at most `cap` rows and about `budget` bytes, so every file is one read.
+    Always at least one file. Returns [(name, row count)]."""
+    parts, current, size = [], [], 0
+    for r in rows:
+        line = json.dumps(r, ensure_ascii=False, default=str)
+        if current and ((cap and len(current) >= cap) or size + len(line) > budget):
+            parts.append(current)
+            current, size = [], 0
+        current.append(r)
+        size += len(line) + 2
+    parts.append(current)
+    out = []
+    for i, part in enumerate(parts, 1):
+        rows_file(folder / f'{stem}-{i}.json', part)
+        out.append((f'{stem}-{i}.json', len(part)))
+    return out
 
 
 def options_reading_files(ws, data):
@@ -119,13 +139,15 @@ def options_reading_files(ws, data):
     words = narration.pop('words', None) or []
     reading_copy(folder / 'narration.json', narration, drop=(), drop_row=(), rows=(('sentences',),))
     files.append({'file': 'work/options/narration.json', 'rows': len(narration.get('sentences') or []), 'for': 'scenes'})
-    put('words.json', None, 'placements (pauses and word timing)', rows=words)
+    for name, n in rows_files(folder, 'words', words):
+        files.append({'file': f'work/options/{name}', 'rows': n, 'for': 'placements (pauses and word timing)'})
     put('shapes.json', data.get('shapes') or {}, 'scenes and placements')
     put('coverage.json', data.get('coverage') or [], 'placements')
-    put('cards.json', None, 'placements', rows=data.get('cards') or [])
+    for name, n in rows_files(folder, 'cards', data.get('cards') or []):
+        files.append({'file': f'work/options/{name}', 'rows': n, 'for': 'placements'})
     subs = [{k: v for k, v in r.items() if k not in OPTIONS_DROP_ROW} if isinstance(r, dict) else r for r in data.get('sub_clips') or []]
-    for i in range(0, max(len(subs), 1), OPTIONS_ROWS_PER_FILE):
-        put(f'sub-clips-{i // OPTIONS_ROWS_PER_FILE + 1}.json', None, 'placements', rows=subs[i:i + OPTIONS_ROWS_PER_FILE])
+    for name, n in rows_files(folder, 'sub-clips', subs, cap=OPTIONS_ROWS_PER_FILE):
+        files.append({'file': f'work/options/{name}', 'rows': n, 'for': 'placements'})
     rest = {k: v for k, v in data.items() if k not in ('prompt', 'beats', 'narration', 'shapes', 'coverage', 'cards', 'sub_clips') and k not in READING_DROP}
     put('rest.json', rest, 'reference')
     return files
@@ -1254,7 +1276,7 @@ def cmd_options(a):
         out = write(base + '/prepare', {})
         files = download_options_package(m, out['package']['key'])   # design/61: one file per section
         emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0, f"Package for reading in work/options/ ({len(files)} files, listed in `files` with row counts): {out['beats']} beats, "
-             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the sub-clips files come after. Show the coverage report first.")
+             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the sub-clips, cards and words files come after. Show the coverage report first.")
     if a.what == 'coverage':
         emit(call('GET', base + '/coverage'))
     if a.what == 'scenes':

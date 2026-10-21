@@ -157,7 +157,7 @@ def test_options_reading_files_write_one_file_per_section(tmp_path):
     files = vw.options_reading_files(ws, data)
     folder = ws / 'work' / 'options'
     names = sorted(p.name for p in folder.iterdir())
-    assert names == ['beats.json', 'cards.json', 'coverage.json', 'narration.json', 'prompt.md', 'rest.json', 'shapes.json', 'sub-clips-1.json', 'sub-clips-2.json', 'words.json']
+    assert names == ['beats.json', 'cards-1.json', 'coverage.json', 'narration.json', 'prompt.md', 'rest.json', 'shapes.json', 'sub-clips-1.json', 'sub-clips-2.json', 'words-1.json']
     one = (folder / 'sub-clips-1.json').read_text(encoding='utf-8')
     rows, ok = rows_on_one_line(one, '"sub_clip_id"')
     assert len(rows) == 25 and ok and len(rows_on_one_line((folder / 'sub-clips-2.json').read_text(encoding='utf-8'), '"sub_clip_id"')[0]) == 5
@@ -167,13 +167,23 @@ def test_options_reading_files_write_one_file_per_section(tmp_path):
         assert gone not in row, gone
     narration = (folder / 'narration.json').read_text(encoding='utf-8')
     assert 'words' not in json.loads(narration) and len(rows_on_one_line(narration, '"first_word_id"')[0]) == 1 and json.loads(narration)['pieces'] == data['narration']['pieces']
-    assert len(rows_on_one_line((folder / 'words.json').read_text(encoding='utf-8'), '"start_frame"')[0]) == 2
+    assert len(rows_on_one_line((folder / 'words-1.json').read_text(encoding='utf-8'), '"start_frame"')[0]) == 2
     assert (folder / 'prompt.md').read_text(encoding='utf-8').startswith('ppp') and 'entities' not in (folder / 'rest.json').read_text(encoding='utf-8')
     assert json.loads((folder / 'beats.json').read_text(encoding='utf-8')) == data['beats'] and json.loads((folder / 'shapes.json').read_text(encoding='utf-8')) == data['shapes']
     by = {f['file']: f for f in files}
-    assert by['work/options/sub-clips-1.json']['rows'] == 25 and by['work/options/sub-clips-2.json']['rows'] == 5 and by['work/options/words.json']['rows'] == 2
+    assert by['work/options/sub-clips-1.json']['rows'] == 25 and by['work/options/sub-clips-2.json']['rows'] == 5 and by['work/options/words-1.json']['rows'] == 2
     assert by['work/options/beats.json']['for'] == 'scenes' and by['work/options/sub-clips-1.json']['for'] == 'placements' and by['work/options/prompt.md']['for'] == 'read first'
     assert 'entities' in data and data['sub_clips'][0]['sfx_cues'] == [1]   # the data given is not changed
+
+
+def test_rows_files_split_by_count_and_by_size(tmp_path):
+    """design/61: a table file is never over the byte budget (the reader refuses ~25k tokens) and never over the row cap."""
+    small = [{'id': i} for i in range(30)]
+    assert vw.rows_files(tmp_path, 't', small, cap=25) == [('t-1.json', 25), ('t-2.json', 5)]
+    big = [{'id': i, 'pad': 'x' * 1000} for i in range(10)]
+    parts = vw.rows_files(tmp_path, 'b', big, budget=3500)   # three rows fit a file
+    assert [n for _, n in parts] == [3, 3, 3, 1] and all((tmp_path / name).stat().st_size < 3600 for name, _ in parts)
+    assert vw.rows_files(tmp_path, 'e', []) == [('e-1.json', 0)] and (tmp_path / 'e-1.json').read_text(encoding='utf-8') == '[\n\n]\n'
 
 
 # ---------- 7.5 a rule needs the operator's confirmation ----------
