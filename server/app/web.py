@@ -252,6 +252,76 @@ def run_film(request: Request, code: str, key: str, vw2_session: str | None = Co
     return _stored_file(request, code, key, vw2_session)
 
 
+@router.get('/runs/{code}/file/{key:path}')
+def run_file(request: Request, code: str, key: str, vw2_session: str | None = Cookie(default=None)):
+    return _stored_file(request, code, key, vw2_session)   # design/65: reference images, states and takes on the visuals page
+
+
+@router.get('/runs/{code}/visuals', response_class=HTMLResponse)
+def visuals_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+    return render(request, 'visuals.html', user=user, run=run)
+
+
+def _visuals_payload(conn, store, run):
+    from . import visuals_stage
+    nxt = core.next_for(conn, run)
+    return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
+            **visuals_stage.page_view(conn, store, run, core.current_outputs(conn, run['id']), run['code'])}
+
+
+@router.get('/runs/{code}/visuals/data')
+def visuals_data(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    from fastapi.responses import JSONResponse
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    with db_connect() as conn:
+        run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True)   # the view may repair the session (ticket 9)
+        payload = _visuals_payload(conn, storage(), run)
+    return JSONResponse(core.jsonable(payload))
+
+
+@router.post('/runs/{code}/visuals/act')
+async def visuals_act(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """One JSON post per button. Every action calls the server function the vw tool calls (design/65 §8), behind the visuals stage gate."""
+    from fastapi.responses import JSONResponse
+    from . import visuals_stage as V
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    body = await request.json()
+    action = body.get('action')
+    quote = str(body.get('quote') or '')
+    with db_connect() as conn:
+        run = _run_at(conn, user, code, 'visuals')
+        store = storage()
+        outputs = core.current_outputs(conn, run['id'])
+        calls = {
+            'treatment': lambda: V.treatment(store, user, run, outputs, None, quote),
+            'select': lambda: V.select_choice(store, user, run, outputs, {body['gap_id']: body['choice_id']}),
+            'accept': lambda: V.accept(store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
+            'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote),
+            'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
+            'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),
+            'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
+            'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),
+            'cap': lambda: V.set_cap(store, user, run, outputs, float(body.get('inr') or 0), quote),
+            'record': lambda: V.record_gaps(conn, store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
+        }
+        if action not in calls:
+            raise Problem(404, 'NOT_FOUND', 'No such action.')
+        out = V.guarded(calls[action])
+        out = out if isinstance(out, dict) else {'done': True}
+        return JSONResponse(core.jsonable({**{k: v for k, v in out.items() if k != 'view'}, 'view': _visuals_payload(conn, store, run)}))
+
+
 @router.get('/runs/{code}/review', response_class=HTMLResponse)
 def review_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
     user = page_user(vw2_session)

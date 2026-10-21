@@ -231,9 +231,9 @@ class StillBody(Write):
     quote: str = Field(min_length=1)
 
 
-class TreatmentBody(Write):   # design/65 B6
-    document: dict[str, Any]
-    quote: str = Field(min_length=1)
+class TreatmentBody(Write):   # design/65 B6: a document without words is the draft the page shows; words without a document record the draft
+    document: dict[str, Any] | None = None
+    quote: str = ''
 
 
 class SequenceBody(Write):    # design/65 B2'

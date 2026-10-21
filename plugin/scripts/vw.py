@@ -1191,7 +1191,10 @@ def cmd_visuals(a):
     if a.what == 'treatment':   # design/65 B6: the treatment as a record
         out = write(base + '/treatment', {'document': _json_file(m, a.file), 'quote': a.quote or ''})
         t = out.get('totals') or {}
-        emit(out, 0, f"Treatment recorded: {t.get('gaps', 0)} gaps, {t.get('images', 0)} images, about ₹{out.get('estimate_inr', 0):,.0f} against the cap ₹{out.get('cap_inr', 0):,.0f}. Now author out/visual-plan.json to it.")
+        figures = f"{t.get('gaps', 0)} gaps, {t.get('images', 0)} images, about ₹{out.get('estimate_inr', 0):,.0f} against the cap ₹{out.get('cap_inr', 0):,.0f}"
+        if out.get('draft'):
+            emit(out, 0, f"Treatment draft on the visuals page ({figures}): {visuals_page_url(m['code'])}. The operator approves it there, or tell me their yes and run this again with --quote.")
+        emit(out, 0, f"Treatment recorded: {figures}. Now author out/visual-plan.json to it.")
     if a.what == 'sequence':   # design/65 B2': the states of a graphic, approved in one call
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
         out = write(base + '/sequence', {'shot_id': a.shot, 'reference_ids': refs, 'quote': a.quote or ''})

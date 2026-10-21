@@ -224,9 +224,12 @@ def budget(conn, store, run, outputs):
 
 def treatment(store, user, run, outputs, document, quote):
     """One entry per gap: the team's intended visuals cited or departed from, the picture in a line, the routes, the seconds, the images.
-    Recorded with the operator's words; `propose` is refused without it and when a route departs from it."""
+    Without the operator's words the document is kept as the draft the visuals page shows; with them it is recorded (the page records the
+    draft with the words given there). `propose` is refused without a record and when a route departs from it."""
     session = session_of(store, run, outputs)
-    need(str(quote or '').strip(), "The operator's words are required to record the treatment.")
+    if document is None:
+        document = session.get('treatment_draft')
+        need(document, 'No treatment draft on this run: send one first (`vw visuals treatment --file out/visual-treatment.json`).')
     entries = (document or {}).get('gaps')
     need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
     gaps = session['source']['gaps']
@@ -253,9 +256,73 @@ def treatment(store, user, run, outputs, document, quote):
     need(not missing, 'The treatment covers every gap; missing: ' + ', '.join(missing) + '.')
     pr = prices()
     estimate = round(totals['images'] * pr['image_inr'] + video_seconds * pr['video_inr_per_s'], 2)
-    session['treatment'] = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries)}
+    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries)}
+    if not str(quote or '').strip():   # the draft the page shows for approval
+        session['treatment_draft'] = record
+        save_session(store, run, session)
+        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest']}
+    session['treatment'] = {**record, 'quote': quote}
+    session.pop('treatment_draft', None)
     save_session(store, run, session)
-    return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': session['treatment']['digest']}
+    return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest']}
+
+
+# ---------- design/65 §8: what the visuals page shows ----------
+
+def page_view(conn, store, run, outputs, code):
+    """The page's data in one read of the session (plus the package for the intended visuals): the treatment (draft or record), the plan's gaps and
+    shots with their pictures, the references with their image links, the takes, the budget. Links go through the run's file route."""
+    def url(k):
+        return f'/runs/{code}/file/{k}' if k else None
+    try:
+        session = session_of(store, run, outputs)
+    except Problem:
+        return {'state': 'not_prepared'}
+    if reconcile(conn, run, session):
+        save_session(store, run, session)
+    try:
+        package = load_json(store, key(run, 'package.json'))
+    except Problem:
+        package = {}
+    plan = current_plan(store, session) if session.get('current') else None
+    refs = {}
+    for r in session['references'].values():
+        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}
+        refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
+                             approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None)
+    takes = {}
+    for j in take_jobs(conn, run):
+        res = j.get('result') or {}
+        takes.setdefault(j['unit'], []).append({'job_id': str(j['id']), 'status': j['status'], 'error': j.get('error'), 'url': url(res.get('key')), 'sha256': res.get('sha256'),
+                                                 'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
+                                                 'reviews': [{k: rv.get(k) for k in ('decision', 'notes', 'quote', 'by')} for rv in session['reviews'].get(str(j['id']), [])],
+                                                 'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id'])})
+    gaps = []
+    for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
+        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None}
+        if plan:
+            gap = next((x for x in plan['gaps'] if x['gap_id'] == gid), None)
+            if gap:
+                if gap.get('choices'):
+                    entry['choices'] = {'options': [{'id': c['id'], 'title': c['title'], 'why': c['why']} for c in gap['choices']], 'recommended': gap.get('recommended_choice'),
+                                        'selected': (session['choice_selections'].get(gid) or {}).get('choice_id')}
+                try:
+                    shots = [sh for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']]
+                except ValueError:
+                    shots = []
+                for sh in shots:
+                    asset = session['assets'].get(sh['id'])
+                    binding = session['bindings'].get(sh['id']) or {}
+                    entry['shots'].append({'shot_id': sh['id'], 'title': sh.get('title') or '', 'visual_type': sh['visual_type'], 'route': route_of(sh), 'purpose': sh.get('purpose', ''),
+                                           'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
+                                           'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
+                                           'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []]} if asset else None),
+                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations']})
+        gaps.append(entry)
+    sp = visuals_spend(conn, run)
+    return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
+            'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
+            'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
 
 # ---------- design/65 B2': the graphic sequence ----------

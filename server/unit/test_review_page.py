@@ -270,3 +270,13 @@ def test_a_version_without_stored_slides_still_loads_its_document():
 def test_the_page_draws_from_the_act_reply_without_a_second_request():
     html = (APP / 'templates' / 'review.html').read_text(encoding='utf-8')
     assert 'j.view' in html and 'will-change:transform' in html
+
+
+def test_the_visuals_template_renders_with_its_hooks():
+    """design/65 §8: the visuals page; the route-exists test above covers its paths."""
+    import jinja2
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(APP / 'templates')), autoescape=True)
+    env.globals['version'] = 't'
+    html = env.get_template('visuals.html').render(user={'name': 'SK', 'role': 'Admin'}, run={'code': 'VW-9', 'title': 'Film'})
+    for needed in ('id="app"', 'data-code="VW-9"', "'/runs/'+code+'/visuals'", 'id="gaps"', 'id="fmsg"', 'treatment', 'sequence', 'select-take', 'reject-take', 'record', 'cap', 'approve', "'/data'", "'/act'"):
+        assert needed in html, needed

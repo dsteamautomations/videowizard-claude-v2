@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Visuals · {{ run.code }} · VideoWizard{% endblock %}
+{% block body %}
+<style>
+.vz .top{position:sticky;top:0;background:var(--bg);z-index:5;padding:10px 0 8px;border-bottom:1px solid var(--line)}
+.vz .top h1{font-size:20px;margin:0 0 2px}
+.vz .line{font-size:13px;color:var(--muted)}
+.vz .line strong{color:var(--fg)}
+.vz .meter{display:inline-flex;align-items:center;gap:8px;margin-left:12px;font-size:12.5px}
+.vz .meter .bar{display:inline-block;width:120px;height:8px;border-radius:999px;background:var(--z);overflow:hidden;vertical-align:middle;border:1px solid var(--line)}
+.vz .meter .bar i{display:block;height:100%;background:var(--accent)}
+.vz .meter .bar i.over{background:var(--err)}
+.vz .gap{border:1px solid var(--line);border-radius:12px;margin:14px 0;background:var(--card);overflow:hidden}
+.vz .gap .hd{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--z)}
+.vz .gap .hd b{font-size:15px}
+.vz .gap .hd .ds{margin:0}
+.vz .gap .bd{padding:10px 14px}
+.vz .ds{color:var(--muted);font-size:12.5px;margin-top:3px}
+.vz .intended{font-size:13px;margin:4px 0 8px;padding-left:18px}
+.vz .intended li{margin:0}
+.vz .badge{display:inline-block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px}
+.vz .badge.ok{border-color:var(--ok);color:var(--ok)}
+.vz .badge.dec{border-color:var(--accent);color:var(--fg)}
+.vz .shot{border-top:1px dashed var(--line);padding:10px 0}
+.vz .shot:first-of-type{border-top:0}
+.vz .shot .nm{font-weight:600}
+.vz .strip{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.vz .pic{width:160px;min-width:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--z);font-size:12px}
+.vz .pic img{display:block;width:100%;height:90px;object-fit:cover;background:#000}
+.vz .pic .cap{padding:4px 6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vz .pic.on{border-color:var(--ok)}
+.vz .pic button{margin:0 6px 6px;padding:3px 9px;font-size:12px;border-radius:999px}
+.vz video{width:100%;max-width:480px;background:#000;border-radius:8px;display:block;margin:6px 0}
+.vz .btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.vz .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px}
+.vz .btns button.go{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.vz .btns button:disabled{opacity:.5;cursor:default}
+.vz .btns input{min-width:0;padding:5px 9px;font-size:13px;border-radius:8px;width:260px}
+.vz .btns input.n{width:90px}
+.vz .err{color:var(--err)}.vz .ok{color:var(--ok)}
+.vz .empty{color:var(--muted);padding:30px 12px;font-size:15px;text-align:center;border:1px dashed var(--line);border-radius:12px;margin:14px 0}
+.vz table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
+.vz th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.vz td{padding:6px 8px;vertical-align:top;border-bottom:1px solid var(--line)}
+.vz .foot{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:6}
+.vz .foot .in{max-width:1100px;margin:0 auto;padding:8px 20px 10px}
+.vz .foot .status{font-size:13px;min-height:1.3em;margin-bottom:6px;color:var(--muted)}
+.vz .foot .status.err{color:var(--err)}.vz .foot .status.ok{color:var(--ok)}
+.vz .foot .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.vz .foot textarea{flex:1;min-width:240px;min-height:38px;padding:8px 10px;font-size:14px;border-radius:10px;resize:vertical}
+.vz .foot .go{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);padding:10px 18px;font-size:14px;border-radius:10px;white-space:nowrap}
+.vz .foot .go:disabled{opacity:.45}
+.vz .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:vzspin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes vzspin{to{transform:rotate(360deg)}}
+.vz .spacer{height:130px}
+</style>
+<div class="vz" id="app" data-code="{{ run.code }}">
+  <div class="top">
+    <h1>Visuals · {{ run.code }} <small>{{ run.title }}</small></h1>
+    <div class="line" id="line">Loading…</div>
+  </div>
+  <div id="treat"></div>
+  <div id="gaps"></div>
+  <div class="spacer"></div>
+  <div class="foot"><div class="in"><div class="status" id="fmsg"></div><div class="row" id="action"></div></div></div>
+</div>
+<script>
+(function(){
+const code=document.getElementById('app').dataset.code, base='/runs/'+code+'/visuals';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const inr=n=>'₹'+Math.round(Number(n)||0).toLocaleString('en-IN');
+const ROUTE={video:'AI video',still:'still',graphic_sequence:'graphic sequence',footage:'footage'};
+let data=null, timer=null, inflight=false;
+function msg(t,err,busy){const f=$('fmsg');f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');f.className='status '+(err?'err':(busy?'':'ok'));}
+async function act(body){
+  if(inflight){throw new Error('Still recording the last action; try again in a moment.');}
+  inflight=true;
+  try{
+    const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    let j=null;try{j=await r.json();}catch(e){j=null;}
+    if(!r.ok){throw new Error((j&&j.message)||('The server answered '+r.status+'.'));}
+    return j;
+  }finally{inflight=false;}
+}
+async function load(){
+  let r;
+  try{r=await fetch(base+'/data',{cache:'no-store'});}catch(e){msg('The server is not reachable; trying again in 15 s.',true);schedule();return;}
+  if(r.status===401){location.href='/login?next='+encodeURIComponent(base);return;}
+  if(!r.ok){msg('The page could not load ('+r.status+').',true);schedule();return;}
+  data=await r.json();draw();
+}
+function schedule(){clearTimeout(timer);timer=setTimeout(load,15000);}
+function fmt(frames){const fps=Number(data&&data.fps)||25;const s=Math.max(0,Math.round(frames/fps));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+function secs(frames){const fps=Number(data&&data.fps)||25;return (frames/fps).toFixed(1)+' s';}
+function stage(){return data&&data.run?data.run.stage:null;}
+function words(id,placeholder){return '<input id="'+id+'" placeholder="'+esc(placeholder||'your words')+'">';}
+async function send(body,okText){
+  msg('Recording…',false,true);
+  try{const j=await act(body);msg(okText||'Recorded.');if(j&&j.view){data=j.view;draw();}else{await load();}}
+  catch(err){msg(err.message,true);}
+}
+function draw(){
+  const d=data; clearTimeout(timer);
+  if(d.state!=='prepared'){
+    $('line').textContent='The visuals stage has not started: the assistant runs vw visuals prepare.';
+    $('treat').innerHTML='<div class="empty">Nothing to show yet.</div>';$('gaps').innerHTML='';$('action').innerHTML='';
+    if(stage()==='visuals')schedule();return;
+  }
+  const b=d.budget||{}; const over=b.spent_inr>b.cap_inr;
+  const pct=b.cap_inr?Math.min(100,Math.round(100*b.spent_inr/b.cap_inr)):0;
+  const meter='<span class="meter">spend '+inr(b.spent_inr)+' of '+inr(b.cap_inr)+' <span class="bar"><i class="'+(over?'over':'')+'" style="width:'+pct+'%"></i></span></span>';
+  const t=d.treatment, dr=d.treatment_draft;
+  let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(!t?(dr?'<strong>Treatment drafted</strong>: read it and approve it at the foot':'The assistant is preparing the treatment'):(d.plan_digest?'<strong>Plan proposed</strong>: pictures and takes below':'<strong>Treatment approved</strong>: the assistant writes the plan'));
+  if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
+  $('line').innerHTML=line+meter;
+  drawTreatment(t||dr,!!t);
+  drawGaps();
+  drawFoot();
+  if(d.references.some(r=>r.status==='generating')||d.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status)))))schedule();
+}
+function intendedBlock(){const iv=data.intended_visuals||[];if(!iv.length)return '';return '<div class="gap"><div class="hd"><b>The script\'s intended visuals</b><span class="ds">as the team wrote them, scene by scene; the treatment cites or departs from them</span></div><div class="bd">'+iv.map(e=>'<div class="ds"><b>'+esc(e.heading||'(no heading)')+'</b>'+(e.narration_starts?' · “'+esc(e.narration_starts)+'…”':'')+'</div><ul class="intended">'+e.lines.map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>').join('')+'</div></div>';}
+function drawTreatment(tr,recorded){
+  if(!tr){$('treat').innerHTML=intendedBlock()+'<div class="empty">The treatment, gap by gap, appears here once the assistant drafts it.</div>';return;}
+  const byGap={};(tr.gaps||[]).forEach(e=>byGap[e.gap_id]=e);
+  const rows=data.gaps.map((g,i)=>{const e=byGap[g.gap_id]||{};
+    return '<tr><td><b>'+esc(g.gap_id)+'</b><div class="ds">'+esc(g.requirement||'')+'</div></td><td>'+(e.intended&&e.intended.length?'<ul class="intended">'+[].concat(e.intended).map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>':'<span class="ds">none in the script</span>')+(e.departure?'<div class="ds err">departs: '+esc(e.departure)+'</div>':'')+'</td><td>'+esc(e.picture||'')+'</td><td>'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</td><td class="n">'+esc(e.seconds!=null?e.seconds+' s':'')+'</td><td class="n">'+esc(e.images!=null?e.images:'')+'</td></tr>';}).join('');
+  const tot=tr.totals||{};
+  $('treat').innerHTML=intendedBlock()+'<div class="gap"><div class="hd"><b>Treatment</b><span class="badge '+(recorded?'ok':'')+'">'+(recorded?'approved '+esc(String(tr.at||'').slice(0,16).replace('T',' ')):'draft')+'</span>'+(recorded&&tr.quote?'<span class="ds">“'+esc(tr.quote)+'”</span>':'')+'</div><div class="bd">'+
+    '<table><thead><tr><th>Gap</th><th>The team\'s intended visuals</th><th>Picture</th><th>Route</th><th>Length</th><th>Images</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="ds" style="margin-top:8px">'+esc(tot.gaps||0)+' gaps · '+esc(tot.images||0)+' images · '+Object.entries(tot.routes||{}).map(([k,v])=>v+' '+(ROUTE[k]||k)).join(', ')+' · estimate '+inr(tr.estimate_inr)+' against the cap '+inr((data.budget||{}).cap_inr)+'</div></div></div>';
+}
+function refCard(r,sel,chosen){
+  return '<div class="pic '+(r.status==='approved'?'on':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
+    '<div class="cap" title="'+esc(r.name)+'">'+esc(r.name)+' · '+esc(r.kind)+(r.status==='approved'?' · ✓':'')+'</div>'+(sel?sel:'')+'</div>';
+}
+function drawGaps(){
+  const refs={};(data.references||[]).forEach(r=>refs[r.id]=r);
+  const can=stage()==='visuals'&&!!data.treatment;
+  $('gaps').innerHTML=data.gaps.map((g,gi)=>{
+    const head='<div class="hd"><b>'+esc(g.gap_id)+'</b><span class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</span>'+(g.recorded?'<span class="badge ok">recorded</span>':g.accepted?'<span class="badge ok">accepted</span>':data.plan_digest?'<span class="badge dec">to accept</span>':'')+'<span class="ds">'+esc(g.requirement||'')+'</span></div>';
+    let body='';
+    if(g.choices){body+='<div class="btns"><span class="ds">Two choices:</span>'+g.choices.options.map(c=>'<button data-a="select" data-gap="'+esc(g.gap_id)+'" data-choice="'+esc(c.id)+'" class="'+(g.choices.selected===c.id?'go':'')+'" title="'+esc(c.why)+'">'+esc(c.title)+(g.choices.recommended===c.id?' (recommended)':'')+'</button>').join('')+'</div>';}
+    if(!g.shots.length){body+='<div class="ds">'+(data.plan_digest?(g.choices&&!g.choices.selected?'Choose one of the two to see its shots.':'No shots in this gap yet.'):'The plan has not been proposed yet.')+'</div>';}
+    g.shots.forEach(s=>{
+      let sh='<div class="shot"><span class="nm">'+esc(s.shot_id)+'</span> <span class="badge">'+esc(ROUTE[s.route]||s.route)+'</span><span class="ds">'+secs(s.end_frame-s.start_frame)+'</span><div class="ds">'+esc(s.purpose)+'</div>';
+      const mine=(data.references||[]).filter(r=>s.element_ids.includes(r.element_id));
+      if(s.route==='graphic_sequence'){
+        const chosen=s.asset&&s.asset.kind==='sequence'?s.asset.states.map(st=>st.reference_id):[];
+        sh+='<div class="ds">States: '+s.states.map((st,i)=>(i+1)+'. '+esc(st.what_appears)+' ('+esc(st.hold_s)+' s)').join(' · ')+'</div>';
+        if(s.asset&&s.asset.kind==='sequence'){sh+='<div class="strip">'+s.asset.states.map((st,i)=>'<div class="pic on"><img src="'+esc(st.url)+'" alt=""><div class="cap">state '+(i+1)+' · '+esc(st.hold_frames)+' f</div></div>').join('')+'</div><div class="ds ok">Sequence held for the shot.</div>';}
+        else if(mine.length){
+          sh+='<div class="strip">'+mine.map(r=>refCard(r,'<label style="display:block;margin:0 6px 6px;font-size:12px"><input type="checkbox" data-seq="'+esc(s.shot_id)+'" value="'+esc(r.id)+'"> use as a state</label>')).join('')+'</div>';
+          if(g.accepted&&can){sh+='<div class="btns"><span class="ds">Tick the states; they are sent in the order shown:</span>'+words('w-seq-'+s.shot_id,'your words for these states')+'<button class="go" data-a="sequence" data-shot="'+esc(s.shot_id)+'">Approve the sequence</button></div>';}
+        }else{sh+='<div class="ds">No states generated yet.</div>';}
+      }else if(s.route==='still'){
+        if(s.asset){sh+='<div class="strip"><div class="pic on"><img src="'+esc(s.asset.url)+'" alt=""><div class="cap">the picture for this shot ✓</div></div></div>';}
+        else if(mine.length){sh+='<div class="strip">'+mine.map(r=>refCard(r,(g.accepted&&can)?'<div class="btns" style="margin:0 6px 6px">'+(r.status==='candidate'?'<button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="still" data-shot="'+esc(s.shot_id)+'" data-ref="'+esc(r.id)+'" class="go">Use for the shot</button></div>':'')).join('')+'</div>';}
+        else{sh+='<div class="ds">No picture yet.</div>';}
+      }else{
+        if(mine.length){sh+='<div class="strip">'+mine.map(r=>refCard(r,(g.accepted&&can&&r.status==='candidate')?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'')).join('')+'</div>';}
+        s.takes.forEach(k=>{
+          sh+='<div class="shot"><span class="ds">take '+esc(k.job_id.slice(0,8))+' · '+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.selected?' · <span class="ok">selected</span>':'')+'</span>';
+          if(k.url){sh+='<video controls preload="metadata" src="'+esc(k.url)+'"></video>';}
+          if(k.error){sh+='<div class="ds err">'+esc(k.error)+'</div>';}
+          if(k.status==='ready'&&can&&!k.selected){sh+='<div class="btns">'+words('w-take-'+k.job_id,'your words after watching')+'<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>';}
+          sh+='</div>';
+        });
+        if(!s.takes.length){sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
+      }
+      body+=sh+'</div>';
+    });
+    if(data.plan_digest&&!g.accepted&&!g.recorded&&can&&g.shots.length){body+='<div class="btns">'+words('w-acc-'+g.gap_id,'your words for this gap')+'<button class="go" data-a="accept" data-gap="'+esc(g.gap_id)+'">Accept the gap</button></div>';}
+    return '<div class="gap">'+head+'<div class="bd">'+body+'</div></div>';
+  }).join('');
+  $('gaps').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+}
+function val(id){const e=$(id);return e?e.value.trim():'';}
+async function click(b){
+  const a=b.dataset.a;
+  if(a==='select'){await send({action:'select',gap_id:b.dataset.gap,choice_id:b.dataset.choice},'Choice recorded.');return;}
+  if(a==='approve'){const q=prompt_words('Your words for this picture');if(q===null)return;await send({action:'approve',reference_id:b.dataset.ref,sha256:b.dataset.sha,quote:q},'Picture approved.');return;}
+  if(a==='still'){const q=prompt_words('Your words for this picture');if(q===null)return;await send({action:'still',shot_id:b.dataset.shot,reference_id:b.dataset.ref,quote:q},'Picture held for the shot.');return;}
+  if(a==='sequence'){const ids=[...document.querySelectorAll('input[data-seq="'+b.dataset.shot+'"]:checked')].map(i=>i.value);const q=val('w-seq-'+b.dataset.shot);
+    if(!ids.length){msg('Tick the states first.',true);return;} if(!q){msg('Your words are required.',true);return;}
+    await send({action:'sequence',shot_id:b.dataset.shot,reference_ids:ids,quote:q},'Sequence approved and held.');return;}
+  if(a==='select-take'){const q=val('w-take-'+b.dataset.job);if(!q){msg('Your words are required.',true);return;}await send({action:'select-take',job_id:b.dataset.job,quote:q},'Take selected.');return;}
+  if(a==='reject-take'){const q=val('w-take-'+b.dataset.job);if(!q){msg('Say why in the words box, then Reject.',true);return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}
+  if(a==='accept'){const q=val('w-acc-'+b.dataset.gap);if(!q){msg('Your words are required.',true);return;}await send({action:'accept',gap_ids:[b.dataset.gap],quote:q},'Gap accepted.');return;}
+}
+let pendingWords=null;
+function prompt_words(label){
+  // the viewer shows no dialogs: the words are typed in the foot box, then the button pressed again
+  const w=val('words');
+  if(w){return w;}
+  msg(label+' in the box at the foot, then press the button again.',true);
+  return null;
+}
+function drawFoot(){
+  const d=data, can=stage()==='visuals';
+  if(!can){$('action').innerHTML='<span>The run is at '+esc(d.run&&d.run.stage||'')+'.</span>';return;}
+  if(!d.treatment&&d.treatment_draft){
+    $('action').innerHTML='<span>Approve the treatment with your own words:</span><textarea id="words" placeholder="e.g. Yes, this treatment, with the wall section as the recurring diagram"></textarea><button class="go" id="do-treat">Approve the treatment</button>';
+    $('do-treat').addEventListener('click',async()=>{const w=val('words');if(!w){msg('Your words are required.',true);return;}await send({action:'treatment',quote:w},'Treatment recorded: the assistant writes the plan.');});
+    return;
+  }
+  const ready=d.gaps.filter(g=>g.accepted&&!g.recorded&&g.shots.length&&g.shots.every(s=>s.asset||s.takes.some(k=>k.selected)));
+  $('action').innerHTML='<span>Words for the next button:</span><textarea id="words" placeholder="your words"></textarea>'+(ready.length?'<button class="go" id="do-record">Record '+ready.length+' gap'+(ready.length>1?'s':'')+'</button>':'')+'<button id="do-cap">Raise the cap</button><input id="cap-inr" class="n" type="number" min="1" placeholder="₹" style="min-width:0;width:90px">';
+  const rec=$('do-record');if(rec)rec.addEventListener('click',async()=>{const w=val('words');if(!w){msg('Your words are required.',true);return;}await send({action:'record',gap_ids:ready.map(g=>g.gap_id),quote:w},'Gaps recorded.');});
+  $('do-cap').addEventListener('click',async()=>{const w=val('words'),n=parseFloat($('cap-inr').value||'0');if(!n||!w){msg('A number and your words are required to raise the cap.',true);return;}await send({action:'cap',inr:n,quote:w},'Cap set to '+inr(n)+'.');});
+}
+load();
+})();
+</script>
+{% endblock %}

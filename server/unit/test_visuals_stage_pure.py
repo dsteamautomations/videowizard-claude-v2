@@ -118,8 +118,7 @@ def test_treatment_refuses_a_missing_gap_an_unknown_route_or_no_words():
     bad = {'gaps': [{**TREATMENT['gaps'][0], 'routes': ['hand_made']}, TREATMENT['gaps'][1]]}
     with pytest.raises(Problem, match='route'):
         g(lambda: VS.treatment(store, USER, RUN, [], bad, 'yes'))
-    with pytest.raises(Problem, match='operator'):
-        g(lambda: VS.treatment(store, USER, RUN, [], TREATMENT, '  '))
+    assert VS.treatment(store, USER, RUN, [], TREATMENT, '  ')['draft'] is True   # no words: the draft the page shows, not a record
     with pytest.raises(Problem, match='unknown gap'):
         g(lambda: VS.treatment(store, USER, RUN, [], {'gaps': TREATMENT['gaps'] + [{**TREATMENT['gaps'][0], 'gap_id': 'G9'}]}, 'yes'))
 
@@ -253,3 +252,42 @@ def test_status_carries_the_treatment_and_the_budget(monkeypatch):
     VS.treatment(store, USER, RUN, [], TREATMENT, 'yes')
     st = VS.status(FakeConn([job('openai')]), store, RUN, [])
     assert st['treatment']['totals']['images'] == 4 and st['treatment']['quote'] == 'yes' and st['budget']['spent_inr'] == 20.0 and st['budget']['cap_inr'] == 1000.0
+
+
+# ---------- design/65 §8: the draft and the page view ----------
+
+def test_a_treatment_without_words_is_the_draft_and_the_page_records_it(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    store = store_with(session())
+    out = VS.treatment(store, USER, RUN, [], TREATMENT, '')
+    assert out['draft'] is True and saved(store)['treatment_draft']['totals']['images'] == 4 and 'treatment' not in saved(store)
+    with pytest.raises(Problem, match='Record the treatment first'):
+        g(lambda: VS.propose(FakeConn(), store, USER, RUN, [], plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])))
+    out = VS.treatment(store, USER, RUN, [], None, 'Yes, from the page.')   # the page: the words alone record the draft
+    assert out['recorded'] is True and saved(store)['treatment']['quote'] == 'Yes, from the page.' and 'treatment_draft' not in saved(store)
+    with pytest.raises(Problem, match='No treatment draft'):
+        g(lambda: VS.treatment(store_with(session()), USER, RUN, [], None, 'yes'))
+
+
+def test_page_view_carries_the_gaps_shots_pictures_takes_and_budget(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('AN1', 0, 500, 'animation', states=[{'what_appears': 'a', 'hold_s': 10}, {'what_appears': 'b', 'hold_s': 10}])], [shot('VS1', 900, 1150, 'video')])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved'), 'R2': ref('R2', parents=['R1'])}, bindings={'VS1': {'references': {'E1': [{'id': 'R1'}]}}},
+                   selections={'VS1': {'job_id': 'j-video-1'}}, reviews={'j-video-1': [{'decision': 'accepted', 'notes': 'fine', 'quote': 'yes', 'by': 'u1'}]})
+    store = store_with(sess, doc)
+    store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': [{'heading': 'Scene 2', 'lines': ['Cutaway section'], 'narration_starts': 'Unlike'}]}).encode('utf-8')
+    VS.sequence(store, USER, RUN, [], 'AN1', ['R1', 'R2'], 'yes')
+    take = {'id': 'j-video-1', 'unit': 'VS1', 'run_id': 'run-1', 'provider': 'video', 'status': 'ready', 'request': {'duration_seconds': 10}, 'error': None, 'cost': None,
+            'result': {'key': 'run-1/visuals/takes/t1.mp4', 'sha256': 's', 'evidence': {'duration_seconds': 10.0, 'timing_matches_placement': True}}}
+    view = VS.page_view(FakeConn([take, job('openai')]), store, RUN, [], 'VW-9')
+    assert view['state'] == 'prepared' and view['intended_visuals'][0]['heading'] == 'Scene 2' and view['treatment'] is None
+    g1, g2 = view['gaps']
+    assert g1['gap_id'] == 'G1' and g1['accepted'] and g1['shots'][0]['route'] == 'graphic_sequence' and g1['shots'][0]['asset']['kind'] == 'sequence'
+    assert [st['url'] for st in g1['shots'][0]['asset']['states']] == ['/runs/VW-9/file/run-1/visuals/references/R1.png', '/runs/VW-9/file/run-1/visuals/references/R2.png']
+    assert g2['shots'][0]['route'] == 'video' and g2['shots'][0]['bound'] == ['R1'] and g2['shots'][0]['takes'][0]['url'] == '/runs/VW-9/file/run-1/visuals/takes/t1.mp4'
+    assert g2['shots'][0]['takes'][0]['selected'] is True and g2['shots'][0]['takes'][0]['reviews'][0]['decision'] == 'accepted' and g2['shots'][0]['takes'][0]['duration_s'] == 10.0
+    refs = {r['id']: r for r in view['references']}
+    assert refs['R2']['parents'] == ['R1'] and refs['R2']['url'].endswith('/R2.png') and refs['R1']['status'] == 'approved'
+    assert view['budget']['spent_inr'] == 20.0 + 10 * 8.0 and view['budget']['cap_inr'] == 1000.0
+    assert VS.page_view(FakeConn([]), FakeStore({}), RUN, [], 'VW-9') == {'state': 'not_prepared'}
