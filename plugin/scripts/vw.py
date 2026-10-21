@@ -78,6 +78,66 @@ def readable_json(path, data):
 READING_DROP = {'entities'}                        # design/43 7.4: never read by the assistant, kept in the stored package
 READING_DROP_ROW = {'sfx_cues', 'editorial_ideas'}   # per sub-clip row: used at master build and assembly, not here
 READING_ROWS = (('sub_clips',), ('narration', 'words'), ('narration', 'sentences'))   # tables written one row per line
+OPTIONS_ROWS_PER_FILE = 25   # design/61 L17: a sub-clips file of 25 rows is about 22 KB, under the reader's limit with room
+OPTIONS_DROP_ROW = READING_DROP_ROW | {'ui_path', 'crop_rect', 'position', 'zoom', 'source_width', 'source_height', 'source_fps', 'horizon_rotation_deg',
+                                       'stabilization_needed', 'log_sub_clip_id', 'fit_source', 'risk_flags_waived'}   # the master build's and the UI's, never a placement decision
+
+
+def rows_file(path, rows):
+    """A table one row per line: each row is one read."""
+    path.write_text('[\n' + ',\n'.join(' ' + json.dumps(r, ensure_ascii=False, default=str) for r in rows) + '\n]\n', encoding='utf-8')
+
+
+def options_reading_files(ws, data):
+    """design/61 L17: the options package for reading, one file per section under work/options/, so the assistant reads a file whole
+    and never guesses line offsets. The folder is emptied first (a refresh leaves no stale part). The data given is not changed;
+    the stored package keeps everything. Returns the list of files with row counts and what each is for."""
+    import textwrap
+    folder = ws / 'work' / 'options'
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.iterdir():
+        if old.suffix in ('.json', '.md'):
+            old.unlink()
+    files = []
+
+    def put(name, payload, purpose, rows=None):
+        path = folder / name
+        if rows is not None:
+            rows_file(path, rows)
+            n = len(rows)
+        elif name.endswith('.md'):
+            path.write_text(payload, encoding='utf-8')
+            n = payload.count('\n')
+        else:
+            path.write_text(json.dumps(payload, indent=1, ensure_ascii=False, default=str) + '\n', encoding='utf-8')
+            n = len(payload) if isinstance(payload, (list, dict)) else 1
+        files.append({'file': f'work/options/{name}', 'rows': n, 'for': purpose})
+    prompt = str(data.get('prompt') or '')
+    put('prompt.md', '\n'.join(textwrap.fill(l, 160) if len(l) > 160 else l for l in prompt.split('\n')) + '\n', 'read first')
+    put('beats.json', data.get('beats') or [], 'scenes')
+    narration = dict(data.get('narration') or {})
+    words = narration.pop('words', None) or []
+    reading_copy(folder / 'narration.json', narration, drop=(), drop_row=(), rows=(('sentences',),))
+    files.append({'file': 'work/options/narration.json', 'rows': len(narration.get('sentences') or []), 'for': 'scenes'})
+    put('words.json', None, 'placements (pauses and word timing)', rows=words)
+    put('shapes.json', data.get('shapes') or {}, 'scenes and placements')
+    put('coverage.json', data.get('coverage') or [], 'placements')
+    put('cards.json', None, 'placements', rows=data.get('cards') or [])
+    subs = [{k: v for k, v in r.items() if k not in OPTIONS_DROP_ROW} if isinstance(r, dict) else r for r in data.get('sub_clips') or []]
+    for i in range(0, max(len(subs), 1), OPTIONS_ROWS_PER_FILE):
+        put(f'sub-clips-{i // OPTIONS_ROWS_PER_FILE + 1}.json', None, 'placements', rows=subs[i:i + OPTIONS_ROWS_PER_FILE])
+    rest = {k: v for k, v in data.items() if k not in ('prompt', 'beats', 'narration', 'shapes', 'coverage', 'cards', 'sub_clips') and k not in READING_DROP}
+    put('rest.json', rest, 'reference')
+    return files
+
+
+def download_options_package(m, key):
+    """The options package, fetched and written for reading (design/61)."""
+    with api() as c:
+        r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
+    if r.status_code != 200:
+        emit({'action': 'tell_builder', 'message': f'Download of {key} failed: HTTP {r.status_code}.'}, 2)
+    return options_reading_files(workspace(m['code']), json.loads(r.content))
 
 
 def reading_copy(path, data, drop=READING_DROP, drop_row=READING_DROP_ROW, rows=READING_ROWS):
@@ -961,8 +1021,6 @@ def _download(m, key, rel):
         if data is not None:
             if rel in READ_BACK:
                 save_json(ws / rel, data)      # the tool reads this one back: line breaks only, values unchanged
-            elif rel == 'work/options-package.json':
-                reading_copy(ws / rel, data)   # design/43 7.4: the assistant's copy, without what it never reads
             elif rel == 'work/visuals-package.json':
                 reading_copy(ws / rel, data, drop=(), drop_row=(), rows=(('world_evidence',),))   # design/45 10.9: one clip per line
             else:
@@ -1194,14 +1252,16 @@ def cmd_options(a):
     base = f'/api/runs/{run}/options'
     if a.what == 'prepare':
         out = write(base + '/prepare', {})
-        _download(m, out['package']['key'], 'work/options-package.json')
-        emit({**out, 'not_shareable': NOT_SHAREABLE}, 0, f"Package in work/options-package.json: {out['beats']} beats, {out['eligible_sub_clips']} eligible sub-clips. Show the coverage report first.")
+        files = download_options_package(m, out['package']['key'])   # design/61: one file per section
+        emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0, f"Package for reading in work/options/ ({len(files)} files, listed in `files` with row counts): {out['beats']} beats, "
+             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the sub-clips files come after. Show the coverage report first.")
     if a.what == 'coverage':
         emit(call('GET', base + '/coverage'))
     if a.what == 'scenes':
         out = write(base + '/scenes', {'document': _json_file(m, a.file), 'quote': a.quote or ''}, wait=300)
-        _download(m, out['package']['key'], 'work/options-package.json')
-        emit(out, 0, f"Scenes and pauses recorded: {len(out['scenes'])} scenes, film {out['film_seconds']} s ({out['inserted_seconds']} s of pauses added). Package refreshed; show the coverage report next.")
+        files = download_options_package(m, out['package']['key'])
+        emit({**out, 'files': files}, 0, f"Scenes and pauses recorded: {len(out['scenes'])} scenes, film {out['film_seconds']} s ({out['inserted_seconds']} s of pauses added). "
+             f"Package refreshed in work/options/ ({len(files)} files); show the coverage report next.")
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'document': _json_file(m, a.file)})
         emit(out, 2 if out.get('status') == 'rejected' else 0, f"{a.what}: {out.get('status') or 'version ' + str(out.get('version'))}")

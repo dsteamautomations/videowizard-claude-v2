@@ -136,10 +136,44 @@ def test_download_uses_the_reading_copy_for_the_options_package_only(tmp_path, m
             return Resp()
     monkeypatch.setattr(vw, 'api', lambda: Client())
     m = {'code': 'VW-9', 'run_id': 'run-1'}
-    p = vw._download(m, 'k', 'work/options-package.json')
-    assert 'entities' not in json.loads(open(p, encoding='utf-8').read())
+    files = vw.download_options_package(m, 'k')   # design/61: one file per section under work/options/
+    folder = tmp_path / 'runs' / 'VW-9' / 'work' / 'options'
+    assert {f['file'] for f in files} >= {'work/options/beats.json', 'work/options/sub-clips-1.json', 'work/options/prompt.md'}
+    assert not (folder.parent / 'options-package.json').exists() and 'entities' not in (folder / 'rest.json').read_text(encoding='utf-8')
     q = vw._download(m, 'k', 'work/visuals-package.json')
     assert 'entities' in json.loads(open(q, encoding='utf-8').read())
+
+
+def test_options_reading_files_write_one_file_per_section(tmp_path):
+    """design/61 L17: no offsets to guess, no read refused; the sub-clips in files of 25 rows; the mechanics fields left out."""
+    data = package()
+    data['sub_clips'] = [{'sub_clip_id': f'c1:SUB_{i:02d}', 'grade': 'A', 'landmarks': ['wall'], 'handles': {'in': 5, 'out': 5}, 'sfx_cues': [1], 'editorial_ideas': ['x'],
+                          'ui_path': 'Inspector > …', 'crop_rect': [0, 0, 1, 1], 'position': [0, 0], 'zoom': 1.0, 'source_width': 1920, 'source_height': 1080, 'source_fps': 50.0,
+                          'horizon_rotation_deg': 0, 'stabilization_needed': False, 'log_sub_clip_id': 'SUB_01', 'fit_source': 'scene', 'risk_flags_waived': []} for i in range(30)]
+    data.update({'coverage': [{'beat_id': 'BEAT_01'}], 'shapes': {'options': {}}, 'landmarks': ['wall'], 'policy': {}, 'project': {}, 'timeline': {'fps': 25}, 'learned_rules': []})
+    ws = tmp_path / 'VW-9'
+    (ws / 'work' / 'options').mkdir(parents=True)
+    (ws / 'work' / 'options' / 'sub-clips-9.json').write_text('stale', encoding='utf-8')
+    files = vw.options_reading_files(ws, data)
+    folder = ws / 'work' / 'options'
+    names = sorted(p.name for p in folder.iterdir())
+    assert names == ['beats.json', 'cards.json', 'coverage.json', 'narration.json', 'prompt.md', 'rest.json', 'shapes.json', 'sub-clips-1.json', 'sub-clips-2.json', 'words.json']
+    one = (folder / 'sub-clips-1.json').read_text(encoding='utf-8')
+    rows, ok = rows_on_one_line(one, '"sub_clip_id"')
+    assert len(rows) == 25 and ok and len(rows_on_one_line((folder / 'sub-clips-2.json').read_text(encoding='utf-8'), '"sub_clip_id"')[0]) == 5
+    row = json.loads(rows[0].strip().rstrip(','))
+    assert row['landmarks'] == ['wall'] and row['grade'] == 'A' and row['handles'] == {'in': 5, 'out': 5}
+    for gone in ('sfx_cues', 'editorial_ideas', 'ui_path', 'crop_rect', 'position', 'zoom', 'source_width', 'source_height', 'source_fps', 'horizon_rotation_deg', 'stabilization_needed', 'log_sub_clip_id', 'fit_source', 'risk_flags_waived'):
+        assert gone not in row, gone
+    narration = (folder / 'narration.json').read_text(encoding='utf-8')
+    assert 'words' not in json.loads(narration) and len(rows_on_one_line(narration, '"first_word_id"')[0]) == 1 and json.loads(narration)['pieces'] == data['narration']['pieces']
+    assert len(rows_on_one_line((folder / 'words.json').read_text(encoding='utf-8'), '"start_frame"')[0]) == 2
+    assert (folder / 'prompt.md').read_text(encoding='utf-8').startswith('ppp') and 'entities' not in (folder / 'rest.json').read_text(encoding='utf-8')
+    assert json.loads((folder / 'beats.json').read_text(encoding='utf-8')) == data['beats'] and json.loads((folder / 'shapes.json').read_text(encoding='utf-8')) == data['shapes']
+    by = {f['file']: f for f in files}
+    assert by['work/options/sub-clips-1.json']['rows'] == 25 and by['work/options/sub-clips-2.json']['rows'] == 5 and by['work/options/words.json']['rows'] == 2
+    assert by['work/options/beats.json']['for'] == 'scenes' and by['work/options/sub-clips-1.json']['for'] == 'placements' and by['work/options/prompt.md']['for'] == 'read first'
+    assert 'entities' in data and data['sub_clips'][0]['sfx_cues'] == [1]   # the data given is not changed
 
 
 # ---------- 7.5 a rule needs the operator's confirmation ----------
@@ -164,6 +198,8 @@ def test_master_rule_posts_the_rule_and_the_quote(harness, monkeypatch, capsys):
 
 def test_steps_and_command_text_carry_the_new_wording():
     steps = STAGES['options']['steps']
+    assert 'work/options/' in steps[0] and 'never by line offsets' in steps[0] and 'sub-clips-' in steps[0]   # design/61 L17
+    assert 'beats.json' in steps[1] and 'narration.json' in steps[1] and 'shapes.json' in steps[1] and 'coverage.json' in steps[3] and 'sub-clips' in steps[3]
     assert 'always' in steps[1] and 'chapter' in steps[1] and 'refused until the scenes are approved' in steps[1]
     assert 'grouped by rule' in steps[3] and 'R5' in steps[3] and 'R10' in steps[3]
     assert '--wait 900' in steps[4]
