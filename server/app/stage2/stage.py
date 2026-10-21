@@ -489,22 +489,68 @@ def slide_label(value):
     return str(value).strip().lstrip('#').strip().upper()
 
 
+KEPT = ('KEEP', 'KEEP_WITH_EDIT')
+
+
+def _heads(sl):
+    """The scene and backup slides by option number: the cut each inner slide belongs to."""
+    return {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}
+
+
+def _action(decisions, slide):
+    d = decisions.get(str(slide['no'])) if slide else None
+    return d.get('action') if d else None
+
+
+def needs_answer(slide, heads, decisions):
+    """design/63 rule 2: a blank never needs an answer; a decision inside a REJECTed cut needs none (the build skips that cut).
+    Returns (needs, why)."""
+    if slide['type'] == 'blank':
+        return False, None
+    if slide['type'] == 'decision':
+        head = heads.get(slide.get('option_number'))
+        if head and _action(decisions, head) == 'REJECT':
+            return False, f"inside rejected #{head['no']}"
+    return True, None
+
+
+def conflict_of(slide, sl, decisions):
+    """design/63 rule 1: a kept cut whose other cut of the same scene is also kept."""
+    if slide['type'] not in ('option', 'backup') or _action(decisions, slide) not in KEPT:
+        return None
+    other = next((s for s in sl if s['type'] in ('option', 'backup') and s['beat_id'] == slide['beat_id'] and s['no'] != slide['no'] and _action(decisions, s) in KEPT), None)
+    return f"#{other['no']} is also kept: reject it or this one" if other else None
+
+
+def missing_answers(sl, decisions):
+    """The slides the build still needs an answer for (design/63: not the ones inside a rejected cut)."""
+    heads = _heads(sl)
+    return [str(s['no']) for s in sl if needs_answer(s, heads, decisions)[0] and str(s['no']) not in decisions]
+
+
 def _slide_rows(sl, decisions):
     """One row per slide with the answer so far; the slide's own lines travel too (design/62: the chat asks each slide with them, the page shows them)."""
     rows = []
-    scene_of = {s['option_number']: s.get('scene') for s in sl if s['type'] in ('option', 'backup')}   # the inner slides (decision, blank) belong to that scene
+    heads = _heads(sl)
+    scene_of = {n: h.get('scene') for n, h in heads.items()}   # the inner slides (decision, blank) belong to that scene
     for s in sl:
         lab = str(s['no'])
         d = decisions.get(lab)
+        needs, why = needs_answer(s, heads, decisions)
         rows.append({'slide': lab, 'type': s['type'], 'scene': s.get('scene') or scene_of.get(s.get('option_number')), 'backup_for': s.get('backup_for'), 'kind': s.get('kind'), 'question': s.get('question'),
-                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': s['type'] != 'blank',
+                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': needs, 'why': why, 'conflict': conflict_of(s, sl, decisions),
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows
 
 
 def _progress(rows):
+    seen, both = set(), []
+    for r in rows:
+        if r.get('conflict') and r['scene'] not in seen:
+            seen.add(r['scene'])
+            both.append({'scene': r['scene'], 'slides': [x['slide'] for x in rows if x.get('conflict') and x['scene'] == r['scene']]})
     return {'answered': sum(1 for r in rows if r['needs_answer'] and r['answer']), 'of': sum(1 for r in rows if r['needs_answer']),
-            'waiting': [r['slide'] for r in rows if r['needs_answer'] and not r['answer']]}
+            'waiting': [r['slide'] for r in rows if r['needs_answer'] and not r['answer']], 'both_kept': both}
 
 
 def slides_view(store, run):
@@ -535,29 +581,41 @@ def slide_cues(plan, fps):
     return cues
 
 
+_CUES = {}   # (plan key, version digest) → the slide cues: a rendered version's plan never changes
+
+
+def _cues_for(store, run, entry):
+    k = (key(run, f"render-review-v{entry['version']}.json"), entry['digest'])
+    if k not in _CUES:
+        try:
+            plan = load_json(store, k[0])
+            _CUES[k] = slide_cues(plan, TIMELINE['fps']) if plan.get('digest') == entry['digest'] else {}
+        except Problem:
+            return {}
+    return _CUES[k]
+
+
 def review_view(conn, store, run):
     """design/62: what the review page shows. The current version's slides with their answers and lines, the review film of that version
-    when it is rendered (with the cue of every slide), the render state otherwise, and whether the options are recorded."""
+    when it is rendered (with the cue of every slide), the render state otherwise, and whether the options are recorded.
+    A read: one storage read for the session (plus the version document only when the version carries no slides), no write; the render
+    state is refreshed from the jobs table in memory (design/63 addendum: the page reloads after every click)."""
     try:
         session = session_of(store, run)
     except Problem:
         return {'state': 'not_prepared'}
     if not session.get('current'):
         return {'state': 'no_version'}
-    doc, entry = current(store, session)
+    entry = next(v for v in session['versions'] if v['digest'] == session['current'])
+    sl = entry.get('slides') or _slides(store, session, current(store, session)[0], entry)
     _refresh(conn, store, run, session)
-    save_session(store, run, session)
-    rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {})
+    rows = _slide_rows(sl, session.get('decisions') or {})
     r = session['renders'].get('review') or {}
     film, cues = None, {}
     is_current = bool(r) and r.get('digest') == entry['digest']
     if is_current and r.get('status') == 'ready' and (r.get('result') or {}).get('key'):
         film = {'key': r['result']['key'], 'duration_s': r['result'].get('duration_s'), 'sha256': r['result'].get('sha256')}
-        try:
-            plan = load_json(store, key(run, f"render-review-v{entry['version']}.json"))
-            cues = slide_cues(plan, TIMELINE['fps']) if plan.get('digest') == entry['digest'] else {}
-        except Problem:
-            cues = {}
+        cues = _cues_for(store, run, entry)
     accepted = session.get('accepted') or {}
     return {'state': 'prepared', 'version': entry['version'], 'digest': entry['digest'], 'slides': rows, **_progress(rows), 'film': film, 'cues': cues,
             'render': ({'status': r.get('status'), 'error': r.get('error'), 'current': is_current} if r else None),
@@ -594,7 +652,9 @@ def decide(store, user, run, slide_no, action, note, edit):
     session['decisions'][lab] = {'action': action, 'type': s['type'], 'option_number': s['option_number'], 'edit': edit, **stamp}
     session['master'] = None
     save_session(store, run, session)
-    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
+    conflict = conflict_of(s, sl, session['decisions'])   # design/63 rule 1: said the moment the second Keep lands
+    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank'),
+            **({'conflict': conflict} if conflict else {})}
 
 
 def add_rule(store, user, run, text, quote=''):
@@ -651,7 +711,7 @@ def build_master(conn, store, user, run):
     beats = pk['beats']
     decisions = session['decisions']
     sl = _slides(store, session, doc, entry)
-    missing = [f"#{s['no']}" for s in sl if s['type'] != 'blank' and str(s['no']) not in decisions]
+    missing = [f'#{lab}' for lab in missing_answers(sl, decisions)]   # design/63: slides inside a rejected cut need none
     if missing:
         fail(f"Every numbered slide needs an answer; missing: {', '.join(missing)}")
     head = {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}

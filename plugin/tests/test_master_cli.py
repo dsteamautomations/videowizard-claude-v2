@@ -123,6 +123,9 @@ def test_slides_prints_the_review_page_link(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'slides': [{'slide': '1', 'type': 'option', 'needs_answer': True, 'answer': None}], 'answered': 0, 'of': 1, 'waiting': ['1']})
     code, out, err = run(args(what='slides'), capsys)
     assert code == 0 and out['review_page_url'] == 'https://x.example/runs/VW-9/review' and 'Review page: https://x.example/runs/VW-9/review' in err
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'slides': [], 'answered': 2, 'of': 2, 'waiting': [], 'both_kept': [{'scene': 'Scene 2: Mixing', 'slides': ['1', '2']}]})
+    code, out, err = run(args(what='slides'), capsys)
+    assert code == 0 and 'Both cuts kept: Scene 2: Mixing (#1, #2): reject one' in err   # design/63
 
 
 def test_next_carries_the_review_page_link_at_the_options_and_master_stages(harness, monkeypatch, capsys):

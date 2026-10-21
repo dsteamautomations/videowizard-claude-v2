@@ -1359,7 +1359,9 @@ def cmd_master(a):
     if a.what == 'slides':   # design/44 8.1: what still needs an answer
         out = call('GET', base + '/slides')
         out['review_page_url'] = review_page_url(m['code'])   # design/62: the default place to decide
-        emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none') + f". Review page: {out['review_page_url']}")
+        both = '; '.join(f"{b['scene']} (#{', #'.join(b['slides'])})" for b in out.get('both_kept') or [])   # design/63 rule 1
+        emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none')
+             + (f". Both cuts kept: {both}: reject one" if both else '') + f". Review page: {out['review_page_url']}")
     if a.what == 'decide':
         if a.file:   # design/44 8.1: every answer in one call, in order, stopping at the first refusal
             answers = _json_file(m, a.file)

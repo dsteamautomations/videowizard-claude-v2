@@ -161,6 +161,112 @@ def test_every_page_path_a_template_calls_has_a_route():
 def test_the_page_routes_import_the_stage_module_not_the_package():
     """The first deploy of the page answered 500: `from . import stage2` is the package, which exports nothing; the stage logic is stage2.stage."""
     source = (APP / 'web.py').read_text(encoding='utf-8')
-    assert 'from . import stage2' not in source and source.count('from .stage2 import stage as stage2') == 2
+    assert 'from . import stage2' not in source and source.count('from .stage2 import stage as stage2') >= 2
     from app import stage2 as pkg
     assert not hasattr(pkg, 'review_view') and hasattr(S, 'review_view') and hasattr(S, 'record_options') and hasattr(S, 'decide')
+
+
+# ---------- design/63: after the operator has seen both cuts ----------
+
+def kept(action='KEEP', **extra):
+    return {'action': action, 'note': '', 'by': 'u1', 'at': '2026-10-21T10:00:00Z', **extra}
+
+
+def test_both_cuts_kept_is_said_on_both_rows_and_in_the_decide_reply():
+    sess = session(accepted={'version': 1, 'digest': 'd1'}, decisions={'1': kept(), '2': kept()})
+    view = S.review_view(FakeConn({}), FakeStore(files(sess, with_plan=False)), RUN)
+    by = {s['slide']: s for s in view['slides']}
+    assert by['1']['conflict'] == '#2 is also kept: reject it or this one' and by['2']['conflict'] == '#1 is also kept: reject it or this one'
+    assert by['3'].get('conflict') is None and view['both_kept'] == [{'scene': 'Scene 1: The need', 'slides': ['1', '2']}]
+    sess = session(accepted={'version': 1, 'digest': 'd1'}, decisions={'1': kept()})
+    store = FakeStore(files(sess, with_plan=False))
+    out = S.decide(store, {'id': 'u1'}, RUN, '2', 'KEEP', '', None)
+    assert out['conflict'] == '#1 is also kept: reject it or this one' and out['decided'] == 2
+    out = S.decide(store, {'id': 'u1'}, RUN, '2', 'REJECT', 'the first cut is better', None)
+    assert 'conflict' not in out
+
+
+def test_decision_slides_inside_a_rejected_cut_need_no_answer():
+    inner = [{'no': '2A', 'type': 'decision', 'option_number': 2, 'beat_id': 'BEAT_01', 'event_index': 0, 'frames': 50, 'kind': 'keep_or_drop', 'question': 'Keep the pan?', 'lines': ['#2A | DECISION | Scene 1: The need', 'Keep the pan?']}]
+    sess = session(accepted={'version': 1, 'digest': 'd1'}, decisions={'1': kept(), '2': kept('REJECT', note='weaker')})
+    sess['versions'][0]['slides'] = SLIDES + inner
+    view = S.review_view(FakeConn({}), FakeStore(files(sess, with_plan=False)), RUN)
+    by = {s['slide']: s for s in view['slides']}
+    assert by['1A']['needs_answer'] is True and by['1A']['why'] is None            # inside the kept cut #1
+    assert by['3']['needs_answer'] is True and by['3A']['needs_answer'] is False    # a blank never needs one
+    assert by['2A']['needs_answer'] is False                                        # inside the rejected cut #2
+    assert view['of'] == 4 and view['answered'] == 2 and view['waiting'] == ['1A', '3']   # 1, 1A, 2, 3 count; 2A does not
+    # un-rejecting the cut brings its questions back
+    sess['decisions']['2'] = kept()
+    view = S.review_view(FakeConn({}), FakeStore(files(sess, with_plan=False)), RUN)
+    assert view['of'] == 5 and view['waiting'] == ['1A', '3', '2A']   # film order of this fixture
+
+
+def test_a_decision_inside_a_rejected_cut_is_greyed_with_the_reason():
+    inner = [{'no': '2A', 'type': 'decision', 'option_number': 2, 'beat_id': 'BEAT_01', 'event_index': 0, 'frames': 50, 'kind': 'keep_or_drop', 'question': 'Keep the pan?', 'lines': ['#2A | DECISION | Scene 1: The need', 'Keep the pan?']}]
+    sess = session(accepted={'version': 1, 'digest': 'd1'}, decisions={'2': kept('REJECT', note='weaker')})
+    sess['versions'][0]['slides'] = SLIDES + inner
+    view = S.review_view(FakeConn({}), FakeStore(files(sess, with_plan=False)), RUN)
+    by = {s['slide']: s for s in view['slides']}
+    assert by['2A']['needs_answer'] is False and by['2A']['why'] == 'inside rejected #2' and '2A' not in view['waiting']
+
+
+def test_missing_answers_for_the_build_ignore_slides_inside_a_rejected_cut():
+    inner = [{'no': '2A', 'type': 'decision', 'option_number': 2, 'beat_id': 'BEAT_01', 'event_index': 0, 'frames': 50, 'kind': 'keep_or_drop', 'question': 'Keep the pan?', 'lines': []}]
+    sl = SLIDES + inner
+    assert S.missing_answers(sl, {'1': kept(), '2': kept('REJECT', note='x'), '3': kept()}) == ['1A']
+    assert S.missing_answers(sl, {'1': kept(), '2': kept(), '3': kept()}) == ['1A', '2A']
+    assert S.missing_answers(sl, {}) == ['1', '1A', '2', '3', '2A']   # film order, as the slides are listed
+
+
+def test_the_template_shows_the_conflict_and_the_reason():
+    import jinja2
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(APP / 'templates')), autoescape=True)
+    env.globals['version'] = 't'
+    html = env.get_template('review.html').render(user={'name': 'SK', 'role': 'Admin'}, run={'code': 'VW-9', 'title': 'Film'})
+    assert 's.conflict' in html and 's.why' in html and 'both_kept' in html
+
+
+# ---------- design/63 addendum: what a page load and a click cost ----------
+
+class CountingStore(FakeStore):
+    def __init__(self, files):
+        super().__init__(files)
+        self.gets, self.puts = [], []
+
+    def get(self, key):
+        self.gets.append(key)
+        return super().get(key)
+
+    def put(self, key, data, mime=None):
+        self.puts.append(key)
+        return super().put(key, data, mime)
+
+
+def test_a_page_load_reads_the_session_once_writes_nothing_and_skips_the_version_document():
+    S._CUES.clear()
+    sess = session(renders={'review': {'job_id': 'j1', 'status': 'queued', 'digest': 'd1', 'version': 1}})
+    ready = {'status': 'ready', 'result': {'key': 'k.mp4', 'sha256': 's', 'bytes': 10, 'duration_s': 426.0}, 'error': None}
+    store = CountingStore(files(sess))
+    view = S.review_view(FakeConn({'j1': ready}), store, RUN)
+    assert view['film'] and view['cues'] == {'1': 0.0, '1A': 7.0}
+    assert store.puts == [] and store.gets == ['run-1/stage2/session.json', 'run-1/stage2/render-review-v1.json']   # no document, no write
+    store.gets.clear()
+    S.review_view(FakeConn({'j1': ready}), store, RUN)
+    assert store.gets == ['run-1/stage2/session.json']   # the cues of a rendered version are kept in memory
+
+
+def test_a_version_without_stored_slides_still_loads_its_document():
+    sess = session()
+    del sess['versions'][0]['slides']
+    sess['package'] = {'key': 'p', 'digest': 'pk1', 'narration_key': 'n'}
+    store = CountingStore(files(sess, with_plan=False))
+    store.files['run-1/stage2/options-v1.json'] = json.dumps({'document': {'options': []}, 'package_digest': 'pk1'}).encode('utf-8')
+    store.files['p'] = json.dumps({'beats': [], 'sub_clips': [], 'cards': []}).encode('utf-8')
+    view = S.review_view(FakeConn({}), store, RUN)
+    assert view['slides'] == [] and 'run-1/stage2/options-v1.json' in store.gets
+
+
+def test_the_page_draws_from_the_act_reply_without_a_second_request():
+    html = (APP / 'templates' / 'review.html').read_text(encoding='utf-8')
+    assert 'j.view' in html and 'will-change:transform' in html

@@ -9,7 +9,7 @@
 .rv .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:14px;align-items:start}
 @media (max-width:980px){.rv .grid{grid-template-columns:1fr}}
 .rv .left{position:sticky;top:64px}
-.rv video{width:100%;max-height:70vh;background:#000;border-radius:12px;display:block}
+.rv video{width:100%;max-height:70vh;background:#000;border-radius:12px;display:block;will-change:transform}
 .rv .nofilm{color:var(--muted);padding:40px 12px;font-size:15px;text-align:center;border:1px dashed var(--line);border-radius:12px}
 .rv .nofilm[hidden]{display:none}
 .rv .now{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.3em}
@@ -21,6 +21,8 @@
 .rv tbody tr.cue{cursor:pointer}
 .rv tbody tr.cue:hover td{background:var(--hover)}
 .rv tbody tr.cur td{background:var(--sel)}
+.rv tbody tr.off td{opacity:.55}
+.rv .ans.err{color:var(--err)}
 .rv th.n,.rv td.n{width:44px;font-weight:700;white-space:nowrap}
 .rv th.a,.rv td.a{width:190px}
 .rv .badge{display:inline-block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px}
@@ -112,6 +114,7 @@ function draw(){
   else if(d.master_built){line+=' · answers closed: the master film is built';}
   else if(d.of&&d.answered>=d.of){line+=' · <strong>all '+d.of+' answered</strong>. The assistant builds the master film from here (vw master build).';}
   else{line+=' · <strong>'+d.answered+' of '+d.of+'</strong> answered · waiting: '+(d.waiting.length?esc(d.waiting.join(', ')):'none');}
+  if(d.both_kept&&d.both_kept.length){line+=' · <span class="err">both cuts kept: '+esc(d.both_kept.map(b=>b.scene+' (#'+b.slides.join(', #')+')').join('; '))+'</span>';}
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open on this run; nothing can be recorded until it is fixed</span>';}
   $('line').innerHTML=line;
   // the film
@@ -139,15 +142,17 @@ function draw(){
     const info='<div>'+badge+'<span class="sc">'+esc(s.scene||'')+'</span>'+(rest?'<div class="ds">'+esc(rest)+'</div>':'')+'<div class="ds">'+fmt(s.seconds)+(cue?' · at '+fmt(d.cues[s.slide]):'')+'</div></div>';
     let ans='';
     if(s.type==='blank'){ans='<span class="ds">no decision: a blank for AI video or animation</span>';}
+    else if(!s.needs_answer&&s.why){ans='<span class="ds">no answer needed: '+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action.replace(/_/g,' '))+' (ignored)</div>':'');}
     else{
       const a=s.answer;
       const btns=CHOICES[s.type]||[];
       if(can){ans='<div class="btns">'+btns.map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(a&&a.action===v?'on':'')+'">'+l+'</button>').join('')+'</div>';}
       if(a){ans+='<div class="ans"><b>'+esc(a.action.replace(/_/g,' '))+'</b>'+(a.note?' · '+esc(a.note):'')+(a.edit?' · '+esc(a.edit):'')+(a.at?' · '+esc(String(a.at).slice(0,16).replace('T',' ')):'')+'</div>';}
+      if(s.conflict){ans+='<div class="ans err">'+esc(s.conflict)+'</div>';}
       else if(!can){ans+='<span class="ds">'+(d.accepted?(d.master_built?'no answer':'waiting'):'after approval')+'</span>';}
       if(open&&open.slide===s.slide){ans+=form(open);}
     }
-    return '<tr data-slide="'+esc(s.slide)+'" class="'+(cue?'cue':'')+(current===s.slide?' cur':'')+'"><td class="n">'+esc(s.slide)+'</td><td>'+info+'</td><td class="a">'+ans+'</td></tr>';
+    return '<tr data-slide="'+esc(s.slide)+'" class="'+(cue?'cue':'')+(current===s.slide?' cur':'')+(!s.needs_answer&&s.why?' off':'')+'"><td class="n">'+esc(s.slide)+'</td><td>'+info+'</td><td class="a">'+ans+'</td></tr>';
   }).join('');
   $('slides').querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();choose(b.dataset.slide,b.dataset.act);}));
   $('slides').querySelectorAll('tr.cue').forEach(tr=>tr.addEventListener('click',e=>{if(e.target.closest('button,input,label'))return;seek(tr.dataset.slide);}));
@@ -156,7 +161,7 @@ function draw(){
   if(!d.accepted&&stage()==='options'){
     $('action').innerHTML='<span>Approve these options with your own words:</span><textarea id="words" placeholder="e.g. Yes, these options are approved"></textarea><button class="go" id="do-record"'+(d.film?'':' disabled title="The review film is not ready"')+'>Approve the options</button>';
     $('do-record').addEventListener('click',async()=>{const w=$('words').value.trim();if(!w){msg('Your words are required.',true);return;}const b=$('do-record');b.disabled=true;msg('Recording the options…',false,true);
-      try{await act({action:'record',quote:w});msg('Recorded: the run is at master. Answer each slide with the buttons.');await load();}catch(err){msg(err.message,true);b.disabled=false;}});
+      try{const j=await act({action:'record',quote:w});msg('Recorded: the run is at master. Answer each slide with the buttons.');if(j&&j.view){data=j.view;draw();}else{await load();}}catch(err){msg(err.message,true);b.disabled=false;}});
   }else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){
     $('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';
   }else if(d.accepted&&stage()==='master'){
@@ -181,7 +186,7 @@ async function submit(slide){
 }
 async function send(body){
   msg('Recording #'+body.slide+'…',false,true);
-  try{const j=await act(body);open=null;msg('#'+j.slide+' '+String(j.action).replace(/_/g,' ')+' recorded ('+j.decided+' of '+j.of+').');await load();}
+  try{const j=await act(body);open=null;msg('#'+j.slide+' '+String(j.action).replace(/_/g,' ')+' recorded ('+j.decided+' of '+j.of+').'+(j.conflict?' '+j.conflict:''),!!j.conflict);if(j.view){data=j.view;draw();}else{await load();}}
   catch(err){msg(err.message,true);}
 }
 function seek(slide){const t=data&&data.cues?data.cues[slide]:null;if(t==null||!filmKey)return;const f=$('film');f.currentTime=t;f.play().catch(()=>{});}

@@ -272,10 +272,15 @@ def review_data(request: Request, code: str, vw2_session: str | None = Cookie(de
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
     with db_connect() as conn:
         run = _run_by_code(conn, user, code)
-        nxt = core.next_for(conn, run)
-        view = stage2.review_view(conn, storage(), run)
-    return JSONResponse(core.jsonable({'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
-                                       **view}))
+        payload = _review_payload(conn, storage(), run)
+    return JSONResponse(core.jsonable(payload))
+
+
+def _review_payload(conn, store, run):
+    from .stage2 import stage as stage2
+    nxt = core.next_for(conn, run)
+    return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
+            **stage2.review_view(conn, store, run)}
 
 
 def _run_at(conn, user, code, stage):
@@ -307,12 +312,14 @@ async def review_act(request: Request, code: str, vw2_session: str | None = Cook
             if not quote:
                 raise Problem(422, 'ACCEPTANCE_REQUIRED', "The operator's words are required to approve the options.")
             run = _run_at(conn, user, code, 'options')
-            out = stage2.record_options(conn, storage(), user, run, quote)
-            return JSONResponse(core.jsonable({'recorded': True, 'version': out['version']}))
+            store = storage()
+            out = stage2.record_options(conn, store, user, run, quote)
+            return JSONResponse(core.jsonable({'recorded': True, 'version': out['version'], 'view': _review_payload(conn, store, run)}))
         if action == 'decide':
             run = _run_at(conn, user, code, 'master')
-            out = stage2.decide(storage(), user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None)
-            return JSONResponse(core.jsonable(out))
+            store = storage()
+            out = stage2.decide(store, user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None)
+            return JSONResponse(core.jsonable({**out, 'view': _review_payload(conn, store, run)}))   # design/63 addendum: one round trip per click
     raise Problem(404, 'NOT_FOUND', 'No such action.')
 
 
