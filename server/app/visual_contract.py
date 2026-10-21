@@ -71,6 +71,12 @@ class Subject(Model):
     continuity_note: str = Field(default='', max_length=3000)
 
 
+class GraphicState(Model):
+    """design/65: one state of a graphic sequence, an approved still; the states play as a build with holds and dissolves."""
+    what_appears: str = Field(min_length=1, max_length=2000)
+    hold_s: float = Field(gt=0)
+
+
 class Shot(Model):
     title: str = Field(default="", max_length=160)
     id: str = Field(min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
@@ -89,6 +95,7 @@ class Shot(Model):
     appearance: str = Field(default='', max_length=2000)
     production_method: str = Field(default='', max_length=1500)
     review_notes: str = Field(default='', max_length=4000)
+    states: list[GraphicState] = Field(default_factory=list, max_length=12)   # design/65: an animation shot is two to four states (validate_plan says so in words)
 
 
 class Landmark(Model):
@@ -163,7 +170,11 @@ def unique(rows, key, label):
 
 
 MAX_GENERATED_SHOT_S = 30   # design/21 E7: today's AI video tools make at most 30 s per shot; longer blanks are several shots
-FILE_TYPES = ('image', 'diagram', 'animation')   # design/45 10.2: the pipeline makes AI video and stills; these are the operator's files or an approved still
+GRAPHIC_TYPES = ('diagram', 'animation')   # design/65: a diagram is a still, an animation a graphic sequence of stills; both are graphics for the pacing rules
+STILL_TYPES = ('image', 'diagram')         # filled by one approved picture (`vw visuals still`)
+MIN_STATE_S = 3                            # a state is read, not glanced
+MIN_GRAPHIC_S = 3                          # a graphic shorter than this is warned
+MAX_STATIC_S = 6                           # a still longer than this must earn its time (G15)
 
 
 def _default_generator():
@@ -173,9 +184,14 @@ def _default_generator():
     return default, longest
 
 
+def route_of(shot):
+    return 'video' if shot['visual_type'] == 'video' else 'graphic_sequence' if shot['visual_type'] == 'animation' else 'still'
+
+
 def routes(plan, fps=25):
-    """How many shots the pipeline makes itself (video) and how many need a still or the operator's file (design/45 10.2)."""
-    out = {'video': 0, 'still_or_file': 0, 'seconds': {'video': 0.0, 'still_or_file': 0.0}}
+    """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
+    graphics, and the images the plan will need (a keyframe per video shot, one picture per still, one per state of a sequence)."""
+    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0}
     for gap in plan.get('gaps', []):
         scenes = gap.get('scenes') or []
         if gap.get('choices'):
@@ -183,9 +199,13 @@ def routes(plan, fps=25):
             scenes = chosen['scenes']
         for scene in scenes:
             for shot in scene['shots']:
-                kind = 'video' if shot['visual_type'] == 'video' else 'still_or_file'
+                kind = route_of(shot)
+                seconds = (shot['end_frame'] - shot['start_frame']) / float(fps)
                 out[kind] += 1
-                out['seconds'][kind] = round(out['seconds'][kind] + (shot['end_frame'] - shot['start_frame']) / float(fps), 2)
+                out['seconds'][kind] = round(out['seconds'][kind] + seconds, 2)
+                if shot['visual_type'] in GRAPHIC_TYPES:
+                    out['graphic_seconds'] = round(out['graphic_seconds'] + seconds, 2)
+                out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
     return out
 
 
@@ -196,6 +216,7 @@ def validate_plan(document, source_gaps, fps=None):
     unique(plan.foundation.world + plan.foundation.exclusions + plan.foundation.specifications + plan.foundation.production_constraints + plan.foundation.editing_constraints + plan.sequence_rules, 'id', 'rule')
     scene_ids, shot_ids, beat_ids = set(), set(), set()
     warnings = []
+    placed = []   # (gap_id, shot_id, visual_type, start, end) in film order, for the pacing warnings (design/65 B4)
     for gap in plan.gaps:
         need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
         window = source_gaps[gap.gap_id]
@@ -221,15 +242,28 @@ def validate_plan(document, source_gaps, fps=None):
                     need(shot.start_frame == cursor and shot.end_frame > cursor,
                          'Shots must cover their gap in order, without overlaps or missing frames.')
                     cursor = shot.end_frame
-                    if fps and shot.visual_type in ('video', 'animation'):
+                    if fps and shot.visual_type == 'video':   # design/65: an animation is stills now; only a video take has the generator's cap
                         need((shot.end_frame - shot.start_frame) <= MAX_GENERATED_SHOT_S * float(fps),
                              f'A generated shot is at most {MAX_GENERATED_SHOT_S} s; split a longer stretch into several shots.')
                     seconds = (shot.end_frame - shot.start_frame) / float(fps) if fps else None
-                    if shot.visual_type in FILE_TYPES:   # design/45 10.2
-                        length = f'{seconds:.1f} s' if seconds is not None else f'{shot.end_frame - shot.start_frame} frames'
-                        warnings.append({'shot_id': shot.id, 'kind': 'route', 'message': f'shot {shot.id} ({shot.visual_type}, {length}): the operator supplies this file '
-                                                                                        '(`vw visuals asset`), or an approved still fills it (`vw visuals still`)'})
-                    elif shot.visual_type == 'video' and seconds is not None:   # design/45 10.7
+                    placed.append((gap.gap_id, shot.id, shot.visual_type, shot.start_frame, shot.end_frame))
+                    if shot.visual_type == 'animation':   # design/65: a graphic sequence of states
+                        if len(shot.states) == 1:
+                            need(False, f'shot {shot.id}: one state is a diagram still: plan it as a diagram, or add a state.')
+                        need(2 <= len(shot.states) <= 4, f'shot {shot.id}: an animation shot is a graphic sequence of two to four states (`states`).')
+                        for n, st in enumerate(shot.states, 1):
+                            need(st.hold_s >= MIN_STATE_S, f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s; a state holds at least {MIN_STATE_S} s.')
+                        if seconds is not None:
+                            total = sum(st.hold_s for st in shot.states)
+                            need(abs(total - seconds) <= 0.2, f"shot {shot.id}: the states' holds add up to {total:.1f} s; the shot is {seconds:.1f} s.")
+                    else:
+                        need(not shot.states, f'states belong to an animation shot (shot {shot.id} is a {shot.visual_type}).')
+                    if seconds is not None and shot.visual_type in GRAPHIC_TYPES and seconds < MIN_GRAPHIC_S:
+                        warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
+                    if seconds is not None and shot.visual_type in STILL_TYPES and seconds > MAX_STATIC_S:
+                        warnings.append({'shot_id': shot.id, 'kind': 'static_long', 'message': f'shot {shot.id} is a still of {seconds:.1f} s: over {MAX_STATIC_S} s it must earn the time '
+                                                                                               '(new information, reading, a build); say how in its purpose'})
+                    if shot.visual_type == 'video' and seconds is not None:   # design/45 10.7
                         default, longest = _default_generator()
                         if seconds > default['max_seconds']:
                             warnings.append({'shot_id': shot.id, 'kind': 'length', 'message': f"shot {shot.id} is {seconds:.1f} s; the default generator makes at most {default['max_seconds']} s: "
@@ -267,6 +301,15 @@ def validate_plan(document, source_gaps, fps=None):
                     if not shot.subjects:
                         need(shot.information_progression.strip(), 'Describe the composition or information progression for a shot without acting subjects.')
             need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
+    # design/65 B4: graphics back to back, inside a gap or across two gaps with no footage between; a gap of several shots that is all graphics
+    placed.sort(key=lambda p: p[3])
+    for prev, cur in zip(placed, placed[1:]):
+        if prev[2] in GRAPHIC_TYPES and cur[2] in GRAPHIC_TYPES and (prev[0] == cur[0] or prev[4] == cur[3]):
+            warnings.append({'shot_id': cur[1], 'kind': 'graphics_back_to_back', 'message': f"shots {prev[1]} and {cur[1]} are graphics back to back: the second shot's purpose must say why it stays a graphic"})
+    for gap in plan.gaps:
+        own = [p for p in placed if p[0] == gap.gap_id]
+        if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):
+            warnings.append({'gap_id': gap.gap_id, 'kind': 'all_graphics', 'message': f'gap {gap.gap_id} is {len(own)} shots, all graphics: mix in a frame from the footage or a scene unless each one earns its place'})
     result = plan.model_dump()
     for key in ('sequence_overview', 'sequence_rules'):
         if key not in document: result.pop(key)
@@ -282,7 +325,7 @@ def validate_plan(document, source_gaps, fps=None):
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
-                for key in ('title', 'appearance', 'production_method', 'review_notes'):
+                for key in ('title', 'appearance', 'production_method', 'review_notes', 'states'):
                     if key not in original_shot: shot.pop(key)
     return result, warnings
 

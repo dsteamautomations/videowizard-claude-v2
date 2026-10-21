@@ -22,7 +22,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text
-from .visual_contract import FILE_TYPES, chosen_scenes, gap_digest, need, routes, validate_plan
+from .visual_contract import STILL_TYPES, chosen_scenes, gap_digest, need, routes, validate_plan
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare', 'edit': 'gpt-image-2.5-sunburst'}
@@ -360,7 +360,7 @@ def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
     base = packet(store, run, outputs, body['shot_id'], session)
     shot = base['preparation']['shot']
-    need(shot['visual_type'] == 'video', 'Prepare takes only for video shots; use `vw visuals asset` for images.')
+    need(shot['visual_type'] == 'video', f"shot {shot['id']} is a {shot['visual_type']} shot: " + ('an animation shot takes a graphic sequence (`vw visuals sequence`)' if shot['visual_type'] == 'animation' else 'it takes a still (`vw visuals still`)') + ', not a take.')
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))
     selected = base['preparation']['provider']
     cap = next(c for c in video_generators.CATALOG if c['provider'] == selected['provider'] and c['model'] == selected['model'])
@@ -455,7 +455,8 @@ def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote
     """design/45 10.3: an approved reference becomes a still shot's asset; no download and upload."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
-    need(shot['visual_type'] in FILE_TYPES, f"shot {shot_id} is a video shot: it takes a take (`vw visuals prepare-take`), not a still.")
+    need(shot['visual_type'] != 'animation', f'shot {shot_id} is an animation shot: it takes a graphic sequence (`vw visuals sequence`), not a still.')
+    need(shot['visual_type'] in STILL_TYPES, f"shot {shot_id} is a video shot: it takes a take (`vw visuals prepare-take`), not a still.")
     row = session['references'].get(reference_id)
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
     need((quote or '').strip(), 'The operator reply is required.')

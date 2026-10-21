@@ -25,13 +25,75 @@ def plan(shots):
 GAPS = {'G1': {'start_frame': 0, 'end_frame': 1000}}
 
 
-def test_routes_are_counted_and_file_shots_are_warned():
-    doc = plan([shot('VS1', 0, 100, 'video'), shot('AN1', 100, 400, 'animation'), shot('DG1', 400, 500, 'diagram'), shot('IM1', 500, 1000, 'image')])
+def states(*holds):
+    return [{'what_appears': f'state {i + 1}', 'hold_s': h} for i, h in enumerate(holds)]
+
+
+def test_routes_count_video_stills_and_graphic_sequences_with_no_file_warning():
+    """design/65 B1: every route is made in the pipeline; an animation shot is a graphic sequence of states."""
+    doc = plan([shot('VS1', 0, 100, 'video'), {**shot('AN1', 100, 400, 'animation'), 'states': states(4, 4, 4)}, shot('DG1', 400, 500, 'diagram'), shot('IM1', 500, 1000, 'image')])
     result, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
-    route = [w for w in warnings if w.get('kind') == 'route']
-    assert [w['shot_id'] for w in route] == ['AN1', 'DG1', 'IM1']
-    assert 'the operator supplies this file' in route[0]['message'] and 'vw visuals still' in route[0]['message'] and 'animation, 12.0 s' in route[0]['message']
-    assert VC.routes(result) == {'video': 1, 'still_or_file': 3, 'seconds': {'video': 4.0, 'still_or_file': 36.0}}
+    assert not [w for w in warnings if w.get('kind') == 'route']
+    r = VC.routes(result)
+    assert r['video'] == 1 and r['still'] == 2 and r['graphic_sequence'] == 1
+    assert r['seconds'] == {'video': 4.0, 'still': 24.0, 'graphic_sequence': 12.0} and r['graphic_seconds'] == 16.0   # diagram 4 s + sequence 12 s
+    assert r['images_estimated'] == 1 + 3 + 1 + 1   # a keyframe, three states, a diagram, a picture
+
+
+def test_an_animation_shot_needs_two_to_four_states_that_fill_it():
+    with pytest.raises(ValueError, match='one state is a diagram still'):
+        VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(40)}]), GAPS, Fraction(25))
+    with pytest.raises(ValueError, match='two to four states'):
+        VC.validate_plan(plan([shot('AN1', 0, 1000, 'animation')]), GAPS, Fraction(25))
+    with pytest.raises(ValueError, match='two to four states'):
+        VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(8, 8, 8, 8, 8)}]), GAPS, Fraction(25))
+    with pytest.raises(ValueError, match='at least 3 s'):
+        VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(2, 38)}]), GAPS, Fraction(25))
+    with pytest.raises(ValueError, match='holds add up to 30.0 s; the shot is 40.0 s'):
+        VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(10, 10, 10)}]), GAPS, Fraction(25))
+    with pytest.raises(ValueError, match='states belong to an animation shot'):
+        VC.validate_plan(plan([{**shot('DG1', 0, 1000, 'diagram'), 'states': states(20, 20)}]), GAPS, Fraction(25))
+    result, _ = VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(20, 20.1)}]), GAPS, Fraction(25))   # within 0.2 s
+    assert result['gaps'][0]['scenes'][0]['shots'][0]['states'][1]['hold_s'] == 20.1
+    result, _ = VC.validate_plan(plan([shot('IM1', 0, 1000, 'image')]), GAPS, Fraction(25))
+    assert 'states' not in result['gaps'][0]['scenes'][0]['shots'][0]   # absent in the document, absent in the digest material
+
+
+def test_graphic_warnings_short_static_back_to_back_and_all_graphics():
+    """design/64 B4 as kept by design/65: warnings, never refusals."""
+    doc = plan([shot('DG1', 0, 50, 'diagram'), shot('DG2', 50, 250, 'diagram'), shot('VS1', 250, 500, 'video'), shot('IM1', 500, 1000, 'image')])
+    _, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
+    kinds = {(w['shot_id'], w.get('kind')) for w in warnings}
+    assert ('DG1', 'graphic_short') in kinds and ('DG2', 'graphics_back_to_back') in kinds and ('IM1', 'static_long') in kinds
+    assert ('DG2', 'graphic_short') not in kinds and ('VS1', 'graphics_back_to_back') not in kinds
+    short = next(w for w in warnings if w.get('kind') == 'graphic_short')
+    assert 'DG1 is a graphic of 2.0 s' in short['message'] and 'at least 3 s' in short['message']
+    pair = next(w for w in warnings if w.get('kind') == 'graphics_back_to_back')
+    assert 'DG1 and DG2 are graphics back to back' in pair['message'] and "second shot's purpose" in pair['message']
+    # a still of five seconds is not asked to earn its time; the 20 s one above is
+    _, warnings = VC.validate_plan(plan([shot('IM1', 0, 125, 'image'), shot('VS1', 125, 625, 'video'), shot('VS2', 625, 1000, 'video')]), GAPS, Fraction(25))
+    assert not [w for w in warnings if w.get('kind') == 'static_long']
+    long = next(w for w in VC.validate_plan(doc, GAPS, Fraction(25))[1] if w.get('kind') == 'static_long' and w['shot_id'] == 'IM1')
+    assert 'IM1 is a still of 20.0 s' in long['message'] and 'earn the time' in long['message']
+    # a gap of more than one shot that is all graphics
+    doc = plan([shot('DG1', 0, 500, 'diagram'), {**shot('AN1', 500, 1000, 'animation'), 'states': states(10, 10)}])
+    _, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
+    assert any(w.get('kind') == 'all_graphics' and w['gap_id'] == 'G1' for w in warnings)
+    assert any(w.get('kind') == 'graphics_back_to_back' and w['shot_id'] == 'AN1' for w in warnings)
+
+
+def test_graphics_back_to_back_across_two_gaps_with_no_footage_between():
+    doc = plan([shot('DG1', 0, 1000, 'diagram')])
+    doc['gaps'].append({'gap_id': 'G2', 'intent': 'next', 'treatment_fit': 'fits',
+                        'scenes': [{'id': 'SC2', 'purpose': 'p', 'location_time': 'workshop, day', 'layout': 'table centre', 'landmarks': [{'id': 'L2', 'description': 'the table'}],
+                                    'boundary_continuity': 'none', 'shots': [shot('DG2', 1000, 1200, 'diagram')]}]})
+    gaps = {'G1': {'start_frame': 0, 'end_frame': 1000}, 'G2': {'start_frame': 1000, 'end_frame': 1200}}   # G2 starts where G1 ends: no footage between
+    _, warnings = VC.validate_plan(doc, gaps, Fraction(25))
+    assert any(w.get('kind') == 'graphics_back_to_back' and w['shot_id'] == 'DG2' and 'DG1 and DG2' in w['message'] for w in warnings)
+    doc['gaps'][1]['scenes'][0]['shots'][0].update(start_frame=1100, end_frame=1300)
+    gaps = {'G1': {'start_frame': 0, 'end_frame': 1000}, 'G2': {'start_frame': 1100, 'end_frame': 1300}}   # four seconds of footage between them
+    _, warnings = VC.validate_plan(doc, gaps, Fraction(25))
+    assert not any(w.get('kind') == 'graphics_back_to_back' for w in warnings)
 
 
 def test_a_video_shot_longer_than_the_default_generator_is_warned():
@@ -46,6 +108,8 @@ def test_a_video_shot_longer_than_the_default_generator_is_warned():
 def test_a_generated_shot_over_thirty_seconds_is_still_refused():
     with pytest.raises(ValueError, match='at most 30 s'):
         VC.validate_plan(plan([shot('VS1', 0, 1000, 'video')]), GAPS, Fraction(25))   # 40 s
+    result, _ = VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(10, 10, 10, 10)}]), GAPS, Fraction(25))   # 40 s of stills is fine
+    assert len(result['gaps'][0]['scenes'][0]['shots'][0]['states']) == 4
 
 
 # ---------- 10.6 timing: at least as long matches ----------

@@ -204,17 +204,28 @@ def test_visuals_prompt_is_rewritten_for_v2():
     assert len(prompt.split()) <= 3500
     for word in FORBIDDEN:
         assert word not in prompt, word
-    for cmd in ('vw visuals frame', 'vw visuals image', 'vw visuals still', 'vw visuals take', 'vw visuals select', 'vw visuals asset', 'vw visuals record'):
+    for cmd in ('vw visuals frame', 'vw visuals image', 'vw visuals still', 'vw visuals take', 'vw visuals select', 'vw visuals asset', 'vw visuals record',
+                'vw visuals treatment', 'vw visuals sequence', 'vw visuals cap'):
         assert cmd in prompt, cmd
     assert 'design/45' in STAGES['visuals']['prompt_origin']
+    # design/65: every picture is made in the pipeline; graphics move as state sequences; the team's intended visuals are a source; the treatment is recorded; the cap
+    for gone in ('hand-made', 'editor makes', 'Nothing in this pipeline draws', 'shall the editor make them', 'the animation answer'):
+        assert gone not in prompt, gone
+    for kept in ('graphic sequence', 'two to four states', 'as its parent', 'on their instruction; never plan one', 'intended visuals', 'A plan is refused until the treatment is recorded',
+                 'Text is not a reason', 'Footage first', 'no quota', 'three to five seconds', '--start` and `--end`', 'do not add a new rule while keeping shots that contradict it'):
+        assert kept in prompt, kept
 
 
 def test_steps_and_command_text_carry_the_new_flow():
     steps = STAGES['visuals']['steps']
-    assert 'one clip per line' in steps[0]
-    assert 'hand-made animations' in steps[1] and 'AI stills' in steps[1] and 'accept --gaps all' in steps[1] and 'once per run' in steps[1]
-    assert 'images.json' in steps[2] and 'warning' in steps[2] and 'status --wait 300' in steps[2]
-    assert 'take --shots all' in steps[3] and 'status --wait 600' in steps[3] and 'select --job J --notes' in steps[3] and 'still --shot S --ref R' in steps[3] and 'no quote' in steps[3]
-    assert 'record --gaps all' in steps[4]
+    assert 'work/visuals/' in steps[0] and 'intended-visuals.json' in steps[0] and 'never by line offsets' in steps[0]
+    assert 'vw visuals treatment' in steps[1] and 'visuals page' in steps[1] and 'Nothing else before this' in steps[1] and 'cost' in steps[1]
+    assert 'vw visuals check' in steps[2] and 'propose' in steps[2] and 'accept --gaps all' in steps[2] and 'answer every warning' in steps[2]
+    assert 'images.json' in steps[3] and 'warning' in steps[3] and 'status --wait 300' in steps[3] and 'exactly' in steps[3] and '--kind state' in steps[3]
+    assert 'sequence --shot S --refs' in steps[4] and 'take --shots all' in steps[4] and 'select --job J --notes' in steps[4] and 'still --shot S --ref R' in steps[4] and '--end' in steps[4]
+    assert 'record --gaps all' in steps[5]
+    joined = ' '.join(steps)
+    assert 'hand-made' not in joined and 'shall the editor' not in joined and 'on their instruction only' in joined   # the operator's file stays, never planned
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert 'take --shots all' in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' in md
+    assert 'take --shots all' in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' not in md
+    assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap' in md and 'visuals page' in md
