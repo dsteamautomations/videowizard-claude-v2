@@ -120,6 +120,7 @@ def test_record_says_both_are_recorded(harness, monkeypatch, capsys):
 def test_steps_and_command_text_carry_the_labels_and_the_one_approval():
     master = STAGES['master']['steps']
     assert 'vw master slides' in master[0] and '--file out/decisions.json' in master[0] and '2B' in master[0] and 'between 2 and 3' in master[0] and '1/25 s' in master[0]
+    assert 'question tool' in master[0] and 'one slide per question' in master[0] and 'at most four questions' in master[0] and 'as buttons' in master[0] and 'Never ask for labels typed' in master[0]   # design/62 A
     assert '--wait 600' in master[1] and 'say every swap' in master[1] and 'watch' in master[1] and 'listen' in master[1] and 'records the master and the first cut together' in master[1]
     assert 'design/44' in STAGES['first_cut']['steps'][0]
     assert '#2A' in STAGES['options']['prompt'] and 'running numbers' in STAGES['options']['prompt']
