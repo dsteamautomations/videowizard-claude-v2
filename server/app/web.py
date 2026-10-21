@@ -265,7 +265,7 @@ def review_page(request: Request, code: str, vw2_session: str | None = Cookie(de
 @router.get('/runs/{code}/review/data')
 def review_data(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
     from fastapi.responses import JSONResponse
-    from . import stage2
+    from .stage2 import stage as stage2
     from .storage import storage
     user = page_user(vw2_session)
     if not user:
@@ -294,7 +294,7 @@ async def review_act(request: Request, code: str, vw2_session: str | None = Cook
     """One JSON post per button: {action: 'record', quote} at the options stage; {action: 'decide', slide, decision, note, edit} at the master stage.
     Each calls the server function the vw tool calls (`vw options record`, `vw master decide`)."""
     from fastapi.responses import JSONResponse
-    from . import stage2
+    from .stage2 import stage as stage2
     from .storage import storage
     user = page_user(vw2_session)
     if not user:

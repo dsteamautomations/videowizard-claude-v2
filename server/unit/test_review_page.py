@@ -156,3 +156,11 @@ def test_every_page_path_a_template_calls_has_a_route():
         wanted |= set(re.findall(r"/runs/\$\{code\}/([a-z0-9-]+)", text)) | set(re.findall(r"'/runs/'\s*\+\s*code\s*\+\s*'/([a-z0-9-]+)", text))
         wanted |= set(re.findall(r'/runs/\{\{ run\.code \}\}/([a-z0-9-]+)', text))
     assert wanted and wanted <= served, sorted(wanted - served)
+
+
+def test_the_page_routes_import_the_stage_module_not_the_package():
+    """The first deploy of the page answered 500: `from . import stage2` is the package, which exports nothing; the stage logic is stage2.stage."""
+    source = (APP / 'web.py').read_text(encoding='utf-8')
+    assert 'from . import stage2' not in source and source.count('from .stage2 import stage as stage2') == 2
+    from app import stage2 as pkg
+    assert not hasattr(pkg, 'review_view') and hasattr(S, 'review_view') and hasattr(S, 'record_options') and hasattr(S, 'decide')
