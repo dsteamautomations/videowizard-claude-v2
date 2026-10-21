@@ -489,6 +489,12 @@ def generate_image(conn, store, user, run, outputs, body):
     else:   # design/66 C3: an end keyframe is made from the start keyframe before either is approved, so the pair is approved together
         need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate')) for p in parents),
              'Parents must be approved references of this run (an end keyframe may be made from a candidate start keyframe).')
+    if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
+        for start in [p for p in parents if p['kind'] == 'keyframe']:
+            for inherited in (start.get('generation') or {}).get('parents') or []:
+                row = session['references'].get(inherited.get('id'))
+                if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
+                    parents.append(row)
     check_cap(conn, run, session, prices()['image_inr'], 'one image')   # design/65 B7
     op = 'edit' if parents else 'generate'
     ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
@@ -549,9 +555,18 @@ def packet(store, run, outputs, shot_id, session=None):
             need(row['status'] == 'approved' and row['sha256'] == b['sha256'], 'A bound reference changed or lost approval.')
             refs.append({'element_id': eid, 'reference_id': b['id'], 'sha256': b['sha256'], 'key': row['key'], 'subject': row['subject'], **({'subject_selector': b['subject_selector']} if 'subject_selector' in b else {})})
     generator = session['generator_choices'].get(shot_id) or video_generators.DEFAULT
+    start_instruction = ('Write the start prompt and the end prompt together before generating either. Compose the start for the whole segment: every visible subject, '
+                         'including secondary/background subjects, in its start state in the named scene layout, what the motion heads for already in frame, room in the frame '
+                         'for the move, nothing the end state needs cut off or hidden, nothing placed where the end would have to remove it. Keep landmark-relative locations; '
+                         'the camera only changes their screen projection.')   # design/67 B
+    end_instruction = ('Make the end image from the approved start image as its parent; the server sends the start\'s own references with it. Show every subject in its end state '
+                       'as the plan gives it: its position against its landmark and its side of the frame, its facing, its pose, what it holds, how far the work has gone; for an '
+                       'acting subject the result of its last beat. Name the positions in words. Change nothing else: the same framing, camera, light, people and props. Keep in '
+                       'frame whatever the motion heads for.')   # design/67 C
     prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': shot, 'references': refs,
               'sequence_rules': plan.get('sequence_rules', []), 'elements': [e for e in plan['elements'] if e['id'] in shot['element_ids']],
-              'image_instruction': 'Compose the starting state of every visible subject, including secondary/background subjects, in the named scene layout. Keep landmark-relative locations; the camera only changes their screen projection.',
+              'start_image_instruction': start_instruction, 'image_instruction': start_instruction,   # the old name answers for one release (design/67 A)
+              'end_image_instruction': end_instruction,
               'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are.',
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
               'provider': {k: generator[k] for k in ('provider', 'model')}}

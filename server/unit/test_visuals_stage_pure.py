@@ -287,6 +287,40 @@ def test_a_keyframe_may_be_generated_from_a_candidate_keyframe(monkeypatch):
     assert out['op'] == 'edit'
 
 
+def test_the_packet_carries_the_start_end_and_motion_instructions():
+    """design/67 A-C: the start is composed for the whole segment with the end in mind; the end names positions and changes nothing else."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    prep = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']
+    start, end, motion = prep['start_image_instruction'], prep['end_image_instruction'], prep['video_instruction']
+    assert prep['image_instruction'] == start   # the old name still answers for one release
+    assert 'Write the start prompt and the end prompt together before generating either' in start and 'room in the frame for the move' in start and 'what the motion heads for already in frame' in start
+    assert 'from the approved start image as its parent' in end and "the server sends the start's own references with it" in end
+    assert 'its position against its landmark and its side of the frame, its facing' in end and 'Change nothing else' in end and 'result of its last beat' in end
+    assert motion.startswith('Read the actual accepted starting image')
+
+
+def test_an_end_keyframe_carries_the_start_keyframes_own_references(monkeypatch):
+    """design/67 D: the child names only the start; the server sends the start's sheets behind it, in order, without repeating one the child named."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sheets = {'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'S2': {**ref('S2', 'approved'), 'kind': 'sheet'}}
+    start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': 'S1', 'key': sheets['S1']['key'], 'sha256': 'sha-S1'}, {'id': 'S2', 'key': sheets['S2']['key'], 'sha256': 'sha-S2'}]}}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references={**sheets, 'K1': start})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the bucket now empty', 'parents': ['K1']}
+    store = store_with(sess, doc)
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
+    assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['K1', 'S1', 'S2']
+    store = store_with(sess, doc)
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r2', 'parents': ['K1', 'S2']})   # a sheet named by the child is not repeated
+    assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['K1', 'S2', 'S1']
+    store = store_with(sess, doc)
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r3', 'kind': 'isolated', 'parents': ['S1']})   # not a keyframe: as today
+    assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['S1']
+
+
 def test_status_carries_the_treatment_and_the_budget(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     store = store_with(session())
