@@ -1055,7 +1055,8 @@ def visuals_packet(run_id: UUID, shot_id: str, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
     outputs = core.current_outputs(conn, run['id'])
     card = auth.client_card(run['client_id'])   # design/68: the job form's industry and brand lines; {} when the directory does not answer
-    return Response(visuals_stage.packet(storage(), run, outputs, shot_id, card=card, rules=core.effective_rules(conn, run, outputs)['effective']))
+    rules = core.effective_rules(conn, run, outputs)['effective']
+    return Response(visuals_stage.guarded(lambda: visuals_stage.packet(storage(), run, outputs, shot_id, card=card, rules=rules)))   # defect 19: a refusal, not a 500
 
 
 @app.post('/api/runs/{run_id}/visuals/prepare')

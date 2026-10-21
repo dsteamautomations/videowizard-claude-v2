@@ -312,6 +312,15 @@ def test_the_packet_carries_the_start_end_and_motion_instructions():
     assert with_card['preparation_digest'] == full['preparation_digest'] and with_card['preparation']['library']['job_forms']['take']['industry'] == 'education'
 
 
+def test_a_packet_before_bind_is_a_refusal_with_the_message_not_a_crash():
+    """defect 19 (VW-6, 21 Oct): the route returned a bare 500 because the packet call ran outside the guard; the message existed all along."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc))
+    with pytest.raises(Problem) as exc:
+        g(lambda: VS.packet(store_with(sess, doc), RUN, [], 'VS1'))
+    assert exc.value.status == 422 and 'Bind references for this shot' in exc.value.message
+
+
 def test_library_version_is_recorded_at_prepare_and_an_older_session_reads_the_latest():
     assert VS.library_version_of(session()) == VS.library.latest()
     assert VS.library_version_of(session(library_version='vwlib-2026-01-01-aaaaaaaaaaaa')) == 'vwlib-2026-01-01-aaaaaaaaaaaa'
