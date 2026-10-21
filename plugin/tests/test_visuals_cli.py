@@ -169,14 +169,10 @@ def test_accept_and_record_take_all(harness, monkeypatch, capsys):
 
 # ---------- 10.9 the reading copy of the visuals package ----------
 
-def test_visuals_package_is_written_one_clip_per_line(harness, monkeypatch):
-    ws, _ = harness
-    pk = {'source': {'gaps': {'G1': {'start_frame': 0}}}, 'prompt': 'p' * 3000, 'plan_schema': {'a': 1},
-          'world_evidence': [{'clip': 'c1', 'entities': [{'name': 'Mason'}], 'landmarks': ['wall']}, {'clip': 'c2', 'entities': [], 'landmarks': []}]}
-
+def fake_client(monkeypatch, body):
     class Resp:
         status_code = 200
-        content = json.dumps(pk).encode('utf-8')
+        content = json.dumps(body).encode('utf-8')
 
     class Client:
         def __enter__(self):
@@ -188,12 +184,76 @@ def test_visuals_package_is_written_one_clip_per_line(harness, monkeypatch):
         def get(self, path, follow_redirects=True):
             return Resp()
     monkeypatch.setattr(vw, 'api', lambda: Client())
-    p = vw._download({'code': 'VW-9', 'run_id': 'run-1'}, 'k', 'work/visuals-package.json')
-    text = open(p, encoding='utf-8').read()
-    got = json.loads(text)
-    assert got['world_evidence'] == pk['world_evidence'] and got['plan_schema'] == {'a': 1} and 'read visuals-package.prompt.md' in got['prompt']
-    clips = [l for l in text.split('\n') if '"clip"' in l]
-    assert len(clips) == 2 and all(json.loads(l.strip().rstrip(',')) for l in clips)
+
+
+def test_visuals_package_is_written_one_file_per_section(harness, monkeypatch):
+    """design/65 B12: as the options package (design/61): small files, tables one row per line, the world evidence in files of 25 clips."""
+    ws, _ = harness
+    pk = {'source': {'gaps': {'G1': {'start_frame': 0, 'end_frame': 100, 'requirement': 'r'}}}, 'prompt': 'p' * 3000, 'plan_schema': {'a': 1}, 'brief': {'purpose': 'x'},
+          'intended_visuals': [{'heading': 'Scene 1', 'lines': ['A kiln.'], 'narration_starts': 'Every brick'}], 'generator_catalog': [{'provider': 'google'}],
+          'world_evidence': [{'clip': f'c{i}', 'entities': [{'name': 'Mason'}], 'landmarks': ['wall']} for i in range(30)], 'script_digest': 'd'}
+    fake_client(monkeypatch, pk)
+    (ws / 'work' / 'visuals' ).mkdir(parents=True, exist_ok=True)
+    (ws / 'work' / 'visuals' / 'world-9.json').write_text('stale', encoding='utf-8')
+    files = vw.download_visuals_package({'code': 'VW-9', 'run_id': 'run-1'}, 'k')
+    names = sorted(p.name for p in (ws / 'work' / 'visuals').iterdir())
+    assert names == ['brief.json', 'gaps.json', 'generators.json', 'intended-visuals.json', 'prompt.md', 'rest.json', 'schema.json', 'world-1.json', 'world-2.json']
+    assert (ws / 'work' / 'visuals' / 'prompt.md').read_text(encoding='utf-8').startswith('ppp')
+    gaps = json.loads((ws / 'work' / 'visuals' / 'gaps.json').read_text(encoding='utf-8'))
+    assert gaps == [{'gap_id': 'G1', 'start_frame': 0, 'end_frame': 100, 'requirement': 'r'}]
+    world1 = (ws / 'work' / 'visuals' / 'world-1.json').read_text(encoding='utf-8')
+    rows = [l for l in world1.split('\n') if '"clip"' in l]
+    assert len(rows) == 25 and all(json.loads(l.strip().rstrip(',')) for l in rows)
+    assert json.loads((ws / 'work' / 'visuals' / 'intended-visuals.json').read_text(encoding='utf-8')) == pk['intended_visuals']
+    by = {f['file']: f for f in files}
+    assert by['work/visuals/world-1.json']['rows'] == 25 and by['work/visuals/world-2.json']['rows'] == 5 and by['work/visuals/gaps.json']['rows'] == 1
+    assert by['work/visuals/prompt.md']['for'] == 'read first' and by['work/visuals/intended-visuals.json']['for'] == 'treatment'
+    assert not (ws / 'work' / 'visuals-package.json').exists()
+
+
+def test_prepare_writes_the_files_and_prints_the_page_link(harness, monkeypatch, capsys):
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'package': {'key': 'k'}, 'gaps': ['G1'], 'next': 'treatment'})
+    fake_client(monkeypatch, {'source': {'gaps': {'G1': {'start_frame': 0, 'end_frame': 100}}}, 'prompt': 'p', 'plan_schema': {}, 'world_evidence': [], 'intended_visuals': [], 'generator_catalog': []})
+    code, out, err = run(args(what='prepare'), capsys)
+    assert code == 0 and out['visuals_page_url'] == 'https://x.example/runs/VW-9/visuals' and 'work/visuals/' in err and 'https://x.example/runs/VW-9/visuals' in err
+    assert any(f['file'] == 'work/visuals/prompt.md' for f in out['files'])
+
+
+def test_treatment_sequence_cap_and_budget_post_what_the_server_expects(harness, monkeypatch, capsys):
+    ws, _ = harness
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'recorded': True, 'totals': {'images': 4}, 'estimate_inr': 160.0, 'cap_inr': 1000.0, 'shot_id': 'AN1', 'states': 3, 'warnings': [], 'kind': 'sequence'})
+    (ws / 'out' / 'visual-treatment.json').write_text(json.dumps({'gaps': [{'gap_id': 'G1', 'routes': ['still'], 'picture': 'p', 'seconds': 5, 'images': 1}]}), encoding='utf-8')
+    code, out, err = run(args(what='treatment', file='out/visual-treatment.json', quote='Yes, this treatment.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/treatment') and posted[-1][1]['document']['gaps'][0]['gap_id'] == 'G1' and posted[-1][1]['quote'] == 'Yes, this treatment.'
+    assert 'Treatment recorded' in err and '4 images' in err and '₹160' in err and '₹1,000' in err
+    code, out, err = run(args(what='sequence', shot='AN1', refs=['R1,R2,R3'], quote='Yes, these states.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/sequence') and posted[-1][1] == {'shot_id': 'AN1', 'reference_ids': ['R1', 'R2', 'R3'], 'quote': 'Yes, these states.'}
+    assert '3 states' in err
+    code, out, err = run(args(what='cap', inr='1500', quote='Raise it.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/cap') and posted[-1][1] == {'inr': 1500.0, 'quote': 'Raise it.'}
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'spent_inr': 120.0, 'cap_inr': 1000.0, 'left_inr': 880.0, 'images': 6, 'take_seconds': 0.0, 'planned': {'images': 40, 'video_seconds': 41.0, 'inr': 1128.0}, 'prices': {}})
+    code, out, err = run(args(what='budget'), capsys)
+    assert code == 0 and '₹120' in err and '₹1,000' in err and '₹1,128' in err and 'over the cap' in err
+
+
+def test_check_line_prints_routes_images_and_cost(harness, monkeypatch, capsys):
+    ws, _ = harness
+    (ws / 'out' / 'visual-plan.json').write_text('{}', encoding='utf-8')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'status': 'valid', 'warnings': [{'shot_id': 'DG1', 'kind': 'graphic_short', 'message': 'm'}],
+                                                                     'routes': {'video': 8, 'still': 1, 'graphic_sequence': 25, 'seconds': {'video': 41.0, 'still': 4.0, 'graphic_sequence': 180.0}, 'graphic_seconds': 184.0, 'images_estimated': 84},
+                                                                     'budget': {'spent_inr': 0.0, 'cap_inr': 1000.0, 'planned_inr': 2008.0}})
+    code, out, err = run(args(what='check', file='out/visual-plan.json'), capsys)
+    assert code == 0 and 'check: valid' in err and '8 video (41 s)' in err and '25 graphic sequences (180 s)' in err and '1 still (4 s)' in err and '84 images' in err
+    assert '₹2,008' in err and 'cap ₹1,000' in err and '1 warning' in err
+
+
+def test_image_state_kind_posts_one_parent(harness, monkeypatch, capsys):
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append(body) or {'reference_id': 'R2', 'job_id': 'j', 'model': 'm', 'op': 'edit'})
+    code, out, err = run(args(what='image', element='E1', kind='state', parents='R1', prompt='the cavities appear'), capsys)
+    assert code == 0 and posted[-1]['kind'] == 'state' and posted[-1]['parents'] == ['R1']
 
 
 # ---------- the prompt, the steps and the command text ----------

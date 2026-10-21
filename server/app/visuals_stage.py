@@ -100,6 +100,7 @@ def prepare(conn, store, user, run, outputs):
     procedure = core._stage(core.stage_table(run['procedure_version']), STAGE)
     brief = next((o for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     script = next((o for o in outputs if o['stage'] == 'script' and o['unit'] is None), None)
+    intake = next((o for o in outputs if o['stage'] == 'intake' and o['unit'] is None), None)
     world = []
     for o in outputs:
         if o['stage'] == 'analysis' and not o['summary'].get('excluded'):
@@ -117,6 +118,7 @@ def prepare(conn, store, user, run, outputs):
     package = {'source': session['source'], 'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
                'brief': ({**brief['summary'], 'effective_rules': core.effective_rules(conn, run, outputs)} if brief else None),   # design/37 2.7
                'script_digest': script['summary'].get('content_digest') if script else None,
+               'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog()}
     pk = save_json(store, key(run, 'package.json'), package)
@@ -129,7 +131,10 @@ def check(store, run, outputs, document):
         plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session))
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
-    return {'status': 'valid', 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'plan_digest': digest(plan)}   # design/45 10.2
+    r = routes(plan, _fps(session) or 25)
+    pr = prices()
+    planned = round(r['images_estimated'] * pr['image_inr'] + r['seconds']['video'] * pr['video_inr_per_s'], 2)   # design/65 B7: the cost against the cap, before anything is paid
+    return {'status': 'valid', 'warnings': warnings, 'routes': r, 'plan_digest': digest(plan), 'budget': {'planned_inr': planned, 'cap_inr': cap_of(session)}}   # design/45 10.2
 
 
 def propose(conn, store, user, run, outputs, document):

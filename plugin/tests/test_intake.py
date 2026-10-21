@@ -178,3 +178,20 @@ def test_record_keeps_the_documents_timing_lines(ws):
 
 def test_intake_steps_name_the_preview():
     assert 'vw stage intake preview' in ' '.join(PROC['steps']) and 'work/intake-preview.txt' in ' '.join(PROC['steps'])
+
+
+def test_record_keeps_the_documents_visual_lines_per_scene(ws):
+    """design/65 S3: the removed visual notes, grouped under their scene heading with the start of that scene's narration."""
+    (ws / 'in' / 'source.txt').write_text(SOURCE, encoding='utf-8')
+    intake_prepare(ws, PROC, prior)
+    proposal(ws)
+    s = intake_record(ws, PROC, prior, title='T', client='VK')['summary']
+    assert s['intended_visuals'] == [{'heading': 'Scene 1: The yard', 'lines': ['- Close-up of finished blocks'], 'narration_starts': 'Narration: Earth blocks are made from the soil beneath our feet.'}]
+    text = 'Scene 1: One\nVisuals\nA kiln.\nA wall.\nNarration\nFirst words of scene one here.\nScene 2: Two\nNarration\nSecond scene words.\nVisuals\nA roof.\n'
+    removals = [{'line': 1, 'kind': 'scene_heading', 'why': ''}, {'line': 2, 'kind': 'section_label', 'why': ''}, {'line': 3, 'kind': 'visual_note', 'why': ''}, {'line': 4, 'kind': 'visual_note', 'why': ''},
+                {'line': 5, 'kind': 'section_label', 'why': ''}, {'line': 7, 'kind': 'scene_heading', 'why': ''}, {'line': 8, 'kind': 'section_label', 'why': ''}, {'line': 10, 'kind': 'section_label', 'why': ''},
+                {'line': 11, 'kind': 'visual_note', 'why': ''}]
+    assert stages_text.visual_lines(text, removals) == [{'heading': 'Scene 1: One', 'lines': ['A kiln.', 'A wall.'], 'narration_starts': 'First words of scene one here.'},
+                                                         {'heading': 'Scene 2: Two', 'lines': ['A roof.'], 'narration_starts': 'Second scene words.'}]
+    assert stages_text.visual_lines('Just words.\n', []) == []
+    assert stages_text.visual_lines('Seen: a kiln\nWords.\n', [{'line': 1, 'kind': 'visual_note', 'why': ''}]) == [{'heading': '', 'lines': ['Seen: a kiln'], 'narration_starts': 'Words.'}]

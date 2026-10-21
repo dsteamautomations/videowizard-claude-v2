@@ -153,6 +153,50 @@ def options_reading_files(ws, data):
     return files
 
 
+def visuals_reading_files(ws, data):
+    """design/65 B12: the visuals package for reading, one file per section under work/visuals/ (as design/61 did for options)."""
+    import textwrap
+    folder = ws / 'work' / 'visuals'
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.iterdir():
+        if old.suffix in ('.json', '.md'):
+            old.unlink()
+    files = []
+
+    def put(name, payload, purpose):
+        path = folder / name
+        if name.endswith('.md'):
+            path.write_text(payload, encoding='utf-8')
+            n = payload.count('\n')
+        else:
+            path.write_text(json.dumps(payload, indent=1, ensure_ascii=False, default=str) + '\n', encoding='utf-8')
+            n = len(payload) if isinstance(payload, (list, dict)) else 1
+        files.append({'file': f'work/visuals/{name}', 'rows': n, 'for': purpose})
+    prompt = str(data.get('prompt') or '')
+    put('prompt.md', '\n'.join(textwrap.fill(l, 160) if len(l) > 160 else l for l in prompt.split('\n')) + '\n', 'read first')
+    source = dict(data.get('source') or {})
+    gaps = source.pop('gaps', None) or {}
+    put('gaps.json', sorted(({'gap_id': gid, **g} for gid, g in gaps.items()), key=lambda g: g.get('start_frame', 0)), 'treatment')
+    put('intended-visuals.json', data.get('intended_visuals') or [], 'treatment')
+    put('brief.json', data.get('brief') or {}, 'treatment')
+    for name, n in rows_files(folder, 'world', data.get('world_evidence') or [], cap=25):
+        files.append({'file': f'work/visuals/{name}', 'rows': n, 'for': 'scenes and references'})
+    put('schema.json', data.get('plan_schema') or {}, 'the plan')
+    put('generators.json', data.get('generator_catalog') or [], 'video shots')
+    rest = {k: v for k, v in data.items() if k not in ('prompt', 'source', 'intended_visuals', 'brief', 'world_evidence', 'plan_schema', 'generator_catalog')}
+    put('rest.json', {**rest, 'source': source}, 'reference')
+    return files
+
+
+def download_visuals_package(m, key):
+    """The visuals package, fetched and written for reading (design/65)."""
+    with api() as c:
+        r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
+    if r.status_code != 200:
+        emit({'action': 'tell_builder', 'message': f'Download of {key} failed: HTTP {r.status_code}.'}, 2)
+    return visuals_reading_files(workspace(m['code']), json.loads(r.content))
+
+
 def download_options_package(m, key):
     """The options package, fetched and written for reading (design/61)."""
     with api() as c:
@@ -521,6 +565,10 @@ def review_page_url(code):
     return f"{server_url()}/runs/{code}/review"   # design/62: the review film with each slide's buttons; approve the options and decide there
 
 
+def visuals_page_url(code):
+    return f"{server_url()}/runs/{code}/visuals"   # design/65: the treatment, the pictures, the sequences and the takes, approved by click
+
+
 def cmd_next(a):
     m = active()
     nxt = call('GET', f"/api/runs/{m['run_id']}/next")
@@ -529,8 +577,10 @@ def cmd_next(a):
         nxt['voice_page_url'] = voice_page_url(m['code'])
     if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
         nxt['review_page_url'] = review_page_url(m['code'])
+    if nxt.get('stage') == 'visuals':   # design/65: the treatment, the pictures and the takes are approved on the page
+        nxt['visuals_page_url'] = visuals_page_url(m['code'])
     emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
-         + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else ''))
+         + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else '') + (f" Visuals page: {nxt['visuals_page_url']}" if nxt.get('visuals_page_url') else ''))
 
 
 def file_refs(m, paths, stage, retain):
@@ -1050,8 +1100,6 @@ def _download(m, key, rel):
         if data is not None:
             if rel in READ_BACK:
                 save_json(ws / rel, data)      # the tool reads this one back: line breaks only, values unchanged
-            elif rel == 'work/visuals-package.json':
-                reading_copy(ws / rel, data, drop=(), drop_row=(), rows=(('world_evidence',),))   # design/45 10.9: one clip per line
             else:
                 readable_json(ws / rel, data)  # read by the assistant only: long texts move to .md files beside it
             return str(ws / rel)
@@ -1121,11 +1169,42 @@ def cmd_visuals(a):
     ws = workspace(m['code'])
     if a.what == 'prepare':
         out = write(base + '/prepare', {})
-        _download(m, out['package']['key'], 'work/visuals-package.json')
-        emit({**out, 'not_shareable': NOT_SHAREABLE}, 0, f"Visuals package in work/visuals-package.json; gaps: {out['gaps']}. Author out/visual-plan.json, then `vw visuals check`.")
+        files = download_visuals_package(m, out['package']['key'])   # design/65 B12: one file per section
+        url = visuals_page_url(m['code'])
+        emit({**out, 'files': files, 'visuals_page_url': url, 'not_shareable': NOT_SHAREABLE}, 0,
+             f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, gaps.json and intended-visuals.json first. "
+             f"Settle the treatment with the operator and record it before any plan. Visuals page (give the operator this link): {url}")
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'plan': _json_file(m, a.file)})
-        emit(out, 0 if out.get('status') != 'rejected' else 2, f"{a.what}: {out.get('status', 'saved')}")
+        line = f"{a.what}: {out.get('status', 'saved')}"
+        r = out.get('routes') or {}
+        if r:   # design/65 C2: the routes, the images and the cost against the cap
+            secs = r.get('seconds') or {}
+            line += (f"; {r.get('video', 0)} video ({secs.get('video', 0):.0f} s), {r.get('graphic_sequence', 0)} graphic sequences ({secs.get('graphic_sequence', 0):.0f} s), "
+                     f"{r.get('still', 0)} still ({secs.get('still', 0):.0f} s); {r.get('images_estimated', 0)} images")
+            b = out.get('budget') or {}
+            if b.get('planned_inr') is not None:
+                line += f", about ₹{b['planned_inr']:,.0f} against cap ₹{b.get('cap_inr', 0):,.0f}" + (' (over the cap)' if b['planned_inr'] > (b.get('cap_inr') or 0) else '')
+        if out.get('warnings'):
+            line += f"; {len(out['warnings'])} warning(s): answer each in the shot's purpose and show them to the operator"
+        emit(out, 0 if out.get('status') != 'rejected' else 2, line)
+    if a.what == 'treatment':   # design/65 B6: the treatment as a record
+        out = write(base + '/treatment', {'document': _json_file(m, a.file), 'quote': a.quote or ''})
+        t = out.get('totals') or {}
+        emit(out, 0, f"Treatment recorded: {t.get('gaps', 0)} gaps, {t.get('images', 0)} images, about ₹{out.get('estimate_inr', 0):,.0f} against the cap ₹{out.get('cap_inr', 0):,.0f}. Now author out/visual-plan.json to it.")
+    if a.what == 'sequence':   # design/65 B2': the states of a graphic, approved in one call
+        refs = [x for part in (a.refs or []) for x in part.split(',') if x]
+        out = write(base + '/sequence', {'shot_id': a.shot, 'reference_ids': refs, 'quote': a.quote or ''})
+        emit(out, 0, f"Sequence held for {out.get('shot_id')}: {out.get('states', 0)} states approved" + (f"; {len(out['warnings'])} warning(s): " + '; '.join(out['warnings']) if out.get('warnings') else '') + '.')
+    if a.what == 'cap':   # design/65 B7
+        out = write(base + '/cap', {'inr': float(a.inr or 0), 'quote': a.quote or ''})
+        emit(out, 0, f"Cap set to ₹{out.get('cap_inr', 0):,.0f} on the operator's words.")
+    if a.what == 'budget':
+        out = call('GET', base + '/budget')
+        p = out.get('planned') or {}
+        over = (out.get('spent_inr', 0) + p.get('inr', 0)) > out.get('cap_inr', 0)
+        emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); the current plan still needs about ₹{p.get('inr', 0):,.0f}"
+             + (' — over the cap: narrow the plan or ask the operator to raise it.' if over else '.'))
     if a.what == 'select' and a.gap:
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
     if a.what == 'accept':
@@ -1655,8 +1734,8 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
-    s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record'])
-    for flag in ('--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
+    s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'treatment', 'sequence', 'cap', 'budget', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record'])
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing'):
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')

@@ -141,6 +141,11 @@ def test_next_carries_the_review_page_link_at_the_options_and_master_stages(harn
     with pytest.raises(SystemExit):
         vw.cmd_next(argparse.Namespace(take_over=False))
     assert 'review_page_url' not in json.loads(capsys.readouterr()[0])
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'visuals', 'paid': 'openai'})   # design/65: the visuals page
+    with pytest.raises(SystemExit):
+        vw.cmd_next(argparse.Namespace(take_over=False))
+    out, err = capsys.readouterr()
+    assert json.loads(out)['visuals_page_url'] == 'https://x.example/runs/VW-9/visuals' and 'Visuals page: https://x.example/runs/VW-9/visuals' in err
 
 
 def test_review_fetch_names_the_page(harness, monkeypatch, capsys, tmp_path):

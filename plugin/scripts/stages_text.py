@@ -161,6 +161,27 @@ def timing_lines(text, removals):
     return [rows[r['line'] - 1].strip() for r in removals if isinstance(r, dict) and r.get('kind') == 'timing' and isinstance(r.get('line'), int) and 1 <= r['line'] <= len(rows)]
 
 
+def visual_lines(text, removals):
+    """design/65 S3: the document's own visual notes, removed at intake, grouped under the nearest preceding scene heading with the first
+    kept line of that scene's narration, so the visuals planner can treat them as the team's intended pictures."""
+    rows = text.split('\n')
+    kinds = {r['line']: r.get('kind') for r in removals if isinstance(r, dict) and isinstance(r.get('line'), int) and 1 <= r['line'] <= len(rows)}
+    groups, current = [], None
+    for n, raw in enumerate(rows, 1):
+        line, kind = raw.strip(), kinds.get(n)
+        if kind == 'scene_heading':
+            current = {'heading': line, 'lines': [], 'narration_starts': ''}
+            groups.append(current)
+        elif kind == 'visual_note' and line:
+            if current is None:
+                current = {'heading': '', 'lines': [], 'narration_starts': ''}
+                groups.append(current)
+            current['lines'].append(line)
+        elif kind is None and line and current is not None and not current['narration_starts']:
+            current['narration_starts'] = ' '.join(line.split()[:12])
+    return [g for g in groups if g['lines']]
+
+
 def intake_record(ws, procedure, prior, title=None, client=''):
     data = read_proposal(ws, 'intake')
     try:
@@ -189,6 +210,7 @@ def intake_record(ws, procedure, prior, title=None, client=''):
     summary = {'title': chosen, 'title_source': 'suggested' if chosen in titles else 'typed', 'titles': titles, 'client': client, 'notes': data.get('notes', ''),
                'removed_lines': len(data.get('remove', [])), 'kept_lines': sum(1 for line in cleaned.split('\n') if line.strip()),
                'timing_lines': timing_lines(src['text'], data.get('remove', [])),   # design/53 L2
+               'intended_visuals': visual_lines(src['text'], data.get('remove', [])),   # design/65 S3
                'warnings': src['warnings'], 'source_digest': digest(cleaned), 'source_file': src['file'], 'source_sha256': src.get('sha256'), **stamps(ws, 'intake')}
     return {'files': ['out/source.txt', 'out/original' + original.suffix.lower(), 'out/intake.json'], 'summary': summary, 'retain': True, 'upload': True}
 
