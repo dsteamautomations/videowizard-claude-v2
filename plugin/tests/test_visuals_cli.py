@@ -387,6 +387,43 @@ def test_prompt_and_step_say_a_change_request_in_the_gap_words_is_a_revision():
     assert 'design/75' in STAGES['visuals']['prompt_origin']
 
 
+def test_still_bind_and_approve_take_a_file_of_rows_in_order_and_stop_at_the_first_refusal(harness, monkeypatch, capsys):
+    """design/77 L33b: nine stills, nine binds or nine approvals in one call each, as image --file."""
+    ws, _ = harness
+    (ws / 'out' / 'stills.json').write_text(json.dumps([{'shot': 'IM1', 'ref': 'R1', 'quote': 'yes'}, {'shot': 'IM2', 'ref': 'R2', 'quote': 'yes'}, {'shot': 'IM3', 'ref': 'R3', 'quote': 'yes'}]), encoding='utf-8')
+    calls = []
+
+    def req(method, path, json=None, **kw):
+        calls.append((path, json))
+        if json.get('shot_id') == 'IM2':
+            return {'action': 'refused', 'message': 'shot IM2 is an animation shot'}, 422
+        return {'shot_id': json.get('shot_id'), 'kind': 'still'}, 0
+    monkeypatch.setattr(vw, 'request', req)
+    code, out, err = run(args(what='still', file='out/stills.json'), capsys)
+    assert code == 2 and [c[1]['shot_id'] for c in calls] == ['IM1', 'IM2'] and calls[0][1] == {'shot_id': 'IM1', 'reference_id': 'R1', 'quote': 'yes'}
+    assert out['done'] == ['IM1'] and out['refused']['shot'] == 'IM2' and out['remaining'] == ['IM3'] and 'animation shot' in err
+    (ws / 'out' / 'bindings.json').write_text(json.dumps([{'shot': 'VS1', 'refs': {'E1': ['R1', 'R2']}}, {'shot': 'VS2', 'refs': {'E1': ['R3']}, 'selectors': {'E1': {'R3': 'the chair'}}}]), encoding='utf-8')
+    calls.clear()
+    monkeypatch.setattr(vw, 'request', lambda m, p, json=None, **kw: calls.append((p, json)) or ({'shot_id': json['shot_id'], 'elements': list(json['references'])}, 0))
+    code, out, err = run(args(what='bind', file='out/bindings.json'), capsys)
+    assert code == 0 and calls[0][1]['references'] == {'E1': ['R1', 'R2']} and 'subject_selectors' not in calls[0][1] and calls[1][1]['subject_selectors'] == {'E1': {'R3': 'the chair'}}
+    assert out['done'] == ['VS1', 'VS2'] and '2 shots bound' in err and 'packet' in err
+    (ws / 'out' / 'approvals.json').write_text(json.dumps([{'ref': 'R1', 'sha': 'a' * 64, 'quote': 'yes'}, {'ref': 'R2', 'sha': 'b' * 64, 'quote': 'yes'}]), encoding='utf-8')
+    calls.clear()
+    monkeypatch.setattr(vw, 'request', lambda m, p, json=None, **kw: calls.append((p, json)) or ({'id': p.split('/')[-2], 'status': 'approved'}, 0))
+    code, out, err = run(args(what='approve', file='out/approvals.json'), capsys)
+    assert code == 0 and calls[0][0].endswith('/references/R1/approve') and calls[1][1] == {'sha256': 'b' * 64, 'quote': 'yes'} and out['done'] == ['R1', 'R2'] and '2 approved' in err
+
+
+def test_prompt_and_steps_say_a_still_shot_needs_no_bind_and_name_the_file_forms():
+    """design/77 L33a."""
+    prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
+    assert len(prompt.split()) <= 3500
+    assert 'Bind each video shot' in prompt and 'A still shot needs no bind' in prompt
+    assert 'Still shots need no bind' in steps[4] and 'still --file' in steps[4] and 'bind --file' in steps[4] and 'approve --file' in steps[3]
+    assert 'design/77' in STAGES['visuals']['prompt_origin']
+
+
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
     """design/74 L31 (defect 19)."""
     monkeypatch.setattr(vw, 'request', lambda method, path, **kw: ({'action': 'refused', 'message': 'Bind references for this shot under the current accepted plan.'}, 422))

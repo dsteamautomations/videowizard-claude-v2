@@ -1299,8 +1299,16 @@ def cmd_visuals(a):
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`.")
     if a.what == 'approve':
+        if a.file:   # design/77 L33b: several approvals in one call
+            _batch(_rows(m, a.file, ('ref', 'sha', 'quote')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r['quote']}), 'ref',
+                   lambda done: f"{len(done)} approved: {', '.join(done)}.")
         emit(write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote}))
     if a.what == 'bind':   # design/45 10.4: no quote needed; the approved references are the yes
+        if a.file:   # design/77 L33b: several shots in one call
+            def bind_row(r):
+                body = {'shot_id': r['shot'], 'references': r['refs'], **({'subject_selectors': r['selectors']} if r.get('selectors') else {}), **({'quote': r['quote']} if r.get('quote') else {})}
+                return r['shot'], 'POST', base + '/bind', body
+            _batch(_rows(m, a.file, ('shot', 'refs')), bind_row, 'shot', lambda done: f"{len(done)} shots bound: {', '.join(done)}; now `vw visuals packet --shot S` for each, then compose the start and end images.")
         refs = {eid: text.split(',') for eid, text in _pairs(a.refs, '--refs', 'ELEMENT=REF1,REF2').items()}
         selectors = {}
         for item in a.selector or []:   # design/33 A3: an object inside an approved place picture, named in words
@@ -1392,6 +1400,9 @@ def cmd_visuals(a):
     if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
         emit(write(base + '/select-take', {'job_id': a.job, 'quote': a.quote, **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})}))
     if a.what == 'still':   # design/45 10.3: an approved reference fills a still shot
+        if a.file:   # design/77 L33b: several still shots in one call
+            _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or ''}), 'shot',
+                   lambda done: f"{len(done)} stills set: {', '.join(done)}.")
         emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote}), 0, f'Still set for {a.shot} from reference {a.ref}.')
     if a.what == 'asset':
         entry = next((f for f in m['files'] if f.get('name') == Path(a.file).name and f.get('receipt')), None)
@@ -1405,6 +1416,28 @@ def cmd_visuals(a):
         out = write(base + '/record', {'gap_ids': gaps, 'quote': a.quote})
         skipped = out.get('skipped') or {}
         emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
+
+
+def _batch(rows, build, label, done_line):
+    """design/77 L33b: one call per row, in order, stopping at the first refusal (as image --file). build(row) -> (name, method, path, body)."""
+    done = []
+    for i, row in enumerate(rows):
+        name, method, path, body = build(row)
+        payload, code = request(method, path, json=body)
+        if code:
+            if code == 401:
+                finish(payload, code)
+            emit({'done': done, 'refused': {label: name, 'message': payload.get('message') or payload.get('action')}, 'remaining': [build(r)[0] for r in rows[i + 1:]], 'action': 'refused'}, 2,
+                 f"{len(done)} done; {name} refused: {payload.get('message')}; fix it and run the file again with the rest")
+        done.append(name)
+    emit({'done': done}, 0, done_line(done))
+
+
+def _rows(m, path, keys):
+    rows = _json_file(m, path)
+    if not isinstance(rows, list) or not all(isinstance(r, dict) and all(k in r for k in keys) for r in rows):
+        emit({'action': 'refused', 'message': f'{path} must be a list of {{{", ".join(keys)}, …}} rows.'}, 2)
+    return rows
 
 
 def _checklist_line(lines):
