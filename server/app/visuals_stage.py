@@ -698,6 +698,8 @@ def round_done(store, user, run, outputs, verdicts, quote):
     need((quote or '').strip(), "The operator's words are required: they approve the frames and say yes to the searches.")
     verdicts = verdicts or {}
     for eid, row in rd['elements'].items():
+        if not row['frames']:   # a round posted without naming the frames: the element's grabbed frames count (as round_start does now)
+            row['frames'] = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
         v = verdicts.get(eid) or {}
         need(v.get('verdict') in ('approve', 'search'), f'{eid}: a verdict is required, approve or search.')
         if v['verdict'] == 'approve':
