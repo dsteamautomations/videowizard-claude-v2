@@ -151,7 +151,7 @@ function autoStep(){const d=data;if(!d||d.state!=='prepared')return 'treatment';
   if(!d.treatment||d.treatment_draft)return 'treatment';
   if(!d.plan_digest||d.gaps.some(g=>!g.accepted&&!g.recorded&&g.shots.length))return 'plan';
   const els=(d.elements||[]).filter(e=>e.kind!=='graphic');
-  if(els.some(e=>!(d.references||[]).some(r=>r.element_id===e.id&&r.kind==='sheet'&&r.status==='approved')))return 'references';
+  if(roundOpen()||els.some(e=>!(d.references||[]).some(r=>r.element_id===e.id&&r.kind==='sheet'&&r.status==='approved')))return 'references';
   if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>s.route!=='video'&&!s.asset)))return 'pictures';
   if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>s.route==='video'&&!s.takes.some(k=>k.selected))))return 'takes';
   return 'record';}
@@ -208,8 +208,9 @@ function refCard(r,sel){
   const rejected=r.status==='rejected', can=stage()==='visuals';
   const reject=(r.status==='candidate'||r.status==='approved')&&can?'<div class="btns" style="margin:0 6px 6px"><button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'';   // design/74 L7
   const approve=(r.status==='candidate'&&can)?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'';
+  const state='<span class="badge '+(r.status==='approved'?'ok':rejected?'err':r.status==='candidate'?'dec':'')+'" style="margin:4px 6px 0">'+esc(r.status)+'</span>';   // design/79 Q2: the picture's own state, in words
   return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="" data-big="'+esc(r.url)+'">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    '<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+esc(r.name)+' · '+esc(r.kind)+(r.status==='approved'?' · ✓':'')+(rejected?' · rejected':'')+'</div>'+checklist(r.checklist)+(rejected?'':(sel||'')+approve+reject)+'</div>';
+    state+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+esc(r.name)+' · '+esc(r.kind)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist)+(rejected?'':(sel||'')+approve+reject)+'</div>';
 }
 function resultCard(s,r){
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0;
@@ -222,10 +223,38 @@ function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
   if(refs.some(r=>r.status==='candidate'||r.status==='approved'))return ['dec','pictures in hand'];
   const hits=((data.element_matches||{})[e.id]||[]).length;return hits?['','seen in the footage']:['err','needs a picture'];}
+function roundOpen(){const rd=data&&data.round;return rd&&(rd.pass===1||rd.pass===2)?rd:null;}
+function renderRound(rd){   // design/79: every element at once; pass 1 the frames and the keywords, pass 2 the searched elements' pictures
+  const d=data, refs={};(d.references||[]).forEach(r=>refs[r.id]=r);
+  const els=d.elements||[], byId={};els.forEach(e=>byId[e.id]=e);
+  const ids=Object.keys(rd.elements);
+  if(rd.pass===1){
+    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
+      return '<tr><td><span class="nm">'+esc(eid)+'</span><div class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</div></td><td>'+(frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+'"><img src="'+esc(f.url)+'" alt="" data-big="'+esc(f.url)+'"><div class="cap">from your footage'+(f.status==='approved'?' · approved':'')+'</div></div>').join('')+'</div>':'<span class="ds">no frame in the footage</span>')+'</td>'+
+        '<td><input class="kw" data-el="'+esc(eid)+'" value="'+esc(r.keywords||'')+'" placeholder="two to six words" style="width:100%;min-width:180px"></td>'+
+        '<td>'+(frames.length?'<label style="display:block;margin-bottom:6px"><input type="radio" name="v-'+esc(eid)+'" value="approve" checked> Approve the frame</label>':'')+'<label style="display:block"><input type="radio" name="v-'+esc(eid)+'" value="search" '+(frames.length?'':'checked')+'> Search with these keywords</label></td></tr>';}).join('');
+    $('s-references').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 8px"><b>Reference round, pass 1 of 2:</b> every element at once. For each row, keep the footage frame or send the keywords to Google Images; edit the keywords as you like. One words box at the foot covers the whole pass and is your yes to the searches; then Done. Nothing is paid from a click.</p>'+
+      '<table><thead><tr><th>Element</th><th>From your footage</th><th>Keywords</th><th>Your verdict</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }else{
+    const parts=ids.filter(eid=>rd.elements[eid].search_id).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, s=(d.searches||[]).find(x=>x.search_id===r.search_id);
+      if(!s)return '';
+      return '<h3>'+esc(eid)+' <span class="ds" style="text-transform:none">'+esc(e.name)+' · “'+esc(s.keywords)+'”</span></h3>'+(s.results.length?'<div class="strip">'+s.results.map(x=>resultCard(s,x)).join('')+'</div>':'<div class="ds">No picture came back for these keywords.</div>');}).join('');
+    const errs=ids.filter(eid=>rd.elements[eid].error).map(eid=>'<div class="ds err">'+esc(eid)+': '+esc(rd.elements[eid].error)+'</div>').join('');
+    $('s-references').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 8px"><b>Reference round, pass 2 of 2:</b> the searched elements. Click a picture to see it large; tick the ones to use, in order (the first tick is Image 1); add a note under each. One words box at the foot, then Done. An element with no tick gets no picture; say so in the words if it needs another search.</p>'+errs+parts;
+  }
+  const root=$('s-references');
+  root.querySelectorAll('[data-tick]').forEach(t=>t.addEventListener('click',ev=>{ev.stopPropagation();const [sid,n]=t.dataset.tick.split(':');toggleTick(sid,Number(n));renderRound(rd);footer();}));
+  root.querySelectorAll('[data-note]').forEach(n=>n.addEventListener('input',()=>{const [sid,k]=n.dataset.note.split(':');const p=pickOf(sid,Number(k));if(p)p.note=n.value;}));
+  root.querySelectorAll('[data-chip]').forEach(c=>c.addEventListener('click',()=>{const [sid,k]=c.dataset.chip.split(':');const p=pickOf(sid,Number(k));if(p){p.note=(p.note?p.note+'; ':'')+c.dataset.text;renderRound(rd);}}));
+  root.querySelectorAll('.pic[data-lb] img').forEach(i=>i.addEventListener('click',()=>{const [sid,n]=i.parentElement.dataset.lb.split(':');lightbox(sid,Number(n));}));
+  root.querySelectorAll('img[data-big]').forEach(i=>i.addEventListener('click',()=>bigPicture(i.dataset.big)));
+}
 function renderReferences(){
   const d=data, can=stage()==='visuals'&&!!d.treatment&&!!d.plan_digest;
   const els=(d.elements||[]).filter(e=>e.kind!=='graphic');
   if(!can||!els.length){$('s-references').innerHTML='<div class="empty">'+(d.plan_digest?'No element to reference yet.':'The plan comes first; the elements are its people, objects and places.')+'</div>';return;}
+  const rd=roundOpen();
+  if(rd){renderRound(rd);return;}
   if(!selEl||!els.some(e=>e.id===selEl))selEl=(els.find(e=>elState(e)[1]!=='sheet approved')||els[0]).id;
   const e=els.find(x=>x.id===selEl), refs=(d.references||[]).filter(r=>r.element_id===e.id), hits=(d.element_matches||{})[e.id]||[], s=latestSearch(e.id);
   const list='<div class="list">'+els.map(x=>{const st=elState(x);return '<a data-el="'+esc(x.id)+'" class="'+(x.id===selEl?'on':'')+'"><span class="nm" style="font-size:14px">'+esc(x.id)+'</span><div class="ds">'+esc(x.name)+' · '+esc(x.kind)+'</div><div class="ds"><span class="badge '+st[0]+'">'+st[1]+'</span></div></a>';}).join('')+'</div>';
@@ -339,6 +368,10 @@ function footer(){
     const n=Object.keys(selGaps).length;
     tray.innerHTML='<span>'+(n?n+' gap'+(n>1?'s':'')+' ticked:':'Tick gaps above, then:')+'</span>'+box;
     act_.innerHTML='<button class="go" data-a="accept-selected" '+(n?'':'disabled')+'>Accept</button> <button data-a="revise-selected" '+(n?'':'disabled')+'>Revise</button>';
+  }else if(step==='references'&&roundOpen()){   // design/79: one words box and Done for the whole pass
+    const rd=roundOpen();
+    if(rd.pass===1){const n=Object.keys(rd.elements).length;tray.innerHTML='<span>Your words for the whole pass (they approve the frames and say yes to the searches):</span>'+box;act_.innerHTML='<button class="go" data-a="round-done">Done ('+n+' element'+(n>1?'s':'')+')</button>';}
+    else{const n=Object.values(rd.elements).filter(r=>r.search_id).reduce((k,r)=>k+((picks[r.search_id]||[]).length),0);tray.innerHTML='<span>'+(n?n+' picture'+(n>1?'s':'')+' ticked.':'Tick the pictures to use.')+' Your words for the whole pass:</span>'+box;act_.innerHTML='<button class="go" data-a="round-picks">Done</button>';}
   }else if(step==='references'){
     const s=selEl?latestSearch(selEl):null, n=s?(picks[s.search_id]||[]).length:0;
     tray.innerHTML='<span>'+esc(selEl||'')+(n?' · '+n+' picture'+(n>1?'s':'')+' ticked':'')+':</span>'+box;
@@ -370,6 +403,14 @@ async function click(b){
   if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[];if(!list.length){msg('Tick at least one picture first.',true);return;} if(!q){need();return;}const j=await send({action:'pick',search_id:sid,picks:list,quote:q},list.length+' picture(s) kept as references; the assistant generates the sheet from them.');if(j){delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
   if(a==='record'){if(!q){need();return;}await send({action:'record',gap_ids:readyGaps().map(g=>g.gap_id),quote:q},'Gaps recorded.');return;}
+  if(a==='round-done'){const rd=roundOpen();if(!rd)return;if(!q){need('Your words for the whole pass are required: they approve the frames and say yes to the searches.');return;}
+    const verdicts={};Object.keys(rd.elements).forEach(eid=>{const v=document.querySelector('input[name="v-'+eid+'"]:checked');const kw=document.querySelector('input.kw[data-el="'+eid+'"]');verdicts[eid]={verdict:v?v.value:'search',keywords:kw?kw.value.trim():''};});
+    const j=await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the frames are approved and the searches ran.');
+    if(j&&j.errors&&Object.keys(j.errors).length)msg('Some searches failed: '+Object.entries(j.errors).map(([e,w])=>e+' ('+w+')').join('; ')+'. The rest are on pass 2.',true);return;}
+  if(a==='round-picks'){const rd=roundOpen();if(!rd)return;if(!q){need();return;}
+    const pk={};Object.values(rd.elements).filter(r=>r.search_id).forEach(r=>{pk[r.search_id]=picks[r.search_id]||[];});
+    const j=await send({action:'round-picks',picks:pk,quote:q},'Pass 2 done: the picked pictures are kept; the assistant generates the sheets.');
+    if(j){Object.keys(pk).forEach(s=>delete picks[s]);if(j.failed&&Object.keys(j.failed).length)msg('Some pictures could not be downloaded: '+Object.keys(j.failed).join(', ')+'; the rest are kept.',true);}return;}
 }
 // ---------- render ----------
 function render(){

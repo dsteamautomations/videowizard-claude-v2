@@ -13,6 +13,13 @@ def test_the_page_is_six_steps_on_the_voices_frame():
     assert 'localStorage' in HTML   # the step chosen survives a refresh
 
 
+def test_the_reference_round_has_its_two_passes_and_one_done_button():
+    """design/79 Q2."""
+    for needle in ('pass 1 of 2', 'pass 2 of 2', 'data-a="round-done"', 'data-a="round-picks"', 'Approve the frame', 'Search with these keywords', 'input.kw', 'roundOpen()'):
+        assert needle in HTML, needle
+    assert "'" + 'candidate' + "'" in HTML and 'style="margin:4px 6px 0"' in HTML   # the picture's own state badge
+
+
 def test_the_page_has_no_cap_button_and_no_cap_action():
     assert 'Raise the cap' not in HTML and "action:'cap'" not in HTML and 'do-cap' not in HTML
 

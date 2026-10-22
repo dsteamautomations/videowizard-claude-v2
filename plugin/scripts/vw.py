@@ -1199,8 +1199,8 @@ def cmd_planning(a):
         emit(out, 0, 'Planning finalized; certificate recorded. Run `vw next`.')
 
 
-VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web', 'image',
-                'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74 L26, L7; design/76; design/73
+VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74 L26, L7; design/76; design/73; design/79
 
 
 def cmd_visuals(a):
@@ -1270,6 +1270,17 @@ def cmd_visuals(a):
             hits = (out.get('matches') or {}).get(e['id']) or []
             lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else 'not seen in the footage: the operator picks a picture (`vw visuals search`) or the sheet is generated from words'))
         emit({'file': 'work/visuals/elements.json', 'elements': len(out.get('elements') or [])}, 0, 'Elements against the footage (work/visuals/elements.json): ' + '; '.join(lines))
+    if a.what == 'round':   # design/79: every element at once; the operator answers on the page in two passes
+        if a.verdicts:
+            out = write(base + '/round/done', {'verdicts': _json_file(m, a.verdicts), 'quote': a.quote})
+            emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} search(es) ran" + (f"; failed: {', '.join(out['errors'])}" if out.get('errors') else '') + f"; the round is at pass {out.get('pass')}.")
+        if a.picks:
+            out = write(base + '/round/picks', {'picks': _json_file(m, a.picks), 'quote': a.quote})
+            emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks.")
+        rows = _rows(m, a.file or 'out/reference-round.json', ('element_id', 'keywords'))
+        out = write(base + '/round', {'elements': rows})
+        emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements. Give the operator the page link ({visuals_page_url(m['code'])}): they answer every element there in two passes. "
+             "Wait with `vw visuals status --wait 900`; ask nothing per element.")
     if a.what == 'search':   # design/73 R3: Google Images for an element the footage lacks, on the operator's yes
         if not (a.quote or '').strip():
             emit({'action': 'refused', 'message': "The operator's yes to the web search is required: --quote \"<their words>\" (say what you will search and why first)."}, 2)
@@ -1399,10 +1410,13 @@ def cmd_visuals(a):
             jobs_ = st.get('jobs') or []
             open_ = [j for j in jobs_ if j.get('status') in VISUALS_OPEN]
             decide = [j for j in jobs_ if j.get('status') in ('failed', 'rejected', 'cancelled', 'submission_unknown')]
-            if not open_ or decide or time.monotonic() >= deadline:
+            round_open = (st.get('round') or {}).get('pass') in (1, 2)   # design/79: the operator is answering the round on the page
+            if (not open_ and not round_open) or decide or time.monotonic() >= deadline:
                 break
             time.sleep(15)
         ready = sum(1 for j in jobs_ if j.get('status') == 'ready')
+        rd = st.get('round') or {}
+        round_line = f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': read the verdicts and make the sheets') if rd else ''
         if decide:
             line = f"{len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
         elif open_:
@@ -1411,7 +1425,7 @@ def cmd_visuals(a):
                    ('; run again with --wait' if a.wait else '')
         else:
             line = f'all done: {ready} ready' if jobs_ else 'no image or take jobs yet'
-        emit(st, 0, 'Visuals: ' + line)
+        emit(st, 0, 'Visuals: ' + line + round_line)
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)
@@ -1873,7 +1887,7 @@ def build_parser():
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer',
-                 '--keywords', '--search', '--n', '--reason'):   # design/73
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks'):   # design/73, design/79
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')

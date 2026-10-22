@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None}
+            'subject': None, 'selector': None, 'answer': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -467,6 +467,29 @@ def test_prompt_steps_and_doc_carry_the_sheet_per_element_the_people_rule_and_th
     assert 'vw visuals elements' in steps[3] and 'two to six words' in steps[3] and 'pick --search' in steps[3] and 'never a parent for an edit' in steps[3]
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'vw visuals search' in md and 'pick' in md and 'design/73' in STAGES['visuals']['prompt_origin']
+
+
+def test_round_posts_the_elements_the_verdicts_and_the_picks_and_status_waits_for_the_page(harness, monkeypatch, capsys):
+    """design/79 Q3."""
+    ws, _ = harness
+    (ws / 'out' / 'reference-round.json').write_text(json.dumps([{'element_id': 'E1', 'frames': ['F1'], 'keywords': 'village mason Tamil Nadu'}, {'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln'}]), encoding='utf-8')
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'pass': 1, 'elements': 2})
+    code, out, err = run(args(what='round', file='out/reference-round.json'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/round') and posted[-1][1]['elements'][1] == {'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln'} and 'two passes' in err and 'ask nothing per element' in err
+    (ws / 'out' / 'round-verdicts.json').write_text(json.dumps({'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'search', 'keywords': 'clamp kiln'}}), encoding='utf-8')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'pass': 2, 'searched': ['E2'], 'errors': {}})
+    code, out, err = run(args(what='round', verdicts='out/round-verdicts.json', quote='Yes, as ticked.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/round/done') and posted[-1][1]['verdicts']['E2']['keywords'] == 'clamp kiln' and posted[-1][1]['quote'] == 'Yes, as ticked.' and 'pass 2' in err
+    (ws / 'out' / 'round-picks.json').write_text(json.dumps({'s1': [{'n': 2, 'note': 'colour only'}]}), encoding='utf-8')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'complete': True, 'references': ['r1'], 'failed': {}})
+    code, out, err = run(args(what='round', picks='out/round-picks.json', quote='These.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/round/picks') and posted[-1][1]['picks'] == {'s1': [{'n': 2, 'note': 'colour only'}]} and 'one sheet per element' in err
+    answers = [{'jobs': [], 'round': {'pass': 1}}, {'jobs': [], 'round': {'pass': 'complete'}}]
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: answers.pop(0) if answers else {'jobs': [], 'round': {'pass': 'complete'}})
+    monkeypatch.setattr(vw.time, 'sleep', lambda s: None)
+    code, out, err = run(args(what='status', wait=60), capsys)
+    assert code == 0 and 'reference round at pass complete' in err and 'read the verdicts' in err and not answers   # it waited through pass 1
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
