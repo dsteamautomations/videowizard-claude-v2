@@ -7,8 +7,11 @@
 set -euo pipefail
 
 CLAUDE="/Users/vasudha/Library/Application Support/Claude/claude-code/2.1.304/6bbba6adc37f/claude.app/Contents/MacOS/claude"
-if command -v claude >/dev/null 2>&1; then CLAUDE=claude; fi
+if command -v claude >/dev/null 2>&1; then CLAUDE=$(command -v claude); fi   # a bare name fails the -x test (SK's PC, 22 Oct 2026)
 [ -x "$CLAUDE" ] || { echo "refusing: claude binary not found at $CLAUDE (update the path in this script and CLAUDE.md)" >&2; exit 1; }
+# On Windows the CLI needs git-bash named, and refuses a git found under the current directory (git is installed under the home folder):
+# run this script from the repository, never from the home folder.
+[ -n "${CLAUDE_CODE_GIT_BASH_PATH:-}" ] || { b=$(command -v bash 2>/dev/null); case "$b" in /c/*|/mnt/c/*) export CLAUDE_CODE_GIT_BASH_PATH="$(cygpath -w "$b" 2>/dev/null || echo "$b")";; esac; }
 
 cd "$(dirname "$0")/.."
 
@@ -42,8 +45,9 @@ done < <(find plugin -name '*.py' | sort)
 WANT=$(git rev-parse main)
 GOT=$(python -c "import json,sys; d=json.load(open(sys.argv[1])); sys.stdout.write(d[\"plugins\"][\"vw@vw-local\"][0][\"gitCommitSha\"])" "$HOME/.claude/plugins/installed_plugins.json")
 [ "$GOT" = "$WANT" ] || { echo "installed plugin is at $GOT, expected $WANT" >&2; exit 1; }
-(cd "/Users/vasudha/Documents/videobuilder - Operator " && "$CLAUDE" plugin list)
+OPERATOR="${VW2_OPERATOR_DIR:-/Users/vasudha/Documents/videobuilder - Operator }"   # on SK's PC: C:/Coworkspace/VideoWizard-Operator
+if [ -d "$OPERATOR" ]; then (cd "$OPERATOR" && "$CLAUDE" plugin list); fi
 
 echo
 echo "Plugin updated from main @ $(git rev-parse --short main)."
-echo "The operator must restart Claude Code in \"/Users/vasudha/Documents/videobuilder - Operator \" to pick it up."
+echo "The operator must restart Claude Code in \"$OPERATOR\" to pick it up."
