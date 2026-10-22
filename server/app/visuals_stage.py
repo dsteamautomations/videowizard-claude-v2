@@ -206,18 +206,8 @@ def check_cap(conn, run, session, estimate_inr, what):
     spent, cap = visuals_spend(conn, run)['spent_inr'], cap_of(session)
     if spent + float(estimate_inr) > cap + 1e-9:
         raise Problem(409, 'VISUALS_CAP', f"₹{spent:,.0f} spent of ₹{cap:,.0f} on this film's visuals; {what} needs about ₹{float(estimate_inr):,.0f}. "
-                                          "Only the operator raises the cap, with their words (`vw visuals cap --inr N --quote \"…\"`).",
+                                          "Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word (design/74 L26).",
                       spent_inr=spent, cap_inr=cap, estimate_inr=float(estimate_inr))
-
-
-def set_cap(store, user, run, outputs, inr, quote):
-    session = session_of(store, run, outputs)
-    need(str(quote or '').strip(), "The operator's words are required to change the cap.")
-    need(isinstance(inr, (int, float)) and float(inr) > 0, 'The cap is more than ₹0.')
-    session['cap_inr'] = float(inr)
-    session.setdefault('cap_history', []).append({'cap_inr': float(inr), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
-    save_session(store, run, session)
-    return {'cap_inr': float(inr)}
 
 
 def budget(conn, store, run, outputs):
@@ -252,9 +242,14 @@ def treatment(store, user, run, outputs, document, quote):
         need(isinstance(e, dict) and e.get('gap_id') in gaps, f"The treatment names an unknown gap: {(e or {}).get('gap_id')!r}.")
         need(e['gap_id'] not in seen, f"gap {e['gap_id']} appears twice in the treatment.")
         seen.add(e['gap_id'])
-        routes_ = e.get('routes') or ([e['route']] if e.get('route') else [])
+        routes_ = list(e.get('routes') or ([e['route']] if e.get('route') else []))
         need(routes_ and all(r in TREATMENT_ROUTES for r in routes_), f"gap {e['gap_id']}: each route is one of {', '.join(TREATMENT_ROUTES)}.")
-        e['routes'] = list(routes_)
+        for sh in e.get('shots') or []:   # design/74 L25: one named route takes the shots' routes; several named routes must cover every shot
+            r = (sh or {}).get('route')
+            if r and r in TREATMENT_ROUTES and r not in routes_:
+                need(len(routes_) == 1, f"gap {e['gap_id']}: shot {sh.get('id')} uses the route {r!r}, which the entry does not name; name it in routes or change the shot.")
+                routes_.append(r)
+        e['routes'] = routes_
         need(str(e.get('picture') or '').strip(), f"gap {e['gap_id']}: say the picture in one line.")
         need(isinstance(e.get('seconds'), (int, float)) and e['seconds'] > 0, f"gap {e['gap_id']}: seconds must be a number above zero.")
         need(isinstance(e.get('images'), int) and e['images'] >= 0, f"gap {e['gap_id']}: images must be a whole number.")
@@ -302,14 +297,16 @@ def page_view(conn, store, run, outputs, code):
     for r in session['references'].values():
         refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
-                             approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None)
+                             approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
+                             rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
+                             checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None)   # design/74 L6
     takes = {}
     for j in take_jobs(conn, run):
         res = j.get('result') or {}
         takes.setdefault(j['unit'], []).append({'job_id': str(j['id']), 'status': j['status'], 'error': j.get('error'), 'url': url(res.get('key')), 'sha256': res.get('sha256'),
                                                  'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
                                                  'reviews': [{k: rv.get(k) for k in ('decision', 'notes', 'quote', 'by')} for rv in session['reviews'].get(str(j['id']), [])],
-                                                 'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id'])})
+                                                 'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j)})
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
         entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None}
@@ -496,6 +493,9 @@ def generate_image(conn, store, user, run, outputs, body):
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state'), 'Generated references are isolated, sheet, keyframe or state.')
     parents = [session['references'].get(p) for p in body.get('parents') or []]
+    for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
+        if p and p.get('status') == 'rejected':
+            need(False, f"{p['id']} was rejected: make the next {'state from the last approved state' if body['kind'] == 'state' else 'end image from the approved start, not from the candidate chain'}.")
     if body['kind'] == 'state':   # design/65: a state is made from the previous state, which is approved only when the whole sequence is
         need(len(parents) == 1, 'A state is generated from the previous state: give one parent.')
         need(parents[0] and parents[0]['status'] in ('approved', 'candidate'), 'The parent must be a candidate or approved reference of this run.')
@@ -544,8 +544,103 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote):
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
     need((quote or '').strip(), 'The operator reply is required.')
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
+    _feedback_image(session, run, user, row, 'pass', quote, '')
     save_session(store, run, session)
     return row
+
+
+def reject_reference(store, user, run, outputs, ref_id, notes, quote):
+    """design/74 L7: a picture rejected with the operator's words; it is never approved, bound, held or named as a parent afterwards."""
+    session = session_of(store, run, outputs)
+    row = session['references'].get(ref_id)
+    need(row and row['status'] in ('candidate', 'approved'), f"Reference {ref_id} is not a candidate or approved picture (it is {(row or {}).get('status') or 'unknown'}); only those can be rejected.")
+    need((quote or '').strip(), 'The operator reply is required.')
+    row.update(status='rejected', rejection={'notes': str(notes or '').strip() or str(quote), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    _feedback_image(session, run, user, row, 'reject', quote, row['rejection']['notes'])
+    save_session(store, run, session)
+    return row
+
+
+# ---------- design/74 L7: the feedback record, in the library's shape (record-template.videowizard.yaml) ----------
+
+def _step_of_reference(session, row):
+    kind = row.get('kind')
+    if kind in ('isolated', 'sheet'):
+        return 'reference'
+    if kind == 'state':
+        return 'state'
+    if kind == 'keyframe':
+        parents = [(session['references'].get(p.get('id')) or {}) for p in (row.get('generation') or {}).get('parents') or []]
+        return 'end' if any(p.get('kind') == 'keyframe' for p in parents) else 'start'
+    return 'frame'
+
+
+def _feedback(session, run, user, *, kind, ident, owner, step, verdict, quote, notes, prompt, checklist, suggestion, model, inputs):
+    spec = library.STEPS.get(step) or {}
+    session.setdefault('feedback', []).append({
+        'app': 'videowizard', 'library_version': library_version_of(session), 'run_code': run.get('code'), 'job_id': f"{run.get('code')}-{owner}-{str(ident)[:8]}",
+        'kind': kind, 'id': str(ident), 'playbook': spec.get('playbook'), 'task': spec.get('task'), 'model': model or '', 'inputs': list(inputs),
+        'prompt': prompt or '', 'checklist': list(checklist or []), 'verdict': verdict, 'verdict_by': 'person', 'quote': quote,
+        'what_went_wrong': notes if verdict == 'reject' else '', 'suggestion': suggestion or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+
+
+def _feedback_image(session, run, user, row, verdict, quote, notes):
+    gen, answer = row.get('generation') or {}, row.get('answer') or {}
+    inputs = [{'picture_id': p.get('id'), 'tag': 'scene' if (session['references'].get(p.get('id')) or {}).get('kind') == 'frame' else 'approved'} for p in gen.get('parents') or []]
+    _feedback(session, run, user, kind='image', ident=row['id'], owner=row.get('element_id') or '', step=_step_of_reference(session, row), verdict=verdict, quote=quote, notes=notes,
+              prompt=gen.get('prompt') or '', checklist=answer.get('checklist'), suggestion=answer.get('suggestion'), model=gen.get('model'), inputs=inputs)
+
+
+def _feedback_take(session, run, user, job, prep, verdict, quote, notes):
+    answer = (prep or {}).get('answer') or {}
+    inputs = [{'picture_id': (prep or {}).get(role, {}).get('reference_id'), 'tag': tag} for role, tag in (('start_image', 'first-frame'), ('end_image', 'last-frame')) if (prep or {}).get(role)]
+    _feedback(session, run, user, kind='take', ident=job['id'], owner=job['unit'], step='take', verdict=verdict, quote=quote, notes=notes,
+              prompt=(prep or {}).get('motion_prompt') or '', checklist=answer.get('checklist'), suggestion=answer.get('suggestion'), model=(prep or {}).get('model'), inputs=inputs)
+
+
+def _prep_of(store, job):
+    try:
+        return load_json(store, (job.get('request') or {})['request_key'])
+    except (KeyError, Problem):
+        return {}
+
+
+def feedback_yaml(records):
+    """The records as YAML text, by hand (no yaml dependency): a list of mappings; a checklist line is 'check: pass_when (weight)'."""
+    def scalar(v):
+        if v is None:
+            return 'null'
+        if isinstance(v, bool):
+            return 'true' if v else 'false'
+        if isinstance(v, (int, float)):
+            return str(v)
+        s = str(v)
+        return s if s and re.fullmatch(r'[A-Za-z0-9_./-]+', s) else json.dumps(s, ensure_ascii=False)
+
+    def emit(v, pad):
+        out = []
+        if isinstance(v, dict):
+            for k, val in v.items():
+                if isinstance(val, (dict, list)):
+                    out += [f'{pad}{k}:'] + emit(val, pad + '  ') if val else [f'{pad}{k}: ' + ('[]' if isinstance(val, list) else '{}')]
+                else:
+                    out.append(f'{pad}{k}: {scalar(val)}')
+        else:
+            for item in v:
+                if isinstance(item, dict):
+                    sub = emit(item, pad + '  ')
+                    out += [f'{pad}- ' + sub[0].lstrip()] + sub[1:]
+                else:
+                    out.append(f'{pad}- {scalar(item)}')
+        return out
+    rows = [{**r, 'checklist': [{'line': f"{c.get('check')}: {c.get('pass_when')} ({c.get('weight')})"} for c in r.get('checklist') or []]} for r in records]
+    return '\n'.join(emit(rows, '')) + '\n'
+
+
+def feedback(store, run, outputs):
+    session = session_of(store, run, outputs)
+    records = session.get('feedback') or []
+    return {'records': len(records), 'yaml': feedback_yaml(records)}
 
 
 def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
@@ -586,7 +681,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
     start_instruction = ('Write the start prompt and the end prompt together before generating either. Compose the start for the whole segment: every visible subject, '
                          'including secondary/background subjects, in its start state in the named scene layout, what the motion heads for already in frame, room in the frame '
                          'for the move, nothing the end state needs cut off or hidden, nothing placed where the end would have to remove it. Keep landmark-relative locations; '
-                         'the camera only changes their screen projection.')   # design/67 B
+                         'the camera only changes their screen projection. A boundary picture is shared only within one continuous shot, same place and framing: the end image '
+                         'of one segment is the start of the next there; a cut starts a new pair with its own two images.')   # design/67 B; the boundary sentence is design/74 L24
     end_instruction = ('Make the end image from the approved start image as its parent; the server sends the start\'s own references with it. Show every subject in its end state '
                        'as the plan gives it: its position against its landmark and its side of the frame, its facing, its pose, what it holds, how far the work has gone; for an '
                        'acting subject the result of its last beat. Name the positions in words. Change nothing else: the same framing, camera, light, people and props. Keep in '
@@ -685,7 +781,8 @@ def prepare_take(store, user, run, outputs, body):
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)
-    session['preparations'][body['shot_id']] = {'preparation_id': identity, 'key': key(run, f'takes/{identity}.request.json')}
+    session['preparations'][body['shot_id']] = {'preparation_id': identity, 'key': key(run, f'takes/{identity}.request.json'),
+                                                **({'checklist': answer.get('checklist') or []} if answer is not None else {})}   # design/74 L6
     save_session(store, run, session)
     return {'preparation_id': identity, 'duration_seconds': record['duration_seconds'], 'exact_seconds': record['placement']['exact_seconds'], 'provider': selected}
 
@@ -707,6 +804,12 @@ def submit_take(conn, store, user, run, outputs, shot_id):
     return {'job_id': str(row['id']), 'shot_id': shot_id, 'provider': request['provider'], 'model': request['model']}
 
 
+def take_checklist(session, job):
+    """design/74 L6: the checklist of the preparation this take was made from, when it is still the shot's current preparation."""
+    prep = session['preparations'].get(job.get('unit')) or {}
+    return prep.get('checklist') if prep.get('preparation_id') == (job.get('request') or {}).get('preparation_id') else None
+
+
 def take_jobs(conn, run, shot_id=None):
     sql = "select id, unit, provider, status, request, result, error, cost, attempt, created_at, updated_at from vw2_jobs where run_id=%s and stage='visuals'"
     rows = conn.execute(sql + (' and unit=%s' if shot_id else '') + ' order by created_at', (run['id'], shot_id) if shot_id else (run['id'],)).fetchall()
@@ -724,6 +827,8 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     session['reviews'].setdefault(str(job_id), []).append(review)
     if session['selections'].get(job['unit'], {}).get('job_id') == str(job_id):
         session['selections'].pop(job['unit'])
+    if decision == 'rejected':   # design/74 L7
+        _feedback_take(session, run, user, job, _prep_of(store, job), 'reject', quote, notes)
     save_session(store, run, session)
     return review
 
@@ -745,6 +850,7 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     need(live['preparation_digest'] == prep['base_preparation_digest'], 'The plan, references or generator changed since this take was prepared; prepare a current take.')
     session['selections'][job['unit']] = {'job_id': str(job_id), 'review_id': reviews[-1]['id'], 'preparation_id': job['request']['preparation_id'], 'context_digest': live['preparation_digest'],
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id']}
+    _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
     save_session(store, run, session)
     return session['selections'][job['unit']]
 
@@ -810,7 +916,7 @@ def status(conn, store, run, outputs):
                                        'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
         gaps.append(entry)
     refs = [{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')} for r in session['references'].values()]
-    jobs_ = [{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')} for j in take_jobs(conn, run)]
+    jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j)} for j in take_jobs(conn, run)]   # design/74 L6
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,

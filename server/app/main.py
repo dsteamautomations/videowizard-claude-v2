@@ -243,8 +243,8 @@ class SequenceBody(Write):    # design/65 B2'
     quote: str = Field(min_length=1)
 
 
-class CapBody(Write):         # design/65 B7
-    inr: float
+class ReferenceReject(Write):   # design/74 L7
+    notes: str = ''
     quote: str = Field(min_length=1)
 
 
@@ -1147,9 +1147,16 @@ def visuals_sequence(run_id: UUID, body: SequenceBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.sequence(storage(), user, run, outputs, body.shot_id, body.reference_ids, body.quote))
 
 
-@app.post('/api/runs/{run_id}/visuals/cap')
-def visuals_cap(run_id: UUID, body: CapBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_cap(storage(), user, run, outputs, body.inr, body.quote))
+@app.post('/api/runs/{run_id}/visuals/references/{ref_id}/reject')
+def visuals_reject(run_id: UUID, ref_id: str, body: ReferenceReject, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.reject_reference(storage(), user, run, outputs, ref_id, body.notes, body.quote))   # design/74 L7
+
+
+@app.get('/api/runs/{run_id}/visuals/feedback')
+def visuals_feedback(run_id: UUID, user=User, conn=DB):
+    """design/74 L7: the feedback records in the library's shape, as YAML text inside the answer."""
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: visuals_stage.feedback(storage(), run, core.current_outputs(conn, run['id']))))
 
 
 @app.get('/api/runs/{run_id}/visuals/budget')

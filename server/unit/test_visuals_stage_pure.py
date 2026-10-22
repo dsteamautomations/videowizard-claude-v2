@@ -154,7 +154,7 @@ def test_spend_counts_images_and_take_seconds_at_the_configured_prices(monkeypat
     assert sp == {'images': 2, 'take_seconds': 10.0, 'spent_inr': 120.0, 'prices': {'image_inr': 20.0, 'video_inr_per_s': 8.0}}
 
 
-def test_the_cap_refuses_a_paid_call_that_would_pass_it_and_the_operator_raises_it(monkeypatch):
+def test_the_cap_refuses_a_paid_call_that_would_pass_it_and_a_session_cap_is_kept(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     conn = FakeConn([job('openai') for _ in range(49)])   # ₹980 spent
     assert VS.cap_of(session()) == 5000.0   # design/66 C4: the default cap
@@ -162,16 +162,9 @@ def test_the_cap_refuses_a_paid_call_that_would_pass_it_and_the_operator_raises_
     VS.check_cap(conn, RUN, sess, 20.0, 'one image')       # exactly the cap: allowed
     with pytest.raises(Problem) as exc:
         VS.check_cap(conn, RUN, sess, 40.0, 'a 5 s take')
-    assert exc.value.code == 'VISUALS_CAP' and '₹980' in exc.value.message and '₹1,000' in exc.value.message and 'about ₹40' in exc.value.message and 'vw visuals cap' in exc.value.message
+    assert exc.value.code == 'VISUALS_CAP' and '₹980' in exc.value.message and '₹1,000' in exc.value.message and 'about ₹40' in exc.value.message
     assert exc.value.extra == {'spent_inr': 980.0, 'cap_inr': 1000.0, 'estimate_inr': 40.0}
-    store = store_with(sess)
-    with pytest.raises(Problem, match='operator'):
-        g(lambda: VS.set_cap(store, USER, RUN, [], 1500, ''))
-    with pytest.raises(Problem, match='more than'):
-        g(lambda: VS.set_cap(store, USER, RUN, [], 0, 'raise it'))
-    out = VS.set_cap(store, USER, RUN, [], 1500, 'Raise the cap to 1500, the diagrams are worth it.')
-    assert out['cap_inr'] == 1500.0 and saved(store)['cap_inr'] == 1500.0 and saved(store)['cap_history'][0]['quote'].startswith('Raise')
-    VS.check_cap(conn, RUN, saved(store), 40.0, 'a 5 s take')   # under the new cap
+    VS.check_cap(conn, RUN, session(cap_inr=1500.0), 40.0, 'a 5 s take')   # design/74 L26: a film whose session holds a cap keeps it; no front end changes it
 
 
 def test_budget_reports_spend_cap_and_what_the_plan_still_needs(monkeypatch):
@@ -505,6 +498,116 @@ def test_every_prompt_is_linted_for_a_logo_a_model_name_a_size_or_a_resolution(m
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     with pytest.raises(Problem, match="names a model \\('kling'\\)"):
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'Kling: water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2'}))
+
+
+# ---------- design/74: L7 the picture reject and the feedback record, L25 the treatment's shot routes, L26 the cap message, L6 the checklist ----------
+
+def test_a_rejected_picture_cannot_be_approved_bound_held_or_used_as_a_parent(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'K1': ref('K1'), 'A1': ref('A1', 'approved'), 'S2': ref('S2', parents=['A1']), 'F1': ref('F1', 'failed')})
+    store = store_with(sess, doc)
+    row = VS.reject_reference(store, USER, RUN, [], 'K1', 'the bucket is on the wrong side', 'No, the bucket moved.')
+    s = saved(store)
+    assert row['status'] == 'rejected' and s['references']['K1']['rejection'] == {'notes': 'the bucket is on the wrong side', 'quote': 'No, the bucket moved.', 'by': 'u1', 'at': s['references']['K1']['rejection']['at']}
+    with pytest.raises(Problem, match='not a candidate'):
+        g(lambda: VS.approve_reference(store, USER, RUN, [], 'K1', 'sha-K1', 'yes'))
+    with pytest.raises(Problem, match='rejected'):
+        g(lambda: VS.reject_reference(store, USER, RUN, [], 'F1', 'n', 'q'))   # neither candidate nor approved
+    with pytest.raises(Problem, match='operator'):
+        g(lambda: VS.reject_reference(store, USER, RUN, [], 'A1', 'n', ''))
+    with pytest.raises(Problem, match='not approved'):
+        g(lambda: VS.bind(store, USER, RUN, [], 'VS1', {'E1': ['K1']}, {}))
+    with pytest.raises(Problem, match='not an approved reference'):
+        g(lambda: VS.still_from_reference(store, USER, RUN, [], 'IM1', 'K1', 'yes'))
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket empty.', 'parents': ['K1']}
+    with pytest.raises(Problem, match='from the approved start, not from the candidate chain'):   # design/71 P6, the server check
+        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], body))
+    VS.reject_reference(store, USER, RUN, [], 'S2', 'the label drifted', 'No.')
+    with pytest.raises(Problem, match='last approved state'):
+        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r2', 'kind': 'state', 'prompt': 'the next label', 'parents': ['S2']}))
+
+
+def test_feedback_records_are_written_on_approve_reject_select_and_rejected_review(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    answer = {'status': 'ready', 'prompt': 'Image 1 is the start; the bucket empty.', 'checklist': [{'check': 'bucket', 'pass_when': 'empty', 'weight': 'must'}], 'exact_text': [], 'suggestion': 'video-frame.md §4: say the size.'}
+    k1 = {**ref('K1'), 'answer': answer, 'generation': {'op': 'edit', 'model': 'gpt-image-2.5-sunburst', 'prompt': answer['prompt'], 'parents': [{'id': 'A1'}]}}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), library_version='vwlib-x',
+                   references={'K1': k1, 'A1': ref('A1', 'approved'), 'R2': ref('R2', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'A1', 'sha256': 'sha-A1'}]}}})
+    store = store_with(sess, doc)
+    VS.approve_reference(store, USER, RUN, [], 'K1', 'sha-K1', 'Yes, this one.')
+    rec = saved(store)['feedback'][0]
+    assert rec['app'] == 'videowizard' and rec['library_version'] == 'vwlib-x' and rec['run_code'] == 'VW-9' and rec['kind'] == 'image' and rec['job_id'].startswith('VW-9-E1-')
+    assert rec['task'] == 'first-last-frame' and rec['playbook'] == 'video-frame' and rec['model'] == 'gpt-image-2.5-sunburst' and rec['inputs'] == [{'picture_id': 'A1', 'tag': 'approved'}]
+    assert rec['verdict'] == 'pass' and rec['verdict_by'] == 'person' and rec['quote'] == 'Yes, this one.' and rec['prompt'] == answer['prompt'] and rec['checklist'] == answer['checklist'] and rec['suggestion'] == answer['suggestion']
+    VS.reject_reference(store, USER, RUN, [], 'K1', 'the bucket is full', 'No.')
+    rec = saved(store)['feedback'][1]
+    assert rec['verdict'] == 'reject' and rec['what_went_wrong'] == 'the bucket is full' and rec['quote'] == 'No.'
+    text = VS.feedback_yaml(saved(store)['feedback'])
+    assert text.startswith('- app: videowizard\n') and '  verdict: reject\n' in text and '  checklist:\n    - line: "bucket: empty (must)"\n' in text and 'suggestion: "video-frame.md' in text
+    # takes: the selection is a pass, a rejected review a reject, with the preparation's checklist
+    VS.prepare_take(store, USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'A1', 'end_image': 'R2', 'answer': {**answer, 'prompt': 'water poured', 'suggestion': ''}})
+    prep = saved(store)['preparations']['VS1']
+    take = {'id': 'j-video-1', 'unit': 'VS1', 'run_id': 'run-1', 'provider': 'video', 'status': 'ready', 'request': {'duration_seconds': 10, 'preparation_id': prep['preparation_id'], 'request_key': prep['key']}, 'error': None, 'cost': None,
+            'result': {'key': 'run-1/visuals/takes/t1.mp4', 'sha256': 's', 'bytes': 1, 'evidence': {'duration_seconds': 10.0, 'timing_matches_placement': True}}}
+
+    class Conn(FakeConn):
+        def execute(self, sql, params=()):
+            if 'select * from vw2_jobs' in sql:
+                class R:
+                    def fetchone(_):
+                        return take
+                return R()
+            return super().execute(sql, params)
+    VS.review_take(Conn([take]), store, USER, RUN, [], 'j-video-1', 'rejected', 'the hand jumps', '', 'No, the hand jumps.')
+    rec = saved(store)['feedback'][2]
+    assert rec['kind'] == 'take' and rec['task'] == 'clip-from-frame' and rec['verdict'] == 'reject' and rec['what_went_wrong'] == 'the hand jumps' and rec['checklist'] == answer['checklist'] and rec['prompt'] == 'water poured'
+    VS.select_take(Conn([take]), store, USER, RUN, [], 'j-video-1', 'Yes, after watching.', notes='checked the hand')
+    rec = saved(store)['feedback'][3]
+    assert rec['verdict'] == 'pass' and rec['quote'] == 'Yes, after watching.' and rec['job_id'] == 'VW-9-VS1-j-video-'
+
+
+def test_treatment_takes_routes_from_the_shots_when_one_is_named_and_refuses_an_unnamed_shot_route(monkeypatch):
+    """design/74 L25 (VW-6, 21 Oct: seven gaps mixed routes under one named route and propose refused every one)."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    one = {**TREATMENT['gaps'][1], 'routes': ['video'], 'shots': [{'id': 'S1', 'route': 'video', 'seconds': 6}, {'id': 'S2', 'route': 'still', 'seconds': 4}]}
+    store = store_with(session())
+    out = VS.treatment(store, USER, RUN, [], {'gaps': [TREATMENT['gaps'][0], one]}, 'yes')
+    assert out['recorded'] and saved(store)['treatment']['gaps'][1]['routes'] == ['video', 'still']
+    several = {**one, 'routes': ['video', 'graphic_sequence']}   # names two, a shot uses a third
+    with pytest.raises(Problem, match="gap G2: shot S2 uses the route 'still', which the entry does not name"):
+        g(lambda: VS.treatment(store_with(session()), USER, RUN, [], {'gaps': [TREATMENT['gaps'][0], several]}, 'yes'))
+
+
+def test_the_cap_message_tells_the_operator_the_spend_and_names_the_builder(monkeypatch):
+    """design/74 L26: no front end raises the cap; the builder changes the setting on SK's word."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    with pytest.raises(Problem) as exc:
+        VS.check_cap(FakeConn([job('openai') for _ in range(49)]), RUN, session(cap_inr=1000.0), 40.0, 'a 5 s take')
+    assert 'tell the operator the spend' in exc.value.message and 'builder' in exc.value.message and 'vw visuals cap' not in exc.value.message
+    assert not hasattr(VS, 'set_cap')
+
+
+def test_page_view_carries_each_pictures_checklist_the_takes_checklist_and_a_rejected_status(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    lines = [{'check': 'label', 'pass_when': 'reads air', 'weight': 'must'}]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': {**ref('R1'), 'answer': {'status': 'ready', 'prompt': 'p', 'checklist': lines, 'exact_text': []}}, 'R2': {**ref('R2'), 'status': 'rejected', 'rejection': {'notes': 'n', 'quote': 'q', 'by': 'u1', 'at': 't'}}},
+                   preparations={'VS1': {'preparation_id': 'prep-1', 'key': 'run-1/visuals/takes/prep-1.request.json', 'checklist': lines}})
+    store = store_with(sess, doc)
+    store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
+    take = {'id': 'j-video-1', 'unit': 'VS1', 'run_id': 'run-1', 'provider': 'video', 'status': 'ready', 'request': {'duration_seconds': 10, 'preparation_id': 'prep-1'}, 'error': None, 'cost': None,
+            'result': {'key': 'run-1/visuals/takes/t1.mp4', 'sha256': 's', 'evidence': {'duration_seconds': 10.0, 'timing_matches_placement': True}}}
+    view = VS.page_view(FakeConn([take]), store, RUN, [], 'VW-9')
+    refs = {r['id']: r for r in view['references']}
+    assert refs['R1']['checklist'] == lines and refs['R2']['status'] == 'rejected' and refs['R2']['rejection']['notes'] == 'n' and refs['R2']['checklist'] is None
+    assert view['gaps'][1]['shots'][0]['takes'][0]['checklist'] == lines
+    st = VS.status(FakeConn([take]), store, RUN, [])
+    assert st['jobs'][0]['checklist'] == lines
 
 
 def test_record_gap_keeps_the_takes_start_and_end_ids():

@@ -290,11 +290,10 @@ def test_treatment_sequence_cap_and_budget_post_what_the_server_expects(harness,
     code, out, err = run(args(what='sequence', shot='AN1', refs=['R1,R2,R3'], quote='Yes, these states.'), capsys)
     assert code == 0 and posted[-1][0].endswith('/visuals/sequence') and posted[-1][1] == {'shot_id': 'AN1', 'reference_ids': ['R1', 'R2', 'R3'], 'quote': 'Yes, these states.'}
     assert '3 states' in err
-    code, out, err = run(args(what='cap', inr='1500', quote='Raise it.'), capsys)
-    assert code == 0 and posted[-1][0].endswith('/visuals/cap') and posted[-1][1] == {'inr': 1500.0, 'quote': 'Raise it.'}
+    assert 'cap' not in vw.VISUALS_WHAT   # design/74 L26: no front end raises the cap
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'spent_inr': 120.0, 'cap_inr': 1000.0, 'left_inr': 880.0, 'images': 6, 'take_seconds': 0.0, 'planned': {'images': 40, 'video_seconds': 41.0, 'inr': 1128.0}, 'prices': {}})
     code, out, err = run(args(what='budget'), capsys)
-    assert code == 0 and '₹120' in err and '₹1,000' in err and '₹1,128' in err and 'over the cap' in err
+    assert code == 0 and '₹120' in err and '₹1,000' in err and '₹1,128' in err and 'over the cap' in err and 'builder' in err and 'raise it' not in err
 
 
 def test_check_line_prints_routes_images_and_cost(harness, monkeypatch, capsys):
@@ -324,8 +323,9 @@ def test_visuals_prompt_is_rewritten_for_v2():
     for word in FORBIDDEN:
         assert word not in prompt, word
     for cmd in ('vw visuals frame', 'vw visuals image', 'vw visuals still', 'vw visuals take', 'vw visuals select', 'vw visuals asset', 'vw visuals record',
-                'vw visuals treatment', 'vw visuals sequence', 'vw visuals cap'):
+                'vw visuals treatment', 'vw visuals sequence'):
         assert cmd in prompt, cmd
+    assert 'vw visuals cap' not in prompt   # design/74 L26
     assert 'design/45' in STAGES['visuals']['prompt_origin']
     # design/65: every picture is made in the pipeline; graphics move as state sequences; the team's intended visuals are a source; the treatment is recorded; the cap
     for gone in ('hand-made', 'editor makes', 'Nothing in this pipeline draws', 'shall the editor make them', 'the animation answer'):
@@ -353,7 +353,7 @@ def test_steps_and_command_text_carry_the_new_flow():
     assert 'hand-made' not in joined and 'shall the editor' not in joined and 'on their instruction only' in joined   # the operator's file stays, never planned
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'take --shots all' in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' not in md
-    assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap' in md and 'visuals page' in md
+    assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap' not in md and 'visuals page' in md and 'vw visuals reject' in md and 'vw visuals feedback' in md
 
 
 # ---------- design/71: the VideoWizard answer form (F1), a face is a look reference (P5), a retry from the approved picture (P6) ----------
@@ -366,6 +366,50 @@ def test_prompt_and_steps_carry_the_videowizard_form_the_face_rule_and_the_retry
     assert 'design/71' in STAGES['visuals']['prompt_origin']
     steps = STAGES['visuals']['steps']
     assert 'from the approved start' in steps[3] and 'look reference' in steps[3]
+
+
+def test_prompt_and_steps_carry_the_boundary_rule_the_wave_rule_and_no_cap_command():
+    """design/74 L24, L26, L27."""
+    prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
+    assert len(prompt.split()) <= 3500
+    assert 'only within one continuous shot' in prompt and 'a cut starts a new pair' in prompt
+    assert 'one approval wave' in prompt and 'the builder changes the cap' in prompt and 'Only the operator raises the cap' not in prompt
+    assert "next shot's answers" in steps[3] and 'status --wait' in steps[3] and 'vw visuals cap' not in ' '.join(steps)
+    assert 'design/74' in STAGES['visuals']['prompt_origin']
+
+
+def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
+    """design/74 L31 (defect 19)."""
+    monkeypatch.setattr(vw, 'request', lambda method, path, **kw: ({'action': 'refused', 'message': 'Bind references for this shot under the current accepted plan.'}, 422))
+    code, out, err = run(args(what='packet', shot='VS1'), capsys)
+    assert code == 2 and out['message'].startswith('Bind first: `vw visuals bind --shot VS1 --refs E1=R1,R2`, then `vw visuals packet --shot VS1`')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'shot_id': 'VS1', 'elements': ['E1']})
+    code, out, err = run(args(what='bind', shot='VS1', refs=['E1=R1']), capsys)
+    assert code == 0 and 'vw visuals packet --shot VS1' in err
+
+
+def test_fetch_prints_the_checklist_beside_the_picture_and_the_take(harness, monkeypatch, capsys):
+    """design/74 L6."""
+    lines = [{'check': 'label', 'pass_when': 'reads air', 'weight': 'must'}, {'check': 'bucket', 'pass_when': 'empty', 'weight': 'should'}]
+    monkeypatch.setattr(vw, '_download', lambda m, key, name: name)
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'id': 'j1', 'status': 'ready', 'result': {'key': 'k', 'sha256': 's', 'evidence': {}}} if path.endswith('/jobs/j1')
+                        else {'references': [{'id': 'R1', 'sha256': 's', 'checklist': lines}], 'jobs': [{'id': 'j1', 'checklist': lines}]})
+    code, out, err = run(args(what='fetch', ref='R1'), capsys)
+    assert code == 0 and out['checklist'] == lines and 'must: label — reads air' in err and 'should: bucket — empty' in err
+    code, out, err = run(args(what='fetch', job='j1'), capsys)
+    assert code == 0 and out['checklist'] == lines and 'must: label — reads air' in err
+
+
+def test_reject_posts_the_words_and_feedback_writes_the_yaml(harness, monkeypatch, capsys):
+    """design/74 L7."""
+    ws, _ = harness
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'id': 'R1', 'status': 'rejected'})
+    code, out, err = run(args(what='reject', ref='R1', notes='the bucket is full', quote='No, the bucket is full.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/references/R1/reject') and posted[-1][1] == {'notes': 'the bucket is full', 'quote': 'No, the bucket is full.'} and 'rejected' in err
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'records': 2, 'yaml': '- app: videowizard\n  verdict: pass\n- app: videowizard\n  verdict: reject\n'})
+    code, out, err = run(args(what='feedback'), capsys)
+    assert code == 0 and (ws / 'work' / 'visuals' / 'feedback.yaml').read_text(encoding='utf-8').startswith('- app: videowizard\n') and '2 records' in err
 
 
 def test_prepare_writes_the_videowizard_answer_form_under_always(harness, monkeypatch, capsys):

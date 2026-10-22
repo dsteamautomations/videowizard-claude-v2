@@ -1197,6 +1197,10 @@ def cmd_planning(a):
         emit(out, 0, 'Planning finalized; certificate recorded. Run `vw next`.')
 
 
+VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'reject', 'bind', 'packet', 'generator',
+                'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74: no `cap` (L26); `reject` and `feedback` (L7)
+
+
 def cmd_visuals(a):
     m = active()
     run = m['run_id']
@@ -1236,15 +1240,21 @@ def cmd_visuals(a):
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
         out = write(base + '/sequence', {'shot_id': a.shot, 'reference_ids': refs, 'quote': a.quote or ''})
         emit(out, 0, f"Sequence held for {out.get('shot_id')}: {out.get('states', 0)} states approved" + (f"; {len(out['warnings'])} warning(s): " + '; '.join(out['warnings']) if out.get('warnings') else '') + '.')
-    if a.what == 'cap':   # design/65 B7
-        out = write(base + '/cap', {'inr': float(a.inr or 0), 'quote': a.quote or ''})
-        emit(out, 0, f"Cap set to ₹{out.get('cap_inr', 0):,.0f} on the operator's words.")
     if a.what == 'budget':
         out = call('GET', base + '/budget')
         p = out.get('planned') or {}
         over = (out.get('spent_inr', 0) + p.get('inr', 0)) > out.get('cap_inr', 0)
         emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); the current plan still needs about ₹{p.get('inr', 0):,.0f}"
-             + (' — over the cap: narrow the plan or ask the operator to raise it.' if over else '.'))
+             + (" — over the cap: narrow the plan and tell the operator the spend; the cap is a setting the builder changes on SK's word." if over else '.'))   # design/74 L26
+    if a.what == 'reject':   # design/74 L7: a wrong picture, with the operator's words; the next one starts from the approved picture
+        out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote})
+        emit(out, 0, f"Reference {a.ref} rejected; the next end image is made from the approved start (a state from the last approved state), never from this one.")
+    if a.what == 'feedback':   # design/74 L7: the records in the library's shape
+        out = call('GET', base + '/feedback')
+        folder = ws / 'work' / 'visuals'
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / 'feedback.yaml').write_text(out.get('yaml') or '', encoding='utf-8')
+        emit({'records': out.get('records', 0), 'file': 'work/visuals/feedback.yaml'}, 0, f"{out.get('records', 0)} records in work/visuals/feedback.yaml")
     if a.what == 'select' and a.gap:
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
     if a.what == 'accept':
@@ -1298,9 +1308,14 @@ def cmd_visuals(a):
             if not m or not m.group(3).strip():
                 emit({'action': 'refused', 'message': f'--selector expects ELEMENT=REF:"what to look at", got {item!r}.'}, 2)
             selectors.setdefault(m.group(1), {})[m.group(2)] = m.group(3).strip().strip('"')
-        emit(write(base + '/bind', {'shot_id': a.shot, 'references': refs, **({'subject_selectors': selectors} if selectors else {}), **({'quote': a.quote} if a.quote else {})}))
+        out = write(base + '/bind', {'shot_id': a.shot, 'references': refs, **({'subject_selectors': selectors} if selectors else {}), **({'quote': a.quote} if a.quote else {})})
+        emit(out, 0, f"Bound {a.shot} ({', '.join(out.get('elements') or [])}); now `vw visuals packet --shot {a.shot}`, then compose the start and end images.")   # design/74 L31
     if a.what == 'packet':
-        out = call('GET', f'{base}/shots/{a.shot}/packet')
+        out, code = request('GET', f'{base}/shots/{a.shot}/packet')
+        if code:
+            if 'Bind references' in str(out.get('message') or ''):   # design/74 L31 (defect 19): the order, said plainly
+                emit({'action': 'refused', 'message': f"Bind first: `vw visuals bind --shot {a.shot} --refs E1=R1,R2`, then `vw visuals packet --shot {a.shot}`. " + str(out.get('message'))}, 2)
+            finish(out, code)
         (ws / 'work' / f'packet-{a.shot}.json').write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding='utf-8')
         emit(out, 0, f'Composition packet for {a.shot} in work/packet-{a.shot}.json')
     if a.what == 'generator':
@@ -1363,13 +1378,15 @@ def cmd_visuals(a):
             if not ref or not ref.get('sha256'):
                 emit({'action': 'refused', 'message': 'Unknown or not yet generated reference.'}, 2)
             path = _download(m, f"{run}/visuals/references/{a.ref}.png", f'work/ref-{a.ref}.png')
-            emit({'ref': a.ref, 'path': path, 'sha256': ref['sha256']}, 0, f'Reference image at {path}; show it to the operator.')
+            lines = ref.get('checklist') or []
+            emit({'ref': a.ref, 'path': path, 'sha256': ref['sha256'], 'checklist': lines}, 0, f'Reference image at {path}; show it to the operator' + _checklist_line(lines))
         if a.job:
             job = call('GET', f'/api/runs/{run}/jobs/{a.job}')
             if job['status'] != 'ready':
                 emit({'action': 'refused', 'message': f"Take is {job['status']}: {job.get('error') or 'not ready'}", 'job': job}, 2)
             path = _download(m, job['result']['key'], f"work/take-{a.job}.mp4")
-            emit({'job': a.job, 'path': path, 'sha256': job['result']['sha256'], 'evidence': job['result']['evidence']}, 0, f'Take at {path}; let the operator watch it.')
+            lines = next((j.get('checklist') for j in (call('GET', base).get('jobs') or []) if str(j.get('id')) == str(a.job)), None) or []   # design/74 L6
+            emit({'job': a.job, 'path': path, 'sha256': job['result']['sha256'], 'evidence': job['result']['evidence'], 'checklist': lines}, 0, f'Take at {path}; let the operator watch it' + _checklist_line(lines))
     if a.what == 'review':
         emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes, 'timing_notes': a.timing or '', 'quote': a.quote}))
     if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
@@ -1388,6 +1405,13 @@ def cmd_visuals(a):
         out = write(base + '/record', {'gap_ids': gaps, 'quote': a.quote})
         skipped = out.get('skipped') or {}
         emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
+
+
+def _checklist_line(lines):
+    """design/74 L6: the answer's checklist beside the picture or the take, one line each, for the review."""
+    if not lines:
+        return '.'
+    return '. Check against the prompt\'s own list: ' + '; '.join(f"{c.get('weight', '')}: {c.get('check', '')} — {c.get('pass_when', '')}" for c in lines) + '.'
 
 
 def _s2_fetch(m, kind, out_name):
@@ -1779,7 +1803,7 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
-    s = sub.add_parser('visuals'); s.add_argument('what', choices=['prepare', 'treatment', 'sequence', 'cap', 'budget', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record'])
+    s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer'):
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--wait', type=int, default=0)

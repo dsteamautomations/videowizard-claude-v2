@@ -53,6 +53,10 @@
 .vz .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:vzspin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes vzspin{to{transform:rotate(360deg)}}
 .vz .spacer{height:130px}
+.vz .need-words{border-color:var(--err)!important;box-shadow:0 0 0 2px var(--err)}
+.vz .chk{margin:2px 6px 6px;padding-left:14px;font-size:11.5px;color:var(--muted);white-space:normal}
+.vz .chk li{margin:0}
+.vz .pic.off{opacity:.55;border-style:dashed}
 </style>
 <div class="vz" id="app" data-code="{{ run.code }}">
   <div class="top">
@@ -90,7 +94,9 @@ async function load(){
   if(!r.ok){msg('The page could not load ('+r.status+').',true);schedule();return;}
   data=await r.json();draw();
 }
-function schedule(){clearTimeout(timer);timer=setTimeout(load,15000);}
+function schedule(ms){clearTimeout(timer);timer=setTimeout(load,ms||15000);}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&data){load();}});   // design/74 L29: back on the tab, the page catches up with the chat
+function needWords(id,text){const e=$(id);if(e){e.classList.add('need-words');e.focus();e.addEventListener('input',()=>e.classList.remove('need-words'),{once:true});}msg(text||'Your words are required: type them in the box first.',true);}   // design/74 L31
 function fmt(frames){const fps=Number(data&&data.fps)||25;const s=Math.max(0,Math.round(frames/fps));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function secs(frames){const fps=Number(data&&data.fps)||25;return (frames/fps).toFixed(1)+' s';}
 function stage(){return data&&data.run?data.run.stage:null;}
@@ -105,34 +111,39 @@ function draw(){
   if(d.state!=='prepared'){
     $('line').textContent='The visuals stage has not started: the assistant runs vw visuals prepare.';
     $('treat').innerHTML='<div class="empty">Nothing to show yet.</div>';$('gaps').innerHTML='';$('action').innerHTML='';
-    if(stage()==='visuals')schedule();return;
+    if(stage()==='visuals')schedule(60000);return;
   }
   const b=d.budget||{}; const over=b.spent_inr>b.cap_inr;
   const pct=b.cap_inr?Math.min(100,Math.round(100*b.spent_inr/b.cap_inr)):0;
   const meter='<span class="meter">spend '+inr(b.spent_inr)+' of '+inr(b.cap_inr)+' <span class="bar"><i class="'+(over?'over':'')+'" style="width:'+pct+'%"></i></span></span>';
   const t=d.treatment, dr=d.treatment_draft;
-  let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(!t?(dr?'<strong>Treatment drafted</strong>: read it and approve it at the foot':'The assistant is preparing the treatment'):(d.plan_digest?'<strong>Plan proposed</strong>: pictures and takes below':'<strong>Treatment approved</strong>: the assistant writes the plan'));
+  let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(dr?(t?'<strong>New treatment draft</strong>: it replaces the approved one; read it and approve it at the foot':'<strong>Treatment drafted</strong>: read it and approve it at the foot'):(!t?'The assistant is preparing the treatment':(d.plan_digest?'<strong>Plan proposed</strong>: pictures and takes below':'<strong>Treatment approved</strong>: the assistant writes the plan')));
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
   $('line').innerHTML=line+meter;
-  drawTreatment(t||dr,!!t);
+  drawTreatment(dr||t,!!t&&!dr,dr&&t?t.at:null);   // design/74 L28: a draft after a record is the current treatment, badged
   drawGaps();
   drawFoot();
-  if(d.references.some(r=>r.status==='generating')||d.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status)))))schedule();
+  const busy=d.references.some(r=>r.status==='generating')||d.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status))));
+  if(stage()==='visuals')schedule(busy?15000:60000);   // design/74 L29: always in step with the chat; faster while something generates
 }
 function intendedBlock(){const iv=data.intended_visuals||[];if(!iv.length)return '';return '<div class="gap"><div class="hd"><b>The script\'s intended visuals</b><span class="ds">as the team wrote them, scene by scene; the treatment cites or departs from them</span></div><div class="bd">'+iv.map(e=>'<div class="ds"><b>'+esc(e.heading||'(no heading)')+'</b>'+(e.narration_starts?' · “'+esc(e.narration_starts)+'…”':'')+'</div><ul class="intended">'+e.lines.map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>').join('')+'</div></div>';}
-function drawTreatment(tr,recorded){
+function drawTreatment(tr,recorded,replaces){
   if(!tr){$('treat').innerHTML=intendedBlock()+'<div class="empty">The treatment, gap by gap, appears here once the assistant drafts it.</div>';return;}
+  const badge=recorded?'approved '+esc(String(tr.at||'').slice(0,16).replace('T',' ')):(replaces?'draft, replaces the approved treatment of '+esc(String(replaces).slice(0,16).replace('T',' ')):'draft');
   const byGap={};(tr.gaps||[]).forEach(e=>byGap[e.gap_id]=e);
   const rows=data.gaps.map((g,i)=>{const e=byGap[g.gap_id]||{};
     return '<tr><td><b>'+esc(g.gap_id)+'</b><div class="ds">'+esc(g.requirement||'')+'</div></td><td>'+(e.intended&&e.intended.length?'<ul class="intended">'+[].concat(e.intended).map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>':'<span class="ds">none in the script</span>')+(e.departure?'<div class="ds err">departs: '+esc(e.departure)+'</div>':'')+'</td><td>'+esc(e.picture||'')+'</td><td>'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</td><td class="n">'+esc(e.seconds!=null?e.seconds+' s':'')+'</td><td class="n">'+esc(e.images!=null?e.images:'')+'</td></tr>';}).join('');
   const tot=tr.totals||{};
-  $('treat').innerHTML=intendedBlock()+'<div class="gap"><div class="hd"><b>Treatment</b><span class="badge '+(recorded?'ok':'')+'">'+(recorded?'approved '+esc(String(tr.at||'').slice(0,16).replace('T',' ')):'draft')+'</span>'+(recorded&&tr.quote?'<span class="ds">“'+esc(tr.quote)+'”</span>':'')+'</div><div class="bd">'+
+  $('treat').innerHTML=intendedBlock()+'<div class="gap"><div class="hd"><b>Treatment</b><span class="badge '+(recorded?'ok':(replaces?'dec':''))+'">'+badge+'</span>'+(recorded&&tr.quote?'<span class="ds">“'+esc(tr.quote)+'”</span>':'')+'</div><div class="bd">'+
     '<table><thead><tr><th>Gap</th><th>The team\'s intended visuals</th><th>Picture</th><th>Route</th><th>Length</th><th>Images</th></tr></thead><tbody>'+rows+'</tbody></table>'+
     '<div class="ds" style="margin-top:8px">'+esc(tot.gaps||0)+' gaps · '+esc(tot.images||0)+' images · '+Object.entries(tot.routes||{}).map(([k,v])=>v+' '+(ROUTE[k]||k)).join(', ')+' · estimate '+inr(tr.estimate_inr)+' against the cap '+inr((data.budget||{}).cap_inr)+'</div></div></div>';
 }
+function checklist(lines){return lines&&lines.length?'<ul class="chk">'+lines.map(c=>'<li>'+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+'</li>').join('')+'</ul>':'';}   // design/74 L6
 function refCard(r,sel,chosen){
-  return '<div class="pic '+(r.status==='approved'?'on':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    '<div class="cap" title="'+esc(r.name)+'">'+esc(r.name)+' · '+esc(r.kind)+(r.status==='approved'?' · ✓':'')+'</div>'+(sel?sel:'')+'</div>';
+  const rejected=r.status==='rejected';
+  const reject=(r.status==='candidate'||r.status==='approved')&&stage()==='visuals'?'<div class="btns" style="margin:0 6px 6px"><button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'';   // design/74 L7
+  return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
+    '<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+esc(r.name)+' · '+esc(r.kind)+(r.status==='approved'?' · ✓':'')+(rejected?' · rejected':'')+'</div>'+checklist(r.checklist)+(rejected?'':(sel?sel:'')+reject)+'</div>';
 }
 function drawGaps(){
   const refs={};(data.references||[]).forEach(r=>refs[r.id]=r);
@@ -162,6 +173,7 @@ function drawGaps(){
         s.takes.forEach(k=>{
           sh+='<div class="shot"><span class="ds">take '+esc(k.job_id.slice(0,8))+' · '+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.selected?' · <span class="ok">selected</span>':'')+'</span>';
           if(k.url){sh+='<video controls preload="metadata" src="'+esc(k.url)+'"></video>';}
+          sh+=checklist(k.checklist);
           if(k.error){sh+='<div class="ds err">'+esc(k.error)+'</div>';}
           if(k.status==='ready'&&can&&!k.selected){sh+='<div class="btns">'+words('w-take-'+k.job_id,'your words after watching')+'<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>';}
           sh+='</div>';
@@ -181,33 +193,32 @@ async function click(b){
   if(a==='select'){await send({action:'select',gap_id:b.dataset.gap,choice_id:b.dataset.choice},'Choice recorded.');return;}
   if(a==='approve'){const q=prompt_words('Your words for this picture');if(q===null)return;await send({action:'approve',reference_id:b.dataset.ref,sha256:b.dataset.sha,quote:q},'Picture approved.');return;}
   if(a==='still'){const q=prompt_words('Your words for this picture');if(q===null)return;await send({action:'still',shot_id:b.dataset.shot,reference_id:b.dataset.ref,quote:q},'Picture held for the shot.');return;}
+  if(a==='reject'){const q=prompt_words('Why, in your words,');if(q===null)return;await send({action:'reject',reference_id:b.dataset.ref,notes:q,quote:q},'Picture rejected; the next one starts from the approved picture.');return;}
   if(a==='sequence'){const ids=[...document.querySelectorAll('input[data-seq="'+b.dataset.shot+'"]:checked')].map(i=>i.value);const q=val('w-seq-'+b.dataset.shot);
-    if(!ids.length){msg('Tick the states first.',true);return;} if(!q){msg('Your words are required.',true);return;}
+    if(!ids.length){msg('Tick the states first.',true);return;} if(!q){needWords('w-seq-'+b.dataset.shot);return;}
     await send({action:'sequence',shot_id:b.dataset.shot,reference_ids:ids,quote:q},'Sequence approved and held.');return;}
-  if(a==='select-take'){const q=val('w-take-'+b.dataset.job);if(!q){msg('Your words are required.',true);return;}await send({action:'select-take',job_id:b.dataset.job,quote:q},'Take selected.');return;}
-  if(a==='reject-take'){const q=val('w-take-'+b.dataset.job);if(!q){msg('Say why in the words box, then Reject.',true);return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}
-  if(a==='accept'){const q=val('w-acc-'+b.dataset.gap);if(!q){msg('Your words are required.',true);return;}await send({action:'accept',gap_ids:[b.dataset.gap],quote:q},'Gap accepted.');return;}
+  if(a==='select-take'){const q=val('w-take-'+b.dataset.job);if(!q){needWords('w-take-'+b.dataset.job);return;}await send({action:'select-take',job_id:b.dataset.job,quote:q},'Take selected.');return;}
+  if(a==='reject-take'){const q=val('w-take-'+b.dataset.job);if(!q){needWords('w-take-'+b.dataset.job,'Say why in the words box, then Reject.');return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}
+  if(a==='accept'){const q=val('w-acc-'+b.dataset.gap);if(!q){needWords('w-acc-'+b.dataset.gap,'Your words for this gap are required: type them in the box beside the button first.');return;}await send({action:'accept',gap_ids:[b.dataset.gap],quote:q},'Gap accepted.');return;}
 }
-let pendingWords=null;
 function prompt_words(label){
   // the viewer shows no dialogs: the words are typed in the foot box, then the button pressed again
   const w=val('words');
   if(w){return w;}
-  msg(label+' in the box at the foot, then press the button again.',true);
+  needWords('words',label+' in the box at the foot, then press the button again.');
   return null;
 }
 function drawFoot(){
   const d=data, can=stage()==='visuals';
   if(!can){$('action').innerHTML='<span>The run is at '+esc(d.run&&d.run.stage||'')+'.</span>';return;}
-  if(!d.treatment&&d.treatment_draft){
+  if(d.treatment_draft){   // design/74 L28: a draft after a record is approved the same way
     $('action').innerHTML='<span>Approve the treatment with your own words:</span><textarea id="words" placeholder="e.g. Yes, this treatment, with the wall section as the recurring diagram"></textarea><button class="go" id="do-treat">Approve the treatment</button>';
-    $('do-treat').addEventListener('click',async()=>{const w=val('words');if(!w){msg('Your words are required.',true);return;}await send({action:'treatment',quote:w},'Treatment recorded: the assistant writes the plan.');});
+    $('do-treat').addEventListener('click',async()=>{const w=val('words');if(!w){needWords('words');return;}await send({action:'treatment',quote:w},'Treatment recorded: the assistant writes the plan.');});
     return;
   }
   const ready=d.gaps.filter(g=>g.accepted&&!g.recorded&&g.shots.length&&g.shots.every(s=>s.asset||s.takes.some(k=>k.selected)));
-  $('action').innerHTML='<span>Words for the next button:</span><textarea id="words" placeholder="your words"></textarea>'+(ready.length?'<button class="go" id="do-record">Record '+ready.length+' gap'+(ready.length>1?'s':'')+'</button>':'')+'<button id="do-cap">Raise the cap</button><input id="cap-inr" class="n" type="number" min="1" placeholder="₹" style="min-width:0;width:90px">';
-  const rec=$('do-record');if(rec)rec.addEventListener('click',async()=>{const w=val('words');if(!w){msg('Your words are required.',true);return;}await send({action:'record',gap_ids:ready.map(g=>g.gap_id),quote:w},'Gaps recorded.');});
-  $('do-cap').addEventListener('click',async()=>{const w=val('words'),n=parseFloat($('cap-inr').value||'0');if(!n||!w){msg('A number and your words are required to raise the cap.',true);return;}await send({action:'cap',inr:n,quote:w},'Cap set to '+inr(n)+'.');});
+  $('action').innerHTML='<span>Words for the next button:</span><textarea id="words" placeholder="your words"></textarea>'+(ready.length?'<button class="go" id="do-record">Record '+ready.length+' gap'+(ready.length>1?'s':'')+'</button>':'');   // design/74 L26: the cap is a setting, no button
+  const rec=$('do-record');if(rec)rec.addEventListener('click',async()=>{const w=val('words');if(!w){needWords('words');return;}await send({action:'record',gap_ids:ready.map(g=>g.gap_id),quote:w},'Gaps recorded.');});
 }
 load();
 })();

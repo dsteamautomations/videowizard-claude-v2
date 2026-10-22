@@ -312,7 +312,7 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),
-            'cap': lambda: V.set_cap(store, user, run, outputs, float(body.get('inr') or 0), quote),
+            'reject': lambda: V.reject_reference(store, user, run, outputs, body['reference_id'], str(body.get('notes') or ''), quote),   # design/74 L7
             'record': lambda: V.record_gaps(conn, store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
         }
         if action not in calls:
