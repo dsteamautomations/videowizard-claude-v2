@@ -209,6 +209,7 @@ def test_bind_selector_names_an_object_inside_a_place_picture(harness, monkeypat
 
 def test_select_job_carries_the_notes(harness, monkeypatch, capsys):
     posted = {}
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: {'jobs': []})   # design/81: select reads the jobs to accept a shot id
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'job_id': 'j1'}))
     code, out, err = run(args(what='select', job='j1', notes='hands and wall checked', quote='yes, that one'), capsys)
     assert code == 0 and posted['path'].endswith('/select-take') and posted['notes'] == 'hands and wall checked' and posted['quote'] == 'yes, that one'
@@ -490,6 +491,43 @@ def test_round_posts_the_elements_the_verdicts_and_the_picks_and_status_waits_fo
     monkeypatch.setattr(vw.time, 'sleep', lambda s: None)
     code, out, err = run(args(what='status', wait=60), capsys)
     assert code == 0 and 'reference round at pass complete' in err and 'read the verdicts' in err and not answers   # it waited through pass 1
+
+
+def test_status_prints_one_line_per_job_and_writes_the_whole_answer_to_the_run_folder(harness, monkeypatch, capsys):
+    """design/81 (defect 21): over 100 KB of status never reached the assistant; the job ids must."""
+    ws, _ = harness
+    big = {'state': 'prepared', 'plan_digest': 'pd', 'round': None, 'budget': {'spent_inr': 1},
+           'gaps': [{'gap_id': 'G1', 'shots': [{'shot_id': 'VS1'}, {'shot_id': 'VS2'}], 'words': 'x' * 40000}, {'gap_id': 'G2', 'shots': [{'shot_id': 'VS3'}], 'words': 'y' * 40000}],
+           'references': [{'id': f'R{i}', 'element_id': 'E1', 'status': 'approved', 'checklist': ['c'] * 50} for i in range(40)],
+           'jobs': [{'id': 'aaaaaaaa-0000-0000-0000-00000000000' + str(i), 'unit': f'VS{i}', 'provider': 'video', 'status': 'ready', 'error': None, 'checklist': ['c'] * 50} for i in (1, 2, 3)]
+                   + [{'id': 'bbbbbbbb-0000-0000-0000-000000000009', 'unit': 'VS1', 'provider': 'video', 'status': 'failed', 'error': 'e' * 300, 'checklist': []}]}
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: big)
+    code, out, err = run(args(what='status'), capsys)
+    assert code == 0 and len(json.dumps(out)) < 4000 and 'work/visuals/status.json' in err
+    assert [j['id'] for j in out['jobs']] == ['aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-000000000009']
+    assert out['jobs'][3]['error'] == 'e' * 80 and out['references'] == {'E1': {'approved': 40}} and 'checklist' not in json.dumps(out)
+    assert json.loads((ws / 'work' / 'visuals' / 'status.json').read_text(encoding='utf-8'))['plan_digest'] == 'pd'
+    code, out, err = run(args(what='status', shot='VS2'), capsys)
+    assert [j['shot'] for j in out['jobs']] == ['VS2']
+    code, out, err = run(args(what='status', gap='G1'), capsys)
+    assert sorted(j['shot'] for j in out['jobs']) == ['VS1', 'VS1', 'VS2']
+
+
+def test_fetch_and_select_take_the_shot_id_when_it_has_one_ready_take(harness, monkeypatch, capsys):
+    """design/81 T2."""
+    jobs_ = [{'id': 'aaaaaaaa-0000-0000-0000-000000000001', 'unit': 'VS1', 'provider': 'video', 'status': 'ready', 'checklist': []},
+             {'id': 'aaaaaaaa-0000-0000-0000-000000000002', 'unit': 'VS2', 'provider': 'video', 'status': 'ready', 'checklist': []},
+             {'id': 'aaaaaaaa-0000-0000-0000-000000000003', 'unit': 'VS2', 'provider': 'video', 'status': 'ready', 'checklist': []}]
+    monkeypatch.setattr(vw, '_download', lambda m, key, name: name)
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'id': path.rsplit('/', 1)[1], 'status': 'ready', 'result': {'key': 'k', 'sha256': 's', 'evidence': {}}} if '/jobs/' in path else {'jobs': jobs_, 'references': []})
+    code, out, err = run(args(what='fetch', job='VS1'), capsys)
+    assert code == 0 and out['job'] == 'aaaaaaaa-0000-0000-0000-000000000001'
+    code, out, err = run(args(what='fetch', job='VS2'), capsys)
+    assert code == 2 and '2 ready takes' in out['message'] and '--shot VS2' in out['message']
+    posted = {}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.update(body) or {'ok': True})
+    code, out, err = run(args(what='select', job='VS1', quote='Watched, yes.'), capsys)
+    assert code == 0 and posted['job_id'] == 'aaaaaaaa-0000-0000-0000-000000000001'
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

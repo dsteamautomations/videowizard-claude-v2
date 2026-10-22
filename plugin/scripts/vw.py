@@ -1203,6 +1203,37 @@ VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose'
                 'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74 L26, L7; design/76; design/73; design/79
 
 
+def _short_status(st, shot=None, gap=None):
+    """design/81 (defect 21): the whole status is too long for the assistant's shell; one line per job, the references as counts, the rest in the file."""
+    jobs_ = st.get('jobs') or []
+    units = None
+    if gap:
+        units = {s.get('shot_id') for g in st.get('gaps') or [] if g.get('gap_id') == gap for s in g.get('shots') or []}
+    if shot:
+        units = {shot}
+    if units is not None:
+        jobs_ = [j for j in jobs_ if j.get('unit') in units]
+    refs = {}
+    for r in st.get('references') or []:
+        eid = r.get('element_id') or '-'
+        refs.setdefault(eid, {})
+        refs[eid][r.get('status') or '?'] = refs[eid].get(r.get('status') or '?', 0) + 1
+    return {'state': st.get('state'), 'plan_digest': st.get('plan_digest'), 'round': st.get('round'), 'budget': st.get('budget'),
+            'jobs': [{'id': str(j.get('id')), 'shot': j.get('unit'), 'provider': j.get('provider'), 'status': j.get('status'), **({'error': (j.get('error') or '')[:80]} if j.get('error') else {})} for j in jobs_],
+            'references': refs, 'file': 'work/visuals/status.json'}
+
+
+def _take_job(base, value):
+    """design/81 T2: a shot id in place of the job id when the shot has exactly one ready take."""
+    mine = [j for j in (call('GET', base).get('jobs') or []) if j.get('unit') == value and j.get('provider') == 'video']
+    if not mine:
+        return value   # a job id
+    ready = [j for j in mine if j.get('status') == 'ready']
+    if len(ready) != 1:
+        emit({'action': 'refused', 'message': f"{value} has {len(ready)} ready takes; give the job id (`vw visuals status --shot {value}`)."}, 2)
+    return str(ready[0]['id'])
+
+
 def cmd_visuals(a):
     m = active()
     run = m['run_id']
@@ -1425,7 +1456,8 @@ def cmd_visuals(a):
                    ('; run again with --wait' if a.wait else '')
         else:
             line = f'all done: {ready} ready' if jobs_ else 'no image or take jobs yet'
-        emit(st, 0, 'Visuals: ' + line + round_line)
+        readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
+        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)
@@ -1436,6 +1468,7 @@ def cmd_visuals(a):
             lines = ref.get('checklist') or []
             emit({'ref': a.ref, 'path': path, 'sha256': ref['sha256'], 'checklist': lines}, 0, f'Reference image at {path}; show it to the operator' + _checklist_line(lines))
         if a.job:
+            a.job = _take_job(base, a.job)
             job = call('GET', f'/api/runs/{run}/jobs/{a.job}')
             if job['status'] != 'ready':
                 emit({'action': 'refused', 'message': f"Take is {job['status']}: {job.get('error') or 'not ready'}", 'job': job}, 2)
@@ -1445,6 +1478,7 @@ def cmd_visuals(a):
     if a.what == 'review':
         emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes, 'timing_notes': a.timing or '', 'quote': a.quote}))
     if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
+        a.job = _take_job(base, a.job)
         emit(write(base + '/select-take', {'job_id': a.job, 'quote': a.quote, **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})}))
     if a.what == 'still':   # design/45 10.3: an approved reference fills a still shot
         if a.file:   # design/77 L33b: several still shots in one call
