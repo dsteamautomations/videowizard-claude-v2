@@ -11,7 +11,7 @@ if command -v claude >/dev/null 2>&1; then CLAUDE=$(command -v claude); fi   # a
 [ -x "$CLAUDE" ] || { echo "refusing: claude binary not found at $CLAUDE (update the path in this script and CLAUDE.md)" >&2; exit 1; }
 # On Windows the CLI needs git-bash named, and refuses a git found under the current directory (git is installed under the home folder):
 # run this script from the repository, never from the home folder.
-[ -n "${CLAUDE_CODE_GIT_BASH_PATH:-}" ] || { b=$(command -v bash 2>/dev/null); case "$b" in /c/*|/mnt/c/*) export CLAUDE_CODE_GIT_BASH_PATH="$(cygpath -w "$b" 2>/dev/null || echo "$b")";; esac; }
+if [ -z "${CLAUDE_CODE_GIT_BASH_PATH:-}" ] && command -v cygpath >/dev/null 2>&1; then export CLAUDE_CODE_GIT_BASH_PATH="$(cygpath -w "$(command -v bash)")"; fi
 
 cd "$(dirname "$0")/.."
 
