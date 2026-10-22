@@ -218,10 +218,11 @@ function resultCard(s,r){
     '<div class="cap" title="'+esc(r.title||'')+'">'+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+'</div>'+
     (p?'<textarea class="note" data-note="'+esc(s.search_id)+':'+r.n+'" placeholder="keep: the handle shape; avoid: brand text">'+esc(p.note||'')+'</textarea><div class="chips">'+CHIPS.map(c=>'<button data-chip="'+esc(s.search_id)+':'+r.n+'" data-text="'+esc(c)+'">'+esc(c)+'</button>').join('')+'</div>':'')+'</div>';
 }
-function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id);
+function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id&&['frame','supplied','web','isolated','sheet'].includes(r.kind));   // keyframes and states are compositions, not references
   if(refs.some(r=>r.kind==='sheet'&&r.status==='approved'))return ['ok','sheet approved'];
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
-  if(refs.some(r=>r.status==='candidate'||r.status==='approved'))return ['dec','pictures in hand'];
+  if(refs.some(r=>r.status==='approved'))return ['dec','pictures approved, sheet to make'];
+  if(refs.some(r=>r.status==='candidate'))return ['dec','pictures to approve'];
   const hits=((data.element_matches||{})[e.id]||[]).length;return hits?['','seen in the footage']:['err','needs a picture'];}
 function roundOpen(){const rd=data&&data.round;return rd&&(rd.pass===1||rd.pass===2)?rd:null;}
 function renderRound(rd){   // design/79: every element at once; pass 1 the frames and the keywords, pass 2 the searched elements' pictures
