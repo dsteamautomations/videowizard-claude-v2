@@ -20,5 +20,9 @@ def test_an_accepted_gap_shows_the_operators_words():
     assert 'g.quote' in HTML   # design/75 (defect 20)
 
 
+def test_each_gap_has_accept_and_revise_and_a_gap_under_revision_shows_its_badge():
+    assert 'data-a="revise"' in HTML and 'under revision' in HTML and 'g.revise' in HTML   # design/76 (L32)
+
+
 def test_an_empty_words_box_is_marked_and_a_rejected_picture_has_its_badge_and_button():
     assert 'need-words' in HTML and "data-a=\"reject\"" in HTML and 'rejected' in HTML

@@ -248,6 +248,12 @@ class ReferenceReject(Write):   # design/74 L7
     quote: str = Field(min_length=1)
 
 
+class GapRevise(Write):   # design/76 (L32)
+    gap_id: str
+    notes: str = ''
+    quote: str = Field(min_length=1)
+
+
 class GeneratorBody(Write):
     shot_id: str
     provider: str
@@ -1145,6 +1151,11 @@ def visuals_treatment(run_id: UUID, body: TreatmentBody, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/sequence')
 def visuals_sequence(run_id: UUID, body: SequenceBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.sequence(storage(), user, run, outputs, body.shot_id, body.reference_ids, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/revise')
+def visuals_revise(run_id: UUID, body: GapRevise, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.revise_gap(storage(), user, run, outputs, body.gap_id, body.notes, body.quote))   # design/76
 
 
 @app.post('/api/runs/{run_id}/visuals/references/{ref_id}/reject')

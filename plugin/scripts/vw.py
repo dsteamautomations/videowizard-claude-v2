@@ -1199,8 +1199,8 @@ def cmd_planning(a):
         emit(out, 0, 'Planning finalized; certificate recorded. Run `vw next`.')
 
 
-VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'frame', 'supply', 'web', 'image', 'approve', 'reject', 'bind', 'packet', 'generator',
-                'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74: no `cap` (L26); `reject` and `feedback` (L7)
+VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'frame', 'supply', 'web', 'image', 'approve', 'reject', 'bind', 'packet', 'generator',
+                'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74: no `cap` (L26); `reject` and `feedback` (L7); design/76: `revise`
 
 
 def cmd_visuals(a):
@@ -1261,6 +1261,9 @@ def cmd_visuals(a):
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
     if a.what == 'accept':
         emit(write(base + '/accept', {'gap_ids': a.gaps, 'quote': a.quote}))
+    if a.what == 'revise':   # design/76 (L32): a change request is a revision, never a yes
+        out = write(base + '/revise', {'gap_id': a.gap, 'notes': a.notes or '', 'quote': a.quote})
+        emit(out, 0, f"Gap {a.gap} is under revision: change its treatment entry and its plan, propose the next version, then ask for its acceptance afresh; generate nothing for it until then.")
     if a.what in ('frame', 'supply', 'web'):
         body = {'element_id': a.element, 'name': a.name or f'{a.what}-{a.element}', 'kind': 'frame' if a.what == 'frame' else 'supplied' if a.what == 'supply' else 'web', 'subject': _one_subject(a)}
         if a.what == 'frame':

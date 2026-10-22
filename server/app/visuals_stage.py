@@ -183,6 +183,10 @@ def propose(conn, store, user, run, outputs, document):
         gap = next((g for g in plan['gaps'] if g['gap_id'] == gid), None)
         if not gap or acc['digest'] != gap_digest(plan, gap):
             session['accepted'].pop(gid)
+    for gid, rv in list((session.get('revisions') or {}).items()):   # design/76: a revision is answered once the gap is proposed changed
+        gap = next((g for g in plan['gaps'] if g['gap_id'] == gid), None)
+        if not gap or rv.get('digest') != gap_digest(plan, gap):
+            session['revisions'].pop(gid)
     save_session(store, run, session)
     return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']]}
 
@@ -409,15 +413,36 @@ def accept(store, user, run, outputs, gap_ids, quote):
         if gap.get('choices'):
             need(session['choice_selections'].get(gid), f'Select a choice for gap {gid} before accepting it.')
         session['accepted'][gid] = {'digest': gap_digest(plan, gap), 'choice_id': (session['choice_selections'].get(gid) or {}).get('choice_id'), 'quote': quote, 'by': user['id']}
+        (session.get('revisions') or {}).pop(gid, None)   # design/76: accepted after all
         _feedback(session, run, user, kind='gap', ident=gid, owner=gid, step=None, verdict='pass', quote=quote, notes='', prompt='', checklist=None, suggestion='', model='', inputs=())   # design/75
     save_session(store, run, session)
     return {'accepted': sorted(session['accepted'])}
 
 
+def revise_gap(store, user, run, outputs, gap_id, notes, quote):
+    """design/76 (L32): the operator sends a gap back with their words; it is not accepted, the words wait for the assistant in status and on the page,
+    a feedback record says fix, and the entry clears when the gap is proposed changed or accepted after all."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    gap = next((g for g in plan['gaps'] if g['gap_id'] == gap_id), None)
+    need(gap, f'Unknown gap {gap_id}.')
+    need((quote or '').strip(), 'The operator reply is required.')
+    words = str(notes or '').strip() or str(quote)
+    session['accepted'].pop(gap_id, None)
+    session.setdefault('revisions', {})[gap_id] = {'notes': words, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': gap_digest(plan, gap)}
+    _feedback(session, run, user, kind='gap', ident=gap_id, owner=gap_id, step=None, verdict='fix', quote=quote, notes=words, prompt='', checklist=None, suggestion='', model='', inputs=())
+    save_session(store, run, session)
+    return {'gap_id': gap_id, 'revise': True, 'notes': words}
+
+
 def _accepted_words(session, gid):
-    """design/75 (defect 20): the operator's words on a gap's acceptance, for the assistant, the page and the feedback file."""
+    """design/75 (defect 20): the operator's words on a gap's acceptance; design/76: a revision's words while the gap waits for its next version."""
     acc = session['accepted'].get(gid)
-    return {'quote': acc.get('quote') or '', 'by': acc.get('by')} if acc else {}
+    out = {'quote': acc.get('quote') or '', 'by': acc.get('by')} if acc else {}
+    rv = (session.get('revisions') or {}).get(gid)
+    if rv:
+        out['revise'] = {k: rv.get(k) for k in ('notes', 'quote', 'by', 'at')}
+    return out
 
 
 def shots_of(plan, session, gid):
@@ -645,7 +670,7 @@ def _feedback(session, run, user, *, kind, ident, owner, step, verdict, quote, n
         'app': 'videowizard', 'library_version': library_version_of(session), 'run_code': run.get('code'), 'job_id': f"{run.get('code')}-{owner}-{str(ident)[:8]}",
         'kind': kind, 'id': str(ident), 'playbook': spec.get('playbook'), 'task': spec.get('task'), 'model': model or '', 'inputs': list(inputs),
         'prompt': prompt or '', 'checklist': list(checklist or []), 'verdict': verdict, 'verdict_by': 'person', 'quote': quote,
-        'what_went_wrong': notes if verdict == 'reject' else '', 'suggestion': suggestion or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+        'what_went_wrong': notes if verdict in ('reject', 'fix') else '', 'suggestion': suggestion or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
 
 
 def _feedback_image(session, run, user, row, verdict, quote, notes):

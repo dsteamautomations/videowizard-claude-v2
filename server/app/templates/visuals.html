@@ -149,9 +149,10 @@ function drawGaps(){
   const refs={};(data.references||[]).forEach(r=>refs[r.id]=r);
   const can=stage()==='visuals'&&!!data.treatment;
   $('gaps').innerHTML=data.gaps.map((g,gi)=>{
-    const head='<div class="hd"><b>'+esc(g.gap_id)+'</b><span class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</span>'+(g.recorded?'<span class="badge ok">recorded</span>':g.accepted?'<span class="badge ok">accepted</span>':data.plan_digest?'<span class="badge dec">to accept</span>':'')+'<span class="ds">'+esc(g.requirement||'')+'</span></div>';
+    const head='<div class="hd"><b>'+esc(g.gap_id)+'</b><span class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</span>'+(g.recorded?'<span class="badge ok">recorded</span>':g.revise?'<span class="badge dec">under revision</span>':g.accepted?'<span class="badge ok">accepted</span>':data.plan_digest?'<span class="badge dec">to accept</span>':'')+'<span class="ds">'+esc(g.requirement||'')+'</span></div>';
     let body='';
-    if(g.accepted&&g.quote){body+='<div class="ds">Accepted with: “'+esc(g.quote)+'”</div>';}   // design/75 (defect 20): the operator's words stay in view
+    if(g.revise){body+='<div class="ds err">Sent back: “'+esc(g.revise.notes||g.revise.quote)+'” — the assistant revises this gap and proposes the next version.</div>';}   // design/76 (L32)
+    else if(g.accepted&&g.quote){body+='<div class="ds">Accepted with: “'+esc(g.quote)+'”</div>';}   // design/75 (defect 20): the operator's words stay in view
     if(g.choices){body+='<div class="btns"><span class="ds">Two choices:</span>'+g.choices.options.map(c=>'<button data-a="select" data-gap="'+esc(g.gap_id)+'" data-choice="'+esc(c.id)+'" class="'+(g.choices.selected===c.id?'go':'')+'" title="'+esc(c.why)+'">'+esc(c.title)+(g.choices.recommended===c.id?' (recommended)':'')+'</button>').join('')+'</div>';}
     if(!g.shots.length){body+='<div class="ds">'+(data.plan_digest?(g.choices&&!g.choices.selected?'Choose one of the two to see its shots.':'No shots in this gap yet.'):'The plan has not been proposed yet.')+'</div>';}
     g.shots.forEach(s=>{
@@ -183,7 +184,7 @@ function drawGaps(){
       }
       body+=sh+'</div>';
     });
-    if(data.plan_digest&&!g.accepted&&!g.recorded&&can&&g.shots.length){body+='<div class="btns">'+words('w-acc-'+g.gap_id,'your words for this gap')+'<button class="go" data-a="accept" data-gap="'+esc(g.gap_id)+'">Accept the gap</button></div>';}
+    if(data.plan_digest&&!g.recorded&&can&&g.shots.length){body+='<div class="btns">'+words('w-acc-'+g.gap_id,g.accepted?'what to change':'your yes, or what to change')+(g.accepted?'':'<button class="go" data-a="accept" data-gap="'+esc(g.gap_id)+'">Accept the gap</button>')+'<button data-a="revise" data-gap="'+esc(g.gap_id)+'">Revise</button></div>';}   // design/76: Accept and Revise, never a change request as a yes
     return '<div class="gap">'+head+'<div class="bd">'+body+'</div></div>';
   }).join('');
   $('gaps').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
@@ -201,6 +202,7 @@ async function click(b){
   if(a==='select-take'){const q=val('w-take-'+b.dataset.job);if(!q){needWords('w-take-'+b.dataset.job);return;}await send({action:'select-take',job_id:b.dataset.job,quote:q},'Take selected.');return;}
   if(a==='reject-take'){const q=val('w-take-'+b.dataset.job);if(!q){needWords('w-take-'+b.dataset.job,'Say why in the words box, then Reject.');return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}
   if(a==='accept'){const q=val('w-acc-'+b.dataset.gap);if(!q){needWords('w-acc-'+b.dataset.gap,'Your words for this gap are required: type them in the box beside the button first.');return;}await send({action:'accept',gap_ids:[b.dataset.gap],quote:q},'Gap accepted.');return;}
+  if(a==='revise'){const q=val('w-acc-'+b.dataset.gap);if(!q){needWords('w-acc-'+b.dataset.gap,'Say what to change in the box beside the button, then Revise.');return;}await send({action:'revise',gap_id:b.dataset.gap,notes:q,quote:q},'Gap sent back for revision.');return;}
 }
 function prompt_words(label){
   // the viewer shows no dialogs: the words are typed in the foot box, then the button pressed again

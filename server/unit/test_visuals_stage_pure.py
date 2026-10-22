@@ -703,6 +703,39 @@ def test_the_packet_carries_the_recorded_footage_character_or_none():
     assert VS.footage_character([{'stage': 'media', 'unit': None, 'summary': {'clips': []}}]) is None
 
 
+# ---------- design/76: Accept and Revise ----------
+
+def test_a_revision_drops_the_acceptance_keeps_the_words_and_clears_when_the_gap_is_proposed_again_or_accepted(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), library_version='vwlib-x')
+    store = store_with(sess, doc)
+    store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
+    with pytest.raises(Problem, match='operator'):
+        g(lambda: VS.revise_gap(store, USER, RUN, [], 'G2', 'AI video instead', ''))
+    with pytest.raises(Problem, match='Unknown gap'):
+        g(lambda: VS.revise_gap(store, USER, RUN, [], 'G9', 'x', 'yes'))
+    out = VS.revise_gap(store, USER, RUN, [], 'G2', 'AI video instead of the diagram', 'Make G2 an AI video.')
+    s = saved(store)
+    assert out['gap_id'] == 'G2' and 'G2' not in s['accepted'] and s['revisions']['G2']['notes'] == 'AI video instead of the diagram' and s['revisions']['G2']['quote'] == 'Make G2 an AI video.'
+    assert s['feedback'][-1]['kind'] == 'gap' and s['feedback'][-1]['verdict'] == 'fix' and s['feedback'][-1]['what_went_wrong'] == 'AI video instead of the diagram'
+    st = VS.status(FakeConn([]), store, RUN, [])
+    assert st['gaps'][1]['accepted'] is False and st['gaps'][1]['revise']['quote'] == 'Make G2 an AI video.' and 'revise' not in st['gaps'][0]
+    view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')
+    assert view['gaps'][1]['revise']['notes'] == 'AI video instead of the diagram'
+    # proposing the same gap again unchanged keeps the revision; a changed gap clears it
+    VS.treatment(store, USER, RUN, [], TREATMENT, 'yes')
+    VS.propose(FakeConn(), store, USER, RUN, [], doc)
+    assert 'G2' in saved(store)['revisions']
+    changed = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', purpose='the water, closer')])
+    VS.propose(FakeConn(), store, USER, RUN, [], changed)
+    assert 'G2' not in saved(store)['revisions']
+    # accepting a gap under revision clears it too
+    VS.revise_gap(store, USER, RUN, [], 'G1', 'n', 'Change G1.')
+    VS.accept(store, USER, RUN, [], ['G1'], 'Yes, G1 as it is after all.')
+    assert 'G1' not in saved(store)['revisions'] and 'G1' in saved(store)['accepted']
+
+
 def test_record_gap_keeps_the_takes_start_and_end_ids():
     """design/71 P4: assembly needs the boundary pictures to see where two takes of one gap share one."""
     prep = {'start_image': {'reference_id': 'R1'}, 'end_image': {'reference_id': 'R2'}}

@@ -433,6 +433,15 @@ def test_prompt_and_steps_carry_the_packet_order_the_material_rule_and_the_foota
     assert 'recorded footage character' in prompt and 'never from an assumption' in prompt
 
 
+def test_revise_posts_the_gap_and_the_words_and_the_step_names_it(harness, monkeypatch, capsys):
+    """design/76 (L32)."""
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'gap_id': 'G2', 'revise': True})
+    code, out, err = run(args(what='revise', gap='G2', notes='AI video instead', quote='Make G2 an AI video.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/revise') and posted[-1][1] == {'gap_id': 'G2', 'notes': 'AI video instead', 'quote': 'Make G2 an AI video.'} and 'under revision' in err
+    assert 'vw visuals revise' in STAGES['visuals']['steps'][2] and 'vw visuals revise' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+
+
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
     """design/74 L31 (defect 19)."""
     monkeypatch.setattr(vw, 'request', lambda method, path, **kw: ({'action': 'refused', 'message': 'Bind references for this shot under the current accepted plan.'}, 422))
