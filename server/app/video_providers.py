@@ -17,11 +17,15 @@ MAX_VIDEO=200*1024*1024
 
 
 def motion_text(snapshot):
-    prompt=snapshot['motion_prompt']+'\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
-    prompt+='\nContinuity: '+snapshot['continuity_notes']
-    prompt+=f'\nRequested duration: {snapshot["duration_seconds"]} seconds. Use the first image as the starting frame.'
-    if snapshot.get('end_image'):prompt+=' Use the second image as the ending frame; make the transition follow the specified action.'
-    return prompt+' Do not render editorial captions or overlay text into the video. Do not create narration, dialogue or music. Preserve the depicted identities.'
+    """design/84: the library's Omni house shape (fact sheet B1, B2, B7, B9): the frame tags first, the motion brief, the continuity line,
+    one unbroken shot (Omni cuts to several shots by default), no dialogue or music, the pictures' roles in plain words, the length last."""
+    two=bool(snapshot.get('end_image'))
+    prompt='[# Sources <FIRST_FRAME>@Image1'+(' <LAST_FRAME>@Image2' if two else '')+']\n'
+    prompt+=snapshot['motion_prompt']+'\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
+    prompt+='\nContinuity: '+(snapshot.get('continuity_notes') or '')
+    prompt+='\nIn a single unbroken scene, one continuous shot, no scene cuts, no jump cuts. No dialogue. No music. No captions or overlay text.'
+    prompt+='\nUse Image1 as the starting frame'+(' and Image2 as the final frame; the transition follows the action above' if two else '')+'. Preserve the depicted identities.'
+    return prompt+f'\n{snapshot["duration_seconds"]}s'
 
 
 def configured(provider):

@@ -274,7 +274,9 @@ def test_prepare_take_needs_a_start_and_a_distinct_end_image_and_freezes_both():
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved'), 'R3': ref('R3')},
                    bindings={'VS1': {'gap_digest': gap_digest(plan, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
-    body = {'shot_id': 'VS1', 'motion_prompt': 'water poured along the top', 'subject_reconciliation': {}, 'start_image': 'R1'}
+    body = {'shot_id': 'VS1', 'motion_prompt': 'water poured along the top', 'subject_reconciliation': {}, 'start_image': 'R1', 'continuity_notes': 'the wall and the yard light stay'}
+    with pytest.raises(Problem, match='Continuity notes are required'):   # design/84 V2
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'R2', 'continuity_notes': ' '}))
     with pytest.raises(Problem, match='start and an end image') as exc:
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], body))
     assert '--kind keyframe --parents <start>' in exc.value.message and '--start R --end R2' in exc.value.message
@@ -286,7 +288,7 @@ def test_prepare_take_needs_a_start_and_a_distinct_end_image_and_freezes_both():
     out = VS.prepare_take(store, USER, RUN, [], {**body, 'end_image': 'R2'})
     assert out['duration_seconds'] == 10 and out['exact_seconds'] == 10.0
     record = json.loads(store.files[saved(store)['preparations']['VS1']['key']])
-    assert record['start_image']['reference_id'] == 'R1' and record['end_image']['reference_id'] == 'R2' and 'second image as the ending frame' in record['effective_prompt']
+    assert record['start_image']['reference_id'] == 'R1' and record['end_image']['reference_id'] == 'R2' and '<LAST_FRAME>@Image2' in record['effective_prompt'] and 'one continuous shot' in record['effective_prompt'] and 'Continuity: the wall and the yard light stay' in record['effective_prompt']
 
 
 def test_a_keyframe_may_be_generated_from_a_candidate_keyframe(monkeypatch):
@@ -365,7 +367,7 @@ def test_an_answer_is_linted_and_stored_with_the_image_and_the_take(monkeypatch)
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r2', 'prompt': 'another wall'}))
     out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r3', 'answer': None})   # as today
     assert out['op'] == 'generate'
-    take = {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2'}
+    take = {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'continuity_notes': 'the wall stays', 'start_image': 'R1', 'end_image': 'R2'}
     store = store_with(sess, doc)
     VS.prepare_take(store, USER, RUN, [], {**take, 'answer': {**answer, 'prompt': 'water poured'}})
     record = json.loads(store.files[saved(store)['preparations']['VS1']['key']])
@@ -505,7 +507,7 @@ def test_prepare_take_refuses_a_start_and_end_of_different_aspect_and_accepts_a_
             'V1': {**ref('V1', 'approved'), 'width': 1088, 'height': 1936}, 'O1': ref('O1', 'approved')}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references=refs, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'F1', 'sha256': 'sha-F1'}]}}})
-    body = {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'F1', 'end_image': 'E1'}
+    body = {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'continuity_notes': 'the wall stays', 'start_image': 'F1', 'end_image': 'E1'}
     assert VS.prepare_take(store_with(sess, doc), USER, RUN, [], body)['duration_seconds'] == 10   # 1920x1080 and 1536x864 share 16:9
     with pytest.raises(Problem, match='aspect') as exc:
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'V1'}))
@@ -524,7 +526,7 @@ def test_every_prompt_is_linted_for_a_logo_a_model_name_a_size_or_a_resolution(m
     with pytest.raises(Problem, match='asks for a logo'):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     with pytest.raises(Problem, match="names a model \\('kling'\\)"):
-        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'Kling: water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2'}))
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'Kling: water poured', 'subject_reconciliation': {}, 'continuity_notes': 'the wall stays', 'start_image': 'R1', 'end_image': 'R2'}))
 
 
 # ---------- design/74: L7 the picture reject and the feedback record, L25 the treatment's shot routes, L26 the cap message, L6 the checklist ----------
@@ -576,7 +578,7 @@ def test_feedback_records_are_written_on_approve_reject_select_and_rejected_revi
     text = VS.feedback_yaml(saved(store)['feedback'])
     assert text.startswith('- app: videowizard\n') and '  verdict: reject\n' in text and '  checklist:\n    - line: "bucket: empty (must)"\n' in text and 'suggestion: "video-frame.md' in text
     # takes: the selection is a pass, a rejected review a reject, with the preparation's checklist
-    VS.prepare_take(store, USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'A1', 'end_image': 'R2', 'answer': {**answer, 'prompt': 'water poured', 'suggestion': ''}})
+    VS.prepare_take(store, USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'continuity_notes': 'the wall stays', 'start_image': 'A1', 'end_image': 'R2', 'answer': {**answer, 'prompt': 'water poured', 'suggestion': ''}})
     prep = saved(store)['preparations']['VS1']
     take = {'id': 'j-video-1', 'unit': 'VS1', 'run_id': 'run-1', 'provider': 'video', 'status': 'ready', 'request': {'duration_seconds': 10, 'preparation_id': prep['preparation_id'], 'request_key': prep['key']}, 'error': None, 'cost': None,
             'result': {'key': 'run-1/visuals/takes/t1.mp4', 'sha256': 's', 'bytes': 1, 'evidence': {'duration_seconds': 10.0, 'timing_matches_placement': True}}}

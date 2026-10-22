@@ -175,6 +175,7 @@ STILL_TYPES = ('image', 'diagram')         # filled by one approved picture (`vw
 MIN_STATE_S = 3                            # a state is read, not glanced
 MIN_GRAPHIC_S = 3                          # a graphic shorter than this is warned
 MAX_STATIC_S = 6                           # a still longer than this must earn its time (G15)
+AI_RUN_S = 12   # design/85 G2: seconds of AI video back to back in one gap before the check warns
 
 
 def _default_generator():
@@ -313,6 +314,21 @@ def validate_plan(document, source_gaps, fps=None):
     for prev, cur in zip(placed, placed[1:]):
         if prev[2] in GRAPHIC_TYPES and cur[2] in GRAPHIC_TYPES and (prev[0] == cur[0] or prev[4] == cur[3]):
             warnings.append({'shot_id': cur[1], 'kind': 'graphics_back_to_back', 'message': f"shots {prev[1]} and {cur[1]} are graphics back to back: the second shot's purpose must say why it stays a graphic"})
+    for gap in plan.gaps:   # design/85 G2, G3: a run of AI video over AI_RUN_S in one gap, unbroken by a frame, a still or a graphic
+        own = sorted((p for p in placed if p[0] == gap.gap_id), key=lambda p: p[3])
+        run_, runs = [], []
+        for p in own + [None]:
+            if p and p[2] == 'video' and (not run_ or run_[-1][4] == p[3]):
+                run_.append(p)
+                continue
+            if run_:
+                runs.append(run_)
+            run_ = [p] if p and p[2] == 'video' else []
+        for r in runs:
+            seconds = (r[-1][4] - r[0][3]) / float(fps or 25)
+            if seconds > AI_RUN_S:
+                warnings.append({'gap_id': gap.gap_id, 'shot_id': r[0][1], 'kind': 'ai_run', 'message': f"gap {gap.gap_id}: shots {', '.join(p[1] for p in r)} are {seconds:.1f} s of AI video back to back, over {AI_RUN_S} s: "
+                                 'break the run with a frame from the footage, a still or a graphic, and cut the AI shots to three to five seconds each; a run that long reads as synthetic'})
     for gap in plan.gaps:
         own = [p for p in placed if p[0] == gap.gap_id]
         if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):

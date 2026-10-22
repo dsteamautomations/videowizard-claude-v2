@@ -1078,7 +1078,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'sequence_rules': plan.get('sequence_rules', []), 'elements': [e for e in plan['elements'] if e['id'] in shot['element_ids']],
               'start_image_instruction': start_instruction, 'image_instruction': start_instruction,   # the old name answers for one release (design/67 A)
               'end_image_instruction': end_instruction,
-              'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are.',
+              'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are. '
+                                   'The take is one unbroken shot: write the motion so nothing enters the frame that the start or the end does not show. Write the continuity line (`--continuity`): what stays unchanged between the two frames, and for a person five traits from the sheet.',   # design/84 V3
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
               'footage_character': footage_character(outputs),   # design/77 L42
               'provider': {k: generator[k] for k in ('provider', 'model')}}
@@ -1135,6 +1136,7 @@ def prepare_take(store, user, run, outputs, body):
             library.check_answer(answer, body['motion_prompt'])
         except ValueError as exc:
             need(False, str(exc))
+    need(str(body.get('continuity_notes') or '').strip(), 'Continuity notes are required: what stays unchanged between the two frames, and for a person five traits from the sheet (`--continuity`).')   # design/84 V2
     base = packet(store, run, outputs, body['shot_id'], session)
     shot = base['preparation']['shot']
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))

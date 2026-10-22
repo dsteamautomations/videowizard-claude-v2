@@ -137,7 +137,9 @@ def test_prepare_take_needs_the_end_image_before_any_request(harness, monkeypatc
     code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', motion='pours', subject=['E1="pours water"']), capsys)
     assert code == 2 and 'start and an end image' in out['message'] and '--end' in out['message'] and not posted
     code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"']), capsys)
-    assert code == 0 and posted['path'].endswith('/prepare-take') and posted['start_image'] == 'R1' and posted['end_image'] == 'R2' and posted['motion_prompt'] == 'pours'
+    assert code == 2 and '--continuity' in out['message'] and not posted   # design/84 V2
+    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"'], continuity='the wall stays; grey hair, white shirt'), capsys)
+    assert code == 0 and posted['continuity_notes'].startswith('the wall stays') and posted['path'].endswith('/prepare-take') and posted['start_image'] == 'R1' and posted['end_image'] == 'R2' and posted['motion_prompt'] == 'pours'
 
 
 def test_prepare_writes_the_library_files_per_step_behind_the_sentinel(harness, monkeypatch, capsys):
@@ -179,7 +181,7 @@ def test_image_and_prepare_take_post_the_answer_from_the_file(harness, monkeypat
     run(args(what='image', element='E1', kind='keyframe', prompt='p'), capsys)
     assert 'answer' not in posted
     posted.clear()
-    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"'], answer='out/answers/a1.json'), capsys)
+    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"'], continuity='the wall stays', answer='out/answers/a1.json'), capsys)
     assert code == 0 and posted['answer']['prompt'] == 'p' and posted['end_image'] == 'R2'
     (ws / 'out' / 'images.json').write_text(json.dumps([{'element': 'E1', 'kind': 'sheet', 'prompt': 'p', 'answer': 'out/answers/a1.json'}, {'element': 'E2', 'kind': 'sheet', 'prompt': 'q'}]), encoding='utf-8')
     bodies = []
@@ -543,6 +545,13 @@ def test_frame_file_posts_the_rows_in_order_and_stops_at_the_first_refusal(harne
     assert code == 2 and [p['element_id'] for p in posted] == ['E1', 'E2', 'E3'] and posted[0] == {'element_id': 'E1', 'name': 'frame-E1', 'kind': 'frame', 'subject': 'the mason', 'source_media_id': 'c1', 'requested_s': 12.5}
     assert 'E1@12.5' in json.dumps(out) and 'E2@3' in json.dumps(out) and 'Unknown clip c9' in json.dumps(out)
     assert 'frame --file out/frames.json' in json.dumps(STAGES['visuals']) and 'frame --file' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+
+
+def test_steps_and_command_text_carry_the_long_blank_the_ai_run_and_the_continuity_rules():
+    """design/84 V3, design/85 G1-G3."""
+    vis, opt, doc = json.dumps(STAGES['visuals']), json.dumps(STAGES['options']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert 'ai_run' in vis and 'three to five seconds' in vis and 'E2' in opt and 'blank over 12 s' in opt
+    assert '--continuity' in doc and 'ai_run' in doc and 'E2, a blank over 12 s' in doc
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

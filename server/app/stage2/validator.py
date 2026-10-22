@@ -8,6 +8,14 @@ from .slides import DECISION_KINDS
 
 ROLL_SPEAKER = 'ELIGIBLE_A_ROLL_SPEAKER'
 MIN_BLANK_S = 3      # design/21: a blank (AI video or animation) is at least 3 s
+LONG_BLANK_S = 12    # design/85 G1: a blank over this is a long run of AI pictures; the planner looks for a real cut-in first
+
+
+def long_blank_flag(k, tl_fps, tag):
+    """design/85 G1: E2, a flag not a refusal."""
+    if k > LONG_BLANK_S * tl_fps:
+        return f'{tag}: E2 blank of {k / tl_fps:.1f} s is over {LONG_BLANK_S} s: a run of AI pictures that long reads as synthetic; find a footage cut-in, a B-roll clip or a frame that relates and split it, or say in intent why it must stay whole'
+    return None
 LONG_REAL_S = 4      # design/21 rule 11: a real shot longer than this must earn its length
 NEUTRAL = ('Toward_Lens', 'Away', 'Neutral')
 
@@ -90,6 +98,9 @@ def validate_options(doc, package, policy):
                         flags.append(f'{tag}: E1 blank of {k / tl_fps:.1f} s is under {MIN_BLANK_S} s; the operator decides ({ev["short_reason"]})')
                     else:
                         refusals.append(f'{tag}: E1 a blank must be at least {MIN_BLANK_S} s ({k / tl_fps:.1f} s): hold a neighbouring shot longer, or give short_reason so the operator decides')
+                long = long_blank_flag(k, tl_fps, tag)
+                if long:
+                    flags.append(long)
                 ev['_timeline_frames'], ev['_fps_ratio'] = k, '1'
                 total += k
                 cursor += k

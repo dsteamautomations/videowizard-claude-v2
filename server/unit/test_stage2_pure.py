@@ -24,6 +24,15 @@ def test_group_flags_counts_per_rule_with_three_examples():
     assert group_flags([]) == []
 
 
+def test_a_blank_over_twelve_seconds_is_flagged_e2_not_refused():
+    """design/85 G1."""
+    from app.stage2.validator import long_blank_flag
+    assert long_blank_flag(12 * 25, 25, 'OPTION #1 blank at event 2') is None
+    f = long_blank_flag(13 * 25, 25, 'OPTION #1 blank at event 2')
+    assert f.startswith('OPTION #1 blank at event 2: E2 blank of 13.0 s is over 12 s') and 'footage cut-in' in f
+    assert [g['rule'] for g in group_flags([f])] == ['E2']
+
+
 def test_group_flags_keeps_an_unknown_shape_under_other():
     assert group_flags(['something the validator said'])[0]['rule'] == 'other'
 

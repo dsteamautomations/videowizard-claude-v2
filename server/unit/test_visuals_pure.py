@@ -105,6 +105,17 @@ def test_graphics_back_to_back_across_two_gaps_with_no_footage_between():
     assert not any(w.get('kind') == 'graphics_back_to_back' for w in warnings)
 
 
+def test_a_run_of_ai_video_over_twelve_seconds_in_one_gap_is_warned():
+    """design/85 G2, G3: the run, not the shot, is what reads as synthetic; a frame, a still or a graphic breaks it."""
+    _, warnings = VC.validate_plan(plan([shot('V1', 0, 250, 'video'), shot('V2', 250, 500, 'video'), shot('V3', 500, 750, 'video'), shot('IM1', 750, 1000, 'image')]), GAPS, Fraction(25))
+    run_ = [w for w in warnings if w.get('kind') == 'ai_run']
+    assert len(run_) == 1 and run_[0]['gap_id'] == 'G1' and 'shots V1, V2, V3 are 30.0 s of AI video back to back' in run_[0]['message'] and 'three to five seconds' in run_[0]['message']
+    _, warnings = VC.validate_plan(plan([shot('V1', 0, 250, 'video'), shot('IM1', 250, 500, 'image'), shot('V2', 500, 750, 'video'), shot('DG1', 750, 1000, 'diagram')]), GAPS, Fraction(25))
+    assert not [w for w in warnings if w.get('kind') == 'ai_run']   # 10 s runs, broken by a still and a graphic
+    _, warnings = VC.validate_plan(plan([shot('IM1', 0, 250, 'image'), shot('V1', 250, 1000, 'video')]), GAPS, Fraction(25))
+    assert [w['shot_id'] for w in warnings if w.get('kind') == 'ai_run'] == ['V1']   # one 30 s shot is a run too
+
+
 def test_a_video_shot_longer_than_the_default_generator_is_warned():
     doc = plan([shot('VS1', 0, 590, 'video'), shot('VS2', 590, 1000, 'video')])   # 23.6 s and 16.4 s
     result, warnings = VC.validate_plan(doc, GAPS, Fraction(25))

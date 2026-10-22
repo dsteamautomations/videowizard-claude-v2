@@ -54,6 +54,18 @@ def test_a_take_keeps_the_providers_usage_beside_the_seconds():
     assert VW.take_cost(snap, {'steps': []}) == {'provider': 'google', 'model': 'gemini-omni-1.1-flash', 'seconds': 6}
 
 
+def test_the_take_text_follows_the_librarys_omni_house_shape():
+    """design/84 V1: the frame tags, the motion brief, the continuity line, one unbroken shot, no dialogue or music, the length last."""
+    from app.video_providers import motion_text
+    snap = {'motion_prompt': 'The mason lays the brick.', 'subject_reconciliation': {'H_MASON': 'lays'}, 'continuity_notes': 'the wall, the light; grey hair, white shirt', 'duration_seconds': 8, 'end_image': {'key': 'k'}}
+    t = motion_text(snap)
+    assert t.startswith('[# Sources <FIRST_FRAME>@Image1 <LAST_FRAME>@Image2]\nThe mason lays the brick.') and t.endswith('\n8s')
+    assert 'Continuity: the wall, the light; grey hair, white shirt' in t and 'In a single unbroken scene, one continuous shot, no scene cuts, no jump cuts.' in t
+    assert 'No dialogue. No music.' in t and 'Use Image1 as the starting frame and Image2 as the final frame' in t and 'Preserve the depicted identities' in t
+    one = motion_text({**snap, 'end_image': None})
+    assert one.startswith('[# Sources <FIRST_FRAME>@Image1]') and 'LAST_FRAME' not in one and 'Image2' not in one
+
+
 def test_another_400_keeps_todays_message(tmp_path, monkeypatch):
     status, result, error, cost, retry = refused(tmp_path, monkeypatch, {'error': {'type': 'invalid_request_error', 'message': 'size is wrong'}})
     assert status == 'failed' and result['failure'] == 'provider' and error == 'OpenAI rejected the request (HTTP 400).'
