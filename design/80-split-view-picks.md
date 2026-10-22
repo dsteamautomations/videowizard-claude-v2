@@ -1,6 +1,6 @@
 # design/80 — The picks page as a split view: the grid stays still, the chosen picture opens beside it
 
-Status: requirements note, builder, 22 Oct 2026, from SK's look at pass 2 on VW-6 ("the options come below after I select… if it can open up on the side, like a split view, it will be great. Even the buttons are actually disturbing"). Waits for SK's go. Sources: `visuals.html` (`renderRound`, `resultCard`, `lightbox`, `bigPicture`), design/73 R4b, design/79 Q2; Mobbin screens of Magnific, Gamma, Savee, Meetup, Later and Higgsfield (a grid or large picture with a fixed detail column on the right; selection shown as a count and a tray, never as controls under the thumbnails).
+Status: requirements note, builder, 22 Oct 2026, from SK's look at pass 2 on VW-6 ("the options come below after I select… if it can open up on the side, like a split view, it will be great. Even the buttons are actually disturbing"). SK approved it on 22 Oct ("don't start implementation yet": built after SK's image-generation test, with the next round of fixes). Sources: `visuals.html` (`renderRound`, `resultCard`, `lightbox`, `bigPicture`), design/73 R4b, design/79 Q2; Mobbin screens of Magnific, Gamma, Savee, Meetup, Later and Higgsfield (a grid or large picture with a fixed detail column on the right; selection shown as a count and a tray, never as controls under the thumbnails).
 
 ## 1. What is wrong today
 
@@ -23,7 +23,9 @@ The References step becomes two columns: **the grid on the left, a detail panel 
 | S2 | A `panel(sel)` function renders the detail column for the selected picture (`{search_id, n}` for a search result, `{ref_id}` for a reference); the page keeps `selPic` beside `selEl`; the pass-1 table, the pass-2 rows and the element view render inside `.split` (grid left, panel right). | `visuals.html` |
 | S3 | The footer on pass 2 lists the ticks as chips; a chip selects its picture, its ✕ unticks. | `visuals.html` |
 | S4 | Keys: arrows move within the row, Escape clears the selection; the note box keeps the focus while typing (the panel re-renders only on a tick, not on input). | `visuals.html` |
-| | Server 0.30.0; no route, no plugin change (the page only). | `config.py` |
+| S5 | **The searches of pass 1 run at once.** `round_done` runs the search rows in a thread pool (one Apify call each, up to 90 s today, one after another), writes each result or failure back on its row, then moves to pass 2. SK, 22 Oct: anything not dependent runs in parallel. | `visuals_stage.round_done` |
+| S6 | **The words sit with the button.** Approve and Reject on the sheet (and any per-picture verdict) take their words from a box directly above the buttons in the panel, never from the footer: today the button is at the top, the words box at the foot, and the page answers "Your words for this picture are required" after the click (SK, 22 Oct, twice). The footer's words box serves only a pass-level Done. | `visuals.html` |
+| | Server 0.30.0; no route, no plugin change. | `config.py` |
 
 ## 4. Not changed
 
@@ -31,7 +33,7 @@ The round model, the acts and routes, the words rule, the picks' order and notes
 
 ## 5. Tests first
 
-`test_visuals_page_pure.py`: the page carries the `.split` frame and the panel's controls (`Tick as Image`, `Untick`, `Previous`, `Next`); `resultCard` text carries no `textarea`; the footer chip markup for a tick. Rendering is browser-side, so the needles check the script text; SK's look at VW-6 is the real check.
+`test_visuals_stage_pure.py`: `round_done` with three search rows runs them at once (a faked search that records the overlap) and keeps a failed row's error. `test_visuals_page_pure.py`: the page carries the `.split` frame and the panel's controls (`Tick as Image`, `Untick`, `Previous`, `Next`); `resultCard` text carries no `textarea`; the footer chip markup for a tick. Rendering is browser-side, so the needles check the script text; SK's look at VW-6 is the real check.
 
 ## 6. Not covered
 
