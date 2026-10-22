@@ -120,12 +120,19 @@ def prepare(conn, store, user, run, outputs):
     save_session(store, run, session)
     package = {'source': session['source'], 'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
                'brief': ({**brief['summary'], 'effective_rules': core.effective_rules(conn, run, outputs)} if brief else None),   # design/37 2.7
+               'footage_character': footage_character(outputs),   # design/77 L42: the theme's texture comes from this, never from an assumption
                'script_digest': script['summary'].get('content_digest') if script else None,
                'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog()}
     pk = save_json(store, key(run, 'package.json'), package)
     return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'next': 'write out/visual-plan.json then `vw visuals check`'}
+
+
+def footage_character(outputs):
+    """design/77 L42: the operator's confirmed footage character from the media record (camera, support, look, their words), or None for a run recorded before it."""
+    media = next((o for o in outputs if o['stage'] == 'media' and o['unit'] is None), None)
+    return ((media or {}).get('summary') or {}).get('footage_character') if media else None
 
 
 def library_version_of(session):
@@ -756,6 +763,7 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'end_image_instruction': end_instruction,
               'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are.',
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
+              'footage_character': footage_character(outputs),   # design/77 L42
               'provider': {k: generator[k] for k in ('provider', 'model')}}
     identity = digest(prompt)   # the composition only: the library block below carries the card and the rules, which must not make a prepared take stale
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)

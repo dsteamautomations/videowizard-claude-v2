@@ -67,6 +67,24 @@ def test_prepare_keeps_name_order_reports_size_and_stores_stat(ws):
     assert len(json.dumps(out)) < 4000
 
 
+def test_prepare_guesses_the_footage_character_from_the_probe_and_record_stores_the_operators_answer(ws):
+    """design/77 L42 (VW-6: the assistant assumed phone footage; the clips were from a cinema camera)."""
+    from stages_av import footage_guess
+    clip(ws / 'in' / 'a.mp4')
+    out = media_prepare(ws, PROC, prior)
+    assert out['footage_guess'].startswith('looks like phone footage') and 'footage' in out['message']   # 64x64 test clips at a few kbit/s
+    assert footage_guess([{'width': 3840, 'height': 2160, 'bit_rate': 120_000_000, 'pix_fmt': 'yuv422p10le', 'codec': 'prores'}]).startswith('looks professional')
+    assert 'prores' in footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'prores'}])
+    assert footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'h264'}]).startswith('looks like phone footage')
+    calls = []
+    res = media_record(ws, PROC, prior, fake_upload(calls), camera_audio='allowed', note='ok', footage={'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'})
+    assert res['summary']['footage_character'] == {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'}
+    res = media_record(ws, PROC, prior, fake_upload(calls), camera_audio='allowed', note='ok')
+    assert res['summary']['footage_character'] is None
+    steps = ' '.join(PROC['steps'])
+    assert '--camera' in steps and '--support' in steps and '--look' in steps and 'footage_guess' in steps
+
+
 def test_prepare_dedupes_first_name_wins_and_converts_vfr(ws):
     clip(ws / 'in' / 'a.mp4')
     (ws / 'in' / 'z-copy.mp4').write_bytes((ws / 'in' / 'a.mp4').read_bytes())
@@ -149,13 +167,15 @@ def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, c
         posted.update(body)
         return {'id': 'out-1', 'stage': 'media', 'files': body['files'], 'summary': body['summary'], 'next': {'stage': 'analysis', 'paid': 'gemini-3.8-flash'}}
     monkeypatch.setattr(vw, 'write', write)
-    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound')
+    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound',
+                           camera='mirrorless', support='handheld', look='graded', footage_note='Sony, handheld, graded in camera')
     with pytest.raises(SystemExit) as exc:
         vw.cmd_stage(a)
     out, err = capsys.readouterr()
     assert exc.value.code == 0, err
     assert 'uploaded 1/2 ' in err and 'uploaded 2/2 ' in err and '(0 MB)' in err and 'Recorded media. Next: analysis.' in err
     assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound' and len(posted['summary']['clips']) == 2
+    assert posted['summary']['footage_character'] == {'camera': 'mirrorless', 'support': 'handheld', 'look': 'graded', 'quote': 'Sony, handheld, graded in camera'}   # design/77 L42
     shown = json.loads(out)   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
     assert shown['id'] == 'out-1' and shown['next']['stage'] == 'analysis' and shown['clips_recorded'] == 2 and 'total_mb' in shown
     assert 'clips' not in shown['summary'] and shown['summary']['camera_audio'] == 'excluded' and isinstance(shown['files'], str) and '3 file' in shown['files']   # out/media.json and the two clips

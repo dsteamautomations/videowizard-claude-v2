@@ -730,8 +730,10 @@ def cmd_stage(a):
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
                 print(f'uploaded {k}/{n} {name} ({size / 1e6:.0f} MB)', file=sys.stderr, flush=True)
+            footage = ({'camera': a.camera, 'support': getattr(a, 'support', None), 'look': getattr(a, 'look', None), 'quote': getattr(a, 'footage_note', None) or ''}
+                       if getattr(a, 'camera', None) else None)   # design/77 L42: the operator's confirmed footage character
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
-                            camera_audio=a.camera_audio, note=a.note, progress=progress)
+                            camera_audio=a.camera_audio, note=a.note, progress=progress, footage=footage)
         elif a.stage == 'voice':
             job = None
             if a.job:   # design/52 D: the record from a kept narration, fetched for the operator to listen to
@@ -1813,6 +1815,8 @@ def build_parser():
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
+    s.add_argument('--camera', choices=['cinema', 'mirrorless', 'phone', 'mixed'], help='media record: the footage character the operator confirmed (design/77 L42)')
+    s.add_argument('--support', choices=['handheld', 'tripod', 'gimbal', 'mixed']); s.add_argument('--look', choices=['natural', 'graded', 'log']); s.add_argument('--footage-note', help="media record: the operator's words on the footage")
     s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)

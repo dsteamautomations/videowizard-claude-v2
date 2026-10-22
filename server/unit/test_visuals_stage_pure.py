@@ -693,6 +693,16 @@ def test_a_keyframe_for_a_shot_with_a_client_material_needs_a_footage_frame_as_a
     assert out['op'] == 'edit'
 
 
+def test_the_packet_carries_the_recorded_footage_character_or_none():
+    """design/77 L42."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    sess = video_session(doc)
+    media = {'stage': 'media', 'unit': None, 'summary': {'clips': [], 'footage_character': {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'cinema camera'}}}
+    assert VS.packet(store_with(sess, doc), RUN, [media], 'VS1')['preparation']['footage_character'] == media['summary']['footage_character']
+    assert VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['footage_character'] is None
+    assert VS.footage_character([{'stage': 'media', 'unit': None, 'summary': {'clips': []}}]) is None
+
+
 def test_record_gap_keeps_the_takes_start_and_end_ids():
     """design/71 P4: assembly needs the boundary pictures to see where two takes of one gap share one."""
     prep = {'start_image': {'reference_id': 'R1'}, 'end_image': {'reference_id': 'R2'}}

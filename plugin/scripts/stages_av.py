@@ -45,6 +45,7 @@ def probe(path):
         w, h = h, w  # displayed orientation; later stages use these
     return {'duration_s': float(data['format'].get('duration') or 0), 'width': w, 'height': h, 'stored_width': v.get('width'), 'stored_height': v.get('height'),
             'rotation_deg': rotation, 'codec': v.get('codec_name'), 'fps': v.get('avg_frame_rate'), 'r_frame_rate': v.get('r_frame_rate'),
+            'bit_rate': int(data['format'].get('bit_rate') or v.get('bit_rate') or 0), 'pix_fmt': v.get('pix_fmt'),   # design/77 L42: what tells a cinema camera from a phone
             'is_variable_frame_rate': bool(v.get('r_frame_rate') and v.get('avg_frame_rate') and v['r_frame_rate'] != v['avg_frame_rate']),
             'color_transfer': v.get('color_transfer'), 'has_audio': bool(audio),
             'audio_channels': audio[0].get('channels') if audio else 0, 'audio_sample_rate_hz': int(audio[0]['sample_rate']) if audio and audio[0].get('sample_rate') else None,
@@ -63,6 +64,21 @@ def to_cfr(src, dst, fps):
 
 
 # ---------- media ----------
+
+PRO_CODECS = ('prores', 'dnxhd', 'dnxhr', 'cineform', 'braw', 'v210')
+
+
+def footage_guess(clips):
+    """design/77 L42: one line from the probe for the operator to confirm or correct, never a decision. Professional when any clip is a
+    production codec, 10-bit or more, or above 50 Mbit/s; else it looks like phone footage. The evidence is printed either way."""
+    top = max(clips, key=lambda c: c.get('bit_rate') or 0)
+    import re
+    ten_bit = any(re.search(r'p1[0-6](le|be)?$', c.get('pix_fmt') or '') for c in clips)   # yuv422p10le, not the 20 of yuv420p
+    mbit = (top.get('bit_rate') or 0) / 1e6
+    evidence = f"{top.get('width')}x{top.get('height')}, {top.get('codec')}, {top.get('pix_fmt') or 'unknown pixel format'}, {mbit:.0f} Mbit/s"
+    pro = any((c.get('codec') or '').lower().startswith(PRO_CODECS) for c in clips) or ten_bit or mbit >= 50
+    return (f'looks professional (a cinema or mirrorless camera): {evidence}' if pro else f'looks like phone footage: {evidence}') + '; the operator confirms the camera, the support and the look at record.'
+
 
 def _inspect(p):
     """Size check, hash and probe of one clip; runs in the prepare pool."""
@@ -111,13 +127,14 @@ def media_prepare(ws, procedure, prior):
              for c in shown]
     total_s = sum(c['duration_s'] for c in clips)
     lines.append(f"{len(clips)} clips · {int(total_s // 60)} min {round(total_s % 60)} s" + (f' · {skipped} duplicate skipped' if skipped else '') + f' · {round(total_bytes / 1e6)} MB')
+    guess = footage_guess(clips)
     return {'prompt': procedure.get('prompt') or '', 'clips': shown, 'listing': '\n'.join(lines), 'detail_file': 'work/media-clips.json',
             'duplicates_skipped': skipped, 'prepared_at': stamp(ws, 'media'), 'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
-            'output_file': 'out/media.json', 'steps': procedure.get('steps') or [],
-            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then record. The upload reports when it is done.'}
+            'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'footage_guess': guess,
+            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then ask the camera sound and the footage ({guess}), then record. The upload reports when it is done.'}
 
 
-def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None):
+def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, footage=None):
     try:
         clips = json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
@@ -147,7 +164,7 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
     summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr')} for c in clips],
                'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1),
-               'camera_audio': camera_audio, 'camera_audio_note': note or '', **stamps(ws, 'media')}   # design/41 5.1
+               'camera_audio': camera_audio, 'camera_audio_note': note or '', 'footage_character': footage or None, **stamps(ws, 'media')}   # design/41 5.1; design/77 L42
     return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}
 
 
