@@ -328,7 +328,7 @@ def test_an_answer_is_linted_and_stored_with_the_image_and_the_take(monkeypatch)
     gap = doc['gaps'][1]
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved')},
-                   bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+                   bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     answer = {'status': 'ready', 'prompt': 'a wall section', 'checklist': [{'check': 'c', 'pass_when': 'p', 'weight': 'must'}], 'exact_text': []}
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'a wall section', 'answer': answer}
     store = store_with(sess, doc)
@@ -426,7 +426,7 @@ def test_an_end_keyframe_must_name_image_1_and_the_packet_says_so(monkeypatch):
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     gap = doc['gaps'][1]
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
-                   references={'K1': ref('K1'), 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+                   references={'K1': ref('K1'), 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'The bucket now empty, the mason one step left.', 'parents': ['K1']}
     with pytest.raises(Problem, match='names "Image 1"'):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
@@ -626,6 +626,71 @@ def test_a_gap_acceptance_keeps_its_words_for_the_assistant_the_page_and_the_fee
     assert g1['accepted'] is False and 'quote' not in g1 and g2['accepted'] is True and g2['quote'].startswith('instead of') and g2['by'] == 'u1'
     view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')
     assert view['gaps'][1]['quote'].startswith('instead of') and view['gaps'][1]['by'] == 'u1' and 'quote' not in view['gaps'][0]
+
+
+# ---------- design/77: L35 the packet before a keyframe, L38 the end keeps the camera, L39 the scale anchor, L41 a client material from a frame ----------
+
+def video_session(doc, **over):
+    gap = doc['gaps'][1]
+    base = dict(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'S1', 'sha256': 'sha-S1'}]}}})
+    return session(**{**base, **over})
+
+
+def test_a_start_keyframe_for_a_video_shot_waits_for_its_packet(monkeypatch):
+    """design/77 L35 (VW-6: 14 starts generated before any packet was read)."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    sess = video_session(doc)
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the yard, the wall centre'}
+    with pytest.raises(Problem, match='Bind the shot and read its packet') as exc:
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    assert 'VS1' in exc.value.message
+    store = store_with(sess, doc)
+    VS.packet(store, RUN, [], 'VS1')   # reading the packet marks the binding
+    assert saved(store)['bindings']['VS1']['packet_read_at']
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
+    assert out['op'] == 'edit' or out['op'] == 'generate'
+    still_doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('IM2', 900, 1150, 'image')])   # an element used by still shots only: unaffected
+    out = VS.generate_image(FakeConn([]), store_with(session(versions=sess['versions'], current='d1', accepted=accepted(still_doc)), still_doc), USER, RUN, [], body)
+    assert out['op'] == 'generate'
+
+
+def test_an_end_keyframe_that_moves_the_camera_is_refused_and_the_packet_says_so(monkeypatch):
+    """design/77 L38 (VW-6 BEAT_01: "the camera has drifted slightly forward" against "keep exactly as in Image 1")."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'K1': ref('K1')})
+    sess['bindings']['VS1']['packet_read_at'] = 't'
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'parents': ['K1'],
+            'prompt': 'Image 1 is the start. The helper five metres on. The camera has drifted slightly forward, so the stack is larger.'}
+    with pytest.raises(Problem, match="moves the camera \\('camera has drifted'\\)"):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    with pytest.raises(Problem, match="moves the camera \\('push in'\\)"):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'prompt': 'Image 1 is the start. A slight push in on the wall top.'}))
+    out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'prompt': 'Image 1 is the start. He pushes the brick level; the camera does not move.'})
+    assert out['op'] == 'edit'   # a mason pushing a brick is not a camera move
+    prep = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']
+    assert 'The camera does not move between the two images' in prep['end_image_instruction'] and 'never the same frozen pose' in prep['end_image_instruction']
+    assert 'one human-scale anchor against a named landmark' in prep['start_image_instruction'] and prep['scene']['landmarks'] == [{'id': 'L2', 'description': 'the wall'}]   # L39
+
+
+def test_a_keyframe_for_a_shot_with_a_client_material_needs_a_footage_frame_as_a_parent(monkeypatch):
+    """design/77 L41 (VW-6: the rat-trap bond drawn from words twice, wrongly)."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[], element_ids=['E1', 'WALL'])])
+    doc['elements'].append({'id': 'WALL', 'name': 'The client\'s rat-trap wall face', 'kind': 'object', 'identity': 'exact', 'requirements': 'courses of equal height, long then short faces'})
+    frame = {**ref('F1', 'approved'), 'kind': 'frame', 'element_id': 'WALL', 'width': 1920, 'height': 1080}
+    sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'F1': frame})
+    sess['bindings']['VS1'] = {'gap_digest': gap_digest(doc, doc['gaps'][1]), 'references': {'E1': [{'id': 'S1', 'sha256': 'sha-S1'}], 'WALL': [{'id': 'F1', 'sha256': 'sha-F1'}]}, 'packet_read_at': 't'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'subject': 'the mason at the wall', 'prompt': 'the mason lays a brick on the wall', 'parents': ['S1']}
+    with pytest.raises(Problem, match="WALL is the client's own: send one of its approved footage frames as a parent"):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'parents': ['S1', 'F1']})
+    assert out['op'] == 'edit'
+    no_frame = {**sess, 'references': {'S1': sess['references']['S1']}}   # the element has no frame yet: nothing to require, the prompt rule asks for one
+    out = VS.generate_image(FakeConn([]), store_with(session(**no_frame), doc), USER, RUN, [], body)
+    assert out['op'] == 'edit'
 
 
 def test_record_gap_keeps_the_takes_start_and_end_ids():

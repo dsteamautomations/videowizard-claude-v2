@@ -520,6 +520,8 @@ def generate_image(conn, store, user, run, outputs, body):
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
+    if body['kind'] == 'keyframe':
+        _keyframe_gates(session, plan, body, parents)   # design/77 L35, L38, L41
     answer = body.get('answer')
     if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
         try:
@@ -541,6 +543,54 @@ def generate_image(conn, store, user, run, outputs, body):
                                      **({'answer': answer} if answer is not None else {})}
     save_session(store, run, session)
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
+
+
+CAMERA_MOVE = re.compile(r"(camera(?![^.;]{0,40}?\b(does not|doesn't|never|no|without|unmoved|stays|static|fixed|locked)\b)[^.;]{0,40}?\b(push|drift|dolly|zoom|pan|tilt|track|mov)\w*)"
+                         r"|\b(push[- ]in|pull[- ]out|dolly|zoom\w*|tracking shot|pan(ning)? (left|right)|tilt(ing)? (up|down))\b", re.I)
+
+
+def _shots_with(plan, session, element_id):
+    """The accepted shots of the current plan that name an element, as (gap, shot) pairs."""
+    out = []
+    for gap in plan['gaps']:
+        if gap.get('choices') and not session['choice_selections'].get(gap['gap_id']):
+            continue
+        acc = session['accepted'].get(gap['gap_id'])
+        if not acc or acc['digest'] != gap_digest(plan, gap):
+            continue
+        for scene in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])):
+            for sh in scene['shots']:
+                if element_id in (sh.get('element_ids') or []):
+                    out.append((gap, sh))
+    return out
+
+
+def _keyframe_gates(session, plan, body, parents):
+    """design/77: L35 a start keyframe for a video shot's element waits until a shot's packet was read (bind, then packet); L38 an end keyframe
+    never moves the camera; L41 a shot that shows a client's own material (an exact object element with approved footage frames) sends one of
+    those frames as a parent."""
+    pairs = _shots_with(plan, session, body['element_id'])
+    end = any(p['kind'] == 'keyframe' for p in parents)
+    video = [(gap, sh) for gap, sh in pairs if sh['visual_type'] == 'video']
+    if video and not end:   # L35
+        read = [sh['id'] for gap, sh in video if (session['bindings'].get(sh['id']) or {}).get('packet_read_at') and session['bindings'][sh['id']].get('gap_digest') == gap_digest(plan, gap)]
+        first = video[0][1]['id']
+        need(read, f"Bind the shot and read its packet before composing its start image (`vw visuals bind --shot {first} …`, then `vw visuals packet --shot {first}`): "
+                   "the packet carries the pair instructions and the library's job form.")
+    if end:   # L38
+        m = CAMERA_MOVE.search(body['prompt'])
+        if m:
+            need(False, f"The end image moves the camera ({m.group(0).strip()!r}): the camera does not move between the start and the end; show the action's visible result instead.")
+    elements = {e['id']: e for e in plan['elements']}
+    parent_frames = {p['element_id'] for p in parents if p.get('kind') == 'frame'}
+    for gap, sh in pairs:   # L41
+        for eid in sh.get('element_ids') or []:
+            e = elements.get(eid)
+            if not e or eid == body['element_id'] or e['kind'] != 'object' or e['identity'] != 'exact':
+                continue
+            frames = [r for r in session['references'].values() if r.get('element_id') == eid and r.get('kind') == 'frame' and r.get('status') == 'approved']
+            need(not frames or eid in parent_frames, f"{eid} is the client's own: send one of its approved footage frames as a parent, named by number as the material reference "
+                                                     f"({', '.join(r['id'][:8] for r in frames)}).")
 
 
 def approve_reference(store, user, run, outputs, ref_id, sha256, quote):
@@ -678,6 +728,9 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     binding = session['bindings'].get(shot_id)
     need(binding and binding['gap_digest'] == gap_digest(plan, gap), 'Bind references for this shot under the current accepted plan.')
+    if not binding.get('packet_read_at'):   # design/77 L35: the start image waits for this
+        binding['packet_read_at'] = datetime.now(timezone.utc).isoformat()
+        save_session(store, run, session)
     refs = []
     for eid, rows in binding['references'].items():
         for b in rows:
@@ -689,12 +742,14 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
                          'including secondary/background subjects, in its start state in the named scene layout, what the motion heads for already in frame, room in the frame '
                          'for the move, nothing the end state needs cut off or hidden, nothing placed where the end would have to remove it. Keep landmark-relative locations; '
                          'the camera only changes their screen projection. A boundary picture is shared only within one continuous shot, same place and framing: the end image '
-                         'of one segment is the start of the next there; a cut starts a new pair with its own two images.')   # design/67 B; the boundary sentence is design/74 L24
+                         'of one segment is the start of the next there; a cut starts a new pair with its own two images. Name one human-scale anchor against a named landmark '
+                         '(a person beside a doorway, a hand on a course) so the scale is fixed; the landmarks are listed under scene.landmarks.')   # design/67 B; design/74 L24; design/77 L39
     end_instruction = ('Make the end image from the approved start image as its parent; the server sends the start\'s own references with it. Show every subject in its end state '
                        'as the plan gives it: its position against its landmark and its side of the frame, its facing, its pose, what it holds, how far the work has gone; for an '
                        'acting subject the result of its last beat. Name the positions in words. Change nothing else: the same framing, camera, light, people and props. Keep in '
                        'frame whatever the motion heads for. Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, '
-                       'nothing else.')   # design/67 C; the numbering sentence is design/71 P1
+                       'nothing else. The camera does not move between the two images: the same framing, lens and position. The end shows the action\'s visible result, a '
+                       'different pose or state from the start, never the same frozen pose.')   # design/67 C; design/71 P1; design/77 L38
     prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': shot, 'references': refs,
               'sequence_rules': plan.get('sequence_rules', []), 'elements': [e for e in plan['elements'] if e['id'] in shot['element_ids']],
               'start_image_instruction': start_instruction, 'image_instruction': start_instruction,   # the old name answers for one release (design/67 A)

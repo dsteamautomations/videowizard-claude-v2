@@ -424,6 +424,15 @@ def test_prompt_and_steps_say_a_still_shot_needs_no_bind_and_name_the_file_forms
     assert 'design/77' in STAGES['visuals']['prompt_origin']
 
 
+def test_prompt_and_steps_carry_the_packet_order_the_material_rule_and_the_footage_character():
+    """design/77 L35, L41, L42."""
+    prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
+    assert len(prompt.split()) <= 3500
+    assert 'never a start image before the packet' in steps[4] and 'the end image from the start candidate at once' in steps[4] and "after that shot's `bind` and `packet`" in steps[3]
+    assert 'anything specific to the client that the footage shows' in prompt and 'never words alone' in prompt
+    assert 'recorded footage character' in prompt and 'never from an assumption' in prompt
+
+
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
     """design/74 L31 (defect 19)."""
     monkeypatch.setattr(vw, 'request', lambda method, path, **kw: ({'action': 'refused', 'message': 'Bind references for this shot under the current accepted plan.'}, 422))
