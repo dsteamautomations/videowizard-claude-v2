@@ -278,5 +278,5 @@ def test_the_visuals_template_renders_with_its_hooks():
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(APP / 'templates')), autoescape=True)
     env.globals['version'] = 't'
     html = env.get_template('visuals.html').render(user={'name': 'SK', 'role': 'Admin'}, run={'code': 'VW-9', 'title': 'Film'})
-    for needed in ('id="app"', 'data-code="VW-9"', "'/runs/'+code+'/visuals'", 'id="gaps"', 'id="fmsg"', 'treatment', 'sequence', 'select-take', 'reject-take', 'record', 'cap', 'approve', "'/data'", "'/act'"):
+    for needed in ('id="app"', 'data-code="VW-9"', "'/runs/'+code+'/visuals'", 'id="s-plan"', 'id="s-record"', 'id="fmsg"', 'treatment', 'sequence', 'select-take', 'reject-take', 'record', 'cap', 'approve', "'/data'", "'/act'"):   # design/78: six step sections
         assert needed in html, needed

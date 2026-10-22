@@ -4,6 +4,15 @@ from pathlib import Path
 HTML = (Path(__file__).resolve().parents[1] / 'app' / 'templates' / 'visuals.html').read_text(encoding='utf-8')
 
 
+def test_the_page_is_six_steps_on_the_voices_frame():
+    """design/78 (L45)."""
+    for step in ('treatment', 'plan', 'references', 'pictures', 'takes', 'record'):
+        assert f'id="s-{step}"' in HTML, step
+    assert "['treatment','Treatment']" in HTML and "['record','Record']" in HTML and 'id="steps"' in HTML and 'class="v2"' in HTML and 'class="foot"' in HTML
+    assert 'id="pl"' in HTML and '<video id="pl"' in HTML   # the docked player, as the voices page has for audio
+    assert 'localStorage' in HTML   # the step chosen survives a refresh
+
+
 def test_the_page_has_no_cap_button_and_no_cap_action():
     assert 'Raise the cap' not in HTML and "action:'cap'" not in HTML and 'do-cap' not in HTML
 
@@ -21,7 +30,7 @@ def test_an_accepted_gap_shows_the_operators_words():
 
 
 def test_each_gap_has_accept_and_revise_and_a_gap_under_revision_shows_its_badge():
-    assert 'data-a="revise"' in HTML and 'under revision' in HTML and 'g.revise' in HTML   # design/76 (L32)
+    assert 'data-a="revise-selected"' in HTML and 'data-a="accept-selected"' in HTML and 'under revision' in HTML and 'g.revise' in HTML   # design/76 (L32); design/78: the foot's action on the ticked gaps
 
 
 def test_the_element_sections_carry_the_picks_page():
