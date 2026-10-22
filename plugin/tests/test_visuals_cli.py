@@ -354,3 +354,26 @@ def test_steps_and_command_text_carry_the_new_flow():
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'take --shots all' in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' not in md
     assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap' in md and 'visuals page' in md
+
+
+# ---------- design/71: the VideoWizard answer form (F1), a face is a look reference (P5), a retry from the approved picture (P6) ----------
+
+def test_prompt_and_steps_carry_the_videowizard_form_the_face_rule_and_the_retry_rule():
+    prompt = STAGES['visuals']['prompt']
+    assert len(prompt.split()) <= 3500
+    assert "the library's VideoWizard answer form" in prompt and 'look reference' in prompt and 'never a parent' in prompt
+    assert 'from the approved start' in prompt and 'not from the candidate chain' in prompt and 'from the last approved state' in prompt
+    assert 'design/71' in STAGES['visuals']['prompt_origin']
+    steps = STAGES['visuals']['steps']
+    assert 'from the approved start' in steps[3] and 'look reference' in steps[3]
+
+
+def test_prepare_writes_the_videowizard_answer_form_under_always(harness, monkeypatch, capsys):
+    ws, _ = harness
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'package': {'key': 'k'}, 'gaps': ['G1'], 'library_version': 'vwlib-x'})
+    monkeypatch.setattr(vw, 'download_visuals_package', lambda m, key: [])
+    lib = {'version': 'vwlib-x', 'always': [{'path': 'library/forms/answer-form.videowizard.md', 'text': '# Answer form, VideoWizard cut'}], 'steps': {}, 'map': '# map', 'field_sources': '# f'}
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: lib if path.endswith('/library') else {})
+    code, out, err = run(args(what='prepare'), capsys)
+    form = ws / 'work' / 'visuals' / 'library' / 'always' / 'forms__answer-form.videowizard.md'
+    assert code == 0 and form.read_text(encoding='utf-8').endswith('# Answer form, VideoWizard cut\n')

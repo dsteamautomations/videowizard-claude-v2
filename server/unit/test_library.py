@@ -91,3 +91,34 @@ def test_the_answer_lint_checks_what_a_machine_can_check():
         L.check_answer({**good, 'exact_text': ['air', 'cavity wall']}, prompt)
     with pytest.raises(ValueError, match='answer form is an object'):
         L.check_answer(['no'], prompt)
+
+
+# ---------- design/71 F1, F2, P3: the VideoWizard answer form, the prompt lint, the sizes ----------
+
+def test_the_always_open_set_names_the_videowizard_answer_form_and_the_file_exists():
+    assert 'library/forms/answer-form.videowizard.md' in L.ALWAYS and 'library/forms/answer-form.md' not in L.ALWAYS
+    text = L.text(VERSION, 'library/forms/answer-form.videowizard.md')
+    assert text.startswith('# Answer form, VideoWizard cut') and '`keep_list`' in text and '`seen`' in text
+    assert L.verify(VERSION) == []   # the variant sits outside the manifest until the master adopts it
+
+
+def test_check_prompt_refuses_a_logo_a_model_name_a_pixel_size_and_a_resolution():
+    assert L.check_prompt('A brick wall in section, label "air". Render only explicitly requested image text. Do not add unrelated logos, signatures or captions.') is None
+    assert L.check_prompt('Lens flare across the top right, the yard at dusk.') is None
+    with pytest.raises(ValueError, match='asks for a logo'):
+        L.check_prompt('The NARDEP logo in the top right corner, the wall below.')
+    with pytest.raises(ValueError, match="names a model \\('sunburst'\\)"):
+        L.check_prompt('Edit with gpt image Sunburst: the bucket now empty.')
+    with pytest.raises(ValueError, match="names a model \\('omni'\\)"):
+        L.check_prompt('For Omni: the mason lifts the brick.')
+    with pytest.raises(ValueError, match="a pixel size \\('1536x864'\\)"):
+        L.check_prompt('Output at 1536x864, the wall centred.')
+    with pytest.raises(ValueError, match="a resolution \\('720p'\\)"):
+        L.check_prompt('Render in 720p, the yard.')
+
+
+def test_default_size_follows_the_frame_and_an_edit_takes_its_parents_size_only_when_both_sides_divide_by_16():
+    assert L.default_size('16:9') == '1536x864' and L.default_size('9:16') == '1088x1936' and L.default_size(None) == '1536x864'
+    assert L.edit_size(1536, 864, '16:9') == '1536x864' and L.edit_size(1088, 1936, '16:9') == '1088x1936'
+    assert L.edit_size(1920, 1080, '16:9') == '1536x864'   # a footage frame: 1080 is not a multiple of 16
+    assert L.edit_size(None, None, '9:16') == '1088x1936'

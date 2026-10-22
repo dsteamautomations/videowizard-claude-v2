@@ -252,3 +252,31 @@ def test_a_graphic_sequence_renders_exactly_the_shot_frames_with_dissolves(tmp_p
     assert frames_of(single) == 30
     plain = r.sequence([(pngs[0], 'a', 10), (pngs[1], 'b', 15)], dissolve=0, n_tl=25)
     assert frames_of(plain) == 25
+
+
+# ---------- design/71 P4: two takes sharing a boundary picture are cross-faded over six frames; the timeline length is unchanged ----------
+
+@pytest.mark.skipif(not (shutil.which('ffmpeg') and shutil.which('ffprobe')), reason='ffmpeg not installed')
+def test_dissolve_pair_renders_exactly_n1_plus_n2_frames(tmp_path):
+    from app.stage2.render import Renderer
+    r = Renderer(tmp_path / 'work', {'width': 64, 'height': 48, 'fps': 25})
+    a, b = r.slate(['a'], 31), r.slate(['b'], 25)   # the first piece carries its six-frame tail
+    out = r.dissolve_pair(a, 31, b, 25, 6)
+    assert out.exists() and frames_of(out) == 50
+    assert r.dissolve_pair(a, 31, b, 25, 6) == out   # cached
+
+
+@pytest.mark.skipif(not (shutil.which('ffmpeg') and shutil.which('ffprobe')), reason='ffmpeg not installed')
+def test_render_film_dissolves_a_fill_into_the_next_from_its_spare_tail(tmp_path, narration):
+    pytest.importorskip('PIL')
+    from app.stage2 import render as R
+    clip = tmp_path / 'take.mp4'
+    subprocess.run(['ffmpeg', '-y', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=red:s=64x48:r=25:d=2', '-pix_fmt', 'yuv420p', str(clip)], check=True, capture_output=True)
+
+    def take(sid, **extra):
+        return {'kind': 'event', 'sub_clip_id': sid, 'clip': {'id': sid, 'name': 't.mp4', 'sha256': sid, 'fps': '25', 'rotation_deg': 0.0, 'hdr': False},
+                'source_in_frame': 0, 'source_out_frame': 25, 'timeline_frames': 25, 'crop_rect': None, 'hold_last_frame': False, 'a2': [], **extra}
+    plan = {'items': [take('VS1', dissolve_into_next=6, normalised_key='n/VS1.mp4'), take('VS2', normalised_key='n/VS2.mp4')]}
+    film, record = R.render_film('assembly', plan, {'VS1': clip, 'VS2': clip}, narration, tmp_path / 'w', {'width': 64, 'height': 48, 'fps': 25})
+    assert record['frames'] == 50 and frames_of(film) == 50
+    assert [k for k, _ in record['normalised_segments']] == ['n/VS1.mp4', 'n/VS2.mp4'] and frames_of(Path(record['normalised_segments'][0][1])) == 25   # the delivered piece is the plain take

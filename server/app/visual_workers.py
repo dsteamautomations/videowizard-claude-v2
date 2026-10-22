@@ -66,7 +66,8 @@ def process_image(job):
             if r.status_code >= 500 or r.status_code == 429:
                 return 'rejected', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code}; no automatic retry.', None, None
             if r.status_code >= 400:
-                return 'failed', {'failure': 'provider', 'http_status': r.status_code, 'detail': r.text[:300]}, f'OpenAI rejected the request (HTTP {r.status_code}).', None, None
+                result, error = refusal(r)
+                return 'failed', result, error, None, None
             durable(raw_path, r.content)
         body = json.loads(raw_path.read_text(encoding='utf-8'))
         png = base64.b64decode(body['data'][0]['b64_json'])
@@ -91,6 +92,25 @@ def process_image(job):
         if dispatched:
             return 'submission_unknown', {'phase': 'generate'}, f'Outcome unknown after dispatch ({exc.__class__.__name__}).', None, None
         return 'failed', {'phase': 'prepare'}, (exc.message if isinstance(exc, Problem) else f'{exc.__class__.__name__}: {exc}'), None, None
+
+
+def refusal(r):
+    """design/71 P5: a refused picture says why. OpenAI's error body names a moderation block (with its stage and categories) or a user error;
+    anything else keeps the plain message. Returns (result, error)."""
+    try:
+        err = (r.json() or {}).get('error') or {}
+    except ValueError:
+        err = {}
+    kind = err.get('type') or err.get('code') or ''
+    result = {'failure': kind if kind in ('moderation_blocked', 'image_generation_user_error') else 'provider', 'http_status': r.status_code, 'detail': r.text[:300]}
+    if kind == 'moderation_blocked':
+        stage = err.get('moderation_stage') or 'unknown'
+        cats = ', '.join(err.get('categories') or []) or 'no category given'
+        return result, (f'OpenAI refused the pictures or the prompt (moderation, stage {stage}, {cats}). A frame with a recognisable face cannot be edited: '
+                        'use it as a look reference only, pick a frame without a face, or change the prompt.')
+    if kind == 'image_generation_user_error':
+        return result, f"OpenAI refused the request: the prompt or the pictures are the problem; do not resend unchanged. ({err.get('message') or r.text[:120]})"
+    return result, f'OpenAI rejected the request (HTTP {r.status_code}).'
 
 
 def apply_image_result(conn, run_id, ref, status, result, error, cost):

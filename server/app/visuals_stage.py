@@ -7,6 +7,7 @@ a gap's output is recorded when every shot in it has a selected take or a local 
 import base64
 import hashlib
 import json
+import re
 import subprocess
 import tempfile
 from copy import deepcopy
@@ -30,6 +31,7 @@ IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare', 'edit': 'gpt-image-2.5-sunbur
 REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state')   # design/65: a state of a graphic sequence, generated from the previous state
 TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video')
 DISSOLVE_S = 0.5   # between the states of a graphic sequence
+MAX_INPUTS = 16    # design/71 P2: GPT Image's limit on input pictures (the library's fact sheet A5)
 
 
 def fail(message):
@@ -500,12 +502,17 @@ def generate_image(conn, store, user, run, outputs, body):
     else:   # design/66 C3: an end keyframe is made from the start keyframe before either is approved, so the pair is approved together
         need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate')) for p in parents),
              'Parents must be approved references of this run (an end keyframe may be made from a candidate start keyframe).')
+    library.check_prompt(body['prompt'])   # design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
-        for start in [p for p in parents if p['kind'] == 'keyframe']:
+        starts = [p for p in parents if p['kind'] == 'keyframe']
+        need(not starts or re.search(r'\bimage 1\b', body['prompt'], re.I),
+             'An end image names its pictures: the prompt names "Image 1" as the start image (images 2 onward are its identity sheets, sent by the server).')   # design/71 P1
+        for start in starts:
             for inherited in (start.get('generation') or {}).get('parents') or []:
                 row = session['references'].get(inherited.get('id'))
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
+    need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
     answer = body.get('answer')
     if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
         try:
@@ -515,7 +522,10 @@ def generate_image(conn, store, user, run, outputs, body):
     check_cap(conn, run, session, prices()['image_inr'], 'one image')   # design/65 B7
     op = 'edit' if parents else 'generate'
     ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
-    request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': body.get('size') or '1536x864',
+    frame = default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), {})   # design/71 P3: the size follows the brief's frame
+    first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
+    size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
+    request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size,
                'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': body['name'], 'kind': body['kind'], 'subject': body['subject']}}
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
@@ -580,7 +590,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
     end_instruction = ('Make the end image from the approved start image as its parent; the server sends the start\'s own references with it. Show every subject in its end state '
                        'as the plan gives it: its position against its landmark and its side of the frame, its facing, its pose, what it holds, how far the work has gone; for an '
                        'acting subject the result of its last beat. Name the positions in words. Change nothing else: the same framing, camera, light, people and props. Keep in '
-                       'frame whatever the motion heads for.')   # design/67 C
+                       'frame whatever the motion heads for. Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, '
+                       'nothing else.')   # design/67 C; the numbering sentence is design/71 P1
     prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': shot, 'references': refs,
               'sequence_rules': plan.get('sequence_rules', []), 'elements': [e for e in plan['elements'] if e['id'] in shot['element_ids']],
               'start_image_instruction': start_instruction, 'image_instruction': start_instruction,   # the old name answers for one release (design/67 A)
@@ -634,6 +645,7 @@ def prepare_take(store, user, run, outputs, body):
     need(body.get('end_image'), 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
                                 'approve both, then `--start R --end R2`.')   # design/66 C2
     need(body['start_image'] != body['end_image'], 'The start and end images are distinct pictures: the end is the start one small action further on.')
+    library.check_prompt(body['motion_prompt'])   # design/71 F2 (a ValueError: the API wraps this call in guarded())
     answer = body.get('answer')
     if answer is not None:   # design/68 L5
         try:
@@ -657,6 +669,11 @@ def prepare_take(store, user, run, outputs, body):
         row = session['references'].get(rid)
         need(row and row['status'] == 'approved', f'{role} must be an approved reference.')
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}
+    s, e = images['start_image'], images['end_image']
+    if all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
+        a, b = s['width'] / s['height'], e['width'] / e['height']
+        need(abs(a - b) <= 0.01 * a, f"The start ({s['width']}x{s['height']}) and the end ({e['width']}x{e['height']}) differ in aspect ratio; "
+                                     "generate the end from the start at the start's own size, or pick a start of the film's frame.")
     record = {'contract': 'videowizard-video-request-v1', 'run_id': str(run['id']), 'shot_id': body['shot_id'], 'plan_digest': base['plan_digest'],
               'base_preparation_digest': base['preparation_digest'], 'motion_prompt': body['motion_prompt'], 'subject_reconciliation': body['subject_reconciliation'],
               'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration),
@@ -836,6 +853,11 @@ def record_gaps(conn, store, user, run, outputs, gap_ids, quote):
     return {'recorded': recorded, 'skipped': skipped, 'next': 'vw next' if not skipped else 'finish the skipped gaps, then record again'}
 
 
+def boundary_of(request):
+    """design/71 P4: the take's start and end picture ids, kept on the gap record so assembly sees where two takes share one."""
+    return {'start_image': (request.get('start_image') or {}).get('reference_id'), 'end_image': (request.get('end_image') or {}).get('reference_id')}
+
+
 def record_gap(conn, store, user, run, outputs, gap_id, quote):
     """Stage output for one gap: every shot has a selected take or an asset."""
     session = session_of(store, run, outputs)
@@ -847,7 +869,13 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
         sel, asset = session['selections'].get(s['id']), session['assets'].get(s['id'])
         need(sel or asset, f"Shot {s['id']} has neither a selected take nor a local asset.")
         if sel:
-            job = conn.execute("select result, cost from vw2_jobs where id=%s", (sel['job_id'],)).fetchone()
+            job = conn.execute("select result, cost, request from vw2_jobs where id=%s", (sel['job_id'],)).fetchone()
+            boundary = {}
+            if job and (job.get('request') or {}).get('request_key'):
+                try:
+                    boundary = {'boundary': boundary_of(load_json(store, job['request']['request_key']))}
+                except Problem:
+                    boundary = {}
             files.append({'name': f"{s['id']}.mp4", 'key': sel['take']['key'], 'sha256': sel['take']['sha256'], 'bytes': sel['take']['bytes'], 'location': 'storage', 'receipt': True})
             jobs.record_file(conn, run['id'], STAGE, sel['take']['key'], f"{s['id']}.mp4", sel['take']['sha256'], sel['take']['bytes'], 'video/mp4')
             if job and job['cost']:
@@ -857,7 +885,7 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
                       'color_transfer': ev.get('color_transfer'), 'color_primaries': ev.get('color_primaries'), 'rotation_deg': ev.get('rotation_deg') or 0, 'issues': ev['issues']}
                      if 'issues' in ev else None)   # design/46 11.2: assembly reads this instead of downloading the take
             shots.append({'shot_id': s['id'], 'source': 'take', 'job_id': sel['job_id'], 'placement': {'start_frame': s['start_frame'], 'end_frame': s['end_frame']},
-                          'duration_s': ev.get('duration_seconds'), 'timing_matches_placement': ev.get('timing_matches_placement'), **({'media': media} if media else {})})
+                          'duration_s': ev.get('duration_seconds'), 'timing_matches_placement': ev.get('timing_matches_placement'), **({'media': media} if media else {}), **boundary})
         elif asset['kind'] == 'sequence':   # design/65: one file per state; assembly plays them as a build
             media_states = []
             for i, st in enumerate(asset['states'], 1):

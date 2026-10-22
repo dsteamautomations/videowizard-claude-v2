@@ -275,7 +275,7 @@ def test_a_keyframe_may_be_generated_from_a_candidate_keyframe(monkeypatch):
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1',
                    references={'K1': ref('K1'), 'S1': {**ref('S1'), 'kind': 'sheet'}, 'A1': ref('A1', 'approved')})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the same yard, the bucket now empty', 'parents': ['K1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the same yard, the bucket now empty', 'parents': ['K1']}
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert out['op'] == 'edit' and saved(store)['references'][out['reference_id']]['generation']['parents'] == [{'id': 'K1', 'key': 'run-1/visuals/references/K1.png', 'sha256': 'sha-K1'}]
@@ -363,7 +363,7 @@ def test_an_end_keyframe_carries_the_start_keyframes_own_references(monkeypatch)
     sheets = {'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'S2': {**ref('S2', 'approved'), 'kind': 'sheet'}}
     start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': 'S1', 'key': sheets['S1']['key'], 'sha256': 'sha-S1'}, {'id': 'S2', 'key': sheets['S2']['key'], 'sha256': 'sha-S2'}]}}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references={**sheets, 'K1': start})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the bucket now empty', 'parents': ['K1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty', 'parents': ['K1']}
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['K1', 'S1', 'S2']
@@ -420,3 +420,95 @@ def test_page_view_carries_the_gaps_shots_pictures_takes_and_budget(monkeypatch)
     assert refs['R2']['parents'] == ['R1'] and refs['R2']['url'].endswith('/R2.png') and refs['R1']['status'] == 'approved'
     assert view['budget']['spent_inr'] == 20.0 + 10 * 8.0 and view['budget']['cap_inr'] == 5000.0
     assert VS.page_view(FakeConn([]), FakeStore({}), RUN, [], 'VW-9') == {'state': 'not_prepared'}
+
+
+# ---------- design/71 P1, P2, P3, F2: the end image names its pictures, a cap of 16 inputs, sizes, the prompt lint ----------
+
+def rid(request_id):
+    return VS.digest({'run': 'run-1', 'request': request_id})[:32]
+
+
+def test_an_end_keyframe_must_name_image_1_and_the_packet_says_so(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'K1': ref('K1'), 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'The bucket now empty, the mason one step left.', 'parents': ['K1']}
+    with pytest.raises(Problem, match='names "Image 1"'):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'prompt': 'Image 1 is the start. ' + body['prompt']})
+    assert out['op'] == 'edit'
+    out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r2', 'parents': []})   # a start keyframe has no parent: no numbering needed
+    assert out['op'] == 'generate'
+    end = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['end_image_instruction']
+    assert 'Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, nothing else.' in end
+
+
+def test_more_than_16_inputs_after_inheritance_are_refused_with_the_count(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sheets = {f'S{i}': {**ref(f'S{i}', 'approved'), 'kind': 'sheet'} for i in range(16)}
+    start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': s, 'key': sheets[s]['key'], 'sha256': 'x'} for s in sheets]}}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references={**sheets, 'K1': start})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty.', 'parents': ['K1']}
+    with pytest.raises(Problem, match='17 input pictures'):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    fewer = {**start, 'generation': {'op': 'edit', 'parents': start['generation']['parents'][:15]}}
+    out = VS.generate_image(FakeConn([]), store_with(session(**{**sess, 'references': {**sheets, 'K1': fewer}}), doc), USER, RUN, [], body)
+    assert out['op'] == 'edit'
+
+
+def test_the_image_size_follows_the_frame_and_an_edit_takes_its_parents_size(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    refs = {'K1': {**ref('K1'), 'width': 1088, 'height': 1936}, 'F1': {**ref('F1', 'approved'), 'kind': 'frame', 'width': 1920, 'height': 1080}, 'S1': {**ref('S1', 'approved'), 'kind': 'sheet', 'width': 1536, 'height': 864}}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references=refs)
+    brief = [{'stage': 'brief', 'unit': None, 'summary': {'production': {'format': {'frame': '9:16'}}}}]
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'a wall'}
+
+    def size_of(outputs, **over):
+        store = store_with(sess, doc)
+        VS.generate_image(FakeConn([]), store, USER, RUN, outputs, {**body, **over})
+        return saved(store)['references'][rid(over.get('request_id', 'r1'))]['generation']['size']
+    assert size_of(brief) == '1088x1936'                                                                                   # a 9:16 film
+    assert size_of([]) == '1536x864'                                                                                       # no brief: 16:9
+    assert size_of([], request_id='r3', prompt='Image 1 is the start; the bucket empty.', parents=['K1']) == '1088x1936'   # the start keyframe's own size
+    assert size_of([], request_id='r4', parents=['F1']) == '1536x864'                                                     # a 1920x1080 frame: 1080 is not a multiple of 16
+    assert size_of([], request_id='r5', parents=['S1'], size='1024x1024') == '1024x1024'                                   # an explicit size still wins
+
+
+def test_prepare_take_refuses_a_start_and_end_of_different_aspect_and_accepts_a_frame_with_an_edit():
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    refs = {'F1': {**ref('F1', 'approved'), 'kind': 'frame', 'width': 1920, 'height': 1080}, 'E1': {**ref('E1', 'approved'), 'width': 1536, 'height': 864},
+            'V1': {**ref('V1', 'approved'), 'width': 1088, 'height': 1936}, 'O1': ref('O1', 'approved')}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references=refs, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'F1', 'sha256': 'sha-F1'}]}}})
+    body = {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'F1', 'end_image': 'E1'}
+    assert VS.prepare_take(store_with(sess, doc), USER, RUN, [], body)['duration_seconds'] == 10   # 1920x1080 and 1536x864 share 16:9
+    with pytest.raises(Problem, match='aspect') as exc:
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'V1'}))
+    assert '1920x1080' in exc.value.message and '1088x1936' in exc.value.message
+    assert VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'O1'})['duration_seconds'] == 10   # a reference without a recorded size: no check
+
+
+def test_every_prompt_is_linted_for_a_logo_a_model_name_a_size_or_a_resolution(monkeypatch):
+    """design/71 F2: lint rules 3 and 8 are the server's, with or without an answer form."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'The NARDEP logo top right, the wall below.'}
+    with pytest.raises(Problem, match='asks for a logo'):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    with pytest.raises(Problem, match="names a model \\('kling'\\)"):
+        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'Kling: water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2'}))
+
+
+def test_record_gap_keeps_the_takes_start_and_end_ids():
+    """design/71 P4: assembly needs the boundary pictures to see where two takes of one gap share one."""
+    prep = {'start_image': {'reference_id': 'R1'}, 'end_image': {'reference_id': 'R2'}}
+    assert VS.boundary_of(prep) == {'start_image': 'R1', 'end_image': 'R2'}
+    assert VS.boundary_of({'start_image': {'reference_id': 'R1'}}) == {'start_image': 'R1', 'end_image': None}

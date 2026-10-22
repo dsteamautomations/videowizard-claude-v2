@@ -17,6 +17,30 @@ from ..stage2 import stage as S2
 from . import CONTRACT_ASSEMBLY, STABILIZE_ZOOM
 
 MAX_ZOOM_1080 = 1.35
+DISSOLVE_FRAMES = 6   # design/71 P4: the cross-fade where two takes of one gap share their boundary picture
+
+
+def dissolves(fills, choices):
+    """design/71 P4: per fill, the frames it dissolves into the next fill of its gap: six when the first take's end image is the second's
+    start image and the first has that much spare tail after its offset and slot; else nought (a cut, as today)."""
+    out = {sid: 0 for sid in fills}
+    by_gap = {}
+    for sid, f in fills.items():
+        by_gap.setdefault(f['gap_id'], []).append((sid, f))
+    for shots in by_gap.values():
+        shots.sort(key=lambda x: x[1]['placement']['start_frame'])
+        for (sid, a), (_, b) in zip(shots, shots[1:]):
+            ba, bb = a.get('boundary') or {}, b.get('boundary') or {}
+            if not ba.get('end_image') or ba['end_image'] != bb.get('start_image'):
+                continue
+            if a['meta']['kind'] != 'movie' or b['meta']['kind'] != 'movie' or a.get('available_frames') is None:
+                continue
+            c = choices.get(sid) or {}
+            if c.get('end_policy') == 'hold_last':
+                continue
+            if a['available_frames'] - int(c.get('offset_frames') or 0) - a['slot_frames'] >= DISSOLVE_FRAMES:
+                out[sid] = DISSOLVE_FRAMES
+    return out
 
 
 def fail(message):
@@ -117,16 +141,19 @@ def prepare(conn, store, user, run, outputs):
             meta = {'kind': 'movie', **probe_file(store, ref['key'], ref['name'])}
         avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
         fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
-                                  'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'}}
+                                  'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'},
+                                  **({'boundary': shot['boundary']} if shot.get('boundary') else {})}   # design/71 P4
         session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
     session['fills'] = fills
+    joins = dissolves(fills, session['choices'])
     session['stabilize'] = {ev['sub_clip_id']: session['stabilize'].get(ev['sub_clip_id'], {'flagged': bool(rows[ev['sub_clip_id']].get('stabilization_needed')), 'choice': 'leave'})
                             for ev in plan['events'] if ev['kind'] == 'event'}
     session['master'] = {'output': str(master_o['id']), 'version': master_o['summary']['version'], 'digest': master_o['summary']['plan_digest']}
     save_session(store, run, session)
     flagged = [k for k, v in session['stabilize'].items() if v['flagged']]
     issues = {k: f['meta']['issues'] for k, f in fills.items() if f['meta']['issues']}
-    return {'gaps': len(plan['gaps']), 'fills': {k: {'slot_frames': f['slot_frames'], 'available_frames': f['available_frames'], 'default': f['default'], 'issues': f['meta']['issues']} for k, f in fills.items()},
+    return {'gaps': len(plan['gaps']), 'fills': {k: {'slot_frames': f['slot_frames'], 'available_frames': f['available_frames'], 'default': f['default'], 'issues': f['meta']['issues'],
+                                                  'dissolve_into_next': joins[k]} for k, f in fills.items()},
             'stabilization_flagged': flagged, 'issues': issues, 'next': 'ask the operator per fill (offset, end policy) and per flagged shot (leave / stabilise / swap), then `vw assembly build`'}
 
 
@@ -174,6 +201,7 @@ def build(conn, store, user, run, outputs):
     tl = pk['timeline']
     events, checklist = [], []
     fills_by_gap = {}
+    joins = dissolves(session['fills'], session['choices'])   # design/71 P4
     for sid, f in session['fills'].items():
         fills_by_gap.setdefault(f['gap_id'], []).append((sid, f))
     for ev in plan['events']:
@@ -203,7 +231,7 @@ def build(conn, store, user, run, outputs):
                     fail(f"{sid} has issues {f['meta']['issues']} and was not accepted as is")
                 events.append({'kind': 'fill', 'beat_id': ev['beat_id'], 'gap_id': gid, 'shot_id': sid, 'source': 'take' if f['file']['name'].endswith('.mp4') and 'asset' not in f['file']['name'] else 'asset',
                                'file': f['file'], 'media': f['meta'], 'offset_frames': c['offset_frames'], 'end_policy': c['end_policy'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n,
-                               'fit': 'contain', 'stabilize': False, 'cumulative_zoom': 1.0, 'a2_intervals': []})
+                               'fit': 'contain', 'stabilize': False, 'cumulative_zoom': 1.0, 'a2_intervals': [], 'dissolve_into_next': joins.get(sid, 0)})
                 cursor += n
             if cursor != ev['timeline_out_frame']:
                 fail(f"Gap {gid} fills cover {cursor - ev['timeline_in_frame']} frames; the gap is {ev['timeline_frames']}")
@@ -255,7 +283,8 @@ def render(conn, store, user, run):
                 items.append({'kind': 'event', 'sub_clip_id': ev['shot_id'], 'clip': {'id': ev['shot_id'], 'name': ev['file']['name'], 'sha256': ev['file']['sha256'], 'key': ev['file']['key'], 'fps': fps,
                                                                                        'rotation_deg': 0.0, 'hdr': str(m.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084')},
                               'source_in_frame': ev['offset_frames'], 'source_out_frame': avail, 'timeline_frames': ev['timeline_frames'], 'crop_rect': None,
-                              'hold_last_frame': ev['end_policy'] == 'hold_last', 'a2': [], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
+                              'hold_last_frame': ev['end_policy'] == 'hold_last', 'a2': [], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4"),
+                              'dissolve_into_next': ev.get('dissolve_into_next') or 0})   # design/71 P4
     open_job = session['renders'].get('assembly')
     if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == entry['digest']:
         raise Problem(409, 'JOB_OPEN', 'The assembly film is already rendering.', job_id=open_job['job_id'])

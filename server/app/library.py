@@ -4,13 +4,16 @@ what a machine can check of the library's answer form."""
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 
 from .errors import Problem
 from .video_generators import DEFAULT as DEFAULT_GENERATOR
 
 ROOT = Path(__file__).resolve().parents[1] / 'library'
-ALWAYS = ('library/RULEBOOK.md', 'library/forms/answer-form.md', 'library/agency/deterministic-checks.md')
+ALWAYS = ('library/RULEBOOK.md', 'library/forms/answer-form.videowizard.md', 'library/agency/deterministic-checks.md')   # design/71 F1: the VideoWizard cut of the form
+SIZES = {'16:9': '1536x864', '9:16': '1088x1936'}   # design/71 P3: GPT Image sizes per frame (the sheet's working values; 1080x1920 fails the multiple-of-16 rule)
+MODEL_WORDS = ('gpt-image', 'sunburst', 'flare', 'omni', 'kling', 'seedance')   # design/71 F2 (the library's lint rule 8)
 COMPLIANCE = 'library/agency/compliance-checklist.md'
 GPT = 'library/models/gpt-image/FACT-SHEET.md'
 MODEL_SHEETS = {'gemini-omni-1.1-flash': ('library/video/models/gemini-omni-1-1/FACT-SHEET.md',),
@@ -159,3 +162,34 @@ def check_answer(answer, prompt):
         if str(s) not in prompt:
             raise ValueError(f'The exact text {str(s)!r} is not in the prompt.')
     return answer
+
+
+def check_prompt(prompt):
+    """design/71 F2: the library's lint rules 3 and 8 as the server's own refusals, on every prompt. A logo is refused unless the sentence
+    says no to it (the standing line "do not add unrelated logos" stays); a model name, a pixel size or a resolution is refused with the word."""
+    text = str(prompt or '')
+    for sentence in re.split(r'(?<=[.;:!?\n])\s+', text):
+        if re.search(r'\blogos?\b', sentence, re.I) and not re.search(r"\b(no|not|never|without|don't|unrelated)\b", sentence, re.I):
+            raise ValueError(f'The prompt asks for a logo ({sentence.strip()[:80]!r}): a logo is never generated; the editor places it.')
+    for word in MODEL_WORDS:
+        if re.search(r'(?<!lens )\b' + re.escape(word) + r'\b', text, re.I):
+            raise ValueError(f'The prompt names a model ({word!r}): the server chooses the model; describe the picture only.')
+    m = re.search(r'\b\d{3,4}\s?[x×]\s?\d{3,4}\b', text)
+    if m:
+        raise ValueError(f'The prompt names a pixel size ({m.group(0)!r}): the server sets the size; describe the picture only.')
+    m = re.search(r'\b(720p|1080p|2160p)\b', text, re.I)
+    if m:
+        raise ValueError(f'The prompt names a resolution ({m.group(0)!r}): the server sets it; describe the picture only.')
+    return None
+
+
+def default_size(frame):
+    """design/71 P3: the image size for the brief's frame."""
+    return SIZES.get(frame or '16:9') or SIZES['16:9']
+
+
+def edit_size(width, height, frame):
+    """design/71 P3: an edit keeps its first parent's size when both sides are multiples of 16, else the frame's default."""
+    if width and height and width % 16 == 0 and height % 16 == 0:
+        return f'{int(width)}x{int(height)}'
+    return default_size(frame)

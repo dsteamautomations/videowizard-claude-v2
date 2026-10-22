@@ -202,6 +202,18 @@ class Renderer:
              '-vf', ','.join(filters), '-frames:v', str(n_tl), *self.video_args(), str(out)])
         return out
 
+    def dissolve_pair(self, a, n_a, b, n_b, d):
+        """design/71 P4: a cross-fade of d frames from piece a (n_a frames, its last d being the spare tail) into piece b (n_b frames):
+        exactly n_a + n_b - d frames, so the timeline length is unchanged."""
+        key = digest({'xf': [Path(a).name, Path(b).name], 'na': int(n_a), 'nb': int(n_b), 'd': int(d), 'tl': self.tl})
+        out = self.cache / f'xf-{key[:16]}.mp4'
+        if out.exists():
+            return out
+        run([ffmpeg(), '-y', '-v', 'error', '-i', str(a), '-i', str(b), '-filter_complex',
+             f'[0:v][1:v]xfade=transition=fade:duration={int(d) / float(self.fps):.6f}:offset={(int(n_a) - int(d)) / float(self.fps):.6f},format=yuv420p[out]',
+             '-map', '[out]', '-frames:v', str(int(n_a) + int(n_b) - int(d)), *self.video_args(), str(out)])
+        return out
+
     def concat(self, parts, out):
         lst = out.with_suffix('.txt')
         lst.write_text(''.join(f"file '{Path(p).as_posix()}'\n" for p in parts), encoding='utf-8')
@@ -307,7 +319,11 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
         narration = timeline_narration(r, recording, narration_plan['pieces'], narration_plan['total_frames'], r.work / 'narration-timeline.wav')
     cursor = Fraction(0)
     silence_before = Fraction(0)
+    carry = None   # design/71 P4: (plain piece, piece with its spare tail, its frames, dissolve frames) waiting for the next take to cross-fade into
     for i, item in enumerate(plan['items']):
+        if carry and item['kind'] != 'event':   # nothing to fade into: the plain piece, a cut
+            parts.append(carry[0])
+            carry = None
         if item['kind'] == 'slate':
             n = int(item.get('frames') or SLATE_FRAMES)
             parts.append(r.slate(item['lines'], n))
@@ -341,14 +357,30 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
                             item.get('label'))
             if item.get('stabilize'):
                 seg = r.stabilized(seg)
-            parts.append(seg)
             if item.get('normalised_key'):
-                normalised.append((item, seg))
+                normalised.append((item, seg))   # the delivered piece is the plain take, whatever the join
+            n, d = int(item['timeline_frames']), int(item.get('dissolve_into_next') or 0)
+            extended, n_ext = None, n + d
+            if d > 0:   # design/71 P4: this take also rendered with its spare tail, to fade into the next
+                tail = int(Fraction(d) * Fraction(str(clip['fps'])) / r.fps)   # the tail in source frames
+                ext = {**item, 'source_out_frame': item['source_out_frame'] + tail}
+                extended = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], ext, n_ext, item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')))
+            if carry:   # the previous take fades into this one over its spare tail
+                seg = r.dissolve_pair(carry[1], carry[2], seg, n, carry[3])
+                if extended is not None:   # three or more in a row: the join so far, with this take's tail
+                    extended, n_ext = r.dissolve_pair(carry[1], carry[2], extended, n_ext, carry[3]), carry[2] + n_ext - carry[3]
+                carry = None
+            if d > 0:
+                carry = (seg, extended, n_ext, d)
+            else:
+                parts.append(seg)
             for j, iv in enumerate(item.get('a2') or []):
                 src_fps = Fraction(str(clip['fps']))
                 at = cursor + (Fraction(iv['in_frame'] - item['source_in_frame']) / src_fps)
                 a2_pieces.append(r.a2_piece(sources[clip['id']], clip['fps'], iv, float(at), r.work / f'a2-{i}-{j}.wav'))
             cursor += Fraction(item['timeline_frames']) / r.fps
+    if carry:
+        parts.append(carry[0])
     picture = r.concat(parts, r.work / f'{kind}-picture.mp4')
     length_s = float(cursor)
     gain, a1_measured = a1_gain(r, recording)
