@@ -708,9 +708,11 @@ def test_the_packet_carries_the_recorded_footage_character_or_none():
 def test_a_revision_drops_the_acceptance_keeps_the_words_and_clears_when_the_gap_is_proposed_again_or_accepted(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), library_version='vwlib-x')
-    store = store_with(sess, doc)
+    store = store_with(session(library_version='vwlib-x'))
     store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
+    VS.treatment(store, USER, RUN, [], {'gaps': [{**TREATMENT['gaps'][0], 'routes': ['still']}, TREATMENT['gaps'][1]]}, 'yes')
+    VS.propose(FakeConn(), store, USER, RUN, [], doc)   # version 1, validated as the real flow stores it
+    VS.accept(store, USER, RUN, [], ['G1', 'G2'], 'yes both')
     with pytest.raises(Problem, match='operator'):
         g(lambda: VS.revise_gap(store, USER, RUN, [], 'G2', 'AI video instead', ''))
     with pytest.raises(Problem, match='Unknown gap'):
@@ -724,7 +726,6 @@ def test_a_revision_drops_the_acceptance_keeps_the_words_and_clears_when_the_gap
     view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')
     assert view['gaps'][1]['revise']['notes'] == 'AI video instead of the diagram'
     # proposing the same gap again unchanged keeps the revision; a changed gap clears it
-    VS.treatment(store, USER, RUN, [], TREATMENT, 'yes')
     VS.propose(FakeConn(), store, USER, RUN, [], doc)
     assert 'G2' in saved(store)['revisions']
     changed = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', purpose='the water, closer')])
@@ -734,6 +735,81 @@ def test_a_revision_drops_the_acceptance_keeps_the_words_and_clears_when_the_gap
     VS.revise_gap(store, USER, RUN, [], 'G1', 'n', 'Change G1.')
     VS.accept(store, USER, RUN, [], ['G1'], 'Yes, G1 as it is after all.')
     assert 'G1' not in saved(store)['revisions'] and 'G1' in saved(store)['accepted']
+
+
+# ---------- design/73: reference assets from the footage first, then Google Images ----------
+
+def test_element_matches_list_where_each_element_is_seen_in_the_footage_best_first():
+    plan = {'elements': [{'id': 'E_MASON', 'name': 'Village mason', 'kind': 'person', 'identity': 'representative', 'requirements': 'a mason laying bricks on the wall'},
+                         {'id': 'E_LORRY', 'name': 'Brick lorry', 'kind': 'object', 'identity': 'representative', 'requirements': 'a lorry'},
+                         {'id': 'G_SECTION', 'name': 'Wall section drawing', 'kind': 'graphic', 'identity': 'exact', 'requirements': 'a drawing'}]}
+    world = [{'clip': 'c2', 'entities': [{'name': 'bricks', 'kind': 'material', 'first_seen_s': 0.0, 'description': 'stacked bricks'}, {'name': 'mason', 'kind': 'person', 'first_seen_s': 5.5, 'description': 'the mason'}]},
+             {'clip': 'c1', 'entities': [{'name': 'mason', 'kind': 'person', 'first_seen_s': 2.0, 'description': 'a mason laying bricks on a wall'}]},
+             {'clip': 'c3', 'world_markers': ['old evidence shape']}]
+    m = VS.element_matches(plan, world)
+    assert [x['clip'] for x in m['E_MASON']] == ['c1', 'c2'] and m['E_MASON'][0]['seconds'] == 2.0 and m['E_MASON'][0]['entity'] == 'mason' and m['E_MASON'][0]['score'] > m['E_MASON'][1]['score']
+    assert m['E_LORRY'] == [] and 'G_SECTION' not in m   # a graphic is drawn, never matched
+
+
+def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_reference_with_its_note(monkeypatch):
+    from io import BytesIO
+    PIL = pytest.importorskip('PIL.Image')
+    png = BytesIO()
+    PIL.new('RGB', (64, 48), (200, 80, 40)).save(png, format='PNG')
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1')
+    rows = [{'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img.example/1.jpg', 'page_url': 'https://site.example/p1', 'site': 'site.example', 'width': 800, 'height': 600, 'title': 'kadapari'},
+            {'n': 2, 'thumbnail': 'https://t/2.jpg', 'image_url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'site': 'site.example', 'width': 1200, 'height': 900, 'title': 'trowel'}]
+    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: rows)
+    store = store_with(sess, doc)
+    with pytest.raises(Problem, match='operator'):
+        g(lambda: VS.search(store, USER, RUN, [], 'E1', 'kadapari tool', ''))
+    with pytest.raises(Problem, match='two to six words'):
+        g(lambda: VS.search(store, USER, RUN, [], 'E1', 'a very long sentence that is not a keyword search at all', 'yes'))
+    with pytest.raises(Problem, match='Unknown element'):
+        g(lambda: VS.search(store, USER, RUN, [], 'E9', 'kadapari tool', 'yes'))
+    out = VS.search(store, USER, RUN, [], 'E1', 'kadapari tool', 'Yes, search the web for it.')
+    sid = out['search_id']
+    s = saved(store)['searches'][sid]
+    assert out['results'] == rows and s['element_id'] == 'E1' and s['keywords'] == 'kadapari tool' and s['quote'] == 'Yes, search the web for it.' and s['by'] == 'u1'
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: png.getvalue())
+    with pytest.raises(Problem, match='not in the search'):
+        g(lambda: VS.pick(store, USER, RUN, [], sid, [{'n': 9}], 'this'))
+    with pytest.raises(Problem, match='operator'):
+        g(lambda: VS.pick(store, USER, RUN, [], sid, [{'n': 1}], ''))
+    out = VS.pick(store, USER, RUN, [], sid, [{'n': 2, 'note': 'avoid brand text'}, {'n': 1}], 'These two, the side from the second.')
+    refs = saved(store)['references']
+    first, second = out['references']
+    assert first['kind'] == 'web' and first['element_id'] == 'E1' and first['status'] == 'candidate' and first['source'] == {'url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'selection_reply': 'These two, the side from the second.', 'note': 'avoid brand text', 'search_id': sid, 'n': 2}
+    assert second['source']['note'] == '' and second['source']['url'] == 'https://img.example/1.jpg' and first['width'] == 64 and refs[first['id']]['sha256']
+    assert saved(store)['searches'][sid]['picked'] == [2, 1]
+    out = VS.nothing_fits(store, USER, RUN, [], sid, 'all show the wrong tool, try the Tamil name')
+    assert saved(store)['searches'][sid]['nothing_fits']['reason'] == 'all show the wrong tool, try the Tamil name'
+    st = VS.status(FakeConn([]), store, RUN, [])
+    assert st['searches'][0]['search_id'] == sid and st['searches'][0]['nothing_fits']['reason'].startswith('all show') and st['searches'][0]['picked'] == [2, 1]
+
+
+def test_the_packet_carries_each_references_note_for_the_sheet_prompt():
+    """design/73 R4a."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    web = {**ref('W1', 'approved'), 'kind': 'web', 'source': {'url': 'https://img.example/2.jpg', 'note': 'avoid brand text', 'selection_reply': 'this'}}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'W1': web, 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'W1', 'sha256': 'sha-W1'}, {'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    refs = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['references']
+    assert refs[0]['note'] == 'avoid brand text' and refs[1]['note'] == ''
+
+
+def test_apify_request_and_answer_shapes():
+    from app import apify
+    assert apify.build('kadapari tool', 10) == {'queries': ['kadapari tool'], 'maxResultsPerQuery': 10}
+    items = [{'imageUrl': 'https://img/1.jpg', 'thumbnailUrl': 'https://t/1.jpg', 'contentUrl': 'https://site/p', 'origin': 'site', 'imageWidth': 800, 'imageHeight': 600, 'title': 'k', 'query': 'kadapari tool'},
+             {'imageUrl': 'http://insecure/2.jpg', 'thumbnailUrl': 'https://t/2.jpg'}, {'imageUrl': 'https://img/3.jpg', 'thumbnailUrl': 'https://t/3.jpg', 'title': 'x'}]
+    rows = apify.parse(items, 10)
+    assert [r['n'] for r in rows] == [1, 2] and rows[0] == {'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img/1.jpg', 'page_url': 'https://site/p', 'site': 'site', 'width': 800, 'height': 600, 'title': 'k'}
+    assert rows[1]['image_url'] == 'https://img/3.jpg'   # an http picture is dropped, the numbering stays dense
+    with pytest.raises(Problem, match='APIFY_TOKEN'):
+        apify.search_images('x y', 10)
 
 
 def test_record_gap_keeps_the_takes_start_and_end_ids():

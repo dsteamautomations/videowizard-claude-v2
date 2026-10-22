@@ -18,12 +18,12 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import core, jobs, library, video_generators
+from . import apify, core, jobs, library, video_generators
 from .config import settings
 from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
-from .video_providers import motion_text
+from .video_providers import motion_text, transfer
 from .visual_contract import STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan
 
 STAGE = 'visuals'
@@ -306,7 +306,8 @@ def page_view(conn, store, run, outputs, code):
     plan = current_plan(store, session) if session.get('current') else None
     refs = {}
     for r in session['references'].values():
-        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}
+        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height')}
+        refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
                              rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
@@ -343,6 +344,8 @@ def page_view(conn, store, run, outputs, code):
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
+            'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
+            'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session),
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
 
@@ -522,6 +525,97 @@ def add_reference(conn, store, user, run, outputs, body, content):
     row = _store_reference(store, run, session, ref_id, png, meta)
     save_session(store, run, session)
     return row
+
+
+# ---------- design/73: reference assets from the footage first, then Google Images ----------
+
+STOP = {'the', 'and', 'with', 'from', 'that', 'this', 'their', 'then', 'into', 'onto', 'over', 'under', 'same', 'exact', 'representative', 'view', 'views', 'front', 'side', 'close'}
+KIND_MATCH = {'person': {'person'}, 'animal': {'person', 'other'}, 'object': {'tool', 'material', 'machine', 'vehicle', 'other', 'text'}, 'place': {'structure', 'other'}}
+
+
+def _words(text):
+    return {w for w in re.findall(r'[a-z]{4,}', str(text or '').lower()) if w not in STOP}
+
+
+def element_matches(plan, world):
+    """design/73 R1: where each person, object or place element is seen in the footage, from the clip logs' entities, by word overlap and kind; best first."""
+    out = {}
+    for e in plan.get('elements') or []:
+        if e['kind'] == 'graphic':
+            continue
+        want = _words(e['name']) | _words(e.get('requirements'))
+        hits = {}   # the best entity per clip
+        for clip in world or []:
+            for ent in clip.get('entities') or []:
+                shared = want & (_words(ent.get('name')) | _words(ent.get('description')))
+                if not shared:
+                    continue
+                score = len(shared) + (1 if ent.get('kind') in KIND_MATCH.get(e['kind'], set()) else 0)
+                if score > (hits.get(clip['clip']) or {}).get('score', 0):
+                    hits[clip['clip']] = {'clip': clip['clip'], 'seconds': ent.get('first_seen_s'), 'entity': ent.get('name'), 'description': ent.get('description'), 'score': score}
+        out[e['id']] = sorted(hits.values(), key=lambda h: (-h['score'], str(h['clip'])))
+    return out
+
+
+def fetch_image(url):
+    return transfer(url, limit=16 * 1024 * 1024)
+
+
+def search(store, user, run, outputs, element_id, keywords, quote):
+    """design/73 R3: one Google Images search for an element, on the operator's yes; the ten rows kept on the session for the page and the tool."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    need(any(e['id'] == element_id for e in plan['elements']), f'Unknown element {element_id}.')
+    need((quote or '').strip(), "The operator's yes to the search is required (the web rule).")
+    words = str(keywords or '').split()
+    need(2 <= len(words) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')   # R6
+    rows = apify.search_images(' '.join(words), 10)
+    sid = digest({'run': str(run['id']), 'element': element_id, 'keywords': ' '.join(words), 'at': datetime.now(timezone.utc).isoformat()})[:12]
+    session.setdefault('searches', {})[sid] = {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'quote': quote, 'by': user['id'],
+                                               'at': datetime.now(timezone.utc).isoformat(), 'results': rows, 'picked': []}
+    save_session(store, run, session)
+    return {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'results': rows}
+
+
+def pick(store, user, run, outputs, search_id, picks, quote):
+    """design/73 R4: the ticked pictures, in the order ticked, each with its note, become web references of the element with their source."""
+    session = session_of(store, run, outputs)
+    s = (session.get('searches') or {}).get(search_id)
+    need(s, f'Unknown search {search_id}.')
+    need((quote or '').strip(), "The operator's words are required.")
+    need(isinstance(picks, list) and picks, 'Tick at least one picture.')
+    rows = {r['n']: r for r in s['results']}
+    chosen = []
+    for p in picks:
+        n = (p or {}).get('n')
+        need(n in rows, f'Picture {n} is not in the search ({len(rows)} pictures).')
+        chosen.append((rows[n], str((p or {}).get('note') or '').strip()))
+    made = []
+    for row, note in chosen:
+        png, size = image_bytes(guarded(lambda: fetch_image(row['image_url'])))
+        rid = digest({'run': str(run['id']), 'search': search_id, 'n': row['n']})[:32]
+        meta = {'element_id': s['element_id'], 'element_kind': next(e['kind'] for e in current_plan(store, session)['elements'] if e['id'] == s['element_id']),
+                'name': f"web-{s['element_id']}-{row['n']}", 'kind': 'web', 'subject': row.get('title') or s['keywords'], 'width': size[0], 'height': size[1],
+                'source': {'url': row['image_url'], 'page_url': row.get('page_url'), 'selection_reply': quote, 'note': note, 'search_id': search_id, 'n': row['n']}}
+        made.append(_store_reference(store, run, session, rid, png, meta))
+    s['picked'] = [row['n'] for row, _ in chosen]
+    save_session(store, run, session)
+    return {'search_id': search_id, 'references': made}
+
+
+def nothing_fits(store, user, run, outputs, search_id, reason):
+    """design/73 R4b (6): none of the ten fits; the reason reaches the assistant as the next search's hint."""
+    session = session_of(store, run, outputs)
+    s = (session.get('searches') or {}).get(search_id)
+    need(s, f'Unknown search {search_id}.')
+    need(str(reason or '').strip(), 'Say in one line why nothing fits; it becomes the next search.')
+    s['nothing_fits'] = {'reason': str(reason).strip(), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'search_id': search_id, 'nothing_fits': s['nothing_fits']}
+
+
+def _searches(session):
+    return [{k: v for k, v in s.items() if k != 'results'} | {'results': s.get('results') or []} for s in (session.get('searches') or {}).values()]
 
 
 def generate_image(conn, store, user, run, outputs, body):
@@ -768,7 +862,9 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
         for b in rows:
             row = session['references'][b['id']]
             need(row['status'] == 'approved' and row['sha256'] == b['sha256'], 'A bound reference changed or lost approval.')
-            refs.append({'element_id': eid, 'reference_id': b['id'], 'sha256': b['sha256'], 'key': row['key'], 'subject': row['subject'], 'kind': row.get('kind'), **({'subject_selector': b['subject_selector']} if 'subject_selector' in b else {})})
+            refs.append({'element_id': eid, 'reference_id': b['id'], 'sha256': b['sha256'], 'key': row['key'], 'subject': row['subject'], 'kind': row.get('kind'),
+                         'note': (row.get('source') or {}).get('note') or '',   # design/73 R4a: the operator's note on a picked picture becomes a keep or avoid line
+                         **({'subject_selector': b['subject_selector']} if 'subject_selector' in b else {})})
     generator = session['generator_choices'].get(shot_id) or video_generators.DEFAULT
     start_instruction = ('Write the start prompt and the end prompt together before generating either. Compose the start for the whole segment: every visible subject, '
                          'including secondary/background subjects, in its start state in the named scene layout, what the motion heads for already in frame, room in the frame '
@@ -1015,6 +1111,7 @@ def status(conn, store, run, outputs):
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+            'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 

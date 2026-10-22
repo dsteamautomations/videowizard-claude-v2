@@ -254,6 +254,23 @@ class GapRevise(Write):   # design/76 (L32)
     quote: str = Field(min_length=1)
 
 
+class SearchBody(Write):   # design/73 R3
+    element_id: str
+    keywords: str = Field(min_length=1, max_length=120)
+    quote: str = Field(min_length=1)
+
+
+class PickBody(Write):     # design/73 R4
+    search_id: str
+    picks: list[dict[str, Any]] = Field(min_length=1, max_length=10)
+    quote: str = Field(min_length=1)
+
+
+class NothingFits(Write):  # design/73 R4b
+    search_id: str
+    reason: str = Field(min_length=1)
+
+
 class GeneratorBody(Write):
     shot_id: str
     provider: str
@@ -1151,6 +1168,32 @@ def visuals_treatment(run_id: UUID, body: TreatmentBody, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/sequence')
 def visuals_sequence(run_id: UUID, body: SequenceBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.sequence(storage(), user, run, outputs, body.shot_id, body.reference_ids, body.quote))
+
+
+@app.get('/api/runs/{run_id}/visuals/elements')
+def visuals_elements(run_id: UUID, user=User, conn=DB):
+    """design/73 R1: where each element is seen in the footage, from the clip logs."""
+    run, outputs = _visuals_run(conn, user, run_id)
+    store = storage()
+    session = visuals_stage.session_of(store, run, outputs)
+    plan = visuals_stage.guarded(lambda: visuals_stage.current_plan(store, session))
+    package = visuals_stage.load_json(store, visuals_stage.key(run, 'package.json'))
+    return Response({'elements': plan['elements'], 'matches': visuals_stage.element_matches(plan, package.get('world_evidence'))})
+
+
+@app.post('/api/runs/{run_id}/visuals/search')
+def visuals_search(run_id: UUID, body: SearchBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.search(storage(), user, run, outputs, body.element_id, body.keywords, body.quote))   # design/73 R3
+
+
+@app.post('/api/runs/{run_id}/visuals/pick', status_code=201)
+def visuals_pick(run_id: UUID, body: PickBody, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.pick(storage(), user, run, outputs, body.search_id, body.picks, body.quote), 201)   # design/73 R4
+
+
+@app.post('/api/runs/{run_id}/visuals/nothing-fits')
+def visuals_nothing_fits(run_id: UUID, body: NothingFits, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.nothing_fits(storage(), user, run, outputs, body.search_id, body.reason))   # design/73 R4b
 
 
 @app.post('/api/runs/{run_id}/visuals/revise')

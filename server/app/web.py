@@ -308,6 +308,9 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'select': lambda: V.select_choice(store, user, run, outputs, {body['gap_id']: body['choice_id']}),
             'accept': lambda: V.accept(store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
             'revise': lambda: V.revise_gap(store, user, run, outputs, body['gap_id'], str(body.get('notes') or ''), quote),   # design/76
+            'search': lambda: V.search(store, user, run, outputs, body['element_id'], str(body.get('keywords') or ''), quote),   # design/73
+            'pick': lambda: V.pick(store, user, run, outputs, body['search_id'], list(body.get('picks') or []), quote),
+            'nothing-fits': lambda: V.nothing_fits(store, user, run, outputs, body['search_id'], str(body.get('reason') or '')),
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote),
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     WORKERS: int = 5  # one process per concurrent job; must be at least ANALYSIS_CAP plus room for voice, images, takes and renders
     ANALYSIS_CAP: int = 5  # concurrent Gemini analysis calls across all runs; 15 on the live VM since 18 Oct 2026 (design/35 row 29: 10 and 20 at once tested clean)
     HF_API_KEY: SecretStr = SecretStr('')
+    APIFY_TOKEN: SecretStr = SecretStr('')         # design/73 R3: Google Images through Apify; SK's account
     ANALYSIS_DEADLINE_SECONDS: int = 1800
     FFPROBE_EXECUTABLE: str = 'ffprobe'
     # design/65 B7: the visuals cap. No job records a money amount (tokens, characters, seconds only), so the ledger is computed from these prices in INR.
