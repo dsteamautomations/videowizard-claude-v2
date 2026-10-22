@@ -68,7 +68,7 @@ def test_the_job_form_fills_from_the_run():
     assert form['hard_constraints'] == ['no logos', 'no PPE claims'] and form['avoid'] == ['no gift boxes']
     assert form['model'] == 'gemini-omni-1.1-flash' and form['finish'] == 'final' and form['variants'] == 1 and form['checked_by'] == 'person' and form['trial'] is False
     start = L.job_form('start', run=RUN, plan=PLAN, gap=GAP, scene=SCENE, shot=SHOT, refs=REFS, generator=None, brief=BRIEF, card=CARD, rules=[], fps=25)
-    assert start['task'] == 'keyframe' and start['mode'] == 'multi-reference' and start['model'] == 'gpt-image-2.5-sunburst' and 'video_seconds' not in start
+    assert start['task'] == 'keyframe' and start['mode'] == 'multi-reference' and start['model'] == 'gpt-image-2.5-sunburst-2026-09-08' and 'video_seconds' not in start
     end = L.job_form('end', run=RUN, plan=PLAN, gap=GAP, scene=SCENE, shot=SHOT, refs=[], generator=None, brief=None, card=None, rules=[], fps=25)
     assert end['mode'] == 'edit-with-identity' and end['placement'] == '16:9' and end['brand_preamble'] == 'none' and end['industry'] == 'other' and end['client_code'] == 'NARDEP'
     state = L.job_form('state', run=RUN, plan=PLAN, gap=GAP, scene=SCENE, shot={**SHOT, 'visual_type': 'animation', 'states': [{'what_appears': 'the cavity, label "air"', 'hold_s': 5}]}, refs=[], generator=None, brief=None, card=None, rules=[], fps=25)

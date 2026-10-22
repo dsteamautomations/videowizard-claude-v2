@@ -606,13 +606,13 @@ def fetch_image(url):
     raise ValueError('too many redirects')
 
 
-def _search_into(session, user, run, plan, element_id, keywords, quote):
+def _search_into(session, user, run, plan, element_id, keywords, quote, results=None):
     """The search on a loaded session (design/73 R3; the round of design/79 calls it for several elements before one save)."""
     need(any(e['id'] == element_id for e in plan['elements']), f'Unknown element {element_id}.')
     need((quote or '').strip(), "The operator's yes to the search is required (the web rule).")
     words = str(keywords or '').split()
     need(2 <= len(words) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')   # R6
-    rows = apify.search_images(' '.join(words), 10)
+    rows = results if results is not None else apify.search_images(' '.join(words), 10)
     sid = digest({'run': str(run['id']), 'element': element_id, 'keywords': ' '.join(words), 'at': datetime.now(timezone.utc).isoformat()})[:12]
     session.setdefault('searches', {})[sid] = {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'quote': quote, 'by': user['id'],
                                                'at': datetime.now(timezone.utc).isoformat(), 'results': rows, 'picked': []}
@@ -718,6 +718,12 @@ def round_done(store, user, run, outputs, verdicts, quote):
             need(row['frames'], f'{eid} has no frame to approve: search instead.')
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
     for eid, row in rd['elements'].items():
+        if verdicts[eid]['verdict'] == 'search':
+            row['keywords'] = str(verdicts[eid].get('keywords') or row['keywords']).strip()
+    from concurrent.futures import ThreadPoolExecutor   # design/80 S5: the searches do not depend on each other; they run at once
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {eid: pool.submit(apify.search_images, ' '.join(row['keywords'].split()), 10) for eid, row in rd['elements'].items() if verdicts[eid]['verdict'] == 'search' and 2 <= len(row['keywords'].split()) <= 6}
+    for eid, row in rd['elements'].items():
         v = verdicts[eid]
         row['verdict'] = v['verdict']
         if v['verdict'] == 'approve':
@@ -727,9 +733,8 @@ def round_done(store, user, run, outputs, verdicts, quote):
                     r.update(status='approved', approval={**stamp, 'sha256': r['sha256']})
                     _feedback_image(session, run, user, r, 'pass', quote, '')
             continue
-        row['keywords'] = str(v.get('keywords') or row['keywords']).strip()
         try:
-            row['search_id'] = _search_into(session, user, run, plan, eid, row['keywords'], quote)['search_id']
+            row['search_id'] = _search_into(session, user, run, plan, eid, row['keywords'], quote, futures[eid].result() if eid in futures else None)['search_id']
             row['error'] = None
         except (Problem, ValueError) as exc:   # a failed search is this row's, the rest go on
             row['error'] = exc.message if isinstance(exc, Problem) else str(exc)
