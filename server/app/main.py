@@ -271,6 +271,20 @@ class NothingFits(Write):  # design/73 R4b
     reason: str = Field(min_length=1)
 
 
+class RoundStart(Write):   # design/79 Q1
+    elements: list[dict[str, Any]] = Field(min_length=1, max_length=80)
+
+
+class RoundDone(Write):
+    verdicts: dict[str, dict[str, Any]]
+    quote: str = Field(min_length=1)
+
+
+class RoundPicks(Write):
+    picks: dict[str, list[dict[str, Any]]]
+    quote: str = Field(min_length=1)
+
+
 class GeneratorBody(Write):
     shot_id: str
     provider: str
@@ -1190,6 +1204,21 @@ def visuals_search(run_id: UUID, body: SearchBody, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/pick', status_code=201)
 def visuals_pick(run_id: UUID, body: PickBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.pick(storage(), user, run, outputs, body.search_id, body.picks, body.quote), 201)   # design/73 R4
+
+
+@app.post('/api/runs/{run_id}/visuals/round', status_code=201)
+def visuals_round(run_id: UUID, body: RoundStart, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_start(storage(), user, run, outputs, body.elements), 201)   # design/79
+
+
+@app.post('/api/runs/{run_id}/visuals/round/done')
+def visuals_round_done(run_id: UUID, body: RoundDone, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/round/picks')
+def visuals_round_picks(run_id: UUID, body: RoundPicks, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_picks(storage(), user, run, outputs, body.picks, body.quote))
 
 
 @app.post('/api/runs/{run_id}/visuals/nothing-fits')

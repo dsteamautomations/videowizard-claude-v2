@@ -345,7 +345,7 @@ def page_view(conn, store, run, outputs, code):
     return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
             'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
-            'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session),
+            'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
 
@@ -594,10 +594,8 @@ def fetch_image(url):
     raise ValueError('too many redirects')
 
 
-def search(store, user, run, outputs, element_id, keywords, quote):
-    """design/73 R3: one Google Images search for an element, on the operator's yes; the ten rows kept on the session for the page and the tool."""
-    session = session_of(store, run, outputs)
-    plan = guarded(lambda: current_plan(store, session))
+def _search_into(session, user, run, plan, element_id, keywords, quote):
+    """The search on a loaded session (design/73 R3; the round of design/79 calls it for several elements before one save)."""
     need(any(e['id'] == element_id for e in plan['elements']), f'Unknown element {element_id}.')
     need((quote or '').strip(), "The operator's yes to the search is required (the web rule).")
     words = str(keywords or '').split()
@@ -606,13 +604,28 @@ def search(store, user, run, outputs, element_id, keywords, quote):
     sid = digest({'run': str(run['id']), 'element': element_id, 'keywords': ' '.join(words), 'at': datetime.now(timezone.utc).isoformat()})[:12]
     session.setdefault('searches', {})[sid] = {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'quote': quote, 'by': user['id'],
                                                'at': datetime.now(timezone.utc).isoformat(), 'results': rows, 'picked': []}
-    save_session(store, run, session)
     return {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'results': rows}
+
+
+def search(store, user, run, outputs, element_id, keywords, quote):
+    """design/73 R3: one Google Images search for an element, on the operator's yes; the ten rows kept on the session for the page and the tool."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    out = _search_into(session, user, run, plan, element_id, keywords, quote)
+    save_session(store, run, session)
+    return out
 
 
 def pick(store, user, run, outputs, search_id, picks, quote):
     """design/73 R4: the ticked pictures, in the order ticked, each with its note, become web references of the element with their source."""
     session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    out = _pick_into(store, session, user, run, plan, search_id, picks, quote)
+    save_session(store, run, session)
+    return out
+
+
+def _pick_into(store, session, user, run, plan, search_id, picks, quote):
     s = (session.get('searches') or {}).get(search_id)
     need(s, f'Unknown search {search_id}.')
     need((quote or '').strip(), "The operator's words are required.")
@@ -624,7 +637,7 @@ def pick(store, user, run, outputs, search_id, picks, quote):
         need(n in rows, f'Picture {n} is not in the search ({len(rows)} pictures).')
         chosen.append((rows[n], str((p or {}).get('note') or '').strip()))
     made, failed = [], []
-    element_kind = next(e['kind'] for e in current_plan(store, session)['elements'] if e['id'] == s['element_id'])
+    element_kind = next(e['kind'] for e in plan['elements'] if e['id'] == s['element_id'])
     for row, note in chosen:
         png, size, used = None, None, None
         errors = []
@@ -648,8 +661,99 @@ def pick(store, user, run, outputs, search_id, picks, quote):
     need(made, 'None of the ticked pictures could be downloaded: ' + '; '.join(f"{f['n']} ({f['site']}): {f['why']}" for f in failed) + '. Pick others, or save one yourself and `vw visuals supply` it.')
     s['picked'] = [r['source']['n'] for r in made]
     s['failed'] = failed
-    save_session(store, run, session)
     return {'search_id': search_id, 'references': made, 'failed': failed}
+
+
+# ---------- design/79: the reference round, every element at once, two passes on one page ----------
+
+def round_start(store, user, run, outputs, elements):
+    """The assistant's one-shot preparation: for each element its grabbed footage frames and the keywords it would search; the page shows them all."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    kinds = {e['id']: e['kind'] for e in plan['elements']}
+    need(isinstance(elements, list) and elements, 'The round lists the elements: [{element_id, frames, keywords}].')
+    rows = {}
+    for row in elements:
+        eid = (row or {}).get('element_id')
+        need(eid in kinds, f'Unknown element {eid}.')
+        need(kinds[eid] != 'graphic', f'{eid} is a graphic: drawn from the plan, never referenced.')
+        frames = list((row or {}).get('frames') or [])
+        for fid in frames:
+            r = session['references'].get(fid)
+            need(r and r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved'), f'{fid} is not a footage frame of {eid}.')
+        rows[eid] = {'frames': frames, 'keywords': str((row or {}).get('keywords') or '').strip(), 'verdict': None, 'search_id': None, 'error': None}
+    session['round'] = {'pass': 1, 'at': datetime.now(timezone.utc).isoformat(), 'by': user['id'], 'elements': rows, 'quote': None}
+    save_session(store, run, session)
+    return {'pass': 1, 'elements': len(rows)}
+
+
+def round_done(store, user, run, outputs, verdicts, quote):
+    """Pass 1 answered: the chosen frames approved with the words, the searches run with the words as the yes; pass 2 for the searched elements."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    rd = session.get('round')
+    need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
+    need((quote or '').strip(), "The operator's words are required: they approve the frames and say yes to the searches.")
+    verdicts = verdicts or {}
+    for eid, row in rd['elements'].items():
+        v = verdicts.get(eid) or {}
+        need(v.get('verdict') in ('approve', 'search'), f'{eid}: a verdict is required, approve or search.')
+        if v['verdict'] == 'approve':
+            need(row['frames'], f'{eid} has no frame to approve: search instead.')
+    stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
+    for eid, row in rd['elements'].items():
+        v = verdicts[eid]
+        row['verdict'] = v['verdict']
+        if v['verdict'] == 'approve':
+            for fid in row['frames']:
+                r = session['references'][fid]
+                if r['status'] == 'candidate':
+                    r.update(status='approved', approval={**stamp, 'sha256': r['sha256']})
+                    _feedback_image(session, run, user, r, 'pass', quote, '')
+            continue
+        row['keywords'] = str(v.get('keywords') or row['keywords']).strip()
+        try:
+            row['search_id'] = _search_into(session, user, run, plan, eid, row['keywords'], quote)['search_id']
+            row['error'] = None
+        except (Problem, ValueError) as exc:   # a failed search is this row's, the rest go on
+            row['error'] = exc.message if isinstance(exc, Problem) else str(exc)
+    rd['quote'] = quote
+    rd['pass'] = 2 if any(r['search_id'] for r in rd['elements'].values()) else 'complete'
+    save_session(store, run, session)
+    return {'pass': rd['pass'], 'searched': [eid for eid, r in rd['elements'].items() if r['search_id']], 'errors': {eid: r['error'] for eid, r in rd['elements'].items() if r['error']}}
+
+
+def round_picks(store, user, run, outputs, picks, quote):
+    """Pass 2 answered: the ticked pictures per search become web references; the round is complete."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    rd = session.get('round')
+    need(rd and rd.get('pass') == 2, 'No reference round is waiting for its second pass.')
+    need((quote or '').strip(), "The operator's words are required.")
+    own = {r['search_id'] for r in rd['elements'].values() if r['search_id']}
+    made, failed = [], {}
+    for sid, rows in (picks or {}).items():
+        need(sid in own, f'Search {sid} is not in this round.')
+        if not rows:
+            continue
+        try:
+            out = _pick_into(store, session, user, run, plan, sid, list(rows), quote)
+            made += out['references']
+            if out['failed']:
+                failed[sid] = out['failed']
+        except (Problem, ValueError) as exc:
+            failed[sid] = exc.message if isinstance(exc, Problem) else str(exc)
+    rd['pass'] = 'complete'
+    save_session(store, run, session)
+    return {'complete': True, 'references': [r['id'] for r in made], 'failed': failed}
+
+
+def _round_view(session):
+    rd = session.get('round')
+    if not rd:
+        return None
+    searches = session.get('searches') or {}
+    return {**rd, 'elements': {eid: {**r, 'picked': (searches.get(r['search_id']) or {}).get('picked') if r.get('search_id') else None} for eid, r in rd['elements'].items()}}
 
 
 def nothing_fits(store, user, run, outputs, search_id, reason):
@@ -1161,6 +1265,7 @@ def status(conn, store, run, outputs):
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
+            'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 

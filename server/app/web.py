@@ -311,6 +311,8 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'search': lambda: V.search(store, user, run, outputs, body['element_id'], str(body.get('keywords') or ''), quote),   # design/73
             'pick': lambda: V.pick(store, user, run, outputs, body['search_id'], list(body.get('picks') or []), quote),
             'nothing-fits': lambda: V.nothing_fits(store, user, run, outputs, body['search_id'], str(body.get('reason') or '')),
+            'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote),   # design/79
+            'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote),
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote),
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),

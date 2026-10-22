@@ -816,6 +816,61 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
     assert st['searches'][0]['search_id'] == sid and st['searches'][0]['nothing_fits']['reason'].startswith('all show') and st['searches'][0]['picked'] == [2, 1]
 
 
+def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
+    """design/79: every element at once; pass 1 approves frames and runs the searches; pass 2 takes the picks."""
+    from io import BytesIO
+    PIL = pytest.importorskip('PIL.Image')
+    png = BytesIO()
+    PIL.new('RGB', (64, 48), (120, 80, 40)).save(png, format='PNG')
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    doc['elements'] += [{'id': 'E2', 'name': 'Brick kiln', 'kind': 'place', 'identity': 'representative', 'requirements': 'a kiln'},
+                        {'id': 'G1', 'name': 'Section drawing', 'kind': 'graphic', 'identity': 'exact', 'requirements': 'a drawing'}]
+    doc['elements'][0]['kind'] = 'object'   # E1 is a graphic in the shared fixture; a round is for people, objects and places
+    frame = {**ref('F1'), 'kind': 'frame', 'element_id': 'E1', 'width': 1920, 'height': 1080}
+    other = {**ref('F2'), 'kind': 'frame', 'element_id': 'E2'}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references={'F1': frame, 'F2': other})
+    store = store_with(sess, doc)
+    store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
+    with pytest.raises(Problem, match='G1 is a graphic'):
+        g(lambda: VS.round_start(store, USER, RUN, [], [{'element_id': 'G1', 'frames': [], 'keywords': 'x y'}]))
+    with pytest.raises(Problem, match='F2 is not a footage frame of E1'):
+        g(lambda: VS.round_start(store, USER, RUN, [], [{'element_id': 'E1', 'frames': ['F2'], 'keywords': 'x y'}]))
+    out = VS.round_start(store, USER, RUN, [], [{'element_id': 'E1', 'frames': ['F1'], 'keywords': 'village mason Tamil Nadu'}, {'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln Tamil Nadu'}])
+    rd = saved(store)['round']
+    assert out == {'pass': 1, 'elements': 2} and rd['pass'] == 1 and rd['elements']['E1']['frames'] == ['F1'] and rd['elements']['E2']['keywords'] == 'brick kiln Tamil Nadu'
+    st = VS.status(FakeConn([]), store, RUN, [])
+    assert st['round']['pass'] == 1 and st['round']['elements']['E1']['verdict'] is None
+    rows = [{'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img.example/1.jpg', 'page_url': 'https://site.example/p1', 'site': 'site.example', 'width': 800, 'height': 600, 'title': 'kiln'}]
+    calls = []
+    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: calls.append(keywords) or rows)
+    with pytest.raises(Problem, match='operator'):
+        g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'search'}}, ''))
+    with pytest.raises(Problem, match='E2: a verdict is required'):
+        g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}}, 'yes'))
+    with pytest.raises(Problem, match='E2 has no frame to approve'):
+        g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'approve'}}, 'yes'))
+    out = VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'search', 'keywords': 'clamp kiln Tamil Nadu'}}, 'Yes: the first frame, and search for the kiln.')
+    s = saved(store)
+    assert s['references']['F1']['status'] == 'approved' and s['references']['F1']['approval']['quote'].startswith('Yes') and calls == ['clamp kiln Tamil Nadu']
+    rd = s['round']
+    assert out['pass'] == 2 and rd['pass'] == 2 and rd['elements']['E1']['verdict'] == 'approve' and rd['elements']['E2']['verdict'] == 'search' and rd['elements']['E2']['search_id'] and rd['elements']['E2']['keywords'] == 'clamp kiln Tamil Nadu'
+    sid = rd['elements']['E2']['search_id']
+    assert s['searches'][sid]['quote'].startswith('Yes') and s['feedback'][-1]['id'] == 'F1'
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: png.getvalue())
+    with pytest.raises(Problem, match='not in this round'):
+        g(lambda: VS.round_picks(store, USER, RUN, [], {'nope': [{'n': 1}]}, 'these'))
+    out = VS.round_picks(store, USER, RUN, [], {sid: [{'n': 1, 'note': 'colour only'}]}, 'This one, colour only.')
+    s = saved(store)
+    assert out['complete'] is True and s['round']['pass'] == 'complete' and s['searches'][sid]['picked'] == [1]
+    web = [r for r in s['references'].values() if r.get('kind') == 'web']
+    assert len(web) == 1 and web[0]['element_id'] == 'E2' and web[0]['source']['note'] == 'colour only'
+    # a search that fails is recorded on its row and the round goes on
+    VS.round_start(store, USER, RUN, [], [{'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln'}])
+    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: (_ for _ in ()).throw(Problem(502, 'SEARCH', 'Apify answered HTTP 500 to the image search.')))
+    out = VS.round_done(store, USER, RUN, [], {'E2': {'verdict': 'search'}}, 'yes')
+    assert out['pass'] == 'complete' and saved(store)['round']['elements']['E2']['error'].startswith('Apify answered')
+
+
 def test_the_packet_carries_each_references_note_for_the_sheet_prompt():
     """design/73 R4a."""
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
