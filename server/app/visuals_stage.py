@@ -681,6 +681,8 @@ def round_start(store, user, run, outputs, elements):
         for fid in frames:
             r = session['references'].get(fid)
             need(r and r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved'), f'{fid} is not a footage frame of {eid}.')
+        if not frames:   # the element's footage frames already grabbed count, whether or not the row names them
+            frames = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
         rows[eid] = {'frames': frames, 'keywords': str((row or {}).get('keywords') or '').strip(), 'verdict': None, 'search_id': None, 'error': None}
     session['round'] = {'pass': 1, 'at': datetime.now(timezone.utc).isoformat(), 'by': user['id'], 'elements': rows, 'quote': None}
     save_session(store, run, session)

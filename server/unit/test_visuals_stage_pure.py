@@ -835,9 +835,14 @@ def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
         g(lambda: VS.round_start(store, USER, RUN, [], [{'element_id': 'G1', 'frames': [], 'keywords': 'x y'}]))
     with pytest.raises(Problem, match='F2 is not a footage frame of E1'):
         g(lambda: VS.round_start(store, USER, RUN, [], [{'element_id': 'E1', 'frames': ['F2'], 'keywords': 'x y'}]))
-    out = VS.round_start(store, USER, RUN, [], [{'element_id': 'E1', 'frames': ['F1'], 'keywords': 'village mason Tamil Nadu'}, {'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln Tamil Nadu'}])
+    out = VS.round_start(store, USER, RUN, [], [{'element_id': 'E1', 'frames': [], 'keywords': 'village mason Tamil Nadu'}, {'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln Tamil Nadu'}])
     rd = saved(store)['round']
-    assert out == {'pass': 1, 'elements': 2} and rd['pass'] == 1 and rd['elements']['E1']['frames'] == ['F1'] and rd['elements']['E2']['keywords'] == 'brick kiln Tamil Nadu'
+    assert out == {'pass': 1, 'elements': 2} and rd['pass'] == 1 and rd['elements']['E1']['frames'] == ['F1'] and rd['elements']['E2']['frames'] == ['F2'] and rd['elements']['E2']['keywords'] == 'brick kiln Tamil Nadu'   # the elements' own frames, named or not
+    sess['references']['F2']['status'] = 'rejected'
+    store = store_with(sess, doc)
+    store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
+    VS.round_start(store, USER, RUN, [], [{'element_id': 'E1', 'frames': ['F1'], 'keywords': 'village mason Tamil Nadu'}, {'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln Tamil Nadu'}])
+    assert saved(store)['round']['elements']['E2']['frames'] == []   # a rejected frame does not count
     st = VS.status(FakeConn([]), store, RUN, [])
     assert st['round']['pass'] == 1 and st['round']['elements']['E1']['verdict'] is None
     rows = [{'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img.example/1.jpg', 'page_url': 'https://site.example/p1', 'site': 'site.example', 'width': 800, 'height': 600, 'title': 'kiln'}]

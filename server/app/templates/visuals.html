@@ -230,7 +230,9 @@ function renderRound(rd){   // design/79: every element at once; pass 1 the fram
   const els=d.elements||[], byId={};els.forEach(e=>byId[e.id]=e);
   const ids=Object.keys(rd.elements);
   if(rd.pass===1){
-    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
+    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};
+      let frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
+      if(!frames.length)frames=(d.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));   // the element's frames count even when the row names none
       return '<tr><td><span class="nm">'+esc(eid)+'</span><div class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</div></td><td>'+(frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+'"><img src="'+esc(f.url)+'" alt="" data-big="'+esc(f.url)+'"><div class="cap">from your footage'+(f.status==='approved'?' · approved':'')+'</div></div>').join('')+'</div>':'<span class="ds">no frame in the footage</span>')+'</td>'+
         '<td><input class="kw" data-el="'+esc(eid)+'" value="'+esc(r.keywords||'')+'" placeholder="two to six words" style="width:100%;min-width:180px"></td>'+
         '<td>'+(frames.length?'<label style="display:block;margin-bottom:6px"><input type="radio" name="v-'+esc(eid)+'" value="approve" checked> Approve the frame</label>':'')+'<label style="display:block"><input type="radio" name="v-'+esc(eid)+'" value="search" '+(frames.length?'':'checked')+'> Search with these keywords</label></td></tr>';}).join('');
