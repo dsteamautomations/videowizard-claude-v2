@@ -280,7 +280,7 @@ function renderReferences(){
   root.querySelectorAll('img[data-big]').forEach(i=>i.addEventListener('click',()=>bigPicture(i.dataset.big)));
   root.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
 }
-function bigPicture(url){const old=$('lb');if(old)old.remove();const box=document.createElement('div');box.className='lightbox';box.id='lb';box.innerHTML='<img src="'+esc(url)+'" alt=""><div class="bar"><button id="lb-close">Close</button></div>';document.body.appendChild(box);$('lb-close').addEventListener('click',()=>box.remove());box.addEventListener('click',ev=>{if(ev.target===box)box.remove();});}
+function bigPicture(url){const old=$('lb');if(old)old.remove();const box=document.createElement('div');box.className='lightbox';box.id='lb';box.innerHTML='<img src="'+esc(url)+'" alt=""><div class="bar"><button id="lb-close">Close</button></div>';document.getElementById('app').appendChild(box);$('lb-close').addEventListener('click',()=>box.remove());box.addEventListener('click',ev=>{if(ev.target===box)box.remove();});}
 function lightbox(sid,n){   // compare the ten without closing: arrows, the tick and the note inside
   const s=(data.searches||[]).find(x=>x.search_id===sid);if(!s)return;
   const r=s.results.find(x=>x.n===n);if(!r)return;
@@ -289,7 +289,7 @@ function lightbox(sid,n){   // compare the ten without closing: arrows, the tick
   const box=document.createElement('div');box.className='lightbox';box.id='lb';
   box.innerHTML='<img src="'+esc(r.image_url)+'" alt="" onerror="this.onerror=null;this.src=\''+esc(r.thumbnail||'')+'\'"><div class="bar"><button id="lb-prev">‹</button><span>'+n+' of '+s.results.length+' · '+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+(r.page_url?' · <a href="'+esc(r.page_url)+'" target="_blank" rel="noopener" style="color:#9cf">source</a>':'')+'</span><button id="lb-next">›</button></div>'+
     '<div class="bar"><button id="lb-tick">'+(p?'Ticked as Image '+idx+' (untick)':'Tick this picture')+'</button><textarea id="lb-note" placeholder="your note for this picture">'+esc(p?p.note:'')+'</textarea><button id="lb-close">Close</button></div>';
-  document.body.appendChild(box);
+  document.getElementById('app').appendChild(box);
   const go_=k=>{const next=s.results.find(x=>x.n===n+k);if(next){lightbox(sid,next.n);}};
   $('lb-prev').addEventListener('click',()=>go_(-1));$('lb-next').addEventListener('click',()=>go_(1));
   $('lb-close').addEventListener('click',()=>{box.remove();renderReferences();footer();});
