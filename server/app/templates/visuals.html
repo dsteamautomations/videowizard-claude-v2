@@ -151,6 +151,7 @@ function drawGaps(){
   $('gaps').innerHTML=data.gaps.map((g,gi)=>{
     const head='<div class="hd"><b>'+esc(g.gap_id)+'</b><span class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</span>'+(g.recorded?'<span class="badge ok">recorded</span>':g.accepted?'<span class="badge ok">accepted</span>':data.plan_digest?'<span class="badge dec">to accept</span>':'')+'<span class="ds">'+esc(g.requirement||'')+'</span></div>';
     let body='';
+    if(g.accepted&&g.quote){body+='<div class="ds">Accepted with: “'+esc(g.quote)+'”</div>';}   // design/75 (defect 20): the operator's words stay in view
     if(g.choices){body+='<div class="btns"><span class="ds">Two choices:</span>'+g.choices.options.map(c=>'<button data-a="select" data-gap="'+esc(g.gap_id)+'" data-choice="'+esc(c.id)+'" class="'+(g.choices.selected===c.id?'go':'')+'" title="'+esc(c.why)+'">'+esc(c.title)+(g.choices.recommended===c.id?' (recommended)':'')+'</button>').join('')+'</div>';}
     if(!g.shots.length){body+='<div class="ds">'+(data.plan_digest?(g.choices&&!g.choices.selected?'Choose one of the two to see its shots.':'No shots in this gap yet.'):'The plan has not been proposed yet.')+'</div>';}
     g.shots.forEach(s=>{

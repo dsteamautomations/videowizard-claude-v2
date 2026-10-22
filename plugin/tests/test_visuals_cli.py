@@ -378,6 +378,15 @@ def test_prompt_and_steps_carry_the_boundary_rule_the_wave_rule_and_no_cap_comma
     assert 'design/74' in STAGES['visuals']['prompt_origin']
 
 
+def test_prompt_and_step_say_a_change_request_in_the_gap_words_is_a_revision():
+    """design/75 (defect 20)."""
+    prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
+    assert len(prompt.split()) <= 3500
+    assert 'accepted afresh' in prompt and "every gap's words" in prompt
+    assert 'accepted afresh' in steps[2] and 'before any picture' in steps[2]
+    assert 'design/75' in STAGES['visuals']['prompt_origin']
+
+
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
     """design/74 L31 (defect 19)."""
     monkeypatch.setattr(vw, 'request', lambda method, path, **kw: ({'action': 'refused', 'message': 'Bind references for this shot under the current accepted plan.'}, 422))

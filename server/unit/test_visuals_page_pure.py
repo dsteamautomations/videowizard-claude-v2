@@ -16,5 +16,9 @@ def test_the_page_polls_at_all_times_at_visuals_and_reloads_on_return():
     assert 'visibilitychange' in HTML and '60000' in HTML and '15000' in HTML
 
 
+def test_an_accepted_gap_shows_the_operators_words():
+    assert 'g.quote' in HTML   # design/75 (defect 20)
+
+
 def test_an_empty_words_box_is_marked_and_a_rejected_picture_has_its_badge_and_button():
     assert 'need-words' in HTML and "data-a=\"reject\"" in HTML and 'rejected' in HTML

@@ -610,6 +610,24 @@ def test_page_view_carries_each_pictures_checklist_the_takes_checklist_and_a_rej
     assert st['jobs'][0]['checklist'] == lines
 
 
+def test_a_gap_acceptance_keeps_its_words_for_the_assistant_the_page_and_the_feedback_file(monkeypatch):
+    """design/75 (defect 20): SK's 18 comments on the page were stored as each gap's acceptance and nothing read them back."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', library_version='vwlib-x')
+    store = store_with(sess, doc)
+    store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
+    VS.accept(store, USER, RUN, [], ['G2'], 'instead of an animated diagram, I would like an AI video for G2')
+    s = saved(store)
+    rec = s['feedback'][0]
+    assert rec['kind'] == 'gap' and rec['id'] == 'G2' and rec['verdict'] == 'pass' and rec['quote'].startswith('instead of') and rec['library_version'] == 'vwlib-x' and rec['job_id'] == 'VW-9-G2-G2'
+    st = VS.status(FakeConn([]), store, RUN, [])
+    g1, g2 = st['gaps']
+    assert g1['accepted'] is False and 'quote' not in g1 and g2['accepted'] is True and g2['quote'].startswith('instead of') and g2['by'] == 'u1'
+    view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')
+    assert view['gaps'][1]['quote'].startswith('instead of') and view['gaps'][1]['by'] == 'u1' and 'quote' not in view['gaps'][0]
+
+
 def test_record_gap_keeps_the_takes_start_and_end_ids():
     """design/71 P4: assembly needs the boundary pictures to see where two takes of one gap share one."""
     prep = {'start_image': {'reference_id': 'R1'}, 'end_image': {'reference_id': 'R2'}}

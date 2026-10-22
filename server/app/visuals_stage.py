@@ -309,7 +309,7 @@ def page_view(conn, store, run, outputs, code):
                                                  'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j)})
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
-        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None}
+        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, **_accepted_words(session, gid)}
         if plan:
             gap = next((x for x in plan['gaps'] if x['gap_id'] == gid), None)
             if gap:
@@ -402,8 +402,15 @@ def accept(store, user, run, outputs, gap_ids, quote):
         if gap.get('choices'):
             need(session['choice_selections'].get(gid), f'Select a choice for gap {gid} before accepting it.')
         session['accepted'][gid] = {'digest': gap_digest(plan, gap), 'choice_id': (session['choice_selections'].get(gid) or {}).get('choice_id'), 'quote': quote, 'by': user['id']}
+        _feedback(session, run, user, kind='gap', ident=gid, owner=gid, step=None, verdict='pass', quote=quote, notes='', prompt='', checklist=None, suggestion='', model='', inputs=())   # design/75
     save_session(store, run, session)
     return {'accepted': sorted(session['accepted'])}
+
+
+def _accepted_words(session, gid):
+    """design/75 (defect 20): the operator's words on a gap's acceptance, for the assistant, the page and the feedback file."""
+    acc = session['accepted'].get(gid)
+    return {'quote': acc.get('quote') or '', 'by': acc.get('by')} if acc else {}
 
 
 def shots_of(plan, session, gid):
@@ -909,7 +916,7 @@ def status(conn, store, run, outputs):
     plan = current_plan(store, session) if session.get('current') else None
     gaps = []
     for gid, g in session['source']['gaps'].items():
-        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': []}
+        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], **_accepted_words(session, gid)}
         if plan and gid in session['accepted']:
             for s in shots_of(plan, session, gid):
                 entry['shots'].append({'shot_id': s['id'], 'visual_type': s['visual_type'], 'bound': s['id'] in session['bindings'], 'prepared': s['id'] in session['preparations'],
