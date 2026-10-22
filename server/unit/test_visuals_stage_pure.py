@@ -841,6 +841,15 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
     assert saved(store)['searches'][sid]['nothing_fits']['reason'] == 'all show the wrong tool, try the Tamil name'
     st = VS.status(FakeConn([]), store, RUN, [])
     assert st['searches'][0]['search_id'] == sid and st['searches'][0]['nothing_fits']['reason'].startswith('all show') and st['searches'][0]['picked'] == [2, 1]
+    # design/83 P1: the picks are downloaded at once (a barrier only three concurrent downloads can pass), kept in the ticked order
+    import threading
+    gate = threading.Barrier(3, timeout=3)
+    rows3 = rows + [{'n': 3, 'thumbnail': 'https://t/3.jpg', 'image_url': 'https://img.example/3.jpg', 'page_url': 'https://site.example/p3', 'site': 'site.example', 'width': 640, 'height': 480, 'title': 'float'}]
+    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: rows3)
+    sid3 = VS.search(store, USER, RUN, [], 'E1', 'kadapari tool', 'yes again')['search_id']
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: (gate.wait() and None) or png.getvalue())
+    out = VS.pick(store, USER, RUN, [], sid3, [{'n': 3}, {'n': 1}, {'n': 2}], 'all three')
+    assert [r['source']['n'] for r in out['references']] == [3, 1, 2] and out['failed'] == []
 
 
 def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
@@ -912,6 +921,17 @@ def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
     monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: (_ for _ in ()).throw(Problem(502, 'SEARCH', 'Apify answered HTTP 500 to the image search.')))
     out = VS.round_done(store, USER, RUN, [], {'E2': {'verdict': 'search'}}, 'yes')
     assert out['pass'] == 'complete' and saved(store)['round']['elements']['E2']['error'].startswith('Apify answered')
+    # design/83 P1: the picks of every search in the round are downloaded at once (two searches, three picks, one barrier)
+    import threading
+    s2 = saved(store)
+    s2['searches']['sid-b'] = {**s2['searches'][sid], 'search_id': 'sid-b', 'element_id': 'E1', 'picked': [], 'results': rows + [{**rows[0], 'n': 2, 'image_url': 'https://img.example/b2.jpg'}]}
+    s2['round'] = {'pass': 2, 'at': 'now', 'by': 'u1', 'quote': 'yes', 'elements': {'E2': {'frames': [], 'keywords': 'brick kiln', 'verdict': 'search', 'search_id': sid, 'error': None},
+                                                                             'E1': {'frames': [], 'keywords': 'x y', 'verdict': 'search', 'search_id': 'sid-b', 'error': None}}}
+    store = store_with(s2, doc)
+    gate = threading.Barrier(3, timeout=3)
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: (gate.wait() and None) or png.getvalue())
+    out = VS.round_picks(store, USER, RUN, [], {sid: [{'n': 1, 'note': 'again'}], 'sid-b': [{'n': 1}, {'n': 2}]}, 'All three.')
+    assert out['complete'] is True and len(out['references']) == 3 and out['failed'] == {} and saved(store)['searches']['sid-b']['picked'] == [1, 2]
 
 
 def test_the_packet_carries_each_references_note_for_the_sheet_prompt():

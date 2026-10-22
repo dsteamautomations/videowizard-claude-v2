@@ -530,6 +530,21 @@ def test_fetch_and_select_take_the_shot_id_when_it_has_one_ready_take(harness, m
     assert code == 0 and posted['job_id'] == 'aaaaaaaa-0000-0000-0000-000000000001'
 
 
+def test_frame_file_posts_the_rows_in_order_and_stops_at_the_first_refusal(harness, monkeypatch, capsys):
+    """design/83 P2."""
+    ws, _ = harness
+    (ws / 'out' / 'frames.json').write_text(json.dumps([{'element': 'E1', 'clip': 'c1', 'at': 12.5, 'subject': 'the mason'}, {'element': 'E2', 'clip': 'c2', 'at': 3}, {'element': 'E3', 'clip': 'c9', 'at': 1}]), encoding='utf-8')
+    posted = []
+    def request(method, path, **kw):
+        posted.append(kw['json'])
+        return ({'action': 'refused', 'message': 'Unknown clip c9.'}, 422) if kw['json']['source_media_id'] == 'c9' else ({'id': 'R-' + kw['json']['element_id'], 'kind': 'frame'}, 0)
+    monkeypatch.setattr(vw, 'request', request)
+    code, out, err = run(args(what='frame', file='out/frames.json'), capsys)
+    assert code == 2 and [p['element_id'] for p in posted] == ['E1', 'E2', 'E3'] and posted[0] == {'element_id': 'E1', 'name': 'frame-E1', 'kind': 'frame', 'subject': 'the mason', 'source_media_id': 'c1', 'requested_s': 12.5}
+    assert 'E1@12.5' in json.dumps(out) and 'E2@3' in json.dumps(out) and 'Unknown clip c9' in json.dumps(out)
+    assert 'frame --file out/frames.json' in json.dumps(STAGES['visuals']) and 'frame --file' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+
+
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):
     """design/74 L31 (defect 19)."""
     monkeypatch.setattr(vw, 'request', lambda method, path, **kw: ({'action': 'refused', 'message': 'Bind references for this shot under the current accepted plan.'}, 422))

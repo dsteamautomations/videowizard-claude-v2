@@ -637,7 +637,29 @@ def pick(store, user, run, outputs, search_id, picks, quote):
     return out
 
 
-def _pick_into(store, session, user, run, plan, search_id, picks, quote):
+def _download_pick(row):
+    """The full picture, else Google's thumbnail (smaller, always served): (png, size, which) or (None, None, the errors)."""
+    errors = []
+    for candidate, label in ((row['image_url'], 'picture'), (row.get('thumbnail'), 'thumbnail')):
+        if not candidate:
+            continue
+        try:
+            png, size = image_bytes(fetch_image(candidate))
+            return png, size, label
+        except (ValueError, OSError) as exc:
+            errors.append(f'{label}: {exc}')
+    return None, None, errors
+
+
+def _download_picks(rows):
+    """design/83 P1: every picked picture at once (eight downloads in flight), keyed by (search_id, n)."""
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {key: pool.submit(_download_pick, row) for key, row in rows.items()}
+    return {key: f.result() for key, f in futures.items()}
+
+
+def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched=None):
     s = (session.get('searches') or {}).get(search_id)
     need(s, f'Unknown search {search_id}.')
     need((quote or '').strip(), "The operator's words are required.")
@@ -650,20 +672,12 @@ def _pick_into(store, session, user, run, plan, search_id, picks, quote):
         chosen.append((rows[n], str((p or {}).get('note') or '').strip()))
     made, failed = [], []
     element_kind = next(e['kind'] for e in plan['elements'] if e['id'] == s['element_id'])
+    if fetched is None:
+        fetched = _download_picks({(search_id, row['n']): row for row, _ in chosen})
     for row, note in chosen:
-        png, size, used = None, None, None
-        errors = []
-        for candidate, label in ((row['image_url'], 'picture'), (row.get('thumbnail'), 'thumbnail')):   # the full picture, else Google's thumbnail (smaller, always served)
-            if not candidate:
-                continue
-            try:
-                png, size = image_bytes(fetch_image(candidate))
-                used = label
-                break
-            except (ValueError, OSError) as exc:
-                errors.append(f'{label}: {exc}')
+        png, size, used = fetched[(search_id, row['n'])]
         if png is None:
-            failed.append({'n': row['n'], 'site': row.get('site'), 'why': '; '.join(errors)})
+            failed.append({'n': row['n'], 'site': row.get('site'), 'why': '; '.join(used)})
             continue
         rid = digest({'run': str(run['id']), 'search': search_id, 'n': row['n']})[:32]
         meta = {'element_id': s['element_id'], 'element_kind': element_kind, 'name': f"web-{s['element_id']}-{row['n']}", 'kind': 'web', 'subject': row.get('title') or s['keywords'],
@@ -753,12 +767,20 @@ def round_picks(store, user, run, outputs, picks, quote):
     need((quote or '').strip(), "The operator's words are required.")
     own = {r['search_id'] for r in rd['elements'].values() if r['search_id']}
     made, failed = [], {}
-    for sid, rows in (picks or {}).items():
+    for sid in (picks or {}):
         need(sid in own, f'Search {sid} is not in this round.')
+    wanted = {}   # design/83 P1: every pick of every search downloaded at once, then recorded search by search in the ticked order
+    for sid, rows in (picks or {}).items():
+        results = {r['n']: r for r in (session.get('searches') or {}).get(sid, {}).get('results') or []}
+        for p in rows or []:
+            if (p or {}).get('n') in results:
+                wanted[(sid, p['n'])] = results[p['n']]
+    fetched = _download_picks(wanted)
+    for sid, rows in (picks or {}).items():
         if not rows:
             continue
         try:
-            out = _pick_into(store, session, user, run, plan, sid, list(rows), quote)
+            out = _pick_into(store, session, user, run, plan, sid, list(rows), quote, fetched)
             made += out['references']
             if out['failed']:
                 failed[sid] = out['failed']

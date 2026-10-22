@@ -1334,6 +1334,10 @@ def cmd_visuals(a):
     if a.what == 'revise':   # design/76 (L32): a change request is a revision, never a yes
         out = write(base + '/revise', {'gap_id': a.gap, 'notes': a.notes or '', 'quote': a.quote})
         emit(out, 0, f"Gap {a.gap} is under revision: change its treatment entry and its plan, propose the next version, then ask for its acceptance afresh; generate nothing for it until then.")
+    if a.what == 'frame' and a.file:   # design/83 P2: several footage frames in one call, in order, stopping at the first refusal (as still --file)
+        _batch(_rows(m, a.file, ('element', 'clip', 'at')), lambda r: (f"{r['element']}@{r['at']}", 'POST', base + '/references',
+               {'element_id': r['element'], 'name': r.get('name') or f"frame-{r['element']}", 'kind': 'frame', 'subject': r.get('subject') or '', 'source_media_id': r['clip'], 'requested_s': float(r['at'])}), 'element',
+               lambda done: f"{len(done)} frames grabbed: {', '.join(done)}; they are candidates for the round (`vw visuals round --file`).")
     if a.what in ('frame', 'supply', 'web'):
         body = {'element_id': a.element, 'name': a.name or f'{a.what}-{a.element}', 'kind': 'frame' if a.what == 'frame' else 'supplied' if a.what == 'supply' else 'web', 'subject': _one_subject(a)}
         if a.what == 'frame':
