@@ -1199,8 +1199,8 @@ def cmd_planning(a):
         emit(out, 0, 'Planning finalized; certificate recorded. Run `vw next`.')
 
 
-VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'frame', 'supply', 'web', 'image', 'approve', 'reject', 'bind', 'packet', 'generator',
-                'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74: no `cap` (L26); `reject` and `feedback` (L7); design/76: `revise`
+VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web', 'image',
+                'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74 L26, L7; design/76; design/73
 
 
 def cmd_visuals(a):
@@ -1261,6 +1261,34 @@ def cmd_visuals(a):
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
     if a.what == 'accept':
         emit(write(base + '/accept', {'gap_ids': a.gaps, 'quote': a.quote}))
+    if a.what == 'elements':   # design/73 R1: where each element is seen in the footage
+        out = call('GET', base + '/elements')
+        (ws / 'work' / 'visuals').mkdir(parents=True, exist_ok=True)
+        (ws / 'work' / 'visuals' / 'elements.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+        lines = []
+        for e in out.get('elements') or []:
+            hits = (out.get('matches') or {}).get(e['id']) or []
+            lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else 'not seen in the footage: the operator picks a picture (`vw visuals search`) or the sheet is generated from words'))
+        emit({'file': 'work/visuals/elements.json', 'elements': len(out.get('elements') or [])}, 0, 'Elements against the footage (work/visuals/elements.json): ' + '; '.join(lines))
+    if a.what == 'search':   # design/73 R3: Google Images for an element the footage lacks, on the operator's yes
+        if not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': "The operator's yes to the web search is required: --quote \"<their words>\" (say what you will search and why first)."}, 2)
+        out = write(base + '/search', {'element_id': a.element, 'keywords': a.keywords or '', 'quote': a.quote})
+        rows = out.get('results') or []
+        listing = '; '.join(f"{r['n']}. {r.get('site') or '?'} {r.get('width')}x{r.get('height')} {r.get('title') or ''}".strip() for r in rows)
+        emit(out, 0, f"Search {out.get('search_id')} for {a.element} ({len(rows)} pictures): {listing}. The operator ticks pictures and adds notes on the visuals page ({visuals_page_url(m['code'])}), or tell me their picks: `vw visuals pick --search {out.get('search_id')} --n 2,5 --note 2=\"…\" --quote \"…\"`.")
+    if a.what == 'pick':   # design/73 R4: the ticked pictures, in order, with notes
+        ns = [int(x) for x in str(a.n or '').replace(' ', '').split(',') if x]
+        if not ns:
+            emit({'action': 'refused', 'message': 'Give the picture numbers in the order picked: --n 2,5'}, 2)
+        notes = {}
+        for item in a.note or []:
+            k, _, v = str(item).partition('=')
+            notes[int(k.strip())] = v.strip().strip('"')
+        out = write(base + '/pick', {'search_id': a.search, 'picks': [{'n': n, 'note': notes.get(n, '')} for n in ns], 'quote': a.quote})
+        emit(out, 0, f"{len(out.get('references') or [])} web references made from search {a.search}; show each (`fetch --ref`) and approve with its hash, then generate the element's sheet from them.")
+    if a.what == 'nothing-fits':   # design/73 R4b
+        emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted; the reason is the next search\'s hint.')
     if a.what == 'revise':   # design/76 (L32): a change request is a revision, never a yes
         out = write(base + '/revise', {'gap_id': a.gap, 'notes': a.notes or '', 'quote': a.quote})
         emit(out, 0, f"Gap {a.gap} is under revision: change its treatment entry and its plan, propose the next version, then ask for its acceptance afresh; generate nothing for it until then.")
@@ -1844,9 +1872,10 @@ def build_parser():
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer'):
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer',
+                 '--keywords', '--search', '--n', '--reason'):   # design/73
         s.add_argument(flag)
-    s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--wait', type=int, default=0)
+    s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])

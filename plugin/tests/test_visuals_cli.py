@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'wait': 0}
+            'subject': None, 'selector': None, 'answer': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -346,7 +346,7 @@ def test_steps_and_command_text_carry_the_new_flow():
     assert 'work/visuals/' in steps[0] and 'intended-visuals.json' in steps[0] and 'never by line offsets' in steps[0]
     assert 'vw visuals treatment' in steps[1] and 'visuals page' in steps[1] and 'Nothing else before this' in steps[1] and 'cost' in steps[1]
     assert 'vw visuals check' in steps[2] and 'propose' in steps[2] and 'accept --gaps all' in steps[2] and 'answer every warning' in steps[2]
-    assert 'images.json' in steps[3] and 'warning' in steps[3] and 'status --wait 300' in steps[3] and 'exactly' in steps[3] and '--kind state' in steps[3]
+    assert 'images.json' in steps[3] and 'their yes' in steps[3] and 'status --wait 300' in steps[3] and 'exactly' in steps[3] and '--kind state' in steps[3]   # design/73: the web step is the search on the operator's yes
     assert 'sequence --shot S --refs' in steps[4] and 'take --shots all' in steps[4] and 'select --job J --notes' in steps[4] and 'still --shot S --ref R' in steps[4] and '--end' in steps[4]
     assert 'record --gaps all' in steps[5]
     joined = ' '.join(steps)
@@ -440,6 +440,33 @@ def test_revise_posts_the_gap_and_the_words_and_the_step_names_it(harness, monke
     code, out, err = run(args(what='revise', gap='G2', notes='AI video instead', quote='Make G2 an AI video.'), capsys)
     assert code == 0 and posted[-1][0].endswith('/visuals/revise') and posted[-1][1] == {'gap_id': 'G2', 'notes': 'AI video instead', 'quote': 'Make G2 an AI video.'} and 'under revision' in err
     assert 'vw visuals revise' in STAGES['visuals']['steps'][2] and 'vw visuals revise' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+
+
+def test_elements_search_pick_and_nothing_fits_post_what_the_server_expects(harness, monkeypatch, capsys):
+    """design/73 R1, R3, R4, R4b on the chat path."""
+    ws, _ = harness
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'elements': [{'id': 'E1', 'name': 'Mason'}], 'matches': {'E1': [{'clip': 'c1', 'seconds': 2.0, 'entity': 'mason', 'score': 3}]}})
+    code, out, err = run(args(what='elements'), capsys)
+    assert code == 0 and json.loads((ws / 'work' / 'visuals' / 'elements.json').read_text(encoding='utf-8'))['matches']['E1'][0]['clip'] == 'c1' and 'E1: seen in c1 at 2.0 s' in err
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'search_id': 's1', 'element_id': 'E1', 'keywords': 'kadapari tool', 'results': [{'n': 1, 'site': 'a.in', 'width': 800, 'height': 600, 'title': 'k', 'page_url': 'https://a.in/p'}]})
+    code, out, err = run(args(what='search', element='E1', keywords='kadapari tool', quote='Yes, search.'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/search') and posted[-1][1] == {'element_id': 'E1', 'keywords': 'kadapari tool', 'quote': 'Yes, search.'} and '1. a.in 800x600' in err and 'visuals page' in err
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'search_id': 's1', 'references': [{'id': 'r2'}, {'id': 'r1'}]})
+    code, out, err = run(args(what='pick', search='s1', n='2,1', note=['2=avoid brand text'], quote='These two.'), capsys)
+    assert code == 0 and posted[-1][1] == {'search_id': 's1', 'picks': [{'n': 2, 'note': 'avoid brand text'}, {'n': 1, 'note': ''}], 'quote': 'These two.'} and '2 web references' in err
+    code, out, err = run(args(what='nothing-fits', search='s1', reason='wrong tool, try the Tamil name'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/nothing-fits') and posted[-1][1] == {'search_id': 's1', 'reason': 'wrong tool, try the Tamil name'}
+
+
+def test_prompt_steps_and_doc_carry_the_sheet_per_element_the_people_rule_and_the_search_route():
+    """design/73 R2, R5, R6."""
+    prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
+    assert len(prompt.split()) <= 3500
+    assert 'one generated reference sheet' in prompt and 'posture, dress, build and features' in prompt and 'vw visuals search' in prompt
+    assert 'vw visuals elements' in steps[3] and 'two to six words' in steps[3] and 'pick --search' in steps[3] and 'never a parent for an edit' in steps[3]
+    md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert 'vw visuals search' in md and 'pick' in md and 'design/73' in STAGES['visuals']['prompt_origin']
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

@@ -57,6 +57,19 @@
 .vz .chk{margin:2px 6px 6px;padding-left:14px;font-size:11.5px;color:var(--muted);white-space:normal}
 .vz .chk li{margin:0}
 .vz .pic.off{opacity:.55;border-style:dashed}
+.vz .el{border:1px solid var(--line);border-radius:12px;margin:14px 0;background:var(--card);overflow:hidden}
+.vz .el .hd{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--z);cursor:pointer}
+.vz .el .bd{padding:10px 14px}
+.vz .el.closed .bd{display:none}
+.vz .pic .tick{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--bg);border:1px solid var(--line);font-size:12px;display:flex;align-items:center;justify-content:center}
+.vz .pic .tick.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.vz .pic{position:relative}
+.vz .pic textarea.note{width:calc(100% - 12px);margin:0 6px 6px;min-height:34px;font-size:11.5px;border-radius:6px;padding:4px 6px}
+.vz .chips button{font-size:11px;padding:1px 7px;border-radius:999px;margin:0 4px 4px 0}
+.vz .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.vz .lightbox img{max-width:90vw;max-height:70vh;background:#000}
+.vz .lightbox .bar{display:flex;gap:10px;align-items:center;color:#eee;font-size:13px;flex-wrap:wrap;justify-content:center}
+.vz .lightbox textarea{min-width:280px;min-height:36px;font-size:13px;border-radius:8px;padding:6px 8px}
 </style>
 <div class="vz" id="app" data-code="{{ run.code }}">
   <div class="top">
@@ -64,6 +77,7 @@
     <div class="line" id="line">Loading…</div>
   </div>
   <div id="treat"></div>
+  <div id="elements"></div>
   <div id="gaps"></div>
   <div class="spacer"></div>
   <div class="foot"><div class="in"><div class="status" id="fmsg"></div><div class="row" id="action"></div></div></div>
@@ -121,6 +135,7 @@ function draw(){
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
   $('line').innerHTML=line+meter;
   drawTreatment(dr||t,!!t&&!dr,dr&&t?t.at:null);   // design/74 L28: a draft after a record is the current treatment, badged
+  drawElements();
   drawGaps();
   drawFoot();
   const busy=d.references.some(r=>r.status==='generating')||d.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status))));
@@ -144,6 +159,69 @@ function refCard(r,sel,chosen){
   const reject=(r.status==='candidate'||r.status==='approved')&&stage()==='visuals'?'<div class="btns" style="margin:0 6px 6px"><button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'';   // design/74 L7
   return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
     '<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+esc(r.name)+' · '+esc(r.kind)+(r.status==='approved'?' · ✓':'')+(rejected?' · rejected':'')+'</div>'+checklist(r.checklist)+(rejected?'':(sel?sel:'')+reject)+'</div>';
+}
+// ---------- design/73: the reference assets per element (the picks page, R4b) ----------
+const picks={};      // search id -> [{n, note}] in the order ticked
+const openEl={};     // element id -> true when the operator opened a collapsed element
+const CHIPS=['avoid brand text','posture only, not the person','colour only'];
+function latestSearch(eid){return (data.searches||[]).filter(s=>s.element_id===eid).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0]||null;}
+function pickOf(sid,n){return (picks[sid]||[]).find(p=>p.n===n);}
+function resultCard(s,r){
+  const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0;
+  return '<div class="pic" data-lb="'+esc(s.search_id)+':'+r.n+'"><span class="tick '+(p?'on':'')+'" data-tick="'+esc(s.search_id)+':'+r.n+'" title="tick to use; the first tick is Image 1">'+(p?idx:'')+'</span><img src="'+esc(r.thumbnail||r.image_url)+'" alt="" loading="lazy">'+
+    '<div class="cap" title="'+esc(r.title||'')+'">'+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+'</div>'+
+    (p?'<textarea class="note" data-note="'+esc(s.search_id)+':'+r.n+'" placeholder="keep: the handle shape; avoid: brand text">'+esc(p.note||'')+'</textarea><div class="chips" style="margin:0 6px 6px">'+CHIPS.map(c=>'<button data-chip="'+esc(s.search_id)+':'+r.n+'" data-text="'+esc(c)+'">'+esc(c)+'</button>').join('')+'</div>':'')+'</div>';
+}
+function drawElements(){
+  const d=data, can=stage()==='visuals'&&!!d.treatment&&!!d.plan_digest;
+  const els=(d.elements||[]).filter(e=>e.kind!=='graphic');
+  if(!can||!els.length){$('elements').innerHTML='';return;}
+  const refs=d.references||[];
+  $('elements').innerHTML='<h2 style="font-size:16px;margin:18px 0 4px">Reference assets, element by element</h2><div class="ds">Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Nothing is paid from a click.</div>'+els.map(e=>{
+    const mine=refs.filter(r=>r.element_id===e.id), sheets=mine.filter(r=>r.kind==='sheet'), done=sheets.some(r=>r.status==='approved');
+    const closed=done&&!openEl[e.id];
+    const hits=(d.element_matches||{})[e.id]||[];
+    const s=latestSearch(e.id);
+    let body='<div class="ds">'+esc(e.requirements||'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div>';
+    body+='<div class="ds" style="margin-top:6px"><b>From your footage:</b> '+(hits.length?hits.slice(0,6).map(h=>esc(h.clip)+' at '+esc(h.seconds)+' s ('+esc(h.entity)+')').join(' · ')+' — the assistant grabs the frames':'not seen in the footage')+'</div>';
+    const frames=mine.filter(r=>r.kind==='frame'||r.kind==='supplied'||r.kind==='web');
+    if(frames.length){body+='<div class="strip">'+frames.map(r=>refCard({...r,name:(r.kind==='frame'?'from your footage':r.kind==='web'?'from the web':'your file')+(r.note?' · '+r.note:'')},(can&&r.status==='candidate')?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'')).join('')+'</div>';}
+    body+='<div class="btns"><span class="ds">Search Google Images:</span><input id="kw-'+esc(e.id)+'" placeholder="two to six words: the thing and its place or trade" value="'+esc(s?s.keywords:'')+'">'+words('w-s-'+e.id,'your yes to the search')+'<button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button></div>';
+    if(s){
+      body+='<div class="ds" style="margin-top:6px">'+esc(s.results.length)+' pictures for “'+esc(s.keywords)+'”'+(s.picked&&s.picked.length?' · used: '+esc(s.picked.join(', ')):'')+(s.nothing_fits?' · <span class="err">nothing fit: '+esc(s.nothing_fits.reason)+'</span>':'')+'. Click a picture to see it large; tick the ones to use, in order; add a note under each.</div>';
+      body+='<div class="strip">'+s.results.map(r=>resultCard(s,r)).join('')+'</div>';
+      body+='<div class="btns">'+words('w-p-'+e.id,'your words for the ticked pictures')+'<button class="go" data-a="pick" data-el="'+esc(e.id)+'" data-search="'+esc(s.search_id)+'">Use the ticked pictures</button><button data-a="nothing-fits" data-el="'+esc(e.id)+'" data-search="'+esc(s.search_id)+'">Nothing fits</button></div>';
+    }
+    if(sheets.length){body+='<div class="ds" style="margin-top:8px"><b>The reference sheet</b> (generated from the pictures above):</div><div class="strip">'+sheets.map(r=>refCard(r,(can&&r.status==='candidate')?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'')).join('')+'</div>';}
+    else{body+='<div class="ds" style="margin-top:8px">No sheet yet: the assistant generates it once the pictures are approved.</div>';}
+    return '<div class="el '+(closed?'closed':'')+'" data-el="'+esc(e.id)+'"><div class="hd" data-open="'+esc(e.id)+'"><b>'+esc(e.id)+'</b><span class="ds">'+esc(e.name)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span>'+(done?'<span class="badge ok">sheet approved</span>':'')+(closed?'<span class="ds">(click to open)</span>':'')+'</div><div class="bd">'+body+'</div></div>';
+  }).join('');
+  const root=$('elements');
+  root.querySelectorAll('[data-open]').forEach(h=>h.addEventListener('click',()=>{openEl[h.dataset.open]=!openEl[h.dataset.open];drawElements();}));
+  root.querySelectorAll('[data-tick]').forEach(t=>t.addEventListener('click',ev=>{ev.stopPropagation();const [sid,n]=t.dataset.tick.split(':');toggleTick(sid,Number(n));drawElements();}));
+  root.querySelectorAll('[data-note]').forEach(n=>n.addEventListener('input',()=>{const [sid,k]=n.dataset.note.split(':');const p=pickOf(sid,Number(k));if(p)p.note=n.value;}));
+  root.querySelectorAll('[data-chip]').forEach(c=>c.addEventListener('click',()=>{const [sid,k]=c.dataset.chip.split(':');const p=pickOf(sid,Number(k));if(p){p.note=(p.note?p.note+'; ':'')+c.dataset.text;drawElements();}}));
+  root.querySelectorAll('.pic[data-lb] img').forEach(i=>i.addEventListener('click',()=>{const [sid,n]=i.parentElement.dataset.lb.split(':');lightbox(sid,Number(n));}));
+  root.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+}
+function toggleTick(sid,n){picks[sid]=picks[sid]||[];const i=picks[sid].findIndex(p=>p.n===n);if(i>=0)picks[sid].splice(i,1);else picks[sid].push({n:n,note:''});}
+function lightbox(sid,n){   // compare the ten without closing: arrows, the tick and the note inside
+  const s=(data.searches||[]).find(x=>x.search_id===sid);if(!s)return;
+  const r=s.results.find(x=>x.n===n);if(!r)return;
+  const old=document.getElementById('lb');if(old)old.remove();
+  const p=pickOf(sid,n), idx=p?(picks[sid].indexOf(p)+1):0;
+  const box=document.createElement('div');box.className='lightbox';box.id='lb';
+  box.innerHTML='<img src="'+esc(r.image_url)+'" alt=""><div class="bar"><button id="lb-prev">‹</button><span>'+n+' of '+s.results.length+' · '+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+(r.page_url?' · <a href="'+esc(r.page_url)+'" target="_blank" rel="noopener" style="color:#9cf">source</a>':'')+'</span><button id="lb-next">›</button></div>'+
+    '<div class="bar"><button id="lb-tick">'+(p?'Ticked as Image '+idx+' (untick)':'Tick this picture')+'</button><textarea id="lb-note" placeholder="your note for this picture">'+esc(p?p.note:'')+'</textarea><button id="lb-close">Close</button></div>';
+  document.body.appendChild(box);
+  const go=k=>{const next=s.results.find(x=>x.n===n+k);if(next){lightbox(sid,next.n);}};
+  $('lb-prev').addEventListener('click',()=>go(-1));$('lb-next').addEventListener('click',()=>go(1));
+  $('lb-close').addEventListener('click',()=>{box.remove();drawElements();});
+  $('lb-tick').addEventListener('click',()=>{toggleTick(sid,n);lightbox(sid,n);});
+  $('lb-note').addEventListener('input',ev=>{const q=pickOf(sid,n);if(q)q.note=ev.target.value;});
+  box.addEventListener('click',ev=>{if(ev.target===box){box.remove();drawElements();}});
+  const key=ev=>{if(ev.key==='ArrowLeft')go(-1);else if(ev.key==='ArrowRight')go(1);else if(ev.key==='Escape'){box.remove();drawElements();}document.removeEventListener('keydown',key);};
+  document.addEventListener('keydown',key);
 }
 function drawGaps(){
   const refs={};(data.references||[]).forEach(r=>refs[r.id]=r);
@@ -203,6 +281,9 @@ async function click(b){
   if(a==='reject-take'){const q=val('w-take-'+b.dataset.job);if(!q){needWords('w-take-'+b.dataset.job,'Say why in the words box, then Reject.');return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}
   if(a==='accept'){const q=val('w-acc-'+b.dataset.gap);if(!q){needWords('w-acc-'+b.dataset.gap,'Your words for this gap are required: type them in the box beside the button first.');return;}await send({action:'accept',gap_ids:[b.dataset.gap],quote:q},'Gap accepted.');return;}
   if(a==='revise'){const q=val('w-acc-'+b.dataset.gap);if(!q){needWords('w-acc-'+b.dataset.gap,'Say what to change in the box beside the button, then Revise.');return;}await send({action:'revise',gap_id:b.dataset.gap,notes:q,quote:q},'Gap sent back for revision.');return;}
+  if(a==='search'){const kw=val('kw-'+b.dataset.el), q=val('w-s-'+b.dataset.el);if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} if(!q){needWords('w-s-'+b.dataset.el,'Your yes to the web search is required.');return;}await send({action:'search',element_id:b.dataset.el,keywords:kw,quote:q},'Search done: tick the pictures to use.');return;}   // design/73
+  if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[], q=val('w-p-'+b.dataset.el);if(!list.length){msg('Tick at least one picture first.',true);return;} if(!q){needWords('w-p-'+b.dataset.el);return;}await send({action:'pick',search_id:sid,picks:list,quote:q},list.length+' picture(s) kept as references; the assistant generates the sheet from them.');delete picks[sid];return;}
+  if(a==='nothing-fits'){const q=val('w-p-'+b.dataset.el);if(!q){needWords('w-p-'+b.dataset.el,'Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
 }
 function prompt_words(label){
   // the viewer shows no dialogs: the words are typed in the foot box, then the button pressed again
