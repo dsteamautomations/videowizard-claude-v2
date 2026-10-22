@@ -1178,7 +1178,8 @@ def visuals_elements(run_id: UUID, user=User, conn=DB):
     session = visuals_stage.session_of(store, run, outputs)
     plan = visuals_stage.guarded(lambda: visuals_stage.current_plan(store, session))
     package = visuals_stage.load_json(store, visuals_stage.key(run, 'package.json'))
-    return Response({'elements': plan['elements'], 'matches': visuals_stage.element_matches(plan, package.get('world_evidence'))})
+    return Response({'elements': [e for e in plan['elements'] if e['kind'] != 'graphic'], 'graphics': [e['id'] for e in plan['elements'] if e['kind'] == 'graphic'],   # L43: graphics are drawn, never searched
+                     'matches': visuals_stage.element_matches(plan, package.get('world_evidence'))})
 
 
 @app.post('/api/runs/{run_id}/visuals/search')

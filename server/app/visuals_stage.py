@@ -534,7 +534,7 @@ KIND_MATCH = {'person': {'person'}, 'animal': {'person', 'other'}, 'object': {'t
 
 
 def _words(text):
-    return {w for w in re.findall(r'[a-z]{4,}', str(text or '').lower()) if w not in STOP}
+    return {(w[:-1] if w.endswith('s') and len(w) > 4 else w) for w in re.findall(r'[a-z]{4,}', str(text or '').lower()) if w not in STOP}   # bricks and brick are one word
 
 
 def element_matches(plan, world):
@@ -550,6 +550,8 @@ def element_matches(plan, world):
                 shared = want & (_words(ent.get('name')) | _words(ent.get('description')))
                 if not shared:
                     continue
+                if len(shared) < 2:   # L44: one shared word is noise ("brick" matched a kiln to every wall); two name the thing
+                    continue
                 score = len(shared) + (1 if ent.get('kind') in KIND_MATCH.get(e['kind'], set()) else 0)
                 if score > (hits.get(clip['clip']) or {}).get('score', 0):
                     hits[clip['clip']] = {'clip': clip['clip'], 'seconds': ent.get('first_seen_s'), 'entity': ent.get('name'), 'description': ent.get('description'), 'score': score}
@@ -557,8 +559,39 @@ def element_matches(plan, world):
     return out
 
 
+IMAGE_LIMIT = 16 * 1024 * 1024
+BROWSER = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36', 'Accept': 'image/avif,image/webp,image/*,*/*;q=0.8'}
+
+
+def _public_https(url):
+    """The same guard as the provider transfer: HTTPS, a hostname, and a public address, so a picked picture never points the server at itself."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlsplit
+    t = urlsplit(url)
+    if t.scheme != 'https' or not t.hostname or t.username or t.password:
+        raise ValueError(f'not an HTTPS picture address: {url[:80]}')
+    addresses = socket.getaddrinfo(t.hostname, 443, type=socket.SOCK_STREAM)
+    if not addresses or any(not ipaddress.ip_address(a[4][0]).is_global for a in addresses):
+        raise ValueError(f'{t.hostname} does not resolve to a public address')
+
+
 def fetch_image(url):
-    return transfer(url, limit=16 * 1024 * 1024)
+    """design/73 R4: download a picked picture as a browser would: redirects followed (each hop checked), a browser identity, 20 s, 16 MiB."""
+    import httpx
+    target = url
+    for _ in range(5):
+        _public_https(target)
+        r = httpx.get(target, headers=BROWSER, timeout=20, follow_redirects=False)
+        if r.status_code in (301, 302, 303, 307, 308) and r.headers.get('location'):
+            target = httpx.URL(target).join(r.headers['location']).__str__()
+            continue
+        if r.status_code != 200:
+            raise ValueError(f'HTTP {r.status_code} from {httpx.URL(target).host}')
+        if len(r.content) > IMAGE_LIMIT:
+            raise ValueError('the picture is over 16 MiB')
+        return r.content
+    raise ValueError('too many redirects')
 
 
 def search(store, user, run, outputs, element_id, keywords, quote):
@@ -590,17 +623,33 @@ def pick(store, user, run, outputs, search_id, picks, quote):
         n = (p or {}).get('n')
         need(n in rows, f'Picture {n} is not in the search ({len(rows)} pictures).')
         chosen.append((rows[n], str((p or {}).get('note') or '').strip()))
-    made = []
+    made, failed = [], []
+    element_kind = next(e['kind'] for e in current_plan(store, session)['elements'] if e['id'] == s['element_id'])
     for row, note in chosen:
-        png, size = image_bytes(guarded(lambda: fetch_image(row['image_url'])))
+        png, size, used = None, None, None
+        errors = []
+        for candidate, label in ((row['image_url'], 'picture'), (row.get('thumbnail'), 'thumbnail')):   # the full picture, else Google's thumbnail (smaller, always served)
+            if not candidate:
+                continue
+            try:
+                png, size = image_bytes(fetch_image(candidate))
+                used = label
+                break
+            except (ValueError, OSError) as exc:
+                errors.append(f'{label}: {exc}')
+        if png is None:
+            failed.append({'n': row['n'], 'site': row.get('site'), 'why': '; '.join(errors)})
+            continue
         rid = digest({'run': str(run['id']), 'search': search_id, 'n': row['n']})[:32]
-        meta = {'element_id': s['element_id'], 'element_kind': next(e['kind'] for e in current_plan(store, session)['elements'] if e['id'] == s['element_id']),
-                'name': f"web-{s['element_id']}-{row['n']}", 'kind': 'web', 'subject': row.get('title') or s['keywords'], 'width': size[0], 'height': size[1],
-                'source': {'url': row['image_url'], 'page_url': row.get('page_url'), 'selection_reply': quote, 'note': note, 'search_id': search_id, 'n': row['n']}}
+        meta = {'element_id': s['element_id'], 'element_kind': element_kind, 'name': f"web-{s['element_id']}-{row['n']}", 'kind': 'web', 'subject': row.get('title') or s['keywords'],
+                'width': size[0], 'height': size[1],
+                'source': {'url': row['image_url'], 'page_url': row.get('page_url'), 'selection_reply': quote, 'note': note, 'search_id': search_id, 'n': row['n'], 'from_thumbnail': used == 'thumbnail'}}
         made.append(_store_reference(store, run, session, rid, png, meta))
-    s['picked'] = [row['n'] for row, _ in chosen]
+    need(made, 'None of the ticked pictures could be downloaded: ' + '; '.join(f"{f['n']} ({f['site']}): {f['why']}" for f in failed) + '. Pick others, or save one yourself and `vw visuals supply` it.')
+    s['picked'] = [r['source']['n'] for r in made]
+    s['failed'] = failed
     save_session(store, run, session)
-    return {'search_id': search_id, 'references': made}
+    return {'search_id': search_id, 'references': made, 'failed': failed}
 
 
 def nothing_fits(store, user, run, outputs, search_id, reason):

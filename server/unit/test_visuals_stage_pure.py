@@ -741,14 +741,25 @@ def test_a_revision_drops_the_acceptance_keeps_the_words_and_clears_when_the_gap
 
 def test_element_matches_list_where_each_element_is_seen_in_the_footage_best_first():
     plan = {'elements': [{'id': 'E_MASON', 'name': 'Village mason', 'kind': 'person', 'identity': 'representative', 'requirements': 'a mason laying bricks on the wall'},
-                         {'id': 'E_LORRY', 'name': 'Brick lorry', 'kind': 'object', 'identity': 'representative', 'requirements': 'a lorry'},
+                         {'id': 'E_LORRY', 'name': 'Tipper lorry', 'kind': 'object', 'identity': 'representative', 'requirements': 'a tipper lorry'},
                          {'id': 'G_SECTION', 'name': 'Wall section drawing', 'kind': 'graphic', 'identity': 'exact', 'requirements': 'a drawing'}]}
     world = [{'clip': 'c2', 'entities': [{'name': 'bricks', 'kind': 'material', 'first_seen_s': 0.0, 'description': 'stacked bricks'}, {'name': 'mason', 'kind': 'person', 'first_seen_s': 5.5, 'description': 'the mason'}]},
              {'clip': 'c1', 'entities': [{'name': 'mason', 'kind': 'person', 'first_seen_s': 2.0, 'description': 'a mason laying bricks on a wall'}]},
              {'clip': 'c3', 'world_markers': ['old evidence shape']}]
     m = VS.element_matches(plan, world)
-    assert [x['clip'] for x in m['E_MASON']] == ['c1', 'c2'] and m['E_MASON'][0]['seconds'] == 2.0 and m['E_MASON'][0]['entity'] == 'mason' and m['E_MASON'][0]['score'] > m['E_MASON'][1]['score']
+    assert [x['clip'] for x in m['E_MASON']] == ['c1'] and m['E_MASON'][0]['seconds'] == 2.0 and m['E_MASON'][0]['entity'] == 'mason' and m['E_MASON'][0]['score'] == 5   # c2's lone "mason" is too little
     assert m['E_LORRY'] == [] and 'G_SECTION' not in m   # a graphic is drawn, never matched
+    kiln = {'elements': [{'id': 'P_KILN', 'name': 'Brick kiln', 'kind': 'place', 'identity': 'representative', 'requirements': 'a kiln with rows of green bricks drying'}]}
+    walls = [{'clip': 'c1', 'entities': [{'name': 'rat_trap_bond_brick_wall', 'kind': 'structure', 'first_seen_s': 0.0, 'description': 'a brick wall'}]},
+             {'clip': 'c2', 'entities': [{'name': 'brick kiln', 'kind': 'structure', 'first_seen_s': 0.0, 'description': 'a kiln with green bricks'}]}]
+    assert [h['clip'] for h in VS.element_matches(kiln, walls)['P_KILN']] == ['c2']   # L44: one shared word ("brick") no longer ties a kiln to every wall
+
+
+def test_fetch_image_refuses_a_non_https_or_private_address():
+    with pytest.raises(ValueError, match='not an HTTPS picture address'):
+        VS.fetch_image('http://img.example/1.jpg')
+    with pytest.raises(ValueError, match='public address'):
+        VS.fetch_image('https://127.0.0.1/1.jpg')
 
 
 def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_reference_with_its_note(monkeypatch):
@@ -780,9 +791,25 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
     out = VS.pick(store, USER, RUN, [], sid, [{'n': 2, 'note': 'avoid brand text'}, {'n': 1}], 'These two, the side from the second.')
     refs = saved(store)['references']
     first, second = out['references']
-    assert first['kind'] == 'web' and first['element_id'] == 'E1' and first['status'] == 'candidate' and first['source'] == {'url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'selection_reply': 'These two, the side from the second.', 'note': 'avoid brand text', 'search_id': sid, 'n': 2}
+    assert first['kind'] == 'web' and first['element_id'] == 'E1' and first['status'] == 'candidate' and first['source'] == {'url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'selection_reply': 'These two, the side from the second.', 'note': 'avoid brand text', 'search_id': sid, 'n': 2, 'from_thumbnail': False}
     assert second['source']['note'] == '' and second['source']['url'] == 'https://img.example/1.jpg' and first['width'] == 64 and refs[first['id']]['sha256']
     assert saved(store)['searches'][sid]['picked'] == [2, 1]
+    # a picture the host refuses falls back to Google's thumbnail; one with neither is reported and the others still land (the pick that failed live on 22 Oct)
+    def flaky(url):
+        if url == 'https://img.example/2.jpg':
+            raise ValueError('HTTP 403 from img.example')
+        if url == 'https://t/1.jpg' or url == 'https://img.example/1.jpg':
+            raise ValueError('HTTP 404')
+        return png.getvalue()
+    monkeypatch.setattr(VS, 'fetch_image', flaky)
+    store2 = store_with(sess, doc)
+    VS.search(store2, USER, RUN, [], 'E1', 'kadapari tool', 'yes')
+    sid2 = next(iter(saved(store2)['searches']))
+    out = VS.pick(store2, USER, RUN, [], sid2, [{'n': 2}, {'n': 1}], 'both')
+    assert len(out['references']) == 1 and out['references'][0]['source']['from_thumbnail'] is True and out['failed'] == [{'n': 1, 'site': 'site.example', 'why': 'picture: HTTP 404; thumbnail: HTTP 404'}]
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: (_ for _ in ()).throw(ValueError('HTTP 403')))
+    with pytest.raises(Problem, match='None of the ticked pictures could be downloaded'):
+        g(lambda: VS.pick(store, USER, RUN, [], sid, [{'n': 1}], 'this'))
     out = VS.nothing_fits(store, USER, RUN, [], sid, 'all show the wrong tool, try the Tamil name')
     assert saved(store)['searches'][sid]['nothing_fits']['reason'] == 'all show the wrong tool, try the Tamil name'
     st = VS.status(FakeConn([]), store, RUN, [])
@@ -808,8 +835,16 @@ def test_apify_request_and_answer_shapes():
     rows = apify.parse(items, 10)
     assert [r['n'] for r in rows] == [1, 2] and rows[0] == {'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img/1.jpg', 'page_url': 'https://site/p', 'site': 'site', 'width': 800, 'height': 600, 'title': 'k'}
     assert rows[1]['image_url'] == 'https://img/3.jpg'   # an http picture is dropped, the numbering stays dense
-    with pytest.raises(Problem, match='APIFY_TOKEN'):
-        apify.search_images('x y', 10)
+    from types import SimpleNamespace
+    from pydantic import SecretStr
+    import pytest as _pt
+    mp = _pt.MonkeyPatch()
+    mp.setattr(apify, 'settings', lambda: SimpleNamespace(APIFY_TOKEN=SecretStr('')))   # never the real token from server/.env: no paid call from a test
+    try:
+        with pytest.raises(Problem, match='APIFY_TOKEN'):
+            apify.search_images('x y', 10)
+    finally:
+        mp.undo()
 
 
 def test_record_gap_keeps_the_takes_start_and_end_ids():

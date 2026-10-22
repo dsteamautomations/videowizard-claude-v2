@@ -211,7 +211,7 @@ function lightbox(sid,n){   // compare the ten without closing: arrows, the tick
   const old=document.getElementById('lb');if(old)old.remove();
   const p=pickOf(sid,n), idx=p?(picks[sid].indexOf(p)+1):0;
   const box=document.createElement('div');box.className='lightbox';box.id='lb';
-  box.innerHTML='<img src="'+esc(r.image_url)+'" alt=""><div class="bar"><button id="lb-prev">‹</button><span>'+n+' of '+s.results.length+' · '+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+(r.page_url?' · <a href="'+esc(r.page_url)+'" target="_blank" rel="noopener" style="color:#9cf">source</a>':'')+'</span><button id="lb-next">›</button></div>'+
+  box.innerHTML='<img src="'+esc(r.image_url)+'" alt="" onerror="this.onerror=null;this.src=\''+esc(r.thumbnail||'')+'\'"><div class="bar"><button id="lb-prev">‹</button><span>'+n+' of '+s.results.length+' · '+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+(r.page_url?' · <a href="'+esc(r.page_url)+'" target="_blank" rel="noopener" style="color:#9cf">source</a>':'')+'</span><button id="lb-next">›</button></div>'+
     '<div class="bar"><button id="lb-tick">'+(p?'Ticked as Image '+idx+' (untick)':'Tick this picture')+'</button><textarea id="lb-note" placeholder="your note for this picture">'+esc(p?p.note:'')+'</textarea><button id="lb-close">Close</button></div>';
   document.body.appendChild(box);
   const go=k=>{const next=s.results.find(x=>x.n===n+k);if(next){lightbox(sid,next.n);}};
