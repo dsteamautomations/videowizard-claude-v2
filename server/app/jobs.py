@@ -75,7 +75,7 @@ def claim(conn, provider):
     """Claim one queued job (or a storage_pending one whose retry delay passed) with a lease."""
     return conn.execute('''update vw2_jobs set status = case when status='queued' then 'running' else status end,
                            lease_until = now() + interval '20 minutes', attempt = attempt + 1, updated_at = now()
-                           where id = (select id from vw2_jobs where provider=%s and (status='queued' or (status='storage_pending' and (lease_until is null or lease_until < now())))
+                           where id = (select id from vw2_jobs where provider=%s and ((status='queued' and (lease_until is null or lease_until < now())) or (status='storage_pending' and (lease_until is null or lease_until < now())))
                                        order by created_at limit 1 for update skip locked)
                            returning *''', (provider,)).fetchone()
 

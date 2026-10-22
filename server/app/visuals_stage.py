@@ -27,7 +27,7 @@ from .video_providers import motion_text, transfer
 from .visual_contract import STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan
 
 STAGE = 'visuals'
-IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare', 'edit': 'gpt-image-2.5-sunburst'}
+IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
 REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state')   # design/65: a state of a graphic sequence, generated from the previous state
 TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video')
 DISSOLVE_S = 0.5   # between the states of a graphic sequence
@@ -195,17 +195,29 @@ def propose(conn, store, user, run, outputs, document):
 
 def prices():
     s = settings()
-    return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S)}
+    return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S), 'usd_inr': float(s.VISUALS_USD_INR)}
+
+
+IMAGE_USD_PER_M = {'input': 8.0, 'output': 30.0}   # design/82 U2: OpenAI's GPT Image 2.5 rates, every input token at the image rate (the text share is a fraction of a rupee)
+
+
+def image_cost_inr(cost, pr):
+    """A finished image job's cost from its tokens; the flat image price when the job has none."""
+    c = cost or {}
+    if not c.get('output_tokens'):
+        return pr['image_inr']
+    return ((c.get('input_tokens') or 0) * IMAGE_USD_PER_M['input'] + c['output_tokens'] * IMAGE_USD_PER_M['output']) / 1e6 * pr.get('usd_inr', 88.0)
 
 
 def visuals_spend(conn, run):
     """What this film's visuals have cost so far, at the configured prices: every image job and every take job that ran or is running."""
-    rows = conn.execute("select provider, status, request from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'video')", (run['id'],)).fetchall()
+    rows = conn.execute("select provider, status, request, cost from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'video')", (run['id'],)).fetchall()
     live = [r for r in rows if r['status'] not in ('failed', 'rejected', 'cancelled')]
     pr = prices()
     images = sum(1 for r in live if r['provider'] == 'openai')
+    image_inr = sum(image_cost_inr(r.get('cost'), pr) for r in live if r['provider'] == 'openai')
     seconds = float(sum(float((r.get('request') or {}).get('duration_seconds') or 0) for r in live if r['provider'] == 'video'))
-    return {'images': images, 'take_seconds': seconds, 'spent_inr': round(images * pr['image_inr'] + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
+    return {'images': images, 'take_seconds': seconds, 'spent_inr': round(image_inr + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
 
 
 def cap_of(session):
@@ -1354,6 +1366,7 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
         else:
             name = f"{s['id']}-asset{'.mp4' if asset['kind'] == 'movie' else '.png'}"
             files.append({'name': name, 'key': asset['key'], 'sha256': asset['sha256'], 'bytes': asset['bytes'], 'location': 'storage', 'receipt': True})
+            jobs.record_file(conn, run['id'], STAGE, asset['key'], name, asset['sha256'], asset.get('bytes') or 0, 'video/mp4' if asset['kind'] == 'movie' else 'image/png')   # design/82 U1: a still from a reference was never an upload
             shots.append({'shot_id': s['id'], 'source': 'asset', 'kind': asset['kind'], 'placement': asset['placement'], **({'media': {'kind': 'still'}} if asset['kind'] == 'still' else {})})
         binding = session['bindings'].get(s['id']) or {}
         for eid, rows in binding.get('references', {}).items():

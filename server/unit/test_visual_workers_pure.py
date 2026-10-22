@@ -35,6 +35,25 @@ def test_a_user_error_says_the_prompt_or_the_pictures_are_the_problem(tmp_path, 
     assert error == 'OpenAI refused the request: the prompt or the pictures are the problem; do not resend unchanged. (bad input)'
 
 
+def test_a_429_or_5xx_goes_back_to_the_queue_with_a_growing_delay_and_the_fourth_attempt_is_rejected(tmp_path, monkeypatch):
+    """design/82 U3: retry with backoff, as OpenAI's guide says."""
+    monkeypatch.setattr(VW, 'SPOOL', tmp_path)
+    monkeypatch.setattr(VW, 'storage', lambda: None)
+    monkeypatch.setattr(VW, 'openai_client', lambda path, **kw: Resp(429, {'error': {'type': 'rate_limit'}}))
+    for attempt, delay in ((1, 1), (2, 2), (3, 4)):
+        status, result, error, cost, retry = VW.process_image({**JOB, 'attempt': attempt})
+        assert (status, retry) == ('queued', delay) and result['http_status'] == 429 and f'attempt {attempt + 1} of 4' in error
+    status, result, error, cost, retry = VW.process_image({**JOB, 'attempt': 4})
+    assert status == 'rejected' and retry is None and 'no further retry' in error
+
+
+def test_a_take_keeps_the_providers_usage_beside_the_seconds():
+    """design/82 U5."""
+    snap = {'provider': 'google', 'model': 'gemini-omni-1.1-flash', 'duration_seconds': 6}
+    assert VW.take_cost(snap, {'usage': {'video_tokens': 34752}}) == {'provider': 'google', 'model': 'gemini-omni-1.1-flash', 'seconds': 6, 'usage': {'video_tokens': 34752}}
+    assert VW.take_cost(snap, {'steps': []}) == {'provider': 'google', 'model': 'gemini-omni-1.1-flash', 'seconds': 6}
+
+
 def test_another_400_keeps_todays_message(tmp_path, monkeypatch):
     status, result, error, cost, retry = refused(tmp_path, monkeypatch, {'error': {'type': 'invalid_request_error', 'message': 'size is wrong'}})
     assert status == 'failed' and result['failure'] == 'provider' and error == 'OpenAI rejected the request (HTTP 400).'

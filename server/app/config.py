@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.29.4'
+    SERVER_VERSION: str = '0.30.0'
     PLUGIN_MIN_VERSION: str = '0.1.0'
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
@@ -36,8 +36,9 @@ class Settings(BaseSettings):
     FFPROBE_EXECUTABLE: str = 'ffprobe'
     # design/65 B7: the visuals cap. No job records a money amount (tokens, characters, seconds only), so the ledger is computed from these prices in INR.
     # The defaults are the builder's estimates (21 Oct 2026); SK sets the real figures in server/.env (VW2_VISUALS_PRICE_IMAGE_INR, VW2_VISUALS_PRICE_VIDEO_INR_PER_S).
-    VISUALS_PRICE_IMAGE_INR: float = 20.0          # one GPT Image 2.5 picture at 1536×864, high quality
-    VISUALS_PRICE_VIDEO_INR_PER_S: float = 8.0     # one second of a generated take, any generator
+    VISUALS_PRICE_IMAGE_INR: float = 4.0           # a picture whose job has no tokens; with tokens the ledger uses OpenAI's rates (design/82 U2; measured ₹3 to ₹5 on 22 Oct)
+    VISUALS_PRICE_VIDEO_INR_PER_S: float = 8.9     # one second of a generated take: Omni 1.1 Flash, 5,792 tokens a second at $17.50/M
+    VISUALS_USD_INR: float = 88.0
     VISUALS_CAP_INR: float = 5000.0                # per film, unless the operator raises it with their words (SK, 21 Oct 2026, design/66)
     FFMPEG_EXECUTABLE: str = 'ffmpeg'
 

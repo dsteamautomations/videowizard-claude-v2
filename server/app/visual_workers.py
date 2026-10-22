@@ -63,8 +63,11 @@ def process_image(job):
                 r = _openai('/images/edits', data={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality']}, files=files)
             if r.status_code == 404 or (r.status_code == 400 and 'model' in r.text.lower() and 'not' in r.text.lower()):
                 return 'rejected', {'failure': 'MODEL_UNAVAILABLE', 'http_status': r.status_code}, f"OpenAI reports the model {req['model']} is unavailable on this account.", None, None
-            if r.status_code >= 500 or r.status_code == 429:
-                return 'rejected', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code}; no automatic retry.', None, None
+            if r.status_code >= 500 or r.status_code == 429:   # design/82 U3: back to the queue 1, 2 then 4 minutes later; the fourth attempt is rejected
+                attempt = job.get('attempt') or 1
+                if attempt < 4:
+                    return 'queued', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code}; attempt {attempt + 1} of 4 in {2 ** (attempt - 1)} min.', None, 2 ** (attempt - 1)
+                return 'rejected', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code} on {attempt} attempts; no further retry.', None, None
             if r.status_code >= 400:
                 result, error = refusal(r)
                 return 'failed', result, error, None, None
@@ -168,6 +171,12 @@ def probe(path):
             'issues': ([] if v.get('color_transfer') and v.get('color_primaries') else ['colour untagged']) + (['rotation metadata'] if rotation else [])}
 
 
+def take_cost(snapshot, result):
+    """design/82 U5: the seconds, and the provider's usage when its result carries one."""
+    return {'provider': snapshot['provider'], 'model': snapshot['model'], 'seconds': snapshot['duration_seconds'],
+            **({'usage': result['usage']} if isinstance((result or {}).get('usage'), dict) else {})}
+
+
 def process_take(job):
     """Submit once, poll, retain. Returns (status, result, error, cost, retry_in) where status 'submitted' means poll again later."""
     req, jid = job['request'], str(job['id'])
@@ -214,7 +223,7 @@ def process_take(job):
         placement = snapshot['placement']
         evidence.update(requested_duration_seconds=snapshot['duration_seconds'], placement=placement, creative_approval=False,
                         **timing_evidence(evidence['duration_seconds'], placement['duration_seconds']))
-        cost = {'provider': snapshot['provider'], 'model': snapshot['model'], 'seconds': snapshot['duration_seconds']}
+        cost = take_cost(snapshot, result)
         return 'ready', {'provider_id': remote, 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence}, None, cost, None
     except (Problem, ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as exc:
         rejected = isinstance(exc, Problem) and exc.code == 'VIDEO_REJECTED'

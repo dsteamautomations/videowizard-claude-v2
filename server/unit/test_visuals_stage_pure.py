@@ -40,10 +40,11 @@ class FakeConn:
     """vw2_jobs rows for the spend ledger; inserts are recorded."""
 
     def __init__(self, jobs=()):
-        self.jobs, self.inserted = list(jobs), []
+        self.jobs, self.inserted, self.sql = list(jobs), [], []
 
     def execute(self, sql, params=()):
         conn = self
+        self.sql.append((sql, params))
 
         class R:
             def fetchall(_):
@@ -152,6 +153,32 @@ def test_spend_counts_images_and_take_seconds_at_the_configured_prices(monkeypat
     conn = FakeConn([job('openai'), job('openai', 'running'), job('openai', 'failed'), job('video', duration_seconds=10), job('video', 'rejected', duration_seconds=10), job('gemini')])
     sp = VS.visuals_spend(conn, RUN)
     assert sp == {'images': 2, 'take_seconds': 10.0, 'spent_inr': 120.0, 'prices': {'image_inr': 20.0, 'video_inr_per_s': 8.0}}
+
+
+def test_spend_prices_an_image_from_its_tokens_and_a_job_without_tokens_at_the_flat_price(monkeypatch):
+    """design/82 U2: the ledger from tokens at OpenAI's rates, in rupees."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9, 'usd_inr': 88.0})
+    with_tokens = {**job('openai'), 'id': 'j-tok', 'cost': {'input_tokens': 2000, 'output_tokens': 1078}}
+    conn = FakeConn([with_tokens, job('openai'), job('video', duration_seconds=6)])
+    sp = VS.visuals_spend(conn, RUN)
+    assert sp['images'] == 2 and sp['take_seconds'] == 6.0
+    assert sp['spent_inr'] == round((2000 * 8 + 1078 * 30) / 1e6 * 88 + 4.0 + 6 * 8.9, 2) == 61.65
+    assert VS.IMAGE_MODELS == {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4
+
+
+def test_record_gap_registers_a_still_asset_file_so_the_record_finds_it(monkeypatch):
+    """design/82 U1 (L48): a still set from a reference was never an upload; the record checks every storage file against the uploads table."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
+    sess = session(current='pd1', versions=[{'plan_digest': 'pd1', 'file': {'key': 'run-1/visuals/plan-v1.json'}}], accepted={'G1': {'quote': 'yes', 'by': 'u1'}},
+                   assets={'IM1': {'kind': 'still', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'abc', 'bytes': 5, 'reference_id': 'R1', 'placement': {'start_frame': 0, 'end_frame': 500}}})
+    store = store_with(sess, plan=doc)
+    recorded = []
+    monkeypatch.setattr(VS.core, 'output', lambda conn, user, run, body: (recorded.append(body) or {'id': 'o1'}))
+    conn = FakeConn()
+    out = VS.record_gap(conn, store, USER, RUN, [], 'G1', 'record it')
+    assert out == {'gap_id': 'G1', 'output': 'o1', 'shots': 1}
+    assert any('insert into vw2_files' in s and p[0] == 'run-1/visuals/references/R1.png' and p[3] == 'IM1-asset.png' for s, p in conn.sql)
+    assert recorded[0]['files'][0]['name'] == 'IM1-asset.png' and recorded[0]['summary']['shots'][0]['source'] == 'asset'
 
 
 def test_the_cap_refuses_a_paid_call_that_would_pass_it_and_a_session_cap_is_kept(monkeypatch):
