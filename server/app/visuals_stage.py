@@ -20,6 +20,7 @@ from pathlib import Path
 from psycopg.types.json import Jsonb
 
 from . import apify, core, jobs, library, video_generators
+from . import footage as FM   # design/88
 from .config import settings
 from .errors import Problem
 from .planning.digest import digest
@@ -105,7 +106,7 @@ def prepare(conn, store, user, run, outputs):
     brief = next((o for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     script = next((o for o in outputs if o['stage'] == 'script' and o['unit'] is None), None)
     intake = next((o for o in outputs if o['stage'] == 'intake' and o['unit'] is None), None)
-    world = []
+    world, logs = [], {}
     for o in outputs:
         if o['stage'] == 'analysis' and not o['summary'].get('excluded'):
             ref = next((f for f in o['files'] if f['name'].endswith('.evidence.json')), None)
@@ -113,15 +114,24 @@ def prepare(conn, store, user, run, outputs):
                 doc = load_json(store, ref['key'])
                 if doc.get('contract_version') == 'clip-log-v1':
                     log = doc['log']
+                    logs[o['unit']] = log   # design/88: movement and contrast per clip
                     world.append({'clip': o['unit'], 'entities': log.get('entities'), 'unavailable_or_uncertain': log.get('unavailable_or_uncertain'),
                                   'landmarks': sorted({l for s in log.get('sub_clips') or [] for l in (s.get('continuity_and_story') or {}).get('world_landmarks_and_props', [])})})
                 else:
                     ev = doc['evidence']
                     world.append({'clip': o['unit'], 'world_markers': ev.get('world_markers'), 'evidence_limits': ev.get('evidence_limits')})
+    media = next((o for o in outputs if o['stage'] == 'media' and o['unit'] is None), None)   # design/88: measured, not asked
+    session['footage_measured'] = FM.measure(((media or {}).get('summary') or {}).get('clips') or [], logs)
+    if 'footage_correction' not in session:   # F6: the answer recorded at the media step before design/88 stands as the correction
+        old = footage_character(outputs)
+        if old:
+            session['footage_correction'] = {**{k: old.get(k) for k in ('camera', 'support', 'look', 'quote')}, 'from': 'the media step'}
+    session['footage'] = FM.apply_correction(session['footage_measured'], session.get('footage_correction'))
+    session['gap_neighbours'] = gap_neighbours(store, outputs)   # F3: the clip before and after each gap
     save_session(store, run, session)
     package = {'source': session['source'], 'prompt': procedure.get('prompt') or '', 'steps': procedure.get('steps') or [],
                'brief': ({**brief['summary'], 'effective_rules': core.effective_rules(conn, run, outputs)} if brief else None),   # design/37 2.7
-               'footage_character': footage_character(outputs),   # design/77 L42: the theme's texture comes from this, never from an assumption
+               'footage_character': footage_view(session, outputs),   # design/88: measured per clip; the operator's correction wins; the texture comes from this
                'script_digest': script['summary'].get('content_digest') if script else None,
                'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
@@ -129,7 +139,53 @@ def prepare(conn, store, user, run, outputs):
     session['intended_visuals'] = package['intended_visuals']   # design/86 K7: the packet reads them from the session
     save_session(store, run, session)
     pk = save_json(store, key(run, 'package.json'), package)
-    return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'next': 'write out/visual-plan.json then `vw visuals check`'}
+    return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'footage': (footage_view(session, outputs) or {}).get('line'),
+            'next': 'write out/visual-plan.json then `vw visuals check`'}
+
+
+def gap_neighbours(store, outputs):
+    """design/88 F3: for each gap of the master, the clip just before it and just after it on the timeline (a sub-clip id is clip:sub)."""
+    master = next((o for o in outputs if o['stage'] == 'master' and o['unit'] is None), None)
+    ref = next((f for f in (master or {}).get('files') or [] if f['name'].endswith('.json')), None)
+    if not ref:
+        return {}
+    try:
+        events = load_json(store, ref['key']).get('events') or []
+    except Problem:
+        return {}
+    def clip(e):
+        return str(e['sub_clip_id']).rsplit(':', 1)[0] if e and e.get('sub_clip_id') else None
+    out = {}
+    for i, ev in enumerate(events):
+        if ev.get('kind') == 'gap':
+            out[ev.get('gap_id')] = {'before': clip(next((e for e in reversed(events[:i]) if e.get('kind') == 'event'), None)),
+                                     'after': clip(next((e for e in events[i + 1:] if e.get('kind') == 'event'), None))}
+    return out
+
+
+def footage_view(session, outputs=()):
+    """design/88 F4: the line the operator is told, the summary and the per-clip map; a session prepared before design/88 shows the recorded answer."""
+    f = session.get('footage')
+    if not f:
+        old = footage_character(outputs) if outputs else None
+        return {'line': None, 'summary': old, 'per_clip': {}} if old else None
+    return {'line': FM.line(f['summary']), 'summary': f['summary'], 'per_clip': f['per_clip'], 'measured': (session.get('footage_measured') or {}).get('summary')}
+
+
+def correct_footage(store, user, run, outputs, values, quote):
+    """design/88 F4: the operator corrects the measured footage with their words; it wins for the rest of the run, on both front ends."""
+    session = session_of(store, run, outputs)
+    need((quote or '').strip(), "The operator's words are required: say what the footage really is.")
+    vals = {k: ((values or {}).get(k) or None) for k in ('camera', 'support', 'look')}
+    need(any(vals.values()), 'Give the camera, the support or the look to correct.')
+    for k, allowed in (('camera', FM.CAMERAS), ('support', FM.SUPPORTS), ('look', FM.LOOKS)):
+        need(vals[k] is None or vals[k] in allowed, f"{k} is one of {', '.join(allowed)}.")
+    prev = session.get('footage_correction') or {}
+    session['footage_correction'] = {**{k: prev.get(k) for k in ('camera', 'support', 'look') if prev.get(k)}, **{k: v for k, v in vals.items() if v},
+                                     'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    session['footage'] = FM.apply_correction(session.get('footage_measured') or {'per_clip': {}, 'summary': {}}, session['footage_correction'])
+    save_session(store, run, session)
+    return footage_view(session)
 
 
 def footage_character(outputs):
@@ -360,6 +416,7 @@ def page_view(conn, store, run, outputs, code):
         gaps.append(entry)
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
+            'footage': footage_view(session, outputs),   # design/88 F4: told, not asked
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
             'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
@@ -1124,7 +1181,11 @@ def packet_context(session, plan, gap, shot):
                   'next': {'shot_id': next_shot['id'], 'starts': [{'element_id': s['element_id'], **(s.get('start') or {})} for s in next_shot.get('subjects') or []]} if next_shot else None}
     rejected = [{'reference_id': r['id'], 'element_id': r.get('element_id'), 'name': r.get('name'), 'kind': r.get('kind'), 'notes': (r.get('rejection') or {}).get('notes') or ''}
                 for r in session['references'].values() if r.get('status') == 'rejected' and r.get('element_id') in (shot.get('element_ids') or [])]
-    return {'gap_id': gap['gap_id'], 'gap_words': words, 'treatment_picture': treatment, 'intended_visuals': intended, 'neighbours': neighbours, 'earlier_rejections': rejected}
+    nb = (session.get('gap_neighbours') or {}).get(gap['gap_id']) or {}   # design/88 F3: the character of the clips on either side of the gap
+    rows = (session.get('footage') or {}).get('per_clip') or {}
+    footage_nb = {side: ({'clip_id': cid, **rows[cid]} if cid in rows else {'clip_id': cid}) if cid else None for side, cid in (('before', nb.get('before')), ('after', nb.get('after')))}
+    return {'gap_id': gap['gap_id'], 'gap_words': words, 'treatment_picture': treatment, 'intended_visuals': intended, 'neighbours': neighbours, 'earlier_rejections': rejected,
+            'footage_neighbours': footage_nb}
 
 
 def exact_patterns(plan, shot, refs):
@@ -1177,9 +1238,9 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are. '
                                    'The take is one unbroken shot: write the motion so nothing enters the frame that the start or the end does not show. Write the continuity line (`--continuity`): what stays unchanged between the two frames, and for a person five traits from the sheet.',   # design/84 V3
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
-              'footage_character': footage_character(outputs),   # design/77 L42
+              'footage_character': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/77 L42; design/88: measured, the correction winning
               'provider': {k: generator[k] for k in ('provider', 'model')}}
-    identity = digest(prompt)   # the composition only: the library block below carries the card and the rules, which must not make a prepared take stale
+    identity = digest({k: v for k, v in prompt.items() if k not in ('context', 'footage_character')})   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     steps_ = library.steps_of(shot)   # design/68 L3: the library beside the three instructions; the texts are in work/visuals/library/, written at prepare
     prompt['library'] = {'version': library_version_of(session),
@@ -1408,6 +1469,7 @@ def status(conn, store, run, outputs):
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
+            'footage': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/88
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 

@@ -1,6 +1,6 @@
 # design/88 — The footage character is measured, not asked
 
-Status: proposed by Revathi, 23 Oct 2026, for SK's approval. Nothing built. It replaces the question added by design/77 L42 and keeps that change's purpose: the theme's texture must come from the real footage, never from an assumption.
+Status: proposed by Revathi, 23 Oct 2026; approved by SK the same day ("go ahead and build"); built as server 0.33.0, plugin 0.31.0. It replaces the question added by design/77 L42 and keeps that change's purpose: the theme's texture must come from the real footage, never from an assumption.
 
 ## Why
 
@@ -43,3 +43,12 @@ The visuals prompt's rule that the theme's texture comes from the footage charac
 - Maker and model tags differ by camera brand and are sometimes stripped by editing or transfer apps. The codec, bit depth and bit rate rule is the fallback, and the operator's correction is the backstop.
 - "Graded" cannot be reliably told apart from "natural" by measurement. It is reported only from a tag or a correction.
 - How well Gemini's `movement_type` matches the real support on short clips. VW-6's clips are the first check against what SK knows of them.
+
+## Builder's notes (23 Oct, at the build)
+
+- **The file name is a second clue**, before the codec rule: VW-7's clips carried no maker tags (`C0…` from a Sony, `DJI_…` from a drone) and the old rule called 1080p h264 at 22 Mbit/s phone footage. The order is now maker and model tags, then the file name, then codec, bit depth and bit rate. A Sony XAVC brand or a DJI or GoPro encoder tag names the maker when the make tag is missing.
+- **`drone` is a camera value** (the correction offers it too): a DJI clip is neither a phone nor a mirrorless, and with no analysis yet its support is gimbal.
+- **The film summary** takes the value two thirds of the clips share, else `mixed` with the counts; unknowns do not vote.
+- **The neighbours** come from the master plan's events: the clip just before and just after each gap (a sub-clip id is `clip:sub`). A run without a master (procedure version 1) has none.
+- **A fix to design/86 in the same release.** The packet's digest, which `select-take` compares, included design/86's `context` (earlier rejections among it): rejecting any picture of an element would have made its prepared takes unselectable. The digest now leaves out `context` and `footage_character`; they inform the writer and never make a prepared take stale. Takes prepared under 0.32.0 (none known) would need preparing again.
+- The code is `server/app/footage.py` (pure, `test_footage_pure.py`), `visuals_stage.prepare`, `gap_neighbours`, `footage_view`, `correct_footage`, the route `POST /visuals/footage`, the page's act `footage`, `vw visuals footage`.

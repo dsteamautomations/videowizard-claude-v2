@@ -25,6 +25,25 @@ def file_sha256(path):
     return h.hexdigest()
 
 
+MAKE_KEYS = ('com.apple.quicktime.make', 'com.android.manufacturer', 'make', 'manufacturer')
+MODEL_KEYS = ('com.apple.quicktime.model', 'com.android.model', 'model')
+
+
+def maker_of(data):
+    """design/88 F1: the maker and model from the format and stream tags, when the camera wrote them; a Sony XAVC brand or a DJI or GoPro encoder names the maker."""
+    import re
+    tags = {}
+    for part in [data.get('format') or {}] + list(data.get('streams') or []):
+        for k, v in (part.get('tags') or {}).items():
+            tags.setdefault(str(k).lower(), str(v).strip())
+    make = next((tags[k] for k in MAKE_KEYS if tags.get(k)), None)
+    model = next((tags[k] for k in MODEL_KEYS if tags.get(k)), None)
+    if not make:
+        brand, enc = tags.get('major_brand', '').upper(), tags.get('encoder', '') + ' ' + tags.get('handler_name', '')
+        make = 'Sony' if brand.startswith('XAVC') else 'DJI' if re.search(r'\bDJI\b', enc, re.I) else 'GoPro' if re.search(r'gopro', enc, re.I) else None
+    return make, model
+
+
 def probe(path):
     try:
         out = subprocess.run(['ffprobe', '-v', 'error', '-show_format', '-show_streams', '-of', 'json', str(path)], capture_output=True, check=True, timeout=60).stdout
@@ -49,7 +68,7 @@ def probe(path):
             'is_variable_frame_rate': bool(v.get('r_frame_rate') and v.get('avg_frame_rate') and v['r_frame_rate'] != v['avg_frame_rate']),
             'color_transfer': v.get('color_transfer'), 'has_audio': bool(audio),
             'audio_channels': audio[0].get('channels') if audio else 0, 'audio_sample_rate_hz': int(audio[0]['sample_rate']) if audio and audio[0].get('sample_rate') else None,
-            'creation_time': (data['format'].get('tags') or {}).get('creation_time')}
+            'creation_time': (data['format'].get('tags') or {}).get('creation_time'), **dict(zip(('make', 'model'), maker_of(data)))}
 
 
 def to_cfr(src, dst, fps):
@@ -131,7 +150,7 @@ def media_prepare(ws, procedure, prior):
     return {'prompt': procedure.get('prompt') or '', 'clips': shown, 'listing': '\n'.join(lines), 'detail_file': 'work/media-clips.json',
             'duplicates_skipped': skipped, 'prepared_at': stamp(ws, 'media'), 'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
             'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'footage_guess': guess,
-            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then ask the camera sound and the footage ({guess}), then record. The upload reports when it is done.'}
+            'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then ask the camera sound, then record. Do not ask what the footage is: it is measured at visuals. The upload reports when it is done.'}
 
 
 def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, footage=None):
@@ -162,7 +181,8 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
     with ThreadPoolExecutor(max_workers=3) as pool:   # design/19 C2: three uploads at a time; each keeps its own retry
         refs = list(pool.map(up, clips))
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
-    summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr')} for c in clips],
+    summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr',
+                                                'codec', 'pix_fmt', 'bit_rate', 'make', 'model')} for c in clips],   # design/88 F1: what the server measures the footage from
                'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1),
                'camera_audio': camera_audio, 'camera_audio_note': note or '', 'footage_character': footage or None, **stamps(ws, 'media')}   # design/41 5.1; design/77 L42
     return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}

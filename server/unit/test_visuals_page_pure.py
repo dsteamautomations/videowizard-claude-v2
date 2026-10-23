@@ -64,5 +64,11 @@ def test_the_takes_step_says_whose_turn_it_is_and_marks_the_checked_lines():
         assert needle in HTML, needle
 
 
+def test_the_treatment_step_tells_the_measured_footage_and_offers_the_correction():
+    """design/88 F4."""
+    for needle in ('function footageBlock', 'Correct this', 'data-a="footage"', 'id="ftwords"', "action:'footage'", 'wireFootage'):
+        assert needle in HTML, needle
+
+
 def test_an_empty_words_box_is_marked_and_a_rejected_picture_has_its_badge_and_button():
     assert 'need-words' in HTML and "data-a=\"reject\"" in HTML and 'rejected' in HTML

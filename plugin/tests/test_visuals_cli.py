@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
+            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'camera': None, 'support': None, 'look': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -570,6 +570,17 @@ def test_image_posts_two_variants_and_the_end_answer_written_with_the_start(harn
     monkeypatch.setattr(vw, 'request', lambda method, path, **kw: (bodies.append(kw['json']) or ({'reference_id': 'R-a', 'reference_ids': ['R-a', 'R-b'], 'job_id': 'j', 'model': 'm', 'op': 'edit'}, 0)))
     code, out, err = run(args(what='image', file='out/images.json'), capsys)
     assert code == 0 and bodies[0]['variants'] == 2 and bodies[0]['end_prompt'].startswith('Image 1')
+
+
+def test_footage_tells_the_line_and_posts_a_correction_with_the_words(harness, monkeypatch, capsys):
+    """design/88 F4."""
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'footage': {'line': 'Your footage: mirrorless camera, handheld, natural look (measured from the clips)'}})
+    code, out, err = run(args(what='footage'), capsys)
+    assert code == 0 and err.strip().startswith('Your footage: mirrorless camera')
+    posted = {}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'line': 'Your footage: cinema camera, handheld, natural look (your correction)'}))
+    code, out, err = run(args(what='footage', camera='cinema', quote='professional camera'), capsys)
+    assert code == 0 and posted['path'].endswith('/visuals/footage') and posted['camera'] == 'cinema' and posted['support'] is None and posted['quote'] == 'professional camera' and 'your correction' in err
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

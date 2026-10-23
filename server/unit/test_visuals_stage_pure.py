@@ -329,7 +329,7 @@ def test_the_packet_carries_the_start_end_and_motion_instructions():
     assert lib['job_forms']['start']['images'] == [{'id': 'R1', 'tag': 'approved', 'element_id': 'E1', 'keep': 'a cut wall'}]
     from app.planning.digest import digest
     full = VS.packet(store_with(sess, doc), RUN, [], 'VS1')
-    assert full['preparation_digest'] == digest({k: v for k, v in full['preparation'].items() if k != 'library'})   # the card and the rules never make a take stale
+    assert full['preparation_digest'] == digest({k: v for k, v in full['preparation'].items() if k not in ('library', 'context', 'footage_character')})   # design/88: context and footage never make a take stale   # the card and the rules never make a take stale
     with_card = VS.packet(store_with(sess, doc), RUN, [], 'VS1', card={'industry': 'education'}, rules=['no PPE claims'])
     assert with_card['preparation_digest'] == full['preparation_digest'] and with_card['preparation']['library']['job_forms']['take']['industry'] == 'education'
 
@@ -407,6 +407,46 @@ def test_the_feedback_file_opens_with_the_rounds_summary():
     sess = session(feedback=[{'app': 'videowizard', 'kind': 'image', 'verdict': 'pass', 'id': 'x', 'checklist': []}])
     out = VS.feedback(store_with(sess), RUN, [])
     assert out['yaml'].startswith('# image: approved 1, rejected 0, rounds per approved 1.0\n- app: videowizard') and out['summary']['image']['approved'] == 1
+
+
+def test_prepare_measures_the_footage_tells_it_and_the_neighbours_reach_the_packet(monkeypatch):
+    """design/88 F2, F3, F4, F6."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    store = store_with(sess, doc)
+    store.files['run-1/master-v1.json'] = json.dumps({'events': [{'kind': 'event', 'sub_clip_id': 'c1:SUB_01'}, {'kind': 'gap', 'gap_id': 'G2'}, {'kind': 'event', 'sub_clip_id': 'c2:SUB_03'}]}).encode()
+    store.files['run-1/ev-c1.json'] = json.dumps({'contract_version': 'clip-log-v1', 'log': {'contrast_profile': 'Standard_Normal', 'sub_clips': [{'camera_and_optics': {'movement_type': 'Handheld'}}]}}).encode()
+    store.files['run-1/ev-c2.json'] = json.dumps({'contract_version': 'clip-log-v1', 'log': {'contrast_profile': 'Standard_Normal', 'sub_clips': [{'camera_and_optics': {'movement_type': 'Gimbal'}}]}}).encode()
+    media = {'stage': 'media', 'unit': None, 'files': [], 'summary': {'clips': [{'id': 'c1', 'name': 'C0012.MP4', 'color_transfer': 'bt709'}, {'id': 'c2', 'name': 'DJI_0071.MP4', 'color_transfer': 'bt709'}]}}
+    outputs = [media, {'stage': 'master', 'unit': None, 'files': [{'name': 'master-v1.json', 'key': 'run-1/master-v1.json'}], 'summary': {}},
+               {'stage': 'analysis', 'unit': 'c1', 'summary': {}, 'files': [{'name': 'c1.evidence.json', 'key': 'run-1/ev-c1.json'}]},
+               {'stage': 'analysis', 'unit': 'c2', 'summary': {}, 'files': [{'name': 'c2.evidence.json', 'key': 'run-1/ev-c2.json'}]}]
+    monkeypatch.setattr(VS, 'gaps_source', lambda store, outputs: sess['source'])
+    monkeypatch.setattr(VS.core, 'stage_table', lambda v: [{'name': 'visuals', 'prompt': '', 'steps': []}])
+    monkeypatch.setattr(VS.core, 'effective_rules', lambda conn, run, outputs: [])
+    out = VS.prepare(FakeConn([]), store, USER, {**RUN, 'procedure_version': '2'}, outputs)
+    assert out['footage'] == 'Your footage: mixed cameras (1 mirrorless, 1 drone), mixed support (1 handheld, 1 gimbal), natural look (measured from the clips)'
+    s = saved(store)
+    assert s['gap_neighbours'] == {'G2': {'before': 'c1', 'after': 'c2'}} and s['footage']['per_clip']['c2']['camera'] == 'drone'
+    nb = VS.packet(store, RUN, outputs, 'VS1')['preparation']['context']['footage_neighbours']
+    assert nb['before']['clip_id'] == 'c1' and nb['before']['camera'] == 'mirrorless' and nb['before']['support'] == 'handheld' and nb['after']['support'] == 'gimbal'
+    # the correction wins on both front ends (the API and the page call the same function); it never makes a prepared take stale
+    before = VS.packet(store, RUN, outputs, 'VS1')['preparation_digest']
+    with pytest.raises(Problem, match="operator's words"):
+        g(lambda: VS.correct_footage(store, USER, RUN, outputs, {'camera': 'cinema'}, ''))
+    with pytest.raises(Problem, match='camera is one of'):
+        g(lambda: VS.correct_footage(store, USER, RUN, outputs, {'camera': 'film'}, 'yes'))
+    view = VS.correct_footage(store, USER, RUN, outputs, {'camera': 'cinema', 'support': 'handheld'}, 'professional camera, handheld, natural')
+    assert view['line'] == 'Your footage: cinema camera, handheld, natural look (your correction)' and view['measured']['camera'] == 'mixed'
+    assert VS.packet(store, RUN, outputs, 'VS1')['preparation_digest'] == before and VS.status(FakeConn([]), store, RUN, outputs)['footage']['line'] == view['line']
+    # F6: an answer recorded at the media step before design/88 stands as the correction at the next prepare
+    old = {**media, 'summary': {**media['summary'], 'footage_character': {'camera': 'mirrorless', 'support': 'handheld', 'look': 'natural', 'quote': 'Sony, handheld'}}}
+    s2 = saved(store); s2.pop('footage_correction')
+    store2 = store_with(s2, doc); store2.files.update({k: v for k, v in store.files.items() if k not in store2.files})
+    out = VS.prepare(FakeConn([]), store2, USER, {**RUN, 'procedure_version': '2'}, [old] + outputs[1:])
+    assert out['footage'] == 'Your footage: mirrorless camera, handheld, natural look (your correction)' and saved(store2)['footage_correction']['from'] == 'the media step'
 
 
 def test_a_packet_before_bind_is_a_refusal_with_the_message_not_a_crash():
@@ -802,8 +842,8 @@ def test_the_packet_carries_the_recorded_footage_character_or_none():
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     sess = video_session(doc)
     media = {'stage': 'media', 'unit': None, 'summary': {'clips': [], 'footage_character': {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'cinema camera'}}}
-    assert VS.packet(store_with(sess, doc), RUN, [media], 'VS1')['preparation']['footage_character'] == media['summary']['footage_character']
-    assert VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['footage_character'] is None
+    assert VS.packet(store_with(sess, doc), RUN, [media], 'VS1')['preparation']['footage_character'] == {'line': None, 'summary': media['summary']['footage_character']}   # a session from before design/88
+    assert VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['footage_character'] == {'line': None, 'summary': None}
     assert VS.footage_character([{'stage': 'media', 'unit': None, 'summary': {'clips': []}}]) is None
 
 

@@ -180,7 +180,15 @@ function frame(){
   $('line').innerHTML=line+meter;
 }
 // ---------- treatment ----------
-function intendedBlock(){const iv=data.intended_visuals||[];if(!iv.length)return '';return '<h3>The script\'s intended visuals</h3><div class="card">'+iv.map(e=>'<div class="ds"><b>'+esc(e.heading||'(no heading)')+'</b>'+(e.narration_starts?' · “'+esc(e.narration_starts)+'…”':'')+'</div><ul class="intended">'+e.lines.map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>').join('')+'</div>';}
+function footageBlock(){   // design/88 F4: the footage is measured and told; the operator may correct it with their words
+  const f=data.footage;if(!f||!f.line)return '';
+  const opt=(name,vals)=>'<select id="ft-'+name+'"><option value="">'+name+': as measured</option>'+vals.map(v=>'<option value="'+v+'">'+v+'</option>').join('')+'</select>';
+  return '<div class="card"><span class="nm" style="font-size:14px">'+esc(f.line)+'</span> <button class="chip" id="ft-open">Correct this</button>'+
+    '<div id="ft-form" hidden style="margin-top:8px"><div class="btns">'+opt('camera',['cinema','mirrorless','phone','drone','mixed'])+opt('support',['handheld','tripod','gimbal','mixed'])+opt('look',['natural','graded','log'])+'</div>'+
+    '<textarea id="ftwords" class="words" style="width:100%;margin-top:6px" placeholder="your words: what the footage really is"></textarea><div class="btns"><button class="go" data-a="footage">Save the correction</button></div></div></div>';}
+function wireFootage(){const o=$('ft-open');if(!o)return;o.addEventListener('click',()=>{$('ft-form').hidden=!$('ft-form').hidden;});
+  $('s-treatment').querySelectorAll('button[data-a="footage"]').forEach(b=>b.addEventListener('click',()=>click(b)));}
+function intendedBlock(){const iv=data.intended_visuals||[];if(!iv.length)return footageBlock();return footageBlock()+'<h3>The script\'s intended visuals</h3><div class="card">'+iv.map(e=>'<div class="ds"><b>'+esc(e.heading||'(no heading)')+'</b>'+(e.narration_starts?' · “'+esc(e.narration_starts)+'…”':'')+'</div><ul class="intended">'+e.lines.map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>').join('')+'</div>';}
 function renderTreatment(){
   const d=data, t=d.treatment, dr=d.treatment_draft, tr=dr||t, recorded=!!t&&!dr, replaces=dr&&t?t.at:null;
   if(!tr){$('s-treatment').innerHTML=intendedBlock()+'<div class="empty">The treatment, gap by gap, appears here once the assistant drafts it.</div>';return;}
@@ -471,6 +479,9 @@ async function click(b){
   if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} if(!q){need('Your yes to the web search goes in the box at the foot.');return;}await send({action:'search',element_id:b.dataset.el,keywords:kw,quote:q},'Search done: tick the pictures to use.');return;}
   if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[];if(!list.length){msg('Tick at least one picture first.',true);return;} if(!q){need();return;}const j=await send({action:'pick',search_id:sid,picks:list,quote:q},list.length+' picture(s) kept as references; the assistant generates the sheet from them.');if(j){delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
+  if(a==='footage'){const w=(($('ftwords')||{}).value||'').trim();const v=k=>(($('ft-'+k)||{}).value||'')||null;   // design/88 F4: the words sit with the button
+    if(!v('camera')&&!v('support')&&!v('look')){msg('Choose what to correct first.',true);return;} if(!w){needWords('ftwords','Say in your words what the footage really is.');return;}
+    await send({action:'footage',camera:v('camera'),support:v('support'),look:v('look'),quote:w},'Footage corrected: your words win for the rest of the run.');return;}
   if(a==='record'){if(!q){need();return;}await send({action:'record',gap_ids:readyGaps().map(g=>g.gap_id),quote:q},'Gaps recorded.');return;}
   if(a==='round-done'){const rd=roundOpen();if(!rd)return;if(!q){need('Your words for the whole pass are required: they approve the frames and say yes to the searches.');return;}
     const verdicts={};Object.keys(rd.elements).forEach(eid=>{const v=document.querySelector('input[name="v-'+eid+'"]:checked');const kw=document.querySelector('input.kw[data-el="'+eid+'"]');verdicts[eid]={verdict:v?v.value:'search',keywords:kw?kw.value.trim():''};});
@@ -487,7 +498,7 @@ function render(){
   frame();
   STEPS.forEach(([k])=>$('s-'+k).hidden=(k!==step));
   if(!data||data.state!=='prepared'){STEPS.forEach(([k])=>$('s-'+k).innerHTML='<div class="empty">Nothing to show yet.</div>');footer();if(stage()==='visuals')schedule(60000);return;}
-  if(step==='treatment')renderTreatment();if(step==='plan')renderPlan();if(step==='references')renderReferences();if(step==='pictures')renderPictures();if(step==='takes')renderTakes();if(step==='record')renderRecord();
+  if(step==='treatment'){renderTreatment();wireFootage();}if(step==='plan')renderPlan();if(step==='references')renderReferences();if(step==='pictures')renderPictures();if(step==='takes')renderTakes();if(step==='record')renderRecord();
   footer();
   const busy=data.references.some(r=>r.status==='generating')||data.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status))));
   if(stage()==='visuals')schedule(busy?15000:60000);   // design/74 L29

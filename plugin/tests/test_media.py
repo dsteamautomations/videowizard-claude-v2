@@ -72,7 +72,7 @@ def test_prepare_guesses_the_footage_character_from_the_probe_and_record_stores_
     from stages_av import footage_guess
     clip(ws / 'in' / 'a.mp4')
     out = media_prepare(ws, PROC, prior)
-    assert out['footage_guess'].startswith('looks like phone footage') and 'footage' in out['message']   # 64x64 test clips at a few kbit/s
+    assert out['footage_guess'].startswith('looks like phone footage') and 'Do not ask what the footage is' in out['message']   # design/88: measured at visuals
     assert footage_guess([{'width': 3840, 'height': 2160, 'bit_rate': 120_000_000, 'pix_fmt': 'yuv422p10le', 'codec': 'prores'}]).startswith('looks professional')
     assert 'prores' in footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'prores'}])
     assert footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'h264'}]).startswith('looks like phone footage')
@@ -81,8 +81,20 @@ def test_prepare_guesses_the_footage_character_from_the_probe_and_record_stores_
     assert res['summary']['footage_character'] == {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'}
     res = media_record(ws, PROC, prior, fake_upload(calls), camera_audio='allowed', note='ok')
     assert res['summary']['footage_character'] is None
+    assert {'codec', 'pix_fmt', 'bit_rate', 'make', 'model'} <= set(res['summary']['clips'][0])   # design/88 F1: what the server measures from
     steps = ' '.join(PROC['steps'])
-    assert '--camera' in steps and '--support' in steps and '--look' in steps and 'footage_guess' in steps
+    assert '--camera cinema' not in steps and '--look' not in steps and 'Do not ask what the footage is' in steps   # design/88 F5: the old flags still work, the steps no longer ask
+
+
+def test_the_maker_and_model_come_from_the_tags_when_the_camera_wrote_them():
+    """design/88 F1."""
+    from stages_av import maker_of
+    iphone = {'format': {'tags': {'com.apple.quicktime.make': 'Apple', 'com.apple.quicktime.model': 'iPhone 15 Pro'}}, 'streams': []}
+    sony = {'format': {'tags': {'major_brand': 'XAVC', 'compatible_brands': 'XAVCmp42iso2'}}, 'streams': [{'tags': {'handler_name': 'Video Media Handler'}}]}
+    dji = {'format': {'tags': {'encoder': 'DJI OsmoPocket3'}}, 'streams': []}
+    tagged = {'format': {'tags': {'Make': 'Canon', 'Model': 'EOS R6'}}, 'streams': []}
+    assert maker_of(iphone) == ('Apple', 'iPhone 15 Pro') and maker_of(sony) == ('Sony', None) and maker_of(dji) == ('DJI', None) and maker_of(tagged) == ('Canon', 'EOS R6')
+    assert maker_of({'format': {'tags': {'major_brand': 'isom'}}, 'streams': [{}]}) == (None, None)
 
 
 def test_prepare_dedupes_first_name_wins_and_converts_vfr(ws):

@@ -1138,6 +1138,18 @@ def visuals_image(run_id: UUID, body: ImageGenerate, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.generate_image(conn, storage(), user, run, outputs, body_dict(body)), 201)
 
 
+class FootageCorrect(Write):   # design/88 F4
+    camera: Literal['cinema', 'mirrorless', 'phone', 'drone', 'mixed'] | None = None
+    support: Literal['handheld', 'tripod', 'gimbal', 'mixed'] | None = None
+    look: Literal['natural', 'graded', 'log'] | None = None
+    quote: str = Field(min_length=1)
+
+
+@app.post('/api/runs/{run_id}/visuals/footage')
+def visuals_footage(run_id: UUID, body: FootageCorrect, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.correct_footage(storage(), user, run, outputs, {'camera': body.camera, 'support': body.support, 'look': body.look}, body.quote))
+
+
 @app.post('/api/runs/{run_id}/visuals/references/{ref_id}/approve')
 def visuals_approve(run_id: UUID, ref_id: str, body: ReferenceApprove, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote, conn))

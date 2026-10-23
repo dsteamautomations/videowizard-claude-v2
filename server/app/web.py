@@ -314,6 +314,7 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote),   # design/79
             'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote),
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
+            'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),

@@ -1200,7 +1200,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback']   # design/74 L26, L7; design/76; design/73; design/79
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage']   # design/74 L26, L7; design/76; design/73; design/79
 
 
 def _short_status(st, shot=None, gap=None):
@@ -1244,10 +1244,18 @@ def cmd_visuals(a):
         files = download_visuals_package(m, out['package']['key'])   # design/65 B12: one file per section
         files += visuals_library_files(ws, call('GET', base + '/library'))   # design/68 L4: the library per step
         url = visuals_page_url(m['code'])
+        told = (f"Tell the operator in one line, never ask: {out['footage']}; they correct it on the visuals page or say so (`vw visuals footage --camera … --support … --look … --quote`). "
+                if out.get('footage') else '')   # design/88 F4
         emit({**out, 'files': files, 'visuals_page_url': url, 'not_shareable': NOT_SHAREABLE}, 0,
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, gaps.json and intended-visuals.json first. "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
-             f"Visuals page (give the operator this link): {url}")
+             f"Visuals page (give the operator this link): {url}. " + told)
+    if a.what == 'footage':   # design/88 F4: the measured footage, told; a correction only with the operator's words
+        if not (a.camera or a.support or a.look):
+            f = call('GET', base).get('footage') or {}
+            emit(f, 0, f.get('line') or 'Nothing measured yet: run `vw visuals prepare`.')
+        out = write(base + '/footage', {'camera': a.camera, 'support': a.support, 'look': a.look, 'quote': a.quote})
+        emit(out, 0, f"Corrected with the operator's words. {out.get('line')}")
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'plan': _json_file(m, a.file)})
         line = f"{a.what}: {out.get('status', 'saved')}"
@@ -1914,7 +1922,7 @@ def build_parser():
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
-    s.add_argument('--camera', choices=['cinema', 'mirrorless', 'phone', 'mixed'], help='media record: the footage character the operator confirmed (design/77 L42)')
+    s.add_argument('--camera', choices=['cinema', 'mirrorless', 'phone', 'mixed'], help='media record: accepted for one release and kept as the correction; the footage is measured at visuals (design/88)')
     s.add_argument('--support', choices=['handheld', 'tripod', 'gimbal', 'mixed']); s.add_argument('--look', choices=['natural', 'graded', 'log']); s.add_argument('--footage-note', help="media record: the operator's words on the footage")
     s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
@@ -1940,7 +1948,7 @@ def build_parser():
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer',
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look',
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks'):   # design/73, design/79
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
