@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
+            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -552,6 +552,24 @@ def test_steps_and_command_text_carry_the_long_blank_the_ai_run_and_the_continui
     vis, opt, doc = json.dumps(STAGES['visuals']), json.dumps(STAGES['options']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'ai_run' in vis and 'three to five seconds' in vis and 'E2' in opt and 'blank over 12 s' in opt
     assert '--continuity' in doc and 'ai_run' in doc and 'E2, a blank over 12 s' in doc
+    assert 'end_answer' in vis and '--variants 2' in vis and 'One change, two at most' in vis and 'close reference' in vis and 'checks every picture' in vis   # design/86 K1, K4, K5, K8
+    assert '--end-answer' in doc and '--variants 2' in doc and 'one change per edit' in doc
+
+
+def test_image_posts_two_variants_and_the_end_answer_written_with_the_start(harness, monkeypatch, capsys):
+    """design/86 K1, K4."""
+    ws, _ = harness
+    (ws / 'out' / 'answers').mkdir(parents=True, exist_ok=True)
+    (ws / 'out' / 'answers' / 'end.json').write_text(json.dumps({'status': 'ready', 'prompt': 'Image 1 is the start; the bucket empty.', 'checklist': [{'check': 'c', 'pass_when': 'p', 'weight': 'must'}]}), encoding='utf-8')
+    posted = {}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'reference_id': 'R-a', 'reference_ids': ['R-a', 'R-b'], 'job_id': 'j', 'model': 'm', 'op': 'edit'}))
+    code, out, err = run(args(what='image', element='E1', kind='keyframe', prompt='the wall', parents='R1', variants='2', end_answer='out/answers/end.json'), capsys)
+    assert code == 0 and posted['variants'] == 2 and posted['end_prompt'] == 'Image 1 is the start; the bucket empty.' and posted['end_answer']['checklist'][0]['check'] == 'c'
+    (ws / 'out' / 'images.json').write_text(json.dumps([{'element': 'E1', 'kind': 'keyframe', 'prompt': 'the wall', 'parents': 'R1', 'variants': 2, 'end_answer': 'out/answers/end.json'}]), encoding='utf-8')
+    bodies = []
+    monkeypatch.setattr(vw, 'request', lambda method, path, **kw: (bodies.append(kw['json']) or ({'reference_id': 'R-a', 'reference_ids': ['R-a', 'R-b'], 'job_id': 'j', 'model': 'm', 'op': 'edit'}, 0)))
+    code, out, err = run(args(what='image', file='out/images.json'), capsys)
+    assert code == 0 and bodies[0]['variants'] == 2 and bodies[0]['end_prompt'].startswith('Image 1')
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

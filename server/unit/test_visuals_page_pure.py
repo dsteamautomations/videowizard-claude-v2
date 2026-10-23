@@ -57,5 +57,12 @@ def test_the_references_step_is_a_split_view_with_the_controls_in_the_panel():
     assert "$('pwords')" in HTML and 'Approve' in HTML[HTML.index('function panel'):HTML.index('function selectPic')]   # S6: the words sit with the button
 
 
+def test_the_takes_step_says_whose_turn_it_is_and_marks_the_checked_lines():
+    """design/86 K2, K3."""
+    for needle in ('function shotState', 'Your turn: approve the start image', 'Your turn: approve the pair', 'Checking the picture against its list, under 30 seconds', 'about 3 minutes. You may leave the page',
+                   'prompt is not written yet', 'want your decision', 'wait for the assistant', 'class="turn ', 'c.pass===false', 'a fix of the picture before it'):
+        assert needle in HTML, needle
+
+
 def test_an_empty_words_box_is_marked_and_a_rejected_picture_has_its_badge_and_button():
     assert 'need-words' in HTML and "data-a=\"reject\"" in HTML and 'rejected' in HTML

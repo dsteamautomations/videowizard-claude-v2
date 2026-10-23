@@ -334,6 +334,81 @@ def test_the_packet_carries_the_start_end_and_motion_instructions():
     assert with_card['preparation_digest'] == full['preparation_digest'] and with_card['preparation']['library']['job_forms']['take']['industry'] == 'education'
 
 
+def test_the_packet_carries_end_targets_context_and_exact_patterns():
+    """design/86 K6, K7, K8."""
+    sub = {'element_id': 'E1', 'role': 'primary', 'screen_position': 'centre', 'behaviour': 'acts', 'beats': [],
+           'start': {'position': {'landmark_id': 'L2', 'relation': 'beside'}, 'facing': 'camera', 'pose': 'standing', 'holding': ['O_BRICK'], 'progress': 'one course laid'},
+           'end': {'position': {'landmark_id': 'L2', 'relation': 'at the far end of'}, 'facing': 'away', 'pose': 'bending to the course', 'holding': [], 'progress': 'two courses laid'}}
+    first = shot('VS0', 900, 1000, 'video', narration='Every wall begins with a course.', subjects=[{**sub, 'end': {**sub['end'], 'progress': 'the first brick set'}}])
+    second = shot('VS1', 1000, 1150, 'video', narration='Then the next course goes on.', subjects=[sub])
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [first, second])
+    doc['elements'].append({'id': 'O_BOND', 'name': 'Rat-trap bond', 'kind': 'object', 'identity': 'exact', 'requirements': 'bricks on edge, two leaves, a cavity'})
+    second['element_ids'] = ['E1', 'O_BOND']
+    gap = doc['gaps'][1]
+    rejected = {**ref('X1'), 'status': 'rejected', 'rejection': {'notes': 'the helper too large against the house'}}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved'), 'F9': {**ref('F9', 'approved'), 'kind': 'frame', 'element_id': 'O_BOND'}, 'X1': rejected},
+                   bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}], 'O_BOND': [{'id': 'F9', 'sha256': 'sha-F9'}]}}},
+                   treatment={'gaps': [{'gap_id': 'G2', 'picture': 'water poured over a finished wall', 'routes': ['video'], 'intended': ['curing shown']}], 'quote': 'yes', 'by': 'u1', 'at': 't', 'digest': 'x', 'totals': {}, 'estimate_inr': 0},
+                   intended_visuals=[{'heading': 'Curing', 'narration_starts': 'Then the next course', 'lines': ['the wall wetted']}, {'heading': 'Elsewhere', 'narration_starts': 'A kiln', 'lines': []}])
+    prep = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']
+    assert prep['end_targets'] == ['E1 ends at the far end of the wall, facing away, bending to the course, holding nothing; two courses laid.']
+    assert 'Carry each line of end_targets word for word' in prep['end_image_instruction']
+    ctx = prep['context']
+    assert ctx['gap_words'] == 'Every wall begins with a course. Then the next course goes on.' and ctx['treatment_picture']['picture'] == 'water poured over a finished wall'
+    assert [iv['heading'] for iv in ctx['intended_visuals']] == ['Curing']
+    assert ctx['neighbours']['previous']['shot_id'] == 'VS0' and ctx['neighbours']['previous']['ends'][0]['progress'] == 'the first brick set' and ctx['neighbours']['next'] is None
+    assert ctx['earlier_rejections'] == [{'reference_id': 'X1', 'element_id': 'E1', 'name': 'X1', 'kind': 'keyframe', 'notes': 'the helper too large against the house'}]
+    assert prep['exact_patterns'][0]['element_id'] == 'O_BOND' and prep['exact_patterns'][0]['pattern_references'] == ['F9'] and 'medium and close shots' in prep['exact_patterns'][0]['rule']
+
+
+def test_two_candidates_for_a_start_and_the_end_written_with_it_is_queued_on_approval(monkeypatch):
+    """design/86 K4, K1."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': {**ref('R1', 'approved'), 'kind': 'sheet'}}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
+    end_answer = {'status': 'ready', 'prompt': 'Image 1 is the start; the bucket now empty.', 'checklist': [{'check': 'bucket', 'pass_when': 'empty', 'weight': 'must'}], 'exact_text': []}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the wall, bucket full', 'parents': ['R1'],
+            'variants': 2, 'end_prompt': end_answer['prompt'], 'end_answer': end_answer}
+    conn, store = FakeConn([]), store_with(sess, doc)
+    out = VS.generate_image(conn, store, USER, RUN, [], body)
+    assert len(conn.inserted) == 2 and len(out['reference_ids']) == 2 and out['reference_id'] == out['reference_ids'][0]
+    refs = saved(store)['references']
+    a, b = (refs[i] for i in out['reference_ids'])
+    assert a['name'] == 'keyframe-start-VS1-a' and b['name'] == 'keyframe-start-VS1-b' and a['pending_end']['prompt'] == end_answer['prompt'] and a['generation']['prompt'] == b['generation']['prompt']
+    with pytest.raises(Problem, match='names Image 1'):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r2', 'end_prompt': 'the bucket empty'}))
+    with pytest.raises(Problem, match='start keyframe only'):
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r3', 'kind': 'sheet', 'end_prompt': None, 'end_answer': None}))
+    # the start retained and approved: the end is queued from it with the pre-written prompt, once
+    s2 = saved(store)
+    s2['references'][a['id']].update(status='candidate', sha256='a' * 64, width=1536, height=864, key=f"run-1/visuals/references/{a['id']}.png", bytes=9)
+    store = store_with(s2, doc)
+    conn = FakeConn([])
+    row = VS.approve_reference(store, USER, RUN, [], a['id'], 'a' * 64, 'Yes, this one.', conn)
+    assert row['status'] == 'approved' and row['end_reference_id'] and len(conn.inserted) == 1
+    s3 = saved(store)
+    end = s3['references'][row['end_reference_id']]
+    assert end['kind'] == 'keyframe' and end['name'] == 'keyframe-end-VS1-a' and [p['id'] for p in end['generation']['parents']] == [a['id'], 'R1'] and end['answer'] == end_answer
+    assert s3['references'][a['id']]['end_queued'] == end['id']
+    conn = FakeConn([])
+    VS.approve_reference(store, USER, RUN, [], a['id'], 'a' * 64, 'Yes, again.', conn)   # approving again queues nothing more
+    assert conn.inserted == []
+    assert VS.approve_reference(store, USER, RUN, [], a['id'], 'a' * 64, 'Yes.')['status'] == 'approved'   # without a connection (chat path today): approval only
+
+
+def test_the_feedback_file_opens_with_the_rounds_summary():
+    """design/86 K9."""
+    records = [{'kind': 'image', 'verdict': 'pass'}, {'kind': 'image', 'verdict': 'reject'}, {'kind': 'image', 'verdict': 'pass'}, {'kind': 'take', 'verdict': 'pass'}, {'kind': 'image', 'verdict': 'pass'}]
+    assert VS.rounds_summary(records) == {'image': {'approved': 3, 'rejected': 1, 'rounds_per_approved': 1.33}, 'take': {'approved': 1, 'rejected': 0, 'rounds_per_approved': 1.0}}
+    assert VS.rounds_summary([{'kind': 'image', 'verdict': 'reject'}]) == {'image': {'approved': 0, 'rejected': 1, 'rounds_per_approved': None}}
+    sess = session(feedback=[{'app': 'videowizard', 'kind': 'image', 'verdict': 'pass', 'id': 'x', 'checklist': []}])
+    out = VS.feedback(store_with(sess), RUN, [])
+    assert out['yaml'].startswith('# image: approved 1, rejected 0, rounds per approved 1.0\n- app: videowizard') and out['summary']['image']['approved'] == 1
+
+
 def test_a_packet_before_bind_is_a_refusal_with_the_message_not_a_crash():
     """defect 19 (VW-6, 21 Oct): the route returned a bare 500 because the packet call ran outside the guard; the message existed all along."""
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])

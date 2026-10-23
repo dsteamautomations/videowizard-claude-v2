@@ -212,6 +212,10 @@ class ImageGenerate(Write):
     size: str | None = None
     quality: str | None = None
     answer: dict | None = None   # design/68 L5: the library's answer form
+    variants: int | None = None            # design/86 K4
+    end_prompt: str | None = Field(default=None, max_length=8000)   # design/86 K1
+    end_answer: dict | None = None
+    fix_of: str | None = None              # design/86 K2
 
 
 class ReferenceApprove(Write):
@@ -1136,7 +1140,7 @@ def visuals_image(run_id: UUID, body: ImageGenerate, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/references/{ref_id}/approve')
 def visuals_approve(run_id: UUID, ref_id: str, body: ReferenceApprove, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote, conn))
 
 
 @app.post('/api/runs/{run_id}/visuals/bind')

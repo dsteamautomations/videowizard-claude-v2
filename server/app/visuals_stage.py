@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import tempfile
+import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 from fractions import Fraction
@@ -125,6 +126,8 @@ def prepare(conn, store, user, run, outputs):
                'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog()}
+    session['intended_visuals'] = package['intended_visuals']   # design/86 K7: the packet reads them from the session
+    save_session(store, run, session)
     pk = save_json(store, key(run, 'package.json'), package)
     return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'next': 'write out/visual-plan.json then `vw visuals check`'}
 
@@ -323,7 +326,9 @@ def page_view(conn, store, run, outputs, code):
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
                              rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
-                             checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None)   # design/74 L6
+                             checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None,   # design/74 L6
+                             check=({k: r['check'].get(k) for k in ('lines', 'must_failed', 'error', 'fix_error', 'model')} if r.get('check') else None),   # design/86 K2
+                             pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'))   # design/86 K1, K2
     takes = {}
     for j in take_jobs(conn, run):
         res = j.get('result') or {}
@@ -850,20 +855,43 @@ def generate_image(conn, store, user, run, outputs, body):
             library.check_answer(answer, body['prompt'])
         except ValueError as exc:
             need(False, str(exc))
-    check_cap(conn, run, session, prices()['image_inr'], 'one image')   # design/65 B7
+    variants = int(body.get('variants') or 1)   # design/86 K4: two candidates for a start keyframe, the operator picks
+    need(variants in (1, 2), 'variants is 1 or 2.')
+    need(variants == 1 or (body['kind'] == 'keyframe' and not any(p['kind'] == 'keyframe' for p in parents)), 'Two candidates are for a start keyframe only.')
+    pending_end = None
+    if body.get('end_prompt'):   # design/86 K1: the end prompt written with the start; the server makes the end from the approved start
+        need(body['kind'] == 'keyframe' and not any(p['kind'] == 'keyframe' for p in parents), 'An end prompt goes with a start keyframe.')
+        library.check_prompt(body['end_prompt'])
+        need(re.search(r'\bimage 1\b', body['end_prompt'], re.I), 'The end prompt names Image 1 as the start image.')
+        if body.get('end_answer') is not None:
+            try:
+                library.check_answer(body['end_answer'], body['end_prompt'])
+            except ValueError as exc:
+                need(False, 'end answer: ' + str(exc))
+        pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
+    check_cap(conn, run, session, prices()['image_inr'] * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
     op = 'edit' if parents else 'generate'
-    ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
+    made = []
+    for n in range(variants):
+        suffix = '' if variants == 1 else '-ab'[n + 1]
+        made.append(_queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), body['request_id'] + ('-' + suffix if suffix else ''), pending_end))
+    save_session(store, run, session)
+    return {**made[0], **({'reference_ids': [m['reference_id'] for m in made], 'job_ids': [m['job_id'] for m in made]} if variants == 2 else {})}
+
+
+def _queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, name, request_id, pending_end):
+    ref_id = digest({'run': str(run['id']), 'request': request_id})[:32]
     frame = default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), {})   # design/71 P3: the size follows the brief's frame
     first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
     size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
     request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size,
                'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
-               'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': body['name'], 'kind': body['kind'], 'subject': body['subject']}}
+               'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject']}}
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
-                       (run['id'], ref_id, Jsonb(request), body['request_id'])).fetchone()
+                       (run['id'], ref_id, Jsonb(request), request_id)).fetchone()
     session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents')},
-                                     **({'answer': answer} if answer is not None else {})}
-    save_session(store, run, session)
+                                     **({'answer': answer} if answer is not None else {}), **({'pending_end': pending_end} if pending_end else {}),
+                                     **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
 
 
@@ -915,7 +943,7 @@ def _keyframe_gates(session, plan, body, parents):
                                                      f"({', '.join(r['id'][:8] for r in frames)}).")
 
 
-def approve_reference(store, user, run, outputs, ref_id, sha256, quote):
+def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=None):
     session = session_of(store, run, outputs)
     row = session['references'].get(ref_id)
     need(row and row['status'] in ('candidate', 'approved'), 'Reference is not a candidate.')
@@ -925,6 +953,14 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote):
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
     _feedback_image(session, run, user, row, 'pass', quote, '')
     save_session(store, run, session)
+    pe = row.get('pending_end')
+    if pe and conn is not None and not row.get('end_queued'):   # design/86 K1: the end image follows the approved start without a chat turn
+        out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
+                                                               'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer')})
+        session = session_of(store, run, outputs)
+        session['references'][ref_id]['end_queued'] = out['reference_id']
+        save_session(store, run, session)
+        return {**session['references'][ref_id], 'end_reference_id': out['reference_id']}
     return row
 
 
@@ -1016,10 +1052,26 @@ def feedback_yaml(records):
     return '\n'.join(emit(rows, '')) + '\n'
 
 
+def rounds_summary(records):
+    """design/86 K9: per kind, how many were approved, how many rejected, and the rounds per approved picture; the next film shows whether the corrections work."""
+    out = {}
+    for r in records:
+        k = out.setdefault(r.get('kind') or '?', {'approved': 0, 'rejected': 0})
+        if r.get('verdict') == 'pass':
+            k['approved'] += 1
+        elif r.get('verdict') in ('reject', 'fix'):
+            k['rejected'] += 1
+    for k in out.values():
+        k['rounds_per_approved'] = round((k['approved'] + k['rejected']) / k['approved'], 2) if k['approved'] else None
+    return out
+
+
 def feedback(store, run, outputs):
     session = session_of(store, run, outputs)
     records = session.get('feedback') or []
-    return {'records': len(records), 'yaml': feedback_yaml(records)}
+    summary = rounds_summary(records)
+    head = ''.join(f"# {kind}: approved {v['approved']}, rejected {v['rejected']}, rounds per approved {v['rounds_per_approved']}\n" for kind, v in sorted(summary.items()))
+    return {'records': len(records), 'summary': summary, 'yaml': head + feedback_yaml(records)}
 
 
 def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
@@ -1043,6 +1095,47 @@ def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
     session['bindings'][shot_id] = {'gap_digest': gap_digest(plan, gap), 'references': bindings, 'quote': quote or '', 'by': user['id']}
     save_session(store, run, session)
     return {'shot_id': shot_id, 'elements': sorted(bindings)}
+
+
+def end_targets(scene, shot):
+    """design/86 K6: each subject's end state, from the plan's data, as one sentence; the writer cannot send a person the wrong way."""
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    out = []
+    for s in shot.get('subjects') or []:
+        e = s.get('end') or {}
+        pos = e.get('position') or {}
+        held = ', '.join(e.get('holding') or []) or 'nothing'
+        out.append(f"{s['element_id']} ends {pos.get('relation', '')} {marks.get(pos.get('landmark_id'), pos.get('landmark_id', ''))}, facing {e.get('facing', '')}, {e.get('pose', '')}, holding {held}; {e.get('progress', '')}.")
+    return out
+
+
+def packet_context(session, plan, gap, shot):
+    """design/86 K7: what the writer should know beyond the shot. None of it goes into the prompt sent to the model."""
+    scenes = chosen_scenes(gap, session['choice_selections'].get(gap['gap_id']))
+    shots = [sh for sc in scenes for sh in sc['shots']]
+    words = ' '.join(str(sh.get('narration') or '').strip() for sh in shots if sh.get('narration')).strip()
+    entry = next((e for e in ((session.get('treatment') or {}).get('gaps') or []) if e.get('gap_id') == gap['gap_id']), None)
+    treatment = {k: entry.get(k) for k in ('picture', 'routes', 'intended', 'departure') if entry and entry.get(k)} if entry else None
+    intended = [iv for iv in (session.get('intended_visuals') or []) if words and str(iv.get('narration_starts') or '')[:40] and str(iv.get('narration_starts'))[:40] in words]
+    i = next((n for n, sh in enumerate(shots) if sh['id'] == shot['id']), None)
+    prev_shot = shots[i - 1] if i else None
+    next_shot = shots[i + 1] if i is not None and i + 1 < len(shots) else None
+    neighbours = {'previous': {'shot_id': prev_shot['id'], 'ends': [{'element_id': s['element_id'], **(s.get('end') or {})} for s in prev_shot.get('subjects') or []]} if prev_shot else None,
+                  'next': {'shot_id': next_shot['id'], 'starts': [{'element_id': s['element_id'], **(s.get('start') or {})} for s in next_shot.get('subjects') or []]} if next_shot else None}
+    rejected = [{'reference_id': r['id'], 'element_id': r.get('element_id'), 'name': r.get('name'), 'kind': r.get('kind'), 'notes': (r.get('rejection') or {}).get('notes') or ''}
+                for r in session['references'].values() if r.get('status') == 'rejected' and r.get('element_id') in (shot.get('element_ids') or [])]
+    return {'gap_id': gap['gap_id'], 'gap_words': words, 'treatment_picture': treatment, 'intended_visuals': intended, 'neighbours': neighbours, 'earlier_rejections': rejected}
+
+
+def exact_patterns(plan, shot, refs):
+    """design/86 K8: an object of exact identity in the shot (a bond, a product, a uniform) and the bound picture that carries its pattern."""
+    out = []
+    for e in plan['elements']:
+        if e['id'] in (shot.get('element_ids') or []) and e.get('kind') == 'object' and e.get('identity') == 'exact':
+            carriers = [r['reference_id'] for r in refs if r['element_id'] == e['id'] and r.get('kind') in ('frame', 'isolated', 'supplied', 'web')]
+            out.append({'element_id': e['id'], 'name': e.get('name'), 'requirements': e.get('requirements'), 'pattern_references': carriers,
+                        'rule': 'name the geometry in nouns; the pattern is demanded on the checklist at medium and close shots only' + ('' if carriers else '; no close reference is bound yet: bind a footage frame or an isolated picture of it first')})
+    return out
 
 
 def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
@@ -1073,8 +1166,11 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
                        'acting subject the result of its last beat. Name the positions in words. Change nothing else: the same framing, camera, light, people and props. Keep in '
                        'frame whatever the motion heads for. Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, '
                        'nothing else. The camera does not move between the two images: the same framing, lens and position. The end shows the action\'s visible result, a '
-                       'different pose or state from the start, never the same frozen pose.')   # design/67 C; design/71 P1; design/77 L38
+                       'different pose or state from the start, never the same frozen pose. Carry each line of end_targets word for word: it is where every subject ends.')   # design/67 C; design/71 P1; design/77 L38; design/86 K6
     prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': shot, 'references': refs,
+              'end_targets': end_targets(scene, shot),   # design/86 K6: the end state of each subject as one sentence the end prompt carries word for word
+              'context': packet_context(session, plan, gap, shot),   # design/86 K7: the gap's words, the treatment's picture, the intended visuals, the neighbours, earlier rejections
+              'exact_patterns': exact_patterns(plan, shot, refs),   # design/86 K8: client patterns and the reference that carries each
               'sequence_rules': plan.get('sequence_rules', []), 'elements': [e for e in plan['elements'] if e['id'] in shot['element_ids']],
               'start_image_instruction': start_instruction, 'image_instruction': start_instruction,   # the old name answers for one release (design/67 A)
               'end_image_instruction': end_instruction,

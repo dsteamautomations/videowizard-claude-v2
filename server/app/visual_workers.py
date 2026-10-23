@@ -142,7 +142,14 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
         return
     ref = session['references'].get(job['request']['reference']['id'])
     if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
+        if status == 'retained' and (ref.get('answer') or {}).get('checklist'):   # design/86 K2: the check before the operator sees it
+            from . import image_check
+            from .analysis_jobs import transport_factory
+            ref['check'] = image_check.run_check(store, session, ref, result, transport_factory)
         store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+        if status == 'retained' and (ref.get('check') or {}).get('must_failed'):
+            from . import image_check
+            image_check.queue_fix(conn, store, job['run_id'], ref['id'])
 
 
 # ---------- video takes ----------

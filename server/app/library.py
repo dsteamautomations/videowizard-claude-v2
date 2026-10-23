@@ -180,6 +180,11 @@ def check_prompt(prompt):
     m = re.search(r'\b(720p|1080p|2160p)\b', text, re.I)
     if m:
         raise ValueError(f'The prompt names a resolution ({m.group(0)!r}): the server sets it; describe the picture only.')
+    m = re.search(r'Change only:(.*?)(?:\n\s*(?:Keep|Constraints|Render only)\b|$)', text, re.S | re.I)   # design/86 K5: an edit makes one change, two at most
+    if m:
+        changes = [s for s in re.split(r'(?<=[.;])\s+', m.group(1).strip()) if s.strip()]
+        if len(changes) > 2:
+            raise ValueError(f'The edit names {len(changes)} changes under "Change only": one change per edit, two at most; make the rest in a second edit of the result.')
     return None
 
 

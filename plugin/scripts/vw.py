@@ -1362,7 +1362,8 @@ def cmd_visuals(a):
                 body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
                         'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt'), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
-                        **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {})}   # design/68 L5
+                        **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
+                        **_pair_fields(m, it.get('variants'), it.get('end_answer'))}   # design/86 K1, K4
                 payload, code = request('POST', base + '/images', json=body)
                 if code:
                     if code == 401:
@@ -1374,7 +1375,7 @@ def cmd_visuals(a):
             emit({'queued': queued}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`.")
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
-                **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5: the library's answer form
+                **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer)}   # design/68 L5; design/86 K1, K4
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`.")
     if a.what == 'approve':
@@ -1503,6 +1504,19 @@ def cmd_visuals(a):
         out = write(base + '/record', {'gap_ids': gaps, 'quote': a.quote})
         skipped = out.get('skipped') or {}
         emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
+
+
+def _pair_fields(m, variants, end_answer):
+    """design/86 K1, K4: two candidates for a start, and the end prompt written with it (its answer file; the prompt is the answer's prompt)."""
+    out = {}
+    if variants:
+        out['variants'] = int(variants)
+    if end_answer:
+        ans = _json_file(m, end_answer)
+        if not isinstance(ans, dict) or not ans.get('prompt'):
+            emit({'action': 'refused', 'message': f'{end_answer} must be the end image\'s answer form with its prompt.'}, 2)
+        out.update(end_prompt=ans['prompt'], end_answer=ans)
+    return out
 
 
 def _batch(rows, build, label, done_line):
@@ -1926,7 +1940,7 @@ def build_parser():
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer',
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer',
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks'):   # design/73, design/79
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)

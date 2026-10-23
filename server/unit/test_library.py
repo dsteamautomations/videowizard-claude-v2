@@ -117,6 +117,14 @@ def test_check_prompt_refuses_a_logo_a_model_name_a_pixel_size_and_a_resolution(
         L.check_prompt('Render in 720p, the yard.')
 
 
+def test_an_edit_names_one_change_two_at_most():
+    """design/86 K5."""
+    assert L.check_prompt('Mode: edit. Image 1 is the start.\nChange only: the helper has walked five metres on. He is now smaller with distance.\nKeep exactly as in Image 1: the lane, the houses.') is None
+    with pytest.raises(ValueError, match='names 4 changes'):
+        L.check_prompt('Mode: edit.\nChange only: the helper is redrawn at true scale. He stands two metres past the stack. He faces the house. He walks toward its entrance.\nKeep exactly as in Image 1: the lane.')
+    assert L.check_prompt('Shot: a wall. Beat: built. Constraints: no people.') is None   # a fresh picture has no change section
+
+
 def test_default_size_follows_the_frame_and_an_edit_takes_its_parents_size_only_when_both_sides_divide_by_16():
     assert L.default_size('16:9') == '1536x864' and L.default_size('9:16') == '1088x1936' and L.default_size(None) == '1536x864'
     assert L.edit_size(1536, 864, '16:9') == '1536x864' and L.edit_size(1088, 1936, '16:9') == '1088x1936'

@@ -77,6 +77,11 @@
 .v2 .pic.sel{outline:2px solid var(--accent);outline-offset:1px}
 .v2 .fchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg);font-size:12.5px;cursor:pointer;color:var(--fg)}
 .v2 .fchip b{color:var(--muted);cursor:pointer;font-weight:400}
+.v2 .turn{font-size:13px;margin:8px 0 4px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+.v2 .turn.you{border-color:var(--accent);color:var(--fg);font-weight:600}
+.v2 .turn.ok{border-color:var(--ok);color:var(--ok)}
+.v2 .turn.head{margin:14px 0 6px;background:var(--card)}
+.v2 .chk li.ok{color:var(--ok)}.v2 .chk li.err{color:var(--err)}
 @media (max-width:900px){.v2 .split{grid-template-columns:1fr}.v2 .panel{position:static}}
 .v2 .foot{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:6}
 .v2 .foot .in{max-width:1100px;margin:0 auto;padding:8px 20px 10px}
@@ -208,7 +213,9 @@ function renderPlan(){
 function latestSearch(eid){return (data.searches||[]).filter(s=>s.element_id===eid).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0]||null;}
 function pickOf(sid,n){return (picks[sid]||[]).find(p=>p.n===n);}
 function toggleTick(sid,n){picks[sid]=picks[sid]||[];const i=picks[sid].findIndex(p=>p.n===n);if(i>=0)picks[sid].splice(i,1);else picks[sid].push({n:n,note:''});}
-function checklist(lines){return lines&&lines.length?'<ul class="chk">'+lines.map(c=>'<li>'+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+'</li>').join('')+'</ul>':'';}   // design/74 L6
+function checklist(lines,check){   // design/74 L6; design/86 K2: with a check, each line is marked pass or fail with what the checker saw
+  if(check&&check.lines&&check.lines.length){return '<ul class="chk">'+check.lines.map(c=>'<li class="'+(c.pass===true?'ok':c.pass===false?'err':'')+'">'+(c.pass===true?'✓ ':c.pass===false?'✗ ':'· ')+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+(c.seen?' <i>('+esc(c.seen)+')</i>':'')+'</li>').join('')+(check.error?'<li class="ds">check not run: '+esc(check.error)+'</li>':'')+'</ul>';}
+  return lines&&lines.length?'<ul class="chk">'+lines.map(c=>'<li>'+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+'</li>').join('')+'</ul>':'';}
 function isSel(k,v){return !!selPic&&selPic[k]===v&&(k!=='sid'||selPic.n===arguments[2]);}
 function refCard(r,sel,inPanel){   // inPanel: the References step, where the picture opens beside the grid and Approve and Reject live in the panel (design/80 S1)
   const rejected=r.status==='rejected', can=stage()==='visuals';
@@ -216,7 +223,7 @@ function refCard(r,sel,inPanel){   // inPanel: the References step, where the pi
   const approve=!inPanel&&(r.status==='candidate'&&can)?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'';
   const state='<span class="badge '+(r.status==='approved'?'ok':rejected?'err':r.status==='candidate'?'dec':'')+'" style="margin:4px 6px 0">'+esc(r.status)+'</span>';   // design/79 Q2: the picture's own state, in words
   return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+(inPanel&&isSel('ref',r.id)?' sel':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="" '+(inPanel?'data-ref="'+esc(r.id)+'"':'')+'>':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    state+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+esc(r.name)+' · '+esc(r.kind)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+(inPanel?'':checklist(r.checklist))+(rejected?'':(sel||'')+approve+reject)+'</div>';
+    state+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+esc(r.name)+' · '+esc(r.kind)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+(inPanel?'':checklist(r.checklist,r.check))+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">a fix of the picture before it</div>':'')+(rejected?'':(sel||'')+approve+reject)+'</div>';
 }
 function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; the note and the chips are in the panel
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0;
@@ -246,7 +253,7 @@ function panel(){
   const r=(d.references||[]).find(x=>x.id===selPic.ref);
   if(!r)return '<div class="empty">That picture is gone.</div>';
   const own=can&&(r.status==='candidate'||r.status==='approved');
-  return (r.url?'<img src="'+esc(r.url)+'" alt="">':'')+'<div class="ds" style="margin-top:8px"><b>'+esc(r.element_id||'')+'</b> · '+esc(r.kind)+' · <span class="badge '+(r.status==='approved'?'ok':r.status==='rejected'?'err':'dec')+'">'+esc(r.status)+'</span>'+(r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist)+
+  return (r.url?'<img src="'+esc(r.url)+'" alt="">':'')+'<div class="ds" style="margin-top:8px"><b>'+esc(r.element_id||'')+'</b> · '+esc(r.kind)+' · <span class="badge '+(r.status==='approved'?'ok':r.status==='rejected'?'err':'dec')+'">'+esc(r.status)+'</span>'+(r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+
     (own?'<textarea id="pwords" class="pnote" placeholder="your words for this picture"></textarea><div class="btns">'+(r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'');   // design/80 S6: the words sit with the button
 }
 function selectPic(p){selPic=p;renderReferences();footer();}
@@ -368,15 +375,37 @@ function renderPictures(){
 }
 // ---------- takes ----------
 function play(url,name){const pl=$('pl');$('player').hidden=false;pl.src=url;$('pl-name').textContent=name;pl.play().catch(()=>{});}
+function shotState(s){   // design/86 K3: whose turn it is on this shot, and how long to wait
+  const d=data, kf=(d.references||[]).filter(r=>s.element_ids.includes(r.element_id)&&r.kind==='keyframe'&&r.status!=='rejected'&&r.status!=='failed');
+  const ids=new Set(kf.map(r=>r.id)), isStart=r=>!(r.parents||[]).some(p=>ids.has(p));
+  const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected);
+  if(s.takes.some(k=>k.selected))return ['ok','Take selected.'];
+  if(ready)return ['you','Your turn: watch the take and select it, or reject it with what is wrong.'];
+  if(open)return ['wait','The take is being made, about 3 minutes. You may leave the page; it refreshes itself.'];
+  const gen=kf.filter(r=>r.status==='generating');
+  if(gen.length)return ['wait','Making the '+(gen.some(isStart)?'start':'end')+' image, about 1 minute. Nothing for you to do; the page refreshes itself.'];
+  const cand=kf.filter(r=>r.status==='candidate'), appr=kf.filter(r=>r.status==='approved');
+  if(cand.some(r=>!r.check&&r.checklist&&r.checklist.length))return ['wait','Checking the picture against its list, under 30 seconds.'];
+  const sApp=appr.find(isStart);
+  if(cand.some(isStart)&&!sApp)return ['you','Your turn: approve the start image, or reject it with what is wrong.'];
+  if(sApp&&cand.some(r=>!isStart(r)))return ['you','Your turn: approve the pair, or reject the end image with what is wrong.'];
+  if(sApp&&appr.some(r=>!isStart(r)))return ['assistant',s.prepared?'The pair is approved; the assistant submits the take.':'The pair is approved; the assistant prepares the take. Nothing to do here.'];
+  if(sApp)return ['assistant',sApp.end_queued?'The end image is on its way.':'Waiting for the assistant: the end image\'s prompt is not written yet. Nothing to do here.'];
+  return ['assistant','Waiting for the assistant to generate the start image. Nothing to do here.'];
+}
 function renderTakes(){
   const d=data, can=stage()==='visuals'&&!!d.treatment;
   const gaps=d.gaps.filter(g=>g.accepted&&g.shots.some(s=>s.route==='video'));
   if(!gaps.length){$('s-takes').innerHTML='<div class="empty">No video shot in an accepted gap yet.</div>';return;}
-  let h='';
+  const states={};gaps.forEach(g=>g.shots.filter(s=>s.route==='video').forEach(s=>{states[s.shot_id]=shotState(s);}));
+  const n=k=>Object.values(states).filter(x=>x[0]===k).length;
+  let h='<div class="turn head"><b>'+n('you')+'</b> want your decision · <b>'+n('wait')+'</b> being made · <b>'+n('assistant')+'</b> wait for the assistant · <b>'+n('ok')+'</b> done</div>';
   gaps.forEach(g=>{
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
     g.shots.filter(s=>s.route==='video').forEach(s=>{
-      let sh='<div class="card"><span class="nm">'+esc(s.shot_id)+'</span> <span class="badge">AI video</span><span class="ds">'+secs(s.end_frame-s.start_frame)+(s.bound&&s.bound.length?' · bound':'')+(s.prepared?' · take prepared':'')+'</span><div class="ds">'+esc(s.purpose)+'</div>';
+      const st=states[s.shot_id];
+      let sh='<div class="card"><span class="nm">'+esc(s.shot_id)+'</span> <span class="badge">AI video</span><span class="ds">'+secs(s.end_frame-s.start_frame)+(s.bound&&s.bound.length?' · bound':'')+(s.prepared?' · take prepared':'')+'</span><div class="ds">'+esc(s.purpose)+'</div>'+
+        '<div class="turn '+st[0]+'">'+esc(st[1])+'</div>';
       const pair=(d.references||[]).filter(r=>s.element_ids.includes(r.element_id)&&r.kind==='keyframe');
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The start and end images:</div><div class="strip">'+pair.map(r=>refCard(r)).join('')+'</div>';}
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="btns"><button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>':'')+'</td></tr>').join('')+'</tbody></table>';}
