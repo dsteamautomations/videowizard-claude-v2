@@ -120,3 +120,25 @@ The rules above that are about writing pictures, not about VideoWizard's server,
 2. C and D (graphics content, style and spec).
 3. E (drawn route).
 4. F and I.
+
+## SK's decisions (23 Oct 2026, one at a time) and the builder's corrections
+
+These override the sections above where they differ.
+
+| | Decision |
+|---|---|
+| B2 | Every still and graphic state moves by **5 %** across its shot. **Graphics (diagram, animation) move closer only** (`push_in` or `none`), never sideways, so labels never slide out of frame. `none` needs a reason. |
+| B4 | The frozen share warns above **10 %** of the film (counting only what is marked `none` and graphic holds), shown on the treatment; a film that needs more goes ahead with a reason. |
+| F | **F1 is built.** **F2 stays off**, tested on five Omni takes from the next film that allows camera sound; AI sound always follows the media step's camera-sound answer. |
+| E | **Yes: the drawn graphic is the default route for technical diagrams**, built after D. |
+| B1 | A still **with movement at most 4 s**; a still marked `none` **at most 3 s**; a graphic state **at most 5 s**; a graphic on screen over about 4 s is a build or a drawn animation. All **warn for one release, then refuse**. |
+| H4 | An approved reuse: **at least 60 s apart** and **a different stretch** of the clip; its framing differs **only within the clip's safe enlargement** (the analysis's `max_safe_zoom_limit`). Where that is too small for a clearly different framing (a crop of 30 %, i.e. 1.43×; 1080p footage allows 1.35×), the plain reuse is **refused** and the planner uses a reimagined shot (H7). |
+
+Builder's corrections from reading the code (`../design-88-89-review-2026-10-23.md`):
+
+- **A1** reads the film-time words and sentences from the options package (`pk['narration']`, timeline frames with the approved pauses already in), not the voice stage's `timing.json`, which is in narration time.
+- **C4** matters more than stated: a picture sent without an answer form gets **no** check today, not three fixed lines.
+- **H2** goes in `add_reference` and the placement functions; there is no `visuals_stage.frame`.
+- **H5** refuses a shared **start** image only; the end image of one segment is the start of the next within one continuous shot by design (design/67, 71 P4).
+- **E2** puts drawn graphics on the Takes step, which today lists only video shots; a font file on the VM is checked before E.
+- **F2**, when tested, changes design/84's "No dialogue. No music." line and assembly's take audio (dropped today).
