@@ -249,13 +249,15 @@ def timing_warnings(gap_id, shots, timing, fps):
             where = f"inside the word '{inside['text']}'" if inside else f'{dist:.1f} s from the nearest pause'
             out.append({'gap_id': gap_id, 'shot_id': nxt.id, 'kind': 'cut_off_pause', 'message': f'the cut from {sh.id} to {nxt.id} at {t:.1f} s falls {where}: move it into a pause between sentences or phrases'})
     flat = [(tok, w) for w in words for tok in _tokens(w['text'])]
+    pos = 0   # each shot's words are found after the previous shot's words: the same phrase twice is two places
     for sh in shots:
         want = _tokens(sh.narration)[:3]
         if not want:
             continue
-        i = next((k for k in range(len(flat) - len(want) + 1) if [x[0] for x in flat[k:k + len(want)]] == want), None)
+        i = next((k for k in range(pos, len(flat) - len(want) + 1) if [x[0] for x in flat[k:k + len(want)]] == want), None)
         if i is None:
             continue
+        pos = i + len(want)
         spoken = flat[i][1]['start_frame'] / f
         if spoken < sh.start_frame / f - WORD_TOLERANCE_S or spoken >= sh.end_frame / f:
             out.append({'gap_id': gap_id, 'shot_id': sh.id, 'kind': 'words_off_picture', 'message': f"shot {sh.id}: its words ('{' '.join(want)}…') are spoken at {spoken:.1f} s but the shot runs "
@@ -333,7 +335,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:
                             warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state' + NEXT_RELEASE})
-                    starts[shot.id] = shot.start_frame
+                    if scenes is counted:   # a return names a shot the film shows: the recommended choice, never the alternative
+                        starts[shot.id] = shot.start_frame
                     returns.append(shot)
                     gap_shots.append(shot)
                     if shot.visual_type == 'video' and seconds is not None:   # design/45 10.7

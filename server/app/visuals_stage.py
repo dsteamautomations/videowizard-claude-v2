@@ -69,7 +69,7 @@ def session_of(store, run, outputs, create=False):
             raise Problem(409, 'NOT_ALLOWED', 'Run `vw visuals prepare` first.')
     return {'contract': 'vw2-visuals-session-v1', 'source': gaps_source(store, outputs), 'versions': [], 'current': None,
             'accepted': {}, 'choice_selections': {}, 'references': {}, 'bindings': {}, 'generator_choices': {}, 'preparations': {},
-            'reviews': {}, 'selections': {}, 'assets': {}, 'recorded_gaps': {}}
+            'reviews': {}, 'selections': {}, 'assets': {}, 'recorded_gaps': {}, 'repeat_rules': 'refuse'}   # design/89: a session begun before batch 1 is warned instead
 
 
 def save_session(store, run, session):
@@ -129,6 +129,7 @@ def prepare(conn, store, user, run, outputs):
             session['footage_correction'] = {**{k: old.get(k) for k in ('camera', 'support', 'look', 'quote')}, 'from': 'the media step'}
     session['footage'] = FM.apply_correction(session['footage_measured'], session.get('footage_correction'))
     session['gap_neighbours'] = gap_neighbours(store, outputs)   # F3: the clip before and after each gap
+    session['first_cut_events'] = first_cut_events(store, outputs)   # design/89 H1, finding 9: read once here, not on every placement
     for gid, timing in gap_timing(store, run, session['source']['gaps'], session['source'].get('fps') or 25).items():   # design/89 A1
         session['source']['gaps'][gid]['timing'] = timing
     save_session(store, run, session)
@@ -171,10 +172,42 @@ def gap_timing(store, run, gaps, fps):
     return out
 
 
+def ensure_timing(store, run, session):
+    """design/89 A1: a session prepared before batch 1 gets its gaps' timing when the check, the packet or the page first needs it. True when it changed."""
+    gaps = session['source']['gaps']
+    if all('timing' in g for g in gaps.values()):
+        return False
+    found = gap_timing(store, run, gaps, session['source'].get('fps') or 25)
+    for gid, timing in found.items():
+        gaps[gid]['timing'] = timing
+    return bool(found)
+
+
+def _rule(session, ok, message, warns):
+    """design/89 H2-H5: refused in a visuals session begun on batch 1 or later; in one begun before, warned and kept with the picture (SK: a run in progress is warned for one release first)."""
+    if ok:
+        return
+    if session.get('repeat_rules') == 'refuse':
+        need(False, message)
+    warns.append(message)
+
+
 def film_frames(outputs):
     """design/89 B4: the film's length, from the first cut (or the master)."""
     o = next((o for o in outputs if o['stage'] in ('first_cut', 'master') and o['unit'] is None and (o.get('summary') or {}).get('duration_frames')), None)
     return o['summary']['duration_frames'] if o else None
+
+
+def first_cut_events(store, outputs):
+    """The master's picture events, the fields the ledger needs."""
+    master = next((o for o in outputs if o['stage'] == 'master' and o['unit'] is None), None)
+    ref = next((f for f in (master or {}).get('files') or [] if f['name'].endswith('.json')), None)
+    try:
+        events = load_json(store, ref['key']).get('events') or [] if ref else []
+    except Problem:
+        return []
+    keys = ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_in_frame', 'timeline_out_frame')
+    return [{k: ev[k] for k in keys} for ev in events if ev.get('kind') == 'event' and all(k in ev for k in keys)]
 
 
 def gap_neighbours(store, outputs):
@@ -240,6 +273,7 @@ def library_pack(store, run, outputs):
 
 def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
+    ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
         plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE)   # design/89 B4
     except (ValueError, KeyError, TypeError) as exc:
@@ -254,6 +288,7 @@ def check(store, run, outputs, document):
 
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
+    ensure_timing(store, run, session)   # saved with the proposal
     plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE))
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     for gap in plan['gaps']:   # a route that departs from the recorded treatment needs a new treatment, with the reason
@@ -411,7 +446,7 @@ def page_view(conn, store, run, outputs, code):
         session = session_of(store, run, outputs)
     except Problem:
         return {'state': 'not_prepared'}
-    if reconcile(conn, run, session):
+    if reconcile(conn, run, session) | ensure_timing(store, run, session):   # design/89 A1: the page shows the timing too
         save_session(store, run, session)
     try:
         package = load_json(store, key(run, 'package.json'))
@@ -454,13 +489,15 @@ def page_view(conn, store, run, outputs, code):
                     entry['shots'].append({'shot_id': sh['id'], 'title': sh.get('title') or '', 'visual_type': sh['visual_type'], 'route': route_of(sh), 'purpose': sh.get('purpose', ''),
                                            'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
-                                           'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []]} if asset else None),
+                                           'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
+                                                      **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {})} if asset else None),   # design/89 B3
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations']})
         gaps.append(entry)
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
             'footage': footage_view(session, outputs),   # design/88 F4: told, not asked
             'reuse_pending': session.get('reuse_pending') or {},   # design/89 H7: a reuse the operator may approve here
+            'clips': [{k: c.get(k) for k in ('id', 'name', 'duration_s')} for c in media_clips(outputs).values()],   # finding 7: a clip stretch placed from the page
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
             'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
@@ -1052,6 +1089,7 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
     need((quote or '').strip(), 'The operator reply is required.')
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
+    row['dhash'] = _fingerprints(store, row['key'])   # design/89 H6, finding 9: kept once, never read again for the look-alike check
     _feedback_image(session, run, user, row, 'pass', quote, '')
     save_session(store, run, session)
     pe = row.get('pending_end')
@@ -1248,6 +1286,8 @@ def exact_patterns(plan, shot, refs):
 def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
     session = session or session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    if ensure_timing(store, run, session):   # design/89 A1, finding 3
+        save_session(store, run, session)
     binding = session['bindings'].get(shot_id)
     need(binding and binding['gap_digest'] == gap_digest(plan, gap), 'Bind references for this shot under the current accepted plan.')
     if not binding.get('packet_read_at'):   # design/77 L35: the start image waits for this
@@ -1358,8 +1398,9 @@ def prepare_take(store, user, run, outputs, body):
         need(row and row['status'] == 'approved', f'{role} must be an approved reference.')
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}
     used = [sid for sid, rid in _start_images(store, session).items() if rid == body['start_image'] and sid != body['shot_id']] + \
-           [sid for sid, a in session['assets'].items() if a.get('reference_id') == body['start_image']]
-    need(not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).")
+           [sid for sid, a in session['assets'].items() if sid != body['shot_id'] and a.get('reference_id') == body['start_image']]
+    warns = []
+    _rule(session, not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
     s, e = images['start_image'], images['end_image']
     if all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
         a, b = s['width'] / s['height'], e['width'] / e['height']
@@ -1377,9 +1418,10 @@ def prepare_take(store, user, run, outputs, body):
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)
     session['preparations'][body['shot_id']] = {'preparation_id': identity, 'key': key(run, f'takes/{identity}.request.json'), 'start_image': body['start_image'], 'end_image': body['end_image'],
+                                                **({'repeat_warnings': warns} if warns else {}),
                                                 **({'checklist': answer.get('checklist') or []} if answer is not None else {})}   # design/74 L6
     save_session(store, run, session)
-    return {'preparation_id': identity, 'duration_seconds': record['duration_seconds'], 'exact_seconds': record['placement']['exact_seconds'], 'provider': selected}
+    return {'preparation_id': identity, 'duration_seconds': record['duration_seconds'], 'exact_seconds': record['placement']['exact_seconds'], 'provider': selected, **({'warnings': warns} if warns else {})}
 
 
 def submit_take(conn, store, user, run, outputs, shot_id):
@@ -1459,18 +1501,20 @@ def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
     need((quote or '').strip(), 'The operator reply is required.')
     used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
-    need(not used, f'H5: picture {reference_id} is already on screen in {used[0] if used else ""}; two shots never show the same picture: compose another (a reimagined shot, return_of, for a return).')
+    warns = []
+    _rule(session, not used, f'H5: picture {reference_id} is already on screen in {used[0] if used else ""}; two shots never show the same picture: compose another (a reimagined shot, return_of, for a return).', warns)
     kept = None
     src = row.get('source') or {}
     if row.get('kind') == 'frame' and src.get('media_id') is not None:
         at = float(src.get('requested_s') or 0)
-        kept = _reuse_gate(store, run, session, outputs, shot, src['media_id'], at, at, False, reuse, quote, crop, {'action': 'still', 'reference_id': reference_id})
+        kept, more = _reuse_gate(store, run, session, outputs, shot, src['media_id'], at, at, False, reuse, quote, crop, {'action': 'still', 'reference_id': reference_id})
+        warns += more
     session['assets'][shot_id] = {'kind': 'still', 'key': row['key'], 'sha256': row['sha256'], 'bytes': row['bytes'], 'reference_id': reference_id, 'quote': quote, 'by': user['id'],
-                                  'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}, **({'reuse': kept} if kept else {})}
+                                  'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}, **({'reuse': kept} if kept else {}), **({'repeat_warnings': warns} if warns else {})}
     session['selections'].pop(shot_id, None)
     (session.get('reuse_pending') or {}).pop(shot_id, None)
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'kind': 'still', 'reference_id': reference_id, 'sha256': row['sha256']}
+    return {'shot_id': shot_id, 'kind': 'still', 'reference_id': reference_id, 'sha256': row['sha256'], **({'warnings': warns} if warns else {})}
 
 
 REUSE_APART_S = 60          # design/89 H4 (SK): an approved reuse is at least this far from the other showing
@@ -1490,15 +1534,12 @@ def ledger(store, session, outputs):
     """design/89 H1: what the film shows, first cut and visuals alike: clip stretches (moving), footage frames (frozen), other pictures."""
     fps = session['source'].get('fps') or 25
     clips = media_clips(outputs)
-    master = next((o for o in outputs if o['stage'] == 'master' and o['unit'] is None), None)
-    ref = next((f for f in (master or {}).get('files') or [] if f['name'].endswith('.json')), None)
-    try:
-        events = load_json(store, ref['key']).get('events') or [] if ref else []
-    except Problem:
-        events = []
+    events = session.get('first_cut_events')
+    if events is None:   # a session prepared before batch 1
+        events = first_cut_events(store, outputs)
     out = []
     for ev in events:
-        if ev.get('kind') == 'event':
+        if ev.get('kind', 'event') == 'event':
             cid = str(ev['sub_clip_id']).rsplit(':', 1)[0]
             cf = (clips.get(cid) or {}).get('fps') or fps
             out.append({'where': 'first cut', 'shot_id': ev['sub_clip_id'], 'clip_id': cid, 'moving': True, 'src_in_s': _sec(ev['source_in_frame'], cf), 'src_out_s': _sec(ev['source_out_frame'], cf),
@@ -1515,44 +1556,57 @@ def ledger(store, session, outputs):
     return out
 
 
+def _crop_check(crop, safe):
+    """H4: a crop inside the frame, of the frame's shape, enlarging at least REUSE_MIN_ZOOM and no more than the clip's safe enlargement."""
+    if not (isinstance(crop, (list, tuple)) and len(crop) == 4):
+        return None, 'H4: give the crop that makes the framing clearly different (--crop x,y,w,h, fractions of the frame).'
+    x, y, w, h = (float(v) for v in crop)
+    if not (0 <= x and 0 <= y and 0 < w <= 1 and 0 < h <= 1 and x + w <= 1.0001 and y + h <= 1.0001 and abs(w - h) <= 0.01):
+        return None, 'H4: the crop lies inside the frame and keeps its shape (w equal to h).'
+    zoom = 1 / max(w, h)
+    if not REUSE_MIN_ZOOM - 1e-6 <= zoom <= safe + 1e-6:
+        return None, f"H4: the crop enlarges {zoom:.2f}×; it must be between {REUSE_MIN_ZOOM:.2f}× and the clip's safe {safe:.2f}×."
+    return [x, y, w, h], ''
+
+
 def _reuse_gate(store, run, session, outputs, shot, clip_id, src_in, src_out, moving, reuse, quote, crop, pending):
     """design/89 H2-H4 with SK's H4: a clip already on screen is a reuse: never a frozen frame of a clip that plays elsewhere; otherwise only with the
     reason, the reimagined shot considered and the operator's words, 60 s apart, a different stretch, and a crop within the clip's safe enlargement.
-    Returns the reuse kept with the asset, or None when the clip is not on screen elsewhere."""
+    Returns (the reuse kept with the asset or None, the warnings): in a session begun before batch 1 every broken rule is a warning instead."""
     fps = session['source'].get('fps') or 25
     film_in, film_out = _sec(shot['start_frame'], fps), _sec(shot['end_frame'], fps)
     others = [e for e in ledger(store, session, outputs) if e.get('clip_id') == clip_id and e['shot_id'] != shot['id']]
+    warns = []
     if not others:
-        return None
+        return None, warns
     names = ', '.join(f"{e['shot_id']} ({e['where']})" for e in others)
-    if not moving and any(e['moving'] for e in others):
-        need(False, f'H3: clip {clip_id} plays elsewhere ({names}); a frozen frame of it is never shown: use another clip, or a moving stretch with an approved reuse.')
-    if moving and any(not e['moving'] for e in others):
-        need(False, f'H3: clip {clip_id} is shown as a frozen frame in {names}; a clip is either moving or a frame in the film, never both.')
+    if not moving:
+        _rule(session, not any(e['moving'] for e in others), f'H3: clip {clip_id} plays elsewhere ({names}); a frozen frame of it is never shown: use another clip, or a moving stretch with an approved reuse.', warns)
+    else:
+        _rule(session, all(e['moving'] for e in others), f'H3: clip {clip_id} is shown as a frozen frame in {names}; a clip is either moving or a frame in the film, never both.', warns)
     r = reuse or {}
-    need(str(r.get('reason') or '').strip() and str(r.get('considered') or '').strip(),
-         f'H2: clip {clip_id} is already on screen in {names}: showing it again is a reuse. Prefer a reimagined shot (the same subject from another angle, distance or moment, '
-         'return_of). A plain reuse needs the reason, the reimagined shot you considered and why it adds nothing (--reuse, --considered), then the operator\'s approval.')
+    why = bool(str(r.get('reason') or '').strip() and str(r.get('considered') or '').strip())
+    _rule(session, why, f'H2: clip {clip_id} is already on screen in {names}: showing it again is a reuse. Prefer a reimagined shot (the same subject from another angle, distance or moment, '
+                        "return_of). A plain reuse needs the reason, the reimagined shot you considered and why it adds nothing (--reuse, --considered, or the page's reuse fields), then the operator's approval.", warns)
     for e in others:
         apart = max(film_in - e['film_out_s'], e['film_in_s'] - film_out)
-        need(apart >= REUSE_APART_S, f"H4: {shot['id']} is {apart:.0f} s from {e['shot_id']}; an approved reuse is at least {REUSE_APART_S} s apart.")
-        need(src_out <= e['src_in_s'] or src_in >= e['src_out_s'] if (moving or e['moving']) else abs(src_in - e['src_in_s']) >= 1.0,
-             f"H4: a different stretch of clip {clip_id} from the one in {e['shot_id']}, with no overlap in the clip's own time.")
+        _rule(session, apart >= REUSE_APART_S, f"H4: {shot['id']} is {apart:.0f} s from {e['shot_id']}; an approved reuse is at least {REUSE_APART_S} s apart.", warns)
+        _rule(session, src_out <= e['src_in_s'] or src_in >= e['src_out_s'] if (moving or e['moving']) else abs(src_in - e['src_in_s']) >= 1.0,
+              f"H4: a different stretch of clip {clip_id} from the one in {e['shot_id']}, with no overlap in the clip's own time.", warns)
     safe = float((session.get('clip_safe_zoom') or {}).get(clip_id) or 1.0)
-    need(safe >= REUSE_MIN_ZOOM - 1e-6, f'H4: clip {clip_id} can be enlarged only {safe:.2f}× before it goes soft; a clearly different framing needs {REUSE_MIN_ZOOM:.2f}×. '
-                                        'Use a reimagined shot instead (return_of): a soft picture is never the fix for a repeat.')
-    need(isinstance(crop, (list, tuple)) and len(crop) == 4, 'H4: give the crop that makes the framing clearly different (--crop x,y,w,h, fractions of the frame).')
-    x, y, w, h = (float(v) for v in crop)
-    need(0 <= x and 0 <= y and 0 < w <= 1 and 0 < h <= 1 and x + w <= 1.0001 and y + h <= 1.0001 and abs(w - h) <= 0.01, 'H4: the crop lies inside the frame and keeps its shape (w equal to h).')
-    zoom = 1 / max(w, h)
-    need(REUSE_MIN_ZOOM - 1e-6 <= zoom <= safe + 1e-6, f'H4: the crop enlarges {zoom:.2f}×; it must be between {REUSE_MIN_ZOOM:.2f}× and the clip\'s safe {safe:.2f}×.')
+    _rule(session, safe >= REUSE_MIN_ZOOM - 1e-6, f'H4: clip {clip_id} can be enlarged only {safe:.2f}× before it goes soft; a clearly different framing needs {REUSE_MIN_ZOOM:.2f}×. '
+                                                 'Use a reimagined shot instead (return_of): a soft picture is never the fix for a repeat.', warns)
+    box, problem = _crop_check(crop, safe)
+    _rule(session, box is not None, problem, warns)
+    if session.get('repeat_rules') != 'refuse':   # a session begun before batch 1: placed as before, with its warnings
+        return ({'reason': r.get('reason'), 'considered': r.get('considered'), 'crop': box, 'on_screen': names} if why and box else None), warns
     if not str(r.get('approval') or '').strip():   # H2, H7: the reuse itself waits for the operator's own words, on the page or in chat
         session.setdefault('reuse_pending', {})[shot['id']] = {**pending, 'clip_id': clip_id, 'on_screen': names, 'reason': r['reason'], 'considered': r['considered'],
-                                                               'crop': [x, y, w, h], 'quote': quote, 'at': datetime.now(timezone.utc).isoformat()}
+                                                               'crop': box, 'quote': quote, 'at': datetime.now(timezone.utc).isoformat()}
         save_session(store, run, session)
         raise Problem(409, 'REUSE_WAITING', f"The reuse of clip {clip_id} in {shot['id']} passes the checks and waits for the operator's approval in their own words: on the visuals "
                                            f"page, or `vw visuals reuse --shot {shot['id']} --quote \"<their words>\"`.")
-    return {'reason': r['reason'], 'considered': r['considered'], 'approval': r['approval'], 'crop': [x, y, w, h], 'on_screen': names}
+    return {'reason': r['reason'], 'considered': r['considered'], 'approval': r['approval'], 'crop': box, 'on_screen': names}, warns
 
 
 def _start_images(store, session):
@@ -1565,6 +1619,7 @@ def _start_images(store, session):
                 rid = (load_json(store, p['key']).get('start_image') or {}).get('reference_id')
             except Problem:
                 rid = None
+            p['start_image'] = rid   # kept in the session once read; saved with the session's next save
         if rid:
             out[sid] = rid
     return out
@@ -1582,15 +1637,15 @@ def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=No
     in_s = float(in_s)
     out_s = round(in_s + seconds, 3)
     need(in_s >= 0 and out_s <= float(clip.get('duration_s') or 0) + 1e-3, f"The stretch {in_s:.2f}–{out_s:.2f} s lies outside clip {clip_id} ({clip.get('duration_s')} s).")
-    kept = _reuse_gate(store, run, session, outputs, shot, clip_id, in_s, out_s, True, reuse, quote, crop, {'action': 'clip', 'clip_id': clip_id, 'in_s': in_s})
+    kept, warns = _reuse_gate(store, run, session, outputs, shot, clip_id, in_s, out_s, True, reuse, quote, crop, {'action': 'clip', 'clip_id': clip_id, 'in_s': in_s})
     session['assets'][shot_id] = {'kind': 'clip', 'clip_id': clip_id, 'name': clip['name'], 'sha256': clip['sha256'], 'bytes': clip.get('bytes'), 'fps': clip.get('fps'),
                                   'rotation_deg': clip.get('rotation_deg') or 0, 'hdr': str(clip.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084'),
                                   'in_s': in_s, 'out_s': out_s, 'quote': quote, 'by': user['id'], 'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']},
-                                  **({'reuse': kept} if kept else {})}
+                                  **({'reuse': kept} if kept else {}), **({'repeat_warnings': warns} if warns else {})}
     session['selections'].pop(shot_id, None)
     (session.get('reuse_pending') or {}).pop(shot_id, None)
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'kind': 'clip', 'clip_id': clip_id, 'in_s': in_s, 'out_s': out_s, **({'reuse': kept} if kept else {})}
+    return {'shot_id': shot_id, 'kind': 'clip', 'clip_id': clip_id, 'in_s': in_s, 'out_s': out_s, **({'reuse': kept} if kept else {}), **({'warnings': warns} if warns else {})}
 
 
 def approve_reuse(store, user, run, outputs, shot_id, quote):
@@ -1605,27 +1660,38 @@ def approve_reuse(store, user, run, outputs, shot_id, quote):
     return still_from_reference(store, user, run, outputs, shot_id, p['reference_id'], p.get('quote') or quote, reuse, p['crop'])
 
 
+def _fingerprints(store, key_):
+    from . import lookalike
+    try:
+        data = store.get(key_)
+        return {'picture': lookalike.image_hashes(data)[0], 'graphic': lookalike.image_hashes(data, True)[0]}
+    except Exception:   # a picture that cannot be read has no fingerprint
+        return None
+
+
 def look_alike_placed(store, session):
     """design/89 H6 at the plan stage: the pictures already placed (stills, the first state of a sequence, prepared starts) that look alike."""
     from . import lookalike
     fps = session['source'].get('fps') or 25
-    items = []
+    items = []   # (shot, start frame, reference id, file key, graphic)
     starts = _start_images(store, session)
     for sid, a in (session.get('assets') or {}).items():
-        key_ = a.get('key') if a.get('kind') == 'still' else (a.get('states') or [{}])[0].get('key') if a.get('kind') == 'sequence' else None
+        first = (a.get('states') or [{}])[0] if a.get('kind') == 'sequence' else {}
+        rid, key_ = (a.get('reference_id'), a.get('key')) if a.get('kind') == 'still' else (first.get('id') or first.get('reference_id'), first.get('key')) if a.get('kind') == 'sequence' else (None, None)
         if key_:
-            items.append((sid, a.get('placement', {}).get('start_frame', 0), key_, a.get('kind') == 'sequence'))
+            items.append((sid, a.get('placement', {}).get('start_frame', 0), rid, key_, a.get('kind') == 'sequence'))
     for sid, rid in starts.items():
         r = session['references'].get(rid) or {}
         if r.get('key') and sid not in session.get('assets', {}):
-            items.append((sid, 0, r['key'], False))
+            items.append((sid, 0, rid, r['key'], False))
     rows = []
-    for sid, start, key_, graphic in sorted(items, key=lambda x: x[1]):
-        try:
-            rows.append({'label': sid, 'at_s': _sec(start, fps), 'graphic': graphic, 'hashes': lookalike.image_hashes(store.get(key_), graphic)})
-        except Exception:   # a missing or unreadable picture is not a look-alike
-            continue
-    return lookalike.pairs(rows)   # ponytail: reads every placed picture on each check; cache the hashes on the reference if checks get slow
+    for sid, start, rid, key_, graphic in sorted(items, key=lambda x: x[1]):
+        kept = (session['references'].get(rid) or {}).get('dhash')   # finding 9: the fingerprint kept at approval; the file is read only for a picture approved before it
+        if kept is None:
+            kept = _fingerprints(store, key_)
+        if kept is not None:
+            rows.append({'label': sid, 'at_s': _sec(start, fps), 'graphic': graphic, 'hashes': [kept['graphic' if graphic else 'picture']]})
+    return lookalike.pairs(rows)
 
 
 def add_asset(conn, store, user, run, outputs, shot_id, file_key, sha256, size, kind, quote):

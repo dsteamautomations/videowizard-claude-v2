@@ -82,5 +82,15 @@ def test_a_proposed_reuse_waits_on_the_page_for_the_operators_words_and_the_trea
     assert HTML.count('+reuseBox(s)+') == 2   # the Pictures and the Takes steps
 
 
+def test_the_page_places_a_clip_stretch_and_proposes_a_reuse_through_the_server_functions():
+    """Finding 7: one flow, two front ends."""
+    for needle in ('function clipForm', 'data-a="clip"', "action:'clip'", 'rf-why-', 'rf-alt-', 'rf-crop-', 'Use this stretch'):
+        assert needle in HTML, needle
+    assert HTML.count('+clipForm(s)+') == 2   # the Pictures and the Takes steps
+    from pathlib import Path
+    web = (Path(__file__).resolve().parents[1] / 'app' / 'web.py').read_text(encoding='utf-8')
+    assert "'clip': lambda: V.fill_clip(" in web and "body.get('considered')" in web
+
+
 def test_an_empty_words_box_is_marked_and_a_rejected_picture_has_its_badge_and_button():
     assert 'need-words' in HTML and "data-a=\"reject\"" in HTML and 'rejected' in HTML

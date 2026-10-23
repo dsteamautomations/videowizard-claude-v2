@@ -187,6 +187,33 @@ def test_cuts_fall_in_pauses_and_pictures_start_on_their_words():
     assert VC.timing_warnings('G1', [], timing, 25) == [] and VC.timing_warnings('G1', [], None, 25) == []
 
 
+def test_a_shots_words_are_found_after_the_previous_shots_words():
+    """Finding 4: two shots that open with the same words."""
+    w = lambda text, a, b: {'text': text, 'start_frame': a, 'end_frame': b}
+    timing = {'words': [w('The', 0, 5), w('wall', 6, 12), w('is', 13, 16), w('red.', 17, 30), w('The', 45, 50), w('wall', 51, 57), w('is', 58, 61), w('tall.', 62, 80)]}
+    gaps = {'G1': {'start_frame': 0, 'end_frame': 1000, 'timing': timing}}
+    doc = plan([{**shot('IM1', 0, 40, 'image'), 'narration': 'The wall is red.'}, {**shot('IM2', 40, 100, 'image'), 'narration': 'The wall is tall.'},
+                shot('VS1', 100, 500, 'video'), shot('VS2', 500, 1000, 'video')])
+    assert not [x for x in VC.validate_plan(doc, gaps, Fraction(25))[1] if x['kind'] == 'words_off_picture']
+
+
+def test_a_return_names_a_shot_the_film_shows():
+    """Finding 5: a shot of the alternative that is not recommended is never on screen."""
+    base = plan([shot('VS1', 0, 500, 'video'), shot('VS2', 500, 1000, 'video')])
+    gap = base['gaps'][0]
+    scene = lambda sid, shots: {**gap['scenes'][0], 'id': sid, 'shots': shots}
+    two = {**gap, 'scenes': [], 'recommended_choice': 'A', 'decision_reason': 'r',
+           'choices': [{'id': 'A', 'title': 'a', 'why': 'w', 'formats': ['ai_video'], 'description': 'd', 'tradeoff': 't', 'source_strategy': 's', 'scenes': [scene('SA', [shot('A1', 0, 500, 'video'), shot('A2', 500, 1000, 'video')])]},
+                       {'id': 'B', 'title': 'b', 'why': 'w', 'formats': ['ai_video'], 'description': 'd', 'tradeoff': 't', 'source_strategy': 's', 'scenes': [scene('SB', [shot('B1', 0, 500, 'video'), shot('B2', 500, 1000, 'video')])]}]}
+    gaps2 = {'G1': {'start_frame': 0, 'end_frame': 1000}, 'G2': {'start_frame': 1000, 'end_frame': 2000}}
+    later = {'gap_id': 'G2', 'intent': 'x', 'treatment_fit': 'fits', 'scenes': [scene('SC2', [{**shot('V3', 1000, 1500, 'video'), 'return_of': 'B1', 'differs_by': 'from above'}, shot('V4', 1500, 2000, 'video')])]}
+    doc = {**base, 'gaps': [two, later]}
+    with pytest.raises(ValueError, match='names an earlier shot'):
+        VC.validate_plan(doc, gaps2, Fraction(25))
+    later['scenes'][0]['shots'][0]['return_of'] = 'A1'
+    VC.validate_plan(doc, gaps2, Fraction(25))
+
+
 def test_a_video_shot_longer_than_the_default_generator_is_warned():
     doc = plan([shot('VS1', 0, 590, 'video'), shot('VS2', 590, 1000, 'video')])   # 23.6 s and 16.4 s
     result, warnings = VC.validate_plan(doc, GAPS, Fraction(25))

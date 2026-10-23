@@ -1501,6 +1501,8 @@ def cmd_visuals(a):
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
         emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote, **_reuse_fields(a)}), 0, f'Still set for {a.shot} from reference {a.ref}.')
     if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
+        if not a.shot or not a.clip or a.at is None:
+            emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)
         out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': float(a.at), 'quote': a.quote, **_reuse_fields(a)})
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
     if a.what == 'reuse':   # design/89 H7: the operator approves a proposed reuse with their words

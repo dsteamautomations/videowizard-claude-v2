@@ -189,6 +189,20 @@ function footageBlock(){   // design/88 F4: the footage is measured and told; th
     '<textarea id="ftwords" class="words" style="width:100%;margin-top:6px" placeholder="your words: what the footage really is"></textarea><div class="btns"><button class="go" data-a="footage">Save the correction</button></div></div></div>';}
 function wireFootage(){const o=$('ft-open');if(!o)return;o.addEventListener('click',()=>{$('ft-form').hidden=!$('ft-form').hidden;});
   $('s-treatment').querySelectorAll('button[data-a="footage"]').forEach(b=>b.addEventListener('click',()=>click(b)));}
+function clipForm(s){   // design/89 B3, finding 7: a stretch of a clip fills a still or a video shot; the reuse fields when the clip is already on screen
+  if(!['image','video'].includes(s.visual_type)||!(data.clips||[]).length||stage()!=='visuals')return '';const id=esc(s.shot_id);
+  return '<details style="margin-top:8px"><summary class="ds" style="cursor:pointer">Use a stretch of a clip instead</summary><div class="btns">'+
+    '<select id="cf-c-'+id+'">'+data.clips.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+' ('+Math.round(Number(c.duration_s)||0)+' s)</option>').join('')+'</select>'+
+    '<input id="cf-at-'+id+'" type="number" min="0" step="0.1" placeholder="from second" style="width:120px"></div>'+reuseFields(s)+
+    '<textarea id="cf-w-'+id+'" class="words" style="width:100%;margin-top:6px" placeholder="your words for this stretch"></textarea>'+
+    '<div class="btns"><button class="go" data-a="clip" data-shot="'+id+'">Use this stretch</button></div></details>';}
+function reuseFields(s){const id=esc(s.shot_id);   // H2, H4: only when the footage is already on screen elsewhere; the operator then approves the reuse
+  return '<div class="ds" style="margin-top:6px">Only if this footage is already on screen elsewhere:</div>'+
+    '<input id="rf-why-'+id+'" placeholder="why the same footage again" style="width:100%">'+
+    '<input id="rf-alt-'+id+'" placeholder="the new angle considered, and why it adds nothing" style="width:100%;margin-top:4px">'+
+    '<input id="rf-crop-'+id+'" placeholder="a different framing: x,y,w,h (for example 0.1,0.1,0.7,0.7)" style="width:100%;margin-top:4px">';}
+function reuseOf(shot){const v=k=>(($('rf-'+k+'-'+shot)||{}).value||'').trim();const c=v('crop');
+  return {reuse:v('why')||null,considered:v('alt')||null,crop:c?c.split(',').map(Number):null};}
 function reuseBox(s){   // design/89 H2, H7: a reuse the assistant proposed waits for the operator's own words
   const p=(data.reuse_pending||{})[s.shot_id];if(!p)return '';
   return '<div class="card" style="border-color:var(--accent);margin-top:8px"><b>Showing footage again</b><div class="ds">Clip '+esc(p.clip_id)+' is already on screen in '+esc(p.on_screen)+'. '+
@@ -378,11 +392,12 @@ function renderPictures(){
           if(can)sh+='<div class="btns"><span class="ds">Tick the states in order, your words at the foot, then:</span><button class="go" data-a="sequence" data-shot="'+esc(s.shot_id)+'">Approve the sequence</button></div>';}
         else{sh+='<div class="ds">No states generated yet.</div>';}
       }else{
-        if(s.asset){sh+='<div class="strip"><div class="pic on"><img src="'+esc(s.asset.url)+'" alt=""><div class="cap">the picture for this shot ✓</div></div></div>';}
+        if(s.asset&&s.asset.kind==='clip'){sh+='<div class="ds ok">Filled with '+esc(s.asset.name)+' from '+esc(s.asset.in_s)+' s to '+esc(s.asset.out_s)+' s ✓</div>';}   // design/89 B3
+        else if(s.asset){sh+='<div class="strip"><div class="pic on"><img src="'+esc(s.asset.url)+'" alt=""><div class="cap">the picture for this shot ✓</div></div></div>';}
         else if(mine.length){sh+='<div class="strip">'+mine.map(r=>refCard(r,can?'<div class="btns" style="margin:0 6px 6px"><button data-a="still" data-shot="'+esc(s.shot_id)+'" data-ref="'+esc(r.id)+'" class="go">Use for the shot</button></div>':'')).join('')+'</div>';}
         else{sh+='<div class="ds">No picture yet.</div>';}
       }
-      h+=sh+reuseBox(s)+'</div>';
+      h+=sh+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
   $('s-pictures').innerHTML=h;
@@ -397,6 +412,7 @@ function shotState(s){   // design/86 K3: whose turn it is on this shot, and how
   const ids=new Set(kf.map(r=>r.id)), isStart=r=>!(r.parents||[]).some(p=>ids.has(p));
   const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected);
   if(s.takes.some(k=>k.selected))return ['ok','Take selected.'];
+  if(s.asset&&s.asset.kind==='clip')return ['ok','Filled with a stretch of '+(s.asset.name||'a clip')+'.'];   // design/89 B3
   if(ready)return ['you','Your turn: watch the take and select it, or reject it with what is wrong.'];
   if(open)return ['wait','The take is being made, about 3 minutes. You may leave the page; it refreshes itself.'];
   const gen=kf.filter(r=>r.status==='generating');
@@ -427,7 +443,7 @@ function renderTakes(){
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The start and end images:</div><div class="strip">'+pair.map(r=>refCard(r)).join('')+'</div>';}
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="btns"><button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
-      h+=sh+reuseBox(s)+'</div>';
+      h+=sh+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
   $('s-takes').innerHTML=h;
@@ -481,7 +497,10 @@ async function click(b){
   if(a==='approve'||a==='reject'){const pw=$('pwords'), pq=pw?pw.value.trim():q;   // design/80 S6: the words sit with the button
     if(!pq){if(pw)needWords('pwords',a==='approve'?'Your words for this picture go in the box above the button.':'Say why in the box above the button, then Reject.');else need(a==='approve'?'Your words for this picture are required.':'Say why in the box, then Reject.');return;}
     const j=await send(a==='approve'?{action:'approve',reference_id:b.dataset.ref,sha256:b.dataset.sha,quote:pq}:{action:'reject',reference_id:b.dataset.ref,notes:pq,quote:pq},a==='approve'?'Picture approved.':'Picture rejected; the next one starts from the approved picture.');return;}
-  if(a==='still'){if(!q){need('Your words for this picture are required.');return;}await send({action:'still',shot_id:b.dataset.shot,reference_id:b.dataset.ref,quote:q},'Picture held for the shot.');return;}
+  if(a==='still'){if(!q){need('Your words for this picture are required.');return;}await send({action:'still',shot_id:b.dataset.shot,reference_id:b.dataset.ref,quote:q,...reuseOf(b.dataset.shot)},'Picture held for the shot.');return;}
+  if(a==='clip'){const sh=b.dataset.shot, w=(($('cf-w-'+sh)||{}).value||'').trim(), at=($('cf-at-'+sh)||{}).value;   // design/89 B3: the same server function as `vw visuals clip`
+    if(at===''||at==null){msg('Say from which second of the clip.',true);return;} if(!w){needWords('cf-w-'+sh,'Your words for this stretch are required.');return;}
+    await send({action:'clip',shot_id:sh,clip_id:$('cf-c-'+sh).value,in_s:Number(at),quote:w,...reuseOf(sh)},'Stretch placed for the shot.');return;}
   if(a==='sequence'){const ids=seqTicks[b.dataset.shot]||[];if(!ids.length){msg('Tick the states first.',true);return;} if(!q){need();return;}const j=await send({action:'sequence',shot_id:b.dataset.shot,reference_ids:ids,quote:q},'Sequence approved and held.');if(j)delete seqTicks[b.dataset.shot];return;}
   if(a==='select-take'){if(!q){need('Your words after watching are required.');return;}await send({action:'select-take',job_id:b.dataset.job,quote:q},'Take selected.');return;}
   if(a==='reject-take'){if(!q){need('Say why in the box, then Reject.');return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}

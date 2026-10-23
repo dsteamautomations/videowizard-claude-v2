@@ -316,7 +316,9 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
-            'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),
+            'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote, {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),
+            'clip': lambda: V.fill_clip(store, user, run, outputs, body['shot_id'], body['clip_id'], float(body.get('in_s') or 0), quote,
+                                        {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),   # design/89 B3, finding 7
             'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),

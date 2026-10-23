@@ -411,6 +411,28 @@ def test_two_candidates_for_a_start_and_the_end_written_with_it_is_queued_on_app
     assert VS.approve_reference(store, USER, RUN, [], a['id'], 'a' * 64, 'Yes.')['status'] == 'approved'   # without a connection (chat path today): approval only
 
 
+def test_an_approved_picture_keeps_its_fingerprint_and_the_check_reads_it_not_the_store():
+    """Finding 9."""
+    from io import BytesIO
+    PIL = pytest.importorskip('PIL.Image')
+    from PIL import ImageDraw
+    img = PIL.new('RGB', (160, 90), (90, 120, 60))
+    ImageDraw.Draw(img).rectangle((20, 10, 100, 70), fill=(200, 30, 30))
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    sess = session(references={'R1': {**ref('R1'), 'sha256': 'a' * 64}, 'R2': {**ref('R2'), 'sha256': 'b' * 64}})
+    store = store_with(sess)
+    store.files['run-1/visuals/references/R1.png'] = buf.getvalue()
+    store.files['run-1/visuals/references/R2.png'] = buf.getvalue()
+    VS.approve_reference(store, USER, RUN, [], 'R1', 'a' * 64, 'yes')
+    VS.approve_reference(store, USER, RUN, [], 'R2', 'b' * 64, 'yes')
+    s = saved(store)
+    assert isinstance(s['references']['R1']['dhash']['picture'], int)
+    s['assets'] = {'IM1': {'kind': 'still', 'reference_id': 'R1', 'key': 'gone/1.png', 'placement': {'start_frame': 0, 'end_frame': 100}},
+                   'IM2': {'kind': 'still', 'reference_id': 'R2', 'key': 'gone/2.png', 'placement': {'start_frame': 3000, 'end_frame': 3100}}}
+    assert [(p['a'], p['b']) for p in VS.look_alike_placed(store_with(s), s)] == [('IM1', 'IM2')]   # the files are not read: their keys lead nowhere
+
+
 def test_the_feedback_file_opens_with_the_rounds_summary():
     """design/86 K9."""
     records = [{'kind': 'image', 'verdict': 'pass'}, {'kind': 'image', 'verdict': 'reject'}, {'kind': 'image', 'verdict': 'pass'}, {'kind': 'take', 'verdict': 'pass'}, {'kind': 'image', 'verdict': 'pass'}]

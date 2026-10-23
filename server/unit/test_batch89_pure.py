@@ -62,7 +62,8 @@ def test_a_still_renders_its_exact_frames_and_moves_5_percent_unless_none(tmp_pa
 
 def clip_session(**extra):
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), **extra)
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   **{'repeat_rules': 'refuse', **extra})
     return doc, sess
 
 
@@ -200,3 +201,47 @@ def test_the_plan_check_lists_the_placed_pictures_that_look_alike():
     store.files['run-1/a.png'] = photo
     store.files['run-1/b.png'] = photo
     assert [(p['a'], p['b']) for p in VS.look_alike_placed(store, saved(store))] == [('IM1', 'IM2')]
+
+
+# ---------- the review of batch 1: the fixes ----------
+
+def test_a_visuals_session_begun_before_the_release_is_warned_not_refused():
+    """Finding 1: SK's rule, a run in progress is warned for one release; a session begun on this release refuses."""
+    doc, sess = clip_session(references={'F1': frame_ref('F1', 'c1', 3.0)})
+    sess.pop('repeat_rules')   # begun before batch 1
+    store = store_with(sess, doc)
+    m, data = master([{'kind': 'event', 'sub_clip_id': 'c1:SUB_01', 'source_in_frame': 0, 'source_out_frame': 100, 'timeline_in_frame': 0, 'timeline_out_frame': 100}])
+    store.files['run-1/master-v1.json'] = data
+    out = VS.still_from_reference(store, USER, RUN, [MEDIA, m], 'IM1', 'F1', 'yes')
+    assert out['warnings'] and out['warnings'][0].startswith('H3: clip c1 plays elsewhere') and saved(store)['assets']['IM1']['repeat_warnings'] == out['warnings']
+
+
+def test_a_new_visuals_session_refuses_the_repeat_rules(monkeypatch):
+    monkeypatch.setattr(VS, 'gaps_source', lambda store, outputs: {'from': 'first_cut', 'fps': '25', 'gaps': {}})
+    assert VS.session_of(FakeStore({}), RUN, [], create=True)['repeat_rules'] == 'refuse'
+
+
+def test_a_shot_may_take_its_own_former_still_as_its_start_image():
+    """Finding 2."""
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), repeat_rules='refuse',
+                   references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved')}, assets={'VS1': {'kind': 'still', 'reference_id': 'R1', 'key': 'k', 'placement': {'start_frame': 900, 'end_frame': 1150}}},
+                   bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    out = VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2',
+                                                                 'continuity_notes': 'the wall stays'})
+    assert out['duration_seconds'] == 10
+
+
+def test_a_session_prepared_before_batch_1_gets_its_timing_when_first_needed():
+    """Finding 3: the check and the packet build the timing; no prepare needed."""
+    doc, sess = clip_session(references={'R1': ref('R1', 'approved')}, bindings={})
+    sess['bindings'] = {'VS1': {'gap_digest': gap_digest(doc, doc['gaps'][1]), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}}
+    store = store_with(sess, doc)
+    w = lambda i, text, a, b: {'id': f'w{i}', 'text': text, 'start_frame': a, 'end_frame': b}
+    store.files['run-1/stage2/session.json'] = json.dumps({'package': {'key': 'run-1/stage2/package.json'}}).encode()
+    store.files['run-1/stage2/package.json'] = json.dumps({'narration': {'words': [w(0, 'Bricks', 900, 950), w(1, 'stand.', 952, 1000)],
+                                                                         'sentences': [{'text': 'Bricks stand.', 'start_frame': 900, 'end_frame': 1000}]}}).encode()
+    assert 'timing' not in saved(store)['source']['gaps']['G2']
+    ctx = VS.packet(store, RUN, [], 'VS1')['preparation']['context']
+    assert ctx['timing']['sentences'][0]['text'] == 'Bricks stand.' and saved(store)['source']['gaps']['G2']['timing']['words'][0]['text'] == 'Bricks'
