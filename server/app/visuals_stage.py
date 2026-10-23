@@ -404,6 +404,8 @@ def treatment(store, user, run, outputs, document, quote):
                 routes_.append(r)
         e['routes'] = routes_
         need(str(e.get('picture') or '').strip(), f"gap {e['gap_id']}: say the picture in one line.")
+        need(isinstance(e.get('depicts', []), list) and all(isinstance(x, str) and x.strip() for x in e.get('depicts', [])),
+             f"gap {e['gap_id']}: depicts is a list of lines, one per graphic, each saying what it shows.")   # design/91 N10
         need(isinstance(e.get('seconds'), (int, float)) and e['seconds'] > 0, f"gap {e['gap_id']}: seconds must be a number above zero.")
         need(isinstance(e.get('images'), int) and e['images'] >= 0, f"gap {e['gap_id']}: images must be a whole number.")
         need(isinstance(e.get('frozen_seconds', 0), (int, float)) and 0 <= e.get('frozen_seconds', 0) <= e['seconds'],
@@ -495,6 +497,9 @@ def page_view(conn, store, run, outputs, code):
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'],
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
                                            'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
+                                           'depicts': sh.get('depicts') or '', 'descriptors': sh.get('descriptors') or [], 'carries_over': sh.get('carries_over') or [],   # design/91
+                                           'facts': [f"{f['looks']} ({f['status']}{', ' + f['source'] if f.get('source') else ''})" for f in (plan or {}).get('visual_facts') or []
+                                                     if f['id'] in (sh.get('fact_ids') or []) or f.get('about') in (sh.get('element_ids') or [])],
                                            'claims': sh.get('claims') or [], 'spec': ({'table': spec_table(sh['drawing_spec']), 'relationships': sh['drawing_spec'].get('relationships') or [],   # design/89 C1, D4
                                                                                       'label': sh['drawing_spec'].get('label') or '',
                                                                                       'approved': (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') == spec_digest(sh['drawing_spec'])}
@@ -694,7 +699,8 @@ def add_reference(conn, store, user, run, outputs, body, content):
 # ---------- design/73: reference assets from the footage first, then Google Images ----------
 
 STOP = {'the', 'and', 'with', 'from', 'that', 'this', 'their', 'then', 'into', 'onto', 'over', 'under', 'same', 'exact', 'representative', 'view', 'views', 'front', 'side', 'close'}
-KIND_MATCH = {'person': {'person'}, 'animal': {'person', 'other'}, 'object': {'tool', 'material', 'machine', 'vehicle', 'other', 'text'}, 'place': {'structure', 'other'}}
+KIND_MATCH = {'person': {'person'}, 'animal': {'person', 'other'}, 'object': {'tool', 'material', 'machine', 'vehicle', 'other', 'text'}, 'place': {'structure', 'other'},
+              'material': {'material', 'other'}, 'process': {'tool', 'machine', 'material', 'other'}}   # design/91 N6
 
 
 def _words(text):
@@ -1017,7 +1023,8 @@ def generate_image(conn, store, user, run, outputs, body):
             except ValueError as exc:
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
-    lines, warns = _graphic_lines(session, plan, body, parents, answer)   # design/89 C, D
+    named = guarded(lambda: locate(store, session, body['shot_id']))[3] if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
+    lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     check_cap(conn, run, session, prices()['image_inr'] * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
     op = 'edit' if parents else 'generate'
     made = []
@@ -1037,16 +1044,35 @@ def spec_digest(spec):
     return digest(spec)
 
 
-def _graphic_lines(session, plan, body, parents, answer):
+def _fact_line(f):
+    return {'check': 'fact: ' + f['id'], 'pass_when': f"it looks as the fact says: {f['looks']}" + (f"; done as: {f['how']}" if f.get('how') else ''), 'weight': 'must'}
+
+
+def _graphic_lines(session, plan, body, parents, answer, named=None):
     """design/89 C1, C4, D3-D5: every picture is warned without its answer form; a picture of a graphic carries its claims, the spec's relationships,
-    its sizes and its label as lines, and is warned without its style sheet or an approved spec (refused from the next release)."""
+    its sizes and its label as lines, and is warned without its style sheet or an approved spec (refused from the next release).
+    design/91: every picture of an element carries the element's facts (N6); a picture made for a named shot carries that shot's claims (never shown as
+    their opposite), its descriptive words (N8), what the step before left (N14) and its facts; a graphic carries what it depicts (N10)."""
     if body.get('fix_of'):   # a fix round carries its picture's form when it had one
         return [], []
     warns = [] if answer is not None else ['no answer form with this picture: write it with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]
+    if body['kind'] == 'keyframe' and named is None:
+        warns.append('name the shot this picture is for (--shot), so its claims, words and the state carried over are checked' + NEXT_RELEASE)
+    facts = {f['id']: f for f in plan.get('visual_facts') or [] if f.get('status') != 'unknown'}   # an unknown fact is never a line: it is never drawn
+    lines = [_fact_line(f) for f in facts.values() if f.get('about') == body['element_id']]
+    if named is not None:
+        graphic = named['visual_type'] in GRAPHIC_TYPES
+        lines += [{'check': 'claim: ' + c, 'pass_when': (f'the picture shows that {c}, plainly, without the narration' if graphic else
+                                                         f'the picture never shows the opposite of: {c}'), 'weight': 'must'} for c in named.get('claims') or []]
+        lines += [{'check': 'word: ' + d, 'pass_when': f'what the narration calls {d} looks {d}, never the opposite', 'weight': 'must'} for d in named.get('descriptors') or []]
+        lines += [{'check': 'carried over: ' + c, 'pass_when': f'{c} is visible, as the step before left it', 'weight': 'must'} for c in named.get('carries_over') or []]
+        lines += [_fact_line(facts[f]) for f in named.get('fact_ids') or [] if f in facts]
     shots = [sh for _, sh in _shots_with(plan, session, body['element_id']) if sh['visual_type'] in GRAPHIC_TYPES]
     if not shots:
-        return [], warns
-    lines = [{'check': 'claim: ' + c, 'pass_when': f'the picture shows that {c}, plainly, without the narration', 'weight': 'must'} for sh in shots for c in sh.get('claims') or []]
+        return _dedupe(lines), warns
+    lines += [{'check': 'claim: ' + c, 'pass_when': f'the picture shows that {c}, plainly, without the narration', 'weight': 'must'} for sh in shots for c in sh.get('claims') or []]
+    lines += [{'check': 'depicts: ' + sh['depicts'], 'pass_when': f"the drawing shows {sh['depicts']}, in the subject's own form (an alternative only as a labelled contrast)",
+               'weight': 'must'} for sh in shots if str(sh.get('depicts') or '').strip()]   # design/91 N10
     lines += [{'check': 'relationship: ' + r, 'pass_when': f'in the drawing, {r}', 'weight': 'must'} for sh in shots for r in (sh.get('drawing_spec') or {}).get('relationships') or []]
     for sh in shots:   # D3, D5: an unknown size shows no figure; the label is on the drawing; a known size reads as the spec says
         spec = sh.get('drawing_spec') or {}
@@ -1062,7 +1088,12 @@ def _graphic_lines(session, plan, body, parents, answer):
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
             warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {sh['id']} --quote`, or on the page)" + NEXT_RELEASE)
-    return lines, warns
+    return _dedupe(lines), warns
+
+
+def _dedupe(lines):
+    seen = set()
+    return [l for l in lines if not (l['check'] in seen or seen.add(l['check']))]
 
 
 def approve_spec(store, user, run, outputs, shot_id, quote):
@@ -1074,7 +1105,8 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     need(spec, f'Shot {shot_id} has no drawing spec.')
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'table': spec_table(spec), 'relationships': spec.get('relationships') or [], 'label': spec.get('label') or ''}
+    return {'shot_id': shot_id, 'table': spec_table(spec), 'relationships': spec.get('relationships') or [], 'label': spec.get('label') or '',
+            'depicts': shot.get('depicts') or ''}   # design/91 N10: the spec repeats what the drawing depicts
 
 
 def spec_table(spec):
@@ -1379,7 +1411,8 @@ def packet_context(session, plan, gap, shot):
     timing = (session['source']['gaps'].get(gap['gap_id']) or {}).get('timing')   # design/89 A1: when each sentence is spoken, and the sentences on either side
     return {'gap_id': gap['gap_id'], 'gap_words': words, 'treatment_picture': treatment, 'intended_visuals': intended, 'neighbours': neighbours, 'earlier_rejections': rejected,
             'timing': ({k: timing.get(k) for k in ('sentences', 'before', 'after')} if timing else None),
-            'footage_neighbours': footage_nb}
+            'footage_neighbours': footage_nb,
+            'visual_facts': [f for f in plan.get('visual_facts') or [] if f['id'] in (shot.get('fact_ids') or []) or f.get('about') in (shot.get('element_ids') or [])]}   # design/91 N6
 
 
 def exact_patterns(plan, shot, refs):

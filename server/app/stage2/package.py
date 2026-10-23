@@ -110,7 +110,17 @@ def coverage(beats, rows, policy):
     return report
 
 
+def with_steps(beats, sentences):
+    """design/91 N17: a scene's steps are its timed sentences, numbered BEAT_03.S2; a sentence belongs to the scene its first word starts in."""
+    out = []
+    for b in beats:
+        own = [s for s in sentences or [] if b['timeline_start_frame'] <= s['start_frame'] < b['timeline_end_frame']]
+        out.append({**b, 'steps': [{'step_id': f"{b['beat_id']}.S{n}", 'text': s['text'], 'start_frame': s['start_frame'], 'end_frame': s['end_frame']} for n, s in enumerate(own, 1)]})
+    return out
+
+
 def build(run, production, beats, cards, rows, landmarks, entities, learned_rules, timeline, policy, prompt, narration=None):
+    beats = with_steps(beats, (narration or {}).get('sentences'))
     return {'contract': 'vw2-options-package-v1', 'project': {'code': run['code'], 'client': run.get('client'), **production}, 'timeline': timeline, 'policy': policy,
             'narration': narration or {}, 'beats': beats, 'cards': cards, 'sub_clips': rows, 'landmarks': sorted(landmarks), 'entities': entities, 'learned_rules': learned_rules,
             'coverage': coverage(beats, rows, policy), 'prompt': prompt,
@@ -122,6 +132,10 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
                                                                                           'hold_reason': 'only for a real shot over 4 s', 'illustrates_word_id': '', 'action_word_id': ''},
                                                                                          {'blank': True, 'timeline_frames': 75, 'intent': 'what the AI video or animation must show', 'short_reason': 'only for a blank under 3 s'}],
                                                                               'reasoning': 'why these sub-clips, which log fields drove it', 'log_fields_cited': ['SUB_x.primary_fit_for_beats'],
-                                                                              'best_unchosen': {'sub_clip_id': '', 'rule': 'the rule that excluded it'}}],
+                                                                              'best_unchosen': {'sub_clip_id': '', 'rule': 'the rule that excluded it'},
+                                                                              'steps': [{'step_id': 'BEAT_01.S1', 'event': 1, 'why': 'the logged action, process_stage or outcome_state that shows this step',
+                                                                                         'claim': False}],   # design/91 N17: every step of the scene once
+                                                                              'carries_over': ['what the step before left, which must still be visible'],   # design/91 N14
+                                                                              'moves_place': 'only when the narration moves to another place mid-process'}],
                                    'gaps': [{'beat_id': 'BEAT_02', 'reason': 'zero coverage'}],
                                    'qc_self': {f'Q{i}': {'pass': True, 'evidence': ''} for i in range(1, 9)}}}}

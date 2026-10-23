@@ -316,3 +316,46 @@ These override the sections above where they differ. The builder's reading of th
   - The shot's change list and motion text go with the questions as the plan.
   - Each answer gives pass or fail, what was seen and the second it happens. The answers go on the take's card and in `vw visuals status`.
   - A failed must line marks the take. The operator keeps it or asks for another; nothing is taken again automatically. A Gemini error is recorded on the take and never blocks.
+
+**Batch 2 as built (N17, N6, N7, N8, N10, N14):**
+
+- **N17, the step being narrated (options).**
+  - The options package gives every scene its **steps**: its timed sentences, numbered `BEAT_03.S2`.
+  - Each option carries a **step map**: every step of its scene once, with the event that shows it (a real shot or a blank for visuals) and, for a real shot, why its logged action, process stage or outcome shows that step.
+  - Refused:
+    - a step left out or named twice;
+    - an unknown step or event;
+    - a real shot without its why.
+  - Flagged for the operator:
+    - a real shot whose logged process stage is not one the scene narrates;
+    - a claim step (a step whose text makes a claim, marked `claim: true`) shown by footage.
+  - An option with no step map at all is flagged this release and refused from the next.
+- **N17 (visuals).** A shot with claims that is not a graphic says how its picture shows them (`evidence`: a test, a table, the result in a scene); without it, it warns.
+- **N14, consecutive steps (options).**
+  - An option names the state carried over from the step before (`carries_over`: the plinth, the risen dough).
+  - A real shot whose logged landmarks and props don't include it is flagged.
+  - When two consecutive scenes narrate the same process stage, a change of colour group between the last shot of one and the first of the next is flagged, unless the second option names the move (`moves_place`).
+- **N14 (visuals).**
+  - A shot carries `carries_over`, the state from the previous step that must be visible. It becomes a must line on the shot's pictures.
+  - A shot whose narration presents it as the next step ("then", "next", "on top of", "once") without `carries_over` warns.
+- **N6, facts.**
+  - The plan carries `visual_facts`: what it looks like, how it is done, the usual setting and the tools, with its source and status (`confirmed` from the client or a standard, `observed` in the footage, `unknown`).
+  - Two new element kinds: `material` and `process`. A setting stays `place`.
+  - Refused:
+    - a fact without a source unless it is unknown;
+    - a fact about an unknown element;
+    - a shot naming an unknown fact;
+    - a close shot that rests on an unknown fact ("never invented: avoid the close detail, or ask the operator").
+  - A shot naming a material or process element with no fact about it warns.
+  - Every picture of an element carries its facts as must lines.
+- **N7, practice.** Two fixed lines for scene pictures (not graphics), as `should` lines so they never start an automatic fix round on their own:
+  - the setting and its scale are plausible for what is shown;
+  - people handle tools and materials as a practitioner would.
+- **N8, the words.**
+  - Claims apply to every shot. A shot lists the descriptive words the narration uses about its subject (`descriptors`).
+  - When a picture is generated for a named shot (`--shot`), each claim becomes a must line that it is "never shown as its opposite", and each descriptor a must line.
+  - A shot with narration and nothing listed warns this release (the C1 warning, extended). A keyframe made without `--shot` warns.
+- **N10, the subject itself.**
+  - Every graphic shot carries `depicts` (what it shows, in the subject's own form, or labelled as the contrast). The treatment entry may list it for the operator's approval.
+  - It becomes a must line on the graphic's pictures, and `vw visuals spec` repeats it.
+  - A graphic without `depicts` warns this release and is refused from the next.

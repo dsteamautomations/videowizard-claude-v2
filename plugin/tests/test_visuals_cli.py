@@ -683,3 +683,25 @@ def test_the_prompt_and_steps_carry_the_change_list_the_action_budget_and_the_ta
     for needle in ('`changes`', '`min_s`', 'is marked', 'read by Gemini first'):
         assert needle in steps, needle
     assert '`changes`' in doc and '`min_s`' in doc
+
+
+def test_an_image_names_the_shot_it_is_for(harness, monkeypatch, capsys):
+    """design/91 N8."""
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.append((path, body)) or {'model': 'gpt-image-2.5', 'reference_id': 'R1'}))
+    code, out, err = run(args(what='image', element='E1', kind='keyframe', prompt='A mason at the wall.', shot='VS1'), capsys)
+    assert code == 0 and posted[-1][1]['shot_id'] == 'VS1'
+    run(args(what='image', element='E1', kind='keyframe', prompt='A mason at the wall.'), capsys)
+    assert 'shot_id' not in posted[-1][1]
+
+
+def test_the_procedures_carry_the_step_map_facts_words_and_depicts():
+    """design/91 batch 2."""
+    op, osteps = STAGES['options']['prompt'], ' '.join(STAGES['options']['steps'])
+    for needle in ('`steps`', 'BEAT_03.S2', '`carries_over`', '`moves_place`', 'N17 and N14'):
+        assert needle in op, needle
+    assert '`steps` map' in osteps
+    vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for needle in ('`descriptors`', '`evidence`', '`visual_facts`', '`fact_ids`', 'never invented', '`depicts`', '`carries_over`', '`--shot S`'):
+        assert needle in vp and needle in vsteps, needle
+    assert '`steps` map' in doc and '`depicts`' in doc

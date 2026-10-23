@@ -16,6 +16,9 @@ CHECK_MODEL = 'gemini-3.8-flash'
 FIXED = [{'check': 'readable text', 'pass_when': 'no readable text anywhere in the frame unless the prompt asked for exact text', 'weight': 'must'},
          {'check': 'a real face', 'pass_when': 'no face that matches a person in the footage frames sent as references', 'weight': 'must'},
          {'check': 'nothing extra', 'pass_when': 'nothing in the frame that the prompt did not ask for (a second person, a vehicle, a sign, a logo)', 'weight': 'should'}]
+SCENE_FIXED = [   # design/91 N7: for scene pictures, not graphics; should lines, so they never start a fix round alone
+    {'check': 'plausible setting', 'pass_when': 'the setting and its scale are plausible for what is shown: the location, the size of the spaces against a person, the ground', 'weight': 'should'},
+    {'check': 'practitioner', 'pass_when': 'people handle tools and materials as a practitioner would (nothing set down on fresh work, the right tool for the task)', 'weight': 'should'}]
 SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'object', 'properties': {'n': {'type': 'integer'}, 'pass': {'type': 'boolean'}, 'seen': {'type': 'string'}},
                                                                                 'required': ['n', 'pass', 'seen']}}},
           'required': ['lines']}
@@ -64,7 +67,7 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
 def lines_of(ref):
     """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
     own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]
-    return own + FIXED
+    return own + FIXED + ([] if ref.get('element_kind') in ('graphic', 'style') else SCENE_FIXED)
 
 
 def build(candidate_png, parents, lines, prompt):

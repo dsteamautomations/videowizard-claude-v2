@@ -201,6 +201,44 @@ def validate_options(doc, package, policy):
                 flags.append(f'{tag}: B3 cuts inside a narration pause of 1.2 s or more; hold the shot or use a sub-clip with clean natural sound')
             cursor += n_tl
             prev = row
+        # design/91 N17: every step the scene narrates is shown by one event, or left as a blank for visuals
+        own_steps = {s['step_id']: s for s in beat.get('steps') or []}
+        smap = o.get('steps')
+        if smap is None:
+            if own_steps:
+                flags.append(f'OPTION #{n}: N17 no step map: name the event that shows each step of the scene ({", ".join(own_steps)}) (warned in this release; refused from the next)')
+        else:
+            seen = []
+            for s in smap if isinstance(smap, list) else []:
+                sid, k = (s or {}).get('step_id'), (s or {}).get('event')
+                if sid not in own_steps:
+                    refusals.append(f'OPTION #{n}: N17 unknown step {sid!r} for {bid}')
+                    continue
+                seen.append(sid)
+                if not isinstance(k, int) or not 1 <= k <= len(events):
+                    refusals.append(f'OPTION #{n}: N17 step {sid} names event {k}, which this option does not have')
+                    continue
+                e = events[k - 1]
+                if e.get('blank'):
+                    continue
+                if not str(s.get('why') or '').strip():
+                    refusals.append(f'OPTION #{n}: N17 step {sid} is shown by shot {k}: say why (the logged action, process_stage or outcome_state that shows it)')
+                row = rows.get(e.get('sub_clip_id')) or {}
+                if row.get('process_stage') and beat.get('process_stages') and row['process_stage'] not in beat['process_stages']:
+                    flags.append(f"OPTION #{n}: N17 step {sid} ({own_steps[sid]['text'][:60]}) is shown by a clip of the stage {row['process_stage']!r}; the scene narrates "
+                                 f"{', '.join(beat['process_stages'])}: the right step? (the operator decides)")
+                if s.get('claim'):
+                    flags.append(f"OPTION #{n}: N17 step {sid} is a claim ({own_steps[sid]['text'][:60]}) shown by footage: the shot must show its evidence or its result, "
+                                 'or leave a blank for a graphic or a scene of the result')
+            for sid in own_steps:
+                if seen.count(sid) != 1:
+                    refusals.append(f"OPTION #{n}: N17 step {sid} ({own_steps[sid]['text'][:60]}) {'is not shown' if not seen.count(sid) else 'is named twice'}: "
+                                    'name the one event that shows it, or a blank for visuals')
+        for kept in o.get('carries_over') or []:   # design/91 N14: the state the step before left is still visible
+            for k, e in enumerate(events, 1):
+                lm = (rows.get(e.get('sub_clip_id')) or {}).get('landmarks') or []
+                if not e.get('blank') and not any(str(kept).lower() in str(x).lower() or str(x).lower() in str(kept).lower() for x in lm):
+                    flags.append(f"OPTION #{n}: N14 shot {k} ({e.get('sub_clip_id')}) does not show {kept!r}, which the step before left (its log lists {', '.join(map(str, lm)) or 'nothing'})")
         if total != beat['target_beat_frames']:
             refusals.append(f"OPTION #{n}: G11 timeline length {total} frames must equal the beat's {beat['target_beat_frames']}")
         for i, ev in enumerate(events):
@@ -212,6 +250,17 @@ def validate_options(doc, package, policy):
             earlier = [u for u in us[:j] if not (u[1] == bid and u[0] != n)]
             if earlier and not is_reuse:
                 refusals.append(f'OPTION #{n} shot {i + 1}: Q4 clip {cid} is already used (option #{earlier[0][0]}); a second use, even of another part, needs a decision of kind reuse or another clip')
+    # design/91 N14: consecutive scenes narrating the same process stage stay in one place unless the option names the move
+    order = [b for b in package['beats'] if by_beat.get(b['beat_id'])]
+    for a, b in zip(order, order[1:]):
+        if not set(a.get('process_stages') or []) & set(b.get('process_stages') or []):
+            continue
+        oa, ob = by_beat[a['beat_id']][0], by_beat[b['beat_id']][0]
+        last = next((rows.get(e.get('sub_clip_id')) for e in reversed(oa.get('events') or []) if not e.get('blank') and e.get('sub_clip_id') in rows), None)
+        first = next((rows.get(e.get('sub_clip_id')) for e in ob.get('events') or [] if not e.get('blank') and e.get('sub_clip_id') in rows), None)
+        if last and first and last.get('color_group') != first.get('color_group') and not str(ob.get('moves_place') or '').strip():
+            flags.append(f"OPTION #{ob.get('option_number')}: N14 {a['beat_id']} and {b['beat_id']} narrate one process but cut from colour group {last.get('color_group')} "
+                         f"to {first.get('color_group')}: another place mid-process; keep one place, or name the move (moves_place)")
     energies = []
     for b in package['beats']:
         group = by_beat.get(b['beat_id'])

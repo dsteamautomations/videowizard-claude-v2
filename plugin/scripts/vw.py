@@ -1372,7 +1372,7 @@ def cmd_visuals(a):
                         'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt'), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
                         **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
-                        **_pair_fields(m, it.get('variants'), it.get('end_answer'))}   # design/86 K1, K4
+                        **_pair_fields(m, it.get('variants'), it.get('end_answer')), **({'shot_id': it['shot']} if it.get('shot') else {})}   # design/86 K1, K4; design/91 N8
                 payload, code = request('POST', base + '/images', json=body)
                 if code:
                     if code == 401:
@@ -1386,7 +1386,8 @@ def cmd_visuals(a):
                  (' Warnings: ' + '; '.join(warned) if warned else ''))
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
-                **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer)}   # design/68 L5; design/86 K1, K4
+                **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
+                **({'shot_id': a.shot} if a.shot else {})}   # design/91 N8: the shot this picture is for
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
                      (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
@@ -1516,7 +1517,7 @@ def cmd_visuals(a):
             emit({'action': 'refused', 'message': 'Show the operator the drawing spec as a table (part, size, status, source; the visuals page shows it), then pass their words: '
                                                   '`vw visuals spec --shot S --quote "<their words>"`.'}, 2)
         out = write(base + '/spec', {'shot_id': a.shot, 'quote': a.quote})
-        emit(out, 0, f"Drawing spec of {out.get('shot_id')} approved: " + '; '.join(f"{r['part']} {r['measure']} {r['size']} ({r['status']}{', ' + r['source'] if r.get('source') else ''})" for r in out.get('table') or []) + '.')
+        emit(out, 0, f"Drawing spec of {out.get('shot_id')} approved" + (f" (depicts {out['depicts']})" if out.get('depicts') else '') + ': ' + '; '.join(f"{r['part']} {r['measure']} {r['size']} ({r['status']}{', ' + r['source'] if r.get('source') else ''})" for r in out.get('table') or []) + '.')
     if a.what == 'measure':   # design/89 D2: sizes read off approved footage frames, each with its clip and time
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
         if not refs or not a.question:

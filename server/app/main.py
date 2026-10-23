@@ -204,7 +204,7 @@ class ReferenceAdd(Write):
 class ImageGenerate(Write):
     element_id: str
     name: str
-    kind: Literal['isolated', 'sheet', 'keyframe', 'state']   # design/65: a state of a graphic sequence
+    kind: Literal['isolated', 'sheet', 'keyframe', 'state', 'style']   # design/65: a state of a graphic sequence; design/89 C2: the style sheet
     subject: str
     prompt: str = Field(min_length=1, max_length=8000)
     parents: list[str] = []
@@ -216,6 +216,7 @@ class ImageGenerate(Write):
     end_prompt: str | None = Field(default=None, max_length=8000)   # design/86 K1
     end_answer: dict | None = None
     fix_of: str | None = None              # design/86 K2
+    shot_id: str | None = None             # design/91 N8: the shot this picture is for
 
 
 class ReferenceApprove(Write):

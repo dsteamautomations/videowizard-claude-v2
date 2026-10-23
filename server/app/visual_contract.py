@@ -38,7 +38,7 @@ class Foundation(Model):
 class Element(Model):
     id: str = Field(min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
     name: str = Field(min_length=1, max_length=200)
-    kind: Literal['person', 'object', 'place', 'graphic', 'animal']
+    kind: Literal['person', 'object', 'place', 'graphic', 'animal', 'material', 'process']   # design/91 N6: a material or a process the film relies on
     identity: Literal['exact', 'representative']
     requirements: str = Field(min_length=1, max_length=4000)
     required_views: list[str] = Field(default_factory=list, max_length=20)
@@ -105,6 +105,17 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     label: str = Field(default='', max_length=200)
 
 
+class VisualFact(Model):   # design/91 N6: how something real looks and is done, with its source; an unknown fact is never invented
+    id: str = Field(min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
+    about: str = Field(default='', max_length=80)   # the element it describes
+    looks: str = Field(min_length=1, max_length=1000)
+    how: str = Field(default='', max_length=1000)
+    setting: str = Field(default='', max_length=500)
+    tools: str = Field(default='', max_length=500)
+    source: str = Field(default='', max_length=1000)   # the client's material, the footage (clip and time), a web source on the operator's yes, an approved picture
+    status: Literal['confirmed', 'observed', 'unknown']
+
+
 class Change(Model):   # design/91 N1: what differs between a take's start and end picture, and the beat that causes it
     what: str = Field(min_length=1, max_length=500)
     beat_id: str = Field(min_length=1, max_length=80)
@@ -142,6 +153,11 @@ class Shot(Model):
     claims_left_out: list[ClaimOut] = Field(default_factory=list, max_length=10)
     drawing_spec: DrawingSpec | None = None   # design/89 D1: a technical drawing of a real object
     changes: list[Change] = Field(default_factory=list, max_length=20)   # design/91 N1: a video shot's change list
+    fact_ids: list[str] = Field(default_factory=list, max_length=20)   # design/91 N6: the facts this shot rests on
+    descriptors: list[str] = Field(default_factory=list, max_length=10)   # design/91 N8: the narration's descriptive words about the subject
+    evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)
+    depicts: str = Field(default='', max_length=500)   # design/91 N10: what a graphic shows, in the subject's own form or as a labelled contrast
+    carries_over: list[str] = Field(default_factory=list, max_length=10)   # design/91 N14: what the step before left, still visible
 
 
 class Landmark(Model):
@@ -202,6 +218,7 @@ class Plan(Model):
     elements: list[Element] = Field(default_factory=list, max_length=500)
     gaps: list[Gap] = Field(default_factory=list, max_length=500)
     open_questions: list[str] = Field(default_factory=list, max_length=50)
+    visual_facts: list[VisualFact] = Field(default_factory=list, max_length=100)   # design/91 N6
 
 
 def need(value, message):
@@ -319,6 +336,11 @@ def timing_warnings(gap_id, shots, timing, fps):
 def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE):
     plan = Plan.model_validate(document)
     elements = unique(plan.elements, 'id', 'element')
+    unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
+    facts, ekind = {f.id: f for f in plan.visual_facts}, {e.id: e.kind for e in plan.elements}
+    for f in plan.visual_facts:
+        need(f.status == 'unknown' or f.source.strip(), f'fact {f.id} is {f.status}: give its source (the client, the footage with clip and time, a standard).')
+        need(not f.about or f.about in elements, f'fact {f.id} is about {f.about}, which is not an element of the plan.')
     unique(plan.gaps, 'gap_id', 'gap')
     unique(plan.foundation.world + plan.foundation.exclusions + plan.foundation.specifications + plan.foundation.production_constraints + plan.foundation.editing_constraints + plan.sequence_rules, 'id', 'rule')
     scene_ids, shot_ids, beat_ids = set(), set(), set()
@@ -384,7 +406,30 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if seconds is not None and shot.visual_type == 'diagram' and seconds > GRAPHIC_BUILD_S + 0.04:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
                                          '(an animation shot) or a drawn animation' + NEXT_RELEASE})
+                    for fid in shot.fact_ids:   # design/91 N6
+                        need(fid in facts, f'shot {shot.id} names the fact {fid}, which the plan does not have.')
+                    rests_on = {fid: facts[fid] for fid in shot.fact_ids} | {f.id: f for f in plan.visual_facts if f.about and f.about in shot.element_ids}
+                    if 'close' in shot.framing.lower():
+                        for f in rests_on.values():
+                            need(f.status != 'unknown', f'shot {shot.id} is close on what fact {f.id} describes, and that fact is unknown: it is never invented; '
+                                                       'frame the shot wider, or ask the operator.')
+                    if any(ekind.get(e) in ('material', 'process') for e in shot.element_ids) and not rests_on:
+                        warnings.append({'shot_id': shot.id, 'kind': 'facts_missing', 'message': f'shot {shot.id} shows a material or a process: give the facts it rests on (visual_facts, '
+                                         'fact_ids): how it looks and is done, with the source'})
+                    if shot.visual_type not in GRAPHIC_TYPES and shot.narration.strip():   # design/91 N8, N17
+                        if not shot.claims and not shot.claims_left_out and not shot.descriptors:
+                            warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims and the descriptive words spoken over it (claims, '
+                                             'descriptors); the picture never shows their opposite' + NEXT_RELEASE})
+                        if shot.claims and not shot.evidence.strip():
+                            warnings.append({'shot_id': shot.id, 'kind': 'evidence_missing', 'message': f'shot {shot.id}: say how its picture shows its claims (evidence): a test, a table, '
+                                             'or the result in a scene, never an unrelated picture'})
+                    if (re.match(r'\s*(then|next|after (that|this)|once)\b', shot.narration, re.I) or re.search(r'\bon top of\b', shot.narration, re.I)) and not shot.carries_over:
+                        warnings.append({'shot_id': shot.id, 'kind': 'carries_over_missing', 'message': f'shot {shot.id} is the next step of a process: name what the step before left that '
+                                         'must still be visible (carries_over)'})   # design/91 N14
                     if shot.visual_type in GRAPHIC_TYPES:   # design/89 C1, D1, D3
+                        if not shot.depicts.strip():   # design/91 N10
+                            warnings.append({'shot_id': shot.id, 'kind': 'depicts_missing', 'message': f'shot {shot.id}: say what the graphic depicts (depicts), in the subject\'s own form, '
+                                             'or an alternative labelled as the contrast; the operator approves it with the treatment' + NEXT_RELEASE})
                         graphic_seen = True
                         if shot.narration.strip() and not shot.claims and not shot.claims_left_out:
                             warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
@@ -500,7 +545,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         warnings.append({'kind': 'frozen_share', 'message': f'{frozen:.1f} s of frozen pictures, {share:.0%} of the film: over {frozen_limit:.0%}; give the stills movement, '
                                                           'build the graphics, or say why this film needs them still'})
     result = plan.model_dump()
-    for key in ('sequence_overview', 'sequence_rules'):
+    for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
         if key not in document: result.pop(key)
     for key in ('specifications', 'production_constraints', 'editing_constraints', 'graphic_style'):
         if key not in document['foundation']: result['foundation'].pop(key)
@@ -515,7 +560,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             if 'title' not in original_scene: scene.pop('title')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
-                            'claims', 'claims_left_out', 'drawing_spec', 'changes'):   # design/89, 91: absent stays absent
+                            'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over'):   # design/89, 91: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
                     if 'words' not in original_st: st.pop('words', None)
