@@ -234,6 +234,24 @@ class StillBody(Write):
     shot_id: str
     reference_id: str
     quote: str = Field(min_length=1)
+    reuse: str | None = None          # design/89 H2: why the same footage again
+    considered: str | None = None     # the reimagined shot considered, and why it adds nothing
+    crop: list[float] | None = None   # H4: the different framing, x, y, w, h
+
+
+class ClipBody(Write):   # design/89 B3
+    shot_id: str
+    clip_id: str
+    in_s: float = Field(ge=0)
+    quote: str = Field(min_length=1)
+    reuse: str | None = None
+    considered: str | None = None
+    crop: list[float] | None = None
+
+
+class ReuseApprove(Write):   # design/89 H7: the operator's own words for a proposed reuse
+    shot_id: str
+    quote: str = Field(min_length=1)
 
 
 class TreatmentBody(Write):   # design/65 B6: a document without words is the draft the page shows; words without a document record the draft
@@ -1267,7 +1285,19 @@ def visuals_budget(run_id: UUID, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/still')
 def visuals_still(run_id: UUID, body: StillBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.still_from_reference(storage(), user, run, outputs, body.shot_id, body.reference_id, body.quote))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.still_from_reference(storage(), user, run, outputs, body.shot_id, body.reference_id, body.quote,
+                                                                                                                                 {'reason': body.reuse, 'considered': body.considered}, body.crop))
+
+
+@app.post('/api/runs/{run_id}/visuals/clip')
+def visuals_clip(run_id: UUID, body: ClipBody, user=User, conn=DB):   # design/89 B3
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.fill_clip(storage(), user, run, outputs, body.shot_id, body.clip_id, body.in_s, body.quote,
+                                                                                               {'reason': body.reuse, 'considered': body.considered}, body.crop))
+
+
+@app.post('/api/runs/{run_id}/visuals/reuse')
+def visuals_reuse(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/89 H7
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reuse(storage(), user, run, outputs, body.shot_id, body.quote))
 
 
 @app.post('/api/runs/{run_id}/visuals/record', status_code=201)

@@ -1,4 +1,5 @@
 """Combined visual planning. Positions belong to the set, never to the camera."""
+import re
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from .planning.digest import digest
@@ -96,6 +97,10 @@ class Shot(Model):
     production_method: str = Field(default='', max_length=1500)
     review_notes: str = Field(default='', max_length=4000)
     states: list[GraphicState] = Field(default_factory=list, max_length=12)   # design/65: an animation shot is two to four states (validate_plan says so in words)
+    motion: Literal['push_in', 'push_out', 'pan_left', 'pan_right', 'none'] = 'push_in'   # design/89 B2: a still or a graphic moves 5 % across its shot
+    motion_reason: str = Field(default='', max_length=1000)   # why a still stays frozen (`none`)
+    return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
+    differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
 
 
 class Landmark(Model):
@@ -174,7 +179,15 @@ GRAPHIC_TYPES = ('diagram', 'animation')   # design/65: a diagram is a still, an
 STILL_TYPES = ('image', 'diagram')         # filled by one approved picture (`vw visuals still`)
 MIN_STATE_S = 3                            # a state is read, not glanced
 MIN_GRAPHIC_S = 3                          # a graphic shorter than this is warned
-MAX_STATIC_S = 6                           # a still longer than this must earn its time (G15)
+STILL_MOVING_MAX_S = 4                     # design/89 B1 (SK, 23 Oct): a still that moves, at most 4 s
+STILL_FROZEN_MAX_S = 3                     # a still marked motion none, at most 3 s
+STATE_MAX_S = 5                            # one state of a graphic, at most 5 s
+GRAPHIC_BUILD_S = 4                        # a graphic on screen longer than this is a build of states or a drawn animation
+FROZEN_SHARE = 0.10                        # design/89 B4 (SK): warn when frozen pictures pass 10 % of the film
+NEXT_RELEASE = ' (warned in this release; refused from the next)'
+PAUSE_GAP_S = 0.12                         # design/89 A3: a silence between words this long is a pause a cut may fall in
+CUT_TOLERANCE_S = 0.3                      # a cut further than this from a pause is warned
+WORD_TOLERANCE_S = 0.5                     # a picture that starts more than this after its words is warned
 AI_RUN_S = 12   # design/85 G2: seconds of AI video back to back in one gap before the check warns
 
 
@@ -217,7 +230,40 @@ def routes(plan, fps=25):
     return out
 
 
-def validate_plan(document, source_gaps, fps=None):
+def _tokens(text):
+    return re.findall(r"[a-z0-9']+", str(text or '').lower())
+
+
+def timing_warnings(gap_id, shots, timing, fps):
+    """design/89 A3: a cut falls in a pause, never inside a word; a shot's picture is on screen when its words are spoken."""
+    words = (timing or {}).get('words') or []
+    if not words or not fps or not shots:
+        return []
+    f, out = float(fps), []
+    pauses = [(a['end_frame'] / f, b['start_frame'] / f) for a, b in zip(words, words[1:]) if (b['start_frame'] - a['end_frame']) / f >= PAUSE_GAP_S]
+    for sh, nxt in zip(shots, shots[1:]):
+        t = sh.end_frame / f
+        inside = next((w for w in words if w['start_frame'] / f < t < w['end_frame'] / f), None)
+        dist = min((0.0 if a <= t <= b else min(abs(t - a), abs(t - b)) for a, b in pauses), default=None)
+        if inside or (dist is not None and dist > CUT_TOLERANCE_S):
+            where = f"inside the word '{inside['text']}'" if inside else f'{dist:.1f} s from the nearest pause'
+            out.append({'gap_id': gap_id, 'shot_id': nxt.id, 'kind': 'cut_off_pause', 'message': f'the cut from {sh.id} to {nxt.id} at {t:.1f} s falls {where}: move it into a pause between sentences or phrases'})
+    flat = [(tok, w) for w in words for tok in _tokens(w['text'])]
+    for sh in shots:
+        want = _tokens(sh.narration)[:3]
+        if not want:
+            continue
+        i = next((k for k in range(len(flat) - len(want) + 1) if [x[0] for x in flat[k:k + len(want)]] == want), None)
+        if i is None:
+            continue
+        spoken = flat[i][1]['start_frame'] / f
+        if spoken < sh.start_frame / f - WORD_TOLERANCE_S or spoken >= sh.end_frame / f:
+            out.append({'gap_id': gap_id, 'shot_id': sh.id, 'kind': 'words_off_picture', 'message': f"shot {sh.id}: its words ('{' '.join(want)}…') are spoken at {spoken:.1f} s but the shot runs "
+                                                                                         f'{sh.start_frame / f:.1f}–{sh.end_frame / f:.1f} s: start the picture on or just before its words'})
+    return out
+
+
+def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE):
     plan = Plan.model_validate(document)
     elements = unique(plan.elements, 'id', 'element')
     unique(plan.gaps, 'gap_id', 'gap')
@@ -225,6 +271,7 @@ def validate_plan(document, source_gaps, fps=None):
     scene_ids, shot_ids, beat_ids = set(), set(), set()
     warnings = []
     placed = []   # (gap_id, shot_id, visual_type, start, end) in film order, for the pacing warnings (design/65 B4)
+    frozen, starts, returns = 0.0, {}, []   # design/89 B4, H7
     for gap in plan.gaps:
         need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
         window = source_gaps[gap.gap_id]
@@ -237,8 +284,10 @@ def validate_plan(document, source_gaps, fps=None):
             need(gap.scenes and not gap.recommended_choice and not gap.decision_reason, 'A single proposal needs scenes; comparison fields apply only to a focused alternative.')
         for candidate in list(gap.candidates) + [v for c in gap.choices for v in c.candidates]:
             need(candidate.end_s > candidate.start_s, 'Source candidate time window must be positive.')
+        counted = next((c.scenes for c in gap.choices if c.id == gap.recommended_choice), None) if gap.choices else gap.scenes   # design/89 B4: the recommended choice counts
         for scenes in ([c.scenes for c in gap.choices] if gap.choices else [gap.scenes]):
             cursor = window['start_frame']
+            gap_shots = []
             for scene in scenes:
                 need(scene.id not in scene_ids, 'Duplicate scene identity.')
                 scene_ids.add(scene.id)
@@ -268,9 +317,25 @@ def validate_plan(document, source_gaps, fps=None):
                         need(not shot.states, f'states belong to an animation shot (shot {shot.id} is a {shot.visual_type}).')
                     if seconds is not None and shot.visual_type in GRAPHIC_TYPES and seconds < MIN_GRAPHIC_S:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
-                    if seconds is not None and shot.visual_type in STILL_TYPES and seconds > MAX_STATIC_S:
-                        warnings.append({'shot_id': shot.id, 'kind': 'static_long', 'message': f'shot {shot.id} is a still of {seconds:.1f} s: over {MAX_STATIC_S} s it must earn the time '
-                                                                                               '(new information, reading, a build); say how in its purpose'})
+                    if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
+                        need(shot.visual_type not in GRAPHIC_TYPES or shot.motion in ('push_in', 'none'), f'shot {shot.id}: a graphic moves closer only (push_in) or not at all, so its labels never slide out of frame.')
+                        need(shot.motion != 'none' or shot.motion_reason.strip(), f'shot {shot.id}: motion none needs a reason (motion_reason).')
+                        if seconds is not None and shot.motion == 'none' and scenes is counted:
+                            frozen += seconds
+                    if seconds is not None and shot.visual_type == 'image':   # design/89 B1 (SK): 4 s moving, 3 s frozen
+                        limit = STILL_FROZEN_MAX_S if shot.motion == 'none' else STILL_MOVING_MAX_S
+                        if seconds > limit + 0.04:
+                            warnings.append({'shot_id': shot.id, 'kind': 'still_long', 'message': f"shot {shot.id} is a {'frozen ' if shot.motion == 'none' else ''}still of {seconds:.1f} s: at most {limit} s; "
+                                             'fill the stretch with several different stills or a moving shot (a clip stretch or a take)' + NEXT_RELEASE})
+                    if seconds is not None and shot.visual_type == 'diagram' and seconds > GRAPHIC_BUILD_S + 0.04:
+                        warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
+                                         '(an animation shot) or a drawn animation' + NEXT_RELEASE})
+                    for n, st in enumerate(shot.states, 1):
+                        if st.hold_s > STATE_MAX_S + 0.04:
+                            warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state' + NEXT_RELEASE})
+                    starts[shot.id] = shot.start_frame
+                    returns.append(shot)
+                    gap_shots.append(shot)
                     if shot.visual_type == 'video' and seconds is not None:   # design/45 10.7
                         default, longest = _default_generator()
                         if seconds > default['max_seconds']:
@@ -309,6 +374,7 @@ def validate_plan(document, source_gaps, fps=None):
                     if not shot.subjects:
                         need(shot.information_progression.strip(), 'Describe the composition or information progression for a shot without acting subjects.')
             need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
+            warnings += timing_warnings(gap.gap_id, gap_shots, window.get('timing'), fps)   # design/89 A3
     # design/65 B4: graphics back to back, inside a gap or across two gaps with no footage between; a gap of several shots that is all graphics
     placed.sort(key=lambda p: p[3])
     for prev, cur in zip(placed, placed[1:]):
@@ -333,6 +399,14 @@ def validate_plan(document, source_gaps, fps=None):
         own = [p for p in placed if p[0] == gap.gap_id]
         if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):
             warnings.append({'gap_id': gap.gap_id, 'kind': 'all_graphics', 'message': f'gap {gap.gap_id} is {len(own)} shots, all graphics: mix in a frame from the footage or a scene unless each one earns its place'})
+    for shot in returns:   # design/89 H7: a return is reimagined, with what differs
+        if shot.return_of:
+            need(shot.return_of in starts and starts[shot.return_of] < shot.start_frame, f'shot {shot.id}: return_of names an earlier shot of this plan ({shot.return_of} is not one).')
+            need(shot.differs_by.strip(), f'shot {shot.id} returns to {shot.return_of}: say what differs (differs_by): the angle, the distance or the moment.')
+    if film_frames and fps and frozen / (film_frames / float(fps)) > frozen_limit:   # design/89 B4
+        share = frozen / (film_frames / float(fps))
+        warnings.append({'kind': 'frozen_share', 'message': f'{frozen:.1f} s of frozen pictures, {share:.0%} of the film: over {frozen_limit:.0%}; give the stills movement, '
+                                                          'build the graphics, or say why this film needs them still'})
     result = plan.model_dump()
     for key in ('sequence_overview', 'sequence_rules'):
         if key not in document: result.pop(key)
@@ -348,7 +422,7 @@ def validate_plan(document, source_gaps, fps=None):
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
-                for key in ('title', 'appearance', 'production_method', 'review_notes', 'states'):
+                for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by'):   # design/89: absent stays absent
                     if key not in original_shot: shot.pop(key)
     return result, warnings
 

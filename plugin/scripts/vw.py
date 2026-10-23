@@ -1200,7 +1200,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage']   # design/74 L26, L7; design/76; design/73; design/79
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse']   # design/74 L26, L7; design/76; design/73; design/79
 
 
 def _short_status(st, shot=None, gap=None):
@@ -1499,7 +1499,12 @@ def cmd_visuals(a):
         if a.file:   # design/77 L33b: several still shots in one call
             _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or ''}), 'shot',
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
-        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote}), 0, f'Still set for {a.shot} from reference {a.ref}.')
+        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote, **_reuse_fields(a)}), 0, f'Still set for {a.shot} from reference {a.ref}.')
+    if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
+        out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': float(a.at), 'quote': a.quote, **_reuse_fields(a)})
+        emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
+    if a.what == 'reuse':   # design/89 H7: the operator approves a proposed reuse with their words
+        emit(write(base + '/reuse', {'shot_id': a.shot, 'quote': a.quote}), 0, f'Reuse approved for {a.shot} with the operator\'s words.')
     if a.what == 'asset':
         entry = next((f for f in m['files'] if f.get('name') == Path(a.file).name and f.get('receipt')), None)
         if not entry:
@@ -1512,6 +1517,14 @@ def cmd_visuals(a):
         out = write(base + '/record', {'gap_ids': gaps, 'quote': a.quote})
         skipped = out.get('skipped') or {}
         emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
+
+
+def _reuse_fields(a):
+    """design/89 H2-H4: the reason, the reimagined shot considered, and the crop, x,y,w,h."""
+    out = {k: getattr(a, k, None) for k in ('reuse', 'considered') if getattr(a, k, None)}
+    if getattr(a, 'crop', None):
+        out['crop'] = [float(v) for v in str(a.crop).split(',')]
+    return out
 
 
 def _pair_fields(m, variants, end_answer):
@@ -1761,7 +1774,9 @@ def cmd_assembly(a):
                     + ('inside' if not outside else 'outside: ' + ', '.join(outside)))
         else:
             loud = ''
-        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': record}, 0, f'Assembly film at {path}; the operator watches and listens{loud}.')
+        alike = record.get('look_alike') if isinstance(record.get('look_alike'), list) else []   # design/89 H6: told before the operator watches
+        twins = ('; ' + str(len(alike)) + ' pair(s) look alike, tell the operator before they watch: ' + '; '.join(f"{p['a']} at {p['a_at_s']} s and {p['b']} at {p['b_at_s']} s" for p in alike[:8])) if alike else ''
+        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': record}, 0, f'Assembly film at {path}; the operator watches and listens{loud}{twins}.')
     if a.what == 'review':
         notes = [frame_note(x) for x in (a.frame_note or [])]
         emit(write(base + '/review', {'decision': a.decision, 'notes': a.notes or '', 'frame_notes': notes, 'quote': a.quote}))
@@ -1948,7 +1963,7 @@ def build_parser():
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look',
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop',
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks'):   # design/73, design/79
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)

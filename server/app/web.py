@@ -317,6 +317,7 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote),
+            'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),
             'reject': lambda: V.reject_reference(store, user, run, outputs, body['reference_id'], str(body.get('notes') or ''), quote),   # design/74 L7

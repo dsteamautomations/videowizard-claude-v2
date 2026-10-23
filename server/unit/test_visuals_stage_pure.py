@@ -108,8 +108,20 @@ def test_treatment_is_recorded_with_the_words_totals_and_estimate(monkeypatch):
     out = VS.treatment(store, USER, RUN, [], TREATMENT, 'Yes, this treatment.')
     sess = saved(store)
     assert sess['treatment']['quote'] == 'Yes, this treatment.' and sess['treatment']['by'] == 'u1' and sess['treatment']['digest']
-    assert out['totals'] == {'gaps': 2, 'images': 4, 'routes': {'graphic_sequence': 1, 'video': 1}, 'seconds': {'graphic_sequence': 20.0, 'video': 10.0}}
+    assert out['totals'] == {'gaps': 2, 'images': 4, 'routes': {'graphic_sequence': 1, 'video': 1}, 'seconds': {'graphic_sequence': 20.0, 'video': 10.0}, 'frozen_seconds': 0.0}
     assert out['estimate_inr'] == 4 * 20.0 + 10 * 8.0 and sess['treatment']['estimate_inr'] == out['estimate_inr']
+
+
+def test_the_treatment_totals_the_frozen_seconds_and_shows_the_share_of_the_film(monkeypatch):
+    """design/89 B4: the expected frozen share before approval."""
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
+    store = store_with(session())
+    first_cut = {'stage': 'first_cut', 'unit': None, 'summary': {'duration_frames': 2500}}   # a 100 s film
+    doc = {'gaps': [{**TREATMENT['gaps'][0], 'frozen_seconds': 12}, TREATMENT['gaps'][1]]}
+    out = VS.treatment(store, USER, RUN, [first_cut], doc, 'yes')
+    assert out['totals']['frozen_seconds'] == 12 and out['totals']['frozen_share'] == 0.12 and out['totals']['frozen_limit'] == 0.1
+    with pytest.raises(Problem, match='frozen_seconds'):
+        g(lambda: VS.treatment(store, USER, RUN, [], {'gaps': [{**TREATMENT['gaps'][0], 'frozen_seconds': 99}, TREATMENT['gaps'][1]]}, 'yes'))
 
 
 def test_treatment_refuses_a_missing_gap_an_unknown_route_or_no_words():
@@ -447,6 +459,32 @@ def test_prepare_measures_the_footage_tells_it_and_the_neighbours_reach_the_pack
     store2 = store_with(s2, doc); store2.files.update({k: v for k, v in store.files.items() if k not in store2.files})
     out = VS.prepare(FakeConn([]), store2, USER, {**RUN, 'procedure_version': '2'}, [old] + outputs[1:])
     assert out['footage'] == 'Your footage: mirrorless camera, handheld, natural look (your correction)' and saved(store2)['footage_correction']['from'] == 'the media step'
+
+
+def test_each_gap_carries_its_narration_timed_and_the_packet_its_sentences():
+    """design/89 A1: from the options package, in film time; a gap of three sentences gives three, with the sentence before and after."""
+    w = lambda i, text, a, b: {'id': f'w{i}', 'text': text, 'start_frame': a, 'end_frame': b, 'sentence_end': text.endswith('.')}
+    words = [w(0, 'Before.', 850, 890), w(1, 'Bricks', 900, 910), w(2, 'on', 912, 918), w(3, 'edge.', 920, 940), w(4, 'A', 960, 965), w(5, 'cavity.', 967, 1000),
+             w(6, 'Heat', 1020, 1040), w(7, 'stays.', 1042, 1080), w(8, 'After.', 1160, 1190)]
+    s = lambda text, a, b: {'text': text, 'start_frame': a, 'end_frame': b}
+    sents = [s('Before.', 850, 890), s('Bricks on edge.', 900, 940), s('A cavity.', 960, 1000), s('Heat stays.', 1020, 1080), s('After.', 1160, 1190)]
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
+    store = store_with(sess, doc)
+    store.files['run-1/stage2/session.json'] = json.dumps({'package': {'key': 'run-1/stage2/package.json'}}).encode()
+    store.files['run-1/stage2/package.json'] = json.dumps({'narration': {'words': words, 'sentences': sents}}).encode()
+    timing = VS.gap_timing(store, RUN, GAPS, '25')['G2']
+    assert [x['text'] for x in timing['sentences']] == ['Bricks on edge.', 'A cavity.', 'Heat stays.'] and timing['before'] == 'Before.' and timing['after'] == 'After.'
+    assert timing['sentences'][0] == {'text': 'Bricks on edge.', 'start_s': 0.0, 'end_s': 1.6, 'film_start_s': 36.0, 'film_end_s': 37.6, 'whole': True}
+    assert len(timing['words']) == 7 and timing['words'][0] == {'text': 'Bricks', 'start_frame': 900, 'end_frame': 910}
+    assert VS.gap_timing(FakeStore({}), RUN, GAPS, '25') == {}   # a run without an options package: none, never a crash
+    sess2 = saved(store)
+    sess2['source']['gaps']['G2']['timing'] = timing
+    ctx = VS.packet(store_with(sess2, doc), RUN, [], 'VS1')['preparation']['context']
+    assert [x['text'] for x in ctx['timing']['sentences']] == ['Bricks on edge.', 'A cavity.', 'Heat stays.'] and ctx['timing']['before'] == 'Before.' and 'words' not in ctx['timing']
+    assert VS.film_frames([{'stage': 'first_cut', 'unit': None, 'summary': {'duration_frames': 8000}}]) == 8000 and VS.film_frames([]) is None
 
 
 def test_a_packet_before_bind_is_a_refusal_with_the_message_not_a_crash():

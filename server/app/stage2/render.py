@@ -100,6 +100,16 @@ SLATE_HEAD = re.compile(r'^(#\d+[A-Z]*)\s*\|\s*(.*)$')             # "#2 | ..." 
 DELIVERED = ('master', 'assembly')       # films with the whole narration under them; the assembly film is the delivered one
 PEAK_CEILING_DB = -3.0                   # blueprint: −3 dBTP ceiling on the mix (design/46 11.6)
 A1_TOLERANCE_LU = 1.5
+MOTION_SHARE = 0.05   # design/89 B2 (SK, 23 Oct): a still or a graphic moves 5 % across its shot
+
+
+def motion_vf(motion, n, W, H, fps, per_frame):
+    """zoompan for one move over n frames: push in or out by MOTION_SHARE, or a pan across the margin a 5 % zoom leaves."""
+    m = max(int(n) - 1, 1)
+    z = 1 + MOTION_SHARE
+    zoom = {'push_in': f'1+{MOTION_SHARE}*on/{m}', 'push_out': f'{z}-{MOTION_SHARE}*on/{m}'}.get(motion, f'{z}')
+    x = {'pan_left': f'(iw-iw/zoom)*(1-on/{m})', 'pan_right': f'(iw-iw/zoom)*on/{m}'}.get(motion, 'iw/2-(iw/zoom/2)')
+    return f"zoompan=z='{zoom}':x='{x}':y='ih/2-(ih/zoom/2)':d={1 if per_frame else int(n)}:s={W}x{H}:fps={fps}"
 
 
 class Renderer:
@@ -126,19 +136,33 @@ class Renderer:
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
         return out
 
-    def still(self, png_path, sha, n_tl):
-        """A still asset held for n_tl frames, contain-padded to the timeline."""
-        key = digest({'still': sha, 'n': n_tl, 'tl': self.tl})
+    def still(self, png_path, sha, n_tl, motion='none'):
+        """A still asset held for n_tl frames, contain-padded to the timeline; with a motion it moves 5 % (design/89 B2), drawn from a 4× canvas so it does not judder."""
+        key = digest({'still': sha, 'n': n_tl, 'tl': self.tl, **({'motion': motion} if motion != 'none' else {})})
         out = self.cache / f'still-{key[:16]}.mp4'
+        if not out.exists() and motion != 'none':
+            W4, H4 = 4 * self.W, 4 * self.H
+            run([ffmpeg(), '-y', '-v', 'error', '-i', str(png_path), '-vf', f'scale={W4}:{H4}:force_original_aspect_ratio=decrease,pad={W4}:{H4}:(ow-iw)/2:(oh-ih)/2,setsar=1,'
+                 + motion_vf(motion, n_tl, self.W, self.H, self.fps, False) + ',format=yuv420p', '-frames:v', str(n_tl), *self.video_args(), str(out)])
         if not out.exists():
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png_path), '-frames:v', str(n_tl),
                  '-vf', f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease,pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2,format=yuv420p', *self.video_args(), str(out)])
         return out
 
     def sequence(self, states, dissolve, n_tl, motion='none'):
-        """design/65 B8: a graphic sequence. states: [(png_path, sha, hold_frames)] in order; each state holds its frames, a dissolve of
-        `dissolve` frames joins neighbours, and the whole is exactly n_tl frames, contain-padded to the timeline. motion is reserved ('none')."""
-        key = digest({'seq': [(sha, int(h)) for _, sha, h in states], 'd': int(dissolve), 'n': int(n_tl), 'tl': self.tl, 'motion': motion})
+        """design/65 B8: a graphic sequence; design/89 B2: with a motion, one continuous push across the whole build (never restarting per state)."""
+        flat = self._sequence(states, dissolve, n_tl)
+        if motion == 'none':
+            return flat
+        out = self.cache / f"seqm-{digest({'flat': flat.name, 'n': int(n_tl), 'motion': motion, 'tl': self.tl})[:16]}.mp4"
+        if not out.exists():
+            run([ffmpeg(), '-y', '-v', 'error', '-i', str(flat), '-vf', f'scale={2 * self.W}:{2 * self.H},setsar=1,' + motion_vf(motion, n_tl, self.W, self.H, self.fps, True) + ',format=yuv420p',
+                 '-frames:v', str(int(n_tl)), *self.video_args(), str(out)])
+        return out
+
+    def _sequence(self, states, dissolve, n_tl):
+        """The states one after another with their dissolves, exactly n_tl frames, contain-padded to the timeline."""
+        key = digest({'seq': [(sha, int(h)) for _, sha, h in states], 'd': int(dissolve), 'n': int(n_tl), 'tl': self.tl, 'motion': 'none'})
         out = self.cache / f'seq-{key[:16]}.mp4'
         if out.exists():
             return out
@@ -313,7 +337,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     if kind in WATCHED_SIZE:
         timeline = {**timeline, 'width': WATCHED_SIZE[kind][0], 'height': WATCHED_SIZE[kind][1]}
     r = Renderer(work, timeline, fast=kind in WATCHED_SIZE, cache=cache)
-    parts, a2_pieces, a1_parts, normalised = [], [], [], []
+    parts, a2_pieces, a1_parts, normalised, looks = [], [], [], [], []
     recording = narration
     if narration_plan and narration_plan.get('pieces'):
         narration = timeline_narration(r, recording, narration_plan['pieces'], narration_plan['total_frames'], r.work / 'narration-timeline.wav')
@@ -339,8 +363,9 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
                 silence_before = Fraction(0)
             a1_parts.append(r.narration_window(narration, item['start_s'], item['end_s'], r.work / f'a1-{i}.wav'))
         elif item['kind'] == 'still':
-            seg = r.still(sources[item['file']['sha256']], item['file']['sha256'], item['timeline_frames'])
+            seg = r.still(sources[item['file']['sha256']], item['file']['sha256'], item['timeline_frames'], item.get('motion') or 'none')
             parts.append(seg)
+            looks.append((item.get('label') or 'still', float(cursor), seg, item['timeline_frames'], bool(item.get('graphic'))))
             normalised.append((item, seg))
             cursor += Fraction(item['timeline_frames']) / r.fps
             continue
@@ -348,6 +373,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             seg = r.sequence([(sources[st['file']['sha256']], st['file']['sha256'], st['hold_frames']) for st in item['states']], item.get('dissolve_frames') or 0,
                              item['timeline_frames'], item.get('motion') or 'none')
             parts.append(seg)
+            looks.append((item.get('label') or 'sequence', float(cursor), seg, item['timeline_frames'], True))
             normalised.append((item, seg))
             cursor += Fraction(item['timeline_frames']) / r.fps
             continue
@@ -357,6 +383,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
                             item.get('label'))
             if item.get('stabilize'):
                 seg = r.stabilized(seg)
+            looks.append((item.get('label') or item.get('sub_clip_id') or clip['id'], float(cursor), seg, int(item['timeline_frames']), False))
             if item.get('normalised_key'):
                 normalised.append((item, seg))   # the delivered piece is the plain take, whatever the join
             n, d = int(item['timeline_frames']), int(item.get('dissolve_into_next') or 0)
@@ -382,6 +409,13 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     if carry:
         parts.append(carry[0])
     picture = r.concat(parts, r.work / f'{kind}-picture.mp4')
+    look_alike = None
+    if kind == 'assembly':   # design/89 H6: before the operator watches, the pieces that look alike, whatever their source
+        try:
+            from .. import lookalike
+            look_alike = lookalike.pairs([{'label': lab, 'at_s': at, 'graphic': g, 'hashes': lookalike.video_hashes(seg, n, g, ffmpeg())} for lab, at, seg, n, g in looks])
+        except Exception as exc:   # the check never fails a render
+            look_alike = {'error': f'{exc.__class__.__name__}: {str(exc)[:200]}'}
     length_s = float(cursor)
     gain, a1_measured = a1_gain(r, recording)
     if kind in DELIVERED:   # the whole narration, one measured gain (design/46 11.1: the assembly film too, never the small size)
@@ -407,4 +441,5 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
                  'integrated_target_lufs': int(A1_TARGET_LUFS), 'integrated_inside': i is not None and abs(i - A1_TARGET_LUFS) <= A1_TOLERANCE_LU}
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
                   'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'loudness_check': check, 'codec': codec,
-                  'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')]}
+                  'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')],
+                  **({'look_alike': look_alike} if look_alike is not None else {})}

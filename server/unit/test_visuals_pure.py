@@ -73,17 +73,17 @@ def test_graphic_warnings_short_static_back_to_back_and_all_graphics():
     doc = plan([shot('DG1', 0, 50, 'diagram'), shot('DG2', 50, 250, 'diagram'), shot('VS1', 250, 500, 'video'), shot('IM1', 500, 1000, 'image')])
     _, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
     kinds = {(w['shot_id'], w.get('kind')) for w in warnings}
-    assert ('DG1', 'graphic_short') in kinds and ('DG2', 'graphics_back_to_back') in kinds and ('IM1', 'static_long') in kinds
+    assert ('DG1', 'graphic_short') in kinds and ('DG2', 'graphics_back_to_back') in kinds and ('IM1', 'still_long') in kinds
     assert ('DG2', 'graphic_short') not in kinds and ('VS1', 'graphics_back_to_back') not in kinds
     short = next(w for w in warnings if w.get('kind') == 'graphic_short')
     assert 'DG1 is a graphic of 2.0 s' in short['message'] and 'at least 3 s' in short['message']
     pair = next(w for w in warnings if w.get('kind') == 'graphics_back_to_back')
     assert 'DG1 and DG2 are graphics back to back' in pair['message'] and "second shot's purpose" in pair['message']
-    # a still of five seconds is not asked to earn its time; the 20 s one above is
-    _, warnings = VC.validate_plan(plan([shot('IM1', 0, 125, 'image'), shot('VS1', 125, 625, 'video'), shot('VS2', 625, 1000, 'video')]), GAPS, Fraction(25))
-    assert not [w for w in warnings if w.get('kind') == 'static_long']
-    long = next(w for w in VC.validate_plan(doc, GAPS, Fraction(25))[1] if w.get('kind') == 'static_long' and w['shot_id'] == 'IM1')
-    assert 'IM1 is a still of 20.0 s' in long['message'] and 'earn the time' in long['message']
+    # design/89 B1: a still of four seconds that moves passes; the 20 s one above is warned (refused from the next release)
+    _, warnings = VC.validate_plan(plan([shot('IM1', 0, 100, 'image'), shot('VS1', 100, 600, 'video'), shot('VS2', 600, 1000, 'video')]), GAPS, Fraction(25))
+    assert not [w for w in warnings if w.get('kind') == 'still_long']
+    long = next(w for w in VC.validate_plan(doc, GAPS, Fraction(25))[1] if w.get('kind') == 'still_long' and w['shot_id'] == 'IM1')
+    assert 'IM1 is a still of 20.0 s' in long['message'] and 'at most 4 s' in long['message'] and 'refused from the next' in long['message']
     # a gap of more than one shot that is all graphics
     doc = plan([shot('DG1', 0, 500, 'diagram'), {**shot('AN1', 500, 1000, 'animation'), 'states': states(10, 10)}])
     _, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
@@ -114,6 +114,77 @@ def test_a_run_of_ai_video_over_twelve_seconds_in_one_gap_is_warned():
     assert not [w for w in warnings if w.get('kind') == 'ai_run']   # 10 s runs, broken by a still and a graphic
     _, warnings = VC.validate_plan(plan([shot('IM1', 0, 250, 'image'), shot('V1', 250, 1000, 'video')]), GAPS, Fraction(25))
     assert [w['shot_id'] for w in warnings if w.get('kind') == 'ai_run'] == ['V1']   # one 30 s shot is a run too
+
+
+def test_still_and_graphic_limits_motion_rules_and_the_frozen_share():
+    """design/89 B1, B2, B4 with SK's figures: a moving still 4 s, a frozen still 3 s, a graphic state 5 s, a graphic over 4 s is a build; 10 % frozen."""
+    kinds = lambda doc, **kw: {(w.get('shot_id'), w['kind']) for w in VC.validate_plan(doc, GAPS, Fraction(25), **kw)[1]}
+    filler = [shot('VS1', 400, 700, 'video'), shot('VS2', 700, 1000, 'video')]
+    ok = plan([shot('IM1', 0, 100, 'image'), shot('IM2', 100, 200, 'image'), {**shot('IM3', 200, 275, 'image'), 'motion': 'none', 'motion_reason': 'the label is read'},
+               {**shot('AN1', 275, 400, 'animation'), 'states': states(5)}] + filler)
+    with pytest.raises(ValueError, match='one state is a diagram still'):
+        VC.validate_plan(ok, GAPS, Fraction(25))
+    ok['gaps'][0]['scenes'][0]['shots'][3]['states'] = states(3, 2)
+    ok['gaps'][0]['scenes'][0]['shots'][3]['end_frame'] = 400
+    with pytest.raises(ValueError, match='holds at least 3'):
+        VC.validate_plan(ok, GAPS, Fraction(25))
+    ok['gaps'][0]['scenes'][0]['shots'][3]['states'] = states(3, 3)
+    ok['gaps'][0]['scenes'][0]['shots'][3]['start_frame'] = 250
+    ok['gaps'][0]['scenes'][0]['shots'][2]['end_frame'] = 250
+    assert not {k for k in kinds(ok) if k[1] in ('still_long', 'state_long', 'graphic_unbuilt', 'frozen_share')}
+    long = plan([shot('IM1', 0, 125, 'image'), {**shot('IM2', 125, 225, 'image'), 'motion': 'none', 'motion_reason': 'r'}, shot('DG1', 225, 350, 'diagram'),
+                 {**shot('AN1', 350, 500, 'animation'), 'states': states(3, 3)}] + [shot('VS1', 500, 750, 'video'), shot('VS2', 750, 1000, 'video')])
+    k = kinds(long)
+    assert ('IM1', 'still_long') in k and ('IM2', 'still_long') in k and ('DG1', 'graphic_unbuilt') in k   # 5 s moving, 4 s frozen, a 5 s single diagram
+    built = plan([{**shot('AN1', 0, 175, 'animation'), 'states': states(4, 3)}, {**shot('AN2', 175, 325, 'animation'), 'states': states(3, 3)},
+                  {**shot('AN3', 325, 500, 'animation'), 'states': states(3.5, 3.5)}] + [shot('VS1', 500, 750, 'video'), shot('VS2', 750, 1000, 'video')])
+    assert not {x for x in kinds(built) if x[1] == 'state_long'}
+    st = plan([{**shot('AN1', 0, 200, 'animation'), 'states': states(5.5, 2.5)}] + [shot('VS1', 200, 600, 'video'), shot('VS2', 600, 1000, 'video')])
+    with pytest.raises(ValueError, match='holds at least 3'):
+        VC.validate_plan(st, GAPS, Fraction(25))
+    st['gaps'][0]['scenes'][0]['shots'][0]['states'] = states(5.5, 3)
+    st['gaps'][0]['scenes'][0]['shots'][0]['end_frame'] = 212
+    st['gaps'][0]['scenes'][0]['shots'][1]['start_frame'] = 212
+    assert ('AN1', 'state_long') in kinds(st)
+    # B2: graphics move closer only; a frozen still says why
+    with pytest.raises(ValueError, match='moves closer only'):
+        VC.validate_plan(plan([{**shot('DG1', 0, 100, 'diagram'), 'motion': 'pan_left'}, shot('VS1', 100, 500, 'video'), shot('VS2', 500, 1000, 'video')]), GAPS, Fraction(25))
+    with pytest.raises(ValueError, match='needs a reason'):
+        VC.validate_plan(plan([{**shot('IM1', 0, 75, 'image'), 'motion': 'none'}, shot('VS1', 75, 500, 'video'), shot('VS2', 500, 1000, 'video')]), GAPS, Fraction(25))
+    # B4: frozen seconds over 10 % of the film warn; with movement they do not count
+    frozen = plan([{**shot('IM1', 0, 75, 'image'), 'motion': 'none', 'motion_reason': 'r'}, shot('VS1', 75, 500, 'video'), shot('VS2', 500, 1000, 'video')])
+    assert (None, 'frozen_share') in kinds(frozen, film_frames=500) and (None, 'frozen_share') not in kinds(frozen, film_frames=1000)   # 3 s of 20 s is 15 %; of 40 s, 7.5 %
+    assert (None, 'frozen_share') not in kinds(plan([shot('IM1', 0, 75, 'image'), shot('VS1', 75, 500, 'video'), shot('VS2', 500, 1000, 'video')]), film_frames=500)
+    out, _ = VC.validate_plan(plan([shot('IM1', 0, 75, 'image'), shot('VS1', 75, 500, 'video'), shot('VS2', 500, 1000, 'video')]), GAPS, Fraction(25))
+    assert 'motion' not in out['gaps'][0]['scenes'][0]['shots'][0]   # absent stays absent: an accepted plan's digest does not change
+
+
+def test_a_return_is_reimagined_with_what_differs():
+    """design/89 H7."""
+    doc = plan([shot('IM1', 0, 100, 'image'), shot('VS1', 100, 500, 'video'), {**shot('VS2', 500, 1000, 'video'), 'return_of': 'IM1', 'differs_by': 'the same wall from ground level, looking up'}])
+    VC.validate_plan(doc, GAPS, Fraction(25))
+    doc['gaps'][0]['scenes'][0]['shots'][2]['differs_by'] = ''
+    with pytest.raises(ValueError, match='say what differs'):
+        VC.validate_plan(doc, GAPS, Fraction(25))
+    doc['gaps'][0]['scenes'][0]['shots'][2].update(return_of='VS9', differs_by='x')
+    with pytest.raises(ValueError, match='names an earlier shot'):
+        VC.validate_plan(doc, GAPS, Fraction(25))
+
+
+def test_cuts_fall_in_pauses_and_pictures_start_on_their_words():
+    """design/89 A3: a cut 1 s inside a sentence warns, a cut in a pause does not; a picture 1.5 s after its words warns."""
+    w = lambda text, a, b: {'text': text, 'start_frame': a, 'end_frame': b}
+    timing = {'words': [w('Bricks', 0, 10), w('laid', 12, 20), w('on', 22, 25), w('edge.', 27, 40), w('The', 55, 60), w('cavity', 62, 75), w('keeps', 78, 85), w('heat', 87, 95), w('out.', 97, 110)]}
+    gaps = {'G1': {'start_frame': 0, 'end_frame': 1000, 'timing': timing}}
+    good = plan([{**shot('IM1', 0, 47, 'image'), 'narration': 'Bricks laid on edge.'}, {**shot('IM2', 47, 100, 'image'), 'narration': 'The cavity keeps heat out.'},
+                 shot('VS1', 100, 500, 'video'), shot('VS2', 500, 1000, 'video')])
+    found = {(x['shot_id'], x['kind']) for x in VC.validate_plan(good, gaps, Fraction(25))[1]}
+    assert ('IM2', 'cut_off_pause') not in found and ('IM2', 'words_off_picture') not in found   # 47 sits in the pause 40–55
+    bad = plan([{**shot('IM1', 0, 70, 'image'), 'narration': 'Bricks laid on edge.'}, {**shot('IM2', 70, 100, 'image'), 'narration': 'The cavity keeps heat out.'},
+                shot('VS1', 100, 500, 'video'), shot('VS2', 500, 1000, 'video')])
+    got = {x['kind']: x['message'] for x in VC.validate_plan(bad, gaps, Fraction(25))[1] if x.get('shot_id') == 'IM2'}
+    assert "inside the word 'cavity'" in got['cut_off_pause'] and 'spoken at 2.2 s but the shot runs 2.8' in got['words_off_picture']   # the picture arrives 0.6 s after its words
+    assert VC.timing_warnings('G1', [], timing, 25) == [] and VC.timing_warnings('G1', [], None, 25) == []
 
 
 def test_a_video_shot_longer_than_the_default_generator_is_warned():

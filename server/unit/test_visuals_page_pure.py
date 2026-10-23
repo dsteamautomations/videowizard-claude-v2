@@ -70,5 +70,17 @@ def test_the_treatment_step_tells_the_measured_footage_and_offers_the_correction
         assert needle in HTML, needle
 
 
+def test_the_treatment_and_plan_rows_show_when_each_sentence_is_spoken():
+    """design/89 A1."""
+    assert 'function timed(g)' in HTML and HTML.count('+timed(g)+') == 2
+
+
+def test_a_proposed_reuse_waits_on_the_page_for_the_operators_words_and_the_treatment_shows_the_frozen_share():
+    """design/89 H7, B4."""
+    for needle in ('function reuseBox', 'data-a="approve-reuse"', "action:'approve-reuse'", 'Approve the reuse', 'frozen_share', 'of the film (limit'):
+        assert needle in HTML, needle
+    assert HTML.count('+reuseBox(s)+') == 2   # the Pictures and the Takes steps
+
+
 def test_an_empty_words_box_is_marked_and_a_rejected_picture_has_its_badge_and_button():
     assert 'need-words' in HTML and "data-a=\"reject\"" in HTML and 'rejected' in HTML

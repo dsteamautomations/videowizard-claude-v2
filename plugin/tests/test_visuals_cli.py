@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'camera': None, 'support': None, 'look': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
+            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -334,7 +334,7 @@ def test_visuals_prompt_is_rewritten_for_v2():
     for gone in ('hand-made', 'editor makes', 'Nothing in this pipeline draws', 'shall the editor make them', 'the animation answer'):
         assert gone not in prompt, gone
     for kept in ('graphic sequence', 'two to four states', 'as its parent', 'on their instruction; never plan one', 'intended visuals', 'A plan is refused until the treatment is recorded',
-                 'Text is not a reason', 'Footage first', 'no quota', 'three to five seconds', 'do not add a new rule while keeping shots that contradict it',
+                 'Text is not a reason', 'Footage first', 'no quota', '3–5 s', 'do not add a new rule while keeping shots that contradict it',
                  # design/66: segments at action boundaries, a start and an end image per take, the shared boundary picture, the cap
                  '--start R --end R2', 'cut where an action begins or ends', 'the end image of one segment is the start image of the next', 'segments plus one for video', '₹5,000'):
         assert kept in prompt, kept
@@ -550,7 +550,7 @@ def test_frame_file_posts_the_rows_in_order_and_stops_at_the_first_refusal(harne
 def test_steps_and_command_text_carry_the_long_blank_the_ai_run_and_the_continuity_rules():
     """design/84 V3, design/85 G1-G3."""
     vis, opt, doc = json.dumps(STAGES['visuals']), json.dumps(STAGES['options']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert 'ai_run' in vis and 'three to five seconds' in vis and 'E2' in opt and 'blank over 12 s' in opt
+    assert 'ai_run' in vis and '3–5 s' in STAGES['visuals']['prompt'] and 'E2' in opt and 'blank over 12 s' in opt
     assert '--continuity' in doc and 'ai_run' in doc and 'E2, a blank over 12 s' in doc
     assert 'end_answer' in vis and '--variants 2' in vis and 'One change, two at most' in vis and 'close reference' in vis and 'checks every picture' in vis   # design/86 K1, K4, K5, K8
     assert '--end-answer' in doc and '--variants 2' in doc and 'one change per edit' in doc
@@ -581,6 +581,27 @@ def test_footage_tells_the_line_and_posts_a_correction_with_the_words(harness, m
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'line': 'Your footage: cinema camera, handheld, natural look (your correction)'}))
     code, out, err = run(args(what='footage', camera='cinema', quote='professional camera'), capsys)
     assert code == 0 and posted['path'].endswith('/visuals/footage') and posted['camera'] == 'cinema' and posted['support'] is None and posted['quote'] == 'professional camera' and 'your correction' in err
+
+
+def test_clip_fills_a_shot_and_reuse_posts_the_operators_words(harness, monkeypatch, capsys):
+    """design/89 B3, H7."""
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.append((path, body)) or {'in_s': 4.0, 'out_s': 14.0}))
+    code, out, err = run(args(what='clip', shot='VS1', clip='c1', at='4', quote='this stretch', reuse='the only kiln shot', considered='a drone view: none', crop='0.1,0.1,0.7,0.7'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/clip') and posted[-1][1] == {'shot_id': 'VS1', 'clip_id': 'c1', 'in_s': 4.0, 'quote': 'this stretch', 'reuse': 'the only kiln shot',
+                                                                                        'considered': 'a drone view: none', 'crop': [0.1, 0.1, 0.7, 0.7]}
+    code, out, err = run(args(what='reuse', shot='VS1', quote='Yes, reuse it.'), capsys)
+    assert code == 0 and posted[-1] == (posted[-1][0], {'shot_id': 'VS1', 'quote': 'Yes, reuse it.'}) and posted[-1][0].endswith('/visuals/reuse')
+
+
+def test_the_prompt_steps_and_doc_carry_timing_movement_and_no_repeats():
+    """design/89 A2, B, H; the footage route no longer shows a frame of a clip that plays elsewhere."""
+    prompt, steps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert len(prompt.split()) <= 3500 and 'over six seconds must earn' not in prompt and 'used in the edit or not, can be the still' not in prompt
+    assert 'A still moves 5 %' in prompt and 'return_of' in prompt and "narration's pauses" in prompt and 'vw visuals clip' in prompt
+    for needle in ('never inside a word', 'graphics push_in only', 'at most 4 s, a frozen one 3 s', 'reimagined shot', 'at least 60 s', 'safe enlargement', 'vw visuals reuse --shot S', 'frozen_seconds'):
+        assert needle in steps, needle
+    assert 'vw visuals clip --shot S' in doc and 'vw visuals reuse --shot S' in doc and 'return_of' in doc
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

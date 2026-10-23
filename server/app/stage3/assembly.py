@@ -117,6 +117,9 @@ def prepare(conn, store, user, run, outputs):
                     fail(f"Visuals output for {g['shot_id']} lacks a state file of {shot['shot_id']}: " + ', '.join(n for n, r in zip(names, refs) if not r))
                 found.append((g, shot, names[0], {**refs[0], 'states': [{'file': {k: r[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'hold_frames': st['hold_frames']} for r, st in zip(refs, shot['media']['states'])]}))
                 continue
+            if shot.get('source') == 'clip':   # design/89 B3: a moving stretch of an original clip; its file is the original
+                found.append((g, shot, None, {'clip_fill': shot['media']}))
+                continue
             name = f"{shot['shot_id']}.mp4" if shot['source'] == 'take' else f"{shot['shot_id']}-asset{'.mp4' if shot.get('kind') == 'movie' else '.png'}"
             if shot['source'] == 'asset' and visuals_assets is None and not any(f['name'] == name for f in vo['files']):
                 try:
@@ -130,17 +133,22 @@ def prepare(conn, store, user, run, outputs):
     for g, shot, name, ref in found:
         placement = shot['placement']
         slot = placement['end_frame'] - placement['start_frame']
-        if ref.get('states'):   # design/65 B8: a graphic sequence
+        if ref.get('clip_fill'):
+            m = ref['clip_fill']
+            meta = {'kind': 'clip', 'duration_s': round(m['out_s'] - m['in_s'], 3), 'fps': m['clip'].get('fps'), 'issues': [], 'clip': m['clip'], 'in_s': m['in_s'], 'out_s': m['out_s'],
+                    'crop_rect': m.get('crop_rect')}
+        elif ref.get('states'):   # design/65 B8: a graphic sequence
             meta = {'kind': 'sequence', 'duration_s': None, 'fps': None, 'issues': [], 'states': ref['states'],
                     'dissolve_frames': shot['media'].get('dissolve_frames') or 0, 'motion': shot['media'].get('motion') or 'none'}
         elif ref['name'].endswith('.png'):
-            meta = {'kind': 'still', 'duration_s': None, 'fps': None, 'issues': []}
+            sm = shot.get('media') or {}
+            meta = {'kind': 'still', 'duration_s': None, 'fps': None, 'issues': [], 'motion': sm.get('motion') or 'none', 'graphic': bool(sm.get('graphic'))}   # design/89 B2: recorded before it, frozen
         elif shot.get('media') and shot['media'].get('kind') == 'movie' and shot['media'].get('duration_s'):   # design/46 11.2: measured when the take was retained
             meta = {**shot['media'], 'issues': shot['media'].get('issues') or []}
         else:
             meta = {'kind': 'movie', **probe_file(store, ref['key'], ref['name'])}
         avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
-        fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
+        fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': None if ref.get('clip_fill') else {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
                                   'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'},
                                   **({'boundary': shot['boundary']} if shot.get('boundary') else {})}   # design/71 P4
         session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
@@ -229,7 +237,7 @@ def build(conn, store, user, run, outputs):
                     fail(f"{sid}: the take is shorter than its slot with end_policy trim; choose hold_last")
                 if f['meta']['issues'] and not c.get('accept_as_is'):
                     fail(f"{sid} has issues {f['meta']['issues']} and was not accepted as is")
-                events.append({'kind': 'fill', 'beat_id': ev['beat_id'], 'gap_id': gid, 'shot_id': sid, 'source': 'take' if f['file']['name'].endswith('.mp4') and 'asset' not in f['file']['name'] else 'asset',
+                events.append({'kind': 'fill', 'beat_id': ev['beat_id'], 'gap_id': gid, 'shot_id': sid, 'source': 'clip' if f['meta']['kind'] == 'clip' else 'take' if f['file']['name'].endswith('.mp4') and 'asset' not in f['file']['name'] else 'asset',
                                'file': f['file'], 'media': f['meta'], 'offset_frames': c['offset_frames'], 'end_policy': c['end_policy'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n,
                                'fit': 'contain', 'stabilize': False, 'cumulative_zoom': 1.0, 'a2_intervals': [], 'dissolve_into_next': joins.get(sid, 0)})
                 cursor += n
@@ -247,6 +255,18 @@ def build(conn, store, user, run, outputs):
     save_session(store, run, session)
     return {'version': version, 'digest': d, 'events': len(events), 'stabilized': [e['sub_clip_id'] for e in events if e.get('stabilize')], 'finishing_items': len(assembly['finishing']),
             'next': '`vw assembly render`, poll, `vw assembly fetch`, let the operator watch and listen, then `vw assembly review`'}
+
+
+def clip_item(ev, m, tl_fps, normalised_key):
+    """design/89 B3: a clip stretch as a render event: its source frames from the in point for exactly the slot, the reuse crop when there is one."""
+    c = m['clip']
+    sf = Fraction(str(c['fps']))
+    src_in = int(round(Fraction(str(m['in_s'])) * sf))
+    n_src = int(Fraction(ev['timeline_frames']) * sf / Fraction(str(tl_fps)))
+    return {'kind': 'event', 'sub_clip_id': ev['shot_id'], 'label': ev['shot_id'],
+            'clip': {'id': c['id'], 'name': c['name'], 'sha256': c['sha256'], 'fps': c['fps'], 'rotation_deg': c.get('rotation_deg') or 0.0, 'hdr': bool(c.get('hdr'))},
+            'source_in_frame': src_in, 'source_out_frame': src_in + n_src, 'timeline_frames': ev['timeline_frames'], 'crop_rect': m.get('crop_rect'),
+            'hold_last_frame': False, 'a2': [], 'normalised_key': normalised_key, 'dissolve_into_next': 0}
 
 
 def current(store, session):
@@ -273,9 +293,12 @@ def render(conn, store, user, run):
             m = ev['media']
             fps = m.get('fps') or str(pk['timeline']['fps'])
             if m['kind'] == 'still':
-                items.append({'kind': 'still', 'file': ev['file'], 'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
+                items.append({'kind': 'still', 'file': ev['file'], 'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4"),
+                              'motion': m.get('motion') or 'none', 'graphic': bool(m.get('graphic')), 'label': ev['shot_id']})   # design/89 B2, H6
+            elif m['kind'] == 'clip':   # design/89 B3
+                items.append(clip_item(ev, m, pk['timeline']['fps'], key(run, f"normalised/{ev['shot_id']}.mp4")))
             elif m['kind'] == 'sequence':   # design/65 B8
-                items.append({'kind': 'sequence', 'states': m['states'], 'dissolve_frames': m.get('dissolve_frames') or 0, 'motion': m.get('motion') or 'none',
+                items.append({'kind': 'sequence', 'states': m['states'], 'dissolve_frames': m.get('dissolve_frames') or 0, 'motion': m.get('motion') or 'none', 'label': ev['shot_id'],
                               'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
             else:
                 n_src = int(Fraction(ev['timeline_frames']) * Fraction(str(fps)) / Fraction(str(pk['timeline']['fps'])))

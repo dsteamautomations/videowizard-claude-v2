@@ -77,6 +77,7 @@
 .v2 .pic.sel{outline:2px solid var(--accent);outline-offset:1px}
 .v2 .fchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg);font-size:12.5px;cursor:pointer;color:var(--fg)}
 .v2 .fchip b{color:var(--muted);cursor:pointer;font-weight:400}
+.v2 .timed{margin-top:4px;line-height:1.5}.v2 .timed .tm{font-variant-numeric:tabular-nums;color:var(--fg)}
 .v2 .turn{font-size:13px;margin:8px 0 4px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
 .v2 .turn.you{border-color:var(--accent);color:var(--fg);font-weight:600}
 .v2 .turn.ok{border-color:var(--ok);color:var(--ok)}
@@ -188,18 +189,26 @@ function footageBlock(){   // design/88 F4: the footage is measured and told; th
     '<textarea id="ftwords" class="words" style="width:100%;margin-top:6px" placeholder="your words: what the footage really is"></textarea><div class="btns"><button class="go" data-a="footage">Save the correction</button></div></div></div>';}
 function wireFootage(){const o=$('ft-open');if(!o)return;o.addEventListener('click',()=>{$('ft-form').hidden=!$('ft-form').hidden;});
   $('s-treatment').querySelectorAll('button[data-a="footage"]').forEach(b=>b.addEventListener('click',()=>click(b)));}
+function reuseBox(s){   // design/89 H2, H7: a reuse the assistant proposed waits for the operator's own words
+  const p=(data.reuse_pending||{})[s.shot_id];if(!p)return '';
+  return '<div class="card" style="border-color:var(--accent);margin-top:8px"><b>Showing footage again</b><div class="ds">Clip '+esc(p.clip_id)+' is already on screen in '+esc(p.on_screen)+'. '+
+    'The reason: '+esc(p.reason)+'. The new angle considered: '+esc(p.considered)+'. A reimagined shot is preferred; approve only if it adds nothing.</div>'+
+    '<textarea id="rw-'+esc(s.shot_id)+'" class="words" style="width:100%;margin-top:6px" placeholder="your words: why the same footage is right here"></textarea>'+
+    '<div class="btns"><button class="go" data-a="approve-reuse" data-shot="'+esc(s.shot_id)+'">Approve the reuse</button></div></div>';}
+function timed(g){const t=g.timing;if(!t||!t.sentences||!t.sentences.length)return '';   // design/89 A1: when each sentence is spoken in the gap
+  return '<div class="ds timed">'+t.sentences.map(s=>'<span class="tm">'+Number(s.start_s).toFixed(1)+'–'+Number(s.end_s).toFixed(1)+' s</span> “'+esc(s.text)+'”').join('<br>')+'</div>';}
 function intendedBlock(){const iv=data.intended_visuals||[];if(!iv.length)return footageBlock();return footageBlock()+'<h3>The script\'s intended visuals</h3><div class="card">'+iv.map(e=>'<div class="ds"><b>'+esc(e.heading||'(no heading)')+'</b>'+(e.narration_starts?' · “'+esc(e.narration_starts)+'…”':'')+'</div><ul class="intended">'+e.lines.map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>').join('')+'</div>';}
 function renderTreatment(){
   const d=data, t=d.treatment, dr=d.treatment_draft, tr=dr||t, recorded=!!t&&!dr, replaces=dr&&t?t.at:null;
   if(!tr){$('s-treatment').innerHTML=intendedBlock()+'<div class="empty">The treatment, gap by gap, appears here once the assistant drafts it.</div>';return;}
   const byGap={};(tr.gaps||[]).forEach(e=>byGap[e.gap_id]=e);
   const rows=d.gaps.map(g=>{const e=byGap[g.gap_id]||{};
-    return '<tr><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+esc(g.requirement||'')+'</div></td><td>'+(e.intended&&e.intended.length?'<ul class="intended">'+[].concat(e.intended).map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>':'<span class="ds">none in the script</span>')+(e.departure?'<div class="ds err">departs: '+esc(e.departure)+'</div>':'')+'</td><td>'+esc(e.picture||'')+'</td><td class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</td><td class="c">'+esc(e.seconds!=null?e.seconds+' s':'')+'</td><td class="c">'+esc(e.images!=null?e.images:'')+'</td></tr>';}).join('');
+    return '<tr><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+(e.intended&&e.intended.length?'<ul class="intended">'+[].concat(e.intended).map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>':'<span class="ds">none in the script</span>')+(e.departure?'<div class="ds err">departs: '+esc(e.departure)+'</div>':'')+'</td><td>'+esc(e.picture||'')+'</td><td class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</td><td class="c">'+esc(e.seconds!=null?e.seconds+' s':'')+'</td><td class="c">'+esc(e.images!=null?e.images:'')+'</td></tr>';}).join('');
   const tot=tr.totals||{};
   const badge=recorded?'approved '+esc(String(tr.at||'').slice(0,16).replace('T',' ')):(replaces?'draft, replaces the approved treatment of '+esc(String(replaces).slice(0,16).replace('T',' ')):'draft');
   $('s-treatment').innerHTML=intendedBlock()+'<h3>Treatment <span class="badge '+(recorded?'ok':(replaces?'dec':''))+'">'+badge+'</span>'+(recorded&&tr.quote?'<span class="ds">“'+esc(tr.quote)+'”</span>':'')+'</h3>'+
     '<table><thead><tr><th>Gap</th><th>The team\'s intended visuals</th><th>Picture</th><th>Route</th><th class="c">Length</th><th class="c">Images</th></tr></thead><tbody>'+rows+'</tbody></table>'+
-    '<div class="ds" style="margin-top:8px">'+esc(tot.gaps||0)+' gaps · '+esc(tot.images||0)+' images · '+Object.entries(tot.routes||{}).map(([k,v])=>v+' '+(ROUTE[k]||k)).join(', ')+' · estimate '+inr(tr.estimate_inr)+' against the cap '+inr((d.budget||{}).cap_inr)+'</div>';
+    '<div class="ds" style="margin-top:8px">'+esc(tot.gaps||0)+' gaps · '+esc(tot.images||0)+' images · '+Object.entries(tot.routes||{}).map(([k,v])=>v+' '+(ROUTE[k]||k)).join(', ')+' · estimate '+inr(tr.estimate_inr)+' against the cap '+inr((d.budget||{}).cap_inr)+(tot.frozen_share!=null?' · <span class="'+(tot.frozen_share>tot.frozen_limit?'err':'')+'">frozen '+Math.round(tot.frozen_share*100)+' % of the film (limit '+Math.round(tot.frozen_limit*100)+' %)</span>':'')+'</div>';   // design/89 B4
 }
 // ---------- plan ----------
 function renderPlan(){
@@ -212,7 +221,7 @@ function renderPlan(){
     const choice=g.choices?'<div class="btns"><span class="ds">Two choices:</span>'+g.choices.options.map(c=>'<button data-a="select" data-gap="'+esc(g.gap_id)+'" data-choice="'+esc(c.id)+'" class="'+(g.choices.selected===c.id?'go':'')+'" title="'+esc(c.why)+'">'+esc(c.title)+(g.choices.recommended===c.id?' (recommended)':'')+'</button>').join('')+'</div>':'';
     const shots=g.shots.length?'<details><summary class="ds" style="cursor:pointer">'+g.shots.length+' shot'+(g.shots.length>1?'s':'')+'</summary>'+g.shots.map(s=>'<div class="ds" style="margin:4px 0 0 12px"><b>'+esc(s.shot_id)+'</b> · '+esc(ROUTE[s.route]||s.route)+' · '+secs(s.end_frame-s.start_frame)+' — '+esc(s.purpose)+'</div>').join('')+'</details>':'<span class="ds">'+(g.choices&&!g.choices.selected?'choose one of the two':'no shots yet')+'</span>';
     const can=!g.recorded&&g.shots.length;
-    return '<tr class="'+(selGaps[g.gap_id]?'sel':'')+'"><td class="c">'+(can?'<input type="checkbox" data-sel="'+esc(g.gap_id)+'" '+(selGaps[g.gap_id]?'checked':'')+' aria-label="select '+esc(g.gap_id)+'">':'')+'</td><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</div><div class="ds">'+esc(g.requirement||'')+'</div></td><td>'+esc(e.picture||'')+'<div class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</div>'+choice+'</td><td>'+shots+'</td><td>'+state+words_+'</td></tr>';}).join('');
+    return '<tr class="'+(selGaps[g.gap_id]?'sel':'')+'"><td class="c">'+(can?'<input type="checkbox" data-sel="'+esc(g.gap_id)+'" '+(selGaps[g.gap_id]?'checked':'')+' aria-label="select '+esc(g.gap_id)+'">':'')+'</td><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</div><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+esc(e.picture||'')+'<div class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</div>'+choice+'</td><td>'+shots+'</td><td>'+state+words_+'</td></tr>';}).join('');
   $('s-plan').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 4px">Tick the gaps, type your words at the foot, then Accept them, or Revise to send them back with what to change. A change request is never a yes.</p><table><thead><tr><th class="c"></th><th>Gap</th><th>Picture · route</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
   $('s-plan').querySelectorAll('[data-sel]').forEach(c=>c.addEventListener('change',()=>{selGaps[c.dataset.sel]=c.checked;if(!c.checked)delete selGaps[c.dataset.sel];renderPlan();footer();}));
   $('s-plan').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
@@ -373,7 +382,7 @@ function renderPictures(){
         else if(mine.length){sh+='<div class="strip">'+mine.map(r=>refCard(r,can?'<div class="btns" style="margin:0 6px 6px"><button data-a="still" data-shot="'+esc(s.shot_id)+'" data-ref="'+esc(r.id)+'" class="go">Use for the shot</button></div>':'')).join('')+'</div>';}
         else{sh+='<div class="ds">No picture yet.</div>';}
       }
-      h+=sh+'</div>';
+      h+=sh+reuseBox(s)+'</div>';
     });
   });
   $('s-pictures').innerHTML=h;
@@ -418,7 +427,7 @@ function renderTakes(){
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The start and end images:</div><div class="strip">'+pair.map(r=>refCard(r)).join('')+'</div>';}
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="btns"><button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
-      h+=sh+'</div>';
+      h+=sh+reuseBox(s)+'</div>';
     });
   });
   $('s-takes').innerHTML=h;
@@ -479,6 +488,8 @@ async function click(b){
   if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} if(!q){need('Your yes to the web search goes in the box at the foot.');return;}await send({action:'search',element_id:b.dataset.el,keywords:kw,quote:q},'Search done: tick the pictures to use.');return;}
   if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[];if(!list.length){msg('Tick at least one picture first.',true);return;} if(!q){need();return;}const j=await send({action:'pick',search_id:sid,picks:list,quote:q},list.length+' picture(s) kept as references; the assistant generates the sheet from them.');if(j){delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
+  if(a==='approve-reuse'){const w=(($('rw-'+b.dataset.shot)||{}).value||'').trim();if(!w){needWords('rw-'+b.dataset.shot,'Say in your words why the same footage is right here.');return;}
+    await send({action:'approve-reuse',shot_id:b.dataset.shot,quote:w},'Reuse approved with your words.');return;}
   if(a==='footage'){const w=(($('ftwords')||{}).value||'').trim();const v=k=>(($('ft-'+k)||{}).value||'')||null;   // design/88 F4: the words sit with the button
     if(!v('camera')&&!v('support')&&!v('look')){msg('Choose what to correct first.',true);return;} if(!w){needWords('ftwords','Say in your words what the footage really is.');return;}
     await send({action:'footage',camera:v('camera'),support:v('support'),look:v('look'),quote:w},'Footage corrected: your words win for the rest of the run.');return;}
