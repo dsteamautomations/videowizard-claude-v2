@@ -6,7 +6,7 @@ Written when SK moved the builder session to another Claude account (same PC, sa
 
 | | Server | Plugin | Commit |
 |---|---|---|---|
-| Live on the VM (deployed 23 Oct) | 0.32.0 | 0.30.0 | 22c3b37 (design/86) |
+| Live on the VM (deployed 23 Oct) | 0.33.0 | 0.31.0 | 8c1ba7f (design/86, design/88) |
 
 Tests at 7667563: `server/unit` 191 pass; `plugin/tests` 228 pass plus the 3 known Windows-only failures (test_intake ×2, test_start_defect_paths). Deploy only on SK's word; after a deploy: a row in design/35, a line in design/49, the findings file.
 
@@ -25,6 +25,8 @@ From the VW-6 image review (`../image-generation-review-2026-10-23.md`, 11 of 24
 - **K9** `vw visuals feedback` opens with rounds per approved picture, per kind.
 
 Not verified: Gemini's judgement on real pictures (VW-7 is the check); the page in a browser; `server/tests` (Docker).
+
+Since this note was first written: design/88 (the footage character measured, not asked; and a fix to design/86's packet digest) is live, server 0.33.0, plugin 0.31.0.
 
 ## 3. Open, in order
 
