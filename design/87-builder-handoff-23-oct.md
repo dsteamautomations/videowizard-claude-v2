@@ -6,7 +6,7 @@ Written when SK moved the builder session to another Claude account (same PC, sa
 
 | | Server | Plugin | Commit |
 |---|---|---|---|
-| Live on the VM (deployed 23 Oct) | 0.33.0 | 0.31.0 | 8c1ba7f (design/86, design/88) |
+| Live on the VM (deployed 23 Oct) | 0.34.0 | 0.32.0 | 69b4198 (design/86, 88, 89 batch 1) |
 
 Tests at 7667563: `server/unit` 191 pass; `plugin/tests` 228 pass plus the 3 known Windows-only failures (test_intake ×2, test_start_defect_paths). Deploy only on SK's word; after a deploy: a row in design/35, a line in design/49, the findings file.
 
@@ -27,6 +27,8 @@ From the VW-6 image review (`../image-generation-review-2026-10-23.md`, 11 of 24
 Not verified: Gemini's judgement on real pictures (VW-7 is the check); the page in a browser; `server/tests` (Docker).
 
 Since this note was first written: design/88 (the footage character measured, not asked; and a fix to design/86's packet digest) is live, server 0.33.0, plugin 0.31.0.
+
+Also live since 23 Oct: design/89 batch 1 (A timing, B movement and limits, H no repeats) and its review fixes. Next from design/89: batch 2 (C claims, style sheet, the answer form required; D drawing specs), batch 3 (E drawn graphics; the VM has no TrueType font yet), batch 4 (F1 sound notes, I library). SK's decisions are in design/89's last section.
 
 ## 3. Open, in order
 
