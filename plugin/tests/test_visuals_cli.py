@@ -322,7 +322,6 @@ def test_image_state_kind_posts_one_parent(harness, monkeypatch, capsys):
 def test_visuals_prompt_is_rewritten_for_v2():
     prompt = STAGES['visuals']['prompt']
     assert prompt.startswith('VW-PROCEDURE')
-    assert len(prompt.split()) <= 3500
     for word in FORBIDDEN:
         assert word not in prompt, word
     for cmd in ('vw visuals frame', 'vw visuals image', 'vw visuals still', 'vw visuals take', 'vw visuals select', 'vw visuals asset', 'vw visuals record',
@@ -363,7 +362,6 @@ def test_steps_and_command_text_carry_the_new_flow():
 
 def test_prompt_and_steps_carry_the_videowizard_form_the_face_rule_and_the_retry_rule():
     prompt = STAGES['visuals']['prompt']
-    assert len(prompt.split()) <= 3500
     assert "the library's VideoWizard answer form" in prompt and 'look reference' in prompt and 'never a parent' in prompt
     assert 'from the approved start' in prompt and 'not from the candidate chain' in prompt and 'from the last approved state' in prompt
     assert 'design/71' in STAGES['visuals']['prompt_origin']
@@ -374,7 +372,6 @@ def test_prompt_and_steps_carry_the_videowizard_form_the_face_rule_and_the_retry
 def test_prompt_and_steps_carry_the_boundary_rule_the_wave_rule_and_no_cap_command():
     """design/74 L24, L26, L27."""
     prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
-    assert len(prompt.split()) <= 3500
     assert 'only within one continuous shot' in prompt and 'a cut starts a new pair' in prompt
     assert 'one approval wave' in prompt and 'the builder changes the cap' in prompt and 'Only the operator raises the cap' not in prompt
     assert "next shot's answers" in steps[3] and 'status --wait' in steps[3] and 'vw visuals cap' not in ' '.join(steps)
@@ -384,7 +381,6 @@ def test_prompt_and_steps_carry_the_boundary_rule_the_wave_rule_and_no_cap_comma
 def test_prompt_and_step_say_a_change_request_in_the_gap_words_is_a_revision():
     """design/75 (defect 20)."""
     prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
-    assert len(prompt.split()) <= 3500
     assert 'accepted afresh' in prompt and "every gap's words" in prompt
     assert 'accepted afresh' in steps[2] and 'before any picture' in steps[2]
     assert 'design/75' in STAGES['visuals']['prompt_origin']
@@ -421,7 +417,6 @@ def test_still_bind_and_approve_take_a_file_of_rows_in_order_and_stop_at_the_fir
 def test_prompt_and_steps_say_a_still_shot_needs_no_bind_and_name_the_file_forms():
     """design/77 L33a."""
     prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
-    assert len(prompt.split()) <= 3500
     assert 'Bind each video shot' in prompt and 'A still shot needs no bind' in prompt
     assert 'Still shots need no bind' in steps[4] and 'still --file' in steps[4] and 'bind --file' in steps[4] and 'approve --file' in steps[3]
     assert 'design/77' in STAGES['visuals']['prompt_origin']
@@ -430,7 +425,6 @@ def test_prompt_and_steps_say_a_still_shot_needs_no_bind_and_name_the_file_forms
 def test_prompt_and_steps_carry_the_packet_order_the_material_rule_and_the_footage_character():
     """design/77 L35, L41, L42."""
     prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
-    assert len(prompt.split()) <= 3500
     assert 'never a start image before the packet' in steps[4] and 'the end image from the start candidate at once' in steps[4] and "after that shot's `bind` and `packet`" in steps[3]
     assert 'anything specific to the client that the footage shows' in prompt and 'never words alone' in prompt
     assert 'recorded footage character' in prompt and 'never from an assumption' in prompt
@@ -465,7 +459,6 @@ def test_elements_search_pick_and_nothing_fits_post_what_the_server_expects(harn
 def test_prompt_steps_and_doc_carry_the_sheet_per_element_the_people_rule_and_the_search_route():
     """design/73 R2, R5, R6."""
     prompt, steps = STAGES['visuals']['prompt'], STAGES['visuals']['steps']
-    assert len(prompt.split()) <= 3500
     assert 'one generated reference sheet' in prompt and 'posture, dress, build and features' in prompt and 'vw visuals search' in prompt
     assert 'vw visuals elements' in steps[3] and 'two to six words' in steps[3] and 'pick --search' in steps[3] and 'never a parent for an edit' in steps[3]
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
@@ -599,7 +592,7 @@ def test_clip_fills_a_shot_and_reuse_posts_the_operators_words(harness, monkeypa
 def test_the_prompt_steps_and_doc_carry_timing_movement_and_no_repeats():
     """design/89 A2, B, H; the footage route no longer shows a frame of a clip that plays elsewhere."""
     prompt, steps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert len(prompt.split()) <= 3500 and 'over six seconds must earn' not in prompt and 'used in the edit or not, can be the still' not in prompt
+    assert 'over six seconds must earn' not in prompt and 'used in the edit or not, can be the still' not in prompt
     assert 'A still moves 5 %' in prompt and 'return_of' in prompt and "narration's pauses" in prompt and 'vw visuals clip' in prompt
     for needle in ('never inside a word', 'graphics push_in only', 'at most 4 s, a frozen one 3 s', 'reimagined shot', 'at least 60 s', 'safe enlargement', 'vw visuals reuse --shot S', 'frozen_seconds'):
         assert needle in steps, needle
@@ -669,7 +662,24 @@ def test_spec_posts_the_operators_words_and_measure_posts_the_frames_and_questio
 def test_the_prompt_and_steps_carry_claims_style_and_the_drawing_spec():
     """design/89 C, D."""
     prompt, steps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert len(prompt.split()) <= 3500
     for needle in ('claims_left_out', 'graphic_style', 'drawing_spec', 'never invented', 'not to scale', 'vw visuals measure', 'vw visuals spec', '--kind style'):
         assert needle in prompt and needle in steps, needle
     assert 'vw visuals spec --shot S' in doc and 'vw visuals measure --refs' in doc
+
+
+def test_status_shows_a_takes_marks_with_their_seconds():
+    """design/91 N3."""
+    st = {'state': 'prepared', 'jobs': [{'id': 'j1', 'unit': 'VS1', 'provider': 'video', 'status': 'ready', 'check_marks': [{'check': 'appear or vanish', 'at_s': 5.2}, {'check': 'planned end', 'at_s': None}]},
+                                        {'id': 'j2', 'unit': 'VS2', 'provider': 'video', 'status': 'ready', 'check_marks': []}]}
+    jobs_ = vw._short_status(st)['jobs']
+    assert jobs_[0]['marked'] == ['appear or vanish at 5.2 s', 'planned end'] and 'marked' not in jobs_[1]
+
+
+def test_the_prompt_and_steps_carry_the_change_list_the_action_budget_and_the_take_check():
+    """design/91 N1, N2, N3; the 3,500-word limit is gone (SK, 23 Oct)."""
+    prompt, steps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for needle in ('`changes`', '`min_s`', 'marks any difference', 'Gemini reads every ready take'):
+        assert needle in prompt, needle
+    for needle in ('`changes`', '`min_s`', 'is marked', 'read by Gemini first'):
+        assert needle in steps, needle
+    assert '`changes`' in doc and '`min_s`' in doc

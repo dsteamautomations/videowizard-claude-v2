@@ -469,7 +469,8 @@ def page_view(conn, store, run, outputs, code):
         takes.setdefault(j['unit'], []).append({'job_id': str(j['id']), 'status': j['status'], 'error': j.get('error'), 'url': url(res.get('key')), 'sha256': res.get('sha256'),
                                                  'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
                                                  'reviews': [{k: rv.get(k) for k in ('decision', 'notes', 'quote', 'by')} for rv in session['reviews'].get(str(j['id']), [])],
-                                                 'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j)})
+                                                 'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j),
+                                                 'check': (session.get('take_checks') or {}).get(str(j['id']))})   # design/91 N3
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
         entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, **_accepted_words(session, gid)}
@@ -492,6 +493,8 @@ def page_view(conn, store, run, outputs, code):
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {})} if asset else None),   # design/89 B3
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'],
+                                           'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
+                                           'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
                                            'claims': sh.get('claims') or [], 'spec': ({'table': spec_table(sh['drawing_spec']), 'relationships': sh['drawing_spec'].get('relationships') or [],   # design/89 C1, D4
                                                                                       'label': sh['drawing_spec'].get('label') or '',
                                                                                       'approved': (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') == spec_digest(sh['drawing_spec'])}
@@ -1507,6 +1510,12 @@ def prepare_take(store, user, run, outputs, body):
     used = [sid for sid, rid in _start_images(store, session).items() if rid == body['start_image'] and sid != body['shot_id']] + \
            [sid for sid, a in session['assets'].items() if sid != body['shot_id'] and a.get('reference_id') == body['start_image']]
     warns, form = [], [] if answer is not None else ['no answer form with this take: write the motion prompt with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]   # design/89 C4
+    beats = {b['id']: b for s in planned.get('subjects') or [] for b in s.get('beats') or []}   # design/91 N1: when each change happens is its beat's frames
+    changes = [{'what': c['what'], 'beat_id': c['beat_id'], 'at_s': [round((beats[c['beat_id']]['start_frame'] - planned['start_frame']) / float(fps), 2),
+                                                                     round((beats[c['beat_id']]['end_frame'] - planned['start_frame']) / float(fps), 2)]}
+               for c in planned.get('changes') or [] if c.get('beat_id') in beats]
+    if not changes:
+        form.append('no change list on this shot: list what differs between the start and the end picture and the beat that causes each (changes), so the pair is checked' + NEXT_RELEASE)
     _rule(session, not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
     s, e = images['start_image'], images['end_image']
     if all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
@@ -1520,15 +1529,54 @@ def prepare_take(store, user, run, outputs, body):
               'resolution': body.get('resolution') or ('720p' if selected['model'] != video_generators.CATALOG[1]['model'] else None),
               **images, 'provider': selected['provider'], 'model': selected['model'],
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},
-              'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {})}
+              'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {}),
+              **({'changes': changes} if changes else {})}   # design/91 N1: the take check reads them too (N3)
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)
+    pair = None
+    if changes:   # design/91 N1: Gemini lists what differs; a difference no change explains is marked, never refused
+        pk = digest({'start': s['sha256'], 'end': e['sha256'], 'changes': changes})
+        pair = (session.get('pair_checks') or {}).get(pk)
+        if pair is None or pair.get('error'):
+            pair = _pair_check(store, s, e, changes)
+            session.setdefault('pair_checks', {})[pk] = pair
+        form += [f"marked: '{d['what']}' differs between the start and the end picture and has no cause in the change list: show the operator; they approve the pair "
+                 'or the end image is changed' for d in pair.get('uncaused') or []]
+        if pair.get('error'):
+            form.append(f"the pair check could not run ({pair['error']}): compare the two pictures with the change list yourself")
     session['preparations'][body['shot_id']] = {'preparation_id': identity, 'key': key(run, f'takes/{identity}.request.json'), 'start_image': body['start_image'], 'end_image': body['end_image'],
+                                                'motion_prompt': body['motion_prompt'], **({'pair_check': pair} if pair else {}),
                                                 **({'repeat_warnings': warns} if warns else {}),
                                                 **({'checklist': answer.get('checklist') or []} if answer is not None else {})}   # design/74 L6
     save_session(store, run, session)
     return {'preparation_id': identity, 'duration_seconds': record['duration_seconds'], 'exact_seconds': record['placement']['exact_seconds'], 'provider': selected, **({'warnings': warns + form} if warns + form else {})}
+
+
+PAIR_SCHEMA = {'type': 'object', 'properties': {'differences': {'type': 'array', 'items': {'type': 'object', 'properties': {'what': {'type': 'string'}, 'change': {'type': 'integer'}},
+                                                                                          'required': ['what', 'change']}}}, 'required': ['differences']}
+
+
+def _pair_check(store, start, end, changes):
+    """design/91 N1: one Gemini Flash call on the two pictures; every visible difference, matched to the change that causes it (0: none). Never raises."""
+    rec = {'model': MEASURE_MODEL, 'differences': [], 'uncaused': []}
+    try:
+        key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
+        if not key_:
+            return {**rec, 'error': 'no Gemini key on the server'}
+        listed = '\n'.join(f"{n}. {c['what']}" for n, c in enumerate(changes, 1))
+        parts = [{'text': 'Image 1: the start of a video shot.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(start['key'])).decode()}},
+                 {'text': 'Image 2: the end of the same shot.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(end['key'])).decode()}},
+                 {'text': 'List every visible difference between Image 1 and Image 2: anything that appears, disappears, moves, opens, grows, shrinks, changes shape, count, colour '
+                          'or state; a person\'s place, pose or what they hold; the light. Ignore the camera\'s framing. For each difference give the number of the planned change '
+                          'below that causes it, or 0 when none does. Be literal.\nPlanned changes:\n' + listed}]
+        received = _gemini_transport()(key_, MEASURE_MODEL, terminal_deadline_seconds=120, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False).generate(
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'maxOutputTokens': 4096}})
+        body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
+        diffs = [{'what': str(d.get('what') or '')[:300], 'change': d.get('change') if isinstance(d.get('change'), int) else 0} for d in body.get('differences') or [] if isinstance(d, dict)]
+        return {**rec, 'differences': diffs, 'uncaused': [d for d in diffs if not 1 <= d['change'] <= len(changes)]}
+    except Exception as exc:   # the check never blocks a take
+        return {**rec, 'error': f'{exc.__class__.__name__}: {str(exc)[:200]}'}
 
 
 def submit_take(conn, store, user, run, outputs, shot_id):
@@ -1847,7 +1895,9 @@ def status(conn, store, run, outputs):
                                        'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
         gaps.append(entry)
     refs = [{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')} for r in session['references'].values()]
-    jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j)} for j in take_jobs(conn, run)]   # design/74 L6
+    jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
+              'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3
+             for j in take_jobs(conn, run)]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,

@@ -1219,7 +1219,8 @@ def _short_status(st, shot=None, gap=None):
         refs.setdefault(eid, {})
         refs[eid][r.get('status') or '?'] = refs[eid].get(r.get('status') or '?', 0) + 1
     return {'state': st.get('state'), 'plan_digest': st.get('plan_digest'), 'round': st.get('round'), 'budget': st.get('budget'),
-            'jobs': [{'id': str(j.get('id')), 'shot': j.get('unit'), 'provider': j.get('provider'), 'status': j.get('status'), **({'error': (j.get('error') or '')[:80]} if j.get('error') else {})} for j in jobs_],
+            'jobs': [{'id': str(j.get('id')), 'shot': j.get('unit'), 'provider': j.get('provider'), 'status': j.get('status'), **({'error': (j.get('error') or '')[:80]} if j.get('error') else {}),
+                      **({'marked': [f"{m.get('check')}" + (f" at {m['at_s']} s" if m.get('at_s') is not None else '') for m in j['check_marks']]} if j.get('check_marks') else {})} for j in jobs_],   # design/91 N3
             'references': refs, 'file': 'work/visuals/status.json'}
 
 

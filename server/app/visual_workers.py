@@ -241,6 +241,25 @@ def process_take(job):
         return 'submission_unknown', {'phase': 'submit'}, 'Provider acceptance is unknown. Reconcile the retained attempt before any replacement.', None, None
 
 
+def check_take(job, result):
+    """design/91 N3: the ready take read by Gemini before the operator watches it; the record on the session, under the run's lock. Never raises.
+    ponytail: runs in the take worker (about a minute a take); a queue of its own if takes pile up behind it."""
+    from . import image_check
+    from .analysis_jobs import transport_factory
+    store = storage()
+    try:
+        snapshot = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
+        record = image_check.run_take_check(snapshot, SPOOL / str(job['id']) / 'output.mp4', result['sha256'], transport_factory)
+        with connect() as conn:
+            conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
+            k = f"{job['run_id']}/visuals/session.json"
+            session = json.loads(store.get(k).decode('utf-8'))
+            session.setdefault('take_checks', {})[str(job['id'])] = record
+            store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+    except Exception:   # a take is never held back by its check
+        return
+
+
 def claim_take(conn):
     return conn.execute('''update vw2_jobs set status = case when status in ('queued','submitted') then 'running' else status end, lease_until = now() + interval '20 minutes',
                            attempt = attempt + 1, updated_at = now()
@@ -269,5 +288,7 @@ def tick():
             jobs.finish(conn, job['id'], status, result={**prior, **(result or {})}, error=error, cost=cost, retry_in=retry_in)
             if status == 'ready':
                 jobs.record_file(conn, job['run_id'], 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'video/mp4')
+        if status == 'ready':
+            check_take(job, result)   # design/91 N3
         busy = True
     return busy

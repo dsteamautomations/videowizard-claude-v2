@@ -21,6 +21,46 @@ SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {
           'required': ['lines']}
 
 
+TAKE_LINES = [   # design/91 N3: the fixed questions every take is read against
+    {'check': 'appear or vanish', 'pass_when': 'nothing appears or vanishes without a visible cause (a hand placing it, a person carrying it in or out)', 'weight': 'must'},
+    {'check': 'same tools, clothes, faces', 'pass_when': 'every tool, piece of clothing and face stays the same from the first frame to the last', 'weight': 'must'},
+    {'check': 'no repeat without its precondition', 'pass_when': 'no action is repeated without what it needs (pouring again from a pan already emptied)', 'weight': 'must'},
+    {'check': 'no change of shape or size', 'pass_when': 'no object changes shape or size (a window, a wall, a tool)', 'weight': 'must'},
+    {'check': 'planned end', 'pass_when': 'the clip ends in the state the plan below describes', 'weight': 'must'}]
+TAKE_SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'object', 'properties': {'n': {'type': 'integer'}, 'pass': {'type': 'boolean'}, 'seen': {'type': 'string'},
+                                                                                     'at_s': {'type': 'number'}}, 'required': ['n', 'pass', 'seen']}}}, 'required': ['lines']}
+
+
+def run_take_check(snapshot, video_path, sha256, transport_factory):
+    """design/91 N3: a ready take read by Gemini Flash against the fixed questions, the plan beside them; the lines with the second each is decided. Never raises."""
+    record = {'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
+    try:
+        key = settings().GEMINI_API_KEY.get_secret_value().strip()
+        if not key:
+            record['error'] = 'no Gemini key on the server'
+            return record
+        transport = transport_factory(key, CHECK_MODEL, terminal_deadline_seconds=300, initial_soft_wait_seconds=60, on_update=lambda e: None, capture_answer_deltas=False)
+        uploaded = transport.upload(video_path, 'video/mp4', sha256)
+        plan = '\n'.join(['The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
+                         [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
+                         (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []))
+        asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(TAKE_LINES, 1))
+        received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
+            'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
+            '\n\nFor each numbered line answer pass true or false, say in one sentence what you see that decides it, and give the second (at_s) where it happens. Be literal.\n' + asks}]}],
+            'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': TAKE_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 4096}})
+        body = received.get('body')
+        if not isinstance(body, dict):
+            body = json.loads(received.get('raw') or '{}')
+        got = read(body, TAKE_LINES)
+        at = {int(l.get('n')): l.get('at_s') for l in body.get('lines') or [] if isinstance(l, dict) and l.get('n') is not None}
+        lines = [{**l, 'at_s': at.get(n) if isinstance(at.get(n), (int, float)) else None} for n, l in enumerate(got['lines'], 1)]
+        record.update(lines=lines, must_failed=[l for l in lines if l['weight'] == 'must' and l['pass'] is False])
+    except Exception as exc:   # the check never blocks a take
+        record['error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
+    return record
+
+
 def lines_of(ref):
     """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
     own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]

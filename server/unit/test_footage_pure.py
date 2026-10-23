@@ -23,7 +23,7 @@ def test_vw7_names_without_tags_are_read_from_the_file_name_and_a_drone_flies_on
     """SK's VW-7 media list: C0… names from a Sony, a DJI clip, 1080p h264 at 22 Mbit/s that the old rule called phone footage."""
     sony = {'id': 'a', 'name': 'C0012.MP4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 22_000_000}
     dji = {'id': 'b', 'name': 'DJI_20241217163840_0071_D.MP4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 22_000_000}
-    assert F.camera_of(sony) == ('mirrorless', 'file name C0012.MP4 (Sony)')
+    assert F.camera_of(sony) == ('unknown', 'file name C0012.MP4 (Sony, mirrorless or cinema: not classified)')   # L57, SK 23 Oct: left unclassified, never the codec rule
     assert F.camera_of(dji)[0] == 'drone' and F.support_of([], 'drone') == ('gimbal', 'a drone, no analysis yet')
     assert F.camera_of({'id': 'c', 'name': 'clip.mp4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 22_000_000})[0] == 'phone'   # the codec rule, last
     assert F.camera_of({'id': 'd', 'name': 'clip.mp4'}) == ('unknown', 'no maker tag, name pattern or codec on record')   # a run recorded before design/88
@@ -33,14 +33,14 @@ def test_three_clips_of_two_kinds_are_mixed_with_counts_and_two_of_three_is_most
     clips = [{'id': 'a', 'name': 'C0001.MP4'}, {'id': 'b', 'name': 'C0002.MP4'}, {'id': 'c', 'name': 'DJI_0001.MP4'}]
     logs = {'a': {'sub_clips': [sub('Handheld')]}, 'b': {'sub_clips': [sub('Static')]}, 'c': {'sub_clips': [sub('Gimbal')]}}
     m = F.measure(clips, logs)
-    assert m['summary']['camera'] == 'mirrorless' and m['summary']['camera_counts'] == {'mirrorless': 2, 'drone': 1}
+    assert m['summary']['camera'] == 'unknown' and m['summary']['camera_counts'] == {'unknown': 2, 'drone': 1}   # L57: two unread Sony clips are not a drone film
     assert m['summary']['support'] == 'mixed' and m['summary']['support_counts'] == {'handheld': 1, 'tripod': 1, 'gimbal': 1}
-    assert F.line(m['summary']) == 'Your footage: mirrorless camera, mixed support (1 handheld, 1 tripod, 1 gimbal), natural look (measured from the clips)'
+    assert F.line(m['summary']) == 'Your footage: camera not known, mixed support (1 handheld, 1 tripod, 1 gimbal), natural look (measured from the clips)'
 
 
 def test_a_clip_with_no_analysis_yet_has_camera_and_look_from_the_probe_and_support_unknown():
     row = F.per_clip({'id': 'a', 'name': 'C0001.MP4', 'color_transfer': 'bt709'}, None)
-    assert (row['camera'], row['support'], row['look']) == ('mirrorless', 'unknown', 'natural')
+    assert (row['camera'], row['support'], row['look']) == ('unknown', 'unknown', 'natural')
     assert F.measure([{'id': 'a', 'name': 'x.mp4'}], {})['summary']['support'] == 'unknown'
 
 

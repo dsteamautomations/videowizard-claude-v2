@@ -132,6 +132,7 @@ These override the sections above where they differ.
 | F | **F1 is built.** **F2 stays off**, tested on five Omni takes from the next film that allows camera sound; AI sound always follows the media step's camera-sound answer. |
 | E | **Yes: the drawn graphic is the default route for technical diagrams**, built after D. |
 | B1 | A still **with movement at most 4 s**; a still marked `none` **at most 3 s**; a graphic state **at most 5 s**; a graphic on screen over about 4 s is a build or a drawn animation. All **warn for one release, then refuse**. |
+| E font | **A font file in the repo** (SK, 23 Oct): Noto Sans Regular and Bold (OFL) under the server, so every drawn graphic uses the same font and the VM is not changed. A client's brand font, when supplied, sits beside it. |
 | H4 | An approved reuse: **at least 60 s apart** and **a different stretch** of the clip; its framing differs **only within the clip's safe enlargement** (the analysis's `max_safe_zoom_limit`). Where that is too small for a clearly different framing (a crop of 30 %, i.e. 1.43×; 1080p footage allows 1.35×), the plain reuse is **refused** and the planner uses a reimagined shot (H7). |
 
 Builder's corrections from reading the code (`../design-88-89-review-2026-10-23.md`):

@@ -67,6 +67,7 @@ class Beat(Model):
     result: str = Field(min_length=1, max_length=2000)
     start: State
     end: State
+    min_s: float = Field(default=0, ge=0)   # design/91 N2: the realistic minimum time for this action, from the facts of the process
 
 
 class Subject(Model):
@@ -104,6 +105,11 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     label: str = Field(default='', max_length=200)
 
 
+class Change(Model):   # design/91 N1: what differs between a take's start and end picture, and the beat that causes it
+    what: str = Field(min_length=1, max_length=500)
+    beat_id: str = Field(min_length=1, max_length=80)
+
+
 class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
     claim: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=1000)
@@ -135,6 +141,7 @@ class Shot(Model):
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
     claims_left_out: list[ClaimOut] = Field(default_factory=list, max_length=10)
     drawing_spec: DrawingSpec | None = None   # design/89 D1: a technical drawing of a real object
+    changes: list[Change] = Field(default_factory=list, max_length=20)   # design/91 N1: a video shot's change list
 
 
 class Landmark(Model):
@@ -434,6 +441,25 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             need(state.position.landmark_id in landmarks, 'Subject positions must refer to a named scene landmark.')
                             need(set(state.holding) <= elements, 'Held objects must have element identities.')
                         last_states[subject.element_id] = subject.end.model_dump()
+                    if shot.visual_type == 'video':   # design/91 N1, N2
+                        own = {b.id: b for s in shot.subjects for b in s.beats}
+                        for ch in shot.changes:
+                            need(ch.beat_id in own, f"shot {shot.id}: the change '{ch.what}' names {ch.beat_id}, which is not a beat of this shot.")
+                        if not shot.changes:
+                            warnings.append({'shot_id': shot.id, 'kind': 'changes_missing', 'message': f'shot {shot.id}: list what differs between its start and end picture and the beat that '
+                                             'causes each (changes); the pair is checked against it' + NEXT_RELEASE})
+                        acting = [s for s in shot.subjects if s.behaviour == 'acts']
+                        if fps:
+                            f, length = float(fps), (shot.end_frame - shot.start_frame) / float(fps)
+                            for s in acting:
+                                need_s = sum(b.min_s for b in s.beats)
+                                need(need_s <= length + 0.04, f'shot {shot.id}: the actions of {s.element_id} need {need_s:.1f} s but the shot has {length:.1f} s: drop an action or split the shot.')
+                                for b in s.beats:
+                                    have = (b.end_frame - b.start_frame) / f
+                                    need(have >= b.min_s - 0.04, f'shot {shot.id}: beat {b.id} ({b.action}) has {have:.1f} s for an action that needs {b.min_s:g} s: give it the time or drop it.')
+                        if any(not b.min_s for s in acting for b in s.beats):
+                            warnings.append({'shot_id': shot.id, 'kind': 'min_s_missing', 'message': f'shot {shot.id}: give every beat its min_s, the realistic time its action takes, so the shot '
+                                             'holds only what fits its seconds'})
                     if not shot.subjects:
                         need(shot.information_progression.strip(), 'Describe the composition or information progression for a shot without acting subjects.')
             need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
@@ -489,10 +515,13 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             if 'title' not in original_scene: scene.pop('title')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
-                            'claims', 'claims_left_out', 'drawing_spec'):   # design/89: absent stays absent
+                            'claims', 'claims_left_out', 'drawing_spec', 'changes'):   # design/89, 91: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
                     if 'words' not in original_st: st.pop('words', None)
+                for sub, original_sub in zip(shot.get('subjects') or [], original_shot.get('subjects') or []):
+                    for b, original_b in zip(sub.get('beats') or [], original_sub.get('beats') or []):
+                        if 'min_s' not in original_b: b.pop('min_s', None)
     return result, warnings
 
 

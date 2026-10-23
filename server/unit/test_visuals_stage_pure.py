@@ -461,11 +461,11 @@ def test_prepare_measures_the_footage_tells_it_and_the_neighbours_reach_the_pack
     monkeypatch.setattr(VS.core, 'stage_table', lambda v: [{'name': 'visuals', 'prompt': '', 'steps': []}])
     monkeypatch.setattr(VS.core, 'effective_rules', lambda conn, run, outputs: [])
     out = VS.prepare(FakeConn([]), store, USER, {**RUN, 'procedure_version': '2'}, outputs)
-    assert out['footage'] == 'Your footage: mixed cameras (1 mirrorless, 1 drone), mixed support (1 handheld, 1 gimbal), natural look (measured from the clips)'
+    assert out['footage'] == 'Your footage: mixed cameras (1 not known, 1 drone), mixed support (1 handheld, 1 gimbal), natural look (measured from the clips)'
     s = saved(store)
     assert s['gap_neighbours'] == {'G2': {'before': 'c1', 'after': 'c2'}} and s['footage']['per_clip']['c2']['camera'] == 'drone'
     nb = VS.packet(store, RUN, outputs, 'VS1')['preparation']['context']['footage_neighbours']
-    assert nb['before']['clip_id'] == 'c1' and nb['before']['camera'] == 'mirrorless' and nb['before']['support'] == 'handheld' and nb['after']['support'] == 'gimbal'
+    assert nb['before']['clip_id'] == 'c1' and nb['before']['camera'] == 'unknown' and nb['before']['support'] == 'handheld' and nb['after']['support'] == 'gimbal'
     # the correction wins on both front ends (the API and the page call the same function); it never makes a prepared take stale
     before = VS.packet(store, RUN, outputs, 'VS1')['preparation_digest']
     with pytest.raises(Problem, match="operator's words"):

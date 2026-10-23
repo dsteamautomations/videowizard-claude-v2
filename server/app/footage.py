@@ -14,7 +14,7 @@ PRO_CODECS = ('prores', 'dnxhd', 'dnxhr', 'cineform', 'braw', 'v210')
 PHONE_MAKERS = ('apple', 'samsung', 'google', 'xiaomi', 'redmi', 'poco', 'oneplus', 'oppo', 'vivo', 'realme', 'motorola', 'huawei', 'honor', 'nokia', 'nothing')
 CINEMA_MAKERS = ('blackmagic', 'arri', 'red digital', 'kinefinity', 'z cam')
 CAMERA_MAKERS = ('sony', 'canon', 'nikon', 'panasonic', 'fujifilm', 'olympus', 'om digital', 'leica', 'sigma', 'ricoh', 'pentax')
-NAME_HINTS = ((r'^DJI_', 'DJI', 'drone'), (r'^C\d{4}', 'Sony', 'mirrorless'), (r'^MVI_', 'Canon', 'mirrorless'), (r'^DSC_?\d', 'Nikon or Sony', 'mirrorless'),
+NAME_HINTS = ((r'^DJI_', 'DJI', 'drone'), (r'^C\d{4}', 'Sony, mirrorless or cinema: not classified', 'unknown'), (r'^MVI_', 'Canon', 'mirrorless'), (r'^DSC_?\d', 'Nikon or Sony', 'mirrorless'),
               (r'^P\d{7}', 'Panasonic', 'mirrorless'), (r'^(PXL|IMG|VID)_?\d', 'a phone', 'phone'))
 SUPPORT_OF_MOVE = {'Static': 'tripod', 'Pan': 'tripod', 'Tilt': 'tripod', 'Handheld': 'handheld', 'Gimbal': 'gimbal', 'Dolly': 'gimbal'}
 CAMERA_WORDS = {'cinema': 'cinema camera', 'mirrorless': 'mirrorless camera', 'phone': 'phone', 'drone': 'drone', 'professional': 'professional camera (cinema or mirrorless)',
@@ -81,9 +81,10 @@ def per_clip(clip, log):
     return {'name': clip.get('name'), 'camera': camera, 'support': support, 'look': look, 'evidence': {'camera': ce, 'support': se, 'look': le}}
 
 
-def _field(values):
-    """The value most clips share (two thirds or more), else mixed; unknowns do not vote. Always with the counts."""
-    counts = Counter(v for v in values if v != 'unknown')
+def _field(values, unknown_votes=False):
+    """The value most clips share (two thirds or more), else mixed; unknowns do not vote, except for the camera (L57: clips left unclassified
+    are not a film of the few that are read). Always with the counts."""
+    counts = Counter(v for v in values if unknown_votes or v != 'unknown')
     if not counts:
         return 'unknown', {}
     top, n = counts.most_common(1)[0]
@@ -95,7 +96,7 @@ def measure(clips, logs):
     rows = {c['id']: per_clip(c, (logs or {}).get(c['id'])) for c in clips or [] if c.get('id')}
     summary = {}
     for f in ('camera', 'support', 'look'):
-        summary[f], summary[f + '_counts'] = _field([r[f] for r in rows.values()])
+        summary[f], summary[f + '_counts'] = _field([r[f] for r in rows.values()], f == 'camera')
     return {'per_clip': rows, 'summary': summary}
 
 
@@ -118,7 +119,7 @@ def line(summary):
 
     def word(f, v):
         if v == 'mixed':
-            return 'mixed ' + {'camera': 'cameras', 'support': 'support', 'look': 'looks'}[f] + ' (' + ', '.join(f'{n} {k}' for k, n in (s.get(f + '_counts') or {}).items()) + ')'
+            return 'mixed ' + {'camera': 'cameras', 'support': 'support', 'look': 'looks'}[f] + ' (' + ', '.join(f"{n} {'not known' if k == 'unknown' else k}" for k, n in (s.get(f + '_counts') or {}).items()) + ')'
         return {'camera': CAMERA_WORDS, 'support': {'unknown': 'support not known'}, 'look': {'unknown': 'look not known'}}[f].get(v, v + (' look' if f == 'look' else ''))
     text = 'Your footage: ' + ', '.join(word(f, s.get(f) or 'unknown') for f in ('camera', 'support', 'look'))
     return text + (' (your correction)' if s.get('corrected') else ' (measured from the clips)')
