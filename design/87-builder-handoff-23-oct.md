@@ -6,12 +6,11 @@ Written when SK moved the builder session to another Claude account (same PC, sa
 
 | | Server | Plugin | Commit |
 |---|---|---|---|
-| Live on the VM (deployed 22 Oct night) | 0.31.0 | 0.29.0 | c6f42b5 |
-| Pushed to `main`, **not deployed** | 0.32.0 | 0.30.0 | 7667563 (design/86) |
+| Live on the VM (deployed 23 Oct) | 0.32.0 | 0.30.0 | 22c3b37 (design/86) |
 
 Tests at 7667563: `server/unit` 191 pass; `plugin/tests` 228 pass plus the 3 known Windows-only failures (test_intake ×2, test_start_defect_paths). Deploy only on SK's word; after a deploy: a row in design/35, a line in design/49, the findings file.
 
-## 2. What design/86 does (built, waiting for the deploy word)
+## 2. What design/86 does (live since 23 Oct)
 
 From the VW-6 image review (`../image-generation-review-2026-10-23.md`, 11 of 24 keyframes right the first time). SK approved all seven corrections on 23 Oct.
 
@@ -29,7 +28,7 @@ Not verified: Gemini's judgement on real pictures (VW-7 is the check); the page 
 
 ## 3. Open, in order
 
-1. **Deploy design/86** (server 0.32.0, plugin 0.30.0) on SK's word; the operator restarts Claude Code afterwards. `gcloud auth login` first: the token had expired on 23 Oct.
+1. design/86 is live since 23 Oct; VW-7 is its first check (watch the rounds summary in `vw visuals feedback`).
 2. **design/85 G4**, Omni's scene extension, its own note and deploy (specified in design/85).
 3. **VW-6**: the seven takes were to be prepared again with `--continuity` and taken again (text given to SK on 22 Oct); the visuals outputs recorded with placeholder stills during the dry run must be reset by the builder before real takes are recorded, on SK's word.
 4. **L51** Gemini analysis cost against Google's billing export for 20 Oct.
