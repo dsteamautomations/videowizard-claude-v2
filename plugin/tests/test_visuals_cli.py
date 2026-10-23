@@ -705,3 +705,11 @@ def test_the_procedures_carry_the_step_map_facts_words_and_depicts():
     for needle in ('`descriptors`', '`evidence`', '`visual_facts`', '`fact_ids`', 'never invented', '`depicts`', '`carries_over`', '`--shot S`'):
         assert needle in vp and needle in vsteps, needle
     assert '`steps` map' in doc and '`depicts`' in doc
+
+
+def test_the_procedure_carries_life_intent_one_world_and_one_message():
+    """design/91 batch 3."""
+    vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for needle in ('`activity_level`', 'comes into view', '`studio_background`', '`message`', '`adds`'):
+        assert needle in vp and needle in vsteps, needle
+    assert 'light and colour' in vp and '`activity_level`' in doc and '`message`' in doc

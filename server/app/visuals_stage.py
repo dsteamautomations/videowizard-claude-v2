@@ -404,6 +404,7 @@ def treatment(store, user, run, outputs, document, quote):
                 routes_.append(r)
         e['routes'] = routes_
         need(str(e.get('picture') or '').strip(), f"gap {e['gap_id']}: say the picture in one line.")
+        need(e.get('activity_level', '') in ('', 'quiet', 'normal', 'busy'), f"gap {e['gap_id']}: activity_level is quiet, normal or busy.")   # design/91 N4
         need(isinstance(e.get('depicts', []), list) and all(isinstance(x, str) and x.strip() for x in e.get('depicts', [])),
              f"gap {e['gap_id']}: depicts is a list of lines, one per graphic, each saying what it shows.")   # design/91 N10
         need(isinstance(e.get('seconds'), (int, float)) and e['seconds'] > 0, f"gap {e['gap_id']}: seconds must be a number above zero.")
@@ -497,6 +498,7 @@ def page_view(conn, store, run, outputs, code):
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'],
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
                                            'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
+                                           'message': sh.get('message') or '', 'adds': sh.get('adds') or '',   # design/91 N11
                                            'depicts': sh.get('depicts') or '', 'descriptors': sh.get('descriptors') or [], 'carries_over': sh.get('carries_over') or [],   # design/91
                                            'facts': [f"{f['looks']} ({f['status']}{', ' + f['source'] if f.get('source') else ''})" for f in (plan or {}).get('visual_facts') or []
                                                      if f['id'] in (sh.get('fact_ids') or []) or f.get('about') in (sh.get('element_ids') or [])],
@@ -1023,8 +1025,12 @@ def generate_image(conn, store, user, run, outputs, body):
             except ValueError as exc:
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
-    named = guarded(lambda: locate(store, session, body['shot_id']))[3] if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
+    found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
+    named = found[3] if found else None
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named)
+            and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
+        lines.append(WORLD_LINE)
     check_cap(conn, run, session, prices()['image_inr'] * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
     op = 'edit' if parents else 'generate'
     made = []
@@ -1033,10 +1039,14 @@ def generate_image(conn, store, user, run, outputs, body):
         made.append(_queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), body['request_id'] + ('-' + suffix if suffix else ''), pending_end))
         if lines:
             session['references'][made[-1]['reference_id']]['server_checklist'] = lines
+        if found:   # design/91 N9: the check measures its light against the footage beside the shot's gap
+            session['references'][made[-1]['reference_id']].update(shot_id=named['id'], gap_id=found[1]['gap_id'])
     save_session(store, run, session)
     return {**made[0], **({'reference_ids': [m['reference_id'] for m in made], 'job_ids': [m['job_id'] for m in made]} if variants == 2 else {}), **({'warnings': warns} if warns else {})}
 
 
+WORLD_LINE = {'check': "the film's world", 'pass_when': 'the subject is in a real place of the film (its ground, light and surroundings), not on a plain studio or neutral '
+                                                       'background, and not an object alone out of its place of use', 'weight': 'should'}   # design/91 N9, N11
 STYLE = '_STYLE'   # design/89 C2: the film's style sheet, one picture every graphic is made from
 
 

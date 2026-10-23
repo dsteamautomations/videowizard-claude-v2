@@ -233,7 +233,7 @@ function renderTreatment(){
   if(!tr){$('s-treatment').innerHTML=intendedBlock()+'<div class="empty">The treatment, gap by gap, appears here once the assistant drafts it.</div>';return;}
   const byGap={};(tr.gaps||[]).forEach(e=>byGap[e.gap_id]=e);
   const rows=d.gaps.map(g=>{const e=byGap[g.gap_id]||{};
-    return '<tr><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+(e.intended&&e.intended.length?'<ul class="intended">'+[].concat(e.intended).map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>':'<span class="ds">none in the script</span>')+(e.departure?'<div class="ds err">departs: '+esc(e.departure)+'</div>':'')+'</td><td>'+esc(e.picture||'')+((e.depicts||[]).length?'<div class="ds">Depicts: '+e.depicts.map(esc).join(' · ')+'</div>':'')+'</td><td class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</td><td class="c">'+esc(e.seconds!=null?e.seconds+' s':'')+'</td><td class="c">'+esc(e.images!=null?e.images:'')+'</td></tr>';}).join('');
+    return '<tr><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+(e.intended&&e.intended.length?'<ul class="intended">'+[].concat(e.intended).map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>':'<span class="ds">none in the script</span>')+(e.departure?'<div class="ds err">departs: '+esc(e.departure)+'</div>':'')+'</td><td>'+esc(e.picture||'')+((e.depicts||[]).length?'<div class="ds">Depicts: '+e.depicts.map(esc).join(' · ')+'</div>':'')+(e.activity_level?'<div class="ds">Activity: '+esc(e.activity_level)+'</div>':'')+'</td><td class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</td><td class="c">'+esc(e.seconds!=null?e.seconds+' s':'')+'</td><td class="c">'+esc(e.images!=null?e.images:'')+'</td></tr>';}).join('');
   const tot=tr.totals||{};
   const badge=recorded?'approved '+esc(String(tr.at||'').slice(0,16).replace('T',' ')):(replaces?'draft, replaces the approved treatment of '+esc(String(replaces).slice(0,16).replace('T',' ')):'draft');
   $('s-treatment').innerHTML=intendedBlock()+'<h3>Treatment <span class="badge '+(recorded?'ok':(replaces?'dec':''))+'">'+badge+'</span>'+(recorded&&tr.quote?'<span class="ds">“'+esc(tr.quote)+'”</span>':'')+'</h3>'+
@@ -261,7 +261,8 @@ function latestSearch(eid){return (data.searches||[]).filter(s=>s.element_id===e
 function pickOf(sid,n){return (picks[sid]||[]).find(p=>p.n===n);}
 function toggleTick(sid,n){picks[sid]=picks[sid]||[];const i=picks[sid].findIndex(p=>p.n===n);if(i>=0)picks[sid].splice(i,1);else picks[sid].push({n:n,note:''});}
 function shotFacts(s){   // design/91: what the shot depicts, its words, what the step before left, the facts it rests on
-  let h='';if(s.depicts)h+='<div class="ds">Depicts: '+esc(s.depicts)+'</div>';
+  let h='';if(s.message)h+='<div class="ds">Message: '+esc(s.message)+(s.adds?' · adds: '+esc(s.adds):'')+'</div>';   // design/91 N11
+  if(s.depicts)h+='<div class="ds">Depicts: '+esc(s.depicts)+'</div>';
   if((s.descriptors||[]).length)h+='<div class="ds">Words it must not contradict: '+s.descriptors.map(esc).join(' · ')+'</div>';
   if((s.carries_over||[]).length)h+='<div class="ds">Carried over from the step before: '+s.carries_over.map(esc).join(' · ')+'</div>';
   if((s.facts||[]).length)h+='<div class="ds">Facts: '+s.facts.map(esc).join(' · ')+'</div>';

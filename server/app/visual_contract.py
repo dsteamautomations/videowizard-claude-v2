@@ -33,6 +33,7 @@ class Foundation(Model):
     production_constraints: list[Rule] = Field(default_factory=list, max_length=100)
     editing_constraints: list[Rule] = Field(default_factory=list, max_length=100)
     graphic_style: GraphicStyle | None = None
+    studio_background: str = Field(default='', max_length=1000)   # design/91 N9: why this film may show a subject on a plain background; empty: never
 
 
 class Element(Model):
@@ -158,6 +159,8 @@ class Shot(Model):
     evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)
     depicts: str = Field(default='', max_length=500)   # design/91 N10: what a graphic shows, in the subject's own form or as a labelled contrast
     carries_over: list[str] = Field(default_factory=list, max_length=10)   # design/91 N14: what the step before left, still visible
+    message: str = Field(default='', max_length=500)   # design/91 N11: the message this shot carries
+    adds: str = Field(default='', max_length=500)   # what it adds when it carries a message shown before
 
 
 class Landmark(Model):
@@ -174,6 +177,7 @@ class Scene(Model):
     landmarks: list[Landmark] = Field(default_factory=list, max_length=100)
     boundary_continuity: str = Field(min_length=1, max_length=4000)
     shots: list[Shot] = Field(min_length=1, max_length=100)
+    activity_level: Literal['', 'quiet', 'normal', 'busy'] = ''   # design/91 N4: from the narration and the brief
 
 
 class SourceCandidate(Model):
@@ -288,6 +292,10 @@ def routes(plan, fps=25):
     return out
 
 
+STOP_WORDS = {'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'is', 'are', 'it', 'its', 'with', 'for', 'by', 'as', 'at', 'this', 'that', 'be', 'than'}
+MESSAGE_REPEAT, MESSAGE_REPEAT_NEXT = 0.6, 0.4   # design/91 N11: shared words between two messages; ponytail: word overlap, a meaning check if it misses
+
+
 def _tokens(text):
     return re.findall(r"[a-z0-9']+", str(text or '').lower())
 
@@ -347,6 +355,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     warnings = []
     placed = []   # (gap_id, shot_id, visual_type, start, end) in film order, for the pacing warnings (design/65 B4)
     frozen, starts, returns = 0.0, {}, []   # design/89 B4, H7
+    said = []   # design/91 N11: the counted shots, for the repeated messages
     graphic_seen = False   # design/89 C2
     for gap in plan.gaps:
         need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
@@ -368,6 +377,13 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                 need(scene.id not in scene_ids, 'Duplicate scene identity.')
                 scene_ids.add(scene.id)
                 landmarks = unique(scene.landmarks, 'id', 'landmark')
+                if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES for s in scene.shots):   # design/91 N4: life in the frame
+                    if not scene.activity_level:
+                        warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
+                                         'from the narration and the brief'})
+                    elif scene.activity_level != 'quiet' and not any(sub.role in ('secondary', 'background') for s in scene.shots for sub in s.subjects):
+                        warnings.append({'scene_id': scene.id, 'kind': 'life_missing', 'message': f'scene {scene.id} is {scene.activity_level} but shows one subject and no background '
+                                         'activity: add who else is there and what they do (secondary or background subjects with beats) and the working equipment'})
                 last_states = {}
                 for shot in scene.shots:
                     need(shot.id not in shot_ids, 'Duplicate shot identity.')
@@ -380,6 +396,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                              f'A generated shot is at most {MAX_GENERATED_SHOT_S} s; split a longer stretch into several shots.')
                     seconds = (shot.end_frame - shot.start_frame) / float(fps) if fps else None
                     placed.append((gap.gap_id, shot.id, shot.visual_type, shot.start_frame, shot.end_frame))
+                    if scenes is counted:
+                        said.append(shot)
                     if shot.visual_type == 'animation':   # design/65: a graphic sequence of states
                         if len(shot.states) == 1:
                             need(False, f'shot {shot.id}: one state is a diagram still: plan it as a diagram, or add a state.')
@@ -509,6 +527,18 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         need(shot.information_progression.strip(), 'Describe the composition or information progression for a shot without acting subjects.')
             need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
             warnings += timing_warnings(gap.gap_id, gap_shots, window.get('timing'), fps)   # design/89 A3
+    said.sort(key=lambda s: s.start_frame)   # design/91 N11: one message once, unless the later shot says what it adds
+    words = [set(_tokens(s.message)) - STOP_WORDS for s in said]
+    for j, later in enumerate(said):
+        if not words[j] or later.adds.strip():
+            continue
+        for i in range(j):
+            overlap = len(words[i] & words[j]) / len(words[i] | words[j]) if words[i] else 0
+            consecutive = i == j - 1 and set(said[i].element_ids) & set(later.element_ids)
+            if overlap >= MESSAGE_REPEAT or (consecutive and overlap >= MESSAGE_REPEAT_NEXT):
+                warnings.append({'shot_id': later.id, 'kind': 'message_repeated', 'message': f'shot {later.id} carries the message of {said[i].id} again '
+                                 f"('{later.message}'): merge them into one shot in context, or say what it adds (adds: a number, a cause, a consequence)"})
+                break
     # design/65 B4: graphics back to back, inside a gap or across two gaps with no footage between; a gap of several shots that is all graphics
     placed.sort(key=lambda p: p[3])
     for prev, cur in zip(placed, placed[1:]):
@@ -547,7 +577,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     result = plan.model_dump()
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
         if key not in document: result.pop(key)
-    for key in ('specifications', 'production_constraints', 'editing_constraints', 'graphic_style'):
+    for key in ('specifications', 'production_constraints', 'editing_constraints', 'graphic_style', 'studio_background'):
         if key not in document['foundation']: result['foundation'].pop(key)
     # New presentation fields must not change legacy approval digests when absent.
     for gap, original_gap in zip(result['gaps'], document.get('gaps', [])):
@@ -558,9 +588,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             scene_pairs.extend(zip(choice['scenes'], original_choice['scenes']))
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
+            if 'activity_level' not in original_scene: scene.pop('activity_level')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
-                            'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over'):   # design/89, 91: absent stays absent
+                            'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds'):   # design/89, 91: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
                     if 'words' not in original_st: st.pop('words', None)

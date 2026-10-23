@@ -8,6 +8,9 @@ the check failed."""
 import base64
 import json
 import uuid
+from io import BytesIO
+
+from PIL import Image, ImageStat
 
 from .config import settings
 from .errors import Problem
@@ -104,8 +107,53 @@ def code_checks(ref, result, parents):
     return out
 
 
+LIGHT_JUMP = {'brightness': 0.15, 'saturation': 0.15, 'warmth': 0.08}   # design/91 N9; ponytail: fixed jumps on 0..1 means, tune them against real films
+
+
+def _light(png):
+    img = Image.open(BytesIO(png)).convert('RGB').resize((64, 36))
+    r, _, b = ImageStat.Stat(img).mean
+    return {'brightness': ImageStat.Stat(img.convert('L')).mean[0] / 255, 'saturation': ImageStat.Stat(img.convert('HSV')).mean[1] / 255, 'warmth': (r - b) / 255}
+
+
+def light_line(store, session, ref, png):
+    """design/91 N9: a picture in the film against the approved footage frames beside its gap (else all of the film's): brightness, saturation and warmth.
+    None for a graphic, a sheet, or a film without footage frames. Code, not a model: free, and a should line, so it never starts a fix round."""
+    if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') not in ('keyframe', 'isolated'):
+        return None
+    frames = [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')]
+    beside = {c for c in ((session.get('gap_neighbours') or {}).get(ref.get('gap_id')) or {}).values() if c}
+    frames = [r for r in frames if (r.get('source') or {}).get('media_id') in beside] or frames
+    stats = []
+    for r in frames[:6]:
+        try:
+            stats.append(_light(store.get(r['key'])))
+        except Exception:
+            continue
+    if not stats:
+        return None
+    footage = {k: sum(s[k] for s in stats) / len(stats) for k in LIGHT_JUMP}
+    mine = _light(png)
+    words = {'brightness': ('brighter', 'darker'), 'saturation': ('more saturated', 'less saturated'), 'warmth': ('warmer', 'cooler')}
+    jumps = [f"{words[k][0] if mine[k] > footage[k] else words[k][1]} by {abs(mine[k] - footage[k]):.2f}" for k in LIGHT_JUMP if abs(mine[k] - footage[k]) >= LIGHT_JUMP[k]]
+    seen = (', '.join(jumps) + ' than' if jumps else 'close to') + f" the footage beside it ({len(stats)} frame{'s' if len(stats) > 1 else ''})"
+    return {'check': 'light and colour', 'pass_when': 'the light, colour and saturation match the footage beside it', 'weight': 'should', 'pass': not jumps, 'seen': seen}
+
+
 def run_check(store, session, ref, result, transport_factory):
-    """The whole check for one retained candidate; returns the check record. Never raises."""
+    """The whole check for one retained candidate, Gemini's lines and then the measured light (design/91 N9); returns the check record. Never raises."""
+    record = _model_check(store, session, ref, result, transport_factory)
+    try:
+        light = light_line(store, session, ref, store.get(result['key']))
+    except Exception:
+        light = None
+    if light:
+        record['lines'] = list(record.get('lines') or []) + [light]
+    return record
+
+
+def _model_check(store, session, ref, result, transport_factory):
+    """Gemini's part of the check: the lines and the code checks. Never raises."""
     parents = [session['references'].get(p.get('id')) or {} for p in (ref.get('generation') or {}).get('parents') or []]
     lines = lines_of(ref)
     record = {'code': code_checks(ref, result, parents), 'lines': [], 'must_failed': [], 'model': CHECK_MODEL}

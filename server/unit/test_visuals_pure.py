@@ -178,7 +178,7 @@ def test_cuts_fall_in_pauses_and_pictures_start_on_their_words():
     gaps = {'G1': {'start_frame': 0, 'end_frame': 1000, 'timing': timing}}
     good = plan([{**shot('IM1', 0, 47, 'image'), 'narration': 'Bricks laid on edge.'}, {**shot('IM2', 47, 100, 'image'), 'narration': 'The cavity keeps heat out.'},
                  shot('VS1', 100, 500, 'video'), shot('VS2', 500, 1000, 'video')])
-    found = {(x['shot_id'], x['kind']) for x in VC.validate_plan(good, gaps, Fraction(25))[1]}
+    found = {(x.get('shot_id'), x['kind']) for x in VC.validate_plan(good, gaps, Fraction(25))[1]}   # a scene's warning names no shot
     assert ('IM2', 'cut_off_pause') not in found and ('IM2', 'words_off_picture') not in found   # 47 sits in the pause 40–55
     bad = plan([{**shot('IM1', 0, 70, 'image'), 'narration': 'Bricks laid on edge.'}, {**shot('IM2', 70, 100, 'image'), 'narration': 'The cavity keeps heat out.'},
                 shot('VS1', 100, 500, 'video'), shot('VS2', 500, 1000, 'video')])

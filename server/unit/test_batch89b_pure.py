@@ -185,7 +185,7 @@ def test_every_picture_without_its_answer_form_is_warned_and_a_drawing_is_checke
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'k1', 'element_id': 'E2', 'name': 'kiln', 'kind': 'isolated', 'subject': 'a kiln', 'prompt': 'A brick kiln.'})
     assert len(out['warnings']) == 1 and 'answer form' in out['warnings'][0] and 'refused from the next' in out['warnings'][0]
-    assert 'server_checklist' not in saved(store)['references'][out['reference_id']]
+    assert [l['check'] for l in saved(store)['references'][out['reference_id']].get('server_checklist') or []] == ["the film's world"]   # design/91 N9: only the world line
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'k2', 'element_id': 'E1', 'name': 'wall', 'kind': 'isolated', 'subject': 'the wall', 'prompt': 'A wall section.'})
     lines = {l['check']: l for l in saved(store)['references'][out['reference_id']]['server_checklist']}
     assert lines['unknown: cavity width']['weight'] == 'must' and 'no figure' in lines['unknown: cavity width']['pass_when']

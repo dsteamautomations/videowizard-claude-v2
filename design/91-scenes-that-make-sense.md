@@ -359,3 +359,20 @@ These override the sections above where they differ. The builder's reading of th
   - Every graphic shot carries `depicts` (what it shows, in the subject's own form, or labelled as the contrast). The treatment entry may list it for the operator's approval.
   - It becomes a must line on the graphic's pictures, and `vw visuals spec` repeats it.
   - A graphic without `depicts` warns this release and is refused from the next.
+
+**Batch 3 as built (N4, N5, N9, N11):**
+
+- **N4, life in the frame.**
+  - Every scene states its `activity_level`: quiet, normal or busy, from the narration and the brief. A treatment entry may state it too.
+  - A scene with pictures and no activity level warns.
+  - A normal or busy scene whose shots have no secondary or background subject warns ("add who else is there, what they do, the working equipment").
+- **N5, visible intent.** A beat's target was already required. The prompt now asks that the target be in frame at the start, or come into view during the shot. Code cannot check this.
+- **N9, one world.**
+  - The foundation may allow a plain or studio background (`studio_background`: the reason).
+  - Unless it does, a picture that appears in the film (a keyframe or an isolated picture, or any picture for a named shot), and that is not a graphic, carries a `should` line: the subject is in the film's world, not on a plain background.
+  - **Light and colour, measured.** When a picture is checked, code compares its brightness, saturation and warmth with the approved footage frames: those from the gap's neighbouring clips when there are any, else every approved footage frame of the film. A large jump becomes a failed `should` line on the picture's check, saying by how much. It is free (no model) and never starts a fix round.
+  - The prompt asks for the neighbours' light in every image and motion prompt, from the footage character (design/88).
+- **N11, no repeated message.**
+  - Every shot names the message it carries (`message`), and what it adds when it repeats one (`adds`).
+  - The check compares messages across the film by their words. Two shots carrying the same message warn unless the later one says what it adds. Two consecutive shots that share an element warn at a lower overlap.
+  - An isolated object on a plain background is the N9 line above.
