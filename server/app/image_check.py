@@ -22,8 +22,8 @@ SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {
 
 
 def lines_of(ref):
-    """The checklist the writer gave this picture, then the three fixed lines."""
-    own = [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]
+    """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
+    own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]
     return own + FIXED
 
 

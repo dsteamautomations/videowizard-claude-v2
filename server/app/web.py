@@ -320,6 +320,8 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'clip': lambda: V.fill_clip(store, user, run, outputs, body['shot_id'], body['clip_id'], float(body.get('in_s') or 0), quote,
                                         {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),   # design/89 B3, finding 7
             'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7
+            'approve-spec': lambda: V.approve_spec(store, user, run, outputs, body['shot_id'], quote),   # design/89 D4
+            'measure': lambda: V.measure(store, user, run, outputs, list(body.get('reference_ids') or []), str(body.get('question') or '')),   # design/89 D2
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),
             'reject': lambda: V.reject_reference(store, user, run, outputs, body['reference_id'], str(body.get('notes') or ''), quote),   # design/74 L7

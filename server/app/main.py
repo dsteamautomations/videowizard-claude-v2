@@ -254,6 +254,16 @@ class ReuseApprove(Write):   # design/89 H7: the operator's own words for a prop
     quote: str = Field(min_length=1)
 
 
+class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec as a table
+    shot_id: str
+    quote: str = Field(min_length=1)
+
+
+class MeasureBody(Write):   # design/89 D2: sizes read off approved footage frames
+    reference_ids: list[str] = Field(min_length=1, max_length=6)
+    question: str = Field(min_length=1, max_length=1000)
+
+
 class TreatmentBody(Write):   # design/65 B6: a document without words is the draft the page shows; words without a document record the draft
     document: dict[str, Any] | None = None
     quote: str = ''
@@ -1298,6 +1308,16 @@ def visuals_clip(run_id: UUID, body: ClipBody, user=User, conn=DB):   # design/8
 @app.post('/api/runs/{run_id}/visuals/reuse')
 def visuals_reuse(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/89 H7
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reuse(storage(), user, run, outputs, body.shot_id, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/spec')
+def visuals_spec(run_id: UUID, body: SpecApprove, user=User, conn=DB):   # design/89 D4
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_spec(storage(), user, run, outputs, body.shot_id, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/measure')
+def visuals_measure(run_id: UUID, body: MeasureBody, user=User, conn=DB):   # design/89 D2
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.measure(storage(), user, run, outputs, body.reference_ids, body.question))
 
 
 @app.post('/api/runs/{run_id}/visuals/record', status_code=201)

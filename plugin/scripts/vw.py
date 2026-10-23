@@ -1200,7 +1200,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse']   # design/74 L26, L7; design/76; design/73; design/79
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure']   # design/74 L26, L7; design/76; design/73; design/79
 
 
 def _short_status(st, shot=None, gap=None):
@@ -1364,7 +1364,7 @@ def cmd_visuals(a):
             items = _json_file(m, a.file)
             if not isinstance(items, list):
                 emit({'action': 'refused', 'message': f'{a.file} must be a list of {{element, kind, prompt, name, parents, size, quality}}.'}, 2)
-            queued = []
+            queued, warned = [], []
             for i, it in enumerate(items):
                 parents = it.get('parents') or []
                 body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
@@ -1380,12 +1380,15 @@ def cmd_visuals(a):
                           'remaining': [x.get('element') for x in items[i + 1:]], 'action': 'refused'}, 2,
                          f"{len(queued)} queued; {body['element_id']} refused: {payload.get('message')}; fix it and run the file again")
                 queued.append(payload['reference_id'])
-            emit({'queued': queued}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`.")
+                warned += [f"{body['element_id']}: {w}" for w in payload.get('warnings') or []]   # design/89 C, D
+            emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`." +
+                 (' Warnings: ' + '; '.join(warned) if warned else ''))
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer)}   # design/68 L5; design/86 K1, K4
         out = write(base + '/images', body)
-        emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`.")
+        emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
+                     (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
     if a.what == 'approve':
         if a.file:   # design/77 L33b: several approvals in one call
             _batch(_rows(m, a.file, ('ref', 'sha', 'quote')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r['quote']}), 'ref',
@@ -1507,6 +1510,19 @@ def cmd_visuals(a):
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
     if a.what == 'reuse':   # design/89 H7: the operator approves a proposed reuse with their words
         emit(write(base + '/reuse', {'shot_id': a.shot, 'quote': a.quote}), 0, f'Reuse approved for {a.shot} with the operator\'s words.')
+    if a.what == 'spec':   # design/89 D4: the drawing spec approved as a table with the operator's words
+        if not a.quote:
+            emit({'action': 'refused', 'message': 'Show the operator the drawing spec as a table (part, size, status, source; the visuals page shows it), then pass their words: '
+                                                  '`vw visuals spec --shot S --quote "<their words>"`.'}, 2)
+        out = write(base + '/spec', {'shot_id': a.shot, 'quote': a.quote})
+        emit(out, 0, f"Drawing spec of {out.get('shot_id')} approved: " + '; '.join(f"{r['part']} {r['measure']} {r['size']} ({r['status']}{', ' + r['source'] if r.get('source') else ''})" for r in out.get('table') or []) + '.')
+    if a.what == 'measure':   # design/89 D2: sizes read off approved footage frames, each with its clip and time
+        refs = [x for part in (a.refs or []) for x in part.split(',') if x]
+        if not refs or not a.question:
+            emit({'action': 'refused', 'message': 'Name approved footage frames and what to measure: `vw visuals measure --refs F1 F2 --question "<what to measure>"`.'}, 2)
+        out = write(base + '/measure', {'reference_ids': refs, 'question': a.question})
+        emit(out, 0, 'Measured: ' + ('; '.join(f"{m['part']} {m['measure']} {m['value']} {m['unit']} (from {m['source']})" for m in out.get('measurements') or []) or 'nothing readable') +
+                     (f". Limits: {out['limits']}" if out.get('limits') else '') + '.')
     if a.what == 'asset':
         entry = next((f for f in m['files'] if f.get('name') == Path(a.file).name and f.get('receipt')), None)
         if not entry:
@@ -1965,7 +1981,7 @@ def build_parser():
     s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
-    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop',
+    for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks'):   # design/73, design/79
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)

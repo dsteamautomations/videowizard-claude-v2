@@ -16,6 +16,14 @@ class Rule(Model):
     source: str = Field(min_length=1, max_length=2000)
 
 
+class GraphicStyle(Model):   # design/89 C2: one graphic style per film, approved once
+    palette: str = Field(min_length=1, max_length=1000)
+    line_weight: str = Field(min_length=1, max_length=300)
+    labels: str = Field(min_length=1, max_length=500)
+    background: str = Field(min_length=1, max_length=500)
+    frame_fill: str = Field(min_length=1, max_length=500)
+
+
 class Foundation(Model):
     treatment: str = Field(min_length=1, max_length=16000)
     appearance: str = Field(min_length=1, max_length=8000)
@@ -24,6 +32,7 @@ class Foundation(Model):
     specifications: list[Rule] = Field(default_factory=list, max_length=100)
     production_constraints: list[Rule] = Field(default_factory=list, max_length=100)
     editing_constraints: list[Rule] = Field(default_factory=list, max_length=100)
+    graphic_style: GraphicStyle | None = None
 
 
 class Element(Model):
@@ -76,6 +85,28 @@ class GraphicState(Model):
     """design/65: one state of a graphic sequence, an approved still; the states play as a build with holds and dissolves."""
     what_appears: str = Field(min_length=1, max_length=2000)
     hold_s: float = Field(gt=0)
+    words: str = Field(default='', max_length=500)   # design/89 C3: the words this state illustrates; it starts on them
+
+
+class Dimension(Model):   # design/89 D1, D3
+    part: str = Field(min_length=1, max_length=200)
+    measure: str = Field(min_length=1, max_length=200)
+    value: float | int | None = None
+    unit: str = Field(default='', max_length=40)
+    source: str = Field(default='', max_length=1000)   # the client's material, the footage (clip and time), a standard's URL, an approved picture
+    status: Literal['confirmed', 'measured', 'unknown']
+
+
+class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sources, the relationships that must hold
+    parts: list[str] = Field(default_factory=list, max_length=40)
+    dimensions: list[Dimension] = Field(default_factory=list, max_length=60)
+    relationships: list[str] = Field(default_factory=list, max_length=30)
+    label: str = Field(default='', max_length=200)
+
+
+class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
+    claim: str = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class Shot(Model):
@@ -101,6 +132,9 @@ class Shot(Model):
     motion_reason: str = Field(default='', max_length=1000)   # why a still stays frozen (`none`)
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
+    claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
+    claims_left_out: list[ClaimOut] = Field(default_factory=list, max_length=10)
+    drawing_spec: DrawingSpec | None = None   # design/89 D1: a technical drawing of a real object
 
 
 class Landmark(Model):
@@ -252,12 +286,22 @@ def timing_warnings(gap_id, shots, timing, fps):
     pos = 0   # each shot's words are found after the previous shot's words: the same phrase twice is two places
     for sh in shots:
         want = _tokens(sh.narration)[:3]
-        if not want:
-            continue
-        i = next((k for k in range(pos, len(flat) - len(want) + 1) if [x[0] for x in flat[k:k + len(want)]] == want), None)
+        i = next((k for k in range(pos, len(flat) - len(want) + 1) if [x[0] for x in flat[k:k + len(want)]] == want), None) if want else None
+        state_start, at = sh.start_frame / f, pos if i is None else i   # design/89 C3: each state of a build starts on the words it illustrates
+        for n, st in enumerate(sh.states, 1):
+            sw = _tokens(st.words)[:3]
+            k = next((x for x in range(at, len(flat) - len(sw) + 1) if [y[0] for y in flat[x:x + len(sw)]] == sw), None) if sw else None
+            if k is not None:
+                said = flat[k][1]['start_frame'] / f
+                if abs(state_start - said) > WORD_TOLERANCE_S:
+                    out.append({'gap_id': gap_id, 'shot_id': sh.id, 'kind': 'state_off_words', 'message': f"state {n} of shot {sh.id} starts at {state_start:.1f} s but its words ('{' '.join(sw)}…') "
+                                                                                      f'are spoken at {said:.1f} s: change the holds so it appears on them'})
+                at = k + len(sw)
+            state_start += st.hold_s
         if i is None:
+            pos = max(pos, at)
             continue
-        pos = i + len(want)
+        pos = max(i + len(want), at)
         spoken = flat[i][1]['start_frame'] / f
         if spoken < sh.start_frame / f - WORD_TOLERANCE_S or spoken >= sh.end_frame / f:
             out.append({'gap_id': gap_id, 'shot_id': sh.id, 'kind': 'words_off_picture', 'message': f"shot {sh.id}: its words ('{' '.join(want)}…') are spoken at {spoken:.1f} s but the shot runs "
@@ -274,6 +318,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     warnings = []
     placed = []   # (gap_id, shot_id, visual_type, start, end) in film order, for the pacing warnings (design/65 B4)
     frozen, starts, returns = 0.0, {}, []   # design/89 B4, H7
+    graphic_seen = False   # design/89 C2
     for gap in plan.gaps:
         need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
         window = source_gaps[gap.gap_id]
@@ -332,6 +377,21 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if seconds is not None and shot.visual_type == 'diagram' and seconds > GRAPHIC_BUILD_S + 0.04:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
                                          '(an animation shot) or a drawn animation' + NEXT_RELEASE})
+                    if shot.visual_type in GRAPHIC_TYPES:   # design/89 C1, D1, D3
+                        graphic_seen = True
+                        if shot.narration.strip() and not shot.claims and not shot.claims_left_out:
+                            warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
+                                             'or name one left out on purpose with the reason (claims_left_out)' + NEXT_RELEASE})
+                        if shot.drawing_spec is None:
+                            warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
+                                             'its sources; a chart, a timeline or a label needs none: say so in production_method'})
+                        else:
+                            spec = shot.drawing_spec
+                            for d in spec.dimensions:
+                                need(d.status != 'unknown' or d.value is None, f'shot {shot.id}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
+                                need(d.status == 'unknown' or d.source.strip(), f'shot {shot.id}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
+                            if any(d.status == 'unknown' for d in spec.dimensions):
+                                need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:
                             warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state' + NEXT_RELEASE})
@@ -402,6 +462,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         own = [p for p in placed if p[0] == gap.gap_id]
         if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):
             warnings.append({'gap_id': gap.gap_id, 'kind': 'all_graphics', 'message': f'gap {gap.gap_id} is {len(own)} shots, all graphics: mix in a frame from the footage or a scene unless each one earns its place'})
+    if graphic_seen and plan.foundation.graphic_style is None:   # design/89 C2
+        warnings.append({'kind': 'style_missing', 'message': 'the plan has graphics: give foundation.graphic_style (palette from the client card, line weight, labels, background, how the frame '
+                                                           'is filled); the operator approves it once as a style sheet picture and every graphic is bound to it' + NEXT_RELEASE})
     for shot in returns:   # design/89 H7: a return is reimagined, with what differs
         if shot.return_of:
             need(shot.return_of in starts and starts[shot.return_of] < shot.start_frame, f'shot {shot.id}: return_of names an earlier shot of this plan ({shot.return_of} is not one).')
@@ -413,7 +476,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     result = plan.model_dump()
     for key in ('sequence_overview', 'sequence_rules'):
         if key not in document: result.pop(key)
-    for key in ('specifications', 'production_constraints', 'editing_constraints'):
+    for key in ('specifications', 'production_constraints', 'editing_constraints', 'graphic_style'):
         if key not in document['foundation']: result['foundation'].pop(key)
     # New presentation fields must not change legacy approval digests when absent.
     for gap, original_gap in zip(result['gaps'], document.get('gaps', [])):
@@ -425,8 +488,11 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
-                for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by'):   # design/89: absent stays absent
+                for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
+                            'claims', 'claims_left_out', 'drawing_spec'):   # design/89: absent stays absent
                     if key not in original_shot: shot.pop(key)
+                for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
+                    if 'words' not in original_st: st.pop('words', None)
     return result, warnings
 
 

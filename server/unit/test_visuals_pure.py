@@ -72,7 +72,7 @@ def test_graphic_warnings_short_static_back_to_back_and_all_graphics():
     """design/64 B4 as kept by design/65: warnings, never refusals."""
     doc = plan([shot('DG1', 0, 50, 'diagram'), shot('DG2', 50, 250, 'diagram'), shot('VS1', 250, 500, 'video'), shot('IM1', 500, 1000, 'image')])
     _, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
-    kinds = {(w['shot_id'], w.get('kind')) for w in warnings}
+    kinds = {(w.get('shot_id'), w.get('kind')) for w in warnings}
     assert ('DG1', 'graphic_short') in kinds and ('DG2', 'graphics_back_to_back') in kinds and ('IM1', 'still_long') in kinds
     assert ('DG2', 'graphic_short') not in kinds and ('VS1', 'graphics_back_to_back') not in kinds
     short = next(w for w in warnings if w.get('kind') == 'graphic_short')

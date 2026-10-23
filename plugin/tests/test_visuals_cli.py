@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
+            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'question': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -649,3 +649,27 @@ def test_prepare_writes_the_videowizard_answer_form_under_always(harness, monkey
     code, out, err = run(args(what='prepare'), capsys)
     form = ws / 'work' / 'visuals' / 'library' / 'always' / 'forms__answer-form.videowizard.md'
     assert code == 0 and form.read_text(encoding='utf-8').endswith('# Answer form, VideoWizard cut\n')
+
+
+def test_spec_posts_the_operators_words_and_measure_posts_the_frames_and_question(harness, monkeypatch, capsys):
+    """design/89 D2, D4."""
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.append((path, body)) or {'shot_id': 'DG1', 'table': [{'part': 'leaf', 'measure': 'thickness', 'size': '110 mm', 'source': 'brochure', 'status': 'confirmed'}],
+                                                                                                     'measure_id': 'm1', 'measurements': [{'part': 'brick', 'measure': 'length', 'value': 230, 'unit': 'mm', 'source': 'clip c1 at 4.5 s'}]}))
+    code, out, err = run(args(what='spec', shot='DG1'), capsys)
+    assert code == 2 and '--quote' in out['message'] and not posted
+    code, out, err = run(args(what='spec', shot='DG1', quote='The sizes are right.'), capsys)
+    assert code == 0 and posted[-1] == (posted[-1][0], {'shot_id': 'DG1', 'quote': 'The sizes are right.'}) and posted[-1][0].endswith('/visuals/spec') and 'leaf thickness 110 mm' in err
+    code, out, err = run(args(what='measure', refs=['F1,F2'], question='How long is a brick?'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/visuals/measure') and posted[-1][1] == {'reference_ids': ['F1', 'F2'], 'question': 'How long is a brick?'} and 'clip c1 at 4.5 s' in err
+    code, out, err = run(args(what='measure', refs=['F1']), capsys)
+    assert code == 2 and '--question' in out['message']
+
+
+def test_the_prompt_and_steps_carry_claims_style_and_the_drawing_spec():
+    """design/89 C, D."""
+    prompt, steps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert len(prompt.split()) <= 3500
+    for needle in ('claims_left_out', 'graphic_style', 'drawing_spec', 'never invented', 'not to scale', 'vw visuals measure', 'vw visuals spec', '--kind style'):
+        assert needle in prompt and needle in steps, needle
+    assert 'vw visuals spec --shot S' in doc and 'vw visuals measure --refs' in doc

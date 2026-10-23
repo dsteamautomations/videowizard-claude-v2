@@ -203,6 +203,22 @@ function reuseFields(s){const id=esc(s.shot_id);   // H2, H4: only when the foot
     '<input id="rf-crop-'+id+'" placeholder="a different framing: x,y,w,h (for example 0.1,0.1,0.7,0.7)" style="width:100%;margin-top:4px">';}
 function reuseOf(shot){const v=k=>(($('rf-'+k+'-'+shot)||{}).value||'').trim();const c=v('crop');
   return {reuse:v('why')||null,considered:v('alt')||null,crop:c?c.split(',').map(Number):null};}
+function styleCard(){   // design/89 C2: the film's one graphic style, approved once as a style sheet picture
+  const st=data.graphic_style, refs=(data.references||[]).filter(r=>r.kind==='style');if(!st&&!refs.length)return '';
+  return '<h3>The graphic style</h3><div class="card">'+(st?'<div class="ds">'+['palette','line_weight','labels','background','frame_fill'].map(k=>'<b>'+esc(k.replace('_',' '))+'</b>: '+esc(st[k])).join(' · ')+'</div>':'')+
+    (refs.length?'<div class="strip">'+refs.map(r=>refCard(r)).join('')+'</div>':'<div class="ds">No style sheet yet: the assistant makes it before the first graphic.</div>')+'</div>';}
+function specBox(s){   // design/89 D2, D4: the drawing spec as a table, approved with the operator's words; sizes measured from footage frames
+  if(!s.spec)return '';const id=esc(s.shot_id), can=stage()==='visuals', frames=(data.references||[]).filter(r=>r.kind==='frame'&&r.status==='approved');
+  let h='<details style="margin-top:8px" '+(s.spec.approved?'':'open')+'><summary class="ds" style="cursor:pointer">The drawing spec '+(s.spec.approved?'<span class="badge ok">approved</span>':'<span class="badge dec">to approve</span>')+'</summary>'+
+    '<table class="ds" style="width:100%;margin-top:4px"><tr><th align="left">Part</th><th align="left">Measure</th><th align="left">Size</th><th align="left">Status</th><th align="left">Source</th></tr>'+
+    s.spec.table.map(r=>'<tr><td>'+esc(r.part)+'</td><td>'+esc(r.measure)+'</td><td>'+esc(r.size)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.source)+'</td></tr>').join('')+'</table>'+
+    (s.spec.relationships.length?'<div class="ds">Must hold: '+s.spec.relationships.map(esc).join(' · ')+'</div>':'')+(s.spec.label?'<div class="ds">Label: '+esc(s.spec.label)+'</div>':'')+
+    (s.claims.length?'<div class="ds">Claims the picture must show: '+s.claims.map(esc).join(' · ')+'</div>':'');
+  if(can&&!s.spec.approved)h+='<textarea id="sp-w-'+id+'" class="words" style="width:100%;margin-top:6px" placeholder="your words for these sizes"></textarea><div class="btns"><button class="go" data-a="approve-spec" data-shot="'+id+'">Approve the spec</button></div>';
+  if(can&&frames.length)h+='<div class="ds" style="margin-top:6px">Measure from your footage frames:</div><select id="ms-f-'+id+'" multiple size="3">'+frames.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('')+'</select>'+
+    '<input id="ms-q-'+id+'" placeholder="what to measure, for example: how thick is the wall?" style="width:100%;margin-top:4px"><div class="btns"><button data-a="measure" data-shot="'+id+'">Measure</button></div>';
+  const ms=(data.measurements||[]).flatMap(m=>m.measurements.map(x=>esc(x.part)+' '+esc(x.measure)+' '+esc(x.value)+' '+esc(x.unit)+' ('+esc(x.source)+')'));
+  return h+(ms.length?'<div class="ds">Measured: '+ms.join(' · ')+'</div>':'')+'</details>';}
 function reuseBox(s){   // design/89 H2, H7: a reuse the assistant proposed waits for the operator's own words
   const p=(data.reuse_pending||{})[s.shot_id];if(!p)return '';
   return '<div class="card" style="border-color:var(--accent);margin-top:8px"><b>Showing footage again</b><div class="ds">Clip '+esc(p.clip_id)+' is already on screen in '+esc(p.on_screen)+'. '+
@@ -380,6 +396,7 @@ function renderPictures(){
   if(!gaps.length){$('s-pictures').innerHTML='<div class="empty">No still or graphic shot in an accepted gap yet.</div>';return;}
   const shown=gaps.filter(g=>!gapFilter||g.gap_id===gapFilter);
   let h='<div class="tabs"><button data-g="" class="'+(gapFilter?'':'on')+'">All gaps</button>'+gaps.map(g=>'<button data-g="'+esc(g.gap_id)+'" class="'+(gapFilter===g.gap_id?'on':'')+'">'+esc(g.gap_id)+'</button>').join('')+'</div>';
+  h+=styleCard();
   shown.forEach(g=>{
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
     g.shots.filter(s=>s.route!=='video').forEach(s=>{
@@ -397,7 +414,7 @@ function renderPictures(){
         else if(mine.length){sh+='<div class="strip">'+mine.map(r=>refCard(r,can?'<div class="btns" style="margin:0 6px 6px"><button data-a="still" data-shot="'+esc(s.shot_id)+'" data-ref="'+esc(r.id)+'" class="go">Use for the shot</button></div>':'')).join('')+'</div>';}
         else{sh+='<div class="ds">No picture yet.</div>';}
       }
-      h+=sh+clipForm(s)+reuseBox(s)+'</div>';
+      h+=sh+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
   $('s-pictures').innerHTML=h;
@@ -443,7 +460,7 @@ function renderTakes(){
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The start and end images:</div><div class="strip">'+pair.map(r=>refCard(r)).join('')+'</div>';}
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="btns"><button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
-      h+=sh+clipForm(s)+reuseBox(s)+'</div>';
+      h+=sh+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
   $('s-takes').innerHTML=h;
@@ -507,6 +524,10 @@ async function click(b){
   if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} if(!q){need('Your yes to the web search goes in the box at the foot.');return;}await send({action:'search',element_id:b.dataset.el,keywords:kw,quote:q},'Search done: tick the pictures to use.');return;}
   if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[];if(!list.length){msg('Tick at least one picture first.',true);return;} if(!q){need();return;}const j=await send({action:'pick',search_id:sid,picks:list,quote:q},list.length+' picture(s) kept as references; the assistant generates the sheet from them.');if(j){delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
+  if(a==='approve-spec'){const sh=b.dataset.shot,w=(($('sp-w-'+sh)||{}).value||'').trim();if(!w){needWords('sp-w-'+sh,'Your words for these sizes are required.');return;}   // design/89 D4: the same server function as `vw visuals spec`
+    await send({action:'approve-spec',shot_id:sh,quote:w},'Drawing spec approved.');return;}
+  if(a==='measure'){const sh=b.dataset.shot,sel=$('ms-f-'+sh),q=(($('ms-q-'+sh)||{}).value||'').trim(),refs=sel?[...sel.selectedOptions].map(o=>o.value):[];   // design/89 D2: the same server function as `vw visuals measure`
+    if(!refs.length||!q){msg('Pick the footage frames and say what to measure.',true);return;}await send({action:'measure',reference_ids:refs,question:q},'Measured; the sizes are under the spec.');return;}
   if(a==='approve-reuse'){const w=(($('rw-'+b.dataset.shot)||{}).value||'').trim();if(!w){needWords('rw-'+b.dataset.shot,'Say in your words why the same footage is right here.');return;}
     await send({action:'approve-reuse',shot_id:b.dataset.shot,quote:w},'Reuse approved with your words.');return;}
   if(a==='footage'){const w=(($('ftwords')||{}).value||'').trim();const v=k=>(($('ft-'+k)||{}).value||'')||null;   // design/88 F4: the words sit with the button

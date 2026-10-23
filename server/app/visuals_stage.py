@@ -26,11 +26,11 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan
+from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
-REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state')   # design/65: a state of a graphic sequence, generated from the previous state
+REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state', 'style')   # design/65: a state of a graphic sequence, generated from the previous state
 TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video')
 DISSOLVE_S = 0.5   # between the states of a graphic sequence
 MAX_INPUTS = 16    # design/71 P2: GPT Image's limit on input pictures (the library's fact sheet A5)
@@ -491,13 +491,19 @@ def page_view(conn, store, run, outputs, code):
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {})} if asset else None),   # design/89 B3
-                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations']})
+                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'],
+                                           'claims': sh.get('claims') or [], 'spec': ({'table': spec_table(sh['drawing_spec']), 'relationships': sh['drawing_spec'].get('relationships') or [],   # design/89 C1, D4
+                                                                                      'label': sh['drawing_spec'].get('label') or '',
+                                                                                      'approved': (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') == spec_digest(sh['drawing_spec'])}
+                                                                                     if sh.get('drawing_spec') else None)})
         gaps.append(entry)
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
             'footage': footage_view(session, outputs),   # design/88 F4: told, not asked
             'reuse_pending': session.get('reuse_pending') or {},   # design/89 H7: a reuse the operator may approve here
             'clips': [{k: c.get(k) for k in ('id', 'name', 'duration_s')} for c in media_clips(outputs).values()],   # finding 7: a clip stretch placed from the page
+            'graphic_style': ((plan or {}).get('foundation') or {}).get('graphic_style'),   # design/89 C2
+            'measurements': [{'id': k, **{f: m.get(f) for f in ('question', 'measurements', 'limits', 'at')}} for k, m in (session.get('measurements') or {}).items()],   # design/89 D2
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
             'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
@@ -961,9 +967,10 @@ def generate_image(conn, store, user, run, outputs, body):
     """Queue an OpenAI image job (paid, informed). The worker stores the PNG and creates the candidate reference."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
-    element = next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
+    need((body['kind'] == 'style') == (body['element_id'] == STYLE), f'The style sheet is kind style with element {STYLE}, and only it.')   # design/89 C2
+    element = {'id': STYLE, 'kind': 'style'} if body['element_id'] == STYLE else next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
-    need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state'), 'Generated references are isolated, sheet, keyframe or state.')
+    need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style'), 'Generated references are isolated, sheet, keyframe, state or style.')
     parents = [session['references'].get(p) for p in body.get('parents') or []]
     for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
         if p and p.get('status') == 'rejected':
@@ -1007,14 +1014,114 @@ def generate_image(conn, store, user, run, outputs, body):
             except ValueError as exc:
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
+    lines, warns = _graphic_lines(session, plan, body, parents, answer)   # design/89 C, D
     check_cap(conn, run, session, prices()['image_inr'] * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):
         suffix = '' if variants == 1 else '-ab'[n + 1]
         made.append(_queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), body['request_id'] + ('-' + suffix if suffix else ''), pending_end))
+        if lines:
+            session['references'][made[-1]['reference_id']]['server_checklist'] = lines
     save_session(store, run, session)
-    return {**made[0], **({'reference_ids': [m['reference_id'] for m in made], 'job_ids': [m['job_id'] for m in made]} if variants == 2 else {})}
+    return {**made[0], **({'reference_ids': [m['reference_id'] for m in made], 'job_ids': [m['job_id'] for m in made]} if variants == 2 else {}), **({'warnings': warns} if warns else {})}
+
+
+STYLE = '_STYLE'   # design/89 C2: the film's style sheet, one picture every graphic is made from
+
+
+def spec_digest(spec):
+    return digest(spec)
+
+
+def _graphic_lines(session, plan, body, parents, answer):
+    """design/89 C1, C4, D3-D5: every picture is warned without its answer form; a picture of a graphic carries its claims, the spec's relationships,
+    its sizes and its label as lines, and is warned without its style sheet or an approved spec (refused from the next release)."""
+    if body.get('fix_of'):   # a fix round carries its picture's form when it had one
+        return [], []
+    warns = [] if answer is not None else ['no answer form with this picture: write it with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]
+    shots = [sh for _, sh in _shots_with(plan, session, body['element_id']) if sh['visual_type'] in GRAPHIC_TYPES]
+    if not shots:
+        return [], warns
+    lines = [{'check': 'claim: ' + c, 'pass_when': f'the picture shows that {c}, plainly, without the narration', 'weight': 'must'} for sh in shots for c in sh.get('claims') or []]
+    lines += [{'check': 'relationship: ' + r, 'pass_when': f'in the drawing, {r}', 'weight': 'must'} for sh in shots for r in (sh.get('drawing_spec') or {}).get('relationships') or []]
+    for sh in shots:   # D3, D5: an unknown size shows no figure; the label is on the drawing; a known size reads as the spec says
+        spec = sh.get('drawing_spec') or {}
+        for r in spec_table(spec):
+            name = f"{r['part']} {r['measure']}"
+            lines.append({'check': 'unknown: ' + name, 'pass_when': f'no figure is shown for the {name}', 'weight': 'must'} if r['status'] == 'unknown' else
+                         {'check': f"size: {name} {r['size']}", 'pass_when': f"any figure shown for the {name} reads {r['size']}, and its proportion to the other parts looks right", 'weight': 'should'})
+        if spec.get('label'):
+            lines.append({'check': 'label: ' + spec['label'], 'pass_when': f"the drawing carries the words \"{spec['label']}\"", 'weight': 'must'})
+    if body['kind'] != 'state' and not any(p.get('kind') == 'style' and p.get('status') == 'approved' for p in parents):   # a state is made from the previous state
+        warns.append(f'no approved style sheet among the parents: make it once (`vw visuals image --element {STYLE} --kind style`), approve it, and name it in --parents' + NEXT_RELEASE)
+    for sh in shots:
+        spec = sh.get('drawing_spec')
+        if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
+            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {sh['id']} --quote`, or on the page)" + NEXT_RELEASE)
+    return lines, warns
+
+
+def approve_spec(store, user, run, outputs, shot_id, quote):
+    """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval."""
+    need((quote or '').strip(), "The operator's words are required.")
+    session = session_of(store, run, outputs)
+    _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
+    spec = shot.get('drawing_spec')
+    need(spec, f'Shot {shot_id} has no drawing spec.')
+    session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'shot_id': shot_id, 'table': spec_table(spec), 'relationships': spec.get('relationships') or [], 'label': spec.get('label') or ''}
+
+
+def spec_table(spec):
+    return [{'part': d['part'], 'measure': d['measure'], 'size': 'unknown' if d.get('value') is None else f"{d['value']:g} {d.get('unit') or ''}".strip(),
+             'source': d.get('source') or '', 'status': d['status']} for d in spec.get('dimensions') or []]
+
+
+def _gemini_transport():
+    from .analysis_jobs import transport_factory
+    return transport_factory
+
+
+MEASURE_SCHEMA = {'type': 'object', 'properties': {'measurements': {'type': 'array', 'items': {'type': 'object', 'properties': {
+    'part': {'type': 'string'}, 'measure': {'type': 'string'}, 'value': {'type': 'number'}, 'unit': {'type': 'string'}, 'frame': {'type': 'integer'}, 'how': {'type': 'string'}},
+    'required': ['part', 'measure', 'value', 'unit', 'how']}}, 'limits': {'type': 'string'}}, 'required': ['measurements', 'limits']}
+
+
+def measure(store, user, run, outputs, ref_ids, question):
+    """design/89 D2: Gemini reads sizes off approved footage frames against something of known size; each number keeps its clip and time."""
+    need((question or '').strip(), 'Say what to measure.')
+    session = session_of(store, run, outputs)
+    frames = [session['references'].get(r) for r in ref_ids or []]
+    need(frames and all(f and f.get('kind') == 'frame' and f['status'] == 'approved' for f in frames), 'Measure reads approved footage frames only: name frames taken from the clips.')
+    where = [f"clip {(f.get('source') or {}).get('media_id')} at {(f.get('source') or {}).get('requested_s')} s" for f in frames]
+    parts = []
+    for n, (f, w) in enumerate(zip(frames, where), 1):
+        parts += [{'text': f'Frame {n}, {w}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(f['key'])).decode()}}]
+    parts.append({'text': 'Measure from these frames: ' + question.strip()[:1000] + '\nScale each size against something of known size in the same frame (a brick, a door, a level, a person) '
+                          'and say which in how. Give the frame number each size is read from. Measure only what is visible; say in limits what cannot be read.'})
+    key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
+    need(key_, 'No Gemini key on the server.')
+    try:
+        received = _gemini_transport()(key_, MEASURE_MODEL, terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False).generate(
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 4096}})
+        body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
+    except Exception as exc:
+        raise Problem(502, 'MEASURE_FAILED', f'The measure call failed: {exc.__class__.__name__}: {str(exc)[:200]}')
+    out = []
+    for m in body.get('measurements') or []:
+        n = m.get('frame') if isinstance(m.get('frame'), int) and 1 <= m['frame'] <= len(frames) else 1
+        out.append({'part': str(m.get('part') or ''), 'measure': str(m.get('measure') or ''), 'value': m.get('value'), 'unit': str(m.get('unit') or ''), 'status': 'measured',
+                    'source': where[n - 1], 'how': str(m.get('how') or '')[:300]})
+    mid = uuid.uuid4().hex[:12]
+    session.setdefault('measurements', {})[mid] = {'question': question, 'frames': list(ref_ids), 'measurements': out, 'limits': str(body.get('limits') or '')[:500],
+                                                   'model': MEASURE_MODEL, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'measure_id': mid, 'measurements': out, 'limits': session['measurements'][mid]['limits']}
+
+
+MEASURE_MODEL = 'gemini-3.8-flash'
 
 
 def _queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, name, request_id, pending_end):
@@ -1119,7 +1226,7 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
 
 def _step_of_reference(session, row):
     kind = row.get('kind')
-    if kind in ('isolated', 'sheet'):
+    if kind in ('isolated', 'sheet', 'style'):   # design/89 C2: the style sheet is a reference
         return 'reference'
     if kind == 'state':
         return 'state'
@@ -1399,7 +1506,7 @@ def prepare_take(store, user, run, outputs, body):
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}
     used = [sid for sid, rid in _start_images(store, session).items() if rid == body['start_image'] and sid != body['shot_id']] + \
            [sid for sid, a in session['assets'].items() if sid != body['shot_id'] and a.get('reference_id') == body['start_image']]
-    warns = []
+    warns, form = [], [] if answer is not None else ['no answer form with this take: write the motion prompt with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]   # design/89 C4
     _rule(session, not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
     s, e = images['start_image'], images['end_image']
     if all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
@@ -1421,7 +1528,7 @@ def prepare_take(store, user, run, outputs, body):
                                                 **({'repeat_warnings': warns} if warns else {}),
                                                 **({'checklist': answer.get('checklist') or []} if answer is not None else {})}   # design/74 L6
     save_session(store, run, session)
-    return {'preparation_id': identity, 'duration_seconds': record['duration_seconds'], 'exact_seconds': record['placement']['exact_seconds'], 'provider': selected, **({'warnings': warns} if warns else {})}
+    return {'preparation_id': identity, 'duration_seconds': record['duration_seconds'], 'exact_seconds': record['placement']['exact_seconds'], 'provider': selected, **({'warnings': warns + form} if warns + form else {})}
 
 
 def submit_take(conn, store, user, run, outputs, shot_id):
