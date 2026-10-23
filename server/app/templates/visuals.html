@@ -263,6 +263,7 @@ function toggleTick(sid,n){picks[sid]=picks[sid]||[];const i=picks[sid].findInde
 function shotFacts(s){   // design/91: what the shot depicts, its words, what the step before left, the facts it rests on
   let h='';if(s.message)h+='<div class="ds">Message: '+esc(s.message)+(s.adds?' · adds: '+esc(s.adds):'')+'</div>';   // design/91 N11
   if(s.depicts)h+='<div class="ds">Depicts: '+esc(s.depicts)+'</div>';
+  if(s.transition_in||s.transition_out)h+='<div class="ds">Transition: '+esc([s.transition_in&&('in: '+s.transition_in),s.transition_out&&('out: '+s.transition_out)].filter(Boolean).join(' · '))+(s.transition_reason?' ('+esc(s.transition_reason)+')':'')+'</div>';   // design/91 N16
   if((s.descriptors||[]).length)h+='<div class="ds">Words it must not contradict: '+s.descriptors.map(esc).join(' · ')+'</div>';
   if((s.carries_over||[]).length)h+='<div class="ds">Carried over from the step before: '+s.carries_over.map(esc).join(' · ')+'</div>';
   if((s.facts||[]).length)h+='<div class="ds">Facts: '+s.facts.map(esc).join(' · ')+'</div>';

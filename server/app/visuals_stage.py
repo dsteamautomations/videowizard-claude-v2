@@ -499,6 +499,7 @@ def page_view(conn, store, run, outputs, code):
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
                                            'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
                                            'message': sh.get('message') or '', 'adds': sh.get('adds') or '',   # design/91 N11
+                                           **{k: sh.get(k) or '' for k in ('transition_in', 'transition_out', 'transition_reason')},   # design/91 N16
                                            'depicts': sh.get('depicts') or '', 'descriptors': sh.get('descriptors') or [], 'carries_over': sh.get('carries_over') or [],   # design/91
                                            'facts': [f"{f['looks']} ({f['status']}{', ' + f['source'] if f.get('source') else ''})" for f in (plan or {}).get('visual_facts') or []
                                                      if f['id'] in (sh.get('fact_ids') or []) or f.get('about') in (sh.get('element_ids') or [])],
@@ -540,6 +541,11 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
         parents = [p.get('id') for p in (row.get('generation') or {}).get('parents') or []]
         if rows[i - 2]['id'] not in parents:
             warnings.append(f"state {i} ({row['id']}) was not generated from state {i - 1} ({rows[i - 2]['id']}); check the drawing is the same")
+    from . import lookalike   # design/91 N12: every state adds something visible
+    prints = [(_fingerprints(store, r['key']) or {}).get('graphic') for r in rows]
+    for i in range(1, len(rows)):
+        need(prints[i - 1] is None or prints[i] is None or lookalike.distance(prints[i - 1], prints[i]) > lookalike.BITS_GRAPHIC,
+             f"state {i + 1} ({rows[i]['id']}) looks the same as state {i}: a state adds something visible; make it again from state {i} with what it adds.")
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
     for row in rows:
         row.update(status='approved', approval={**stamp, 'sha256': row['sha256']})
@@ -1045,6 +1051,11 @@ def generate_image(conn, store, user, run, outputs, body):
     return {**made[0], **({'reference_ids': [m['reference_id'] for m in made], 'job_ids': [m['job_id'] for m in made]} if variants == 2 else {}), **({'warnings': warns} if warns else {})}
 
 
+LABEL_MIN_PCT, TITLE_MIN_PCT = 4, 6   # design/91 N13, SK 23 Oct: of the frame height (43 and 65 px at 1080p)
+LABEL_SIZE = {'check': 'label size', 'pass_when': f'every label is at least {LABEL_MIN_PCT} % of the frame height and a title at least {TITLE_MIN_PCT} %, readable on a phone',
+              'weight': 'should'}
+LABEL_SIGN = re.compile(r'[↑↓←→⇧⇩▲▼⬆⬇]|^\s*[+\-−]\s*\d')
+LABEL_BARE = re.compile(r'^\s*[\d.,]+\s*$')
 WORLD_LINE = {'check': "the film's world", 'pass_when': 'the subject is in a real place of the film (its ground, light and surroundings), not on a plain studio or neutral '
                                                        'background, and not an object alone out of its place of use', 'weight': 'should'}   # design/91 N9, N11
 STYLE = '_STYLE'   # design/89 C2: the film's style sheet, one picture every graphic is made from
@@ -1078,8 +1089,16 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
         lines += [{'check': 'carried over: ' + c, 'pass_when': f'{c} is visible, as the step before left it', 'weight': 'must'} for c in named.get('carries_over') or []]
         lines += [_fact_line(facts[f]) for f in named.get('fact_ids') or [] if f in facts]
     shots = [sh for _, sh in _shots_with(plan, session, body['element_id']) if sh['visual_type'] in GRAPHIC_TYPES]
+    if shots or (named is not None and named['visual_type'] in GRAPHIC_TYPES):   # design/91 N13: labels say what they mean, readable on a phone
+        labels = [str(s) for s in (answer or {}).get('exact_text') or [] if str(s).strip()]
+        label_lines = [{'check': 'label: ' + s, 'pass_when': f'the label reads exactly "{s}", is at least {LABEL_MIN_PCT} % of the frame height, and its leader line ends on the part it names',
+                   'weight': 'must'} for s in labels] + [LABEL_SIZE]   # after the claims and the drawing's own lines
+        warns += [f"the label '{s}' uses a sign in place of words: write it as a phrase ('25 % fewer bricks', not '↓ 25 %')" for s in labels if LABEL_SIGN.search(s)]
+        warns += [f"the label '{s}' is a number without its unit: give the unit, and its source in the drawing spec" for s in labels if LABEL_BARE.match(s)]
+    else:
+        label_lines = []
     if not shots:
-        return _dedupe(lines), warns
+        return _dedupe(lines + label_lines), warns
     lines += [{'check': 'claim: ' + c, 'pass_when': f'the picture shows that {c}, plainly, without the narration', 'weight': 'must'} for sh in shots for c in sh.get('claims') or []]
     lines += [{'check': 'depicts: ' + sh['depicts'], 'pass_when': f"the drawing shows {sh['depicts']}, in the subject's own form (an alternative only as a labelled contrast)",
                'weight': 'must'} for sh in shots if str(sh.get('depicts') or '').strip()]   # design/91 N10
@@ -1098,7 +1117,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
             warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {sh['id']} --quote`, or on the page)" + NEXT_RELEASE)
-    return _dedupe(lines), warns
+    return _dedupe(lines + label_lines), warns
 
 
 def _dedupe(lines):
@@ -1836,14 +1855,37 @@ def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=No
     out_s = round(in_s + seconds, 3)
     need(in_s >= 0 and out_s <= float(clip.get('duration_s') or 0) + 1e-3, f"The stretch {in_s:.2f}–{out_s:.2f} s lies outside clip {clip_id} ({clip.get('duration_s')} s).")
     kept, warns = _reuse_gate(store, run, session, outputs, shot, clip_id, in_s, out_s, True, reuse, quote, crop, {'action': 'clip', 'clip_id': clip_id, 'in_s': in_s})
+    if crop is not None:   # design/91 N15: the part of the clip the planner keeps
+        need(len(crop) == 4 and all(0 <= float(v) <= 1 for v in crop) and crop[2] > 0 and crop[3] > 0 and crop[0] + crop[2] <= 1 + 1e-6 and crop[1] + crop[3] <= 1 + 1e-6,
+             'A crop is x,y,w,h as fractions of the picture, inside it.')
+    bars = _bars(clip, crop, session)
+    if bars:
+        warns.append(bars)
     session['assets'][shot_id] = {'kind': 'clip', 'clip_id': clip_id, 'name': clip['name'], 'sha256': clip['sha256'], 'bytes': clip.get('bytes'), 'fps': clip.get('fps'),
                                   'rotation_deg': clip.get('rotation_deg') or 0, 'hdr': str(clip.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084'),
                                   'in_s': in_s, 'out_s': out_s, 'quote': quote, 'by': user['id'], 'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']},
+                                  **({'crop': list(crop)} if crop is not None else {}),
                                   **({'reuse': kept} if kept else {}), **({'repeat_warnings': warns} if warns else {})}
     session['selections'].pop(shot_id, None)
     (session.get('reuse_pending') or {}).pop(shot_id, None)
     save_session(store, run, session)
     return {'shot_id': shot_id, 'kind': 'clip', 'clip_id': clip_id, 'in_s': in_s, 'out_s': out_s, **({'reuse': kept} if kept else {}), **({'warnings': warns} if warns else {})}
+
+
+def _bars(clip, crop, session):
+    """design/91 N15: a clip whose shape needs more than the fill cap keeps bars; say so, with the crop that would fill."""
+    from .stage2.render import FILL_MAX_ZOOM, fit
+    w, h = clip.get('width'), clip.get('height')
+    if not w or not h:
+        return None
+    if int(clip.get('rotation_deg') or 0) % 180 == 90:
+        w, h = h, w
+    if crop is not None:
+        w, h = w * crop[2], h * crop[3]
+    W, H = (int(x) for x in str(session['source'].get('resolution') or '1920x1080').split('x'))
+    fill, zoom = fit(w, h, W, H)
+    return None if fill else (f"clip {clip.get('name')} is {int(w)}x{int(h)}: filling the {W}x{H} frame needs {zoom:.2f}x, over the {FILL_MAX_ZOOM}x cap, so it keeps bars; "
+                              'give a crop with the frame\'s shape (--crop x,y,w,h), or choose another clip')
 
 
 def approve_reuse(store, user, run, outputs, shot_id, quote):
@@ -2033,7 +2075,7 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
             files.append({'name': name, 'key': f"{run['id']}/media/{asset['name']}", 'sha256': asset['sha256'], 'bytes': asset.get('bytes'), 'location': 'storage', 'receipt': True})
             shots.append({'shot_id': s['id'], 'source': 'clip', 'kind': 'clip', 'placement': asset['placement'],
                           'media': {'kind': 'clip', 'clip': {k: asset.get(k2) for k, k2 in (('id', 'clip_id'), ('name', 'name'), ('sha256', 'sha256'), ('fps', 'fps'), ('rotation_deg', 'rotation_deg'), ('hdr', 'hdr'))},
-                                    'in_s': asset['in_s'], 'out_s': asset['out_s'], 'crop_rect': (asset.get('reuse') or {}).get('crop')}})
+                                    'in_s': asset['in_s'], 'out_s': asset['out_s'], 'crop_rect': asset.get('crop') or (asset.get('reuse') or {}).get('crop')}})
         else:
             name = f"{s['id']}-asset{'.mp4' if asset['kind'] == 'movie' else '.png'}"
             files.append({'name': name, 'key': asset['key'], 'sha256': asset['sha256'], 'bytes': asset['bytes'], 'location': 'storage', 'receipt': True})
@@ -2046,6 +2088,11 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
                 r = session['references'][b['id']]
                 files.append({'name': f"ref-{b['id'][:8]}.png", 'key': r['key'], 'sha256': r['sha256'], 'bytes': r['bytes'], 'location': 'storage', 'receipt': True})
                 jobs.record_file(conn, run['id'], STAGE, r['key'], f"ref-{b['id'][:8]}.png", r['sha256'], r['bytes'], 'image/png')
+    chosen = {s['id']: s for s in shots_of(plan, session, gap_id) if s.get('transition_in') or s.get('transition_out')}   # design/91 N16
+    for sh in shots:
+        s = chosen.get(sh['shot_id'])
+        if s:
+            sh['transition'] = {'in': s.get('transition_in') or '', 'out': s.get('transition_out') or '', 'reason': s.get('transition_reason') or ''}
     unique_files = unique_by_name(files)
     image_cost = [r.get('generation', {}).get('cost') for r in session['references'].values() if r.get('generation', {}).get('cost')]
     out = core.output(conn, user, run, {'stage': STAGE, 'unit': gap_id, 'files': unique_files, 'accepted_quote': quote,

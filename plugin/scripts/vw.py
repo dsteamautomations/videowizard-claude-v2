@@ -1796,7 +1796,12 @@ def cmd_assembly(a):
             loud = ''
         alike = record.get('look_alike') if isinstance(record.get('look_alike'), list) else []   # design/89 H6: told before the operator watches
         twins = ('; ' + str(len(alike)) + ' pair(s) look alike, tell the operator before they watch: ' + '; '.join(f"{p['a']} at {p['a_at_s']} s and {p['b']} at {p['b_at_s']} s" for p in alike[:8])) if alike else ''
-        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': record}, 0, f'Assembly film at {path}; the operator watches and listens{loud}{twins}.')
+        bars = record.get('bars') or []   # design/91 N15: shots whose shape kept bars
+        bars_line = ('; kept bars (the source too narrow or too wide to fill): ' + ', '.join(bars[:12])) if bars else ''
+        missing = record.get('states_missing') if isinstance(record.get('states_missing'), list) else []   # design/91 N12
+        states_line = ('; planned states not seen in the film: ' + '; '.join(f"{m['shot']} state {', '.join(map(str, m['missing']))}" for m in missing)) if missing else ''
+        emit({'path': path, 'sha256': r['result']['sha256'], 'duration_s': r['result'].get('duration_s'), 'record': record}, 0,
+             f'Assembly film at {path}; the operator watches and listens{loud}{twins}{bars_line}{states_line}.')
     if a.what == 'review':
         notes = [frame_note(x) for x in (a.frame_note or [])]
         emit(write(base + '/review', {'decision': a.decision, 'notes': a.notes or '', 'frame_notes': notes, 'quote': a.quote}))

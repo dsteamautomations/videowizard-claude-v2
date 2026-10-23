@@ -18,6 +18,22 @@ from . import CONTRACT_ASSEMBLY, STABILIZE_ZOOM
 
 MAX_ZOOM_1080 = 1.35
 DISSOLVE_FRAMES = 6   # design/71 P4: the cross-fade where two takes of one gap share their boundary picture
+GRAPHIC_DISSOLVE = 8   # design/91 N16, SK 23 Oct: into and out of graphics; a hard cut everywhere else unless the planner chose otherwise
+
+
+def _graphic(ev):
+    m = ev.get('media') or {}
+    return ev['kind'] == 'fill' and (m.get('kind') == 'sequence' or (m.get('kind') == 'still' and bool(m.get('graphic'))))
+
+
+def transitions(events):
+    """design/91 N16: the join at every cut of the assembly, in film order. The incoming shot's choice, else the outgoing gap shot's choice out, else the default:
+    an 8-frame dissolve where a graphic meets anything that is not one, a cut elsewhere. A match is a cut (the match is in the composition)."""
+    for a, b in zip(events, events[1:]):
+        chosen = ((b.get('transition') or {}).get('in') if b['kind'] == 'fill' else '') or ((a.get('transition') or {}).get('out') if a['kind'] == 'fill' else '')
+        if (chosen or ('dissolve' if _graphic(a) != _graphic(b) else 'cut')) == 'dissolve':
+            a['dissolve_into_next'] = max(int(a.get('dissolve_into_next') or 0), GRAPHIC_DISSOLVE)
+    return events
 
 
 def dissolves(fills, choices):
@@ -150,7 +166,7 @@ def prepare(conn, store, user, run, outputs):
         avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
         fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': None if ref.get('clip_fill') else {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
                                   'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'},
-                                  **({'boundary': shot['boundary']} if shot.get('boundary') else {})}   # design/71 P4
+                                  **({'boundary': shot['boundary']} if shot.get('boundary') else {}), **({'transition': shot['transition']} if shot.get('transition') else {})}   # design/71 P4; design/91 N16
         session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
     session['fills'] = fills
     joins = dissolves(fills, session['choices'])
@@ -239,10 +255,12 @@ def build(conn, store, user, run, outputs):
                     fail(f"{sid} has issues {f['meta']['issues']} and was not accepted as is")
                 events.append({'kind': 'fill', 'beat_id': ev['beat_id'], 'gap_id': gid, 'shot_id': sid, 'source': 'clip' if f['meta']['kind'] == 'clip' else 'take' if f['file']['name'].endswith('.mp4') and 'asset' not in f['file']['name'] else 'asset',
                                'file': f['file'], 'media': f['meta'], 'offset_frames': c['offset_frames'], 'end_policy': c['end_policy'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n,
-                               'fit': 'contain', 'stabilize': False, 'cumulative_zoom': 1.0, 'a2_intervals': [], 'dissolve_into_next': joins.get(sid, 0)})
+                               'fit': 'contain', 'stabilize': False, 'cumulative_zoom': 1.0, 'a2_intervals': [], 'dissolve_into_next': joins.get(sid, 0),
+                               **({'transition': f['transition']} if f.get('transition') else {})})   # design/91 N16
                 cursor += n
             if cursor != ev['timeline_out_frame']:
                 fail(f"Gap {gid} fills cover {cursor - ev['timeline_in_frame']} frames; the gap is {ev['timeline_frames']}")
+    transitions(events)   # design/91 N16
     assembly = {'contract': CONTRACT_ASSEMBLY, 'run_id': str(run['id']), 'master_output': str(master_o['id']), 'master_digest': master_o['summary']['plan_digest'], 'timeline': tl,
                 'events': events, 'duration_frames': plan['duration_frames'], 'sfx_cues': plan.get('sfx_cues') or [], 'finishing': (plan.get('finishing_preview') or []) + checklist,
                 'choices': session['choices'], 'stabilize': session['stabilize']}
@@ -263,7 +281,7 @@ def clip_item(ev, m, tl_fps, normalised_key):
     sf = Fraction(str(c['fps']))
     src_in = int(round(Fraction(str(m['in_s'])) * sf))
     n_src = int(Fraction(ev['timeline_frames']) * sf / Fraction(str(tl_fps)))
-    return {'kind': 'event', 'sub_clip_id': ev['shot_id'], 'label': ev['shot_id'],
+    return {'kind': 'event', 'sub_clip_id': ev['shot_id'], 'name': ev['shot_id'],   # 'name', not 'label': a label is the review film's burned-in caption
             'clip': {'id': c['id'], 'name': c['name'], 'sha256': c['sha256'], 'fps': c['fps'], 'rotation_deg': c.get('rotation_deg') or 0.0, 'hdr': bool(c.get('hdr'))},
             'source_in_frame': src_in, 'source_out_frame': src_in + n_src, 'timeline_frames': ev['timeline_frames'], 'crop_rect': m.get('crop_rect'),
             'hold_last_frame': False, 'a2': [], 'normalised_key': normalised_key, 'dissolve_into_next': 0}
@@ -287,6 +305,7 @@ def render(conn, store, user, run):
         if ev['kind'] == 'event':
             it = S2._event_items(s2, pk, [ev], rows)[0]
             it['stabilize'] = ev.get('stabilize', False)
+            it['dissolve_into_next'] = ev.get('dissolve_into_next') or 0   # design/91 N16: footage into a graphic
             it['normalised_key'] = key(run, f"normalised/{ev['sub_clip_id'].replace(':', '-')}-{ev['timeline_in_frame']}.mp4") if ev.get('stabilize') else None
             items.append(it)
         else:
@@ -294,11 +313,12 @@ def render(conn, store, user, run):
             fps = m.get('fps') or str(pk['timeline']['fps'])
             if m['kind'] == 'still':
                 items.append({'kind': 'still', 'file': ev['file'], 'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4"),
-                              'motion': m.get('motion') or 'none', 'graphic': bool(m.get('graphic')), 'label': ev['shot_id']})   # design/89 B2, H6
+                              'motion': m.get('motion') or 'none', 'graphic': bool(m.get('graphic')), 'name': ev['shot_id'], 'dissolve_into_next': ev.get('dissolve_into_next') or 0})   # design/89 B2, H6; design/91 N16
             elif m['kind'] == 'clip':   # design/89 B3
-                items.append(clip_item(ev, m, pk['timeline']['fps'], key(run, f"normalised/{ev['shot_id']}.mp4")))
+                items.append({**clip_item(ev, m, pk['timeline']['fps'], key(run, f"normalised/{ev['shot_id']}.mp4")), 'dissolve_into_next': ev.get('dissolve_into_next') or 0})
             elif m['kind'] == 'sequence':   # design/65 B8
-                items.append({'kind': 'sequence', 'states': m['states'], 'dissolve_frames': m.get('dissolve_frames') or 0, 'motion': m.get('motion') or 'none', 'label': ev['shot_id'],
+                items.append({'kind': 'sequence', 'states': m['states'], 'dissolve_frames': m.get('dissolve_frames') or 0, 'motion': m.get('motion') or 'none', 'name': ev['shot_id'],
+                              'dissolve_into_next': ev.get('dissolve_into_next') or 0,
                               'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
             else:
                 n_src = int(Fraction(ev['timeline_frames']) * Fraction(str(fps)) / Fraction(str(pk['timeline']['fps'])))

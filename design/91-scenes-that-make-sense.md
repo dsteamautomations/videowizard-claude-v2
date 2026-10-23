@@ -376,3 +376,34 @@ These override the sections above where they differ. The builder's reading of th
   - Every shot names the message it carries (`message`), and what it adds when it repeats one (`adds`).
   - The check compares messages across the film by their words. Two shots carrying the same message warn unless the later one says what it adds. Two consecutive shots that share an element warn at a lower overlap.
   - An isolated object on a plain background is the N9 line above.
+
+**SK's decisions for batch 4 (23 Oct 2026):**
+
+| | Decision |
+|---|---|
+| N16 | By default, an **8-frame dissolve into and out of graphics**, and a **hard cut everywhere else**, including between footage and AI scenes, which are meant to read as one world. The planner may choose otherwise (cut, dissolve, match) with a reason. |
+| N13 | Labels at least **4 % of the frame height** (43 px at 1080p), titles at least **6 %**. |
+
+**Batch 4 as built (N12, N13, N15, N16):**
+
+- **N12, a build that actually builds.**
+  - An animation shot with more claims than states warns.
+  - `vw visuals sequence` refuses a state whose picture has the same fingerprint as the state before (design/89 H6), because a state must add something visible.
+  - After the assembly film is built, a frame from the middle of each state's hold is compared with that state's picture. A planned state that doesn't appear is listed in the render record.
+- **N13, labels.**
+  - On a graphic picture, every exact-text label in the answer form is a must line: it reads exactly as written, is at least 4 % of the frame height, and its leader line ends on the part it names.
+  - One `should` line sets the size: labels at least 4 % of the frame height, a title at least 6 %.
+  - A label that uses an arrow or a sign in place of words, or a bare number without its unit, warns.
+- **N15, every shot fills the frame.**
+  - The renderer (first cut and assembly) fills the frame by cropping when the enlargement needed is within 1.35×, the same cap as stabilisation. Beyond that, it keeps bars rather than enlarge the picture too far.
+  - Graphics are never cropped, so their labels stay in frame.
+  - Each film's render record lists the shots that kept bars.
+  - Filling a shot with a stretch of a clip whose shape needs more than 1.35× warns, asking for a crop or another clip.
+- **N16, transitions.**
+  - A gap shot may choose its transition in (`transition_in`) and, for a gap's last shot, its transition out (`transition_out`): cut, dissolve or match, each with `transition_reason`. A choice without a reason is refused.
+  - By default, assembly dissolves 8 frames wherever a graphic meets anything that is not a graphic, and cuts everywhere else.
+  - The dissolve borrows frames past the cut point:
+    - from a still or a graphic, which hold longer;
+    - from a take, its spare tail;
+    - from footage, the frames after its cut point, holding the last frame if the clip ends.
+  - A match cut renders as a cut; the match is in the composition.

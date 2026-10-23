@@ -713,3 +713,11 @@ def test_the_procedure_carries_life_intent_one_world_and_one_message():
     for needle in ('`activity_level`', 'comes into view', '`studio_background`', '`message`', '`adds`'):
         assert needle in vp and needle in vsteps, needle
     assert 'light and colour' in vp and '`activity_level`' in doc and '`message`' in doc
+
+
+def test_the_procedure_carries_builds_labels_the_frame_and_transitions():
+    """design/91 batch 4 (SK: an 8-frame dissolve at graphics; labels 4 %, titles 6 %)."""
+    vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for needle in ('4 % of the frame height', '`transition_in`', '`transition_reason`', '1.35×'):
+        assert needle in vp and needle in vsteps and needle in doc, needle
+    assert '8 frames' in vp and 'titles 6 %' in vp and 'state per claim' in vsteps

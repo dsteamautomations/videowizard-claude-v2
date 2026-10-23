@@ -112,6 +112,50 @@ def motion_vf(motion, n, W, H, fps, per_frame):
     return f"zoompan=z='{zoom}':x='{x}':y='ih/2-(ih/zoom/2)':d={1 if per_frame else int(n)}:s={W}x{H}:fps={fps}"
 
 
+FILL_MAX_ZOOM = 1.35   # design/91 N15: past this enlargement a picture keeps bars (the same cap as stabilisation, MAX_ZOOM_1080)
+
+
+def fit(w, h, W, H):
+    """(fill, zoom): a source of w x h fills a W x H frame by cropping when the enlargement over the contained size is within the cap."""
+    a, t = float(w) / float(h), float(W) / float(H)
+    zoom = max(a / t, t / a)
+    return zoom <= FILL_MAX_ZOOM + 1e-9, zoom
+
+
+def fit_filters(w, h, W, H):
+    """The scale filters for a source: fill by cropping within the cap, else contain with bars. Returns (filters, padded)."""
+    if fit(w, h, W, H)[0]:
+        return [f'scale={W}:{H}:force_original_aspect_ratio=increase', f'crop={W}:{H}'], False
+    return [f'scale={W}:{H}:force_original_aspect_ratio=decrease', f'pad={W}:{H}:(ow-iw)/2:(oh-ih)/2'], True
+
+
+def frame_size(path):
+    out = subprocess.run([ffprobe(), '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', str(path)], capture_output=True, check=True, timeout=60).stdout
+    s = json.loads(out)['streams'][0]
+    return int(s['width']), int(s['height'])
+
+
+def states_missing(seg, states, fps):
+    """design/91 N12: a frame from the middle of each state's hold; the state is shown when its own picture is the nearest of all the states' and close enough.
+    states: [(png path, hold frames)]. Returns the numbers of the states not shown."""
+    import tempfile
+    from PIL import Image
+    from .. import lookalike
+    prints = [lookalike.dhash(Image.open(p), True) for p, _ in states]
+    missing, start = [], 0
+    with tempfile.TemporaryDirectory() as d:
+        for n, (_, hold) in enumerate(states, 1):
+            at = (start + hold / 2) / float(fps)
+            start += hold
+            out = Path(d) / f'{n}.png'
+            run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{at:.3f}', '-i', str(seg), '-frames:v', '1', str(out)])
+            seen = lookalike.dhash(Image.open(out), True)
+            dist = [lookalike.distance(seen, p) if seen is not None and p is not None else 64 for p in prints]
+            if dist[n - 1] != min(dist) or dist[n - 1] > lookalike.BITS_PICTURE:
+                missing.append(n)
+    return missing
+
+
 class Renderer:
     def __init__(self, work, timeline, fast=False, cache=None):
         self.work = Path(work)
@@ -120,6 +164,7 @@ class Renderer:
         self.tl = timeline
         self.fast = fast   # review films: a fast preset, the pieces are never delivered
         self.W, self.H, self.fps = int(timeline['width']), int(timeline['height']), Fraction(str(timeline['fps']))
+        self.padded, self._sizes = [], {}   # design/91 N15: the pieces that kept bars
 
     # ---------- picture ----------
 
@@ -136,17 +181,25 @@ class Renderer:
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
         return out
 
-    def still(self, png_path, sha, n_tl, motion='none'):
-        """A still asset held for n_tl frames, contain-padded to the timeline; with a motion it moves 5 % (design/89 B2), drawn from a 4× canvas so it does not judder."""
-        key = digest({'still': sha, 'n': n_tl, 'tl': self.tl, **({'motion': motion} if motion != 'none' else {})})
+    def still(self, png_path, sha, n_tl, motion='none', graphic=True, name=None):
+        """A still asset held for n_tl frames; with a motion it moves 5 % (design/89 B2), drawn from a 4× canvas so it does not judder. A graphic is contained so its
+        labels stay in frame; a picture fills the frame by cropping within the cap (design/91 N15)."""
+        from PIL import Image
+        with Image.open(png_path) as im:
+            fill = not graphic and fit(im.width, im.height, self.W, self.H)[0]
+        if not graphic and not fill and name:
+            self.padded.append(name)
+        key = digest({'still': sha, 'n': n_tl, 'tl': self.tl, **({'motion': motion} if motion != 'none' else {}), **({'fit': 'fill'} if fill else {})})
         out = self.cache / f'still-{key[:16]}.mp4'
         if not out.exists() and motion != 'none':
             W4, H4 = 4 * self.W, 4 * self.H
-            run([ffmpeg(), '-y', '-v', 'error', '-i', str(png_path), '-vf', f'scale={W4}:{H4}:force_original_aspect_ratio=decrease,pad={W4}:{H4}:(ow-iw)/2:(oh-ih)/2,setsar=1,'
+            canvas = f'scale={W4}:{H4}:force_original_aspect_ratio=increase,crop={W4}:{H4}' if fill else f'scale={W4}:{H4}:force_original_aspect_ratio=decrease,pad={W4}:{H4}:(ow-iw)/2:(oh-ih)/2'
+            run([ffmpeg(), '-y', '-v', 'error', '-i', str(png_path), '-vf', canvas + ',setsar=1,'
                  + motion_vf(motion, n_tl, self.W, self.H, self.fps, False) + ',format=yuv420p', '-frames:v', str(n_tl), *self.video_args(), str(out)])
         if not out.exists():
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png_path), '-frames:v', str(n_tl),
-                 '-vf', f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease,pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2,format=yuv420p', *self.video_args(), str(out)])
+                 '-vf', (f'scale={self.W}:{self.H}:force_original_aspect_ratio=increase,crop={self.W}:{self.H}' if fill else
+                         f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease,pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2') + ',format=yuv420p', *self.video_args(), str(out)])
         return out
 
     def sequence(self, states, dissolve, n_tl, motion='none'):
@@ -194,11 +247,22 @@ class Renderer:
         run([ffmpeg(), '-y', '-v', 'error', '-i', str(seg), '-vf', f'vidstabtransform=input={trf.as_posix()}:zoom=8:smoothing=15:crop=black,unsharp=5:5:0.8:3:3:0.4', *self.video_args(), str(out)])
         return out
 
-    def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False, label=None):
+    def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False, label=None, name=None):
         """One picture event: source frames [in,out) at src_fps → exactly n_tl timeline frames. hold_last_frame pads with the last frame.
         label: a corner caption burned in (review film only, so the operator knows which numbered slide is playing)."""
+        if src_path not in self._sizes:   # design/91 N15: the source's shape decides fill or bars
+            try:
+                self._sizes[src_path] = frame_size(src_path)
+            except Exception:
+                self._sizes[src_path] = None
+        size = self._sizes[src_path]
+        if size and crop_rect:
+            size = (size[0] * crop_rect[2], size[1] * crop_rect[3])
+        scale, padded = fit_filters(size[0], size[1], self.W, self.H) if size else ([f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease', f'pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2'], True)
+        if padded and name and name not in self.padded:
+            self.padded.append(name)
         key = digest({'src': src_sha, 'in': ev['source_in_frame'], 'out': ev['source_out_frame'], 'n': n_tl, 'crop': crop_rect, 'rot': rotation_deg, 'hold': bool(ev.get('hold_last_frame')), 'tl': self.tl, 'hdr': hdr,
-                      **({'label': label} if label else {})})
+                      **({'label': label} if label else {}), **({} if padded else {'fit': 'fill'})})
         out = self.cache / f'seg-{key[:16]}.mp4'
         if out.exists():
             return out
@@ -213,7 +277,7 @@ class Renderer:
             filters.append(f'rotate={math.radians(rotation_deg)}:c=black')
         if hdr:
             filters.append('zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,format=yuv420p')
-        filters += [f'scale={self.W}:{self.H}:force_original_aspect_ratio=decrease', f'pad={self.W}:{self.H}:(ow-iw)/2:(oh-ih)/2', f'fps={self.fps}']
+        filters += scale + [f'fps={self.fps}']
         if ev.get('hold_last_frame'):
             filters.append(f'tpad=stop_mode=clone:stop_duration={float(n_tl / self.fps) + 1}')
         if label:
@@ -344,8 +408,27 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     cursor = Fraction(0)
     silence_before = Fraction(0)
     carry = None   # design/71 P4: (plain piece, piece with its spare tail, its frames, dissolve frames) waiting for the next take to cross-fade into
+    sequences = []   # design/91 N12: (name, piece, states) for the states-shown check
+
+    def picture(item, n, tail=False):
+        """One piece of n frames; with tail, past its planned end (a still or a graphic holds longer; a take or footage runs on, holding its last frame if it ends)."""
+        name = item.get('label') or item.get('name') or item.get('sub_clip_id')
+        if item['kind'] == 'still':
+            return r.still(sources[item['file']['sha256']], item['file']['sha256'], n, item.get('motion') or 'none', bool(item.get('graphic')), None if tail else name)
+        if item['kind'] == 'sequence':
+            states = [(sources[st['file']['sha256']], st['file']['sha256'], st['hold_frames']) for st in item['states']]
+            if n > int(item['timeline_frames']):
+                states[-1] = (states[-1][0], states[-1][1], states[-1][2] + n - int(item['timeline_frames']))
+            return r.sequence(states, item.get('dissolve_frames') or 0, n, item.get('motion') or 'none')
+        clip, ev = item['clip'], item
+        if tail:
+            extra = int(Fraction(n - int(item['timeline_frames'])) * Fraction(str(clip['fps'])) / r.fps)   # the tail in source frames
+            ev = {**item, 'source_out_frame': item['source_out_frame'] + extra, 'hold_last_frame': True}
+        return r.segment(sources[clip['id']], clip['sha256'], clip['fps'], ev, n, item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')),
+                         None if tail else item.get('label'), None if tail else name)
+
     for i, item in enumerate(plan['items']):
-        if carry and item['kind'] != 'event':   # nothing to fade into: the plain piece, a cut
+        if carry and item['kind'] not in ('event', 'still', 'sequence'):   # nothing to fade into: the plain piece, a cut
             parts.append(carry[0])
             carry = None
         if item['kind'] == 'slate':
@@ -362,37 +445,22 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
                 a1_parts.append(r.silence(float(silence_before), r.work / f'a1-sil-{i}.wav'))
                 silence_before = Fraction(0)
             a1_parts.append(r.narration_window(narration, item['start_s'], item['end_s'], r.work / f'a1-{i}.wav'))
-        elif item['kind'] == 'still':
-            seg = r.still(sources[item['file']['sha256']], item['file']['sha256'], item['timeline_frames'], item.get('motion') or 'none')
-            parts.append(seg)
-            looks.append((item.get('label') or 'still', float(cursor), seg, item['timeline_frames'], bool(item.get('graphic'))))
-            normalised.append((item, seg))
-            cursor += Fraction(item['timeline_frames']) / r.fps
-            continue
-        elif item['kind'] == 'sequence':   # design/65 B8: a graphic sequence of stills
-            seg = r.sequence([(sources[st['file']['sha256']], st['file']['sha256'], st['hold_frames']) for st in item['states']], item.get('dissolve_frames') or 0,
-                             item['timeline_frames'], item.get('motion') or 'none')
-            parts.append(seg)
-            looks.append((item.get('label') or 'sequence', float(cursor), seg, item['timeline_frames'], True))
-            normalised.append((item, seg))
-            cursor += Fraction(item['timeline_frames']) / r.fps
-            continue
-        else:
-            clip = item['clip']
-            seg = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], item, item['timeline_frames'], item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')),
-                            item.get('label'))
-            if item.get('stabilize'):
-                seg = r.stabilized(seg)
-            looks.append((item.get('label') or item.get('sub_clip_id') or clip['id'], float(cursor), seg, int(item['timeline_frames']), False))
-            if item.get('normalised_key'):
-                normalised.append((item, seg))   # the delivered piece is the plain take, whatever the join
+        else:   # a picture: a still, a graphic sequence (design/65 B8) or a footage piece; any may dissolve into the next (design/71 P4, design/91 N16)
             n, d = int(item['timeline_frames']), int(item.get('dissolve_into_next') or 0)
+            name = item.get('label') or item.get('name') or item.get('sub_clip_id') or item['kind']
+            seg = picture(item, n)
+            if item['kind'] == 'event' and item.get('stabilize'):
+                seg = r.stabilized(seg)
+            graphic = item['kind'] == 'sequence' or (item['kind'] == 'still' and bool(item.get('graphic')))
+            looks.append((name, float(cursor), seg, n, graphic))
+            if item['kind'] != 'event' or item.get('normalised_key'):
+                normalised.append((item, seg))   # the delivered piece is the plain one, whatever the join
+            if item['kind'] == 'sequence':
+                sequences.append((name, seg, [(sources[st['file']['sha256']], st['hold_frames']) for st in item['states']]))
             extended, n_ext = None, n + d
-            if d > 0:   # design/71 P4: this take also rendered with its spare tail, to fade into the next
-                tail = int(Fraction(d) * Fraction(str(clip['fps'])) / r.fps)   # the tail in source frames
-                ext = {**item, 'source_out_frame': item['source_out_frame'] + tail}
-                extended = r.segment(sources[clip['id']], clip['sha256'], clip['fps'], ext, n_ext, item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')))
-            if carry:   # the previous take fades into this one over its spare tail
+            if d > 0:   # also rendered past its cut point, to fade into the next: a still or a graphic holds, a take its spare tail, footage its next frames
+                extended = picture(item, n_ext, tail=True)
+            if carry:   # the previous piece fades into this one over its tail
                 seg = r.dissolve_pair(carry[1], carry[2], seg, n, carry[3])
                 if extended is not None:   # three or more in a row: the join so far, with this take's tail
                     extended, n_ext = r.dissolve_pair(carry[1], carry[2], extended, n_ext, carry[3]), carry[2] + n_ext - carry[3]
@@ -401,7 +469,8 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
                 carry = (seg, extended, n_ext, d)
             else:
                 parts.append(seg)
-            for j, iv in enumerate(item.get('a2') or []):
+            for j, iv in enumerate(item.get('a2') or [] if item['kind'] == 'event' else []):
+                clip = item['clip']
                 src_fps = Fraction(str(clip['fps']))
                 at = cursor + (Fraction(iv['in_frame'] - item['source_in_frame']) / src_fps)
                 a2_pieces.append(r.a2_piece(sources[clip['id']], clip['fps'], iv, float(at), r.work / f'a2-{i}-{j}.wav'))
@@ -409,7 +478,12 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     if carry:
         parts.append(carry[0])
     picture = r.concat(parts, r.work / f'{kind}-picture.mp4')
-    look_alike = None
+    look_alike, shown = None, None
+    if kind == 'assembly' and sequences:   # design/91 N12: every planned state of a build appears
+        try:
+            shown = [{'shot': lab, 'missing': m} for lab, seg, sts in sequences for m in [states_missing(seg, sts, r.fps)] if m]
+        except Exception as exc:   # the check never fails a render
+            shown = {'error': f'{exc.__class__.__name__}: {str(exc)[:200]}'}
     if kind == 'assembly':   # design/89 H6: before the operator watches, the pieces that look alike, whatever their source
         try:
             from .. import lookalike
@@ -442,4 +516,5 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
     return film, {'duration_s': round(duration_of(film), 3), 'frames': int(cursor * r.fps), 'a1_gain_db': round(gain, 2), 'a1_measured': a1_measured,
                   'a2_pieces': sum(1 for p in a2_pieces if p), 'mix': master_loudness, 'loudness_check': check, 'codec': codec,
                   'normalised_segments': [(it.get('normalised_key'), str(seg)) for it, seg in normalised if it.get('normalised_key')],
-                  **({'look_alike': look_alike} if look_alike is not None else {})}
+                  **({'look_alike': look_alike} if look_alike is not None else {}), **({'bars': r.padded} if r.padded else {}),   # design/91 N15
+                  **({'states_missing': shown} if shown else {})}   # design/91 N12

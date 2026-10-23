@@ -161,6 +161,9 @@ class Shot(Model):
     carries_over: list[str] = Field(default_factory=list, max_length=10)   # design/91 N14: what the step before left, still visible
     message: str = Field(default='', max_length=500)   # design/91 N11: the message this shot carries
     adds: str = Field(default='', max_length=500)   # what it adds when it carries a message shown before
+    transition_in: Literal['', 'cut', 'dissolve', 'match'] = ''   # design/91 N16: chosen, with a reason; empty: the default (a dissolve at graphics, else a cut)
+    transition_out: Literal['', 'cut', 'dissolve', 'match'] = ''   # only on a gap's last shot: into the footage after the gap
+    transition_reason: str = Field(default='', max_length=500)
 
 
 class Landmark(Model):
@@ -398,6 +401,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     placed.append((gap.gap_id, shot.id, shot.visual_type, shot.start_frame, shot.end_frame))
                     if scenes is counted:
                         said.append(shot)
+                    if shot.visual_type == 'animation' and len(shot.claims) > len(shot.states):   # design/91 N12: a build shows every claim it covers
+                        warnings.append({'shot_id': shot.id, 'kind': 'build_short', 'message': f'shot {shot.id} covers {len(shot.claims)} claims in {len(shot.states)} states: '
+                                         'give each claim its state, so the build shows all of them'})
                     if shot.visual_type == 'animation':   # design/65: a graphic sequence of states
                         if len(shot.states) == 1:
                             need(False, f'shot {shot.id}: one state is a diagram still: plan it as a diagram, or add a state.')
@@ -525,6 +531,11 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                              'holds only what fits its seconds'})
                     if not shot.subjects:
                         need(shot.information_progression.strip(), 'Describe the composition or information progression for a shot without acting subjects.')
+            last = scenes[-1].shots[-1].id if scenes and scenes[-1].shots else None   # design/91 N16
+            for sh in (s for sc in scenes for s in sc.shots):
+                need(not sh.transition_out or sh.id == last, f'shot {sh.id}: transition_out is for the last shot of a gap; set the next shot\'s transition_in instead.')
+                need(not (sh.transition_in or sh.transition_out) or sh.transition_reason.strip(), f'shot {sh.id}: a chosen transition needs its reason (transition_reason); '
+                                                                                            'without a choice, a graphic dissolves 8 frames and everything else cuts.')
             need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
             warnings += timing_warnings(gap.gap_id, gap_shots, window.get('timing'), fps)   # design/89 A3
     said.sort(key=lambda s: s.start_frame)   # design/91 N11: one message once, unless the later shot says what it adds
@@ -591,7 +602,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             if 'activity_level' not in original_scene: scene.pop('activity_level')
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
-                            'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds'):   # design/89, 91: absent stays absent
+                            'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds',
+                            'transition_in', 'transition_out', 'transition_reason'):   # design/89, 91: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
                     if 'words' not in original_st: st.pop('words', None)

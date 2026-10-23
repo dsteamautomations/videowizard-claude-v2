@@ -123,3 +123,12 @@ def test_steps_and_command_text_carry_the_new_flow():
     assert 'records the review and the output together' in steps[3] and 'mm:ss' in steps[3]
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'vw assembly status --wait 900' in md and 'ask once' in md and 'records the review and the output together' in md
+
+
+def test_fetch_names_the_shots_that_kept_bars_and_the_states_not_seen(harness, monkeypatch, capsys):
+    """design/91 N12, N15."""
+    record = {'bars': ['VS7'], 'states_missing': [{'shot': 'AN1', 'missing': [2]}]}
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'renders': {'assembly': {'status': 'ready', 'result': {'key': 'k', 'sha256': 's', 'record': record}}}})
+    monkeypatch.setattr(vw, '_download', lambda m, key, rel: 'out/assembly.mp4')
+    code, out, err = run(args(what='fetch'), capsys)
+    assert code == 0 and 'kept bars' in err and 'VS7' in err and 'AN1 state 2' in err
