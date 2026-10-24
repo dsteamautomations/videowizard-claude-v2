@@ -42,6 +42,30 @@ app.include_router(web.router)
 app.include_router(files.router)
 
 
+PLUGIN_FREE = ('/api/meta', '/api/auth/', '/api/connect')   # design/95 F5: what an old plugin may still reach: the version, signing in, connecting
+
+
+def plugin_refusal(path, sent, minimum):
+    """design/95 F5: an /api/ call from a plugin older than the minimum, or one that sends no version (0.39.0 and before), is told to update."""
+    if not path.startswith('/api/') or path.startswith(PLUGIN_FREE):
+        return None
+    try:
+        if sent and tuple(int(x) for x in sent.strip().split('.')[:3]) >= tuple(int(x) for x in minimum.split('.')):
+            return None
+    except ValueError:   # not a version: treated as an old plugin
+        pass
+    return (f'Your vw plugin ({sent or "0.39.0 or older"}) is older than this server needs ({minimum}): update it and restart Claude Code, '
+            'then run the same command again.')
+
+
+@app.middleware('http')
+async def plugin_version_gate(request, call_next):
+    message = plugin_refusal(request.url.path, request.headers.get('X-VW-Plugin'), settings().PLUGIN_MIN_VERSION)
+    if message:
+        return JSONResponse({'code': 'PLUGIN_TOO_OLD', 'message': message, 'required': settings().PLUGIN_MIN_VERSION}, status_code=426)
+    return await call_next(request)
+
+
 @app.exception_handler(Problem)
 def problem(request, exc: Problem):
     return Response({'code': exc.code, 'message': exc.message, **exc.extra}, status_code=exc.status)

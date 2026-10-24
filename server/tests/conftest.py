@@ -115,6 +115,7 @@ def client(database):
     from fastapi.testclient import TestClient
     from app.main import app
     with TestClient(app) as c:
+        c.headers['X-VW-Plugin'] = '99.0.0'   # design/95 F5: every /api/ call names a current plugin
         yield c
 
 

@@ -743,3 +743,24 @@ def test_the_procedure_says_approving_places_and_how_to_take_a_picture_out():
     vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     for text in (vsteps, doc):
         assert 'approving places it' in text and 'vw visuals unplace --shot' in text and '--refs R1,R2,R3' not in text
+
+def test_the_plugin_sends_its_own_version_with_every_call(monkeypatch):
+    """design/95 F5: the version from plugin.json, not an environment variable nothing sets."""
+    version = json.loads((PLUGIN / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version']
+    monkeypatch.delenv('VW2_PLUGIN_VERSION', raising=False)
+    assert vw.plugin_version() == version
+    monkeypatch.setenv('VW2_PLUGIN_VERSION', '0.0.1')   # the server tests simulate an old plugin this way
+    assert vw.plugin_version() == '0.0.1'
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://example.test')
+    monkeypatch.setattr(vw, 'session', lambda: {'token': 't'})
+    assert vw.api().headers['X-VW-Plugin'] == vw.VERSION
+
+
+def test_approve_file_names_each_placement(harness, monkeypatch, capsys):
+    """design/95 F8."""
+    ws, _ = harness
+    (ws / 'out' / 'approvals.json').write_text(json.dumps([{'ref': 'K2', 'sha': 's', 'quote': 'yes'}, {'ref': 'S1', 'sha': 's', 'quote': 'yes'}]), encoding='utf-8')
+    replies = {'K2': {'id': 'K2', 'placed': 'DG1', 'replaced': 'K1'}, 'S1': {'id': 'S1'}}
+    monkeypatch.setattr(vw, 'request', lambda method, path, wait=None, **kw: (replies[path.split('/')[-2]], 0))
+    code, out, err = run(args(what='approve', file='out/approvals.json'), capsys)
+    assert code == 0 and 'K2 placed in DG1 (replaces K1)' in err and 'S1 placed' not in err

@@ -21,7 +21,17 @@ from pathlib import Path
 
 import httpx
 
-VERSION = os.environ.get('VW2_PLUGIN_VERSION') or '0.1.0'
+def plugin_version():
+    """design/95 F5: this plugin's own version from its plugin.json (the environment variable only for the server tests' old-plugin case)."""
+    if os.environ.get('VW2_PLUGIN_VERSION'):
+        return os.environ['VW2_PLUGIN_VERSION']
+    try:
+        return json.loads((Path(__file__).resolve().parents[1] / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version']
+    except (OSError, ValueError, KeyError):
+        return '0.1.0'
+
+
+VERSION = plugin_version()
 HOME = Path(os.environ.get('VW2_HOME') or (Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'vw2' if os.name == 'nt' else Path.home() / '.vw2'))
 RUNS = Path(os.environ.get('VW2_RUNS') or Path.cwd() / 'runs')
 
@@ -330,7 +340,7 @@ def need_connect(reason=''):
 
 def api():
     tok = session().get('token')
-    return httpx.Client(base_url=server_url(), headers={'Authorization': 'Bearer ' + tok} if tok else {}, timeout=60)
+    return httpx.Client(base_url=server_url(), headers={'X-VW-Plugin': VERSION, **({'Authorization': 'Bearer ' + tok} if tok else {})}, timeout=60)   # design/95 F5
 
 
 RETRY_S, RETRY_EVERY_S = 180, 15   # design/58 L14: a broken connection is tried again every 15 s for three minutes before the tool gives up
@@ -837,7 +847,8 @@ def upload_file(m, stage, path, sha, size):
     url = signed['url'] if signed['url'].startswith('http') else server_url() + signed['url']
     def put():
         with path.open('rb') as f:
-            return httpx.put(url, content=f, headers=signed.get('headers') or {}, timeout=httpx.Timeout(600, connect=30))
+            return httpx.put(url, content=f, headers={**(signed.get('headers') or {}), **({'X-VW-Plugin': VERSION} if url.startswith(server_url()) else {})},
+                             timeout=httpx.Timeout(600, connect=30))   # design/95 F5: our own server's upload route hears the version too
     try:
         r = put_with_retry(put)
     except httpx.RequestError as exc:
@@ -1402,7 +1413,8 @@ def cmd_visuals(a):
     if a.what == 'approve':
         if a.file:   # design/77 L33b: several approvals in one call
             _batch(_rows(m, a.file, ('ref', 'sha', 'quote')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r['quote']}), 'ref',
-                   lambda done: f"{len(done)} approved: {', '.join(done)}.")
+                   lambda done: f"{len(done)} approved: {', '.join(done)}.",
+                   lambda ref, out: out.get('placed') and f"{ref} placed in {out['placed']}" + (f" (replaces {out['replaced']})" if out.get('replaced') else ''))
         out = write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote})
         emit(out, 0, (f"Approved {a.ref} and placed in {out['placed']}" + (f" (it replaces {out['replaced']}, which stays approved)" if out.get('replaced') else '') + '.')   # design/94 A1
              if out.get('placed') else None)
@@ -1574,9 +1586,9 @@ def _pair_fields(m, variants, end_answer):
     return out
 
 
-def _batch(rows, build, label, done_line):
+def _batch(rows, build, label, done_line, note=None):
     """design/77 L33b: one call per row, in order, stopping at the first refusal (as image --file). build(row) -> (name, method, path, body)."""
-    done = []
+    done, notes = [], []
     for i, row in enumerate(rows):
         name, method, path, body = build(row)
         payload, code = request(method, path, json=body)
@@ -1586,7 +1598,10 @@ def _batch(rows, build, label, done_line):
             emit({'done': done, 'refused': {label: name, 'message': payload.get('message') or payload.get('action')}, 'remaining': [build(r)[0] for r in rows[i + 1:]], 'action': 'refused'}, 2,
                  f"{len(done)} done; {name} refused: {payload.get('message')}; fix it and run the file again with the rest")
         done.append(name)
-    emit({'done': done}, 0, done_line(done))
+        said = note(name, payload) if note else None   # design/95 F8: what each call did, when it says
+        if said:
+            notes.append(said)
+    emit({'done': done, **({'notes': notes} if notes else {})}, 0, done_line(done) + (' ' + '; '.join(notes) + '.' if notes else ''))
 
 
 def _rows(m, path, keys):

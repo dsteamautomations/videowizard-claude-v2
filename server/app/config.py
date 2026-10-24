@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.41.0'
-    PLUGIN_MIN_VERSION: str = '0.1.0'
+    SERVER_VERSION: str = '0.42.0'
+    PLUGIN_MIN_VERSION: str = '0.40.0'   # design/95 F5: the first plugin that sends its version; an older one is told to update, never works on silently
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
     STORAGE_SUPABASE_SERVICE_KEY: SecretStr = SecretStr('')

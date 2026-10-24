@@ -494,7 +494,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                     entry['shots'].append({'shot_id': sh['id'], 'title': sh.get('title') or '', 'visual_type': sh['visual_type'], 'route': route_of(sh), 'purpose': sh.get('purpose', ''),
                                            'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
-                                           'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
+                                           'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {})} if asset else None),   # design/89 B3
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'], **_state_order(session, sh),   # design/94 A2
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
@@ -582,13 +582,28 @@ def _state_order(session, sh):
 
 def state_chain(session, shot_id):
     """design/94 A2: the not-rejected pictures made for a shot, in order: the first has no parent among them, each next is made from the one before.
-    None when no picture records the shot; a fork names both cards."""
-    mine = [r for r in session['references'].values() if r.get('kind') in ('keyframe', 'state') and r.get('status') in ('candidate', 'approved') and r.get('sha256')
-            and made_for(session, r) == shot_id]
-    if not mine:
+    None when no picture records the shot; a fork names both cards. design/95: a fix not rejected stands in for its original (F1); a picture made
+    from a rejected one leaves the order (F2)."""
+    shot_pics = {r['id']: r for r in session['references'].values() if r.get('kind') in ('keyframe', 'state') and made_for(session, r) == shot_id}
+    if not shot_pics:
         return None
-    ids = {r['id'] for r in mine}
-    parent = {r['id']: [p.get('id') for p in (r.get('generation') or {}).get('parents') or [] if p.get('id') in ids] for r in mine}
+    stand = {r['fix_of']: r['id'] for r in shot_pics.values() if r.get('fix_of') in shot_pics and r.get('status') != 'rejected'}
+
+    def parents_of(r):
+        if r.get('fix_of') in shot_pics:   # a fix sits where its original sat
+            return parents_of(shot_pics[r['fix_of']])
+        return [stand.get(p.get('id'), p.get('id')) for p in (r.get('generation') or {}).get('parents') or [] if p.get('id') in shot_pics]
+
+    alive = {}
+
+    def live(rid):
+        if rid not in alive:
+            r = shot_pics[rid]
+            alive[rid] = False   # a loop never counts
+            alive[rid] = (r.get('status') in ('candidate', 'approved') and bool(r.get('sha256')) and rid not in stand and all(live(p) for p in parents_of(r)))
+        return alive[rid]
+    mine = [r for r in shot_pics.values() if live(r['id'])]
+    parent = {r['id']: parents_of(r) for r in mine}
     chain, level = [], [r for r in mine if not parent[r['id']]]
     while level:
         need(len(level) == 1, f"two pictures for state {len(chain) + 1}: {', '.join(sorted(r['name'] for r in level))}; reject one.")
@@ -1099,6 +1114,8 @@ def generate_image(conn, store, user, run, outputs, body):
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    warns += [f"made from {p['id']}, which was made for {p['shot_id']}; this picture is listed and checked under {body['shot_id']}"   # design/95 F7: on purpose, or a slip
+              for p in parents if body.get('shot_id') and p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id') not in (None, body['shot_id'])]
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named)
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
@@ -1811,7 +1828,8 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     elif not made and row.get('kind') in ('keyframe', 'state'):
         warns.append(f'{reference_id} has no shot recorded; from the next release a picture is placed only in the shot it was made for')
     used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
-    _rule(session, not used, f'H5: this picture is already in {used[0] if used else ""}. Remove it there first: `vw visuals unplace --shot {used[0] if used else ""}`, or Remove on the page.', warns)   # design/94 R1.8
+    _rule(session, not used, f'H5: this picture is already in {used[0] if used else ""}. Two shots never show the same picture: compose another (a reimagined shot, return_of, for a return), '
+                             f'or take it out there first: `vw visuals unplace --shot {used[0] if used else ""}`, or Remove on the page.', warns)   # design/94 R1.8
     if made and made != shot_id:
         row.update(shot_id=shot_id, moved={'from': made, 'to': shot_id, 'quote': move, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     held = session['assets'].get(shot_id) or {}

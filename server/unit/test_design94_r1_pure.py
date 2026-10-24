@@ -146,7 +146,7 @@ def test_a_picture_made_for_another_shot_moves_only_with_the_operators_words():
 def test_h5_names_the_shot_and_unplace_takes_the_picture_out():
     doc, sess = film(references=refs(pic('K1', 'DG1', 'approved')), assets={'DG1': held('K1')})
     store = store_with(sess, doc)
-    with pytest.raises(Problem, match=r'already in DG1\. Remove it there first: `vw visuals unplace --shot DG1`'):
+    with pytest.raises(Problem, match=r'already in DG1\..*take it out there first: `vw visuals unplace --shot DG1`'):
         g(lambda: VS.still_from_reference(store, USER, RUN, [], 'DG2', 'K1', 'yes', move='move it'))
     out = VS.unplace(store, USER, RUN, [], 'DG1', 'Take it out.')
     s = saved(store)
