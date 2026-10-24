@@ -328,7 +328,8 @@ def _visuals_act(code, vw2_session, body):
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
-            'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote, {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),
+            'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote, {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop'), body.get('move')),
+            'unplace': lambda: V.unplace(store, user, run, outputs, body['shot_id'], quote),   # design/94 R1.8
             'clip': lambda: V.fill_clip(store, user, run, outputs, body['shot_id'], body['clip_id'], float(body.get('in_s') or 0), quote,
                                         {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),   # design/89 B3, finding 7
             'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7

@@ -169,5 +169,5 @@ def test_a_still_for_a_named_image_shot_needs_no_bind_or_packet_of_the_elements_
     assert out['reference_id']
     with pytest.raises(Problem, match='Bind the shot and read its packet'):
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'd24b', 'shot_id': 'VS1'}))   # a video shot still needs its packet
-    with pytest.raises(Problem, match='Bind the shot and read its packet'):
-        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'd24c'}))   # no shot named: as before
+    with pytest.raises(Problem, match='Name the shot'):
+        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'd24c'}))   # design/94 R1.1: a keyframe names its shot

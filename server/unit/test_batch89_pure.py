@@ -162,7 +162,7 @@ def test_two_shots_never_share_a_start_image_or_a_still():
     s = saved(store)
     s['preparations'] = {'VS0': {'preparation_id': 'p', 'key': 'x', 'start_image': 'R2', 'end_image': 'R9'}}
     store = store_with(s, doc)
-    with pytest.raises(Problem, match='H5: picture R2 is already on screen in VS0'):
+    with pytest.raises(Problem, match='H5: this picture is already in VS0'):
         g(lambda: VS.still_from_reference(store, USER, RUN, [], 'IM1', 'R2', 'yes'))
 
 

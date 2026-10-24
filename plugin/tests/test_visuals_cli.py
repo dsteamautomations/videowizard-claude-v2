@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'question': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
+            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'end_answer': None, 'question': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'move': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -349,7 +349,7 @@ def test_steps_and_command_text_carry_the_new_flow():
     assert 'vw visuals treatment' in steps[1] and 'visuals page' in steps[1] and 'Nothing else before this' in steps[1] and 'cost' in steps[1]
     assert 'vw visuals check' in steps[2] and 'propose' in steps[2] and 'accept --gaps all' in steps[2] and 'answer every warning' in steps[2]
     assert 'images.json' in steps[3] and 'their yes' in steps[3] and 'status --wait 300' in steps[3] and 'exactly' in steps[3] and '--kind state' in steps[3]   # design/73: the web step is the search on the operator's yes
-    assert 'sequence --shot S --refs' in steps[4] and 'take --shots all' in steps[4] and 'select --job J --notes' in steps[4] and 'still --shot S --ref R' in steps[4] and '--end' in steps[4]
+    assert 'sequence --shot S --quote' in steps[4] and 'take --shots all' in steps[4] and 'select --job J --notes' in steps[4] and 'still --shot S --ref R' in steps[4] and '--end' in steps[4]
     assert 'record --gaps all' in steps[5]
     joined = ' '.join(steps)
     assert 'hand-made' not in joined and 'shall the editor' not in joined and 'on their instruction only' in joined   # the operator's file stays, never planned
@@ -721,3 +721,25 @@ def test_the_procedure_carries_builds_labels_the_frame_and_transitions():
     for needle in ('4 % of the frame height', '`transition_in`', '`transition_reason`', '1.35×'):
         assert needle in vp and needle in vsteps and needle in doc, needle
     assert '8 frames' in vp and 'titles 6 %' in vp and 'state per claim' in vsteps
+
+def test_approve_says_where_the_picture_went_and_unplace_sequence_and_move_post_the_words(harness, monkeypatch, capsys):
+    """design/94 R1.6-R1.9."""
+    posted = []
+    replies = {'/approve': {'id': 'K2', 'status': 'approved', 'placed': 'DG1', 'replaced': 'K1'}, '/unplace': {'shot_id': 'DG1', 'removed': 'K2'},
+               '/sequence': {'shot_id': 'AN1', 'states': 3, 'warnings': []}, '/still': {'shot_id': 'DG1', 'kind': 'still', 'reference_id': 'K1'}}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or next(v for k, v in replies.items() if path.endswith(k)))
+    code, out, err = run(args(what='approve', ref='K2', sha='s', quote='The second.'), capsys)
+    assert code == 0 and 'placed in DG1' in err and 'K1' in err
+    code, out, err = run(args(what='unplace', shot='DG1', quote='Take it out.'), capsys)
+    assert posted[-1][0].endswith('/unplace') and posted[-1][1] == {'shot_id': 'DG1', 'quote': 'Take it out.'} and 'DG1' in err
+    run(args(what='sequence', shot='AN1', quote='yes'), capsys)
+    assert posted[-1][1] == {'shot_id': 'AN1', 'reference_ids': [], 'quote': 'yes'}
+    run(args(what='still', shot='DG1', ref='K1', quote='yes', move='Use it here.'), capsys)
+    assert posted[-1][1]['move'] == 'Use it here.'
+
+
+def test_the_procedure_says_approving_places_and_how_to_take_a_picture_out():
+    """design/94."""
+    vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for text in (vsteps, doc):
+        assert 'approving places it' in text and 'vw visuals unplace --shot' in text and '--refs R1,R2,R3' not in text

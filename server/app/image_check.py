@@ -197,7 +197,7 @@ def fix_body(ref, failed):
               'Keep exactly as in Image 1: everything else, the framing, the light, every other subject and object where it is.\n'
               'Render only explicitly requested image text. Do not add unrelated logos, signatures or captions.')
     return {'request_id': str(uuid.uuid4()), 'element_id': ref['element_id'], 'name': ref['name'] + '-fix', 'kind': ref['kind'], 'subject': ref.get('subject') or '',
-            'prompt': prompt, 'parents': [ref['id']], 'fix_of': ref['id'],
+            'prompt': prompt, 'parents': [ref['id']], 'fix_of': ref['id'], 'shot_id': ref.get('shot_id'),   # design/94 R1.1: listed under its original's shot
             'answer': {**(ref.get('answer') or {}), 'prompt': prompt, 'base_image_id': ref['id'], 'single_change': failed['pass_when']} if ref.get('answer') else None}
 
 

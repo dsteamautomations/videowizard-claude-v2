@@ -219,8 +219,7 @@ def test_a_picture_for_a_named_shot_carries_its_claims_words_state_and_facts(mon
     lines = {l['check']: l for l in saved(store)['references'][out['reference_id']]['server_checklist']}
     assert 'opposite' in lines['claim: well burnt bricks are stronger']['pass_when'] and lines['word: well burnt']['weight'] == 'must'
     assert lines['carried over: the stack from the kiln']['weight'] == 'must' and 'deep red' in lines['fact: F1']['pass_when']
-    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'k2', 'shot_id': None})
-    assert any('--shot' in w for w in out['warnings'])
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'k2', 'shot_id': None, 'kind': 'isolated'})   # design/94: an element reference, no shot
     lines = {l['check'] for l in saved(store)['references'][out['reference_id']]['server_checklist']}
     assert 'fact: F1' in lines and 'claim: well burnt bricks are stronger' not in lines   # the element's facts on every picture; a shot's words only when it is named
 
@@ -230,7 +229,7 @@ def test_a_graphic_carries_what_it_depicts_and_the_spec_repeats_it(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
     doc_, sess = scene_session()
     store = store_with(sess, doc_)
-    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'g1', 'element_id': 'E1', 'name': 'wall', 'kind': 'isolated', 'subject': 'the wall', 'prompt': 'A wall.'})
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'g1', 'element_id': 'E1', 'name': 'wall', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'A wall.', 'shot_id': 'DG1'})
     lines = {l['check']: l for l in saved(store)['references'][out['reference_id']]['server_checklist']}
     assert lines['depicts: a rat-trap wall in elevation']['weight'] == 'must'
 

@@ -1208,7 +1208,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure']   # design/74 L26, L7; design/76; design/73; design/79
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace']   # design/74 L26, L7; design/76; design/73; design/79
 
 
 def _short_status(st, shot=None, gap=None):
@@ -1403,7 +1403,9 @@ def cmd_visuals(a):
         if a.file:   # design/77 L33b: several approvals in one call
             _batch(_rows(m, a.file, ('ref', 'sha', 'quote')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r['quote']}), 'ref',
                    lambda done: f"{len(done)} approved: {', '.join(done)}.")
-        emit(write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote}))
+        out = write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote})
+        emit(out, 0, (f"Approved {a.ref} and placed in {out['placed']}" + (f" (it replaces {out['replaced']}, which stays approved)" if out.get('replaced') else '') + '.')   # design/94 A1
+             if out.get('placed') else None)
     if a.what == 'bind':   # design/45 10.4: no quote needed; the approved references are the yes
         if a.file:   # design/77 L33b: several shots in one call
             def bind_row(r):
@@ -1512,7 +1514,11 @@ def cmd_visuals(a):
         if a.file:   # design/77 L33b: several still shots in one call
             _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or ''}), 'shot',
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
-        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote, **_reuse_fields(a)}), 0, f'Still set for {a.shot} from reference {a.ref}.')
+        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote, **_reuse_fields(a), **({'move': a.move} if a.move else {})}), 0,
+             f'Still set for {a.shot} from reference {a.ref}.')   # design/94 R1.7: --move, the operator's words for a picture made for another shot
+    if a.what == 'unplace':   # design/94 R1.8: a shot's picture taken out with the operator's words; it stays approved
+        out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote})
+        emit(out, 0, f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")
     if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
         if not a.shot or not a.clip or a.at is None:
             emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)
@@ -1997,7 +2003,7 @@ def build_parser():
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks'):   # design/73, design/79
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move'):   # design/73, design/79; design/94 --move
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')

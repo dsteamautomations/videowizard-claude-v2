@@ -238,6 +238,7 @@ class StillBody(Write):
     reuse: str | None = None          # design/89 H2: why the same footage again
     considered: str | None = None     # the reimagined shot considered, and why it adds nothing
     crop: list[float] | None = None   # H4: the different framing, x, y, w, h
+    move: str | None = None           # design/94 R1.7: the operator's words for moving a picture made for another shot
 
 
 class ClipBody(Write):   # design/89 B3
@@ -272,7 +273,7 @@ class TreatmentBody(Write):   # design/65 B6: a document without words is the dr
 
 class SequenceBody(Write):    # design/65 B2'
     shot_id: str
-    reference_ids: list[str] = Field(min_length=1, max_length=12)
+    reference_ids: list[str] = Field(default_factory=list, max_length=12)   # design/94 A2: the server's order when left out
     quote: str = Field(min_length=1)
 
 
@@ -1300,7 +1301,12 @@ def visuals_budget(run_id: UUID, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/still')
 def visuals_still(run_id: UUID, body: StillBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.still_from_reference(storage(), user, run, outputs, body.shot_id, body.reference_id, body.quote,
-                                                                                                                                 {'reason': body.reuse, 'considered': body.considered}, body.crop))
+                                                                                                                                 {'reason': body.reuse, 'considered': body.considered}, body.crop, body.move))
+
+
+@app.post('/api/runs/{run_id}/visuals/unplace')
+def visuals_unplace(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/94 R1.8: a shot and the operator's words
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.unplace(storage(), user, run, outputs, body.shot_id, body.quote))
 
 
 @app.post('/api/runs/{run_id}/visuals/clip')

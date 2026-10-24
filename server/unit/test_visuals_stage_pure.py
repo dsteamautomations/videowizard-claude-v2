@@ -218,9 +218,9 @@ def test_budget_reports_spend_cap_and_what_the_plan_still_needs(monkeypatch):
 def test_generate_image_and_submit_take_check_the_cap_first(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', cap_inr=30.0)
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', cap_inr=30.0, accepted=accepted(doc))
     store = store_with(sess, doc)
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'a wall section'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'IM1', 'subject': 'the wall', 'prompt': 'a wall section'}
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)          # ₹0 + ₹20 ≤ ₹30
     assert out['op'] == 'generate'
     with pytest.raises(Problem) as exc:
@@ -249,7 +249,7 @@ def test_a_sequence_approves_its_states_in_one_call_and_holds_them_for_the_shot(
     asset = s['assets']['AN1']
     assert asset['kind'] == 'sequence' and [st['hold_frames'] for st in asset['states']] == [175, 175, 150] and sum(st['hold_frames'] for st in asset['states']) == 500
     assert asset['dissolve_frames'] == 12 and asset['motion'] == 'none' and asset['states'][1]['sha256'] == 'sha-R2' and asset['placement'] == {'start_frame': 0, 'end_frame': 500}
-    assert out['warnings'] == [] and out['states'] == 3
+    assert [w for w in out['warnings'] if 'no shot recorded' not in w] == [] and out['states'] == 3
 
 
 def test_a_sequence_warns_when_a_state_was_not_made_from_the_previous_one_and_refuses_the_wrong_count_or_shot():
@@ -257,7 +257,7 @@ def test_a_sequence_warns_when_a_state_was_not_made_from_the_previous_one_and_re
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': ref('R1'), 'R2': ref('R2'), 'R3': ref('R3', parents=['R1'])})
     out = VS.sequence(store_with(sess, doc), USER, RUN, [], 'AN1', ['R1', 'R2'], 'yes')
-    assert out['warnings'] == ['state 2 (R2) was not generated from state 1 (R1); check the drawing is the same']
+    assert out['warnings'][1:] == ['state 2 (R2) was not generated from state 1 (R1); check the drawing is the same'] and 'no shot recorded' in out['warnings'][0]
     with pytest.raises(Problem, match='plans 2 states; 3 references'):
         g(lambda: VS.sequence(store_with(sess, doc), USER, RUN, [], 'AN1', ['R1', 'R2', 'R3'], 'yes'))
     with pytest.raises(Problem, match='diagram shot: it takes a still'):
@@ -307,9 +307,9 @@ def test_a_keyframe_may_be_generated_from_a_candidate_keyframe(monkeypatch):
     """design/66 C3: the end keyframe is made from the start keyframe before either is approved, so the pair is approved together."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1',
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'K1': ref('K1'), 'S1': {**ref('S1'), 'kind': 'sheet'}, 'A1': ref('A1', 'approved')})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the same yard, the bucket now empty', 'parents': ['K1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the same yard, the bucket now empty', 'parents': ['K1']}
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert out['op'] == 'edit' and saved(store)['references'][out['reference_id']]['generation']['parents'] == [{'id': 'K1', 'key': 'run-1/visuals/references/K1.png', 'sha256': 'sha-K1'}]
@@ -382,7 +382,7 @@ def test_two_candidates_for_a_start_and_the_end_written_with_it_is_queued_on_app
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': {**ref('R1', 'approved'), 'kind': 'sheet'}}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     end_answer = {'status': 'ready', 'prompt': 'Image 1 is the start; the bucket now empty.', 'checklist': [{'check': 'bucket', 'pass_when': 'empty', 'weight': 'must'}], 'exact_text': []}
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the wall, bucket full', 'parents': ['R1'],
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the wall, bucket full', 'parents': ['R1'],
             'variants': 2, 'end_prompt': end_answer['prompt'], 'end_answer': end_answer}
     conn, store = FakeConn([]), store_with(sess, doc)
     out = VS.generate_image(conn, store, USER, RUN, [], body)
@@ -534,7 +534,7 @@ def test_an_answer_is_linted_and_stored_with_the_image_and_the_take(monkeypatch)
                    references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved')},
                    bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     answer = {'status': 'ready', 'prompt': 'a wall section', 'checklist': [{'check': 'c', 'pass_when': 'p', 'weight': 'must'}], 'exact_text': []}
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'a wall section', 'answer': answer}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'a wall section', 'answer': answer}
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert saved(store)['references'][out['reference_id']]['answer'] == answer
@@ -559,8 +559,8 @@ def test_an_end_keyframe_carries_the_start_keyframes_own_references(monkeypatch)
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     sheets = {'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'S2': {**ref('S2', 'approved'), 'kind': 'sheet'}}
     start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': 'S1', 'key': sheets['S1']['key'], 'sha256': 'sha-S1'}, {'id': 'S2', 'key': sheets['S2']['key'], 'sha256': 'sha-S2'}]}}
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references={**sheets, 'K1': start})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty', 'parents': ['K1']}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references={**sheets, 'K1': start})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty', 'parents': ['K1']}
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['K1', 'S1', 'S2']
@@ -631,7 +631,7 @@ def test_an_end_keyframe_must_name_image_1_and_the_packet_says_so(monkeypatch):
     gap = doc['gaps'][1]
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'K1': ref('K1'), 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'The bucket now empty, the mason one step left.', 'parents': ['K1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'The bucket now empty, the mason one step left.', 'parents': ['K1']}
     with pytest.raises(Problem, match='names "Image 1"'):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'prompt': 'Image 1 is the start. ' + body['prompt']})
@@ -647,8 +647,8 @@ def test_more_than_16_inputs_after_inheritance_are_refused_with_the_count(monkey
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     sheets = {f'S{i}': {**ref(f'S{i}', 'approved'), 'kind': 'sheet'} for i in range(16)}
     start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': s, 'key': sheets[s]['key'], 'sha256': 'x'} for s in sheets]}}
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references={**sheets, 'K1': start})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty.', 'parents': ['K1']}
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references={**sheets, 'K1': start})
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty.', 'parents': ['K1']}
     with pytest.raises(Problem, match='17 input pictures'):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     fewer = {**start, 'generation': {'op': 'edit', 'parents': start['generation']['parents'][:15]}}
@@ -660,9 +660,9 @@ def test_the_image_size_follows_the_frame_and_an_edit_takes_its_parents_size(mon
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     refs = {'K1': {**ref('K1'), 'width': 1088, 'height': 1936}, 'F1': {**ref('F1', 'approved'), 'kind': 'frame', 'width': 1920, 'height': 1080}, 'S1': {**ref('S1', 'approved'), 'kind': 'sheet', 'width': 1536, 'height': 864}}
-    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', references=refs)
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references=refs)
     brief = [{'stage': 'brief', 'unit': None, 'summary': {'production': {'format': {'frame': '9:16'}}}}]
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'a wall'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'IM1', 'subject': 'the wall', 'prompt': 'a wall'}
 
     def size_of(outputs, **over):
         store = store_with(sess, doc)
@@ -697,7 +697,7 @@ def test_every_prompt_is_linted_for_a_logo_a_model_name_a_size_or_a_resolution(m
     gap = doc['gaps'][1]
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': ref('R1', 'approved'), 'R2': ref('R2', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'The NARDEP logo top right, the wall below.'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'The NARDEP logo top right, the wall below.'}
     with pytest.raises(Problem, match='asks for a logo'):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     with pytest.raises(Problem, match="names a model \\('kling'\\)"):
@@ -725,7 +725,7 @@ def test_a_rejected_picture_cannot_be_approved_bound_held_or_used_as_a_parent(mo
         g(lambda: VS.bind(store, USER, RUN, [], 'VS1', {'E1': ['K1']}, {}))
     with pytest.raises(Problem, match='not an approved reference'):
         g(lambda: VS.still_from_reference(store, USER, RUN, [], 'IM1', 'K1', 'yes'))
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket empty.', 'parents': ['K1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket empty.', 'parents': ['K1']}
     with pytest.raises(Problem, match='from the approved start, not from the candidate chain'):   # design/71 P6, the server check
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], body))
     VS.reject_reference(store, USER, RUN, [], 'S2', 'the label drifted', 'No.')
@@ -846,7 +846,7 @@ def test_a_start_keyframe_for_a_video_shot_waits_for_its_packet(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     sess = video_session(doc)
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'subject': 'the wall', 'prompt': 'the yard, the wall centre'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the yard, the wall centre'}
     with pytest.raises(Problem, match='Bind the shot and read its packet') as exc:
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     assert 'VS1' in exc.value.message
@@ -856,7 +856,7 @@ def test_a_start_keyframe_for_a_video_shot_waits_for_its_packet(monkeypatch):
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert out['op'] == 'edit' or out['op'] == 'generate'
     still_doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('IM2', 900, 1150, 'image')])   # an element used by still shots only: unaffected
-    out = VS.generate_image(FakeConn([]), store_with(session(versions=sess['versions'], current='d1', accepted=accepted(still_doc)), still_doc), USER, RUN, [], body)
+    out = VS.generate_image(FakeConn([]), store_with(session(versions=sess['versions'], current='d1', accepted=accepted(still_doc)), still_doc), USER, RUN, [], {**body, 'shot_id': 'IM2'})
     assert out['op'] == 'generate'
 
 
@@ -866,7 +866,7 @@ def test_an_end_keyframe_that_moves_the_camera_is_refused_and_the_packet_says_so
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'K1': ref('K1')})
     sess['bindings']['VS1']['packet_read_at'] = 't'
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'subject': 'the wall', 'parents': ['K1'],
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'parents': ['K1'],
             'prompt': 'Image 1 is the start. The helper five metres on. The camera has drifted slightly forward, so the stack is larger.'}
     with pytest.raises(Problem, match="moves the camera \\('camera has drifted'\\)"):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
@@ -887,7 +887,7 @@ def test_a_keyframe_for_a_shot_with_a_client_material_needs_a_footage_frame_as_a
     frame = {**ref('F1', 'approved'), 'kind': 'frame', 'element_id': 'WALL', 'width': 1920, 'height': 1080}
     sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'F1': frame})
     sess['bindings']['VS1'] = {'gap_digest': gap_digest(doc, doc['gaps'][1]), 'references': {'E1': [{'id': 'S1', 'sha256': 'sha-S1'}], 'WALL': [{'id': 'F1', 'sha256': 'sha-F1'}]}, 'packet_read_at': 't'}
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'subject': 'the mason at the wall', 'prompt': 'the mason lays a brick on the wall', 'parents': ['S1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the mason at the wall', 'prompt': 'the mason lays a brick on the wall', 'parents': ['S1']}
     with pytest.raises(Problem, match="WALL is the client's own: send one of its approved footage frames as a parent"):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'parents': ['S1', 'F1']})

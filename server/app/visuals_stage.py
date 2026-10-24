@@ -460,6 +460,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
     for r in session['references'].values():
         refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height', 'check_pending')}   # design/92: being checked
         refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
+        refs[r['id']]['shot_id'] = made_for(session, r)   # design/94 R1.3: listed only under its own shot
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
                              rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
@@ -495,7 +496,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {})} if asset else None),   # design/89 B3
-                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'],
+                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'], **_state_order(session, sh),   # design/94 A2
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
                                            'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
                                            'message': sh.get('message') or '', 'adds': sh.get('adds') or '',   # design/91 N11
@@ -529,23 +530,29 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     _route_gate(shot, 'animation')
     states = shot.get('states') or []
-    need(len(reference_ids) == len(states), f'shot {shot_id} plans {len(states)} states; {len(reference_ids)} references given.')
     need(str(quote or '').strip(), 'The operator reply is required.')
-    rows = []
-    for rid in reference_ids:
-        row = session['references'].get(rid)
-        need(row and row.get('status') in ('candidate', 'approved') and row.get('sha256'), f'{rid} is not a candidate or approved reference of this run.')
-        rows.append(row)
-    warnings = []
-    for i, row in enumerate(rows[1:], 2):
-        parents = [p.get('id') for p in (row.get('generation') or {}).get('parents') or []]
-        if rows[i - 2]['id'] not in parents:
-            warnings.append(f"state {i} ({row['id']}) was not generated from state {i - 1} ({rows[i - 2]['id']}); check the drawing is the same")
+    rows, warnings = state_chain(session, shot_id), []
+    if rows is not None:   # design/94 A2: the order comes from the shot's own pictures, each state made from the one before
+        need(len(rows) == len(states), f"{shot_id} plans {len(states)} states; its pictures make {len(rows)}: {', '.join(r['name'] for r in rows)}.")
+        need(not reference_ids or list(reference_ids) == [r['id'] for r in rows], f"in the plan's order the states are {', '.join(r['id'] for r in rows)}; give them in that order, or leave --refs out.")
+    else:   # pictures made before shots were recorded: the order given, warned
+        need(reference_ids, f'no pictures made for {shot_id}: make its states with `vw visuals image --shot {shot_id} --kind state …`.')
+        need(len(reference_ids) == len(states), f'shot {shot_id} plans {len(states)} states; {len(reference_ids)} references given.')
+        rows = []
+        for rid in reference_ids:
+            row = session['references'].get(rid)
+            need(row and row.get('status') in ('candidate', 'approved') and row.get('sha256'), f'{rid} is not a candidate or approved reference of this run.')
+            rows.append(row)
+        warnings.append(f'these states have no shot recorded; from the next release the order comes from the pictures made for {shot_id}')
+        for i, row in enumerate(rows[1:], 2):
+            parents = [p.get('id') for p in (row.get('generation') or {}).get('parents') or []]
+            if rows[i - 2]['id'] not in parents:
+                warnings.append(f"state {i} ({row['id']}) was not generated from state {i - 1} ({rows[i - 2]['id']}); check the drawing is the same")
     from . import lookalike   # design/91 N12: every state adds something visible
     prints = [(_fingerprints(store, r['key']) or {}).get('graphic') for r in rows]
     for i in range(1, len(rows)):
         need(prints[i - 1] is None or prints[i] is None or lookalike.distance(prints[i - 1], prints[i]) > lookalike.BITS_GRAPHIC,
-             f"state {i + 1} ({rows[i]['id']}) looks the same as state {i}: a state adds something visible; make it again from state {i} with what it adds.")
+             f"state {i + 1} ({rows[i]['name']}) looks the same as state {i} ({rows[i - 1]['name']}): a state adds something visible; make it again from state {i} with what it adds.")
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
     for row in rows:
         row.update(status='approved', approval={**stamp, 'sha256': row['sha256']})
@@ -561,6 +568,33 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
     session['selections'].pop(shot_id, None)
     save_session(store, run, session)
     return {'shot_id': shot_id, 'kind': 'sequence', 'states': len(rows), 'warnings': warnings}
+
+
+def _state_order(session, sh):
+    """The page's numbered states: the server's order, or why there is none."""
+    if route_of(sh) != 'graphic_sequence':
+        return {}
+    try:
+        return {'state_order': [r['id'] for r in state_chain(session, sh['id']) or []], 'state_problem': None}
+    except ValueError as exc:
+        return {'state_order': [], 'state_problem': str(exc)}
+
+
+def state_chain(session, shot_id):
+    """design/94 A2: the not-rejected pictures made for a shot, in order: the first has no parent among them, each next is made from the one before.
+    None when no picture records the shot; a fork names both cards."""
+    mine = [r for r in session['references'].values() if r.get('kind') in ('keyframe', 'state') and r.get('status') in ('candidate', 'approved') and r.get('sha256')
+            and made_for(session, r) == shot_id]
+    if not mine:
+        return None
+    ids = {r['id'] for r in mine}
+    parent = {r['id']: [p.get('id') for p in (r.get('generation') or {}).get('parents') or [] if p.get('id') in ids] for r in mine}
+    chain, level = [], [r for r in mine if not parent[r['id']]]
+    while level:
+        need(len(level) == 1, f"two pictures for state {len(chain) + 1}: {', '.join(sorted(r['name'] for r in level))}; reject one.")
+        chain.append(level[0])
+        level = [r for r in mine if chain[-1]['id'] in parent[r['id']]]
+    return chain
 
 
 def current_plan(store, session):
@@ -1037,6 +1071,9 @@ def generate_image(conn, store, user, run, outputs, body):
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
+    if not body.get('shot_id') and body['kind'] in ('keyframe', 'state'):   # design/94 R1.1: a state, an end image or a fix takes its parent's shot
+        body['shot_id'] = next((p['shot_id'] for p in parents if p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id')), None)
+        need(body['shot_id'] or body.get('fix_of'), f"Name the shot this {body['kind']} is for (--shot): a picture is listed, checked and placed only in its own shot.")
     found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
     named = found[3] if found else None
     if body['kind'] == 'keyframe':
@@ -1105,8 +1142,6 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     if body.get('fix_of'):   # a fix round carries its picture's form when it had one
         return [], []
     warns = [] if answer is not None else ['no answer form with this picture: write it with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]
-    if body['kind'] == 'keyframe' and named is None:
-        warns.append('name the shot this picture is for (--shot), so its claims, words and the state carried over are checked' + NEXT_RELEASE)
     facts = {f['id']: f for f in plan.get('visual_facts') or [] if f.get('status') != 'unknown'}   # an unknown fact is never a line: it is never drawn
     lines = [_fact_line(f) for f in facts.values() if f.get('about') == body['element_id']]
     if named is not None:
@@ -1116,8 +1151,8 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
         lines += [{'check': 'word: ' + d, 'pass_when': f'what the narration calls {d} looks {d}, never the opposite', 'weight': 'must'} for d in named.get('descriptors') or []]
         lines += [{'check': 'carried over: ' + c, 'pass_when': f'{c} is visible, as the step before left it', 'weight': 'must'} for c in named.get('carries_over') or []]
         lines += [_fact_line(facts[f]) for f in named.get('fact_ids') or [] if f in facts]
-    shots = [sh for _, sh in _shots_with(plan, session, body['element_id']) if sh['visual_type'] in GRAPHIC_TYPES]
-    if shots or (named is not None and named['visual_type'] in GRAPHIC_TYPES):   # design/91 N13: labels say what they mean, readable on a phone
+    shots = [named] if named is not None and named['visual_type'] in GRAPHIC_TYPES else []   # design/94 R1.2: its own shot's lines only, never every shot of the element
+    if shots or any(sh['visual_type'] in GRAPHIC_TYPES for _, sh in _shots_with(plan, session, body['element_id'])):   # design/91 N13: labels say what they mean, readable on a phone
         labels = [str(s) for s in (answer or {}).get('exact_text') or [] if str(s).strip()]
         label_lines = [{'check': 'label: ' + s, 'pass_when': f'the label reads exactly "{s}", is at least {LABEL_MIN_PCT} % of the frame height, and its leader line ends on the part it names',
                    'weight': 'must'} for s in labels] + [LABEL_SIZE]   # after the claims and the drawing's own lines
@@ -1288,9 +1323,20 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
     need((quote or '').strip(), 'The operator reply is required.')
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
+    placed = None
+    sid = made_for(session, row)
+    if sid and row.get('kind') in ('keyframe', 'state'):   # design/94 A1: approving a still shot's picture places it, in the same save; a refusal approves nothing
+        try:
+            shot = locate(store, session, sid)[3]
+        except ValueError:   # its shot left the plan or its gap waits for acceptance: approved only
+            shot = None
+        if shot and route_of(shot) == 'still':
+            placed = _place_still(store, user, run, outputs, session, sid, ref_id, quote)
     row['dhash'] = _fingerprints(store, row['key'])   # design/89 H6, finding 9: kept once, never read again for the look-alike check
     _feedback_image(session, run, user, row, 'pass', quote, '')
     save_session(store, run, session)
+    if placed:
+        return {**row, 'placed': sid, **({k: placed[k] for k in ('replaced', 'warnings') if k in placed})}
     pe = row.get('pending_end')
     if pe and conn is not None and not row.get('end_queued'):   # design/86 K1: the end image follows the approved start without a chat turn
         out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
@@ -1737,17 +1783,39 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     return session['selections'][job['unit']]
 
 
-def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote, reuse=None, crop=None):
+def made_for(session, row):
+    """design/94 R1.1: the shot a picture was made for; a fix made before shots were recorded takes its original's."""
+    return row.get('shot_id') or (session['references'].get(row.get('fix_of')) or {}).get('shot_id')
+
+
+def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote, reuse=None, crop=None, move=None):
     """design/45 10.3: an approved reference becomes a still shot's asset; no download and upload. design/89 H2-H5: never a picture already on screen."""
     session = session_of(store, run, outputs)
+    out = _place_still(store, user, run, outputs, session, shot_id, reference_id, quote, reuse, crop, move)
+    save_session(store, run, session)
+    return out
+
+
+def _place_still(store, user, run, outputs, session, shot_id, reference_id, quote, reuse=None, crop=None, move=None):
+    """The placement on a loaded session, saved by the caller (design/94 A1: approving places in the same save)."""
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     _route_gate(shot, 'still')
     row = session['references'].get(reference_id)
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
     need((quote or '').strip(), 'The operator reply is required.')
-    used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
+    need(row.get('kind') != 'web', 'a web picture is a guide only; it cannot appear in the film.')   # design/94 R1.5 (U2)
     warns = []
-    _rule(session, not used, f'H5: picture {reference_id} is already on screen in {used[0] if used else ""}; two shots never show the same picture: compose another (a reimagined shot, return_of, for a return).', warns)
+    made = made_for(session, row)
+    if made and made != shot_id:   # R1.7 (L2): only into its own shot, or moved with the operator's words
+        need(str(move or '').strip(), f"{reference_id} was made for {made}; make one for {shot_id} (`vw visuals image --shot {shot_id} …`), or move it with the operator's words (--move).")
+    elif not made and row.get('kind') in ('keyframe', 'state'):
+        warns.append(f'{reference_id} has no shot recorded; from the next release a picture is placed only in the shot it was made for')
+    used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
+    _rule(session, not used, f'H5: this picture is already in {used[0] if used else ""}. Remove it there first: `vw visuals unplace --shot {used[0] if used else ""}`, or Remove on the page.', warns)   # design/94 R1.8
+    if made and made != shot_id:
+        row.update(shot_id=shot_id, moved={'from': made, 'to': shot_id, 'quote': move, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    held = session['assets'].get(shot_id) or {}
+    replaced = held.get('reference_id') or held.get('clip_id')   # a picture or a clip stretch taken out by this placement
     kept = None
     src = row.get('source') or {}
     if row.get('kind') == 'frame' and src.get('media_id') is not None:
@@ -1758,8 +1826,23 @@ def still_from_reference(store, user, run, outputs, shot_id, reference_id, quote
                                   'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}, **({'reuse': kept} if kept else {}), **({'repeat_warnings': warns} if warns else {})}
     session['selections'].pop(shot_id, None)
     (session.get('reuse_pending') or {}).pop(shot_id, None)
+    return {'shot_id': shot_id, 'kind': 'still', 'reference_id': reference_id, 'sha256': row['sha256'], **({'replaced': replaced} if replaced and replaced != reference_id else {}),
+            **({'warnings': warns} if warns else {})}
+
+
+def unplace(store, user, run, outputs, shot_id, quote):
+    """design/94 R1.8 (L3): a shot's still, sequence or clip taken out with the operator's words; the picture stays approved."""
+    session = session_of(store, run, outputs)
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    need(str(quote or '').strip(), 'The operator reply is required.')
+    asset = session['assets'].get(shot_id)
+    need(asset, f'{shot_id} holds no picture.')
+    need(gap['gap_id'] not in session['recorded_gaps'], f"{shot_id}'s gap {gap['gap_id']} is recorded; a recorded gap keeps its pictures.")
+    removed = asset.get('reference_id') or [st.get('reference_id') for st in asset.get('states') or []] or asset.get('clip_id')
+    session.setdefault('unplaced', []).append({'shot_id': shot_id, 'kind': asset['kind'], 'removed': removed, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    del session['assets'][shot_id]
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'kind': 'still', 'reference_id': reference_id, 'sha256': row['sha256'], **({'warnings': warns} if warns else {})}
+    return {'shot_id': shot_id, 'kind': asset['kind'], 'removed': removed}
 
 
 REUSE_APART_S = 60          # design/89 H4 (SK): an approved reuse is at least this far from the other showing
