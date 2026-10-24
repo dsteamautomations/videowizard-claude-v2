@@ -1,5 +1,5 @@
 """design/58 (L14): a broken connection is retried for up to three minutes inside request(); then the outcome is `unreachable`,
-not `tell_builder`. ReadTimeout keeps its two meanings. The server is a fake client; sleep and the clock are patched."""
+not `tell_builder`. A read that times out is the server busy (design/92), retried, then `wait`. The server is a fake client; sleep and the clock are patched."""
 import json
 
 import httpx
@@ -70,13 +70,23 @@ def test_the_other_broken_connection_errors_are_retried_too(monkeypatch, clock, 
     assert vw.request('GET', '/x') == ({'ok': True}, 0) and len(c.sent) == 2 and clock['sleeps'] == [15]
 
 
-def test_read_timeout_is_not_retried_and_keeps_its_two_meanings(monkeypatch, clock):
+def test_a_read_that_times_out_is_the_server_busy_never_a_defect(monkeypatch, clock):
+    """design/92 (L60): a GET that times out is tried again every 15 s for three minutes; then `wait`, never `tell_builder`."""
+    c = use(monkeypatch, FakeClient([httpx.ReadTimeout('slow')] * 2))
+    assert vw.request('GET', '/x') == ({'ok': True}, 0) and len(c.sent) == 3 and clock['sleeps'] == [15, 15]
+    clock['sleeps'].clear()
+    use(monkeypatch, FakeClient([httpx.ReadTimeout('slow')] * 40))
+    payload, code = vw.request('GET', '/x')
+    assert code == 2 and payload['action'] == 'wait' and 'busy' in payload['message'] and 'not a defect' in payload['message'] and sum(clock['sleeps']) <= 180
+
+
+def test_a_write_that_times_out_says_check_the_status_and_is_not_repeated(monkeypatch, clock):
     use(monkeypatch, FakeClient([httpx.ReadTimeout('slow')] * 3))
     payload, code = vw.request('POST', '/x', wait=600)
     assert code == 2 and payload['action'] == 'refused' and 'still working' in payload['message'] and clock['sleeps'] == []
-    use(monkeypatch, FakeClient([httpx.ReadTimeout('slow')] * 3))
-    payload, code = vw.request('GET', '/x')
-    assert code == 2 and payload['action'] == 'tell_builder' and 'ReadTimeout' in payload['message'] and clock['sleeps'] == []
+    c = use(monkeypatch, FakeClient([httpx.ReadTimeout('slow')] * 3))
+    payload, code = vw.request('POST', '/x', json={'a': 1})
+    assert code == 2 and payload['action'] == 'wait' and 'status' in payload['message'] and 'not a defect' in payload['message'] and len(c.sent) == 1 and clock['sleeps'] == []
 
 
 def test_a_retried_write_sends_the_same_request_id(monkeypatch, clock):

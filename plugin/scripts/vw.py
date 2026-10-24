@@ -340,7 +340,8 @@ def request(method, path, wait=None, **kw):
     """One server call without the exit, so it can run in a thread: returns (payload, code). code 0: payload is the body.
     Otherwise finish(payload, code) on the main thread produces the same outcome call() always did.
     A connection that cannot be made or breaks (ConnectError, ConnectTimeout, ReadError, …) is retried (design/58): a write carries
-    its request_id, so a repeated request is the same request to the server. ReadTimeout is not retried: the server has the request."""
+    its request_id, so a repeated request is the same request to the server. A read that times out is the server busy: it is asked again the same way,
+    then `wait` (design/92); a write that times out is not repeated: the server may have it."""
     started = time.monotonic()
     while True:
         try:
@@ -350,7 +351,14 @@ def request(method, path, wait=None, **kw):
         except httpx.ReadTimeout:
             if wait:
                 return {'action': 'refused', 'message': f'The server is still working on this after {wait} s. It may finish on its own: check status in a minute before repeating.'}, 2
-            return {'action': 'tell_builder', 'message': f'VideoWizard server at {server_url()} did not answer in time (ReadTimeout). Tell the builder; do not debug.'}, 2
+            if method != 'GET':   # design/92: a write the server may still be doing; never repeated blindly, never a defect
+                return {'action': 'wait', 'message': 'The server did not answer in time; it may still be doing this. This is not a defect: check the status in a minute, '
+                                                     'and repeat the command only if it did not happen.'}, 2
+            if time.monotonic() - started + RETRY_EVERY_S > RETRY_S:   # design/92 (L60): a read that times out is the server busy (pictures being checked, a search)
+                return {'action': 'wait', 'message': f'The server is busy (pictures being checked or searches running) and did not answer for {RETRY_S // 60} minutes. '
+                                                     'This is not a defect: wait a minute and ask again.'}, 2
+            print(f'server busy; asking again in {RETRY_EVERY_S} s', file=sys.stderr, flush=True)
+            time.sleep(RETRY_EVERY_S)
         except httpx.RequestError as exc:
             cause = f'{exc.__class__.__name__}: {exc}'
             if time.monotonic() - started + RETRY_EVERY_S > RETRY_S:

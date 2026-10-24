@@ -168,6 +168,12 @@ def open_defects(conn, run_id):
     return [r['id'] for r in conn.execute("select id from vw2_defects where run_id=%s and status='open' order by id", (run_id,)).fetchall()]
 
 
+def try_lock(conn, run_id):
+    """design/92: the run's lock if it is free right now, never waiting; a read that gets it may repair the session, one that does not answers as is."""
+    row = conn.execute('select pg_try_advisory_xact_lock(hashtextextended(%s, 0)) as got', ('run:' + str(run_id),)).fetchone()
+    return bool(row and row['got'])
+
+
 def load_run(conn, user, run_id, lock=False):
     row = conn.execute('select * from vw2_runs where id = %s', (run_id,)).fetchone()
     if not row or (row['owner_id'] != user['id'] and not is_admin(user)):

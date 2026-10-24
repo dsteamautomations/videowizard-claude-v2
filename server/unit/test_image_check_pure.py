@@ -49,7 +49,8 @@ def test_the_answer_is_read_line_by_line_and_a_failed_must_line_is_listed(monkey
     answer = {'lines': [{'n': 1, 'pass': False, 'seen': 'the mason is taller than the wall'}, {'n': 2, 'pass': True, 'seen': 'soft light'}, {'n': 3, 'pass': True, 'seen': 'no text'},
                         {'n': 4, 'pass': True, 'seen': 'no face match'}, {'n': 5, 'pass': False, 'seen': 'a second worker at the left'}]}
     rec = IC.run_check(Store(), SESSION, REF, RESULT, transport(answer))
-    assert rec['lines'][0] == {'check': 'scale', 'pass_when': 'the wall is taller than the mason', 'weight': 'must', 'pass': False, 'seen': 'the mason is taller than the wall'}
+    assert rec['lines'][0] == {'check': 'scale', 'weight': 'must', 'pass': False, 'seen': 'the mason is taller than the wall'}   # design/92: stored without what the checklist holds
+    assert IC.expand(rec, REF)['lines'][0]['pass_when'] == 'the wall is taller than the mason'
     assert [l['check'] for l in rec['must_failed']] == ['scale'] and rec['code'][0]['pass'] is True and rec['code'][1]['check'] == 'parent' and 'error' not in rec
     assert rec['lines'][4]['pass'] is False and rec['lines'][4]['weight'] == 'should'
 

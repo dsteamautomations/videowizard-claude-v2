@@ -141,15 +141,37 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
     except Problem:
         return
     ref = session['references'].get(job['request']['reference']['id'])
+    due = False
     if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
         if status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
-            from . import image_check
-            from .analysis_jobs import transport_factory
-            ref['check'] = image_check.run_check(store, session, ref, result, transport_factory)
+            ref['check_pending'] = due = True   # design/92: checked after this transaction, with no lock held (check_image)
         store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
-        if status == 'retained' and (ref.get('check') or {}).get('must_failed'):
-            from . import image_check
-            image_check.queue_fix(conn, store, job['run_id'], ref['id'])
+    return due
+
+
+def check_image(job, result):
+    """design/92 (L60): the picture's check (Gemini, the light against the footage) runs with no lock held; the run's lock is taken only to save it,
+    and to queue the one fix round when a must line failed. A picture changed meanwhile (rejected, or made by another job) keeps what it has. Never raises."""
+    from . import image_check
+    from .analysis_jobs import transport_factory
+    store = storage()
+    k, rid = f"{job['run_id']}/visuals/session.json", job['request']['reference']['id']
+    try:
+        session = json.loads(store.get(k).decode('utf-8'))
+        record = image_check.run_check(store, session, session['references'][rid], result, transport_factory)
+        with connect() as conn:
+            conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
+            session = json.loads(store.get(k).decode('utf-8'))
+            ref = session['references'].get(rid)
+            if not ref or ref.get('job_id') != str(job['id']) or ref.get('status') != 'candidate' or 'check' in ref:
+                return
+            ref['check'] = record
+            ref.pop('check_pending', None)
+            store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+            if record.get('must_failed'):
+                image_check.queue_fix(conn, store, job['run_id'], rid)
+    except Exception:   # a picture is never held back by its check
+        return
 
 
 # ---------- video takes ----------
@@ -274,7 +296,9 @@ def tick():
     if job:
         outcome = process_image(job)
         with connect() as conn:
-            finalize_image(conn, job, *outcome)
+            due = finalize_image(conn, job, *outcome)
+        if due:
+            check_image(job, outcome[1])   # design/92: after the transaction, no lock held while Gemini reads it
         busy = True
     from . import worker
     if worker.STOP:

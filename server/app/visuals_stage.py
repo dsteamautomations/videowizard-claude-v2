@@ -19,7 +19,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import apify, core, jobs, library, video_generators
+from . import apify, core, image_check, jobs, library, video_generators
 from . import footage as FM   # design/88
 from .config import settings
 from .errors import Problem
@@ -440,7 +440,7 @@ def treatment(store, user, run, outputs, document, quote):
 
 # ---------- design/65 §8: what the visuals page shows ----------
 
-def page_view(conn, store, run, outputs, code):
+def page_view(conn, store, run, outputs, code, repair=True):
     """The page's data in one read of the session (plus the package for the intended visuals): the treatment (draft or record), the plan's gaps and
     shots with their pictures, the references with their image links, the takes, the budget. Links go through the run's file route."""
     def url(k):
@@ -449,7 +449,7 @@ def page_view(conn, store, run, outputs, code):
         session = session_of(store, run, outputs)
     except Problem:
         return {'state': 'not_prepared'}
-    if reconcile(conn, run, session) | ensure_timing(store, run, session):   # design/89 A1: the page shows the timing too
+    if (reconcile(conn, run, session) | ensure_timing(store, run, session)) and repair:   # design/89 A1: the page shows the timing too; design/92: saved only under the lock
         save_session(store, run, session)
     try:
         package = load_json(store, key(run, 'package.json'))
@@ -458,13 +458,13 @@ def page_view(conn, store, run, outputs, code):
     plan = current_plan(store, session) if session.get('current') else None
     refs = {}
     for r in session['references'].values():
-        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height')}
+        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height', 'check_pending')}   # design/92: being checked
         refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
                              rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
                              checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None,   # design/74 L6
-                             check=({k: r['check'].get(k) for k in ('lines', 'must_failed', 'error', 'fix_error', 'model')} if r.get('check') else None),   # design/86 K2
+                             check=({k: image_check.expand(r['check'], r).get(k) for k in ('lines', 'must_failed', 'error', 'fix_error', 'model')} if r.get('check') else None),   # design/86 K2; design/92
                              pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'))   # design/86 K1, K2
     takes = {}
     for j in take_jobs(conn, run):
@@ -509,7 +509,7 @@ def page_view(conn, store, run, outputs, code):
                                                                                      if sh.get('drawing_spec') else None)})
         gaps.append(entry)
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
+    return {'state': 'prepared', 'busy': not repair, 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
             'footage': footage_view(session, outputs),   # design/88 F4: told, not asked
             'reuse_pending': session.get('reuse_pending') or {},   # design/89 H7: a reuse the operator may approve here
             'clips': [{k: c.get(k) for k in ('id', 'name', 'duration_s')} for c in media_clips(outputs).values()],   # finding 7: a clip stretch placed from the page
@@ -881,7 +881,28 @@ def round_start(store, user, run, outputs, elements):
     return {'pass': 1, 'elements': len(rows)}
 
 
-def round_done(store, user, run, outputs, verdicts, quote):
+def round_searches(store, run, outputs, verdicts):
+    """design/92 (L59): the round's searches, run before the run's lock (each may take two minutes); round_done saves them under the lock.
+    {element: rows, or {'error': message}}; nothing when no first pass is waiting (round_done then refuses as before)."""
+    session = session_of(store, run, outputs)
+    rd = session.get('round') or {}
+    if rd.get('pass') != 1:
+        return {}
+    wanted = {eid: ' '.join(str((verdicts.get(eid) or {}).get('keywords') or row['keywords']).split()) for eid, row in rd['elements'].items()
+              if (verdicts.get(eid) or {}).get('verdict') == 'search'}
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {eid: pool.submit(apify.search_images, kw, 10) for eid, kw in wanted.items() if 2 <= len(kw.split()) <= 6}
+    out = {}
+    for eid, f in futures.items():
+        try:
+            out[eid] = f.result()
+        except Exception as exc:   # this row's failure, recorded at the save
+            out[eid] = {'error': exc.message if isinstance(exc, Problem) else str(exc)}
+    return out
+
+
+def round_done(store, user, run, outputs, verdicts, quote, found=None):
     """Pass 1 answered: the chosen frames approved with the words, the searches run with the words as the yes; pass 2 for the searched elements."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
@@ -900,9 +921,12 @@ def round_done(store, user, run, outputs, verdicts, quote):
     for eid, row in rd['elements'].items():
         if verdicts[eid]['verdict'] == 'search':
             row['keywords'] = str(verdicts[eid].get('keywords') or row['keywords']).strip()
-    from concurrent.futures import ThreadPoolExecutor   # design/80 S5: the searches do not depend on each other; they run at once
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {eid: pool.submit(apify.search_images, ' '.join(row['keywords'].split()), 10) for eid, row in rd['elements'].items() if verdicts[eid]['verdict'] == 'search' and 2 <= len(row['keywords'].split()) <= 6}
+    if found is None:   # design/80 S5: the searches do not depend on each other; they run at once (the routes run them before the lock, design/92)
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {eid: pool.submit(apify.search_images, ' '.join(row['keywords'].split()), 10) for eid, row in rd['elements'].items() if verdicts[eid]['verdict'] == 'search' and 2 <= len(row['keywords'].split()) <= 6}
+    else:
+        futures = found
     for eid, row in rd['elements'].items():
         v = verdicts[eid]
         row['verdict'] = v['verdict']
@@ -914,7 +938,11 @@ def round_done(store, user, run, outputs, verdicts, quote):
                     _feedback_image(session, run, user, r, 'pass', quote, '')
             continue
         try:
-            row['search_id'] = _search_into(session, user, run, plan, eid, row['keywords'], quote, futures[eid].result() if eid in futures else None)['search_id']
+            got = futures.get(eid)
+            got = got.result() if hasattr(got, 'result') else got
+            if isinstance(got, dict) and got.get('error'):
+                raise ValueError(got['error'])
+            row['search_id'] = _search_into(session, user, run, plan, eid, row['keywords'], quote, got)['search_id']
             row['error'] = None
         except (Problem, ValueError) as exc:   # a failed search is this row's, the rest go on
             row['error'] = exc.message if isinstance(exc, Problem) else str(exc)
@@ -1963,12 +1991,13 @@ def reconcile(conn, run, session):
     return fixed
 
 
-def status(conn, store, run, outputs):
+def status(conn, store, run, outputs, repair=True):
+    """repair: the run's lock is held, so a repaired session may be saved; without it the answer is read as stored (design/92: busy)."""
     try:
         session = session_of(store, run, outputs)
     except Problem:
         return {'state': 'not_prepared', 'next': 'prepare'}
-    if reconcile(conn, run, session):
+    if reconcile(conn, run, session) and repair:
         save_session(store, run, session)
     plan = current_plan(store, session) if session.get('current') else None
     gaps = []
@@ -1985,7 +2014,7 @@ def status(conn, store, run, outputs):
              for j in take_jobs(conn, run)]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+    return {'state': 'prepared', 'busy': not repair, 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6

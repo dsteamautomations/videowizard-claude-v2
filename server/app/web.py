@@ -267,11 +267,11 @@ def visuals_page(request: Request, code: str, vw2_session: str | None = Cookie(d
     return render(request, 'visuals.html', user=user, run=run)
 
 
-def _visuals_payload(conn, store, run):
+def _visuals_payload(conn, store, run, repair=True):
     from . import visuals_stage
     nxt = core.next_for(conn, run)
     return {'run': {'code': run['code'], 'title': run['title'], 'status': run['status'], 'stage': nxt.get('stage'), 'open_defects': nxt.get('open_defects') or []},
-            **visuals_stage.page_view(conn, store, run, core.current_outputs(conn, run['id']), run['code'])}
+            **visuals_stage.page_view(conn, store, run, core.current_outputs(conn, run['id']), run['code'], repair)}
 
 
 @router.get('/runs/{code}/visuals/data')
@@ -282,13 +282,21 @@ def visuals_data(request: Request, code: str, vw2_session: str | None = Cookie(d
     if not user:
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
     with db_connect() as conn:
-        run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'], lock=True)   # the view may repair the session (ticket 9)
-        payload = _visuals_payload(conn, storage(), run)
+        run = core.load_run(conn, user, _run_by_code(conn, user, code)['id'])   # design/92: a read never waits for the lock nor stops on an open defect
+        payload = _visuals_payload(conn, storage(), run, core.try_lock(conn, run['id']))   # the view may repair the session (ticket 9) when the run is free
     return JSONResponse(core.jsonable(payload))
 
 
 @router.post('/runs/{code}/visuals/act')
 async def visuals_act(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """design/92: the body is read here; the work, which blocks (database, storage, providers), runs on a worker thread so the one server
+    process keeps answering every other request meanwhile."""
+    from starlette.concurrency import run_in_threadpool
+    body = await request.json()
+    return await run_in_threadpool(_visuals_act, code, vw2_session, body)
+
+
+def _visuals_act(code, vw2_session, body):
     """One JSON post per button. Every action calls the server function the vw tool calls (design/65 §8), behind the visuals stage gate."""
     from fastapi.responses import JSONResponse
     from . import visuals_stage as V
@@ -296,9 +304,13 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
     user = page_user(vw2_session)
     if not user:
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
-    body = await request.json()
     action = body.get('action')
     quote = str(body.get('quote') or '')
+    found = None
+    if action == 'round-done':   # design/92 (L59): the round's searches run before the run's lock
+        with db_connect() as conn:
+            r0 = core.load_run(conn, user, _run_by_code(conn, user, code)['id'])
+            found = V.round_searches(storage(), r0, core.current_outputs(conn, r0['id']), dict(body.get('verdicts') or {}))
     with db_connect() as conn:
         run = _run_at(conn, user, code, 'visuals')
         store = storage()
@@ -311,7 +323,7 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
             'search': lambda: V.search(store, user, run, outputs, body['element_id'], str(body.get('keywords') or ''), quote),   # design/73
             'pick': lambda: V.pick(store, user, run, outputs, body['search_id'], list(body.get('picks') or []), quote),
             'nothing-fits': lambda: V.nothing_fits(store, user, run, outputs, body['search_id'], str(body.get('reason') or '')),
-            'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote),   # design/79
+            'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, found=found),   # design/79; design/92
             'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote),
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
@@ -378,6 +390,14 @@ def _run_at(conn, user, code, stage):
 
 @router.post('/runs/{code}/review/act')
 async def review_act(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """design/92: the body is read here; the work, which blocks (database, storage, providers), runs on a worker thread so the one server
+    process keeps answering every other request meanwhile."""
+    from starlette.concurrency import run_in_threadpool
+    body = await request.json()
+    return await run_in_threadpool(_review_act, code, vw2_session, body)
+
+
+def _review_act(code, vw2_session, body):
     """One JSON post per button: {action: 'record', quote} at the options stage; {action: 'decide', slide, decision, note, edit} at the master stage.
     Each calls the server function the vw tool calls (`vw options record`, `vw master decide`)."""
     from fastapi.responses import JSONResponse
@@ -386,7 +406,6 @@ async def review_act(request: Request, code: str, vw2_session: str | None = Cook
     user = page_user(vw2_session)
     if not user:
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
-    body = await request.json()
     action = body.get('action')
     with db_connect() as conn:
         if action == 'record':
@@ -435,6 +454,14 @@ def voices2_search(request: Request, vw2_session: str | None = Cookie(default=No
 
 @router.post('/runs/{code}/voices2/act')
 async def voices2_act(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """design/92: the body is read here; the work, which blocks (database, storage, providers), runs on a worker thread so the one server
+    process keeps answering every other request meanwhile."""
+    from starlette.concurrency import run_in_threadpool
+    body = await request.json()
+    return await run_in_threadpool(_voices2_act, code, vw2_session, body)
+
+
+def _voices2_act(code, vw2_session, body):
     """One JSON post per button: {action, ...}. Every action calls the same server function the vw tool calls."""
     import uuid
     from fastapi.responses import JSONResponse
@@ -443,7 +470,6 @@ async def voices2_act(request: Request, code: str, vw2_session: str | None = Coo
     user = page_user(vw2_session)
     if not user:
         raise Problem(401, 'SIGN_IN', 'Sign in first.')
-    body = await request.json()
     action = body.get('action')
     rid = str(uuid.uuid4())
     provider = elevenlabs.ElevenLabs()

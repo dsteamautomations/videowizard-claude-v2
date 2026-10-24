@@ -1109,8 +1109,9 @@ def _visuals_call(conn, user, run_id, body, fn, status=200):
 
 @app.get('/api/runs/{run_id}/visuals')
 def visuals_status(run_id: UUID, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id, lock=True)   # ticket 9: it may repair and save the session
-    return Response(visuals_stage.status(conn, storage(), run, core.current_outputs(conn, run['id'])))
+    run = core.load_run(conn, user, run_id)   # design/92: a read never waits for the lock and never stops on an open defect
+    repair = core.try_lock(conn, run['id'])   # ticket 9: it may repair and save the session, when the run is free
+    return Response(visuals_stage.status(conn, storage(), run, core.current_outputs(conn, run['id']), repair=repair))
 
 
 @app.get('/api/runs/{run_id}/visuals/library')
@@ -1258,7 +1259,9 @@ def visuals_round(run_id: UUID, body: RoundStart, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round/done')
 def visuals_round_done(run_id: UUID, body: RoundDone, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote))
+    run = core.load_run(conn, user, run_id)   # design/92 (L59): the searches run before the run's lock; the save takes it
+    found = visuals_stage.round_searches(storage(), run, core.current_outputs(conn, run['id']), body.verdicts)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote, found=found))
 
 
 @app.post('/api/runs/{run_id}/visuals/round/picks')

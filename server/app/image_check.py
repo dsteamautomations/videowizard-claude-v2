@@ -149,7 +149,20 @@ def run_check(store, session, ref, result, transport_factory):
         light = None
     if light:
         record['lines'] = list(record.get('lines') or []) + [light]
-    return record
+    return compact(record, ref)
+
+
+def compact(record, ref):
+    """design/92: a check line is stored without the pass condition its picture's checklist already holds (the session kept small);
+    a line no checklist holds (the light) and the failed must lines (the fix round reads them) keep theirs."""
+    known = {c['check']: c.get('pass_when') for c in lines_of(ref)}
+    return {**record, 'lines': [{k: v for k, v in l.items() if not (k == 'pass_when' and known.get(l.get('check')) == v)} for l in record.get('lines') or []]}
+
+
+def expand(record, ref):
+    """The stored check with each line's pass condition back, for the page."""
+    known = {c['check']: c.get('pass_when') for c in lines_of(ref)}
+    return {**record, 'lines': [{**l, 'pass_when': l.get('pass_when') or known.get(l.get('check')) or ''} for l in record.get('lines') or []]}
 
 
 def _model_check(store, session, ref, result, transport_factory):
