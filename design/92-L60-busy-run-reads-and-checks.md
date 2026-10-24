@@ -20,7 +20,7 @@
 3. **Reads never wait and never stop on a defect.**
    - `vw visuals status` and the visuals page's data take the lock only if it is free at that moment. If it is busy, they answer from the stored session without repairing it, and say `busy`.
    - An open defect blocks writes only. The reads stay readable, so the page still loads and the assistant can still see where the run is.
-4. **The session is kept small.** A check line is stored without the pass condition its picture's checklist already holds; the page puts it back when it shows the line. A line no checklist holds (the light) and the failed must lines (the fix round reads them) keep theirs. About 3–4 KB less per checked picture.
+4. **The session is kept small.** Measured on VW-7 (24 Oct): 654 KB. The pictures' check records are the largest part (182 KB): 42 KB of pass conditions their checklists already hold, and 52 KB of failed must lines that repeat whole lines. Both are now stored without the pass condition a checklist holds; `expand` puts it back for the page and the fix round. A line no checklist holds (the light) keeps its own. About 90 KB less on VW-7.
 5. **The page's buttons run off the event loop.** One server process serves every request, and three page handlers (the visuals, review and voices buttons) ran their blocking work on its event loop. While a button worked (the round's searches took minutes), every other page and API call waited. The body is now read on the loop and the work runs on a worker thread.
 6. **A timeout is "busy", not a defect.**
    - When a read times out, the tool tries again every 15 s for three minutes, as it already does for a broken connection. Then it says "the server is busy … not a defect: wait a minute and ask again" (`action: wait`).
@@ -44,6 +44,6 @@
 
 ## Not covered
 
-- VW-7's real 655 KB session wasn't measured (gcloud expired on the builder's PC), so the size cut is the one certain from the code, not a measured one. The answer forms, the feedback records and the searches stay in the session.
+- The rest of the session stays as it is: answer forms 67 KB, feedback records 67 KB, searches 61 KB, gap timing 53 KB, generation records 51 KB, server checklists 48 KB. Moving any of them out of the session is a larger change, left for later if the reads stay slow.
 - Requests that are slow for other reasons (a large session read, storage latency) still take that time. The reads are no longer queued behind the work.
 - `server/tests` (Docker).

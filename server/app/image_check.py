@@ -153,16 +153,18 @@ def run_check(store, session, ref, result, transport_factory):
 
 
 def compact(record, ref):
-    """design/92: a check line is stored without the pass condition its picture's checklist already holds (the session kept small);
-    a line no checklist holds (the light) and the failed must lines (the fix round reads them) keep theirs."""
+    """design/92: a check line, and a failed must line, is stored without the pass condition its picture's checklist already holds (the session
+    kept small: on VW-7 about 90 of 654 KB); a line no checklist holds (the light) keeps its own. expand() puts them back for the page and the fix round."""
     known = {c['check']: c.get('pass_when') for c in lines_of(ref)}
-    return {**record, 'lines': [{k: v for k, v in l.items() if not (k == 'pass_when' and known.get(l.get('check')) == v)} for l in record.get('lines') or []]}
+    short = lambda rows: [{k: v for k, v in l.items() if not (k == 'pass_when' and known.get(l.get('check')) == v)} for l in rows or []]
+    return {**record, 'lines': short(record.get('lines')), 'must_failed': short(record.get('must_failed'))}
 
 
 def expand(record, ref):
     """The stored check with each line's pass condition back, for the page."""
     known = {c['check']: c.get('pass_when') for c in lines_of(ref)}
-    return {**record, 'lines': [{**l, 'pass_when': l.get('pass_when') or known.get(l.get('check')) or ''} for l in record.get('lines') or []]}
+    full = lambda rows: [{**l, 'pass_when': l.get('pass_when') or known.get(l.get('check')) or ''} for l in rows or []]
+    return {**record, 'lines': full(record.get('lines')), 'must_failed': full(record.get('must_failed'))}
 
 
 def _model_check(store, session, ref, result, transport_factory):
@@ -208,7 +210,7 @@ def queue_fix(conn, store, run_id, ref_id):
     ref = session['references'].get(ref_id)
     if not ref or ref.get('fix_of') or ref.get('fix_queued') or not (ref.get('check') or {}).get('must_failed'):
         return None
-    failed = ref['check']['must_failed'][0]
+    failed = expand(ref['check'], ref)['must_failed'][0]   # design/92: stored compact
     try:
         out = visuals_stage.generate_image(conn, store, {'id': 'server-check', 'name': 'the check'}, run, outputs, fix_body(ref, failed))
     except (Problem, ValueError) as exc:

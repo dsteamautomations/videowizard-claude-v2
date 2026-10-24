@@ -147,14 +147,14 @@ def test_the_page_buttons_do_their_work_off_the_event_loop(monkeypatch):
 
 
 def test_a_check_is_stored_without_the_pass_conditions_its_checklist_already_holds_and_the_page_shows_them():
-    """design/92: the session kept small; the light line, which no checklist holds, keeps its own."""
+    """design/92: the session kept small; the light line, which no checklist holds, keeps its own; a failed must line is stored short too."""
     r = {**ref('K1'), 'status': 'candidate', 'element_kind': 'graphic', 'server_checklist': [{'check': 'label: 25 % fewer', 'pass_when': 'reads exactly', 'weight': 'must'}]}
     stored = IC.compact({'lines': [{'check': 'label: 25 % fewer', 'pass_when': 'reads exactly', 'weight': 'must', 'pass': True, 'seen': 'ok'},
                                    {'check': 'light and colour', 'pass_when': 'match the footage', 'weight': 'should', 'pass': False, 'seen': 'brighter'}],
                          'must_failed': [{'check': 'label: 25 % fewer', 'pass_when': 'reads exactly'}]}, r)
-    assert 'pass_when' not in stored['lines'][0] and stored['lines'][1]['pass_when'] == 'match the footage' and stored['must_failed'][0]['pass_when'] == 'reads exactly'
+    assert 'pass_when' not in stored['lines'][0] and stored['lines'][1]['pass_when'] == 'match the footage' and 'pass_when' not in stored['must_failed'][0]
     shown = IC.expand(stored, r)
-    assert shown['lines'][0]['pass_when'] == 'reads exactly'
+    assert shown['lines'][0]['pass_when'] == 'reads exactly' and shown['must_failed'][0]['pass_when'] == 'reads exactly'   # the fix round reads it back
 
 
 def test_a_still_for_a_named_image_shot_needs_no_bind_or_packet_of_the_elements_video_shot(monkeypatch):
