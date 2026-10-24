@@ -1037,8 +1037,10 @@ def generate_image(conn, store, user, run, outputs, body):
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
+    found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
+    named = found[3] if found else None
     if body['kind'] == 'keyframe':
-        _keyframe_gates(session, plan, body, parents)   # design/77 L35, L38, L41
+        _keyframe_gates(session, plan, body, parents, named)   # design/77 L35, L38, L41
     answer = body.get('answer')
     if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
         try:
@@ -1059,8 +1061,6 @@ def generate_image(conn, store, user, run, outputs, body):
             except ValueError as exc:
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
-    found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
-    named = found[3] if found else None
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named)
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
@@ -1252,13 +1252,13 @@ def _shots_with(plan, session, element_id):
     return out
 
 
-def _keyframe_gates(session, plan, body, parents):
+def _keyframe_gates(session, plan, body, parents, named=None):
     """design/77: L35 a start keyframe for a video shot's element waits until a shot's packet was read (bind, then packet); L38 an end keyframe
     never moves the camera; L41 a shot that shows a client's own material (an exact object element with approved footage frames) sends one of
     those frames as a parent."""
     pairs = _shots_with(plan, session, body['element_id'])
     end = any(p['kind'] == 'keyframe' for p in parents)
-    video = [(gap, sh) for gap, sh in pairs if sh['visual_type'] == 'video']
+    video = [(gap, sh) for gap, sh in pairs if sh['visual_type'] == 'video' and (named is None or sh['id'] == named['id'])]   # defect 24: a named image shot is a still, no bind or packet
     if video and not end:   # L35
         read = [sh['id'] for gap, sh in video if (session['bindings'].get(sh['id']) or {}).get('packet_read_at') and session['bindings'][sh['id']].get('gap_digest') == gap_digest(plan, gap)]
         first = video[0][1]['id']

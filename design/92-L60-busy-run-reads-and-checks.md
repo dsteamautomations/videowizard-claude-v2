@@ -26,6 +26,8 @@
    - When a read times out, the tool tries again every 15 s for three minutes, as it already does for a broken connection. Then it says "the server is busy … not a defect: wait a minute and ask again" (`action: wait`).
    - A write that times out says the server may still be doing it: check the status, and repeat only if it didn't happen.
 
+7. **Defect 24 (VW-7), folded in.** A picture for a named image shot (`image --kind keyframe --shot B01_S2`) was refused with the bind-and-packet rule of the first video shot sharing its element (design/77 L35): the gate looked at every video shot of the element and ignored `--shot`. The gate now follows the named shot: an image shot is a still, with no bind or packet; a named video shot still needs its own packet; with no shot named, it works as before.
+
 ## Tests first
 
 - The worker's check runs while no lock is held, and only the save is locked. A changed record keeps what it has. A failed must line still queues one fix.
@@ -33,6 +35,7 @@
 - Status and page data with the lock busy: no session write, and `busy` is said. With a defect open, the reads still answer.
 - The round's searches run before the lock.
 - The tool: a read that times out is tried again, then reported as `wait`, never as a defect.
+- Defect 24: a keyframe for a named image shot passes; for a named video shot without its packet, and with no shot named, it is refused as before.
 
 ## As built
 

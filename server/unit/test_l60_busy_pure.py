@@ -155,3 +155,19 @@ def test_a_check_is_stored_without_the_pass_conditions_its_checklist_already_hol
     assert 'pass_when' not in stored['lines'][0] and stored['lines'][1]['pass_when'] == 'match the footage' and stored['must_failed'][0]['pass_when'] == 'reads exactly'
     shown = IC.expand(stored, r)
     assert shown['lines'][0]['pass_when'] == 'reads exactly'
+
+
+def test_a_still_for_a_named_image_shot_needs_no_bind_or_packet_of_the_elements_video_shot(monkeypatch):
+    """Defect 24 (VW-7): the start-image gate (design/77 L35) followed every video shot of the element and ignored --shot."""
+    from test_visuals_stage_pure import g
+    from app.errors import Problem
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])   # E1 in both; VS1 never bound
+    store = store_with(session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc)), doc)
+    body = {'request_id': 'd24', 'element_id': 'E1', 'name': 'house', 'kind': 'keyframe', 'subject': 'a house', 'prompt': 'A half-built house in the sun.'}
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'shot_id': 'IM1'})
+    assert out['reference_id']
+    with pytest.raises(Problem, match='Bind the shot and read its packet'):
+        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'd24b', 'shot_id': 'VS1'}))   # a video shot still needs its packet
+    with pytest.raises(Problem, match='Bind the shot and read its packet'):
+        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'd24c'}))   # no shot named: as before
