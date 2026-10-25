@@ -385,7 +385,7 @@ def _run_at(conn, user, code, stage):
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     nxt = core.next_for(conn, run)
-    if nxt['stage'] != stage:
+    if nxt['stage'] not in (stage if isinstance(stage, tuple) else (stage,)):   # design/98: a slide answer is taken at options or master
         raise Problem(409, 'NOT_ALLOWED', f"The run is at {nxt['stage']!r}, not {stage!r}; reload the page.")
     return run
 
@@ -419,9 +419,9 @@ def _review_act(code, vw2_session, body):
             out = stage2.record_options(conn, store, user, run, quote)
             return JSONResponse(core.jsonable({'recorded': True, 'version': out['version'], 'view': _review_payload(conn, store, run)}))
         if action == 'decide':
-            run = _run_at(conn, user, code, 'master')
+            run = _run_at(conn, user, code, ('options', 'master'))   # design/98: the first answer approves the options
             store = storage()
-            out = stage2.decide(store, user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None)
+            out = stage2.decide(conn, store, user, run, body.get('slide'), str(body.get('decision') or ''), str(body.get('note') or ''), body.get('edit') or None)
             return JSONResponse(core.jsonable({**out, 'view': _review_payload(conn, store, run)}))   # design/63 addendum: one round trip per click
     raise Problem(404, 'NOT_FOUND', 'No such action.')
 

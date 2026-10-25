@@ -100,7 +100,7 @@ async function load(){
 function schedule(){clearTimeout(timer);timer=setTimeout(load,15000);}
 function fmt(s){s=Math.max(0,Math.round(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function stage(){return data&&data.run?data.run.stage:null;}
-function decidable(){return stage()==='master'&&data.accepted&&!data.master_built;}
+function decidable(){return !data.master_built&&((stage()==='master'&&data.accepted)||(stage()==='options'&&!!data.film));}   // design/98 D1: the first answer approves the options
 function draw(){
   const d=data; const film=$('film'), no=$('nofilm');
   if(d.state!=='prepared'){
@@ -109,11 +109,12 @@ function draw(){
   }
   // the top line
   let line='Version <strong>'+esc(d.version)+'</strong>';
-  if(!d.accepted&&stage()==='options'){line+=' · watch the film, then approve the options at the foot of the page';}
+  if(!d.accepted&&stage()==='options'){line+=d.film?' · <strong>answer each slide; your first answer approves these options</strong>':' · the review film is not ready yet';}
   else if(!d.accepted){line+=' · this version is not the recorded one; the assistant proposes or records in chat';}
   else if(d.master_built){line+=' · answers closed: the master film is built';}
   else if(d.of&&d.answered>=d.of){line+=' · <strong>all '+d.of+' answered</strong>. The assistant builds the master film from here (vw master build).';}
   else{line+=' · <strong>'+d.answered+' of '+d.of+'</strong> answered · waiting: '+(d.waiting.length?esc(d.waiting.join(', ')):'none');}
+  if(d.accepted&&d.approved_by&&d.approved_by.slide){line+=' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')';}   // design/98 D6
   if(d.both_kept&&d.both_kept.length){line+=' · <span class="err">both cuts kept: '+esc(d.both_kept.map(b=>b.scene+' (#'+b.slides.join(', #')+')').join('; '))+'</span>';}
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open on this run; nothing can be recorded until it is fixed</span>';}
   $('line').innerHTML=line;
@@ -149,7 +150,7 @@ function draw(){
       if(can){ans='<div class="btns">'+btns.map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(a&&a.action===v?'on':'')+'">'+l+'</button>').join('')+'</div>';}
       if(a){ans+='<div class="ans"><b>'+esc(a.action.replace(/_/g,' '))+'</b>'+(a.note?' · '+esc(a.note):'')+(a.edit?' · '+esc(a.edit):'')+(a.at?' · '+esc(String(a.at).slice(0,16).replace('T',' ')):'')+'</div>';}
       if(s.conflict){ans+='<div class="ans err">'+esc(s.conflict)+'</div>';}
-      else if(!can){ans+='<span class="ds">'+(d.accepted?(d.master_built?'no answer':'waiting'):'after approval')+'</span>';}
+      else if(!can){ans+='<span class="ds">'+(d.accepted?(d.master_built?'no answer':'waiting'):'after the film')+'</span>';}
       if(open&&open.slide===s.slide){ans+=form(open);}
     }
     return '<tr data-slide="'+esc(s.slide)+'" class="'+(cue?'cue':'')+(current===s.slide?' cur':'')+(!s.needs_answer&&s.why?' off':'')+'"><td class="n">'+esc(s.slide)+'</td><td>'+info+'</td><td class="a">'+ans+'</td></tr>';
@@ -158,36 +159,35 @@ function draw(){
   $('slides').querySelectorAll('tr.cue').forEach(tr=>tr.addEventListener('click',e=>{if(e.target.closest('button,input,label'))return;seek(tr.dataset.slide);}));
   if(open){const f=$('f-'+open.slide);if(f){f.querySelector('button.go').addEventListener('click',()=>submit(open.slide));f.querySelector('button.no').addEventListener('click',()=>{open=null;draw();});const first=f.querySelector('input');if(first)first.focus();}}
   // the foot
-  if(!d.accepted&&stage()==='options'){
-    $('action').innerHTML='<span>Approve these options with your own words:</span><textarea id="words" placeholder="e.g. Yes, these options are approved"></textarea><button class="go" id="do-record"'+(d.film?'':' disabled title="The review film is not ready"')+'>Approve the options</button>';
-    $('do-record').addEventListener('click',async()=>{const w=$('words').value.trim();if(!w){msg('Your words are required.',true);return;}const b=$('do-record');b.disabled=true;msg('Recording the options…',false,true);
-      try{const j=await act({action:'record',quote:w});msg('Recorded: the run is at master. Answer each slide with the buttons.');if(j&&j.view){data=j.view;draw();}else{await load();}}catch(err){msg(err.message,true);b.disabled=false;}});
+  if(!d.accepted&&stage()==='options'){   // design/98 D1: no approval box; the first answer approves
+    $('action').innerHTML='<span>Watch the film and answer each slide with its buttons. Your first answer approves these options. Keep: use it. Reject: not this one (a reason is optional). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.</span>';
   }else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){
     $('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';
   }else if(d.accepted&&stage()==='master'){
-    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Keep: use it. Reject: not this one (say why). Keep with edit: use it with a shot or trim change. Drop: leave the decision out. The buttons answer after you approve the options.</span>';   // design/97 O4
+    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Keep: use it. Reject: not this one (a reason is optional). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.</span>';   // design/97 O4; design/98
   }else{
     $('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';
   }
 }
 function form(o){
-  if(o.action==='REJECT'){return '<div class="form" id="f-'+esc(o.slide)+'"><input class="w" placeholder="Why it is rejected (required)"><button class="go">Record reject</button><button class="no">Cancel</button></div>';}
+  if(o.action==='REJECT'){return '<div class="form" id="f-'+esc(o.slide)+'"><input class="w" placeholder="Why? (optional)"><button class="go">Save</button><button class="no">Close</button></div>';}   // design/98 R1
   return '<div class="form" id="f-'+esc(o.slide)+'"><label>shot</label><input class="f" type="number" min="1" value="1"><label>in ±frames</label><input class="f" type="number" value="0"><label>out ±frames</label><input class="f" type="number" value="0"><button class="go">Record edit</button><button class="no">Cancel</button><span class="ds">Source frames; a frame is 1/25 s on the timeline.</span></div>';
 }
 async function choose(slide,action){
-  if(action==='REJECT'||action==='KEEP_WITH_EDIT'){open={slide,action};draw();return;}
+  if(action==='REJECT'){open=null;const j=await send({action:'decide',slide,decision:'REJECT'});if(j){open={slide,action};draw();}return;}   // design/98 R1: recorded at once; a reason may follow
+  if(action==='KEEP_WITH_EDIT'){open={slide,action};draw();return;}
   open=null;await send({action:'decide',slide,decision:action});
 }
 async function submit(slide){
   const f=$('f-'+slide); if(!f||!open)return;
-  if(open.action==='REJECT'){const why=f.querySelector('input').value.trim();if(!why){msg('A reason is required for a reject.',true);return;}await send({action:'decide',slide,decision:'REJECT',note:why});return;}
+  if(open.action==='REJECT'){const why=f.querySelector('input').value.trim();if(!why){open=null;draw();return;}await send({action:'decide',slide,decision:'REJECT',note:why});return;}
   const v=[...f.querySelectorAll('input')].map(i=>parseInt(i.value||'0',10)||0);
   await send({action:'decide',slide,decision:'KEEP_WITH_EDIT',edit:'shot:'+Math.max(1,v[0])+',in:'+v[1]+',out:'+v[2]});
 }
 async function send(body){
   msg('Recording #'+body.slide+'…',false,true);
-  try{const j=await act(body);open=null;msg('#'+j.slide+' '+String(j.action).replace(/_/g,' ')+' recorded ('+j.decided+' of '+j.of+').'+(j.conflict?' '+j.conflict:''),!!j.conflict);if(j.view){data=j.view;draw();}else{await load();}}
-  catch(err){msg(err.message,true);}
+  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action).replace(/_/g,' ')+' recorded ('+j.decided+' of '+j.of+').'+(j.conflict?' '+j.conflict:''),!!j.conflict);if(j.view){data=j.view;draw();}else{await load();}return j;}
+  catch(err){msg(err.message,true);return null;}
 }
 function seek(slide){const t=data&&data.cues?data.cues[slide]:null;if(t==null||!filmKey)return;const f=$('film');f.currentTime=t;f.play().catch(()=>{});}
 $('film').addEventListener('timeupdate',()=>{

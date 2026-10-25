@@ -180,9 +180,9 @@ def test_both_cuts_kept_is_said_on_both_rows_and_in_the_decide_reply():
     assert by['3'].get('conflict') is None and view['both_kept'] == [{'scene': 'Scene 1: The need', 'slides': ['1', '2']}]
     sess = session(accepted={'version': 1, 'digest': 'd1'}, decisions={'1': kept()})
     store = FakeStore(files(sess, with_plan=False))
-    out = S.decide(store, {'id': 'u1'}, RUN, '2', 'KEEP', '', None)
+    out = S.decide(FakeConn({}), store, {'id': 'u1'}, RUN, '2', 'KEEP', '', None)
     assert out['conflict'] == '#1 is also kept: reject it or this one' and out['decided'] == 2
-    out = S.decide(store, {'id': 'u1'}, RUN, '2', 'REJECT', 'the first cut is better', None)
+    out = S.decide(FakeConn({}), store, {'id': 'u1'}, RUN, '2', 'REJECT', 'the first cut is better', None)
     assert 'conflict' not in out
 
 

@@ -456,7 +456,8 @@ def _ready_film(session, kind, plan_digest):
     return r['result']
 
 
-def record_options(conn, store, user, run, quote):
+def record_options(conn, store, user, run, quote, approved_by=None):
+    """The options output; approved_by (design/98 D2, D6): {'how': 'first_answer', 'slide': …} when the first slide answer approved it."""
     session = session_of(store, run)
     doc, entry = current(store, session)
     _same_package(store, session, entry)
@@ -474,8 +475,10 @@ def record_options(conn, store, user, run, quote):
                                                                 'pauses': len(session['scenes']['document']['pauses'])} if session.get('scenes') else None),
                                                     'slides': len(entry.get('slides') or []), 'decision_slides': sum(1 for s in entry.get('slides') or [] if s['type'] == 'decision'),
                                                     'blank_slides': sum(1 for s in entry.get('slides') or [] if s['type'] == 'blank'), 'scene_summary': entry.get('scenes'),
-                                                    'review_film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s')}, 'inspection_cost': inspection_cost}})
-    session['accepted'] = {'version': entry['version'], 'digest': entry['digest'], 'quote': quote, 'output': str(out['id'])}
+                                                    'review_film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s')}, 'inspection_cost': inspection_cost,
+                                                    **({'approved_by': approved_by} if approved_by else {})}})
+    session['accepted'] = {'version': entry['version'], 'digest': entry['digest'], 'quote': quote, 'output': str(out['id']),
+                           **({'approved_by': {**approved_by, 'at': datetime.now(timezone.utc).isoformat()}} if approved_by else {})}
     session['recorded']['options'] = str(out['id'])
     save_session(store, run, session)
     return {'output': str(out['id']), 'version': entry['version'],
@@ -619,14 +622,14 @@ def review_view(conn, store, run):
     accepted = session.get('accepted') or {}
     return {'state': 'prepared', 'version': entry['version'], 'digest': entry['digest'], 'slides': rows, **_progress(rows), 'film': film, 'cues': cues,
             'render': ({'status': r.get('status'), 'error': r.get('error'), 'current': is_current} if r else None),
-            'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'master_built': bool(session.get('master'))}
+            'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'approved_by': accepted.get('approved_by'), 'master_built': bool(session.get('master'))}
 
 
-def decide(store, user, run, slide_no, action, note, edit):
-    """design/21: the operator answers by slide. Scene and backup slides: KEEP, REJECT, KEEP_WITH_EDIT. Decision slides: KEEP or DROP."""
+def decide(conn, store, user, run, slide_no, action, note, edit):
+    """design/21: the operator answers by slide. Scene and backup slides: KEEP, REJECT, KEEP_WITH_EDIT. Decision slides: KEEP or DROP.
+    design/98: the first answer approves the options (the options output recorded in the same call, once the review film is rendered); a
+    REJECT needs no reason."""
     session = session_of(store, run)
-    if not session.get('accepted'):
-        raise Problem(409, 'NOT_ALLOWED', 'Record the options stage first.')
     doc, entry = current(store, session)
     sl = _slides(store, session, doc, entry)
     lab = slide_label(slide_no)
@@ -635,26 +638,30 @@ def decide(store, user, run, slide_no, action, note, edit):
         fail(f"No slide #{lab}; the review film has: " + ', '.join(f"#{x['no']}" for x in sl) + '.')
     if s['type'] == 'blank':
         fail(f'Slide #{lab} is a blank for AI video or animation; it needs no decision.')
-    stamp = {'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
-    if s['type'] == 'decision':
-        if action not in ('KEEP', 'DROP'):
-            fail(f'Slide #{lab} is a decision: answer KEEP or DROP.')
-        session['decisions'][lab] = {'action': action, 'type': 'decision', **stamp}
-        session['master'] = None
-        save_session(store, run, session)
-        return {'slide': lab, 'type': 'decision', 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank')}
-    if action not in ('KEEP', 'REJECT', 'KEEP_WITH_EDIT'):
+    if s['type'] == 'decision' and action not in ('KEEP', 'DROP'):
+        fail(f'Slide #{lab} is a decision: answer KEEP or DROP.')
+    if s['type'] != 'decision' and action not in ('KEEP', 'REJECT', 'KEEP_WITH_EDIT'):
         fail('action must be KEEP, REJECT or KEEP_WITH_EDIT')
     if action == 'KEEP_WITH_EDIT' and not edit:
         fail('KEEP_WITH_EDIT needs --edit "shot:N,in:±frames,out:±frames" (source frames; a frame is 1/25 s on the timeline).')
-    if action == 'REJECT' and not str(note or '').strip():
-        fail("REJECT needs the operator's reason (--note); it stays with this run's decisions.")   # design/44 8.5
+    approved_now = not session.get('accepted')
+    if approved_now:   # design/98 D2: the first answer approves these options, with what was answered
+        record_options(conn, store, user, run, f'Approved by answering the review slides: first answer #{lab} {action}' + (f' — {note.strip()}' if str(note or '').strip() else ''),
+                       {'how': 'first_answer', 'slide': lab})
+        session = session_of(store, run)
+    stamp = {'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    if s['type'] == 'decision':
+        session['decisions'][lab] = {'action': action, 'type': 'decision', **stamp}
+        session['master'] = None
+        save_session(store, run, session)
+        return {'slide': lab, 'type': 'decision', 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank'),
+                **({'options_approved': True} if approved_now else {})}
     session['decisions'][lab] = {'action': action, 'type': s['type'], 'option_number': s['option_number'], 'edit': edit, **stamp}
     session['master'] = None
     save_session(store, run, session)
     conflict = conflict_of(s, sl, session['decisions'])   # design/63 rule 1: said the moment the second Keep lands
     return {'slide': lab, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank'),
-            **({'conflict': conflict} if conflict else {})}
+            **({'conflict': conflict} if conflict else {}), **({'options_approved': True} if approved_now else {})}
 
 
 def add_rule(store, user, run, text, quote=''):

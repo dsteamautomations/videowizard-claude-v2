@@ -812,3 +812,11 @@ def test_the_procedure_gives_the_label_and_the_link():
     vsteps, doc = ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     for text in (vsteps, doc):
         assert 'the label and the link' in text
+
+def test_the_procedure_says_the_first_answer_approves_a_reason_is_optional_and_the_final_needs_no_words():
+    """design/98."""
+    options, master, voice = (' '.join(STAGES[k]['steps']) for k in ('options', 'master', 'voice'))
+    doc = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert 'the first answer approves the options' in options and 'the first answer approves the options' in master and 'the first answer approves the options' in doc
+    assert 'A REJECT is followed by one question for the reason' not in master and 'the reason is optional' in master
+    assert 'their reply as `--quote` if they gave one' in voice

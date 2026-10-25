@@ -248,6 +248,12 @@ def compute_next(run, stages, outputs, attempts):
     return {**base, 'stage': None, 'actor': 'operator', 'allowed': ['close', 'view', 'revise', 'defect', 'adopt']}
 
 
+def acceptance_quote(stage, quote, user):
+    """design/98 W2: the voice stage records without the operator's words (their choice is the record); every other stage keeps the rule."""
+    quote = str(quote or '').strip()
+    return quote or (f"Chosen as final in chat by {user.get('name') or user.get('id')}" if stage == 'voice' else '')
+
+
 def next_for(conn, run):
     nxt = compute_next(run, stage_table(run['procedure_version']), current_outputs(conn, run['id']), attempts_for(conn, run['id']))
     nxt = {**nxt, 'open_defects': open_defects(conn, run['id'])}   # design/48 O.2
@@ -297,7 +303,7 @@ def output(conn, user, run, body):
     if nxt['actor'] == 'operator_decision':
         _needs_decision(nxt)
     try:
-        quote = (body.get('accepted_quote') or '').strip()
+        quote = acceptance_quote(st['name'], body.get('accepted_quote'), user)
         if st['needs_acceptance'] and not quote:
             raise Problem(422, 'ACCEPTANCE_REQUIRED', "Ask the operator to approve this stage and pass their reply verbatim as accepted_quote.")
         if len(quote) > settings().MAX_QUOTE_CHARS:

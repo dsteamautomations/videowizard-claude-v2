@@ -1374,7 +1374,7 @@ def _stage_run(conn, user, run_id, stage):
     if run['status'] == 'closed':
         raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
     nxt = core.next_for(conn, run)
-    if nxt['stage'] != stage:
+    if nxt['stage'] not in (stage if isinstance(stage, tuple) else (stage,)):   # design/98: a slide answer is taken at options or master
         raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not {stage!r}.", next=nxt)
     return run, core.current_outputs(conn, run['id'])
 
@@ -1452,7 +1452,7 @@ def options_record(run_id: UUID, body: Quote, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/master/decide')
 def master_decide(run_id: UUID, body: DecideBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'master', body, lambda run, outputs: stage2.decide(storage(), user, run, body.slide if body.slide is not None else body.option_number, body.action, body.note, body.edit))
+    return _s2(conn, user, run_id, ('options', 'master'), body, lambda run, outputs: stage2.decide(conn, storage(), user, run, body.slide if body.slide is not None else body.option_number, body.action, body.note, body.edit))
 
 
 @app.get('/api/runs/{run_id}/master/slides')

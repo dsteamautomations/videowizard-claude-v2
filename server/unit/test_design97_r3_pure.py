@@ -96,4 +96,4 @@ def test_the_page_carries_each_release_3_piece(needle):
 
 
 def test_the_review_page_explains_its_buttons():
-    assert 'Keep: use it. Reject: not this one (say why). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.' in REVIEW
+    assert 'Keep: use it. Reject: not this one (a reason is optional). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.' in REVIEW   # design/98 R1

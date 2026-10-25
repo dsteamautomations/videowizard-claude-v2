@@ -517,10 +517,9 @@ def narrate_many(conn, store, user, run, outputs, voice_ids, request_id, by='pag
 
 
 def finalise(conn, store, user, run, outputs, job_id, quote, recorded_from='page'):
-    """The record: a kept narration becomes the voice stage output, with the operator's words."""
+    """The record: a kept narration becomes the voice stage output; the click is the operator's choice (design/98 W1), their words kept when given."""
     from . import core
-    if not (quote or '').strip():
-        raise Problem(422, 'ACCEPTANCE_REQUIRED', "The operator's words are required to make a narration final.")
+    quote = str(quote or '').strip() or f"Made final on the voices page by {user.get('name') or user.get('id')}"
     job = conn.execute('select * from vw2_jobs where id=%s and run_id=%s', (job_id, run['id'])).fetchone()
     if not job or job['request'].get('kind') != 'narration':
         raise Problem(404, 'NOT_FOUND', 'No such narration on this run.')
