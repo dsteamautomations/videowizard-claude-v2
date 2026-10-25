@@ -70,7 +70,7 @@
 .v2 .need-words{border-color:var(--err)!important;box-shadow:0 0 0 2px var(--err)}
 /* design/80: the split view: the grid left, the chosen picture and its controls in a sticky panel on the right; under 900px the panel sits under the grid */
 .v2 .split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
-.v2 .panel{position:sticky;top:96px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card);font-size:13px}
+.v2 .panel{position:sticky;top:96px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card);font-size:13px;max-height:calc(100vh - 210px);overflow:auto}   /* design/100 S3 */
 .v2 .panel img{display:block;width:100%;max-height:380px;object-fit:contain;background:#000;border-radius:8px}
 .v2 .panel .pnote{width:100%;min-height:64px;margin:8px 0 4px;font-size:13px;border-radius:8px;padding:6px 8px;resize:vertical}
 .v2 .panel .btns button.go{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
@@ -105,7 +105,9 @@
 .v2 .spacer{height:170px}
 /* design/97: the shared panel on every picture step, wider; the viewer; the check in one line; what waits */
 .v2 .split{grid-template-columns:minmax(0,1fr) minmax(360px,45%)}
-.v2 .panel img{max-height:60vh;cursor:zoom-in}
+.v2 .panel img{max-height:50vh;cursor:zoom-in}
+.v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding-top:8px;z-index:2}   /* design/100 S3: Approve and Reject always in view */
+.v2 details.pdet{margin-top:6px}.v2 details.pdet summary{cursor:pointer;color:var(--muted);font-size:12.5px}   /* design/100 S4 */
 .v2 .panel .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
 .v2 .panel .pair img{max-height:40vh}
 .v2 .panel video{width:100%;max-height:50vh;background:#000;border-radius:8px}
@@ -359,7 +361,7 @@ function refCard(r,sel,inPanel,noApprove){   // inPanel: the References step, wh
   const approve=!inPanel&&!noApprove&&(r.status==='candidate'&&can)?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'';
   const state='<span class="badge '+(r.status==='approved'?'ok':rejected?'err':r.status==='candidate'?'dec':'')+'" style="margin:4px 6px 0">'+esc({approved:'Approved ✓',rejected:'Rejected',candidate:'to approve',generating:'being made',failed:'failed'}[r.status]||r.status)+'</span>';   // design/79 Q2; design/99 C7
   return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+(isSel('ref',r.id)?' sel':'')+'" data-item="'+esc(r.id)+'" data-name="'+esc(r.name)+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="" data-ref="'+esc(r.id)+'">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    state+(isWaiting(r.id)?'<span class="badge waitb" style="margin:4px 6px 0">waiting for you</span>':'')+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+fixBtn(r)+(rejected?'':(sel||'')+approve+reject)+'</div>';
+    state+(isWaiting(r.id)?'<span class="badge waitb" style="margin:4px 6px 0">waiting for you</span>':'')+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.from_thumbnail?'<div class="ds" style="margin:0 6px 4px">saved from the thumbnail: check it</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+fixBtn(r)+(rejected?'':(sel||'')+approve+reject)+'</div>';
 }
 function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; the note and the chips are in the panel
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0, kept=(s.picked||[]).includes(r.n);
@@ -410,7 +412,9 @@ function panel(){
       (own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'):'');
   }
   const placed=placedIn(r.id), srcs=r.kind==='sheet'?(r.parents||[]).map(id=>by[id]).filter(Boolean):[];
-  return big(r)+head+why+(srcs.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="srcs">'+srcs.map(x=>big(x)).join('')+'</div>':'')+checklist(r.checklist,r.check)+fixBtn(r)+   // design/97 R1: a sheet beside its sources
+  const made=srcs.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="srcs">'+srcs.map(x=>big(x)).join('')+'</div>':'', pend=r.kind==='sheet'&&r.status==='candidate';
+  return big(r)+head+why+(pend?made:'')+checklist(r.checklist,r.check)+fixBtn(r)+   // design/97 R1: a pending sheet beside its sources
+    '<details class="pdet"><summary>Details</summary><div class="ds">'+esc(r.kind)+(r.width?' · '+esc(r.width)+'×'+esc(r.height):'')+(r.note?' · note: '+esc(r.note):'')+(r.from_thumbnail?' · saved from the thumbnail':'')+'</div>'+(pend?'':made)+'</details>'+   // design/100 S4
     (placed?'<div class="ds ok">'+'Approved · in the film at '+filmAt(placed)+' ('+esc(placed.shot_id)+')</div>'+(can&&!placed.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(placed.shot_id)+'">Remove</button>'):'')   // design/97 A5
      :own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'+
        (r.status==='approved'&&sh&&sh.route==='still'?'<button data-a="still" data-shot="'+esc(sh.shot_id)+'" data-ref="'+esc(r.id)+'">Use for the shot</button>':'')):'');   // design/80 S6: the words sit with the button

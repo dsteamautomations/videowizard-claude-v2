@@ -992,7 +992,7 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
     out = VS.pick(store, USER, RUN, [], sid, [{'n': 2, 'note': 'avoid brand text'}, {'n': 1}], 'These two, the side from the second.')
     refs = saved(store)['references']
     first, second = out['references']
-    assert first['kind'] == 'web' and first['element_id'] == 'E1' and first['status'] == 'candidate' and first['source'] == {'url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'selection_reply': 'These two, the side from the second.', 'note': 'avoid brand text', 'search_id': sid, 'n': 2, 'from_thumbnail': False}
+    assert first['kind'] == 'web' and first['element_id'] == 'E1' and first['status'] == 'approved' and first['source'] == {'url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'selection_reply': 'These two, the side from the second.', 'note': 'avoid brand text', 'search_id': sid, 'n': 2, 'from_thumbnail': False}
     assert second['source']['note'] == '' and second['source']['url'] == 'https://img.example/1.jpg' and first['width'] == 64 and refs[first['id']]['sha256']
     assert saved(store)['searches'][sid]['picked'] == [2, 1]
     # a picture the host refuses falls back to Google's thumbnail; one with neither is reported and the others still land (the pick that failed live on 22 Oct)

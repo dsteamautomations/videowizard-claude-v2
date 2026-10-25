@@ -474,6 +474,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
     for r in session['references'].values():
         refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height', 'check_pending')}   # design/92: being checked
         refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
+        refs[r['id']]['from_thumbnail'] = bool((r.get('source') or {}).get('from_thumbnail'))   # design/100 S2
         refs[r['id']]['shot_id'] = made_for(session, r)   # design/94 R1.3: listed only under its own shot
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
@@ -973,6 +974,7 @@ def _download_picks(rows):
 def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched=None):
     s = (session.get('searches') or {}).get(search_id)
     need(s, f'Unknown search {search_id}.')
+    words = str(quote or '').strip()
     quote = said(quote, 'Saved', user)   # design/99 C5
     need(isinstance(picks, list) and picks, 'Tick at least one picture.')
     rows = {r['n']: r for r in s['results']}
@@ -994,7 +996,10 @@ def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched
         meta = {'element_id': s['element_id'], 'element_kind': element_kind, 'name': f"web-{s['element_id']}-{row['n']}", 'kind': 'web', 'subject': row.get('title') or s['keywords'],
                 'width': size[0], 'height': size[1],
                 'source': {'url': row['image_url'], 'page_url': row.get('page_url'), 'selection_reply': quote, 'note': note, 'search_id': search_id, 'n': row['n'], 'from_thumbnail': used == 'thumbnail'}}
-        made.append(_store_reference(store, run, session, rid, png, meta))
+        row = _store_reference(store, run, session, rid, png, meta)
+        row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': row['sha256'],   # design/100 S1: ticking and saving is the approval
+                                                'quote': words or f"Approved when saved by {user.get('name') or user.get('id')}"})
+        made.append(row)
     need(made, 'None of the ticked pictures could be downloaded: ' + '; '.join(f"{f['n']} ({f['site']}): {f['why']}" for f in failed) + '. Pick others, or save one yourself and `vw visuals supply` it.')
     s['picked'] = [r['source']['n'] for r in made]
     s['failed'] = failed

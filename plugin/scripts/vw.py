@@ -1356,7 +1356,7 @@ def cmd_visuals(a):
             k, _, v = str(item).partition('=')
             notes[int(k.strip())] = v.strip().strip('"')
         out = write(base + '/pick', {'search_id': a.search, 'picks': [{'n': n, 'note': notes.get(n, '')} for n in ns], 'quote': a.quote or ''})
-        emit(out, 0, f"{len(out.get('references') or [])} web references made from search {a.search}; show each (`fetch --ref`) and approve with its hash, then generate the element's sheet from them.")
+        emit(out, 0, f"{len(out.get('references') or [])} web references saved and approved from search {a.search} (design/100: ticking and saving is the approval); show them (`fetch --ref`) and reject one only if the saved file is not the picture ticked, then generate the element's sheet from them.")
     if a.what == 'nothing-fits':   # design/73 R4b
         emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted; the reason is the next search\'s hint.')
     if a.what == 'revise':   # design/76 (L32): a change request is a revision, never a yes

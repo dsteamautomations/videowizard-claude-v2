@@ -837,3 +837,9 @@ def test_the_procedure_says_a_click_needs_no_words():
     vsteps, doc = ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     for text in (vsteps, doc):
         assert 'no typed words' in text
+
+def test_the_procedure_says_picks_are_approved_when_saved():
+    """design/100 S1."""
+    text = STAGES['visuals']['prompt'] + ' '.join(STAGES['visuals']['steps'])
+    assert 'the picked pictures are approved when saved' in text
+    assert 'approve with its hash, then generate' not in (PLUGIN / 'scripts' / 'vw.py').read_text(encoding='utf-8')
