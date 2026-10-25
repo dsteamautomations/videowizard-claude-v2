@@ -43,7 +43,7 @@ def test_the_page_view_names_the_picture_in_the_shot():
 
 
 def test_the_page_shows_new_pictures_for_a_filled_shot_and_says_where_an_approval_went():
-    assert 'A new picture for this shot · approving replaces the one in the shot' in PAGE and 'j.placed' in PAGE
+    assert 'A new picture for this shot · approving replaces the one in the shot' in PAGE and 'j.next' in PAGE
     assert 'Remove the sequence to rebuild it' in PAGE
 
 

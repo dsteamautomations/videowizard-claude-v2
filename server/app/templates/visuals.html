@@ -103,11 +103,33 @@
 .v2 .why{font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap}
 .v2 .words{flex:1;min-width:240px;padding:8px 10px;font-size:14px;border-radius:10px;min-height:38px;resize:vertical}
 .v2 .spacer{height:170px}
+/* design/97: the shared panel on every picture step, wider; the viewer; the check in one line; what waits */
+.v2 .split{grid-template-columns:minmax(0,1fr) minmax(360px,45%)}
+.v2 .panel img{max-height:60vh;cursor:zoom-in}
+.v2 .panel .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
+.v2 .panel .pair img{max-height:40vh}
+.v2 .panel video{width:100%;max-height:50vh;background:#000;border-radius:8px}
+.v2 .panel .srcs{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.v2 .panel .srcs img{width:72px;height:44px;object-fit:cover}
+.v2 details.chkd summary{cursor:pointer;font-size:12px;margin:2px 6px}
+.v2 details.chkd summary.err{color:var(--err)}.v2 details.chkd summary.ok{color:var(--ok)}
+.v2 .badge.waitb{border-color:var(--accent);color:var(--fg)}
+.v2 .hl{outline:3px solid var(--accent);outline-offset:2px}
+.v2 .wlist{margin:6px 0;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:13px}
+.v2 .wlist a{display:block;padding:2px 0}
+#viewer{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.92);display:grid;grid-template-columns:minmax(0,1fr) 360px}
+#viewer[hidden]{display:none}
+#viewer .vw-stage{overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:pinch-zoom}
+#viewer .vw-stage img{max-width:100%;max-height:100%;transform-origin:center;user-select:none}
+#viewer .vw-side{background:var(--card);padding:12px;overflow:auto;color:var(--fg);font-size:13px}
+@media (max-width:900px){ #viewer{grid-template-columns:1fr} #viewer .vw-side{max-height:45vh}}   /* a space after each brace: a brace then a hash opens a Jinja comment */
+@media (max-width:600px){.v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding:6px 0;z-index:2}}
 </style>
 <div class="v2" id="app" data-code="{{ run.code }}">
 <div class="top">
   <div class="steps" id="steps"></div>
   <div class="dir" id="line">Loading…</div>
+  <div class="wlist" id="wlist" hidden></div>
 </div>
 <div class="msg" id="msg"></div>
 <section id="s-treatment"></section>
@@ -117,6 +139,7 @@
 <section id="s-takes" hidden></section>
 <section id="s-record" hidden></section>
 <div class="spacer"></div>
+<div id="viewer" hidden></div>
 <div class="foot"><div class="in"><div class="status" id="fmsg"></div>
 <div class="player" id="player" hidden><span id="pl-name" class="ds">nothing playing</span><video id="pl" controls preload="metadata"></video></div>
 <div class="row"><div class="tray" id="tray"></div><span id="action"></span></div>
@@ -131,7 +154,7 @@ const CHIPS=['avoid brand text','posture only, not the person','colour only'];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const inr=n=>'₹'+Math.round(Number(n)||0).toLocaleString('en-IN');
-let data=null, timer=null, inflight=false, step=null, selEl=null, selPic=null, gapFilter='', selGaps={};   // selPic: {sid,n} a search result, {ref} a reference (design/80)
+let data=null, timer=null, inflight=false, step=null, selEl=null, selPic=null, gapFilter='', selGaps={}, view=null, wi=-1, hashDone=false;   // selPic: {sid,n} a search result, {ref} a reference (design/80)
 const picks={};   // search id -> [{n, note}] in the order ticked (design/73)
 function remember(k,v){try{localStorage.setItem('vz:'+code+':'+k,v);}catch(e){}}
 function recall(k){try{return localStorage.getItem('vz:'+code+':'+k);}catch(e){return null;}}
@@ -144,20 +167,21 @@ async function act(body){
     if(!r.ok){throw new Error((j&&j.message)||('The server answered '+r.status+'.'));}return j;}
   finally{inflight=false;}
 }
-async function send(body,okText){msg('Recording…',false,true);try{const j=await act(body);msg(okText||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}catch(err){msg(err.message,true);return null;}}
+async function send(body,okText){msg('Recording…',false,true);try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}msg((j&&j.next)||okText||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}catch(err){msg(err.message,true);highlightNamed(err.message,document);return null;}}
 async function load(){
   let r;
   try{r=await fetch(base+'/data',{cache:'no-store'});}catch(e){msg('The server is not reachable; trying again in 15 s.',true);schedule(15000);return;}
   if(r.status===401){location.href='/login?next='+encodeURIComponent(base);return;}
   if(!r.ok){msg('The page could not load ('+r.status+').',true);schedule(15000);return;}
   data=await r.json();render();
+  if(!hashDone){hashDone=true;applyHash();}   // design/97 W1: a link opens its item
 }
 function schedule(ms){clearTimeout(timer);timer=setTimeout(load,ms||15000);}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&data){load();}});   // design/74 L29
 function stage(){return data&&data.run?data.run.stage:null;}
 function fmt(frames){const fps=Number(data&&data.fps)||25;const s=Math.max(0,Math.round(frames/fps));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function secs(frames){const fps=Number(data&&data.fps)||25;return (frames/fps).toFixed(1)+' s';}
-function words(){return (($('words')||{}).value||'').trim();}
+function words(){return ((($('pwords')||{}).value)||(($('words')||{}).value)||'').trim();}   // design/97 P1: the panel's words first
 function autoStep(){const d=data;if(!d||d.state!=='prepared')return 'treatment';
   if(!d.treatment||d.treatment_draft)return 'treatment';
   if(!d.plan_digest||d.gaps.some(g=>!g.accepted&&!g.recorded&&g.shots.length))return 'plan';
@@ -170,7 +194,8 @@ function go(s){step=s;remember('step',s);render();window.scrollTo(0,0);}
 // ---------- frame ----------
 function frame(){
   const d=data;
-  $('steps').innerHTML=STEPS.map(([k,l])=>'<a data-s="'+k+'" class="'+(k===step?'on':'')+'">'+l+'</a>').join('<span class="ds">›</span>');
+  const wt=(d&&d.waiting)||[], per={};wt.forEach(w=>{per[w.step]=(per[w.step]||0)+1;});   // design/97 W3
+  $('steps').innerHTML=STEPS.map(([k,l])=>'<a data-s="'+k+'" class="'+(k===step?'on':'')+'">'+l+(per[k]?' · '+per[k]+' waiting':'')+'</a>').join('<span class="ds">›</span>');
   $('steps').querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>go(a.dataset.s)));
   if(!d||d.state!=='prepared'){$('line').textContent='The visuals stage has not started: the assistant runs vw visuals prepare.';return;}
   const b=d.budget||{}, over=b.spent_inr>b.cap_inr, pct=b.cap_inr?Math.min(100,Math.round(100*b.spent_inr/b.cap_inr)):0;
@@ -178,8 +203,24 @@ function frame(){
   const t=d.treatment, dr=d.treatment_draft, at=autoStep();
   let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(dr?(t?'<strong>New treatment draft</strong>: it replaces the approved one; read it and approve it at the foot':'<strong>Treatment drafted</strong>: read it and approve it at the foot'):(!t?'The assistant is preparing the treatment':'<strong>'+esc(STEPS.find(x=>x[0]===at)[1])+'</strong> is the step the run is at'));
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
-  $('line').innerHTML=line+meter;
+  const wn=(d.waiting||[]).length;
+  $('line').innerHTML=line+meter+(wn?' · <a id="wcount" style="cursor:pointer"><b>'+wn+'</b> waiting for your verdict</a> <button id="wnext">Next waiting</button>':'');   // design/97 W3
+  if($('wcount'))$('wcount').addEventListener('click',()=>{const l=$('wlist');l.hidden=!l.hidden;l.innerHTML=(d.waiting||[]).map(w=>'<a href="'+esc(w.link)+'">'+esc(w.label)+'</a>').join('');});
+  if($('wnext'))$('wnext').addEventListener('click',()=>{const w=d.waiting||[];if(!w.length)return;wi=(wi+1)%w.length;const h=w[wi].link.split('#')[1];if(location.hash==='#'+h)applyHash();else location.hash=h;});
 }
+function applyHash(){   // design/97 W1: #step/group/item opens the step, the item in the panel, scrolls to it and outlines it
+  const h=decodeURIComponent(location.hash.slice(1));if(!h||!data||data.state!=='prepared')return;
+  const [st,grp,item]=h.split('/');if(!STEPS.some(x=>x[0]===st))return;
+  const refs=data.references||[];step=st;remember('step',st);
+  selPic=item&&refs.some(r=>r.id===item)?{ref:item}:(st==='takes'&&item&&!['spec','reuse'].includes(item)?{take:item}:null);
+  if(st==='references'&&grp)selEl=grp;
+  render();
+  const el=document.querySelector('[data-item="'+(item||'')+'"]')||document.getElementById('card-'+grp);
+  if(el){el.scrollIntoView({block:'center'});el.classList.add('hl');}
+  const w=(data.waiting||[]).find(x=>x.link.endsWith('#'+h));
+  if(item&&!['spec','reuse'].includes(item)&&!document.querySelector('[data-item="'+item+'"]'))msg('That item is no longer waiting: '+(w?w.label:h)+'.',true);
+}
+window.addEventListener('hashchange',applyHash);
 // ---------- treatment ----------
 function footageBlock(){   // design/88 F4: the footage is measured and told; the operator may correct it with their words
   const f=data.footage;if(!f||!f.line)return '';
@@ -251,7 +292,7 @@ function renderPlan(){
     const choice=g.choices?'<div class="btns"><span class="ds">Two choices:</span>'+g.choices.options.map(c=>'<button data-a="select" data-gap="'+esc(g.gap_id)+'" data-choice="'+esc(c.id)+'" class="'+(g.choices.selected===c.id?'go':'')+'" title="'+esc(c.why)+'">'+esc(c.title)+(g.choices.recommended===c.id?' (recommended)':'')+'</button>').join('')+'</div>':'';
     const shots=g.shots.length?'<details><summary class="ds" style="cursor:pointer">'+g.shots.length+' shot'+(g.shots.length>1?'s':'')+'</summary>'+g.shots.map(s=>'<div class="ds" style="margin:4px 0 0 12px"><b>'+esc(s.shot_id)+'</b> · '+esc(ROUTE[s.route]||s.route)+' · '+secs(s.end_frame-s.start_frame)+' — '+esc(s.purpose)+'</div>').join('')+'</details>':'<span class="ds">'+(g.choices&&!g.choices.selected?'choose one of the two':'no shots yet')+'</span>';
     const can=!g.recorded&&g.shots.length;
-    return '<tr class="'+(selGaps[g.gap_id]?'sel':'')+'"><td class="c">'+(can?'<input type="checkbox" data-sel="'+esc(g.gap_id)+'" '+(selGaps[g.gap_id]?'checked':'')+' aria-label="select '+esc(g.gap_id)+'">':'')+'</td><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</div><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+esc(e.picture||'')+'<div class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</div>'+choice+'</td><td>'+shots+'</td><td>'+state+words_+'</td></tr>';}).join('');
+    return '<tr class="'+(selGaps[g.gap_id]?'sel':'')+'"><td class="c">'+(can?'<input type="checkbox" data-sel="'+esc(g.gap_id)+'" '+(selGaps[g.gap_id]?'checked':'')+' aria-label="select '+esc(g.gap_id)+'">':'')+'</td><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</div><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+esc(e.picture||'')+'<div class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</div>'+((g.split||[]).length?'<div class="ds">'+g.split.map(x=>esc(x.route)+' '+x.seconds.toFixed(1)+' s ('+x.shots+')').join(' · ')+'</div>':'')+choice+'</td><td>'+shots+'</td><td>'+state+words_+'</td></tr>';}).join('');
   $('s-plan').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 4px">Tick the gaps, type your words at the foot, then Accept them, or Revise to send them back with what to change. A change request is never a yes.</p><table><thead><tr><th class="c"></th><th>Gap</th><th>Picture · route</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
   $('s-plan').querySelectorAll('[data-sel]').forEach(c=>c.addEventListener('change',()=>{selGaps[c.dataset.sel]=c.checked;if(!c.checked)delete selGaps[c.dataset.sel];renderPlan();footer();}));
   $('s-plan').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
@@ -279,22 +320,36 @@ function takeCheck(c){   // design/91 N3: the take read by Gemini before you wat
   if(!c)return '';if(c.error)return '<div class="ds">Take check not run: '+esc(c.error)+'</div>';
   return '<ul class="chk">'+(c.lines||[]).map(l=>'<li class="'+(l.pass===true?'ok':l.pass===false?'err':'')+'">'+(l.pass===true?'✓ ':l.pass===false?'✗ ':'· ')+esc(l.check)+
     (l.at_s!=null&&l.pass===false?' at '+esc(l.at_s)+' s':'')+(l.seen?' <i>('+esc(l.seen)+')</i>':'')+'</li>').join('')+'</ul>';}
-function checklist(lines,check){   // design/74 L6; design/86 K2: with a check, each line is marked pass or fail with what the checker saw
-  if(check&&check.lines&&check.lines.length){return '<ul class="chk">'+check.lines.map(c=>'<li class="'+(c.pass===true?'ok':c.pass===false?'err':'')+'">'+(c.pass===true?'✓ ':c.pass===false?'✗ ':'· ')+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+(c.seen?' <i>('+esc(c.seen)+')</i>':'')+'</li>').join('')+(check.error?'<li class="ds">check not run: '+esc(check.error)+'</li>':'')+'</ul>';}
-  return lines&&lines.length?'<ul class="chk">'+lines.map(c=>'<li>'+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+'</li>').join('')+'</ul>':'';}
+function checklist(lines,check){   // design/74 L6; design/86 K2; design/97 K1: one line, coloured by the worst result, a failed must's text in it; a click opens the lines
+  if(check&&check.lines&&check.lines.length){const bad=check.lines.filter(c=>c.pass===false), must=bad.filter(c=>c.weight==='must'), ok=check.lines.filter(c=>c.pass===true).length;
+    const sum=ok+' passed'+(bad.length?' · '+bad.length+' to look at':'')+(must.length?': '+must.map(c=>c.check).join('; '):'');
+    return '<details class="chkd"><summary class="'+(must.length?'err':bad.length?'':'ok')+'">'+esc(sum)+'</summary><ul class="chk">'+check.lines.map(c=>'<li class="'+(c.pass===true?'ok':c.pass===false?'err':'')+'">'+(c.pass===true?'✓ ':c.pass===false?'✗ ':'· ')+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+(c.seen?' <i>('+esc(c.seen)+')</i>':'')+'</li>').join('')+(check.error?'<li class="ds">check not run: '+esc(check.error)+'</li>':'')+'</ul></details>';}
+  if(check&&check.error)return '<div class="ds" style="margin:2px 6px">check not run: '+esc(check.error)+'</div>';
+  return lines&&lines.length?'<details class="chkd"><summary>'+lines.length+' lines to check</summary><ul class="chk">'+lines.map(c=>'<li>'+esc(c.weight||'')+': '+esc(c.check||'')+' — '+esc(c.pass_when||'')+'</li>').join('')+'</ul></details>':'';}
 function isSel(k,v){return !!selPic&&selPic[k]===v&&(k!=='sid'||selPic.n===arguments[2]);}
 const ownPic=(r,s)=>r.shot_id===s.shot_id||(!r.shot_id&&s.element_ids.includes(r.element_id));   // design/95 F4: made for this shot, or made before shots were recorded
 function shotTitle(id){for(const g of (data.gaps||[]))for(const s of g.shots)if(s.shot_id===id)return s.title||'';return '';}
 function stepMark(r){const n=((r&&r.check&&r.check.lines)||[]).filter(l=>l.pass===false).length;   // design/96 J3: the step's own lines
   return r&&r.check?(n?' · '+n+' to look at':' · ok'):'';}
+function shotOf(id){for(const g of (data.gaps||[]))for(const s of g.shots)if(s.shot_id===id)return {...s,gap:g};return null;}
+function placedIn(rid){for(const g of (data.gaps||[]))for(const s of g.shots){const a=s.asset;if(a&&(a.reference_id===rid||(a.states||[]).some(st=>st.reference_id===rid)))return {...s,gap:g};}return null;}
+function refsById(){const o={};(data.references||[]).forEach(r=>{o[r.id]=r;});return o;}
+function filmAt(s){return fmt(s.start_frame)+'–'+fmt(s.end_frame);}
+function isWaiting(id){return (data.waiting||[]).some(w=>w.item===id);}
+function typeOf(s){return s.route==='graphic_sequence'?'Graphics':s.route==='video'?'AI video':'Still';}   // design/97 W2
+function headOf(s){return esc(typeOf(s))+' · '+esc(s.shot_id)+(s.title?' · '+esc(s.title):'');}
+function big(r){return r&&r.url?'<img src="'+esc(r.url)+'" alt="" data-view="'+esc(r.id)+'">':'';}
+function actBox(btns){return '<div class="act"><textarea id="pwords" class="pnote" placeholder="your words for this picture"></textarea><div class="btns">'+btns+'</div></div>';}   // design/97 P1, P3
+function fixBtn(r){return stage()==='visuals'&&r.status==='candidate'&&!r.fix_of&&!r.fix_queued&&r.check&&(r.check.must_failed||[]).length?'<div class="btns" style="margin:0 6px 6px"><button data-a="fix" data-ref="'+esc(r.id)+'">Try a fix (₹'+esc(fixPrice())+')</button></div>':'';}
+function highlightNamed(text,root){(root||document).querySelectorAll('.pic[data-name]').forEach(p=>{if(p.dataset.name&&String(text||'').includes('('+p.dataset.name+')'))p.classList.add('hl');});}   // design/97 L4
 function fixPrice(){return ((data.budget||{}).prices||{}).image_inr||4;}   // design/96 X1: the cost shown before the click
 function refCard(r,sel,inPanel,noApprove){   // inPanel: the References step, where the picture opens beside the grid and Approve and Reject live in the panel (design/80 S1)
   const rejected=r.status==='rejected', can=stage()==='visuals';
   const reject=!inPanel&&(r.status==='candidate'||r.status==='approved')&&can?'<div class="btns" style="margin:0 6px 6px"><button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'';   // design/74 L7
   const approve=!inPanel&&!noApprove&&(r.status==='candidate'&&can)?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'';
   const state='<span class="badge '+(r.status==='approved'?'ok':rejected?'err':r.status==='candidate'?'dec':'')+'" style="margin:4px 6px 0">'+esc(r.status)+'</span>';   // design/79 Q2: the picture's own state, in words
-  return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+(inPanel&&isSel('ref',r.id)?' sel':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="" '+(inPanel?'data-ref="'+esc(r.id)+'"':'')+'>':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    state+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+(inPanel?'':checklist(r.checklist,r.check))+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+(can&&r.status==='candidate'&&!r.fix_of&&!r.fix_queued&&r.check&&(r.check.must_failed||[]).length?'<div class="btns" style="margin:0 6px 6px"><button data-a="fix" data-ref="'+esc(r.id)+'">Try a fix (₹'+esc(fixPrice())+')</button></div>':'')+(rejected?'':(sel||'')+approve+reject)+'</div>';
+  return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+(isSel('ref',r.id)?' sel':'')+'" data-item="'+esc(r.id)+'" data-name="'+esc(r.name)+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="" data-ref="'+esc(r.id)+'">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
+    state+(isWaiting(r.id)?'<span class="badge waitb" style="margin:4px 6px 0">waiting for you</span>':'')+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+fixBtn(r)+(rejected?'':(sel||'')+approve+reject)+'</div>';
 }
 function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; the note and the chips are in the panel
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0;
@@ -321,13 +376,36 @@ function panel(){
       '<div class="btns"><button id="p-prev" '+(i>0?'':'disabled')+'>‹ Previous</button><button id="p-next" '+(i<s.results.length-1?'':'disabled')+'>Next ›</button><button id="p-tick" class="'+(p?'':'go')+'">'+(p?'Untick (Image '+idx+')':'Tick as Image '+((picks[s.search_id]||[]).length+1))+'</button></div>'+
       (p?'<textarea id="p-note" class="pnote" placeholder="your note for this picture: keep the handle shape; avoid the brand text">'+esc(p.note||'')+'</textarea><div class="chips">'+CHIPS.map(c=>'<button data-pchip="'+esc(c)+'">'+esc(c)+'</button>').join('')+'</div>':'<div class="ds">Tick it to add a note.</div>');
   }
-  const r=(d.references||[]).find(x=>x.id===selPic.ref);
+  if(selPic.take){   // design/97 P2: a take is judged beside its player
+    let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
+    if(!k)return '<div class="empty">That take is gone.</div>';
+    return '<div class="ds"><b>Take · '+headOf(s).replace('AI video · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+esc(k.status)+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+checklist(k.checklist)+takeCheck(k.check)+
+      (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(can&&k.status==='ready'&&!k.selected?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
+  }
+  const by=refsById(), r=by[selPic.ref];
   if(!r)return '<div class="empty">That picture is gone.</div>';
-  const own=can&&(r.status==='candidate'||r.status==='approved');
-  return (r.url?'<img src="'+esc(r.url)+'" alt="">':'')+'<div class="ds" style="margin-top:8px"><b>'+esc(r.element_id||'')+'</b> · '+esc(r.kind)+' · <span class="badge '+(r.status==='approved'?'ok':r.status==='rejected'?'err':'dec')+'">'+esc(r.status)+'</span>'+(r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+
-    (own?'<textarea id="pwords" class="pnote" placeholder="your words for this picture"></textarea><div class="btns">'+(r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'');   // design/80 S6: the words sit with the button
+  const own=can&&(r.status==='candidate'||r.status==='approved'), sh=r.shot_id?shotOf(r.shot_id):null;
+  const head='<div class="ds" style="margin-top:8px"><b>'+(sh?headOf(sh):esc(r.element_id||''))+'</b> · '+esc(r.name)+' · <span class="badge '+(r.status==='approved'?'ok':r.status==='rejected'?'err':'dec')+'">'+esc(r.status)+'</span>'+(r.rejection?' · '+esc(r.rejection.notes):'')+'</div>';
+  if(sh&&sh.route==='graphic_sequence'&&['keyframe','state'].includes(r.kind)){   // design/97 A2, V2: the whole sequence side by side, one Approve, one Reject naming the step
+    const order=sh.state_order||[], states=order.map(id=>by[id]).filter(Boolean), n=(sh.states||[]).length, idx=order.indexOf(r.id)+1;
+    const done=sh.asset&&sh.asset.kind==='sequence', complete=states.length===n&&states.every(x=>!x.check_pending);
+    return '<div class="pair">'+states.map((x,i)=>'<div class="'+(x.id===r.id?'hl':'')+'">'+big(x)+'<div class="ds">state '+(i+1)+' of '+n+stepMark(x)+'</div></div>').join('')+'</div>'+head+(sh.state_problem?'<div class="err">'+esc(sh.state_problem)+'</div>':'')+checklist(r.checklist,r.check)+fixBtn(r)+
+      (done?'<div class="ds ok">'+'Approved · in the film at '+filmAt(sh)+'</div>'+(can&&!sh.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(sh.shot_id)+'">Remove</button>'):'')
+       :can?actBox((complete?'<button class="go" data-a="sequence" data-shot="'+esc(sh.shot_id)+'">Approve the sequence</button>':'<span class="ds">'+(n-states.length)+' state(s) still to make</span>')+(own&&idx?'<button data-a="reject" data-ref="'+esc(r.id)+'">'+'Reject state '+idx+'</button>':'')):'');
+  }
+  if(sh&&sh.route==='video'&&r.kind==='keyframe'){   // design/97 V2: the start and end images side by side
+    const pair=(d.references||[]).filter(x=>x.shot_id===sh.shot_id&&x.kind==='keyframe'&&x.status!=='rejected'&&x.status!=='failed');
+    return '<div class="pair">'+pair.map(x=>'<div class="'+(x.id===r.id?'hl':'')+'">'+big(x)+'<div class="ds">'+esc(x.name)+' · '+esc(x.status)+'</div></div>').join('')+'</div>'+head+checklist(r.checklist,r.check)+fixBtn(r)+
+      (own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'):'');
+  }
+  const placed=placedIn(r.id), srcs=r.kind==='sheet'?(r.parents||[]).map(id=>by[id]).filter(Boolean):[];
+  return big(r)+head+(srcs.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="srcs">'+srcs.map(x=>big(x)).join('')+'</div>':'')+checklist(r.checklist,r.check)+fixBtn(r)+   // design/97 R1: a sheet beside its sources
+    (placed?'<div class="ds ok">'+'Approved · in the film at '+filmAt(placed)+' ('+esc(placed.shot_id)+')</div>'+(can&&!placed.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(placed.shot_id)+'">Remove</button>'):'')   // design/97 A5
+     :own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'+
+       (r.status==='approved'&&sh&&sh.route==='still'?'<button data-a="still" data-shot="'+esc(sh.shot_id)+'" data-ref="'+esc(r.id)+'">Use for the shot</button>':'')):'');   // design/80 S6: the words sit with the button
 }
-function selectPic(p){selPic=p;renderReferences();footer();}
+function renderStep(){const f={references:renderReferences,pictures:renderPictures,takes:renderTakes}[step];if(f)f();}
+function selectPic(p){selPic=p;renderStep();footer();}
 function wirePanel(){
   const pn=$('panel');if(!pn)return;
   const s=selPic&&selPic.sid?(data.searches||[]).find(x=>x.search_id===selPic.sid):null;
@@ -338,8 +416,33 @@ function wirePanel(){
   if($('p-note'))$('p-note').addEventListener('input',ev=>{const q=pickOf(selPic.sid,selPic.n);if(q)q.note=ev.target.value;});   // S4: no re-render while typing
   pn.querySelectorAll('[data-pchip]').forEach(c=>c.addEventListener('click',()=>{const q=pickOf(selPic.sid,selPic.n);if(q){q.note=(q.note?q.note+'; ':'')+c.dataset.pchip;renderReferences();}}));
   pn.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+  pn.querySelectorAll('img[data-view]').forEach(i=>i.addEventListener('click',()=>openViewer(i.dataset.view)));   // design/97 V1
 }
-document.addEventListener('keydown',ev=>{   // S4: arrows move within the row, Escape clears the panel
+// ---------- design/97 V1, V3: the viewer, full size, with zoom, pan, arrows and the panel beside it ----------
+function viewList(id){const by=refsById(), r=by[id];if(!r)return [];const sh=r.shot_id?shotOf(r.shot_id):null;
+  let list=sh&&sh.route==='graphic_sequence'?(sh.state_order||[]).map(x=>by[x]).filter(Boolean):sh?(data.references||[]).filter(x=>x.shot_id===sh.shot_id&&x.url&&x.status!=='rejected'):
+    (data.references||[]).filter(x=>x.element_id===r.element_id&&x.url&&['frame','supplied','web','isolated','sheet','style'].includes(x.kind));
+  if(!list.some(x=>x.id===id))list.unshift(r);return list;}
+function openViewer(id){const list=viewList(id);if(!list.length)return;view={list:list,i:Math.max(0,list.findIndex(x=>x.id===id)),z:1,x:0,y:0};drawViewer();}
+function closeViewer(){view=null;drawViewer();}
+function moveViewer(k){if(!view)return;const i=view.i+k;if(i<0||i>=view.list.length)return;view.i=i;view.z=1;view.x=0;view.y=0;drawViewer();}
+function zoomViewer(f){if(!view)return;view.z=Math.min(8,Math.max(1,view.z*f));if(view.z===1){view.x=0;view.y=0;}const im=$('vw-img');if(im)im.style.transform='translate('+view.x+'px,'+view.y+'px) scale('+view.z+')';}
+function drawViewer(){const v=$('viewer');
+  if(!view){v.hidden=true;v.innerHTML='';renderStep();return;}
+  const r=view.list[view.i];selPic={ref:r.id};const pn=$('panel');if(pn)pn.innerHTML='<div class="empty">Open in the viewer.</div>';   // one panel at a time
+  v.hidden=false;v.innerHTML='<div class="vw-stage" id="vw-stage"><img id="vw-img" src="'+esc(r.url)+'" alt="" draggable="false" style="transform:translate('+view.x+'px,'+view.y+'px) scale('+view.z+')"></div>'+
+    '<div class="vw-side"><div class="btns"><button id="vw-prev" '+(view.i>0?'':'disabled')+'>‹</button><span class="ds">'+(view.i+1)+' of '+view.list.length+'</span><button id="vw-next" '+(view.i<view.list.length-1?'':'disabled')+'>›</button><button id="vw-out">−</button><button id="vw-in">+</button><button id="vw-close">Close (Esc)</button></div><div id="vw-panel">'+panel()+'</div></div>';
+  $('vw-prev').addEventListener('click',()=>moveViewer(-1));$('vw-next').addEventListener('click',()=>moveViewer(1));
+  $('vw-in').addEventListener('click',()=>zoomViewer(1.25));$('vw-out').addEventListener('click',()=>zoomViewer(0.8));$('vw-close').addEventListener('click',closeViewer);
+  const st=$('vw-stage');let drag=null;
+  st.addEventListener('wheel',ev=>{ev.preventDefault();zoomViewer(ev.deltaY<0?1.15:0.87);},{passive:false});
+  st.addEventListener('mousedown',ev=>{drag={x:ev.clientX-view.x,y:ev.clientY-view.y};});
+  st.addEventListener('mousemove',ev=>{if(!drag||view.z===1)return;view.x=ev.clientX-drag.x;view.y=ev.clientY-drag.y;zoomViewer(1);});
+  window.addEventListener('mouseup',()=>{drag=null;},{once:true});
+  v.querySelectorAll('#vw-panel button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+}
+document.addEventListener('keydown',ev=>{   // S4: arrows move within the row, Escape clears the panel; design/97 V1: the viewer's keys first
+  if(view&&!/^(TEXTAREA|INPUT)$/.test((ev.target||{}).tagName)){if(ev.key==='Escape')closeViewer();if(ev.key==='ArrowLeft')moveViewer(-1);if(ev.key==='ArrowRight')moveViewer(1);if(ev.key==='+'||ev.key==='=')zoomViewer(1.25);if(ev.key==='-')zoomViewer(0.8);return;}
   if(step!=='references'||!selPic||/^(TEXTAREA|INPUT)$/.test((ev.target||{}).tagName))return;
   if(ev.key==='Escape'){selectPic(null);return;}
   if(!selPic.sid||(ev.key!=='ArrowLeft'&&ev.key!=='ArrowRight'))return;
@@ -388,17 +491,21 @@ function renderReferences(){
   if(rd){renderRound(rd);return;}
   if(!selEl||!els.some(e=>e.id===selEl))selEl=(els.find(e=>elState(e)[1]!=='sheet approved')||els[0]).id;
   const e=els.find(x=>x.id===selEl), refs=(d.references||[]).filter(r=>r.element_id===e.id), hits=(d.element_matches||{})[e.id]||[], s=latestSearch(e.id);
-  const kwNow=($('kw-'+e.id)||{}).value;
+  const kwNow=($('kw-'+e.id)||{}).value, okSheet=refs.find(r=>r.kind==='sheet'&&r.status==='approved'), pend=refs.find(r=>r.kind==='sheet'&&r.status==='candidate');
+  if(pend&&!selPic)selPic={ref:pend.id};   // design/97 R1: the sheet waiting for approval opens large, beside its sources
   const list='<div class="list">'+els.map(x=>{const st=elState(x);return '<a data-el="'+esc(x.id)+'" class="'+(x.id===selEl?'on':'')+'"><span class="nm" style="font-size:14px">'+esc(x.id)+'</span><div class="ds">'+esc(x.name)+' · '+esc(x.kind)+'</div><div class="ds"><span class="badge '+st[0]+'">'+st[1]+'</span></div></a>';}).join('')+'</div>';
   let body='<div class="card"><span class="nm">'+esc(e.name)+'</span> <span class="ds">'+esc(e.id)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span><div class="ds" style="margin-top:4px">'+esc(e.requirements||'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div></div>';
-  body+='<h3>From your footage</h3><div class="ds">'+(hits.length?hits.slice(0,6).map(h=>esc(h.clip)+' at '+esc(h.seconds)+' s ('+esc(h.entity)+')').join(' · ')+' — the assistant grabs the frames':'not seen in the footage')+'</div>';
+  let src='';
+  src+='<h3>From your footage</h3><div class="ds">'+(hits.length?hits.slice(0,6).map(h=>esc(h.clip)+' at '+esc(h.seconds)+' s ('+esc(h.entity)+')').join(' · ')+' — the assistant grabs the frames':'not seen in the footage')+'</div>';
   const frames=refs.filter(r=>['frame','supplied','web','isolated'].includes(r.kind));
-  if(frames.length){body+='<div class="strip">'+frames.map(r=>refCard({...r,name:(r.kind==='frame'?'from your footage':r.kind==='web'?'from the web':r.kind==='supplied'?'your file':'generated')+(r.note?' · '+r.note:'')},'',true)).join('')+'</div>';}
-  body+='<h3>Google Images, for what the footage lacks</h3><div class="search"><input id="kw-'+esc(e.id)+'" placeholder="two to six words: the thing and its place or trade" value="'+esc(kwNow!=null?kwNow:(s?s.keywords:''))+'"><button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button><span class="why">your yes at the foot</span></div>';
-  if(s){body+='<div class="ds">'+esc(s.results.length)+' pictures for “'+esc(s.keywords)+'”'+(s.picked&&s.picked.length?' · used: '+esc(s.picked.join(', ')):'')+(s.nothing_fits?' · <span class="err">nothing fit: '+esc(s.nothing_fits.reason)+'</span>':'')+'. Click a picture to see it large on the right; tick the ones to use, in order (the first tick is Image 1); the note goes in the panel.</div>';
-    body+='<div class="strip">'+s.results.map(r=>resultCard(s,r)).join('')+'</div>';}
+  if(frames.length){src+='<div class="strip">'+frames.map(r=>refCard({...r,name:(r.kind==='frame'?'from your footage':r.kind==='web'?'from the web':r.kind==='supplied'?'your file':'generated')+(r.note?' · '+r.note:'')},'',true)).join('')+'</div>';}
+  let web='<h3>Google Images, for what the footage lacks</h3><div class="search"><input id="kw-'+esc(e.id)+'" placeholder="two to six words: the thing and its place or trade" value="'+esc(kwNow!=null?kwNow:(s?s.keywords:''))+'"><button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button><span class="why">your yes at the foot</span></div>';
+  if(s){web+='<div class="ds">'+esc(s.results.length)+' pictures for “'+esc(s.keywords)+'”'+(s.picked&&s.picked.length?' · used: '+esc(s.picked.join(', ')):'')+(s.nothing_fits?' · <span class="err">nothing fit: '+esc(s.nothing_fits.reason)+'</span>':'')+'. Click a picture to see it large on the right; tick the ones to use, in order (the first tick is Image 1); the note goes in the panel.</div>';
+    web+='<div class="strip">'+s.results.map(r=>resultCard(s,r)).join('')+'</div>';}
   const sheets=refs.filter(r=>r.kind==='sheet');
-  body+='<h3>The reference sheet</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">No sheet yet: the assistant generates it from the pictures above once they are approved.</div>');
+  if(okSheet){body+='<h3>Reference sheet · '+esc(e.id)+'</h3><div class="strip">'+refCard(okSheet,'',true)+'</div><details><summary class="ds" style="cursor:pointer">sources ('+frames.length+')</summary>'+src+'</details>'+   // design/97 R2
+    '<details><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results, and the search)</summary>'+web+'</details>';}
+  else body+=src+web+'<h3>Reference sheet · '+esc(e.id)+'</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">No sheet yet: the assistant generates it from the pictures above once they are approved.</div>');
   $('s-references').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 8px">Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Click any picture to see it large on the right, where Approve and Reject take your words. Nothing is paid from a click.</p>'+split('<div class="two">'+list+'<div>'+body+'</div></div>');
   const root=$('s-references');
   root.querySelectorAll('.list a').forEach(a=>a.addEventListener('click',()=>{selEl=a.dataset.el;selPic=null;renderReferences();footer();}));
@@ -424,25 +531,25 @@ function renderPictures(){
   shown.forEach(g=>{
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
     g.shots.filter(s=>s.route!=='video').forEach(s=>{
-      let sh='<div class="card"><span class="nm">'+esc(s.shot_id)+'</span> <span class="badge">'+esc(ROUTE[s.route]||s.route)+'</span><span class="ds">'+secs(s.end_frame-s.start_frame)+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s);
+      let sh='<div class="card" id="card-'+esc(s.shot_id)+'"><span class="nm">'+headOf(s)+'</span> <span class="ds">'+secs(s.end_frame-s.start_frame)+' · '+filmAt(s)+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s);   // design/97 W2
       const pics=(d.references||[]).filter(r=>['keyframe','state'].includes(r.kind));
       const mine=pics.filter(r=>r.shot_id===s.shot_id);   // design/94 S1: only the pictures made for this shot
       const loose=pics.filter(r=>!r.shot_id&&r.status!=='rejected'&&s.element_ids.includes(r.element_id));   // made before shots were recorded
       const fresh=mine.filter(r=>r.status==='candidate'||(r.status==='approved'&&s.asset&&r.id!==s.asset.reference_id&&!(s.asset.states||[]).some(st=>st.reference_id===r.id)&&s.route!=='graphic_sequence'));   // design/95 F3
-      const remove=can&&!g.recorded?'<div class="btns"><button data-a="unplace" data-shot="'+esc(s.shot_id)+'">Remove</button></div>':'';   // design/94 L3, the words at the foot
+      const remove=can&&!g.recorded?'<div class="btns"><button data-a="unplace" data-shot="'+esc(s.shot_id)+'">Remove</button></div>':'';   // design/94 L3: a clip's Remove; a picture's is in the panel
       const use=r=>can&&r.status==='approved'&&s.route!=='graphic_sequence'?'<div class="btns" style="margin:0 6px 6px"><button data-a="still" data-shot="'+esc(s.shot_id)+'" data-ref="'+esc(r.id)+'" class="go">Use for the shot</button></div>':'';
       if(s.route==='graphic_sequence'){
         sh+='<div class="ds">States: '+s.states.map((st,i)=>(i+1)+'. '+esc(st.what_appears)+' ('+esc(st.hold_s)+' s)').join(' · ')+'</div>';
-        if(s.asset&&s.asset.kind==='sequence'){sh+='<div class="strip">'+s.asset.states.map((st,i)=>'<div class="pic on"><img src="'+esc(st.url)+'" alt=""><div class="cap">state '+(i+1)+' · '+esc(st.hold_frames)+' f</div></div>').join('')+'</div><div class="ds ok">Sequence held for the shot.</div>'+remove+(fresh.length?'<div class="ds">'+fresh.length+' new picture'+(fresh.length>1?'s':'')+' made for this shot: Remove the sequence to rebuild it.</div>':'');}
-        else if(s.state_problem){sh+='<div class="err">'+esc(s.state_problem)+'</div><div class="strip">'+mine.map(r=>refCard(r,'',false,true)).join('')+'</div>';}
+        if(s.asset&&s.asset.kind==='sequence'){sh+='<div class="strip">'+s.asset.states.map((st,i)=>'<div class="pic on" data-item="'+esc(st.reference_id)+'"><img src="'+esc(st.url)+'" alt="" data-ref="'+esc(st.reference_id)+'"><div class="cap">state '+(i+1)+' · '+esc(st.hold_frames)+' f</div></div>').join('')+'</div><div class="ds ok">'+'Approved · in the film at '+filmAt(s)+'</div>'+(fresh.length?'<div class="ds">'+fresh.length+' new picture'+(fresh.length>1?'s':'')+' made for this shot: Remove the sequence to rebuild it.</div>':'');}
+        else if(s.state_problem){sh+='<div class="err">'+esc(s.state_problem)+'</div><div class="strip">'+mine.map(r=>refCard(r,'',true)).join('')+'</div>';}
         else if((s.state_order||[]).length){const by={};mine.forEach(r=>{by[r.id]=r;});   // design/94 A2: numbered in the server's order, no ticking
-          sh+='<div class="strip">'+s.state_order.map((id,i)=>refCard(by[id],'<div class="ds" style="margin:0 6px 6px"><b>state '+(i+1)+' of '+s.state_order.length+'</b>'+stepMark(by[id])+'</div>',false,true)).join('')+'</div>';
-          if(can)sh+='<div class="btns"><span class="ds">Your words at the foot, then:</span><button class="go" data-a="sequence" data-shot="'+esc(s.shot_id)+'">Approve the sequence</button></div>';}
+          sh+='<div class="strip">'+s.state_order.map((id,i)=>refCard(by[id],'<div class="ds" style="margin:0 6px 6px"><b>state '+(i+1)+' of '+s.state_order.length+'</b>'+stepMark(by[id])+'</div>',true)).join('')+'</div>';
+          if(can)sh+='<div class="ds">Click a state: the sequence opens beside the list, with Approve the sequence and Reject there.</div>';}   // design/97 A2
         else{sh+='<div class="ds">No states generated yet.</div>';}
       }else{
         if(s.asset&&s.asset.kind==='clip'){sh+='<div class="ds ok">Filled with '+esc(s.asset.name)+' from '+esc(s.asset.in_s)+' s to '+esc(s.asset.out_s)+' s ✓</div>'+remove;}   // design/89 B3
-        else if(s.asset){sh+='<div class="strip"><div class="pic on"><img src="'+esc(s.asset.url)+'" alt=""><div class="cap">the picture for this shot ✓</div></div></div>'+remove+(fresh.length?'<div class="ds">A new picture for this shot · approving replaces the one in the shot.</div><div class="strip">'+fresh.map(r=>refCard(r,use(r))).join('')+'</div>':'');}
-        else if(mine.length){sh+='<div class="ds">AI still for this shot · approve or reject: approving places it in the shot.</div><div class="strip">'+mine.map(r=>refCard(r,use(r))).join('')+'</div>';}   // design/94 A1, U3
+        else if(s.asset){sh+='<div class="strip"><div class="pic on" data-item="'+esc(s.asset.reference_id||'')+'"><img src="'+esc(s.asset.url)+'" alt="" data-ref="'+esc(s.asset.reference_id||'')+'"><div class="cap">'+'Approved · in the film at '+filmAt(s)+'</div></div></div>'+(fresh.length?'<div class="ds">A new picture for this shot · approving replaces the one in the shot.</div><div class="strip">'+fresh.map(r=>refCard(r,'',true)).join('')+'</div>':'');}
+        else if(mine.length){sh+='<div class="ds">AI still for this shot · approve or reject: approving places it in the shot. Click it: it opens beside the list, with your words box and its buttons.</div><div class="strip">'+mine.map(r=>refCard(r,'',true)).join('')+'</div>';}   // design/94 A1, U3; design/97 P1
         else{sh+='<div class="ds">No picture yet.</div>';}
       }
       if(loose.length)sh+='<details><summary class="ds" style="cursor:pointer">No shot recorded ('+loose.length+')</summary><div class="strip">'+loose.map(r=>refCard(r,use(r),false,true)).join('')+'</div></details>';
@@ -451,9 +558,12 @@ function renderPictures(){
       h+=sh+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
-  $('s-pictures').innerHTML=h;
-  $('s-pictures').querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{gapFilter=b.dataset.g;renderPictures();}));
-  $('s-pictures').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+  $('s-pictures').innerHTML=split(h);   // design/97 P1, P2: the shared panel
+  const root=$('s-pictures');
+  root.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{gapFilter=b.dataset.g;renderPictures();}));
+  root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
+  shown.forEach(g=>g.shots.forEach(s=>{if(s.state_problem)highlightNamed(s.state_problem,$('card-'+s.shot_id));}));   // design/97 L4
+  wireGrid(root,renderPictures);
 }
 // ---------- takes ----------
 function play(url,name){const pl=$('pl');$('player').hidden=false;pl.src=url;$('pl-name').textContent=name;pl.play().catch(()=>{});}
@@ -487,18 +597,21 @@ function renderTakes(){
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
     g.shots.filter(s=>s.route==='video').forEach(s=>{
       const st=states[s.shot_id];
-      let sh='<div class="card"><span class="nm">'+esc(s.shot_id)+'</span> <span class="badge">AI video</span><span class="ds">'+secs(s.end_frame-s.start_frame)+(s.bound&&s.bound.length?' · bound':'')+(s.prepared?' · take prepared':'')+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s)+
+      let sh='<div class="card" id="card-'+esc(s.shot_id)+'"><span class="nm">'+headOf(s)+'</span> <span class="ds">'+filmAt(s)+' · '+secs(s.end_frame-s.start_frame)+(s.bound&&s.bound.length?' · bound':'')+(s.prepared?' · take prepared':'')+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s)+
         '<div class="turn '+st[0]+'">'+esc(st[1])+'</div>';
       const pair=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe');
-      if(pair.length){sh+='<div class="ds" style="margin-top:6px">The start and end images:</div><div class="strip">'+pair.map(r=>refCard(r)).join('')+'</div>'+pairPlan(s);}
-      if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="btns"><button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button></div>':'')+'</td></tr>').join('')+'</tbody></table>';}
+      if(pair.length){sh+='<div class="ds" style="margin-top:6px">The start and end images:</div><div class="strip">'+pair.map(r=>refCard(r,'',true)).join('')+'</div>'+pairPlan(s);}
+      if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
       h+=sh+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
-  $('s-takes').innerHTML=h;
-  $('s-takes').querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click',()=>play(b.dataset.play,b.dataset.name)));
-  $('s-takes').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+  $('s-takes').innerHTML=split(h);   // design/97 P2: a take, a pair, judged in the shared panel
+  const root=$('s-takes');
+  root.querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click',ev=>{ev.stopPropagation();play(b.dataset.play,b.dataset.name);}));
+  root.querySelectorAll('tr[data-take]').forEach(tr=>tr.addEventListener('click',()=>selectPic({take:tr.dataset.take})));
+  root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
+  wireGrid(root,renderTakes);
 }
 // ---------- record ----------
 function readyGaps(){return data.gaps.filter(g=>g.accepted&&!g.recorded&&g.shots.length&&g.shots.every(s=>s.asset||s.takes.some(k=>k.selected)));}
@@ -527,8 +640,8 @@ function footer(){
     const s=selEl?latestSearch(selEl):null, n=s?(picks[s.search_id]||[]).length:0;
     tray.innerHTML='<span>'+esc(selEl||'')+':</span>'+(s&&n?tickChips([s.search_id]):'')+box;
     act_.innerHTML=(s?'<button class="go" data-a="pick" data-search="'+esc(s.search_id)+'" '+(n?'':'disabled')+'>Use the ticked pictures</button> <button data-a="nothing-fits" data-search="'+esc(s.search_id)+'">Nothing fits</button>':'<span class="why">type keywords above and press Search; your yes goes in this box</span>');wireChips();
-  }else if(step==='pictures'||step==='takes'){
-    tray.innerHTML='<span>Your words for the next button (Approve, Reject, Use, Select):</span>'+box;act_.innerHTML='';
+  }else if(step==='pictures'||step==='takes'){   // design/97 P2: a picture's words go in the panel beside it
+    tray.innerHTML='<span>Click a picture or a take: it opens beside the list, with its words box and buttons. This box is for a clip\'s Remove:</span>'+box;act_.innerHTML='';
   }else{
     const ready=readyGaps();
     tray.innerHTML='<span>'+(ready.length?ready.length+' gap'+(ready.length>1?'s':'')+' ready:':'No gap is ready to record yet.')+'</span>'+box;
@@ -539,7 +652,7 @@ function footer(){
 // ---------- the clicks: every button calls the server function the vw tool calls ----------
 async function click(b){
   const a=b.dataset.a, q=words();
-  const need=(text)=>{needWords('words',text);};
+  const need=(text)=>{needWords($('pwords')?'pwords':'words',text);};   // design/97 P1
   if(a==='select'){await send({action:'select',gap_id:b.dataset.gap,choice_id:b.dataset.choice},'Choice recorded.');return;}
   if(a==='treatment'){if(!q){need();return;}await send({action:'treatment',quote:q},'Treatment recorded: the assistant writes the plan.');return;}
   if(a==='accept-selected'){if(!q){need('Your yes for these gaps is required.');return;}const ids=Object.keys(selGaps);if(!ids.length){msg('Tick a gap first.',true);return;}const j=await send({action:'accept',gap_ids:ids,quote:q},ids.length+' gap(s) accepted.');if(j)selGaps={};return;}
@@ -547,7 +660,7 @@ async function click(b){
   if(a==='approve'||a==='reject'){const pw=$('pwords'), pq=pw?pw.value.trim():q;   // design/80 S6: the words sit with the button
     if(!pq){if(pw)needWords('pwords',a==='approve'?'Your words for this picture go in the box above the button.':'Say why in the box above the button, then Reject.');else need(a==='approve'?'Your words for this picture are required.':'Say why in the box, then Reject.');return;}
     const j=await send(a==='approve'?{action:'approve',reference_id:b.dataset.ref,sha256:b.dataset.sha,quote:pq}:{action:'reject',reference_id:b.dataset.ref,notes:pq,quote:pq},a==='approve'?'Picture approved.':'Picture rejected; the next one starts from the approved picture.');
-    if(j&&j.placed)msg('Picture approved and placed in '+j.placed+(j.replaced?' (it replaces '+j.replaced+', which stays approved)':'')+'.');return;}   // design/95 F3
+    return;}   // design/95 F3, design/97 A4: the server's next line says where it went
   if(a==='still'){if(!q){need('Your words for this picture are required.');return;}await send({action:'still',shot_id:b.dataset.shot,reference_id:b.dataset.ref,quote:q,...reuseOf(b.dataset.shot)},'Picture held for the shot.');return;}
   if(a==='clip'){const sh=b.dataset.shot, w=(($('cf-w-'+sh)||{}).value||'').trim(), at=($('cf-at-'+sh)||{}).value;   // design/89 B3: the same server function as `vw visuals clip`
     if(at===''||at==null){msg('Say from which second of the clip.',true);return;} if(!w){needWords('cf-w-'+sh,'Your words for this stretch are required.');return;}

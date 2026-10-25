@@ -165,7 +165,7 @@ function draw(){
   }else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){
     $('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';
   }else if(d.accepted&&stage()==='master'){
-    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Reject asks for a reason; Keep with edit asks for the shot and the frame trim.</span>';
+    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Keep: use it. Reject: not this one (say why). Keep with edit: use it with a shot or trim change. Drop: leave the decision out. The buttons answer after you approve the options.</span>';   // design/97 O4
   }else{
     $('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';
   }

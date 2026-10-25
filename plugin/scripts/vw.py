@@ -1300,7 +1300,7 @@ def cmd_visuals(a):
     if a.what == 'sequence':   # design/65 B2': the states of a graphic, approved in one call
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
         out = write(base + '/sequence', {'shot_id': a.shot, 'reference_ids': refs, 'quote': a.quote or ''})
-        emit(out, 0, f"Sequence held for {out.get('shot_id')}: {out.get('states', 0)} states approved" + (f"; {len(out['warnings'])} warning(s): " + '; '.join(out['warnings']) if out.get('warnings') else '') + '.')
+        emit(out, 0, (out.get('next') or '') + ' ' + f"Sequence held for {out.get('shot_id')}: {out.get('states', 0)} states approved" + (f"; {len(out['warnings'])} warning(s): " + '; '.join(out['warnings']) if out.get('warnings') else '') + '.')
     if a.what == 'budget':
         out = call('GET', base + '/budget')
         p = out.get('planned') or {}
@@ -1309,7 +1309,7 @@ def cmd_visuals(a):
              + (" — over the cap: narrow the plan and tell the operator the spend; the cap is a setting the builder changes on SK's word." if over else '.'))   # design/74 L26
     if a.what == 'reject':   # design/74 L7: a wrong picture, with the operator's words; the next one starts from the approved picture
         out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote})
-        emit(out, 0, f"Reference {a.ref} rejected; the next end image is made from the approved start (a state from the last approved state), never from this one.")
+        emit(out, 0, (out.get('next') or f'Reference {a.ref} rejected.') + ' The next end image is made from the approved start (a state from the last approved state), never from this one.')   # design/97 A4
     if a.what == 'feedback':   # design/74 L7: the records in the library's shape
         out = call('GET', base + '/feedback')
         folder = ws / 'work' / 'visuals'
@@ -1416,8 +1416,8 @@ def cmd_visuals(a):
                    lambda done: f"{len(done)} approved: {', '.join(done)}.",
                    lambda ref, out: out.get('placed') and f"{ref} placed in {out['placed']}" + (f" (replaces {out['replaced']})" if out.get('replaced') else ''))
         out = write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote})
-        emit(out, 0, (f"Approved {a.ref} and placed in {out['placed']}" + (f" (it replaces {out['replaced']}, which stays approved)" if out.get('replaced') else '') + '.')   # design/94 A1
-             if out.get('placed') else None)
+        emit(out, 0, out.get('next') or ((f"Approved {a.ref} and placed in {out['placed']}" + (f" (it replaces {out['replaced']}, which stays approved)" if out.get('replaced') else '') + '.')   # design/94 A1; design/97 A4
+             if out.get('placed') else None))
     if a.what == 'bind':   # design/45 10.4: no quote needed; the approved references are the yes
         if a.file:   # design/77 L33b: several shots in one call
             def bind_row(r):
@@ -1499,7 +1499,9 @@ def cmd_visuals(a):
         else:
             line = f'all done: {ready} ready' if jobs_ else 'no image or take jobs yet'
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
-        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + '; one line per job above, the whole status in work/visuals/status.json')
+        wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
+        waiting_line = (f'; {len(wt)} waiting for the operator: ' + '; '.join(f"{w['label']} {server_url()}{w['link']}" for w in wt)) if wt else ''
+        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)
@@ -1521,7 +1523,8 @@ def cmd_visuals(a):
         emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes, 'timing_notes': a.timing or '', 'quote': a.quote}))
     if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
         a.job = _take_job(base, a.job)
-        emit(write(base + '/select-take', {'job_id': a.job, 'quote': a.quote, **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})}))
+        out = write(base + '/select-take', {'job_id': a.job, 'quote': a.quote, **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})})
+        emit(out, 0, out.get('next'))   # design/97 A4
     if a.what == 'still':   # design/45 10.3: an approved reference fills a still shot
         if a.file:   # design/77 L33b: several still shots in one call
             _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or ''}), 'shot',
@@ -1533,7 +1536,7 @@ def cmd_visuals(a):
         emit(out, 0, f"Fix {out.get('reference_id')} of {out.get('of')} requested for '{out.get('for')}' (₹{out.get('cost_inr', 0):,.0f}); `vw visuals status --wait 300`, then show it with its original.")
     if a.what == 'unplace':   # design/94 R1.8: a shot's picture taken out with the operator's words; it stays approved
         out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote})
-        emit(out, 0, f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")
+        emit(out, 0, out.get('next') or f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")
     if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
         if not a.shot or not a.clip or a.at is None:
             emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)

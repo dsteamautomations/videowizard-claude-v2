@@ -786,3 +786,29 @@ def test_the_procedure_says_fixes_are_asked_for_and_names_the_graphic_kind():
     for text in (vsteps, doc):
         assert 'vw visuals fix --ref' in text and 'Image 1 to Image N' in text
     assert '`graphic_kind`' in vp and '`graphic_kind`' in vsteps
+
+def test_status_lists_each_waiting_item_with_its_label_and_link(harness, monkeypatch, capsys):
+    """design/97 W4: the label and the link, never only "on the page"."""
+    st = {'jobs': [], 'references': [], 'gaps': [], 'waiting': [{'label': 'Still · DG1', 'link': '/runs/VW-9/visuals#pictures/DG1/K1', 'step': 'pictures'},
+                                                               {'label': 'Take · VS1', 'link': '/runs/VW-9/visuals#takes/VS1/j1', 'step': 'takes'}]}
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: st)
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://vw.test')
+    code, out, err = run(args(what='status'), capsys)
+    assert '2 waiting for the operator: Still · DG1 https://vw.test/runs/VW-9/visuals#pictures/DG1/K1; Take · VS1 https://vw.test/runs/VW-9/visuals#takes/VS1/j1' in err
+
+
+@pytest.mark.parametrize('what, extra', [('approve', {'ref': 'K1', 'sha': 's'}), ('reject', {'ref': 'K1', 'notes': 'n'}), ('sequence', {'shot': 'AN1'}),
+                                         ('unplace', {'shot': 'DG1'}), ('select', {'job': '11111111-1111-1111-1111-111111111111'})])
+def test_a_verdict_prints_what_happens_next(harness, monkeypatch, capsys, what, extra):
+    """design/97 A4: the server's line, the same on the page."""
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'next': 'Approved: in the film at 0:14–0:17 (DG1).'})
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'jobs': []})   # select looks the job up first
+    code, out, err = run(args(what=what, quote='yes', **extra), capsys)
+    assert 'Approved: in the film at 0:14–0:17 (DG1).' in err
+
+
+def test_the_procedure_gives_the_label_and_the_link():
+    """design/97 W4."""
+    vsteps, doc = ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for text in (vsteps, doc):
+        assert 'the label and the link' in text

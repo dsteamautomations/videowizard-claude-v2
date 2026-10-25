@@ -283,7 +283,14 @@ def check(store, run, outputs, document):
     planned = round(r['images_estimated'] * pr['image_inr'] + r['seconds']['video'] * pr['video_inr_per_s'], 2)   # design/65 B7: the cost against the cap, before anything is paid
     alike = look_alike_placed(store, session)   # design/89 H6: the pictures already placed that look alike
     warnings += [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike]
-    return {'status': 'valid', 'warnings': warnings, 'routes': r, 'plan_digest': digest(plan), 'budget': {'planned_inr': planned, 'cap_inr': cap_of(session)}, 'look_alike': alike}   # design/45 10.2
+    split = {}
+    for gap in plan['gaps']:   # design/97 G3: a gap with choices is split by its recommended choice
+        try:
+            split[gap['gap_id']] = split_of([sh for sc in chosen_scenes(gap, {'choice_id': gap.get('recommended_choice')} if gap.get('choices') else None) for sh in sc['shots']],
+                                            float(Fraction(str(_fps(session) or 25))))
+        except ValueError:
+            continue
+    return {'status': 'valid', 'warnings': warnings, 'routes': r, 'split': split, 'plan_digest': digest(plan), 'budget': {'planned_inr': planned, 'cap_inr': cap_of(session)}, 'look_alike': alike}   # design/45 10.2
 
 
 def propose(conn, store, user, run, outputs, document):
@@ -469,8 +476,8 @@ def page_view(conn, store, run, outputs, code, repair=True):
                              checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None,   # design/74 L6
                              check=({k: image_check.expand(r['check'], r).get(k) for k in ('lines', 'must_failed', 'error', 'fix_error', 'model')} if r.get('check') else None),   # design/86 K2; design/92
                              pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'), fix_for=r.get('fix_for'))   # design/86 K1, K2
-    takes = {}
-    for j in take_jobs(conn, run):
+    takes, take_rows = {}, take_jobs(conn, run)
+    for j in take_rows:
         res = j.get('result') or {}
         takes.setdefault(j['unit'], []).append({'job_id': str(j['id']), 'status': j['status'], 'error': j.get('error'), 'url': url(res.get('key')), 'sha256': res.get('sha256'),
                                                  'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
@@ -490,6 +497,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                     shots = [sh for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']]
                 except ValueError:
                     shots = []
+                entry['split'] = split_of(shots, float(Fraction(str(_fps(session) or 25))))   # design/97 G3
                 for sh in shots:
                     asset = session['assets'].get(sh['id'])
                     binding = session['bindings'].get(sh['id']) or {}
@@ -521,6 +529,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
             'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
+            'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
 
@@ -569,7 +578,7 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
                                   'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}}
     session['selections'].pop(shot_id, None)
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'kind': 'sequence', 'states': len(rows), 'warnings': warnings}
+    return {'shot_id': shot_id, 'kind': 'sequence', 'states': len(rows), 'warnings': warnings, 'next': f'Sequence approved: in the film at {film_time(session, shot)} ({shot_id}).'}
 
 
 def _state_order(session, sh):
@@ -580,6 +589,86 @@ def _state_order(session, sh):
         return {'state_order': [r['id'] for r in state_chain(session, sh['id']) or []], 'state_problem': None}
     except ValueError as exc:
         return {'state_order': [], 'state_problem': str(exc)}
+
+
+def film_time(session, shot):
+    """design/97 A4: where a shot sits in the film, as 0:14–0:17."""
+    fps = float(Fraction(str(_fps(session) or 25)))
+    m = lambda f: f"{int(f / fps) // 60}:{int(f / fps) % 60:02d}"
+    return f"{m(shot['start_frame'])}–{m(shot['end_frame'])}"
+
+
+def item_link(code, step, group, item):
+    """design/97 W1: the page's link to one item, the same from both front ends."""
+    return f'/runs/{code}/visuals#{step}/{group}/{item}'
+
+
+def split_of(shots, fps):
+    """design/97 G3: a gap's seconds and shots per route."""
+    out = {}
+    for sh in shots:
+        k = 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else 'still'
+        row = out.setdefault(k, {'route': k, 'seconds': 0.0, 'shots': 0})
+        row['seconds'] = round(row['seconds'] + (sh['end_frame'] - sh['start_frame']) / float(fps), 1)
+        row['shots'] += 1
+    return [out[k] for k in ('graphics', 'AI video', 'still') if k in out]
+
+
+def _accepted_shots(plan, session):
+    """The shots of the accepted gaps, as (gap, shot), in film order."""
+    out = []
+    for gap in plan['gaps']:
+        acc = session['accepted'].get(gap['gap_id'])
+        if not acc or acc['digest'] != gap_digest(plan, gap) or (gap.get('choices') and not session['choice_selections'].get(gap['gap_id'])):
+            continue
+        out += [(gap, sh) for sc in chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])) for sh in sc['shots']]
+    return sorted(out, key=lambda gs: gs[1]['start_frame'])
+
+
+def waiting(session, plan, code, take_rows):
+    """design/97 W1, W3, W4: what waits for the operator's verdict, in film order, each with its label and link: a checked candidate (a reference,
+    the style sheet, a still, a start or end image, a sequence once every state is made), a ready take, a drawing spec, a reuse."""
+    if not plan:
+        return []
+    shots = {sh['id']: sh for _, sh in _accepted_shots(plan, session)}
+    items = []
+
+    def add(at, label, step, group, item):
+        if not any(i['label'] == label for _, i in items):
+            items.append((at, {'label': label, 'step': step, 'group': group, 'item': item, 'link': item_link(code, step, group, item)}))
+    title = lambda sh: f" · {sh['title']}" if sh.get('title') else ''
+    ready = lambda r: r.get('status') == 'candidate' and r.get('sha256') and not r.get('check_pending')
+    for r in session['references'].values():
+        sh = shots.get(made_for(session, r) or '')
+        if not ready(r):
+            continue
+        if r.get('kind') == 'style':
+            add(-1, 'Graphic style · style sheet', 'pictures', STYLE, r['id'])
+        elif r.get('kind') in ('frame', 'supplied', 'web', 'isolated', 'sheet'):
+            add(-1, f"Reference sheet · {r['element_id']}" if r['kind'] == 'sheet' else f"Reference · {r['element_id']} · {r['kind']}", 'references', r['element_id'], r['id'])
+        elif sh and route_of(sh) == 'still':
+            add(sh['start_frame'], f"Still · {sh['id']}{title(sh)}", 'pictures', sh['id'], r['id'])
+        elif sh and route_of(sh) == 'video':
+            add(sh['start_frame'], f"Start and end · {sh['id']}{title(sh)}", 'takes', sh['id'], r['id'])
+    for sid, sh in shots.items():
+        if route_of(sh) == 'graphic_sequence':
+            try:
+                chain = state_chain(session, sid) or []
+            except ValueError:   # two pictures for one step: the page shows the problem
+                chain = []
+            if chain and len(chain) == len(sh.get('states') or []) and any(r['status'] == 'candidate' for r in chain) and not any(r.get('check_pending') for r in chain):
+                add(sh['start_frame'], f"Graphics · {sid}{title(sh)} · {len(chain)} states", 'pictures', sid, chain[-1]['id'])
+        spec = sh.get('drawing_spec')
+        if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec):
+            add(sh['start_frame'], f'Drawing spec · {sid}', 'pictures', sid, 'spec')
+    for sid in session.get('reuse_pending') or {}:
+        sh = shots.get(sid) or {'start_frame': 0}
+        add(sh['start_frame'], f'Reuse · {sid}', 'takes' if sh.get('visual_type') == 'video' else 'pictures', sid, 'reuse')
+    for j in take_rows:
+        sh, reviews = shots.get(j['unit']), session['reviews'].get(str(j['id'])) or []
+        if sh and j['status'] == 'ready' and (session['selections'].get(j['unit']) or {}).get('job_id') != str(j['id']) and not (reviews and reviews[-1]['decision'] == 'rejected'):
+            add(sh['start_frame'], f"Take · {j['unit']}{title(sh)}", 'takes', j['unit'], str(j['id']))
+    return [i for _, i in sorted(items, key=lambda x: x[0])]
 
 
 def state_chain(session, shot_id):
@@ -1387,8 +1476,9 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     row['dhash'] = _fingerprints(store, row['key'])   # design/89 H6, finding 9: kept once, never read again for the look-alike check
     _feedback_image(session, run, user, row, 'pass', quote, '')
     save_session(store, run, session)
-    if placed:
-        return {**row, 'placed': sid, **({k: placed[k] for k in ('replaced', 'warnings') if k in placed})}
+    if placed:   # design/97 A4: what happens next, with the film time
+        nxt = f"Approved: in the film at {film_time(session, shot)} ({sid})" + (f"; it replaces {placed['replaced']}, which stays approved" if placed.get('replaced') else '') + '.'
+        return {**row, 'placed': sid, 'next': nxt, **({k: placed[k] for k in ('replaced', 'warnings') if k in placed})}
     pe = row.get('pending_end')
     if pe and conn is not None and not row.get('end_queued'):   # design/86 K1: the end image follows the approved start without a chat turn
         out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
@@ -1396,8 +1486,8 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         session = session_of(store, run, outputs)
         session['references'][ref_id]['end_queued'] = out['reference_id']
         save_session(store, run, session)
-        return {**session['references'][ref_id], 'end_reference_id': out['reference_id']}
-    return row
+        return {**session['references'][ref_id], 'end_reference_id': out['reference_id'], 'next': 'Approved: the end image is being made from it.'}
+    return {**row, 'next': _approved_next(store, session, row)}
 
 
 def request_fix(conn, store, user, run, outputs, ref_id):
@@ -1417,7 +1507,32 @@ def request_fix(conn, store, user, run, outputs, ref_id):
     session['references'][ref_id]['fix_queued'] = out['reference_id']
     session['references'][out['reference_id']]['fix_for'] = failed[0]['check']
     save_session(store, run, session)
-    return {'reference_id': out['reference_id'], 'of': ref_id, 'for': failed[0]['check'], 'cost_inr': prices()['image_inr']}
+    return {'reference_id': out['reference_id'], 'of': ref_id, 'for': failed[0]['check'], 'cost_inr': prices()['image_inr'], 'next': 'Fix requested: it appears here in about a minute.'}
+
+
+def _picture_word(store, session, row):
+    """What the picture is, in the operator's words."""
+    kind = row.get('kind')
+    if kind == 'keyframe':
+        if any((session['references'].get(p.get('id')) or {}).get('kind') == 'keyframe' for p in (row.get('generation') or {}).get('parents') or []):
+            return 'end image'
+        return 'start image' if made_for(session, row) and _shot_is_video(store, session, made_for(session, row)) else 'picture'
+    return {'state': 'state', 'sheet': 'reference sheet', 'style': 'style sheet'}.get(kind, 'reference picture')
+
+
+def _shot_is_video(store, session, shot_id):
+    try:
+        return locate(store, session, shot_id)[3]['visual_type'] == 'video'
+    except Exception:   # a shot no longer in the plan
+        return False
+
+
+def _approved_next(store, session, row):
+    """design/97 A4: what follows an approval that places nothing."""
+    word = _picture_word(store, session, row)
+    return {'end image': f"Approved: the take for {made_for(session, row)} is the next step.", 'start image': 'Approved: the end image is made from it next.',
+            'state': 'Approved: the sequence is approved as a whole once every state is in.', 'style sheet': 'Approved: every graphic is made from it.',
+            'reference sheet': f"Approved: the shots of {row.get('element_id')} are made from it."}.get(word, 'Approved.')
 
 
 def reject_reference(store, user, run, outputs, ref_id, notes, quote):
@@ -1429,7 +1544,7 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
     row.update(status='rejected', rejection={'notes': str(notes or '').strip() or str(quote), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     _feedback_image(session, run, user, row, 'reject', quote, row['rejection']['notes'])
     save_session(store, run, session)
-    return row
+    return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}   # design/97 A4
 
 
 # ---------- design/74 L7: the feedback record, in the library's shape (record-template.videowizard.yaml) ----------
@@ -1852,7 +1967,8 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id']}
     _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
     save_session(store, run, session)
-    return session['selections'][job['unit']]
+    shot = guarded(lambda: locate(store, session, job['unit']))[3]
+    return {**session['selections'][job['unit']], 'next': f"Take selected: in the film at {film_time(session, shot)} ({job['unit']})."}   # design/97 A4
 
 
 def made_for(session, row):
@@ -1915,7 +2031,7 @@ def unplace(store, user, run, outputs, shot_id, quote):
     session.setdefault('unplaced', []).append({'shot_id': shot_id, 'kind': asset['kind'], 'removed': removed, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     del session['assets'][shot_id]
     save_session(store, run, session)
-    return {'shot_id': shot_id, 'kind': asset['kind'], 'removed': removed}
+    return {'shot_id': shot_id, 'kind': asset['kind'], 'removed': removed, 'next': f'Taken out of {shot_id}: it stays approved.'}
 
 
 REUSE_APART_S = 60          # design/89 H4 (SK): an approved reuse is at least this far from the other showing
@@ -2165,9 +2281,10 @@ def status(conn, store, run, outputs, repair=True):
                                        'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
         gaps.append(entry)
     refs = [{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')} for r in session['references'].values()]
+    take_rows = take_jobs(conn, run)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'check_marks': [{k: m.get(k) for k in ('check', 'at_s', 'seen')} for m in ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('must_failed') or []]}   # design/91 N3
-             for j in take_jobs(conn, run)]
+             for j in take_rows]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
     return {'state': 'prepared', 'busy': not repair, 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
@@ -2175,6 +2292,7 @@ def status(conn, store, run, outputs, repair=True):
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
             'footage': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/88
+            'waiting': waiting(session, plan, run.get('code'), take_rows),   # design/97 W4: each with its label and link
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 
