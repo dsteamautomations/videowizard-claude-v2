@@ -42,14 +42,14 @@ def test_each_gap_has_accept_and_revise_and_a_gap_under_revision_shows_its_badge
 
 def test_the_element_sections_carry_the_picks_page():
     """design/73 R4b: the ten points."""
-    for needle in ('data-a="search"', 'data-a="pick"', 'data-a="nothing-fits"', 'from your footage', 'avoid brand text', 'posture only', 'Use the ticked pictures', 'element_matches', 'Image '):
+    for needle in ('data-a="search"', 'data-a="pick"', 'data-a="nothing-fits"', 'from your footage', 'avoid brand text', 'posture only', "'Save '+", 'element_matches', 'Image '):
         assert needle in HTML, needle
     assert 'Generate' not in HTML   # nothing paid from a click
 
 
 def test_the_references_step_is_a_split_view_with_the_controls_in_the_panel():
     """design/80: the grid left, the chosen picture and its controls on the right, the ticks as chips in the footer; no note under a card, no overlay."""
-    for needle in ('class="split"', 'id="panel"', 'Tick as Image', 'Untick (Image', 'Previous', 'Next ›', 'id="pwords"', 'data-untick', 'tickChips', 'ArrowLeft', "ev.key==='Escape'", 'max-width:900px'):
+    for needle in ('class="split"', 'id="panel"', 'Tick as Image', 'Untick (Image', 'Previous', 'Next ›', 'id="p-close"', 'data-untick', 'tickChips', 'ArrowLeft', "ev.key==='Escape'", 'max-width:900px'):
         assert needle in HTML, needle
     assert 'lightbox' not in HTML and 'textarea class="note"' not in HTML and 'bigPicture' not in HTML
     card = HTML[HTML.index('function resultCard'):HTML.index('function elState')]

@@ -245,7 +245,7 @@ class ImageGenerate(Write):
 
 class ReferenceApprove(Write):
     sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C2: the click is the verdict
 
 
 class BindBody(Write):
@@ -258,7 +258,7 @@ class BindBody(Write):
 class StillBody(Write):
     shot_id: str
     reference_id: str
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C2
     reuse: str | None = None          # design/89 H2: why the same footage again
     considered: str | None = None     # the reimagined shot considered, and why it adds nothing
     crop: list[float] | None = None   # H4: the different framing, x, y, w, h
@@ -273,6 +273,11 @@ class ClipBody(Write):   # design/89 B3
     reuse: str | None = None
     considered: str | None = None
     crop: list[float] | None = None
+
+
+class UnplaceBody(Write):   # design/99 C2: Remove is a click
+    shot_id: str
+    quote: str = ''
 
 
 class ReuseApprove(Write):   # design/89 H7: the operator's own words for a proposed reuse
@@ -298,12 +303,12 @@ class TreatmentBody(Write):   # design/65 B6: a document without words is the dr
 class SequenceBody(Write):    # design/65 B2'
     shot_id: str
     reference_ids: list[str] = Field(default_factory=list, max_length=12)   # design/94 A2: the server's order when left out
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C2
 
 
-class ReferenceReject(Write):   # design/74 L7
+class ReferenceReject(Write):   # design/74 L7; design/99 C3: the reason is optional
     notes: str = ''
-    quote: str = Field(min_length=1)
+    quote: str = ''
 
 
 class GapRevise(Write):   # design/76 (L32)
@@ -315,13 +320,13 @@ class GapRevise(Write):   # design/76 (L32)
 class SearchBody(Write):   # design/73 R3
     element_id: str
     keywords: str = Field(min_length=1, max_length=120)
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C4: the click is the yes
 
 
 class PickBody(Write):     # design/73 R4
     search_id: str
     picks: list[dict[str, Any]] = Field(min_length=1, max_length=10)
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C5
 
 
 class NothingFits(Write):  # design/73 R4b
@@ -335,12 +340,12 @@ class RoundStart(Write):   # design/79 Q1
 
 class RoundDone(Write):
     verdicts: dict[str, dict[str, Any]]
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C6
 
 
 class RoundPicks(Write):
     picks: dict[str, list[dict[str, Any]]]
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C6
 
 
 class GeneratorBody(Write):
@@ -369,14 +374,14 @@ class ShotBody(Write):
 class TakeReview(Write):
     job_id: UUID
     decision: Literal['accepted', 'rejected']
-    notes: str = Field(min_length=1)
+    notes: str = ''          # design/99 C3: a take's reason is optional
     timing_notes: str = ''
-    quote: str = Field(min_length=1)
+    quote: str = ''
 
 
 class TakeSelect(Write):
     job_id: UUID
-    quote: str = Field(min_length=1)
+    quote: str = ''   # design/99 C2
     notes: str = ''          # design/45 10.4: with notes, the accepted review is recorded in the same call
     timing_notes: str = ''
 
@@ -1334,7 +1339,7 @@ def visuals_fix(run_id: UUID, ref_id: str, body: Write, user=User, conn=DB):   #
 
 
 @app.post('/api/runs/{run_id}/visuals/unplace')
-def visuals_unplace(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/94 R1.8: a shot and the operator's words
+def visuals_unplace(run_id: UUID, body: UnplaceBody, user=User, conn=DB):   # design/94 R1.8: a shot and the operator's words
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.unplace(storage(), user, run, outputs, body.shot_id, body.quote))
 
 

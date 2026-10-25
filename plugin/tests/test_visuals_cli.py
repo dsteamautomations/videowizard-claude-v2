@@ -820,3 +820,20 @@ def test_the_procedure_says_the_first_answer_approves_a_reason_is_optional_and_t
     assert 'the first answer approves the options' in options and 'the first answer approves the options' in master and 'the first answer approves the options' in doc
     assert 'A REJECT is followed by one question for the reason' not in master and 'the reason is optional' in master
     assert 'their reply as `--quote` if they gave one' in voice
+
+@pytest.mark.parametrize('what, extra', [('approve', {'ref': 'K1', 'sha': 's'}), ('reject', {'ref': 'K1'}), ('sequence', {'shot': 'AN1'}), ('still', {'shot': 'DG1', 'ref': 'K1'}),
+                                         ('unplace', {'shot': 'DG1'}), ('select', {'job': '11111111-1111-1111-1111-111111111111'}), ('pick', {'search': 's1', 'n': '1,2'})])
+def test_a_click_needs_no_quote_in_chat_either(harness, monkeypatch, capsys, what, extra):
+    """design/99 C2-C5: the words are optional; the server records who and when."""
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append(body) or {'next': 'ok.', 'references': [], 'shot_id': 'S', 'states': 1})
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'jobs': []})
+    code, out, err = run(args(what=what, **extra), capsys)
+    assert code == 0 and posted and posted[-1]['quote'] == ''
+
+
+def test_the_procedure_says_a_click_needs_no_words():
+    """design/99."""
+    vsteps, doc = ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for text in (vsteps, doc):
+        assert 'no typed words' in text

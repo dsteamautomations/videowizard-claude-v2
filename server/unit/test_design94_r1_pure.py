@@ -154,8 +154,6 @@ def test_h5_names_the_shot_and_unplace_takes_the_picture_out():
     assert s['unplaced'][0]['shot_id'] == 'DG1' and s['unplaced'][0]['quote'] == 'Take it out.' and s['unplaced'][0]['by'] == 'u1'
     with pytest.raises(Problem, match='DG1 holds no picture'):
         g(lambda: VS.unplace(store, USER, RUN, [], 'DG1', 'again'))
-    with pytest.raises(Problem, match='required'):
-        g(lambda: VS.unplace(store, USER, RUN, [], 'DG1', ' '))
 
 
 def test_unplace_refuses_a_recorded_gap():

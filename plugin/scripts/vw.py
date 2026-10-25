@@ -1308,7 +1308,7 @@ def cmd_visuals(a):
         emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); images: {out.get('images', 0) - out.get('fixes', 0)} requested + {out.get('fixes', 0)} fixes; the current plan still needs about ₹{p.get('inr', 0):,.0f}"
              + (" — over the cap: narrow the plan and tell the operator the spend; the cap is a setting the builder changes on SK's word." if over else '.'))   # design/74 L26
     if a.what == 'reject':   # design/74 L7: a wrong picture, with the operator's words; the next one starts from the approved picture
-        out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote})
+        out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote or ''})   # design/99 C3: the reason is optional
         emit(out, 0, (out.get('next') or f'Reference {a.ref} rejected.') + ' The next end image is made from the approved start (a state from the last approved state), never from this one.')   # design/97 A4
     if a.what == 'feedback':   # design/74 L7: the records in the library's shape
         out = call('GET', base + '/feedback')
@@ -1355,7 +1355,7 @@ def cmd_visuals(a):
         for item in a.note or []:
             k, _, v = str(item).partition('=')
             notes[int(k.strip())] = v.strip().strip('"')
-        out = write(base + '/pick', {'search_id': a.search, 'picks': [{'n': n, 'note': notes.get(n, '')} for n in ns], 'quote': a.quote})
+        out = write(base + '/pick', {'search_id': a.search, 'picks': [{'n': n, 'note': notes.get(n, '')} for n in ns], 'quote': a.quote or ''})
         emit(out, 0, f"{len(out.get('references') or [])} web references made from search {a.search}; show each (`fetch --ref`) and approve with its hash, then generate the element's sheet from them.")
     if a.what == 'nothing-fits':   # design/73 R4b
         emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted; the reason is the next search\'s hint.')
@@ -1412,10 +1412,10 @@ def cmd_visuals(a):
                      (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
     if a.what == 'approve':
         if a.file:   # design/77 L33b: several approvals in one call
-            _batch(_rows(m, a.file, ('ref', 'sha', 'quote')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r['quote']}), 'ref',
+            _batch(_rows(m, a.file, ('ref', 'sha')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r.get('quote') or ''}), 'ref',
                    lambda done: f"{len(done)} approved: {', '.join(done)}.",
                    lambda ref, out: out.get('placed') and f"{ref} placed in {out['placed']}" + (f" (replaces {out['replaced']})" if out.get('replaced') else ''))
-        out = write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote})
+        out = write(f"{base}/references/{a.ref}/approve", {'sha256': a.sha, 'quote': a.quote or ''})   # design/99 C2: the words are optional
         emit(out, 0, out.get('next') or ((f"Approved {a.ref} and placed in {out['placed']}" + (f" (it replaces {out['replaced']}, which stays approved)" if out.get('replaced') else '') + '.')   # design/94 A1; design/97 A4
              if out.get('placed') else None))
     if a.what == 'bind':   # design/45 10.4: no quote needed; the approved references are the yes
@@ -1523,19 +1523,19 @@ def cmd_visuals(a):
         emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes, 'timing_notes': a.timing or '', 'quote': a.quote}))
     if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
         a.job = _take_job(base, a.job)
-        out = write(base + '/select-take', {'job_id': a.job, 'quote': a.quote, **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})})
+        out = write(base + '/select-take', {'job_id': a.job, 'quote': a.quote or '', **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})})
         emit(out, 0, out.get('next'))   # design/97 A4
     if a.what == 'still':   # design/45 10.3: an approved reference fills a still shot
         if a.file:   # design/77 L33b: several still shots in one call
             _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or ''}), 'shot',
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
-        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote, **_reuse_fields(a), **({'move': a.move} if a.move else {})}), 0,
+        emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote or '', **_reuse_fields(a), **({'move': a.move} if a.move else {})}), 0,
              f'Still set for {a.shot} from reference {a.ref}.')   # design/94 R1.7: --move, the operator's words for a picture made for another shot
     if a.what == 'fix':   # design/96 X1: a fix round only on request; tell the operator the line and the cost
         out = write(f"{base}/references/{a.ref}/fix", {})
         emit(out, 0, f"Fix {out.get('reference_id')} of {out.get('of')} requested for '{out.get('for')}' (₹{out.get('cost_inr', 0):,.0f}); `vw visuals status --wait 300`, then show it with its original.")
     if a.what == 'unplace':   # design/94 R1.8: a shot's picture taken out with the operator's words; it stays approved
-        out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote})
+        out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote or ''})
         emit(out, 0, out.get('next') or f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")
     if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
         if not a.shot or not a.clip or a.at is None:

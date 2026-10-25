@@ -719,8 +719,7 @@ def test_a_rejected_picture_cannot_be_approved_bound_held_or_used_as_a_parent(mo
         g(lambda: VS.approve_reference(store, USER, RUN, [], 'K1', 'sha-K1', 'yes'))
     with pytest.raises(Problem, match='rejected'):
         g(lambda: VS.reject_reference(store, USER, RUN, [], 'F1', 'n', 'q'))   # neither candidate nor approved
-    with pytest.raises(Problem, match='operator'):
-        g(lambda: VS.reject_reference(store, USER, RUN, [], 'A1', 'n', ''))
+    # design/99: a click needs no typed words; this step no longer refuses without them
     with pytest.raises(Problem, match='not approved'):
         g(lambda: VS.bind(store, USER, RUN, [], 'VS1', {'E1': ['K1']}, {}))
     with pytest.raises(Problem, match='not an approved reference'):
@@ -977,8 +976,7 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
             {'n': 2, 'thumbnail': 'https://t/2.jpg', 'image_url': 'https://img.example/2.jpg', 'page_url': 'https://site.example/p2', 'site': 'site.example', 'width': 1200, 'height': 900, 'title': 'trowel'}]
     monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: rows)
     store = store_with(sess, doc)
-    with pytest.raises(Problem, match='operator'):
-        g(lambda: VS.search(store, USER, RUN, [], 'E1', 'kadapari tool', ''))
+    # design/99: a click needs no typed words; this step no longer refuses without them
     with pytest.raises(Problem, match='two to six words'):
         g(lambda: VS.search(store, USER, RUN, [], 'E1', 'a very long sentence that is not a keyword search at all', 'yes'))
     with pytest.raises(Problem, match='Unknown element'):
@@ -990,8 +988,7 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
     monkeypatch.setattr(VS, 'fetch_image', lambda url: png.getvalue())
     with pytest.raises(Problem, match='not in the search'):
         g(lambda: VS.pick(store, USER, RUN, [], sid, [{'n': 9}], 'this'))
-    with pytest.raises(Problem, match='operator'):
-        g(lambda: VS.pick(store, USER, RUN, [], sid, [{'n': 1}], ''))
+    # design/99: a click needs no typed words; this step no longer refuses without them
     out = VS.pick(store, USER, RUN, [], sid, [{'n': 2, 'note': 'avoid brand text'}, {'n': 1}], 'These two, the side from the second.')
     refs = saved(store)['references']
     first, second = out['references']
@@ -1061,8 +1058,7 @@ def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
     rows = [{'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img.example/1.jpg', 'page_url': 'https://site.example/p1', 'site': 'site.example', 'width': 800, 'height': 600, 'title': 'kiln'}]
     calls = []
     monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: calls.append(keywords) or rows)
-    with pytest.raises(Problem, match='operator'):
-        g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'search'}}, ''))
+    # design/99: a click needs no typed words; this step no longer refuses without them
     with pytest.raises(Problem, match='E2: a verdict is required'):
         g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}}, 'yes'))
     with pytest.raises(Problem, match='E2 has no frame to approve'):

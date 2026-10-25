@@ -36,6 +36,11 @@ DISSOLVE_S = 0.5   # between the states of a graphic sequence
 MAX_INPUTS = 16    # design/71 P2: GPT Image's limit on input pictures (the library's fact sheet A5)
 
 
+def said(quote, what, user):
+    """design/99 C2: a click is the operator's verdict; their words are kept when given, else the record says who did what."""
+    return str(quote or '').strip() or f"{what} by {user.get('name') or user.get('id')}"
+
+
 def fail(message):
     raise Problem(422, 'VISUALS_CONTRACT', str(message))
 
@@ -541,7 +546,7 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     _route_gate(shot, 'animation')
     states = shot.get('states') or []
-    need(str(quote or '').strip(), 'The operator reply is required.')
+    quote = said(quote, 'Approved', user)   # design/99 C2
     rows, warnings = state_chain(session, shot_id), []
     if rows is not None:   # design/94 A2: the order comes from the shot's own pictures, each state made from the one before
         need(len(rows) == len(states), f"{shot_id} plans {len(states)} states; its pictures make {len(rows)}: {', '.join(r['name'] for r in rows)}.")
@@ -915,7 +920,7 @@ def fetch_image(url):
 def _search_into(session, user, run, plan, element_id, keywords, quote, results=None):
     """The search on a loaded session (design/73 R3; the round of design/79 calls it for several elements before one save)."""
     need(any(e['id'] == element_id for e in plan['elements']), f'Unknown element {element_id}.')
-    need((quote or '').strip(), "The operator's yes to the search is required (the web rule).")
+    quote = said(quote, 'Searched', user)   # design/99 C4: the click is the operator's yes to the web search
     words = str(keywords or '').split()
     need(2 <= len(words) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')   # R6
     rows = results if results is not None else apify.search_images(' '.join(words), 10)
@@ -968,7 +973,7 @@ def _download_picks(rows):
 def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched=None):
     s = (session.get('searches') or {}).get(search_id)
     need(s, f'Unknown search {search_id}.')
-    need((quote or '').strip(), "The operator's words are required.")
+    quote = said(quote, 'Saved', user)   # design/99 C5
     need(isinstance(picks, list) and picks, 'Tick at least one picture.')
     rows = {r['n']: r for r in s['results']}
     chosen = []
@@ -1048,7 +1053,7 @@ def round_done(store, user, run, outputs, verdicts, quote, found=None):
     plan = guarded(lambda: current_plan(store, session))
     rd = session.get('round')
     need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
-    need((quote or '').strip(), "The operator's words are required: they approve the frames and say yes to the searches.")
+    quote = said(quote, 'Pass 1 done', user)   # design/99 C6: the click approves the frames and says yes to the searches
     verdicts = verdicts or {}
     for eid, row in rd['elements'].items():
         if not row['frames']:   # a round posted without naming the frames: the element's grabbed frames count (as round_start does now)
@@ -1098,7 +1103,7 @@ def round_picks(store, user, run, outputs, picks, quote):
     plan = guarded(lambda: current_plan(store, session))
     rd = session.get('round')
     need(rd and rd.get('pass') == 2, 'No reference round is waiting for its second pass.')
-    need((quote or '').strip(), "The operator's words are required.")
+    quote = said(quote, 'Pass 2 done', user)   # design/99 C6
     own = {r['search_id'] for r in rd['elements'].values() if r['search_id']}
     made, failed = [], {}
     for sid in (picks or {}):
@@ -1462,7 +1467,7 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     need(row and row['status'] in ('candidate', 'approved'), 'Reference is not a candidate.')
     if row['sha256'] != sha256:
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
-    need((quote or '').strip(), 'The operator reply is required.')
+    quote = said(quote, 'Approved', user)   # design/99 C2
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
     placed = None
     sid = made_for(session, row)
@@ -1539,9 +1544,16 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
     """design/74 L7: a picture rejected with the operator's words; it is never approved, bound, held or named as a parent afterwards."""
     session = session_of(store, run, outputs)
     row = session['references'].get(ref_id)
+    words = str(quote or '').strip()
+    reason = str(notes or '').strip() or words
+    if row and row.get('status') == 'rejected' and reason and row.get('rejection'):   # design/99 C3: the reason given after the click joins the same rejection
+        row['rejection']['notes'] = reason
+        _feedback_image(session, run, user, row, 'reject', row['rejection']['quote'], reason)
+        save_session(store, run, session)
+        return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}
     need(row and row['status'] in ('candidate', 'approved'), f"Reference {ref_id} is not a candidate or approved picture (it is {(row or {}).get('status') or 'unknown'}); only those can be rejected.")
-    need((quote or '').strip(), 'The operator reply is required.')
-    row.update(status='rejected', rejection={'notes': str(notes or '').strip() or str(quote), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    quote = said(words, 'Rejected', user)   # design/99 C3: the reason is optional
+    row.update(status='rejected', rejection={'notes': reason, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     _feedback_image(session, run, user, row, 'reject', quote, row['rejection']['notes'])
     save_session(store, run, session)
     return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}   # design/97 A4
@@ -1933,6 +1945,7 @@ def take_jobs(conn, run, shot_id=None):
 
 def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing_notes, quote):
     session = session_of(store, run, outputs)
+    quote = said(quote, 'Rejected' if decision == 'rejected' else 'Accepted', user)   # design/99 C3: a take's reason is optional
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()
     need(job and job['status'] == 'ready', 'Review a ready take.')
     ev = job['result']['evidence']
@@ -1951,6 +1964,7 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
 def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes=''):
     """design/45 10.4: with notes, the accepted review and the selection are one call; without, the latest review must be accepted."""
     session = session_of(store, run, outputs)
+    quote = said(quote, 'Selected', user)   # design/99 C2
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()
     need(job and job['status'] == 'ready', 'Select a ready take.')
     if str(notes or '').strip():
@@ -1990,7 +2004,7 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     _route_gate(shot, 'still')
     row = session['references'].get(reference_id)
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
-    need((quote or '').strip(), 'The operator reply is required.')
+    quote = said(quote, 'Placed', user)   # design/99 C2
     need(row.get('kind') != 'web', 'a web picture is a guide only; it cannot appear in the film.')   # design/94 R1.5 (U2)
     warns = []
     made = made_for(session, row)
@@ -2023,7 +2037,7 @@ def unplace(store, user, run, outputs, shot_id, quote):
     """design/94 R1.8 (L3): a shot's still, sequence or clip taken out with the operator's words; the picture stays approved."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
-    need(str(quote or '').strip(), 'The operator reply is required.')
+    quote = said(quote, 'Removed', user)   # design/99 C2
     asset = session['assets'].get(shot_id)
     need(asset, f'{shot_id} holds no picture.')
     need(gap['gap_id'] not in session['recorded_gaps'], f"{shot_id}'s gap {gap['gap_id']} is recorded; a recorded gap keeps its pictures.")
