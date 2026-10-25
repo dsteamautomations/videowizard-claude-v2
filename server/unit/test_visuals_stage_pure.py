@@ -164,7 +164,7 @@ def test_spend_counts_images_and_take_seconds_at_the_configured_prices(monkeypat
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     conn = FakeConn([job('openai'), job('openai', 'running'), job('openai', 'failed'), job('video', duration_seconds=10), job('video', 'rejected', duration_seconds=10), job('gemini')])
     sp = VS.visuals_spend(conn, RUN)
-    assert sp == {'images': 2, 'take_seconds': 10.0, 'spent_inr': 120.0, 'prices': {'image_inr': 20.0, 'video_inr_per_s': 8.0}}
+    assert sp == {'images': 2, 'fixes': 0, 'take_seconds': 10.0, 'spent_inr': 120.0, 'prices': {'image_inr': 20.0, 'video_inr_per_s': 8.0}}
 
 
 def test_spend_prices_an_image_from_its_tokens_and_a_job_without_tokens_at_the_flat_price(monkeypatch):

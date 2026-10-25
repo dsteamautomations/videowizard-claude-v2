@@ -345,9 +345,11 @@ def visuals_spend(conn, run):
     live = [r for r in rows if r['status'] not in ('failed', 'rejected', 'cancelled')]
     pr = prices()
     images = sum(1 for r in live if r['provider'] == 'openai')
+    ref = lambda r: (r.get('request') or {}).get('reference') or {}
+    fixes = sum(1 for r in live if r['provider'] == 'openai' and (ref(r).get('fix_of') or str(ref(r).get('name') or '').endswith('-fix')))   # design/96 X3; an old fix by its name
     image_inr = sum(image_cost_inr(r.get('cost'), pr) for r in live if r['provider'] == 'openai')
     seconds = float(sum(float((r.get('request') or {}).get('duration_seconds') or 0) for r in live if r['provider'] == 'video'))
-    return {'images': images, 'take_seconds': seconds, 'spent_inr': round(image_inr + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
+    return {'images': images, 'fixes': fixes, 'take_seconds': seconds, 'spent_inr': round(image_inr + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
 
 
 def cap_of(session):
@@ -466,7 +468,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                              rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
                              checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None,   # design/74 L6
                              check=({k: image_check.expand(r['check'], r).get(k) for k in ('lines', 'must_failed', 'error', 'fix_error', 'model')} if r.get('check') else None),   # design/86 K2; design/92
-                             pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'))   # design/86 K1, K2
+                             pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'), fix_for=r.get('fix_for'))   # design/86 K1, K2
     takes = {}
     for j in take_jobs(conn, run):
         res = j.get('result') or {}
@@ -1114,6 +1116,10 @@ def generate_image(conn, store, user, run, outputs, body):
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    missing = [] if body.get('fix_of') else library.image_names_missing(body['prompt'], len(body.get('parents') or []))   # design/96 C1: the pictures it names, not those the server adds
+    if missing:
+        warns.append(f"the edit sends {len(body['parents'])} pictures but the prompt does not name Image {', '.join(map(str, missing))}: name each as Image 1 to Image N "
+                     'with what to take from it' + NEXT_RELEASE)
     warns += [f"made from {p['id']}, which was made for {p['shot_id']}; this picture is listed and checked under {body['shot_id']}"   # design/95 F7: on purpose, or a slip
               for p in parents if body.get('shot_id') and p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id') not in (None, body['shot_id'])]
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named)
@@ -1151,6 +1157,23 @@ def _fact_line(f):
     return {'check': 'fact: ' + f['id'], 'pass_when': f"it looks as the fact says: {f['looks']}" + (f"; done as: {f['how']}" if f.get('how') else ''), 'weight': 'must'}
 
 
+def _step_filter(session, parents, named):
+    """design/96 J1: for a state of a graphic sequence, (keep(text), final): a claim, word or depiction belongs to the first state whose `what_appears`
+    or `words` names it, else to the last; a state keeps the ones before it. The step is 1 plus the parents made for the shot. A still diagram is
+    one state, with everything."""
+    states = named.get('states') or [] if route_of(named) == 'graphic_sequence' else []
+    if not states:
+        return (lambda text: True), True
+    step, row = 1, next((p for p in parents if p and p.get('kind') in ('keyframe', 'state') and made_for(session, p) == named['id']), None)
+    while row and step < len(states):
+        step += 1
+        ups = [session['references'].get(p.get('id')) or {} for p in (row.get('generation') or {}).get('parents') or []]
+        row = next((p for p in ups if p.get('kind') in ('keyframe', 'state') and made_for(session, p) == named['id']), None)
+    shown = [f"{st.get('what_appears') or ''} {st.get('words') or ''}".lower() for st in states]
+    first = lambda text: next((i for i, t in enumerate(shown, 1) if str(text).lower() in t), len(states))
+    return (lambda text: first(text) <= step), step >= len(states)
+
+
 def _graphic_lines(session, plan, body, parents, answer, named=None):
     """design/89 C1, C4, D3-D5: every picture is warned without its answer form; a picture of a graphic carries its claims, the spec's relationships,
     its sizes and its label as lines, and is warned without its style sheet or an approved spec (refused from the next release).
@@ -1161,27 +1184,38 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     warns = [] if answer is not None else ['no answer form with this picture: write it with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]
     facts = {f['id']: f for f in plan.get('visual_facts') or [] if f.get('status') != 'unknown'}   # an unknown fact is never a line: it is never drawn
     lines = [_fact_line(f) for f in facts.values() if f.get('about') == body['element_id']]
+    graphic = named is not None and named['visual_type'] in GRAPHIC_TYPES
+    kind = (named or {}).get('graphic_kind') or 'diagram'
+    wordy = graphic and kind in ('title', 'text')   # design/96 J2: a card of words is checked for its words, their size and readability only
+    keep, final = _step_filter(session, parents, named) if graphic else ((lambda text: True), True)   # design/96 J1: each step for what it shows
     if named is not None:
-        graphic = named['visual_type'] in GRAPHIC_TYPES
-        lines += [{'check': 'claim: ' + c, 'pass_when': (f'the picture shows that {c}, plainly, without the narration' if graphic else
-                                                         f'the picture never shows the opposite of: {c}'), 'weight': 'must'} for c in named.get('claims') or []]
-        lines += [{'check': 'word: ' + d, 'pass_when': f'what the narration calls {d} looks {d}, never the opposite', 'weight': 'must'} for d in named.get('descriptors') or []]
+        if not wordy:
+            lines += [{'check': 'claim: ' + c, 'pass_when': (f'the picture shows that {c}, plainly, without the narration' if graphic else
+                                                             f'the picture never shows the opposite of: {c}'), 'weight': 'must'} for c in named.get('claims') or [] if keep(c)]
+            lines += [{'check': 'word: ' + d, 'pass_when': f'what the narration calls {d} looks {d}, never the opposite', 'weight': 'must'} for d in named.get('descriptors') or [] if keep(d)]
         lines += [{'check': 'carried over: ' + c, 'pass_when': f'{c} is visible, as the step before left it', 'weight': 'must'} for c in named.get('carries_over') or []]
         lines += [_fact_line(facts[f]) for f in named.get('fact_ids') or [] if f in facts]
-    shots = [named] if named is not None and named['visual_type'] in GRAPHIC_TYPES else []   # design/94 R1.2: its own shot's lines only, never every shot of the element
+    shots = [named] if graphic else []   # design/94 R1.2: its own shot's lines only, never every shot of the element
     if shots or any(sh['visual_type'] in GRAPHIC_TYPES for _, sh in _shots_with(plan, session, body['element_id'])):   # design/91 N13: labels say what they mean, readable on a phone
         labels = [str(s) for s in (answer or {}).get('exact_text') or [] if str(s).strip()]
-        label_lines = [{'check': 'label: ' + s, 'pass_when': f'the label reads exactly "{s}", is at least {LABEL_MIN_PCT} % of the frame height, and its leader line ends on the part it names',
-                   'weight': 'must'} for s in labels] + [LABEL_SIZE]   # after the claims and the drawing's own lines
+        said = ((lambda s: f'the words read exactly "{s}", spelled as written, at least {TITLE_MIN_PCT} % of the frame height, readable on a phone') if wordy else
+                (lambda s: f'the label reads exactly "{s}", is at least {LABEL_MIN_PCT} % of the frame height, and its leader line ends on the part it names') if kind == 'diagram' else
+                (lambda s: f'the label reads exactly "{s}", spelled as written, at least {LABEL_MIN_PCT} % of the frame height'))   # J2: leader lines only on a diagram
+        label_lines = [{'check': 'label: ' + s, 'pass_when': said(s), 'weight': 'must'} for s in labels] + [LABEL_SIZE]   # after the claims and the drawing's own lines
         warns += [f"the label '{s}' uses a sign in place of words: write it as a phrase ('25 % fewer bricks', not '↓ 25 %')" for s in labels if LABEL_SIGN.search(s)]
         warns += [f"the label '{s}' is a number without its unit: give the unit, and its source in the drawing spec" for s in labels if LABEL_BARE.match(s)]
     else:
         label_lines = []
     if not shots:
         return _dedupe(lines + label_lines), warns
-    lines += [{'check': 'claim: ' + c, 'pass_when': f'the picture shows that {c}, plainly, without the narration', 'weight': 'must'} for sh in shots for c in sh.get('claims') or []]
+    if wordy:
+        if named.get('drawing_spec'):
+            warns.append(f"{named['id']} is a {kind} card: its drawing spec is not checked")
+        shots = []   # its words, their size and readability only
+    lines += [{'check': 'claim: ' + c, 'pass_when': f'the picture shows that {c}, plainly, without the narration', 'weight': 'must'} for sh in shots for c in sh.get('claims') or [] if keep(c)]
     lines += [{'check': 'depicts: ' + sh['depicts'], 'pass_when': f"the drawing shows {sh['depicts']}, in the subject's own form (an alternative only as a labelled contrast)",
-               'weight': 'must'} for sh in shots if str(sh.get('depicts') or '').strip()]   # design/91 N10
+               'weight': 'must'} for sh in shots if str(sh.get('depicts') or '').strip() and keep(sh['depicts'])]   # design/91 N10
+    shots = shots if final else []   # J1: the spec's relationships, sizes and label are the finished drawing's
     lines += [{'check': 'relationship: ' + r, 'pass_when': f'in the drawing, {r}', 'weight': 'must'} for sh in shots for r in (sh.get('drawing_spec') or {}).get('relationships') or []]
     for sh in shots:   # D3, D5: an unknown size shows no figure; the label is on the drawing; a known size reads as the spec says
         spec = sh.get('drawing_spec') or {}
@@ -1275,7 +1309,8 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
     request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size,
                'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
-               'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject']}}
+               'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
+                             **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}}   # design/96 X3: the spend counts fixes apart
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
                        (run['id'], ref_id, Jsonb(request), request_id)).fetchone()
     session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents')},
@@ -1363,6 +1398,26 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         save_session(store, run, session)
         return {**session['references'][ref_id], 'end_reference_id': out['reference_id']}
     return row
+
+
+def request_fix(conn, store, user, run, outputs, ref_id):
+    """design/96 X1, X4: one fix round of a candidate, only when the operator or the assistant asks: an edit with the one change its first failed must
+    line asks for, at the image price, inside the cap. Never for a fix, never twice, never for a line the check could not decide."""
+    session = session_of(store, run, outputs)
+    ref = session['references'].get(ref_id)
+    need(ref, f'{ref_id} is not a picture of this run.')
+    need(not ref.get('fix_of'), 'a fix is not fixed again: reject it and make a new picture.')
+    need(not ref.get('fix_queued'), f"a fix of this picture is already made: {ref.get('fix_queued')}.")
+    need(ref.get('status') == 'candidate', f"only a candidate is fixed; {ref_id} is {ref.get('status')}.")
+    need(ref.get('check'), 'the check is still running; try again once its lines show.')
+    failed = [l for l in image_check.expand(ref['check'], ref)['must_failed'] if l.get('pass') is False]
+    need(failed, 'nothing to fix: no must line failed.')
+    out = generate_image(conn, store, user, run, outputs, image_check.fix_body(ref, failed[0]))
+    session = session_of(store, run, outputs)
+    session['references'][ref_id]['fix_queued'] = out['reference_id']
+    session['references'][out['reference_id']]['fix_for'] = failed[0]['check']
+    save_session(store, run, session)
+    return {'reference_id': out['reference_id'], 'of': ref_id, 'for': failed[0]['check'], 'cost_inr': prices()['image_inr']}
 
 
 def reject_reference(store, user, run, outputs, ref_id, notes, quote):

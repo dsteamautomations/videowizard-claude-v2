@@ -2,8 +2,8 @@
 
 A retained candidate is read against its own answer form's checklist by Gemini Flash (the analysis stage's transport), one pass or fail with a
 sentence per line, plus three fixed questions: readable text, a face that matches a footage frame, anything in the frame the prompt did not ask for.
-The code checks size, aspect and parent. On a must failing the worker queues one fix round: an edit of the candidate with the one change the failed
-line asks for. The check never blocks: a transport error leaves the candidate a candidate with the error on it. The operator may approve a picture
+The code checks size, aspect and parent. A failed must line marks the picture; a fix round (an edit of the candidate with the one change the
+failed line asks for) is made only on request (design/96 X1: `visuals_stage.request_fix`). The check never blocks: a transport error leaves the candidate a candidate with the error on it. The operator may approve a picture
 the check failed."""
 import base64
 import json
@@ -13,7 +13,6 @@ from io import BytesIO
 from PIL import Image, ImageStat
 
 from .config import settings
-from .errors import Problem
 
 CHECK_MODEL = 'gemini-3.8-flash'
 FIXED = [{'check': 'readable text', 'pass_when': 'no readable text anywhere in the frame unless the prompt asked for exact text', 'weight': 'must'},
@@ -199,26 +198,3 @@ def fix_body(ref, failed):
     return {'request_id': str(uuid.uuid4()), 'element_id': ref['element_id'], 'name': ref['name'] + '-fix', 'kind': ref['kind'], 'subject': ref.get('subject') or '',
             'prompt': prompt, 'parents': [ref['id']], 'fix_of': ref['id'], 'shot_id': ref.get('shot_id'),   # design/94 R1.1: listed under its original's shot
             'answer': {**(ref.get('answer') or {}), 'prompt': prompt, 'base_image_id': ref['id'], 'single_change': failed['pass_when']} if ref.get('answer') else None}
-
-
-def queue_fix(conn, store, run_id, ref_id):
-    """After the session is saved with the check: one fix for a candidate whose must line failed, never for a fix itself, never twice."""
-    from . import core, visuals_stage
-    run = conn.execute('select * from vw2_runs where id=%s', (run_id,)).fetchone()
-    outputs = core.current_outputs(conn, run_id)
-    session = visuals_stage.session_of(store, run, outputs)
-    ref = session['references'].get(ref_id)
-    if not ref or ref.get('fix_of') or ref.get('fix_queued') or not (ref.get('check') or {}).get('must_failed'):
-        return None
-    failed = expand(ref['check'], ref)['must_failed'][0]   # design/92: stored compact
-    try:
-        out = visuals_stage.generate_image(conn, store, {'id': 'server-check', 'name': 'the check'}, run, outputs, fix_body(ref, failed))
-    except (Problem, ValueError) as exc:
-        session = visuals_stage.session_of(store, run, outputs)
-        session['references'][ref_id]['check']['fix_error'] = str(getattr(exc, 'message', exc))[:200]
-        visuals_stage.save_session(store, run, session)
-        return None
-    session = visuals_stage.session_of(store, run, outputs)
-    session['references'][ref_id]['fix_queued'] = out['reference_id']
-    visuals_stage.save_session(store, run, session)
-    return out['reference_id']

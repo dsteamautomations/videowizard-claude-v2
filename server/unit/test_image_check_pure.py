@@ -65,26 +65,10 @@ def test_a_transport_error_or_no_key_leaves_the_candidate_with_the_error_on_the_
     assert wrong[0]['pass'] is False and wrong[0]['seen'] == '1536x864'
 
 
-def test_the_fix_round_is_one_change_from_the_failed_line_and_is_queued_once(monkeypatch):
+def test_the_fix_round_is_one_change_from_the_failed_line(monkeypatch):
     failed = {'check': 'scale', 'pass_when': 'the wall is taller than the mason', 'weight': 'must', 'pass': False, 'seen': 'x'}
     body = IC.fix_body(REF, failed)
     assert body['parents'] == ['k1'] and body['fix_of'] == 'k1' and body['name'] == 'keyframe-start-VS1-fix' and body['kind'] == 'keyframe'
     assert 'Change only: the wall is taller than the mason.' in body['prompt'] and body['prompt'].count('Change only') == 1 and body['answer']['single_change'] == failed['pass_when']
     from app import library
     assert library.check_prompt(body['prompt']) is None   # the fix passes the lint, one change
-    # queue_fix: generates once, marks the candidate, never for a fix or a second time
-    from app import visuals_stage as VS, core
-    sess = {'references': {'k1': {**REF, 'check': {'must_failed': [failed]}}}}
-    saved = []
-    monkeypatch.setattr(VS, 'session_of', lambda store, run, outputs: sess)
-    monkeypatch.setattr(VS, 'save_session', lambda store, run, s: saved.append(json.loads(json.dumps(s))))
-    monkeypatch.setattr(VS, 'generate_image', lambda conn, store, user, run, outputs, body: {'reference_id': 'fix-1'})
-    monkeypatch.setattr(core, 'current_outputs', lambda conn, run_id: [])
-
-    class Conn:
-        def execute(self, sql, params=()):
-            return types.SimpleNamespace(fetchone=lambda: {'id': 'run-1', 'code': 'VW-9'})
-    assert IC.queue_fix(Conn(), None, 'run-1', 'k1') == 'fix-1' and sess['references']['k1']['fix_queued'] == 'fix-1'
-    assert IC.queue_fix(Conn(), None, 'run-1', 'k1') is None   # not twice
-    sess['references']['f'] = {**REF, 'id': 'f', 'fix_of': 'k1', 'check': {'must_failed': [failed]}}
-    assert IC.queue_fix(Conn(), None, 'run-1', 'f') is None   # never for a fix

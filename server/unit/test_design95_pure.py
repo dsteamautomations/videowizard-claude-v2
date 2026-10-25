@@ -69,7 +69,7 @@ def test_the_minimum_is_this_releases_plugin():
     from app.config import Settings
     import json
     plugin = json.loads((Path(__file__).resolve().parents[2] / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
-    assert Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.40.0' and plugin['version'] >= '0.40.0'
+    assert Settings.model_fields['PLUGIN_MIN_VERSION'].default == plugin['version']
 
 
 # ---------- F6, F7, F9 ----------

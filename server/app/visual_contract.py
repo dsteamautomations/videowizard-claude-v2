@@ -133,6 +133,7 @@ class Shot(Model):
     start_frame: int = Field(ge=0)
     end_frame: int = Field(gt=0)
     visual_type: Literal['image', 'video', 'diagram', 'animation']
+    graphic_kind: Literal['diagram', 'chart', 'map', 'title', 'text'] = 'diagram'   # design/96 J2: what a graphic is checked for; leader lines only on a diagram
     narration: str = Field(max_length=12000)
     purpose: str = Field(min_length=1, max_length=4000)
     relation: Literal['illustration', 'explanation', 'evocation', 'counterpoint', 'anticipation', 'bridge', 'context']

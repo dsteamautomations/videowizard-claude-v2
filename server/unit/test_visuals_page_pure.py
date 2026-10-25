@@ -60,7 +60,7 @@ def test_the_references_step_is_a_split_view_with_the_controls_in_the_panel():
 def test_the_takes_step_says_whose_turn_it_is_and_marks_the_checked_lines():
     """design/86 K2, K3."""
     for needle in ('function shotState', 'Your turn: approve the start image', 'Your turn: approve the pair', 'Checking the picture against its list, under 30 seconds', 'about 3 minutes. You may leave the page',
-                   'prompt is not written yet', 'want your decision', 'wait for the assistant', 'class="turn ', 'c.pass===false', 'a fix of the picture before it'):
+                   'prompt is not written yet', 'want your decision', 'wait for the assistant', 'class="turn ', 'c.pass===false', "'fix of '"):
         assert needle in HTML, needle
 
 

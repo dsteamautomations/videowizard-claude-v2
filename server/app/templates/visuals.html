@@ -174,7 +174,7 @@ function frame(){
   $('steps').querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>go(a.dataset.s)));
   if(!d||d.state!=='prepared'){$('line').textContent='The visuals stage has not started: the assistant runs vw visuals prepare.';return;}
   const b=d.budget||{}, over=b.spent_inr>b.cap_inr, pct=b.cap_inr?Math.min(100,Math.round(100*b.spent_inr/b.cap_inr)):0;
-  const meter='<span class="meter">spend '+inr(b.spent_inr)+' of '+inr(b.cap_inr)+' <span class="bar"><i class="'+(over?'over':'')+'" style="width:'+pct+'%"></i></span></span>';
+  const meter='<span class="meter">spend '+inr(b.spent_inr)+' of '+inr(b.cap_inr)+' <span class="bar"><i class="'+(over?'over':'')+'" style="width:'+pct+'%"></i></span>'+(b.images?' images: '+(b.images-(b.fixes||0))+' requested + '+(b.fixes||0)+' fixes':'')+'</span>';   // design/96 X3
   const t=d.treatment, dr=d.treatment_draft, at=autoStep();
   let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(dr?(t?'<strong>New treatment draft</strong>: it replaces the approved one; read it and approve it at the foot':'<strong>Treatment drafted</strong>: read it and approve it at the foot'):(!t?'The assistant is preparing the treatment':'<strong>'+esc(STEPS.find(x=>x[0]===at)[1])+'</strong> is the step the run is at'));
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
@@ -285,13 +285,16 @@ function checklist(lines,check){   // design/74 L6; design/86 K2: with a check, 
 function isSel(k,v){return !!selPic&&selPic[k]===v&&(k!=='sid'||selPic.n===arguments[2]);}
 const ownPic=(r,s)=>r.shot_id===s.shot_id||(!r.shot_id&&s.element_ids.includes(r.element_id));   // design/95 F4: made for this shot, or made before shots were recorded
 function shotTitle(id){for(const g of (data.gaps||[]))for(const s of g.shots)if(s.shot_id===id)return s.title||'';return '';}
+function stepMark(r){const n=((r&&r.check&&r.check.lines)||[]).filter(l=>l.pass===false).length;   // design/96 J3: the step's own lines
+  return r&&r.check?(n?' · '+n+' to look at':' · ok'):'';}
+function fixPrice(){return ((data.budget||{}).prices||{}).image_inr||4;}   // design/96 X1: the cost shown before the click
 function refCard(r,sel,inPanel,noApprove){   // inPanel: the References step, where the picture opens beside the grid and Approve and Reject live in the panel (design/80 S1)
   const rejected=r.status==='rejected', can=stage()==='visuals';
   const reject=!inPanel&&(r.status==='candidate'||r.status==='approved')&&can?'<div class="btns" style="margin:0 6px 6px"><button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'';   // design/74 L7
   const approve=!inPanel&&!noApprove&&(r.status==='candidate'&&can)?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'';
   const state='<span class="badge '+(r.status==='approved'?'ok':rejected?'err':r.status==='candidate'?'dec':'')+'" style="margin:4px 6px 0">'+esc(r.status)+'</span>';   // design/79 Q2: the picture's own state, in words
   return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+(inPanel&&isSel('ref',r.id)?' sel':'')+'">'+(r.url?'<img src="'+esc(r.url)+'" alt="" '+(inPanel?'data-ref="'+esc(r.id)+'"':'')+'>':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    state+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+(inPanel?'':checklist(r.checklist,r.check))+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">a fix of the picture before it</div>':'')+(rejected?'':(sel||'')+approve+reject)+'</div>';
+    state+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+(inPanel?'':checklist(r.checklist,r.check))+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+(can&&r.status==='candidate'&&!r.fix_of&&!r.fix_queued&&r.check&&(r.check.must_failed||[]).length?'<div class="btns" style="margin:0 6px 6px"><button data-a="fix" data-ref="'+esc(r.id)+'">Try a fix (₹'+esc(fixPrice())+')</button></div>':'')+(rejected?'':(sel||'')+approve+reject)+'</div>';
 }
 function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; the note and the chips are in the panel
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0;
@@ -433,7 +436,7 @@ function renderPictures(){
         if(s.asset&&s.asset.kind==='sequence'){sh+='<div class="strip">'+s.asset.states.map((st,i)=>'<div class="pic on"><img src="'+esc(st.url)+'" alt=""><div class="cap">state '+(i+1)+' · '+esc(st.hold_frames)+' f</div></div>').join('')+'</div><div class="ds ok">Sequence held for the shot.</div>'+remove+(fresh.length?'<div class="ds">'+fresh.length+' new picture'+(fresh.length>1?'s':'')+' made for this shot: Remove the sequence to rebuild it.</div>':'');}
         else if(s.state_problem){sh+='<div class="err">'+esc(s.state_problem)+'</div><div class="strip">'+mine.map(r=>refCard(r,'',false,true)).join('')+'</div>';}
         else if((s.state_order||[]).length){const by={};mine.forEach(r=>{by[r.id]=r;});   // design/94 A2: numbered in the server's order, no ticking
-          sh+='<div class="strip">'+s.state_order.map((id,i)=>refCard(by[id],'<div class="ds" style="margin:0 6px 6px"><b>state '+(i+1)+'</b></div>',false,true)).join('')+'</div>';
+          sh+='<div class="strip">'+s.state_order.map((id,i)=>refCard(by[id],'<div class="ds" style="margin:0 6px 6px"><b>state '+(i+1)+' of '+s.state_order.length+'</b>'+stepMark(by[id])+'</div>',false,true)).join('')+'</div>';
           if(can)sh+='<div class="btns"><span class="ds">Your words at the foot, then:</span><button class="go" data-a="sequence" data-shot="'+esc(s.shot_id)+'">Approve the sequence</button></div>';}
         else{sh+='<div class="ds">No states generated yet.</div>';}
       }else{
@@ -550,6 +553,7 @@ async function click(b){
     if(at===''||at==null){msg('Say from which second of the clip.',true);return;} if(!w){needWords('cf-w-'+sh,'Your words for this stretch are required.');return;}
     await send({action:'clip',shot_id:sh,clip_id:$('cf-c-'+sh).value,in_s:Number(at),quote:w,...reuseOf(sh)},'Stretch placed for the shot.');return;}
   if(a==='sequence'){if(!q){need();return;}await send({action:'sequence',shot_id:b.dataset.shot,quote:q},'Sequence approved and held.');return;}
+  if(a==='fix'){const j=await send({action:'fix',reference_id:b.dataset.ref},'Fix requested.');if(j)msg('Fix requested for \''+(j.for||'')+'\' (₹'+(j.cost_inr||fixPrice())+'); it appears here in about a minute.');return;}   // design/96 X1
   if(a==='unplace'){if(!q){need('Say why the picture comes out, in the box, then Remove.');return;}await send({action:'unplace',shot_id:b.dataset.shot,quote:q},'Picture taken out of the shot; it stays approved.');return;}   // design/94 L3
   if(a==='select-take'){if(!q){need('Your words after watching are required.');return;}await send({action:'select-take',job_id:b.dataset.job,quote:q},'Take selected.');return;}
   if(a==='reject-take'){if(!q){need('Say why in the box, then Reject.');return;}await send({action:'reject-take',job_id:b.dataset.job,notes:q,quote:q},'Take rejected.');return;}

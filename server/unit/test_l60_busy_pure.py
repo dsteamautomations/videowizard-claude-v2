@@ -41,12 +41,10 @@ def test_the_image_check_runs_with_no_lock_held_and_only_the_save_is_locked(monk
     monkeypatch.setattr(VW, 'storage', lambda: store)
     monkeypatch.setattr(VW, 'connect', lambda: Locks(log))
     monkeypatch.setattr(IC, 'run_check', lambda st, sess, r, result, f: log.append('check') or {'lines': [], 'must_failed': [{'check': 'x', 'pass_when': 'y'}]})
-    queued = []
-    monkeypatch.setattr(IC, 'queue_fix', lambda conn, st, run_id, ref_id: queued.append(ref_id))
     VW.check_image(JOB, {'key': 'run-1/visuals/references/K1.png'})
     assert log == ['check', 'lock', 'commit']   # the check first, then the lock only for the save
     row = json.loads(store.files['run-1/visuals/session.json'])['references']['K1']
-    assert row['check']['must_failed'] and 'check_pending' not in row and queued == ['K1']
+    assert row['check']['must_failed'] and 'check_pending' not in row and 'fix_queued' not in row   # design/96 X1: a fix only on request
 
 
 def test_a_picture_changed_while_it_was_checked_keeps_what_it_has(monkeypatch):

@@ -764,3 +764,25 @@ def test_approve_file_names_each_placement(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'request', lambda method, path, wait=None, **kw: (replies[path.split('/')[-2]], 0))
     code, out, err = run(args(what='approve', file='out/approvals.json'), capsys)
     assert code == 0 and 'K2 placed in DG1 (replaces K1)' in err and 'S1 placed' not in err
+
+def test_fix_is_asked_for_and_says_its_line_and_cost(harness, monkeypatch, capsys):
+    """design/96 X1: a fix only on request."""
+    posted = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'reference_id': 'F1', 'of': 'K1', 'for': 'label: Rat-trap bond', 'cost_inr': 4.0})
+    code, out, err = run(args(what='fix', ref='K1'), capsys)
+    assert code == 0 and posted[-1][0].endswith('/references/K1/fix') and "label: Rat-trap bond" in err and '₹4' in err and 'F1' in err
+
+
+def test_budget_counts_fixes_apart(harness, monkeypatch, capsys):
+    """design/96 X3."""
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'spent_inr': 64.0, 'cap_inr': 5000, 'left_inr': 4936, 'images': 16, 'fixes': 2, 'planned': {'inr': 0}})
+    code, out, err = run(args(what='budget'), capsys)
+    assert 'images: 14 requested + 2 fixes' in err
+
+
+def test_the_procedure_says_fixes_are_asked_for_and_names_the_graphic_kind():
+    """design/96."""
+    vp, vsteps, doc = STAGES['visuals']['prompt'], ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    for text in (vsteps, doc):
+        assert 'vw visuals fix --ref' in text and 'Image 1 to Image N' in text
+    assert '`graphic_kind`' in vp and '`graphic_kind`' in vsteps

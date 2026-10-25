@@ -188,6 +188,18 @@ def check_prompt(prompt):
     return None
 
 
+def image_names_missing(prompt, n):
+    """design/96 C1 (the course's C03-2): the numbers of the n pictures an edit sends that its prompt does not name as Image k; a range
+    ("images 2–4") and "images 2 onward" count."""
+    text, named = str(prompt or ''), set()
+    for a, b in re.findall(r'\bimages?\s+(\d+)\s*(?:-|–|to)\s*(\d+)', text, re.I):
+        named.update(range(int(a), int(b) + 1))
+    for a in re.findall(r'\bimages?\s+(\d+)\s+onwards?\b', text, re.I):
+        named.update(range(int(a), n + 1))
+    named.update(int(a) for a in re.findall(r'\bimages?\s+(\d+)\b', text, re.I))
+    return [k for k in range(1, n + 1) if k not in named]
+
+
 def default_size(frame):
     """design/71 P3: the image size for the brief's frame."""
     return SIZES.get(frame or '16:9') or SIZES['16:9']

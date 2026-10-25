@@ -1328,6 +1328,11 @@ def visuals_still(run_id: UUID, body: StillBody, user=User, conn=DB):
                                                                                                                                  {'reason': body.reuse, 'considered': body.considered}, body.crop, body.move))
 
 
+@app.post('/api/runs/{run_id}/visuals/references/{ref_id}/fix')
+def visuals_fix(run_id: UUID, ref_id: str, body: Write, user=User, conn=DB):   # design/96 X1: a fix only on request
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.request_fix(conn, storage(), user, run, outputs, ref_id))
+
+
 @app.post('/api/runs/{run_id}/visuals/unplace')
 def visuals_unplace(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/94 R1.8: a shot and the operator's words
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.unplace(storage(), user, run, outputs, body.shot_id, body.quote))

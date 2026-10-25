@@ -150,8 +150,8 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
 
 
 def check_image(job, result):
-    """design/92 (L60): the picture's check (Gemini, the light against the footage) runs with no lock held; the run's lock is taken only to save it,
-    and to queue the one fix round when a must line failed. A picture changed meanwhile (rejected, or made by another job) keeps what it has. Never raises."""
+    """design/92 (L60): the picture's check (Gemini, the light against the footage) runs with no lock held; the run's lock is taken only to save it
+    (design/96 X1: a fix is made only on request). A picture changed meanwhile (rejected, or made by another job) keeps what it has. Never raises."""
     from . import image_check
     from .analysis_jobs import transport_factory
     store = storage()
@@ -168,8 +168,6 @@ def check_image(job, result):
             ref['check'] = record
             ref.pop('check_pending', None)
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
-            if record.get('must_failed'):
-                image_check.queue_fix(conn, store, job['run_id'], rid)
     except Exception:   # a picture is never held back by its check
         return
 

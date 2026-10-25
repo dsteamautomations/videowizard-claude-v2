@@ -1219,7 +1219,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace']   # design/74 L26, L7; design/76; design/73; design/79
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix']   # design/74 L26, L7; design/76; design/73; design/79
 
 
 def _short_status(st, shot=None, gap=None):
@@ -1305,7 +1305,7 @@ def cmd_visuals(a):
         out = call('GET', base + '/budget')
         p = out.get('planned') or {}
         over = (out.get('spent_inr', 0) + p.get('inr', 0)) > out.get('cap_inr', 0)
-        emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); the current plan still needs about ₹{p.get('inr', 0):,.0f}"
+        emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); images: {out.get('images', 0) - out.get('fixes', 0)} requested + {out.get('fixes', 0)} fixes; the current plan still needs about ₹{p.get('inr', 0):,.0f}"
              + (" — over the cap: narrow the plan and tell the operator the spend; the cap is a setting the builder changes on SK's word." if over else '.'))   # design/74 L26
     if a.what == 'reject':   # design/74 L7: a wrong picture, with the operator's words; the next one starts from the approved picture
         out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote})
@@ -1528,6 +1528,9 @@ def cmd_visuals(a):
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
         emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote, **_reuse_fields(a), **({'move': a.move} if a.move else {})}), 0,
              f'Still set for {a.shot} from reference {a.ref}.')   # design/94 R1.7: --move, the operator's words for a picture made for another shot
+    if a.what == 'fix':   # design/96 X1: a fix round only on request; tell the operator the line and the cost
+        out = write(f"{base}/references/{a.ref}/fix", {})
+        emit(out, 0, f"Fix {out.get('reference_id')} of {out.get('of')} requested for '{out.get('for')}' (₹{out.get('cost_inr', 0):,.0f}); `vw visuals status --wait 300`, then show it with its original.")
     if a.what == 'unplace':   # design/94 R1.8: a shot's picture taken out with the operator's words; it stays approved
         out = write(base + '/unplace', {'shot_id': a.shot, 'quote': a.quote})
         emit(out, 0, f"Took {out.get('removed')} out of {out.get('shot_id')}; it stays approved.")

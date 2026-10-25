@@ -104,7 +104,8 @@ def test_a_graphic_picture_carries_the_claims_and_relationships_as_must_lines_an
     s['references']['ST1'] = {**ref('ST1', 'approved'), 'kind': 'style', 'element_id': '_STYLE'}
     s['spec_approvals'] = {'DG1': {'digest': VS.spec_digest(SPEC), 'quote': 'yes'}}
     store = store_with(s, doc)
-    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r2', 'parents': ['ST1'], 'answer': ANSWER})
+    named = 'Image 1 is the style sheet: take its palette and line weight. ' + ANSWER['prompt']   # design/96 C1: an edit names its pictures
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r2', 'parents': ['ST1'], 'prompt': named, 'answer': {**ANSWER, 'prompt': named}})
     assert not out.get('warnings')
     assert [l['check'] for l in saved(store)['references'][out['reference_id']]['answer']['checklist']][0] == 'look'
     # the spec changed after its approval: warned again
