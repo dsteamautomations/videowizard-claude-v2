@@ -718,7 +718,7 @@ async function click(b){
 function render(){
   if(!step)step=recall('step')||autoStep();
   frame();
-  STEPS.forEach(([k])=>$('s-'+k).hidden=(k!==step));
+  STEPS.forEach(([k])=>{const sec=$('s-'+k);sec.hidden=(k!==step);if(k!==step)sec.innerHTML='';});   // defect 29: one panel at a time, so its buttons are the wired ones
   if(!data||data.state!=='prepared'){STEPS.forEach(([k])=>$('s-'+k).innerHTML='<div class="empty">Nothing to show yet.</div>');footer();if(stage()==='visuals')schedule(60000);return;}
   if(step==='treatment'){renderTreatment();wireFootage();}if(step==='plan')renderPlan();if(step==='references')renderReferences();if(step==='pictures')renderPictures();if(step==='takes')renderTakes();if(step==='record')renderRecord();
   footer();
