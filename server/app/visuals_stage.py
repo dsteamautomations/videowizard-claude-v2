@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan
+from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, without_ambient
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -501,13 +501,15 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                         'selected': (session['choice_selections'].get(gid) or {}).get('choice_id')}
                 try:
                     shots = [sh for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']]
+                    ambient = {sh['id']: sc.get('ambient') or '' for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']}   # design/101 M6
                 except ValueError:
-                    shots = []
+                    shots, ambient = [], {}
                 entry['split'] = split_of(shots, float(Fraction(str(_fps(session) or 25))))   # design/97 G3
                 for sh in shots:
                     asset = session['assets'].get(sh['id'])
                     binding = session['bindings'].get(sh['id']) or {}
                     entry['shots'].append({'shot_id': sh['id'], 'title': sh.get('title') or '', 'visual_type': sh['visual_type'], 'route': route_of(sh), 'purpose': sh.get('purpose', ''),
+                                           **({'ambient': ambient.get(sh['id'])} if sh['visual_type'] == 'video' and ambient.get(sh['id']) else {}),   # design/101 M6
                                            'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
@@ -1783,7 +1785,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
               'footage_character': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/77 L42; design/88: measured, the correction winning
               'provider': {k: generator[k] for k in ('provider', 'model')}}
-    identity = digest({k: v for k, v in prompt.items() if k not in ('context', 'footage_character')})   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
+    prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START}}   # design/101 M5: in the context, so no take goes stale
+    identity = digest(without_ambient({k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}))   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     steps_ = library.steps_of(shot)   # design/68 L3: the library beside the three instructions; the texts are in work/visuals/library/, written at prepare
     prompt['library'] = {'version': library_version_of(session),
@@ -1819,6 +1822,10 @@ def _route_gate(shot, wanted):
     takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
+
+
+AMBIENT_START = ("Put in the frame what the scene's ambient line says moves (the trees, the people in the background, the dust in the light), "
+                 'so the take can move it.')   # design/101 M5
 
 
 def prepare_take(store, user, run, outputs, body):
@@ -1877,7 +1884,8 @@ def prepare_take(store, user, run, outputs, body):
               **images, 'provider': selected['provider'], 'model': selected['model'],
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},
               'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {}),
-              **({'changes': changes} if changes else {})}   # design/91 N1: the take check reads them too (N3)
+              **({'changes': changes} if changes else {}),   # design/91 N1: the take check reads them too (N3)
+              **({'ambient': base['preparation']['scene']['ambient']} if base['preparation']['scene'].get('ambient') else {})}   # design/101 M3, M4: the take text and the take check read it
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)

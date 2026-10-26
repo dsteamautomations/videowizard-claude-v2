@@ -32,6 +32,7 @@ TAKE_LINES = [   # design/91 N3: the fixed questions every take is read against
     {'check': 'no repeat without its precondition', 'pass_when': 'no action is repeated without what it needs (pouring again from a pan already emptied)', 'weight': 'must'},
     {'check': 'no change of shape or size', 'pass_when': 'no object changes shape or size (a window, a wall, a tool)', 'weight': 'must'},
     {'check': 'planned end', 'pass_when': 'the clip ends in the state the plan below describes', 'weight': 'must'}]
+AMBIENT_LINE = {'check': 'surroundings move', 'pass_when': "what the plan's ambient line names moves visibly through the shot; nothing that should move is frozen", 'weight': 'must'}   # design/101 M4
 TAKE_SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'object', 'properties': {'n': {'type': 'integer'}, 'pass': {'type': 'boolean'}, 'seen': {'type': 'string'},
                                                                                      'at_s': {'type': 'number'}}, 'required': ['n', 'pass', 'seen']}}}, 'required': ['lines']}
 
@@ -48,8 +49,10 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
         uploaded = transport.upload(video_path, 'video/mp4', sha256)
         plan = '\n'.join(['The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
                          [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
-                         (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []))
-        asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(TAKE_LINES, 1))
+                         (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []) +
+                         (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if snapshot.get('ambient') else []))
+        take_lines = TAKE_LINES + ([AMBIENT_LINE] if snapshot.get('ambient') else [])   # design/101 M4
+        asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(take_lines, 1))
         received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
             'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
             '\n\nFor each numbered line answer pass true or false, say in one sentence what you see that decides it, and give the second (at_s) where it happens. Be literal.\n' + asks}]}],
@@ -57,7 +60,7 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
         body = received.get('body')
         if not isinstance(body, dict):
             body = json.loads(received.get('raw') or '{}')
-        got = read(body, TAKE_LINES)
+        got = read(body, take_lines)
         at = {int(l.get('n')): l.get('at_s') for l in body.get('lines') or [] if isinstance(l, dict) and l.get('n') is not None}
         lines = [{**l, 'at_s': at.get(n) if isinstance(at.get(n), (int, float)) else None} for n, l in enumerate(got['lines'], 1)]
         record.update(lines=lines, must_failed=[l for l in lines if l['weight'] == 'must' and l['pass'] is False])

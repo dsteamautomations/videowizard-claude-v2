@@ -182,6 +182,7 @@ class Scene(Model):
     boundary_continuity: str = Field(min_length=1, max_length=4000)
     shots: list[Shot] = Field(min_length=1, max_length=100)
     activity_level: Literal['', 'quiet', 'normal', 'busy'] = ''   # design/91 N4: from the narration and the brief
+    ambient: str = Field(default='', max_length=1000)   # design/101 M1: what moves around the action in a take, or 'still'
 
 
 class SourceCandidate(Model):
@@ -388,6 +389,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     elif scene.activity_level != 'quiet' and not any(sub.role in ('secondary', 'background') for s in scene.shots for sub in s.subjects):
                         warnings.append({'scene_id': scene.id, 'kind': 'life_missing', 'message': f'scene {scene.id} is {scene.activity_level} but shows one subject and no background '
                                          'activity: add who else is there and what they do (secondary or background subjects with beats) and the working equipment'})
+                if scenes is counted and any(s.visual_type == 'video' for s in scene.shots) and not scene.ambient.strip():   # design/101 M2
+                    warnings.append({'scene_id': scene.id, 'kind': 'ambient_missing', 'message': f"scene {scene.id}: say what moves around the action (ambient): "
+                                     "trees, air, people in the background, or 'still'"})
                 last_states = {}
                 for shot in scene.shots:
                     need(shot.id not in shot_ids, 'Duplicate shot identity.')
@@ -601,6 +605,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
             if 'activity_level' not in original_scene: scene.pop('activity_level')
+            if 'ambient' not in original_scene: scene.pop('ambient')   # design/101: absent stays absent
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
                             'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds',
@@ -614,10 +619,17 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     return result, warnings
 
 
+def without_ambient(value):
+    """design/101: a copy without the scenes' ambient lines, so adding one changes no gap's or take's fingerprint."""
+    if isinstance(value, dict):
+        return {k: without_ambient(v) for k, v in value.items() if k != 'ambient'}
+    return [without_ambient(v) for v in value] if isinstance(value, list) else value
+
+
 def gap_digest(plan, gap):
     """Only relevant elements invalidate a gap; descriptive edits elsewhere do not."""
     used = {eid for scene in all_scenes(gap) for shot in scene['shots'] for eid in shot['element_ids']}
-    content = {'foundation': plan['foundation'], 'gap': gap,
+    content = {'foundation': plan['foundation'], 'gap': without_ambient(gap),   # design/101: the ambient line needs no re-acceptance
                'elements': [e for e in plan['elements'] if e['id'] in used]}
     if plan.get('sequence_rules'): content['sequence_rules'] = plan['sequence_rules']
     return digest(content)
