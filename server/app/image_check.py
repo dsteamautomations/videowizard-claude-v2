@@ -10,7 +10,7 @@ import json
 import uuid
 from io import BytesIO
 
-from PIL import Image, ImageStat
+from PIL import Image, ImageFilter, ImageStat
 
 from .config import settings
 
@@ -20,7 +20,9 @@ FIXED = [{'check': 'readable text', 'pass_when': 'no readable text anywhere in t
          {'check': 'nothing extra', 'pass_when': 'nothing in the frame that the prompt did not ask for (a second person, a vehicle, a sign, a logo)', 'weight': 'should'}]
 SCENE_FIXED = [   # design/91 N7: for scene pictures, not graphics; should lines, so they never start a fix round alone
     {'check': 'plausible setting', 'pass_when': 'the setting and its scale are plausible for what is shown: the location, the size of the spaces against a person, the ground', 'weight': 'should'},
-    {'check': 'practitioner', 'pass_when': 'people handle tools and materials as a practitioner would (nothing set down on fresh work, the right tool for the task)', 'weight': 'should'}]
+    {'check': 'practitioner', 'pass_when': 'people handle tools and materials as a practitioner would (nothing set down on fresh work, the right tool for the task)', 'weight': 'should'},
+    {'check': 'wear', 'pass_when': 'materials show their real age and wear (uneven colour, chipped and worn edges, irregular joints, dust where work happens); '
+                                   'clothes on people doing dirty work are soiled; skin shows texture', 'weight': 'should'}]   # design/104 C2
 SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'object', 'properties': {'n': {'type': 'integer'}, 'pass': {'type': 'boolean'}, 'seen': {'type': 'string'}},
                                                                                 'required': ['n', 'pass', 'seen']}}},
           'required': ['lines']}
@@ -31,7 +33,9 @@ TAKE_LINES = [   # design/91 N3: the fixed questions every take is read against
     {'check': 'same tools, clothes, faces', 'pass_when': 'every tool, piece of clothing and face stays the same from the first frame to the last', 'weight': 'must'},
     {'check': 'no repeat without its precondition', 'pass_when': 'no action is repeated without what it needs (pouring again from a pan already emptied)', 'weight': 'must'},
     {'check': 'no change of shape or size', 'pass_when': 'no object changes shape or size (a window, a wall, a tool)', 'weight': 'must'},
-    {'check': 'planned end', 'pass_when': 'the clip ends in the state the plan below describes', 'weight': 'must'}]
+    {'check': 'planned end', 'pass_when': 'the clip ends in the state the plan below describes', 'weight': 'must'},
+    {'check': 'frozen person', 'pass_when': 'no person stands frozen while others move', 'weight': 'should'}]   # design/104 C4
+LIGHT_KEPT = {'check': 'light kept', 'pass_when': "the light keeps the direction and brightness the plan's light line gives, from the first frame to the last", 'weight': 'must'}   # design/104 C5
 AMBIENT_LINE = {'check': 'surroundings move', 'pass_when': "what the plan's ambient line names moves visibly through the shot; nothing that should move is frozen", 'weight': 'must'}   # design/101 M4
 TAKE_SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'object', 'properties': {'n': {'type': 'integer'}, 'pass': {'type': 'boolean'}, 'seen': {'type': 'string'},
                                                                                      'at_s': {'type': 'number'}}, 'required': ['n', 'pass', 'seen']}}}, 'required': ['lines']}
@@ -50,8 +54,9 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
         plan = '\n'.join(['The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
                          [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
                          (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []) +
-                         (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if snapshot.get('ambient') else []))
-        take_lines = TAKE_LINES + ([AMBIENT_LINE] if snapshot.get('ambient') else [])   # design/101 M4
+                         (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if snapshot.get('ambient') else []) +
+                         (['The light (the light line): ' + str(snapshot['light'])[:1000]] if snapshot.get('light') else []))
+        take_lines = TAKE_LINES + ([AMBIENT_LINE] if snapshot.get('ambient') else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])   # design/101 M4; design/104 C5
         asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(take_lines, 1))
         received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
             'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
@@ -142,6 +147,35 @@ def light_line(store, session, ref, png):
     return {'check': 'light and colour', 'pass_when': 'the light, colour and saturation match the footage beside it', 'weight': 'should', 'pass': not jumps, 'seen': seen}
 
 
+DETAIL_MIN, DETAIL_FRAMES = 0.6, 3   # design/104 C3; ponytail: the handover's 40 % smoother, untuned; tune it from the ratios the line reports
+
+
+def _detail(png):
+    return ImageStat.Stat(Image.open(BytesIO(png)).convert('L').resize((768, 432)).filter(ImageFilter.FIND_EDGES)).mean[0]
+
+
+def detail_line(store, session, ref, png):
+    """design/104 C3: the picture's fine detail (edge energy) against the footage frames beside its gap, as N9 does for the light; code, not a model,
+    and a should line. None for a graphic, a sheet, or fewer than three footage frames."""
+    if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') not in ('keyframe', 'isolated'):
+        return None
+    frames = [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')]
+    beside = {c for c in ((session.get('gap_neighbours') or {}).get(ref.get('gap_id')) or {}).values() if c}
+    near = [r for r in frames if (r.get('source') or {}).get('media_id') in beside]
+    frames = near if len(near) >= DETAIL_FRAMES else frames
+    values = []
+    for r in frames[:6]:
+        try:
+            values.append(_detail(store.get(r['key'])))
+        except Exception:
+            continue
+    if len(values) < DETAIL_FRAMES or not sum(values):
+        return None
+    ratio = _detail(png) / (sum(values) / len(values))
+    return {'check': 'fine detail', 'pass_when': 'the picture has about the fine detail of the footage beside it, not much smoother', 'weight': 'should',
+            'pass': ratio >= DETAIL_MIN, 'seen': f'{ratio:.2f} of the fine detail of the footage beside it ({len(values)} frames)'}
+
+
 def run_check(store, session, ref, result, transport_factory):
     """The whole check for one retained candidate, Gemini's lines and then the measured light (design/91 N9); returns the check record. Never raises."""
     record = _model_check(store, session, ref, result, transport_factory)
@@ -151,6 +185,12 @@ def run_check(store, session, ref, result, transport_factory):
         light = None
     if light:
         record['lines'] = list(record.get('lines') or []) + [light]
+    try:
+        detail = detail_line(store, session, ref, store.get(result['key']))   # design/104 C3
+    except Exception:
+        detail = None
+    if detail:
+        record['lines'] = list(record.get('lines') or []) + [detail]
     return compact(record, ref)
 
 

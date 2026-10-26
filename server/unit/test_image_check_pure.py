@@ -37,7 +37,7 @@ def key_set(monkeypatch, value='k'):
 
 def test_the_lines_are_the_writers_then_the_three_fixed_ones_and_the_request_carries_the_parents_and_the_candidate():
     lines = IC.lines_of(REF)
-    assert [l['check'] for l in lines] == ['scale', 'light', 'readable text', 'a real face', 'nothing extra', 'plausible setting', 'practitioner']   # design/91 N7: a scene picture
+    assert [l['check'] for l in lines] == ['scale', 'light', 'readable text', 'a real face', 'nothing extra', 'plausible setting', 'practitioner', 'wear']   # design/91 N7: a scene picture; design/104 C2: wear
     payload = IC.build(b'cand', [('sheet', b'p1')], lines, REF['generation']['prompt'])
     parts = payload['contents'][0]['parts']
     assert parts[0]['text'] == 'Reference 1 (sheet).' and 'inlineData' in parts[1] and parts[2]['text'] == 'The candidate picture.' and 'inlineData' in parts[3]

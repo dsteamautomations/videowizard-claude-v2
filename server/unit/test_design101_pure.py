@@ -108,10 +108,10 @@ def test_the_take_check_asks_whether_the_surroundings_move_only_when_the_take_ha
     video_path.write_bytes(b'mp4')
     rec = IC.run_take_check({'motion_prompt': 'm', 'ambient': LINE}, video_path, 'a' * 64, Video)
     asked = json.dumps(Video.payload)
-    assert '6. surroundings move' in asked and LINE in asked and [l['check'] for l in rec['lines']][-1] == 'surroundings move'
+    assert '7. surroundings move' in asked and LINE in asked and [l['check'] for l in rec['lines']][-1] == 'surroundings move'
     assert IC.AMBIENT_LINE['weight'] == 'must'
     rec = IC.run_take_check({'motion_prompt': 'm'}, video_path, 'a' * 64, Video)
-    assert '6. ' not in json.dumps(Video.payload) and len(rec['lines']) == 5
+    assert '7. ' not in json.dumps(Video.payload) and len(rec['lines']) == 6   # design/104 C4: six fixed lines
 
 
 # ---------- M6 ----------

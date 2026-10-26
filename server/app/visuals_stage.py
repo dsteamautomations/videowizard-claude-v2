@@ -1220,6 +1220,8 @@ def generate_image(conn, store, user, run, outputs, body):
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     lw = light_warning(found[2], body['kind'], body['prompt']) if found else None   # design/103 A1
+    if found and element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated'):   # design/104 C5: the scene's light and air, the shot's size, real sizes
+        lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements'])
     if lw:
         warns.append(lw)
     missing = [] if body.get('fix_of') else library.image_names_missing(body['prompt'], len(body.get('parents') or []))   # design/96 C1: the pictures it names, not those the server adds
@@ -1791,7 +1793,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'footage_character': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/77 L42; design/88: measured, the correction winning
               'provider': {k: generator[k] for k in ('provider', 'model')}}
     prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START},
-                         'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {})}   # design/102: in the context, so no take goes stale   # design/101 M5: in the context, so no take goes stale
+                         'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {}),   # design/102: in the context, so no take goes stale
+                         'bind_advice': bind_advice(plan, session, shot)}   # design/104 D1, D2   # design/101 M5: in the context, so no take goes stale
     identity = digest({**{k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}, 'scene': note_free_scene(prompt['scene']),   # design/101, 103
                        'shot': note_free_scene({'shots': [prompt['shot']]})['shots'][0], 'elements': note_free_elements(prompt['elements'])})   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
@@ -1829,6 +1832,37 @@ def _route_gate(shot, wanted):
     takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
+
+
+def picture_lines(scene, shot, elements):
+    """design/104 C5: should lines from the plan's fields, only where the plan gives them."""
+    out = []
+    light, air = (scene.get('light') or '').strip(), (scene.get('air') or '').strip()
+    if light:
+        out.append({'check': 'light', 'pass_when': f'the main light comes from where the scene\'s light says ({light}); shadows fall opposite', 'weight': 'should'})
+    if air and air.lower() != 'clean':
+        out.append({'check': 'air', 'pass_when': f'{air}: visible, lit by the light', 'weight': 'should'})
+    if shot.get('size'):
+        out.append({'check': 'shot size', 'pass_when': f"the picture is a {shot['size']}", 'weight': 'should'})
+    sized = [e for e in elements if e['id'] in (shot.get('element_ids') or []) and e.get('size')]
+    if sized:
+        words = '; '.join(e['name'] + ': ' + ', '.join(f"{d['part']} {d['measure']} {d.get('value')} {d.get('unit') or ''}".strip() for d in e['size'] if d.get('value') is not None) for e in sized)
+        out.append({'check': 'real size', 'pass_when': f'true sizes against the person and the place ({words})', 'weight': 'should'})
+    return out
+
+
+def bind_advice(plan, session, shot):
+    """design/104 D1, D2: the footage frames the shot should bind, and why; advice for the assistant, never bound automatically."""
+    out = []
+    frames = lambda eid: sorted(r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('element_id') == eid)
+    for e in plan['elements']:
+        if e['id'] not in (shot.get('element_ids') or []) or not frames(e['id']):
+            continue
+        if (e['kind'] == 'material' or (e['kind'] == 'object' and e.get('identity') == 'exact')) and shot.get('size', '') in ('', 'MS', 'MCU', 'CU', 'ECU'):   # D1
+            out.append({'element_id': e['id'], 'use': 'texture', 'reference_ids': frames(e['id']), 'line': 'the texture reference: take only its surface: its colour, wear and joints'})
+        if e['kind'] == 'place':   # D2
+            out.append({'element_id': e['id'], 'use': 'look', 'reference_ids': frames(e['id']), 'line': 'the look reference: take only its light and colour'})
+    return out
 
 
 def light_warning(scene, kind, prompt):

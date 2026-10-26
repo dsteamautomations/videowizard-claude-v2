@@ -154,7 +154,7 @@ def test_a_ready_take_is_read_by_gemini_and_an_appearing_object_is_marked_with_i
     video_path.write_bytes(b'mp4')
     snapshot = {'motion_prompt': 'he lays two bricks', 'changes': [{'what': 'two more bricks on the top course', 'beat_id': 'B1', 'at_s': [0.0, 4.0]}], 'continuity_notes': 'the wall stays'}
     rec = IC.run_take_check(snapshot, video_path, 'a' * 64, Video)
-    assert [l['check'] for l in rec['lines']] == [l['check'] for l in IC.TAKE_LINES] and len(IC.TAKE_LINES) == 5
+    assert [l['check'] for l in rec['lines']] == [l['check'] for l in IC.TAKE_LINES] and len(IC.TAKE_LINES) == 6   # design/104 C4 added the frozen-person line
     assert rec['must_failed'][0]['check'] == IC.TAKE_LINES[0]['check'] and rec['must_failed'][0]['at_s'] == 5.2
     assert 'two more bricks on the top course' in json.dumps(Video.payload) and Video.uploaded[1] == 'video/mp4'
 
