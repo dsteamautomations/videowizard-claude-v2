@@ -1785,7 +1785,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
               'footage_character': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/77 L42; design/88: measured, the correction winning
               'provider': {k: generator[k] for k in ('provider', 'model')}}
-    prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START}}   # design/101 M5: in the context, so no take goes stale
+    prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START},
+                         'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {})}   # design/102: in the context, so no take goes stale   # design/101 M5: in the context, so no take goes stale
     identity = digest(without_ambient({k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}))   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     steps_ = library.steps_of(shot)   # design/68 L3: the library beside the three instructions; the texts are in work/visuals/library/, written at prepare
@@ -1822,6 +1823,25 @@ def _route_gate(shot, wanted):
     takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
+
+
+def shot_guidance(shot, neighbours):
+    """design/102 (course batch B): the lines for this shot's pictures and take; a graphic gets none, a close-up no layers, a still no camera line."""
+    if shot.get('visual_type') in GRAPHIC_TYPES:
+        return []
+    lines = []
+    if 'close' not in str(shot.get('framing') or '').lower():   # B1
+        lines.append('Name a foreground, a midground and a background. When the camera travels, write the parallax: what is near slides past faster than what is far.')
+    lines += ['Where a face is hidden or small, carry the action in the hands, shoulders and posture, beat by beat.',   # B2
+              'Two or three imperfections at their places in this shot, not copied from the scene. Work leaves traces: tools, offcuts, mortar droppings, '
+              'footprints on an active site; signs of use in a finished house.',   # B8
+              'Thirds by default, the centre only on purpose; use leading lines and give a moving subject room ahead. To show a task, a first-person frame '
+              'with the hands in front is an option.']   # B10, B13
+    support = {(s or {}).get('support') for s in neighbours.values()} - {None, 'unknown'}
+    if shot.get('visual_type') == 'video' and support:   # B4: the camera matches the clips beside the gap
+        lines.append('The clips beside this gap are handheld: ask for slight handheld micro-movement in the take.' if 'handheld' in support
+                     else 'The clips beside this gap are steady: keep the camera steady in the take.')
+    return lines
 
 
 AMBIENT_START = ("Put in the frame what the scene's ambient line says moves (the trees, the people in the background, the dust in the light), "
