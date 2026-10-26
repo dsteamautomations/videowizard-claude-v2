@@ -271,3 +271,28 @@ def test_page_link_points_at_the_new_page_and_the_steps_put_the_direction_first(
 def test_voice_steps_name_the_four_steps():
     steps = ' '.join(STAGES['voice']['steps'])
     assert 'Browse, Try, Narrations, Final' in steps and 'without a tryout' in steps
+
+
+# ---------- defects 24, 25: favourites from the live search, the voices page state from `next` ----------
+
+def test_favourites_come_from_the_search_the_server_serves(monkeypatch):
+    calls = []
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: calls.append((path, kw.get('params'))) or {'voices': [{'voice_id': 'v1', 'name': 'A'}], 'tab': 'favourites'})
+    assert vw.favourites() == [{'voice_id': 'v1', 'name': 'A'}]
+    assert calls == [('/api/voice/search', {'tab': 'favourites'})]   # never /api/voice/catalog (dropped in server 0.20.0)
+
+    def down(method, path, **kw):
+        raise SystemExit(2)
+    monkeypatch.setattr(vw, 'call', down)
+    assert vw.favourites() == []   # a provider hiccup leaves the list empty, never stops the prepare
+
+
+def test_the_voices_page_state_is_read_from_next_when_the_run_reply_lacks_it(monkeypatch):
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'stage': 'voice', 'voice_page': {'step': 'browse', 'tried': 0, 'narrations': 0}} if path.endswith('/next') else {})
+    assert vw.voice_page_of({'stage': 'voice'}, 'run-1') == {'step': 'browse', 'tried': 0, 'narrations': 0}
+    assert vw.voice_page_of({'stage': 'voice', 'voice_page': {'pick': {'name': 'B'}}}, 'run-1') == {'pick': {'name': 'B'}}   # already there: no second call
+
+    def down(method, path, **kw):
+        raise SystemExit(2)
+    monkeypatch.setattr(vw, 'call', down)
+    assert vw.voice_page_of({'stage': 'voice'}, 'run-1') is None

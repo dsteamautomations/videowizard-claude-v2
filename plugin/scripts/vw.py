@@ -706,9 +706,19 @@ def cmd_defect(a):
 def favourites():
     """design/52 M: the favourite voices with their usage, for the voice stage's prepare; a provider hiccup leaves the list empty."""
     try:
-        return (call('GET', '/api/voice/catalog', params={'scope': 'favourites'}) or {}).get('voices') or []
+        return (call('GET', '/api/voice/search', params={'tab': 'favourites'}) or {}).get('voices') or []   # defects 24, 25: /api/voice/catalog was dropped in server 0.20.0
     except SystemExit:
         return []
+
+
+def voice_page_of(nxt, run_id):
+    """defect 25: the run's reply carries no voices page state; `next` does. None when it can't be read."""
+    if 'voice_page' in nxt:
+        return nxt['voice_page']
+    try:
+        return (call('GET', f'/api/runs/{run_id}/next') or {}).get('voice_page')
+    except SystemExit:
+        return None
 
 
 def cmd_stage(a):
@@ -743,7 +753,7 @@ def cmd_stage(a):
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
                 {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}} if a.stage == 'brief' else \
-                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': nxt.get('voice_page'), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else {}
+                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else {}
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
