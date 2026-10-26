@@ -1229,7 +1229,8 @@ def generate_image(conn, store, user, run, outputs, body):
     made = []
     for n in range(variants):
         suffix = '' if variants == 1 else '-ab'[n + 1]
-        made.append(_queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), body['request_id'] + ('-' + suffix if suffix else ''), pending_end))
+        request_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"{body['request_id']}-{suffix}")) if suffix else body['request_id']   # defect 27: the jobs' request_id is a uuid; one per candidate, the same on a retry
+        made.append(_queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), request_id, pending_end))
         if lines:
             session['references'][made[-1]['reference_id']]['server_checklist'] = lines
         if found:   # design/91 N9: the check measures its light against the footage beside the shot's gap

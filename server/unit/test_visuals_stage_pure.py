@@ -374,6 +374,29 @@ def test_the_packet_carries_end_targets_context_and_exact_patterns():
     assert prep['exact_patterns'][0]['element_id'] == 'O_BOND' and prep['exact_patterns'][0]['pattern_references'] == ['F9'] and 'medium and close shots' in prep['exact_patterns'][0]['rule']
 
 
+def test_two_candidates_queue_jobs_with_valid_request_ids(monkeypatch):
+    """Defect 27: vw2_jobs.request_id is a uuid column; the two candidates sent '<uuid>-a' and '<uuid>-b', and Postgres refused both."""
+    import uuid as _uuid
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
+    doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
+    gap = doc['gaps'][1]
+    sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
+                   references={'R1': {**ref('R1', 'approved'), 'kind': 'sheet'}}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
+    rid = 'a6638116-0fe9-4305-9ea3-db7263d79c01'
+    body = {'request_id': rid, 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the wall, bucket full', 'parents': ['R1'], 'variants': 2}
+    conn = FakeConn([])
+    out = VS.generate_image(conn, store_with(sess, doc), USER, RUN, [], body)
+    ids = [params[3] for params in conn.inserted]
+    assert len(ids) == 2 and len(set(ids)) == 2 and rid not in ids
+    assert all(str(_uuid.UUID(i)) == i for i in ids)   # each one a uuid Postgres accepts
+    again = FakeConn([])   # the same request gives the same ids, so a retried call finds the same rows
+    out2 = VS.generate_image(again, store_with(sess, doc), USER, RUN, [], body)
+    assert [params[3] for params in again.inserted] == ids and out2['reference_ids'] == out['reference_ids']
+    one = FakeConn([])   # one variant keeps the request id as sent
+    VS.generate_image(one, store_with(sess, doc), USER, RUN, [], {**body, 'variants': 1})
+    assert [params[3] for params in one.inserted] == [rid]
+
+
 def test_two_candidates_for_a_start_and_the_end_written_with_it_is_queued_on_approval(monkeypatch):
     """design/86 K4, K1."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
