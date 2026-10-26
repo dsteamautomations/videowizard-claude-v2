@@ -69,3 +69,19 @@ def test_the_table_is_written_grouped_by_kind_in_the_checklist():
     md = D.editors_table_md(lines())
     assert md.startswith("\n## Editor's table\n") and md.index('### Look') < md.index('### Sound') < md.index('### Finishing')
     assert '- [00:14] IM1: ' in md and '(E7)' in md
+
+
+# ---------- the review's finding: a file the operator supplied (`vw visuals asset`) is not labelled AI ----------
+
+def test_operator_supplied_files_are_listed_apart_and_get_no_ai_lines():
+    events = EVENTS + [fill('HM1', 34, 'asset', 'movie'), fill('HS1', 38, 'asset', 'still')]
+    vis = {**VIS, 'HM1': {'supplied': True}, 'HS1': {'supplied': True}}
+    rows = D.ai_shots(events, FPS, vis)
+    kinds = {r['shot_id']: r['kind'] for r in rows}
+    assert kinds['HM1'] == kinds['HS1'] == 'supplied' and kinds['VS1'] == 'AI video'
+    md = D.ai_shots_md(rows)
+    assert '## Supplied by the operator' in md and 'check whether they were made with AI' in md
+    assert md.index('## Supplied by the operator') < md.index('HM1') and 'HM1: AI' not in md
+    assert not any(r['shot'] in ('HM1', 'HS1') for r in D.editors_table(events, FPS, vis))
+    only = D.ai_shots([fill('HM1', 34, 'asset', 'movie')], FPS, {'HM1': {'supplied': True}})
+    assert not D.has_ai(only) and D.has_ai(rows) and 'tick the platform' not in D.ai_shots_md(only) and 'tick the platform' in md   # a film of supplied files only: no "tick the AI option" line in OPEN-EDIT

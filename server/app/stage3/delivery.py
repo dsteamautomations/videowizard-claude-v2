@@ -91,9 +91,11 @@ def _tc(frames, fps):
 
 
 def ai_kind(ev, vis):
-    """AI video, AI still, graphic, or None for footage."""
+    """AI video, AI still, graphic, supplied (a file the operator gave, `vw visuals asset`: maybe AI, maybe not), or None for footage."""
     if ev.get('kind') != 'fill' or ev.get('source') == 'clip':
         return None
+    if ev.get('source') == 'asset' and (vis.get(ev.get('shot_id')) or {}).get('supplied'):
+        return 'supplied'
     media = ev.get('media') or {}
     if media.get('kind') == 'sequence' or (media.get('kind') == 'still' and media.get('graphic')):
         return 'graphic'
@@ -106,12 +108,21 @@ def ai_shots(events, fps, vis):
     return [{'shot_id': ev['shot_id'], 'kind': k, 'timecode': _tc(ev['timeline_in_frame'], fps)} for ev in events for k in [ai_kind(ev, vis)] if k]
 
 
+def has_ai(rows):
+    return any(r['kind'] != 'supplied' for r in rows)
+
+
 def ai_shots_md(rows):
-    pic = [r for r in rows if r['kind'] != 'graphic']
+    pic = [r for r in rows if r['kind'] in ('AI video', 'AI still')]
     gfx = [r for r in rows if r['kind'] == 'graphic']
-    return ('# AI shots in this film\n\nEvery shot made by AI, with its timecode. When uploading, tick the platform\'s AI-generated or altered-content option.\n\n'
+    own = [r for r in rows if r['kind'] == 'supplied']
+    head = ("Every shot made by AI, with its timecode. When uploading, tick the platform's AI-generated or altered-content option.\n\n" if pic or gfx
+            else 'No shot was generated here; the files below were supplied by the operator.\n\n')
+    return ('# AI shots in this film\n\n' + head
             + ''.join(f"- {r['timecode']} {r['shot_id']}: {r['kind']}\n" for r in pic)
-            + ('\n## Graphics\n\nDrawn graphics (diagrams, charts, titles), listed apart:\n\n' + ''.join(f"- {r['timecode']} {r['shot_id']}\n" for r in gfx) if gfx else ''))
+            + ('\n## Graphics\n\nDrawn graphics (diagrams, charts, titles), listed apart:\n\n' + ''.join(f"- {r['timecode']} {r['shot_id']}\n" for r in gfx) if gfx else '')
+            + ('\n## Supplied by the operator\n\nFiles the operator gave for these shots; the server cannot tell how they were made: check whether they were made with AI '
+               'before ticking the option.\n\n' + ''.join(f"- {r['timecode']} {r['shot_id']}\n" for r in own) if own else ''))
 
 
 NUMBER = re.compile(r'\d[\d,.]*\s*(?:%|per ?cent)?|\b[a-z-]+ per ?cent\b', re.I)
@@ -180,7 +191,8 @@ def visuals_info(store, run, outputs):
                 asset = session.get('assets', {}).get(sh['id']) or {}
                 ref = session.get('references', {}).get(asset.get('reference_id') or '') or {}
                 check = image_check.expand(ref['check'], ref)['lines'] if ref.get('check') else []
-                out[sh['id']] = {'narration': sh.get('narration') or '', 'ambient': scene.get('ambient') or '', 'reference_kind': ref.get('kind'), 'check_lines': check}
+                out[sh['id']] = {'narration': sh.get('narration') or '', 'ambient': scene.get('ambient') or '', 'reference_kind': ref.get('kind'), 'check_lines': check,
+                                 'supplied': bool(asset) and not asset.get('reference_id') and asset.get('kind') in ('movie', 'still')}   # add_asset: a file the operator gave
     return out
 
 
@@ -232,7 +244,7 @@ def bundle(conn, store, user, run, outputs):
     md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n' + editors_table_md(table)
     checklist = checklist + [{'section': 'editor', 'kind': r['kind'], 'rule': r['rule'], 'where': r['where'], 'shot': r['shot'], 'item': r['line']} for r in table]
     csv_text = media_pool_csv(pk).encode('utf-8')
-    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=bool(shots)).encode('utf-8')
+    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots)).encode('utf-8')
     generated = {'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
                  'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown'),
                  **({'AI-shots.md': (ai_shots_md(shots).encode('utf-8'), 'text/markdown')} if shots else {})}   # design/105 E-c
