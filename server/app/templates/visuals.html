@@ -393,8 +393,8 @@ function panel(){
   if(selPic.take){   // design/97 P2: a take is judged beside its player
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
     if(!k)return '<div class="empty">That take is gone.</div>';
-    return '<div class="ds"><b>Take · '+headOf(s).replace('AI video · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+esc(k.status)+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+checklist(k.checklist)+takeCheck(k.check)+
-      (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
+    return '<div class="ds"><b>Take · '+headOf(s).replace('AI video · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+checklist(k.checklist)+takeCheck(k.check)+
+      (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
   }
   const by=refsById(), r=by[selPic.ref];
   if(!r)return '<div class="empty">That picture is gone.</div>';
@@ -585,14 +585,16 @@ function renderPictures(){
 }
 // ---------- takes ----------
 function play(url,name){const pl=$('pl');$('player').hidden=false;pl.src=url;$('pl-name').textContent=name;pl.play().catch(()=>{});}
+function takeRejected(k){return !!(k.reviews&&k.reviews.length&&k.reviews[k.reviews.length-1].decision==='rejected');}   // defect 30: the job stays 'ready'; its latest review says rejected
 function shotState(s){   // design/86 K3: whose turn it is on this shot, and how long to wait
   const d=data, kf=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'&&r.status!=='rejected'&&r.status!=='failed');
   const ids=new Set(kf.map(r=>r.id)), isStart=r=>!(r.parents||[]).some(p=>ids.has(p));
-  const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected);
+  const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected&&!takeRejected(k));
   if(s.takes.some(k=>k.selected))return ['ok','Take selected.'];
   if(s.asset&&s.asset.kind==='clip')return ['ok','Filled with a stretch of '+(s.asset.name||'a clip')+'.'];   // design/89 B3
   if(ready)return ['you','Your turn: watch the take and select it, or reject it with what is wrong.'];
   if(open)return ['wait','The take is being made, about 3 minutes. You may leave the page; it refreshes itself.'];
+  if(s.takes.some(takeRejected))return ['assistant','The take is rejected: the assistant prepares a new take from your reason. Nothing to do here.'];   // defect 30
   const gen=kf.filter(r=>r.status==='generating');
   if(gen.length)return ['wait','Making the '+(gen.some(isStart)?'start':'end')+' image, about 1 minute. Nothing for you to do; the page refreshes itself.'];
   const cand=kf.filter(r=>r.status==='candidate'), appr=kf.filter(r=>r.status==='approved');
@@ -619,7 +621,7 @@ function renderTakes(){
         '<div class="turn '+st[0]+'">'+esc(st[1])+'</div>';
       const pair=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe');
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The pictures: click a picture to see it large, approve or reject it.</div><div class="strip">'+pair.map(r=>refCard({...r,name:picWord(r)+' · '+r.name},'',true)).join('')+'</div>'+pairPlan(s);}
-      if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+esc(k.status)+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
+      if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+(k.reviews.length?k.reviews.map(rv=>'<div class="ds">'+esc(rv.decision)+': '+esc(rv.notes||'')+'</div>').join(''):'')+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
       h+=sh+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });

@@ -1248,7 +1248,7 @@ def _take_job(base, value):
     mine = [j for j in (call('GET', base).get('jobs') or []) if j.get('unit') == value and j.get('provider') == 'video']
     if not mine:
         return value   # a job id
-    ready = [j for j in mine if j.get('status') == 'ready']
+    ready = [j for j in mine if j.get('status') == 'ready' and j.get('verdict') != 'rejected']   # defect 30
     if len(ready) != 1:
         emit({'action': 'refused', 'message': f"{value} has {len(ready)} ready takes; give the job id (`vw visuals status --shot {value}`)."}, 2)
     return str(ready[0]['id'])
@@ -1487,7 +1487,8 @@ def cmd_visuals(a):
             if (not open_ and not round_open) or decide or time.monotonic() >= deadline:
                 break
             time.sleep(15)
-        ready = sum(1 for j in jobs_ if j.get('status') == 'ready')
+        ready = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') != 'rejected')   # defect 30: a rejected take stays 'ready' as a job
+        rejected = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') == 'rejected')
         rd = st.get('round') or {}
         round_line = f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': read the verdicts and make the sheets') if rd else ''
         if decide:
@@ -1497,7 +1498,7 @@ def cmd_visuals(a):
             line = ', '.join(x for x in (f'{images} image{"s" if images != 1 else ""}' if images else '', f'{takes} take{"s" if takes != 1 else ""}' if takes else '') if x) + f' open; {ready} ready' + \
                    ('; run again with --wait' if a.wait else '')
         else:
-            line = f'all done: {ready} ready' if jobs_ else 'no image or take jobs yet'
+            line = f'all done: {ready} ready' + (f', {rejected} rejected' if rejected else '') if jobs_ else 'no image or take jobs yet'
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
         waiting_line = (f'; {len(wt)} waiting for the operator: ' + '; '.join(f"{w['label']} {server_url()}{w['link']}" for w in wt)) if wt else ''

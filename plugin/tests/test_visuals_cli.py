@@ -843,3 +843,13 @@ def test_the_procedure_says_picks_are_approved_when_saved():
     text = STAGES['visuals']['prompt'] + ' '.join(STAGES['visuals']['steps'])
     assert 'the picked pictures are approved when saved' in text
     assert 'approve with its hash, then generate' not in (PLUGIN / 'scripts' / 'vw.py').read_text(encoding='utf-8')
+
+
+def test_a_rejected_take_is_not_counted_ready_and_a_shot_names_its_one_unrejected_take(harness, monkeypatch, capsys):
+    """Defect 30 (VW-7): status listed two rejected takes as ready."""
+    answer = jobs_answer(('j1', 'VS1', 'video', 'ready'), ('j2', 'VS1', 'video', 'ready'), ('j3', 'VS1', 'video', 'ready'))
+    answer['jobs'][0]['verdict'] = answer['jobs'][1]['verdict'] = 'rejected'
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: answer)
+    code, out, err = run(args(what='status'), capsys)
+    assert code == 0 and 'all done: 1 ready, 2 rejected' in err
+    assert vw._take_job('/api/runs/run-1/visuals', 'VS1') == 'j3'
