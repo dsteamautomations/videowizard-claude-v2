@@ -1383,6 +1383,18 @@ def spec_table(spec):
     return rows + [{'part': 'proportion', 'measure': '', 'size': p, 'source': '', 'status': 'ratio'} for p in spec.get('proportions') or []]
 
 
+def note_reference(store, user, run, outputs, ref_id, note):
+    """design/106 N4: a saved picture's note stays editable until its element's sheet is made; the sheet prompt reads the latest note."""
+    session = session_of(store, run, outputs)
+    row = session['references'].get(ref_id)
+    need(row and row.get('kind') in ('web', 'frame', 'supplied', 'isolated') and row.get('status') != 'rejected', f'{ref_id} is not a saved picture of an element.')
+    sheet = next((r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == row.get('element_id') and r.get('status') != 'rejected'), None)
+    need(not sheet, f"{row.get('element_id')}'s sheet is already made ({(sheet or {}).get('id', '')[:8]}): reject the sheet to change the notes it was made from.")
+    row.setdefault('source', {})['note'] = str(note or '').strip()[:500]
+    save_session(store, run, session)
+    return {'reference_id': ref_id, 'note': row['source']['note'], 'next': f"Note saved: {row.get('element_id')}'s sheet is made with it."}
+
+
 def correct_spec(store, user, run, outputs, shot_id, words):
     """design/106 D4: the operator corrects a value; the assistant revises the spec, and the next approval clears the correction."""
     words = str(words or '').strip()
@@ -2443,7 +2455,8 @@ def status(conn, store, run, outputs, repair=True):
                 entry['shots'].append({'shot_id': s['id'], 'visual_type': s['visual_type'], 'bound': s['id'] in session['bindings'], 'prepared': s['id'] in session['preparations'],
                                        'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
         gaps.append(entry)
-    refs = [{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')} for r in session['references'].values()]
+    refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}, 'note': (r.get('source') or {}).get('note') or ''}   # design/106 N4: the latest note
+            for r in session['references'].values()]
     take_rows = take_jobs(conn, run)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
               'verdict': ((session['reviews'].get(str(j['id'])) or [{}])[-1]).get('decision'),   # defect 30: a rejected take stays 'ready' as a job

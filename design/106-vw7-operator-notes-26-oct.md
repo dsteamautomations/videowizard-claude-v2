@@ -138,3 +138,27 @@ Server 0.53.0, plugin 0.47.0. Committed, not deployed.
   - `server/unit`: 462 passed, 9 of them new in `test_design106d_pure.py`.
   - Older expectations were updated to the new rules: the SPEC fixture gains `tried`; approval needs no words; the waiting label is now one item; the plugin's spec posts with no words.
   - `plugin/tests`: 272 passed, with the 3 known Windows-only failures.
+
+## As built: N1 to N4 and R1 to R3 (builder, 26 Oct 2026)
+
+Server 0.53.0, plugin 0.47.0. Committed, not deployed.
+
+- **N1:** a note field sits under every ticked picture in the round's grid. A note typed there is the one saved with the pick.
+- **N2:** pass 2's foot says "Picture notes go under each ticked picture", and its box is "words for the whole pass (optional)". The box was gone since design/99; it is back, labelled.
+- **N3:** Done shows "n pictures ticked, k notes: finish pass 2?" with Back and Finish. Nothing is sent before Finish.
+- **N4:**
+  - `note_reference` changes a saved picture's note until its element has a sheet (a rejected sheet does not count);
+  - on the page, the panel holds the note box and "Save the note"; in chat, `vw visuals note --ref R --notes "…"`;
+  - status gives every reference its latest note, for the sheet prompt.
+- **R1:** once a search has saved picks or "nothing fits", its results and the search box fold behind "show all (n)".
+- **R2, R3:** whenever a sheet exists, waiting or approved, it comes first, then "Made from" its sources, then the rest folded. Pass 2 after Done is the same view.
+- **D, added from the browser check:** a spec with no size and no proportion shows in the specs table as a highlighted "no size or proportion given" row, never silently. On VW-7 that is 9 of its 11 specs.
+- **Browser check (local copy with VW-7's page data):**
+  - the round reopened at pass 2: tick, the note in the grid, Done's summary, Back, and Finish posting the note;
+  - References: the sheet first with "Made from" for all 12 elements, the search folded;
+  - the panel's note box shown only while no sheet exists, and saving;
+  - the specs table with one approval and a correction;
+  - no script errors.
+- **Tests:**
+  - `server/unit`: 466 passed, 4 of them new in `test_design106n_pure.py`.
+  - `plugin/tests`: 272 passed, with the 3 known Windows-only failures.

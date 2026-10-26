@@ -290,6 +290,10 @@ class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec
     quote: str = ''
 
 
+class RefNote(Write):   # design/106 N4: a saved picture's note, until its sheet is made
+    note: str = Field(default='', max_length=500)
+
+
 class SpecsApprove(Write):   # design/106 D5: every spec of the run at once
     quote: str = ''
 
@@ -1361,6 +1365,11 @@ def visuals_clip(run_id: UUID, body: ClipBody, user=User, conn=DB):   # design/8
 @app.post('/api/runs/{run_id}/visuals/reuse')
 def visuals_reuse(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/89 H7
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reuse(storage(), user, run, outputs, body.shot_id, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/references/{ref_id}/note')
+def visuals_ref_note(run_id: UUID, ref_id: str, body: RefNote, user=User, conn=DB):   # design/106 N4
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.note_reference(storage(), user, run, outputs, ref_id, body.note))
 
 
 @app.post('/api/runs/{run_id}/visuals/specs')

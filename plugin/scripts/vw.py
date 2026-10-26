@@ -1229,7 +1229,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix']   # design/74 L26, L7; design/76; design/73; design/79
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note']   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1247,7 +1247,7 @@ VISUALS_FLAGS = {
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
     'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote'},
     'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'quote', 'notes'},
-    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}}
+    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'}}
 _VISUALS_ALL = set().union(*VISUALS_FLAGS.values()) | {'inr'}
 
 
@@ -1599,6 +1599,11 @@ def cmd_visuals(a):
                                                           for r in out.get('approved') or []))
         out = write(base + '/spec', {'shot_id': a.shot, 'quote': a.quote or ''})
         emit(out, 0, f"Drawing spec of {out.get('shot_id')} approved" + (f" (depicts {out['depicts']})" if out.get('depicts') else '') + ': ' + '; '.join(f"{r['part']} {r['measure']} {r['size']} ({r['status']}{', ' + r['source'] if r.get('source') else ''})" for r in out.get('table') or []) + '.')
+    if a.what == 'note':   # design/106 N4: a saved picture's note, until its element's sheet is made
+        if not a.ref:
+            emit({'action': 'refused', 'message': 'Name the picture: `vw visuals note --ref R --notes "<keep or avoid>"`.'}, 2)
+        out = write(f'{base}/references/{a.ref}/note', {'note': a.notes or ''})
+        emit(out, 0, out.get('next') or 'Note saved.')
     if a.what == 'measure':   # design/89 D2: sizes read off approved footage frames, each with its clip and time
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
         if not refs or not a.question:

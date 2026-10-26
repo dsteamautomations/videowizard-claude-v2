@@ -117,3 +117,4 @@ def test_the_procedure_researches_before_the_operator_sees_a_spec():
 def test_the_page_offers_one_approval_and_a_correction_box_never_a_size_box():
     assert 'your words for these sizes' not in PAGE
     assert 'data-a="approve-specs"' in PAGE and 'data-a="correct-spec"' in PAGE and 'data-item="specs"' in PAGE
+    assert 'no size or proportion given' in PAGE   # an empty spec shows as a row to research, never silently
