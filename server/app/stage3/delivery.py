@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from datetime import datetime, timezone
 from fractions import Fraction
 
@@ -79,6 +80,110 @@ def media_pool_csv(pk):
     return buf.getvalue()
 
 
+# ---------- design/105: the AI-shot list (E-c) and the editor's table (E-b), from the assembly and the visuals record ----------
+
+NOT_AI_REFS = ('frame', 'supplied', 'web')   # a footage frame, a client's file or a web photo held as a still is not AI
+
+
+def _tc(frames, fps):
+    s = int(frames / float(Fraction(str(fps))))   # an fps may be 25, 25.0 or '30000/1001'
+    return f'{s // 60:02d}:{s % 60:02d}'
+
+
+def ai_kind(ev, vis):
+    """AI video, AI still, graphic, or None for footage."""
+    if ev.get('kind') != 'fill' or ev.get('source') == 'clip':
+        return None
+    media = ev.get('media') or {}
+    if media.get('kind') == 'sequence' or (media.get('kind') == 'still' and media.get('graphic')):
+        return 'graphic'
+    if ev.get('source') == 'take' or media.get('kind') == 'movie':
+        return 'AI video'
+    return None if (vis.get(ev.get('shot_id')) or {}).get('reference_kind') in NOT_AI_REFS else 'AI still'
+
+
+def ai_shots(events, fps, vis):
+    return [{'shot_id': ev['shot_id'], 'kind': k, 'timecode': _tc(ev['timeline_in_frame'], fps)} for ev in events for k in [ai_kind(ev, vis)] if k]
+
+
+def ai_shots_md(rows):
+    pic = [r for r in rows if r['kind'] != 'graphic']
+    gfx = [r for r in rows if r['kind'] == 'graphic']
+    return ('# AI shots in this film\n\nEvery shot made by AI, with its timecode. When uploading, tick the platform\'s AI-generated or altered-content option.\n\n'
+            + ''.join(f"- {r['timecode']} {r['shot_id']}: {r['kind']}\n" for r in pic)
+            + ('\n## Graphics\n\nDrawn graphics (diagrams, charts, titles), listed apart:\n\n' + ''.join(f"- {r['timecode']} {r['shot_id']}\n" for r in gfx) if gfx else ''))
+
+
+NUMBER = re.compile(r'\d[\d,.]*\s*(?:%|per ?cent)?|\b[a-z-]+ per ?cent\b', re.I)
+SOCIAL = ('instagram', 'reels', 'tiktok', 'shorts', 'facebook', 'linkedin')
+KINDS = ('look', 'sound', 'text', 'finishing')
+
+
+def editors_table(events, fps, vis, fmt=None):
+    """design/105 E-b: one line per suggestion, from data the server has; the editor decides, nothing is applied."""
+    rows, takes, ai = [], 0, False
+    for ev in events:
+        kind = ai_kind(ev, vis)
+        if kind not in ('AI video', 'AI still'):
+            continue
+        ai = True
+        sid, where, v = ev['shot_id'], _tc(ev['timeline_in_frame'], fps), vis.get(ev['shot_id']) or {}
+        add = lambda k, rule, line: rows.append({'kind': k, 'rule': rule, 'where': where, 'shot': sid, 'line': line})
+        add('sound', 'E5', 'layer sound under it: near, middle, far, from what the scene shows' + (f" ({v['ambient']})" if v.get('ambient') else ''))
+        if kind == 'AI video':
+            takes += ev.get('source') == 'take'
+            m = NUMBER.search(v.get('narration') or '')
+            if m:
+                add('text', 'E6', f"'{m.group(0).strip()}' is spoken over a video shot: overlay it in the edit; it is not drawn in the take")
+        failed = {l.get('check'): l.get('seen') or '' for l in v.get('check_lines') or [] if l.get('pass') is False}
+        if 'light and colour' in failed:
+            add('look', 'E7', failed['light and colour'] + ': match the grade by eye')
+        if 'fine detail' in failed:
+            add('look', 'E8', failed['fine detail'] + ': add fine grain to match')
+        if 'nothing extra' in failed:
+            add('look', 'E10', 'the check saw: ' + failed['nothing extra'] + ': paint it out if it distracts')
+    once = lambda k, rule, line: rows.append({'kind': k, 'rule': rule, 'where': '', 'shot': '', 'line': line})
+    if takes:
+        once('finishing', 'E11', f"{takes} AI take{'s are' if takes > 1 else ' is'} 720p: use Resolve's Super Scale 2x on them before the final render")
+    once('sound', 'E13', 'If music is added, move cuts within ±4 frames of a beat where the narration allows')
+    once('finishing', 'E15', "End card: place the client's own logo file (never drawn by AI)")
+    if ai:
+        once('finishing', 'E16', 'Upload with the AI label: see AI-shots.md')
+    fmt = fmt or {}
+    if fmt.get('frame') == '9:16' or any(w in ' '.join(fmt.get('destinations') or []).lower() for w in SOCIAL):
+        once('finishing', 'E17', 'For Reels or TikTok: export 1080p 30 fps, not 4K 60 fps')
+    return rows
+
+
+def editors_table_md(rows):
+    out = "\n## Editor's table\n\nSuggestions for the editor, from the film's data; nothing here is applied. One line each: where, the shot, what to do, the rule.\n"
+    for k in KINDS:
+        mine = [r for r in rows if r['kind'] == k]
+        if mine:
+            out += f'\n### {k.capitalize()}\n\n' + ''.join(f"- [{r['where']}] {r['shot']}: {r['line']} ({r['rule']})\n" if r['shot'] else f"- {r['line']} ({r['rule']})\n" for r in mine)
+    return out
+
+
+def visuals_info(store, run, outputs):
+    """Per shot: its narration, its scene's ambient line, the kind of its placed picture and that picture's check lines. Empty when the run has no visuals."""
+    from .. import image_check, visuals_stage as VS
+    from ..visual_contract import all_scenes
+    try:
+        session = VS.session_of(store, run, outputs)
+        plan = VS.current_plan(store, session)
+    except Exception:
+        return {}
+    out = {}
+    for gap in plan.get('gaps') or []:
+        for scene in all_scenes(gap):
+            for sh in scene['shots']:
+                asset = session.get('assets', {}).get(sh['id']) or {}
+                ref = session.get('references', {}).get(asset.get('reference_id') or '') or {}
+                check = image_check.expand(ref['check'], ref)['lines'] if ref.get('check') else []
+                out[sh['id']] = {'narration': sh.get('narration') or '', 'ambient': scene.get('ambient') or '', 'reference_kind': ref.get('kind'), 'check_lines': check}
+    return out
+
+
 def bundle(conn, store, user, run, outputs):
     session = session_of(store, run)
     asm_o = S2._output(outputs, 'assembly')
@@ -120,11 +225,17 @@ def bundle(conn, store, user, run, outputs):
     for f in brand['files']:
         files.append({'role': 'brand', 'name': 'Graphics/' + f['name'], 'key': f['key'], 'sha256': f['sha256'], 'bytes': f['bytes']})
     checklist = checklist_of(asm_o['summary'], pk_flat, master_o['summary'], brief=brief_summary) + brand_lines(card, {f['kind']: 'Graphics/' + f['name'] for f in brand['files']})
-    md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n'
+    vis = visuals_info(store, run, outputs)   # design/105
+    fps = pk['timeline']['fps']
+    table = editors_table(assembly['events'], fps, vis, ((brief_summary.get('production') or {}).get('format')))
+    shots = ai_shots(assembly['events'], fps, vis)
+    md = '# Human finishing checklist\n\n' + '\n'.join(f"- [{i['where']}] {i['item']}" for i in checklist) + '\n' + editors_table_md(table)
+    checklist = checklist + [{'section': 'editor', 'kind': r['kind'], 'rule': r['rule'], 'where': r['where'], 'shot': r['shot'], 'item': r['line']} for r in table]
     csv_text = media_pool_csv(pk).encode('utf-8')
-    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or []).encode('utf-8')
+    open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=bool(shots)).encode('utf-8')
     generated = {'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
-                 'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown')}
+                 'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown'),
+                 **({'AI-shots.md': (ai_shots_md(shots).encode('utf-8'), 'text/markdown')} if shots else {})}   # design/105 E-c
     for name, (data, mime) in generated.items():
         k = key(run, 'delivery/' + name)
         store.put(k, data, mime)
@@ -176,11 +287,14 @@ def brand_lines(card, fetched):
     return items
 
 
-def open_edit_text(run, card=None, differences=None):
+def open_edit_text(run, card=None, differences=None, ai=False):
     """OPEN-EDIT.md (design/47 12.3: the subtitles are one cue per sentence since design/19; design/50: the brand section and the recorded differences)."""
     text = (f"# OPEN-EDIT\n\nRun {run['code']} — client {run.get('client')}.\n\n1. Open Approved-timeline.drt in DaVinci Resolve 21.1.1 (File > Import > Timeline) with Media/ next to it.\n"
             "2. Approved-film.mp4 is the film the operator approved; the timeline reproduces its cuts, crops and zooms. A2 fades are listed in the checklist.\n"
-            "3. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do.\n")
+            "3. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do.\n"
+            "4. The finishing checklist ends with the Editor's table: suggestions from the film's data, one line each; nothing in it is applied.\n")
+    if ai:   # design/105 E-c
+        text += "5. AI-shots.md lists every AI shot with its timecode: tick the platform's AI-generated or altered-content option when uploading.\n"
     if card:
         text += '\n## Brand\n\nFrom the client directory, for the end card and the graphics (Graphics/ holds the logo files when the directory had them): see the Brand lines of the checklist.\n'
     if differences:
