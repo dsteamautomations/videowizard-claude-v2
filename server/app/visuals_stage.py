@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, without_ambient
+from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -502,14 +502,16 @@ def page_view(conn, store, run, outputs, code, repair=True):
                 try:
                     shots = [sh for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']]
                     ambient = {sh['id']: sc.get('ambient') or '' for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']}   # design/101 M6
+                    lit = {sh['id']: {k: sc.get(k) for k in ('light', 'air') if sc.get(k)} for sc in chosen_scenes(gap, session['choice_selections'].get(gid)) for sh in sc['shots']}   # design/103
                 except ValueError:
-                    shots, ambient = [], {}
+                    shots, ambient, lit = [], {}, {}
                 entry['split'] = split_of(shots, float(Fraction(str(_fps(session) or 25))))   # design/97 G3
                 for sh in shots:
                     asset = session['assets'].get(sh['id'])
                     binding = session['bindings'].get(sh['id']) or {}
                     entry['shots'].append({'shot_id': sh['id'], 'title': sh.get('title') or '', 'visual_type': sh['visual_type'], 'route': route_of(sh), 'purpose': sh.get('purpose', ''),
                                            **({'ambient': ambient.get(sh['id'])} if sh['visual_type'] == 'video' and ambient.get(sh['id']) else {}),   # design/101 M6
+                                           **{k: sh[k] for k in ('size', 'camera_reason') if sh.get(k)}, **lit.get(sh['id'], {}),   # design/103
                                            'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
@@ -535,7 +537,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'graphic_style': ((plan or {}).get('foundation') or {}).get('graphic_style'),   # design/89 C2
             'measurements': [{'id': k, **{f: m.get(f) for f in ('question', 'measurements', 'limits', 'at')}} for k, m in (session.get('measurements') or {}).items()],   # design/89 D2
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
-            'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
+            'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views', 'size')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
             'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
@@ -1217,6 +1219,9 @@ def generate_image(conn, store, user, run, outputs, body):
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    lw = light_warning(found[2], body['kind'], body['prompt']) if found else None   # design/103 A1
+    if lw:
+        warns.append(lw)
     missing = [] if body.get('fix_of') else library.image_names_missing(body['prompt'], len(body.get('parents') or []))   # design/96 C1: the pictures it names, not those the server adds
     if missing:
         warns.append(f"the edit sends {len(body['parents'])} pictures but the prompt does not name Image {', '.join(map(str, missing))}: name each as Image 1 to Image N "
@@ -1787,7 +1792,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'provider': {k: generator[k] for k in ('provider', 'model')}}
     prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START},
                          'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {})}   # design/102: in the context, so no take goes stale   # design/101 M5: in the context, so no take goes stale
-    identity = digest(without_ambient({k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}))   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
+    identity = digest({**{k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}, 'scene': note_free_scene(prompt['scene']),   # design/101, 103
+                       'shot': note_free_scene({'shots': [prompt['shot']]})['shots'][0], 'elements': note_free_elements(prompt['elements'])})   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
     steps_ = library.steps_of(shot)   # design/68 L3: the library beside the three instructions; the texts are in work/visuals/library/, written at prepare
     prompt['library'] = {'version': library_version_of(session),
@@ -1823,6 +1829,14 @@ def _route_gate(shot, wanted):
     takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
+
+
+def light_warning(scene, kind, prompt):
+    """design/103 A1: a keyframe in a lit scene names the scene's light word for word; a warning in this release."""
+    light = (scene or {}).get('light', '').strip().rstrip('.')
+    if kind == 'keyframe' and light and light not in prompt:
+        return f"the prompt does not carry the scene's light sentence word for word ('{light}'): one light per scene, so the shots match" + NEXT_RELEASE
+    return None
 
 
 def shot_guidance(shot, neighbours):
@@ -1905,7 +1919,8 @@ def prepare_take(store, user, run, outputs, body):
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},
               'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {}),
               **({'changes': changes} if changes else {}),   # design/91 N1: the take check reads them too (N3)
-              **({'ambient': base['preparation']['scene']['ambient']} if base['preparation']['scene'].get('ambient') else {})}   # design/101 M3, M4: the take text and the take check read it
+              **({'ambient': base['preparation']['scene']['ambient']} if base['preparation']['scene'].get('ambient') else {}),
+              **({'light': base['preparation']['scene']['light']} if base['preparation']['scene'].get('light') else {})}   # design/103 A1   # design/101 M3, M4: the take text and the take check read it
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)

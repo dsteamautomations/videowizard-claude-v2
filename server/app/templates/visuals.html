@@ -313,6 +313,8 @@ function shotFacts(s){   // design/91: what the shot depicts, its words, what th
   let h='';if(s.message)h+='<div class="ds">Message: '+esc(s.message)+(s.adds?' · adds: '+esc(s.adds):'')+'</div>';   // design/91 N11
   if(s.depicts)h+='<div class="ds">Depicts: '+esc(s.depicts)+'</div>';
   if(s.ambient)h+='<div class="ds">'+'Moves around it: '+esc(s.ambient)+'</div>';   // design/101 M6
+  if(s.size||s.camera_reason)h+='<div class="ds">'+[s.size&&('Size: '+esc(s.size)),s.camera_reason&&('Camera: '+esc(s.camera_reason))].filter(Boolean).join(' · ')+'</div>';   // design/103 A3, A4
+  if(s.light||s.air)h+='<div class="ds">'+[s.light&&('Light: '+esc(s.light)),s.air&&('Air: '+esc(s.air))].filter(Boolean).join(' · ')+'</div>';   // design/103 A1, A2
   if(s.transition_in||s.transition_out)h+='<div class="ds">Transition: '+esc([s.transition_in&&('in: '+s.transition_in),s.transition_out&&('out: '+s.transition_out)].filter(Boolean).join(' · '))+(s.transition_reason?' ('+esc(s.transition_reason)+')':'')+'</div>';   // design/91 N16
   if((s.descriptors||[]).length)h+='<div class="ds">Words it must not contradict: '+s.descriptors.map(esc).join(' · ')+'</div>';
   if((s.carries_over||[]).length)h+='<div class="ds">Carried over from the step before: '+s.carries_over.map(esc).join(' · ')+'</div>';
@@ -518,7 +520,7 @@ function renderReferences(){
   const kwNow=($('kw-'+e.id)||{}).value, okSheet=refs.find(r=>r.kind==='sheet'&&r.status==='approved'), pend=refs.find(r=>r.kind==='sheet'&&r.status==='candidate');
   if(pend&&!selPic&&!closed[e.id])selPic={ref:pend.id};   // design/97 R1: the sheet waiting for approval opens large, beside its sources
   const list='<div class="list">'+els.map(x=>{const st=elState(x);return '<a data-el="'+esc(x.id)+'" class="'+(x.id===selEl?'on':'')+'"><span class="nm" style="font-size:14px">'+esc(x.id)+'</span><div class="ds">'+esc(x.name)+' · '+esc(x.kind)+'</div><div class="ds"><span class="badge '+st[0]+'">'+st[1]+'</span></div></a>';}).join('')+'</div>';
-  let body='<div class="card"><span class="nm">'+esc(e.name)+'</span> <span class="ds">'+esc(e.id)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span><div class="ds" style="margin-top:4px">'+esc(e.requirements||'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div></div>';
+  let body='<div class="card"><span class="nm">'+esc(e.name)+'</span> <span class="ds">'+esc(e.id)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span><div class="ds" style="margin-top:4px">'+esc(e.requirements||'')+(e.size&&e.size.length?'<div>'+'Size: '+e.size.map(x=>esc(x.part)+' '+esc(x.measure)+' '+(x.value!=null?esc(x.value)+' '+esc(x.unit||''):'unknown')+' ('+esc(x.status)+')').join(' · ')+'</div>':'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div></div>';
   let src='';
   src+='<h3>From your footage</h3><div class="ds">'+(hits.length?hits.slice(0,6).map(h=>esc(h.clip)+' at '+esc(h.seconds)+' s ('+esc(h.entity)+')').join(' · ')+' — the assistant grabs the frames':'not seen in the footage')+'</div>';
   const frames=refs.filter(r=>['frame','supplied','web','isolated'].includes(r.kind));

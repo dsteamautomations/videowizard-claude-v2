@@ -43,6 +43,7 @@ class Element(Model):
     identity: Literal['exact', 'representative']
     requirements: str = Field(min_length=1, max_length=4000)
     required_views: list[str] = Field(default_factory=list, max_length=20)
+    size: list['Dimension'] = Field(default_factory=list, max_length=20)   # design/103 A5: real size, each with its source and status, never invented
 
 
 class Position(Model):
@@ -165,6 +166,10 @@ class Shot(Model):
     transition_in: Literal['', 'cut', 'dissolve', 'match'] = ''   # design/91 N16: chosen, with a reason; empty: the default (a dissolve at graphics, else a cut)
     transition_out: Literal['', 'cut', 'dissolve', 'match'] = ''   # only on a gap's last shot: into the footage after the gap
     transition_reason: str = Field(default='', max_length=500)
+    size: Literal['', 'EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU'] = ''   # design/103 A3: the footage analysis's own words
+    size_reason: str = Field(default='', max_length=500)   # a stated reveal or repeat
+    camera_reason: str = Field(default='', max_length=1000)   # design/103 A4: what the viewer should feel or read, and why this camera gives it
+    claim: Literal['', 'visible', 'invisible'] = ''   # design/103 G2: a claim a camera could film, or one it cannot
 
 
 class Landmark(Model):
@@ -183,6 +188,8 @@ class Scene(Model):
     shots: list[Shot] = Field(min_length=1, max_length=100)
     activity_level: Literal['', 'quiet', 'normal', 'busy'] = ''   # design/91 N4: from the narration and the brief
     ambient: str = Field(default='', max_length=1000)   # design/101 M1: what moves around the action in a take, or 'still'
+    light: str = Field(default='', max_length=1000)   # design/103 A1: the sources against the landmarks, the main one, hard or soft, colour, strength
+    air: str = Field(default='', max_length=500)   # design/103 A2: what hangs in the air, lit by that light, or 'clean'
 
 
 class SourceCandidate(Model):
@@ -590,11 +597,14 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         share = frozen / (film_frames / float(fps))
         warnings.append({'kind': 'frozen_share', 'message': f'{frozen:.1f} s of frozen pictures, {share:.0%} of the film: over {frozen_limit:.0%}; give the stills movement, '
                                                           'build the graphics, or say why this film needs them still'})
+    warnings.extend(course_warnings(plan, fps))   # design/103
     result = plan.model_dump()
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
         if key not in document: result.pop(key)
     for key in ('specifications', 'production_constraints', 'editing_constraints', 'graphic_style', 'studio_background'):
         if key not in document['foundation']: result['foundation'].pop(key)
+    for element, original_element in zip(result['elements'], document.get('elements', [])):
+        if 'size' not in original_element: element.pop('size')   # design/103: absent stays absent
     # New presentation fields must not change legacy approval digests when absent.
     for gap, original_gap in zip(result['gaps'], document.get('gaps', [])):
         for key in ('title', 'choices', 'recommended_choice', 'decision_reason', 'source_strategy', 'candidates'):
@@ -605,11 +615,12 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
             if 'activity_level' not in original_scene: scene.pop('activity_level')
-            if 'ambient' not in original_scene: scene.pop('ambient')   # design/101: absent stays absent
+            for key in ('ambient', 'light', 'air'):   # design/101, 103: absent stays absent
+                if key not in original_scene: scene.pop(key)
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
                             'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds',
-                            'transition_in', 'transition_out', 'transition_reason'):   # design/89, 91: absent stays absent
+                            'transition_in', 'transition_out', 'transition_reason', 'size', 'size_reason', 'camera_reason', 'claim'):   # design/89, 91, 103: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
                     if 'words' not in original_st: st.pop('words', None)
@@ -619,18 +630,93 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     return result, warnings
 
 
-def without_ambient(value):
-    """design/101: a copy without the scenes' ambient lines, so adding one changes no gap's or take's fingerprint."""
-    if isinstance(value, dict):
-        return {k: without_ambient(v) for k, v in value.items() if k != 'ambient'}
-    return [without_ambient(v) for v in value] if isinstance(value, list) else value
+SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim'), ('size',)   # design/101, 103
+
+
+def _drop(d, keys):
+    return {k: v for k, v in d.items() if k not in keys}
+
+
+def note_free_scene(scene):
+    return {**_drop(scene, SCENE_NOTES), **({'shots': [_drop(sh, SHOT_NOTES) for sh in scene['shots']]} if 'shots' in scene else {})}
+
+
+def note_free_gap(gap):
+    """design/101, 103: a gap without the notes that need no re-acceptance (ambient, light, air, size, the camera's reason, the claim's kind)."""
+    out = dict(gap)
+    if gap.get('scenes'):
+        out['scenes'] = [note_free_scene(s) for s in gap['scenes']]
+    if gap.get('choices'):
+        out['choices'] = [{**c, 'scenes': [note_free_scene(s) for s in c['scenes']]} for c in gap['choices']]
+    return out
+
+
+def note_free_elements(elements):
+    return [_drop(e, ELEMENT_NOTES) for e in elements]
+
+
+CLOSE_SIZES, OPEN_SIZES = ('MCU', 'CU', 'ECU'), ('EWS', 'WS', 'MWS')
+SIZE_ORDER = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
+
+
+def course_warnings(plan, fps):
+    """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
+    out = []
+    for e in plan.elements:   # A5
+        if e.kind in ('person', 'object', 'animal', 'material') and not e.size:
+            out.append({'element_id': e.id, 'kind': 'element_size_missing', 'message': f'element {e.id} ({e.kind}): give its real size (size: height, width, depth or length, '
+                                                                                       'each with its source and status: confirmed, measured or unknown); never invent one'})
+    for gap in plan.gaps:
+        scenes = next((c.scenes for c in gap.choices if c.id == gap.recommended_choice), []) if gap.choices else gap.scenes
+        run_s, run_ids = 0.0, []
+        for scene in scenes:
+            if any(s.visual_type not in GRAPHIC_TYPES for s in scene.shots) and not scene.light.strip():   # A1
+                out.append({'scene_id': scene.id, 'kind': 'light_missing', 'message': f'scene {scene.id}: describe its light once (light): the sources against the landmarks, '
+                                                                                      'the main one, hard or soft, colour, strength'})
+            seen, sizes = {}, []   # A3: the widest size each element was seen at so far in the scene; the sizes in order
+            for shot in scene.shots:
+                if shot.visual_type in GRAPHIC_TYPES:
+                    run_s += (shot.end_frame - shot.start_frame) / float(fps) if fps else 0
+                    run_ids.append(shot.id)
+                    if shot.claim == 'visible':   # G2
+                        out.append({'shot_id': shot.id, 'kind': 'claim_visible_graphic', 'message': f'shot {shot.id}: its claim is about something a camera can film; '
+                                                                                                    'show it with footage first, then an AI scene, and keep graphics for what a camera cannot show'})
+                    continue
+                if run_s > 8:   # G1: a camera shot ends a run of graphics
+                    out.append(_graphics_run(gap.gap_id, run_ids, run_s))
+                run_s, run_ids = 0.0, []
+                if not shot.camera_reason.strip():   # A4
+                    out.append({'shot_id': shot.id, 'kind': 'camera_reason_missing',
+                                'message': f'shot {shot.id}: say what the viewer should feel or read, and why this angle, size and move give it (camera_reason)'})
+                if not shot.size:
+                    continue
+                reason = shot.size_reason.strip()
+                if not sizes and shot.size not in OPEN_SIZES and not reason:   # A3 (1)
+                    out.append({'shot_id': shot.id, 'kind': 'size_open',
+                                'message': f'shot {shot.id} opens scene {scene.id} at {shot.size}: a new place opens wide or medium-wide, unless a reveal is stated (size_reason)'})
+                if len(sizes) >= 2 and sizes[-1] == sizes[-2] == shot.size and not reason:   # A3 (2)
+                    out.append({'shot_id': shot.id, 'kind': 'size_repeat', 'message': f'shot {shot.id}: three {shot.size} shots in a row; change the size, or say why (size_reason)'})
+                if shot.size in CLOSE_SIZES and not reason and shot.element_ids and not any(seen.get(e, 99) < SIZE_ORDER.index('MCU') for e in shot.element_ids):   # A3 (3)
+                    out.append({'shot_id': shot.id, 'kind': 'size_close_first',
+                                'message': f'shot {shot.id} is a {shot.size} of a subject not seen wider in this scene yet; show it wider first, or state the reveal (size_reason)'})
+                for e in shot.element_ids:
+                    seen[e] = min(seen.get(e, 99), SIZE_ORDER.index(shot.size))
+                sizes.append(shot.size)
+        if run_s > 8:
+            out.append(_graphics_run(gap.gap_id, run_ids, run_s))
+    return out
+
+
+def _graphics_run(gap_id, ids, seconds):   # design/93 G1
+    return {'gap_id': gap_id, 'kind': 'graphics_run', 'message': f"{seconds:.1f} s of graphics in a row in {gap_id} ({', '.join(ids)}): above 8 s, break it with a camera shot"
+                                                              + ('; above 12 s it will be refused from the next release unless the treatment gives a reason' if seconds > 12 else '')}
 
 
 def gap_digest(plan, gap):
     """Only relevant elements invalidate a gap; descriptive edits elsewhere do not."""
     used = {eid for scene in all_scenes(gap) for shot in scene['shots'] for eid in shot['element_ids']}
-    content = {'foundation': plan['foundation'], 'gap': without_ambient(gap),   # design/101: the ambient line needs no re-acceptance
-               'elements': [e for e in plan['elements'] if e['id'] in used]}
+    content = {'foundation': plan['foundation'], 'gap': note_free_gap(gap),   # design/101, 103: the notes need no re-acceptance
+               'elements': note_free_elements([e for e in plan['elements'] if e['id'] in used])}
     if plan.get('sequence_rules'): content['sequence_rules'] = plan['sequence_rules']
     return digest(content)
 
