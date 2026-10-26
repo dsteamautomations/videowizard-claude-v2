@@ -335,6 +335,8 @@ def _visuals_act(code, vw2_session, body):
                                         {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),   # design/89 B3, finding 7
             'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7
             'approve-spec': lambda: V.approve_spec(store, user, run, outputs, body['shot_id'], quote),   # design/89 D4
+            'approve-specs': lambda: V.approve_specs(store, user, run, outputs, quote),   # design/106 D5
+            'correct-spec': lambda: V.correct_spec(store, user, run, outputs, body['shot_id'], body.get('words')),   # design/106 D4
             'measure': lambda: V.measure(store, user, run, outputs, list(body.get('reference_ids') or []), str(body.get('question') or '')),   # design/89 D2
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),

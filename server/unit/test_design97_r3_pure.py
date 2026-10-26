@@ -27,7 +27,7 @@ def test_waiting_lists_each_item_for_the_operator_in_film_order_with_its_label_a
     items = VS.waiting(sess, VS.current_plan(store_with(sess, doc), sess), 'VW-9', [take('j1', 'VS1'), take('j2', 'VS1', 'running')])
     labels = [i['label'] for i in items]
     assert labels[0] == 'Reference sheet · E1'
-    assert 'Reuse · DG1' in labels and 'Graphics · AN1 · 3 states' in labels and 'Still · DG2' in labels and 'Drawing spec · DG2' in labels and 'Take · VS1' in labels
+    assert 'Reuse · DG1' in labels and 'Graphics · AN1 · 3 states' in labels and 'Still · DG2' in labels and 'Drawing specs · 1 to approve' in labels and 'Take · VS1' in labels
     assert labels.index('Reuse · DG1') < labels.index('Graphics · AN1 · 3 states') < labels.index('Still · DG2') < labels.index('Take · VS1')   # film order
     by = {i['label']: i for i in items}
     assert by['Still · DG2']['link'] == '/runs/VW-9/visuals#pictures/DG2/K1' and by['Take · VS1']['link'] == '/runs/VW-9/visuals#takes/VS1/j1'
@@ -43,7 +43,7 @@ def test_a_sequence_waits_only_once_every_state_is_made():
 def test_the_page_view_and_status_carry_the_waiting_list():
     doc, sess = film(references=refs(pic('K1', 'DG1', check={'lines': [], 'must_failed': []})))
     store = store_with(sess, doc)
-    assert [i['label'] for i in VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')['waiting']] == ['Still · DG1', 'Drawing spec · DG2']   # DG2's spec is not approved
+    assert [i['label'] for i in VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')['waiting']] == ['Still · DG1', 'Drawing specs · 1 to approve']   # DG2's spec is not approved
     assert VS.status(FakeConn([]), store, RUN, [])['waiting'][0]['link'] == '/runs/VW-9/visuals#pictures/DG1/K1'
 
 

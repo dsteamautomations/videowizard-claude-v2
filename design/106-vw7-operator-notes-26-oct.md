@@ -106,3 +106,35 @@ Server 0.53.0, plugin 0.47.0. Committed, not deployed.
   - `server/unit`: 453 passed, 6 of them new in `test_design106_pure.py`.
   - `plugin/tests`: 271 passed, with the 3 known Windows-only failures.
   - A bug the older tests caught while building (the role written into the caller's request) is fixed.
+
+## As built: D1 to D6 (builder, 26 Oct 2026)
+
+Server 0.53.0, plugin 0.47.0. Committed, not deployed.
+
+- **D1:** the procedure's plan step says to research a spec before it is shown. The sources come in order: the client's material; `measure` on footage frames (announced, never asked); a standard or maker figure (one warning and one yes for the run); an approved picture.
+- **D2:**
+  - `drawing_spec.proportions` (a list of the ratios that matter);
+  - a spec without it gets the warning `spec_proportions_missing`;
+  - the table shows each proportion as a "ratio" row.
+- **D3:**
+  - `Dimension.tried` records the sources tried and why each failed;
+  - an unknown row in the table carries its risk line, e.g. "cavity width not found (…); drawn by eye";
+  - the page highlights it.
+- **D4:**
+  - a spec is approved without words, as "Approved by SK";
+  - the old "your words for these sizes" box is now a correction box (`correct_spec`, `vw visuals spec --shot S --notes "…"`);
+  - a correction waits for the assistant, and the next approval clears it.
+- **D5:**
+  - `approve_specs` approves every spec still waiting in one call: `vw visuals spec` with no `--shot`, or "Approve all specs" on the page;
+  - the Pictures step opens with one table of every spec still to approve;
+  - the waiting list has one item, "Drawing specs · n to approve".
+- **D6:** the plan check refuses an `unknown` size without `tried`.
+- **No re-acceptance:**
+  - `proportions` and `tried` stay out of the gap digest;
+  - an old spec keeps its spec digest (absent stays absent);
+  - VW-7's 18 and VW-9's 8 accepted gaps keep their digests.
+- **Effect on runs in progress:** VW-7's and VW-9's current plans are refused if resubmitted until their unknown sizes record `tried` (VW-7: B01_S6's brick size; VW-9: B01D_S1's brick sizes). The assistant fills that when it next revises a plan.
+- **Tests:**
+  - `server/unit`: 462 passed, 9 of them new in `test_design106d_pure.py`.
+  - Older expectations were updated to the new rules: the SPEC fixture gains `tried`; approval needs no words; the waiting label is now one item; the plugin's spec posts with no words.
+  - `plugin/tests`: 272 passed, with the 3 known Windows-only failures.

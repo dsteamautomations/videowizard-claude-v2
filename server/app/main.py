@@ -285,9 +285,18 @@ class ReuseApprove(Write):   # design/89 H7: the operator's own words for a prop
     quote: str = Field(min_length=1)
 
 
-class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec as a table
+class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec as a table; design/106 D4: no words needed
     shot_id: str
-    quote: str = Field(min_length=1)
+    quote: str = ''
+
+
+class SpecsApprove(Write):   # design/106 D5: every spec of the run at once
+    quote: str = ''
+
+
+class SpecCorrection(Write):   # design/106 D4: a correction, never typed sizes
+    shot_id: str
+    words: str = Field(min_length=1, max_length=2000)
 
 
 class MeasureBody(Write):   # design/89 D2: sizes read off approved footage frames
@@ -1352,6 +1361,16 @@ def visuals_clip(run_id: UUID, body: ClipBody, user=User, conn=DB):   # design/8
 @app.post('/api/runs/{run_id}/visuals/reuse')
 def visuals_reuse(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/89 H7
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reuse(storage(), user, run, outputs, body.shot_id, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/specs')
+def visuals_specs(run_id: UUID, body: SpecsApprove, user=User, conn=DB):   # design/106 D5
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_specs(storage(), user, run, outputs, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/spec-correction')
+def visuals_spec_correction(run_id: UUID, body: SpecCorrection, user=User, conn=DB):   # design/106 D4
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.correct_spec(storage(), user, run, outputs, body.shot_id, body.words))
 
 
 @app.post('/api/runs/{run_id}/visuals/spec')

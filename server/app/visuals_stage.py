@@ -526,7 +526,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                      if f['id'] in (sh.get('fact_ids') or []) or f.get('about') in (sh.get('element_ids') or [])],
                                            'claims': sh.get('claims') or [], 'spec': ({'table': spec_table(sh['drawing_spec']), 'relationships': sh['drawing_spec'].get('relationships') or [],   # design/89 C1, D4
                                                                                       'label': sh['drawing_spec'].get('label') or '',
-                                                                                      'approved': (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') == spec_digest(sh['drawing_spec'])}
+                                                                                      'correction': ((session.get('spec_corrections') or {}).get(sh['id']) or {}).get('words'), 'approved': (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') == spec_digest(sh['drawing_spec'])}
                                                                                      if sh.get('drawing_spec') else None)})
         gaps.append(entry)
     sp = visuals_spend(conn, run)
@@ -648,6 +648,7 @@ def waiting(session, plan, code, take_rows):
             items.append((at, {'label': label, 'step': step, 'group': group, 'item': item, 'link': item_link(code, step, group, item)}))
     title = lambda sh: f" · {sh['title']}" if sh.get('title') else ''
     ready = lambda r: r.get('status') == 'candidate' and r.get('sha256') and not r.get('check_pending')
+    pending_specs = []
     for r in session['references'].values():
         sh = shots.get(made_for(session, r) or '')
         if not ready(r):
@@ -670,7 +671,9 @@ def waiting(session, plan, code, take_rows):
                 add(sh['start_frame'], f"Graphics · {sid}{title(sh)} · {len(chain)} states", 'pictures', sid, chain[-1]['id'])
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec):
-            add(sh['start_frame'], f'Drawing spec · {sid}', 'pictures', sid, 'spec')
+            pending_specs.append(sh['start_frame'])
+    if pending_specs:   # design/106 D5: one item, one table, one approval
+        add(min(pending_specs), f"Drawing specs · {len(pending_specs)} to approve", 'pictures', 'specs', 'specs')
     for sid in session.get('reuse_pending') or {}:
         sh = shots.get(sid) or {'start_frame': 0}
         add(sh['start_frame'], f'Reuse · {sid}', 'takes' if sh.get('visual_type') == 'video' else 'pictures', sid, 'reuse')
@@ -1355,21 +1358,57 @@ def _dedupe(lines):
 
 
 def approve_spec(store, user, run, outputs, shot_id, quote):
-    """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval."""
-    need((quote or '').strip(), "The operator's words are required.")
+    """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval.
+    design/106 D4: no words needed; the operator never types sizes, and a correction goes to the assistant instead."""
     session = session_of(store, run, outputs)
     _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
-    session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    (session.get('spec_corrections') or {}).pop(shot_id, None)
     save_session(store, run, session)
     return {'shot_id': shot_id, 'table': spec_table(spec), 'relationships': spec.get('relationships') or [], 'label': spec.get('label') or '',
             'depicts': shot.get('depicts') or ''}   # design/91 N10: the spec repeats what the drawing depicts
 
 
 def spec_table(spec):
-    return [{'part': d['part'], 'measure': d['measure'], 'size': 'unknown' if d.get('value') is None else f"{d['value']:g} {d.get('unit') or ''}".strip(),
-             'source': d.get('source') or '', 'status': d['status']} for d in spec.get('dimensions') or []]
+    """design/106 D3, D5: every size with its source and status, an unknown one with its risk in one line, then the proportions."""
+    rows = []
+    for d in spec.get('dimensions') or []:
+        row = {'part': d['part'], 'measure': d['measure'], 'size': 'unknown' if d.get('value') is None else f"{d['value']:g} {d.get('unit') or ''}".strip(),
+               'source': d.get('source') or '', 'status': d['status']}
+        if d['status'] == 'unknown':
+            row['risk'] = f"{d['part']} {d['measure']} not found" + (f" ({d['tried']})" if d.get('tried') else '') + '; drawn by eye'
+        rows.append(row)
+    return rows + [{'part': 'proportion', 'measure': '', 'size': p, 'source': '', 'status': 'ratio'} for p in spec.get('proportions') or []]
+
+
+def correct_spec(store, user, run, outputs, shot_id, words):
+    """design/106 D4: the operator corrects a value; the assistant revises the spec, and the next approval clears the correction."""
+    words = str(words or '').strip()
+    need(words, 'Say what to correct in the spec (a value, a part, a proportion).')
+    session = session_of(store, run, outputs)
+    _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
+    need(shot.get('drawing_spec'), f'Shot {shot_id} has no drawing spec.')
+    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'shot_id': shot_id, 'correction': words, 'next': f'Correction sent: the assistant revises the spec of {shot_id}, then you approve it.'}
+
+
+def approve_specs(store, user, run, outputs, quote=''):
+    """design/106 D5: one approval for every drawing spec of the run still to approve, the same function for the page and chat."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    quote = said(quote, 'Approved', user)
+    approved = []
+    for _, sh in _accepted_shots(plan, session):
+        spec = sh.get('drawing_spec')
+        if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
+            session.setdefault('spec_approvals', {})[sh['id']] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+            (session.get('spec_corrections') or {}).pop(sh['id'], None)
+            approved.append({'shot_id': sh['id'], 'table': spec_table(spec)})
+    save_session(store, run, session)
+    return {'approved': approved, 'next': f"{len(approved)} drawing spec{'s' if len(approved) != 1 else ''} approved." if approved else 'No drawing spec was waiting.'}
 
 
 def _gemini_transport():

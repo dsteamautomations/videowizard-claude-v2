@@ -256,14 +256,25 @@ function styleCard(){   // design/89 C2: the film's one graphic style, approved 
   const st=data.graphic_style, refs=(data.references||[]).filter(r=>r.kind==='style');if(!st&&!refs.length)return '';
   return '<h3>The graphic style</h3><div class="card">'+(st?'<div class="ds">'+['palette','line_weight','labels','background','frame_fill'].map(k=>'<b>'+esc(k.replace('_',' '))+'</b>: '+esc(st[k])).join(' · ')+'</div>':'')+
     (refs.length?'<div class="strip">'+refs.map(r=>refCard(r)).join('')+'</div>':'<div class="ds">No style sheet yet: the assistant makes it before the first graphic.</div>')+'</div>';}
+function specRow(r){return '<tr'+(r.status==='unknown'?' class="err"':'')+'><td>'+esc(r.part)+'</td><td>'+esc(r.measure)+'</td><td>'+esc(r.size)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.source)+'</td></tr>';}
+function specsBlock(){   // design/106 D5: every spec still to approve, one table, one approval
+  const shots=[];(data.gaps||[]).forEach(g=>{if(g.accepted)g.shots.forEach(s=>{if(s.spec&&!s.spec.approved)shots.push(s);});});
+  if(!shots.length)return '';const can=stage()==='visuals';
+  return '<div class="card" data-item="specs" id="card-specs"><span class="nm">Drawing specs to approve</span> <span class="ds">'+shots.length+' spec'+(shots.length>1?'s':'')+'; the sizes come from the planner, with their sources</span>'+
+    '<table class="ds" style="width:100%;margin-top:4px"><tr><th align="left">Drawing</th><th align="left">Part</th><th align="left">Measure</th><th align="left">Value or ratio</th><th align="left">Status</th><th align="left">Source</th></tr>'+
+    shots.map(s=>s.spec.table.map(r=>specRow(r).replace('<td>','<td>'+esc(s.shot_id)+'</td><td>')).join('')).join('')+'</table>'+
+    shots.flatMap(s=>s.spec.table.filter(r=>r.risk).map(r=>'<div class="err">'+esc(s.shot_id)+': '+esc(r.risk)+'</div>')).join('')+
+    (can?'<div class="btns"><button class="go" data-a="approve-specs">Approve all specs</button></div><div class="ds">To correct one value, use the box under that drawing.</div>':'')+'</div>';}
 function specBox(s){   // design/89 D2, D4: the drawing spec as a table, approved with the operator's words; sizes measured from footage frames
   if(!s.spec)return '';const id=esc(s.shot_id), can=stage()==='visuals', frames=(data.references||[]).filter(r=>r.kind==='frame'&&r.status==='approved');
   let h='<details style="margin-top:8px" '+(s.spec.approved?'':'open')+'><summary class="ds" style="cursor:pointer">The drawing spec '+(s.spec.approved?'<span class="badge ok">approved</span>':'<span class="badge dec">to approve</span>')+'</summary>'+
     '<table class="ds" style="width:100%;margin-top:4px"><tr><th align="left">Part</th><th align="left">Measure</th><th align="left">Size</th><th align="left">Status</th><th align="left">Source</th></tr>'+
-    s.spec.table.map(r=>'<tr><td>'+esc(r.part)+'</td><td>'+esc(r.measure)+'</td><td>'+esc(r.size)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.source)+'</td></tr>').join('')+'</table>'+
+    s.spec.table.map(specRow).join('')+'</table>'+(s.spec.table.filter(r=>r.risk).map(r=>'<div class="err">'+esc(r.risk)+'</div>').join(''))+
     (s.spec.relationships.length?'<div class="ds">Must hold: '+s.spec.relationships.map(esc).join(' · ')+'</div>':'')+(s.spec.label?'<div class="ds">Label: '+esc(s.spec.label)+'</div>':'')+
     (s.claims.length?'<div class="ds">Claims the picture must show: '+s.claims.map(esc).join(' · ')+'</div>':'');
-  if(can&&!s.spec.approved)h+='<textarea id="sp-w-'+id+'" class="words" style="width:100%;margin-top:6px" placeholder="your words for these sizes"></textarea><div class="btns"><button class="go" data-a="approve-spec" data-shot="'+id+'">Approve the spec</button></div>';
+  if(s.spec.correction)h+='<div class="ds">Correction sent: '+esc(s.spec.correction)+' (the assistant revises the spec)</div>';
+  if(can&&!s.spec.approved)h+='<div class="btns"><button class="go" data-a="approve-spec" data-shot="'+id+'">Approve the spec</button></div>'+   // design/106 D4: the sizes come from the planner, never typed
+    '<textarea id="sp-c-'+id+'" class="words" style="width:100%;margin-top:6px" placeholder="correct a value, if one is wrong (optional): the cavity is 50 mm"></textarea><div class="btns"><button data-a="correct-spec" data-shot="'+id+'">Send the correction</button></div>';
   if(can&&frames.length)h+='<div class="ds" style="margin-top:6px">Measure from your footage frames:</div><select id="ms-f-'+id+'" multiple size="3">'+frames.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('')+'</select>'+
     '<input id="ms-q-'+id+'" placeholder="what to measure, for example: how thick is the wall?" style="width:100%;margin-top:4px"><div class="btns"><button data-a="measure" data-shot="'+id+'">Measure</button></div>';
   const ms=(data.measurements||[]).flatMap(m=>m.measurements.map(x=>esc(x.part)+' '+esc(x.measure)+' '+esc(x.value)+' '+esc(x.unit)+' ('+esc(x.source)+')'));
@@ -553,7 +564,7 @@ function renderPictures(){
   if(!gaps.length){$('s-pictures').innerHTML='<div class="empty">No still or graphic shot in an accepted gap yet.</div>';return;}
   const shown=gaps.filter(g=>!gapFilter||g.gap_id===gapFilter);
   let h='<div class="tabs"><button data-g="" class="'+(gapFilter?'':'on')+'">All gaps</button>'+gaps.map(g=>'<button data-g="'+esc(g.gap_id)+'" class="'+(gapFilter===g.gap_id?'on':'')+'">'+esc(g.gap_id)+'</button>').join('')+'</div>';
-  h+=styleCard();
+  h+=styleCard()+specsBlock();
   shown.forEach(g=>{
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
     g.shots.filter(s=>s.route!=='video').forEach(s=>{
@@ -706,8 +717,10 @@ async function click(b){
   if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} await send({action:'search',element_id:b.dataset.el,keywords:kw},'Search done: tick the pictures to use, then Save.');return;}
   if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[];if(!list.length){msg('Tick at least one picture first.',true);return;}const j=await send({action:'pick',search_id:sid,picks:list},list.length+' picture'+(list.length>1?'s':'')+' saved as references for '+(selEl||'the element')+'; the assistant makes the sheet from them.');if(j){delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
-  if(a==='approve-spec'){const sh=b.dataset.shot,w=(($('sp-w-'+sh)||{}).value||'').trim();if(!w){needWords('sp-w-'+sh,'Your words for these sizes are required.');return;}   // design/89 D4: the same server function as `vw visuals spec`
-    await send({action:'approve-spec',shot_id:sh,quote:w},'Drawing spec approved.');return;}
+  if(a==='approve-spec'){await send({action:'approve-spec',shot_id:b.dataset.shot,quote:''},'Drawing spec approved.');return;}   // design/106 D4: no words for a click
+  if(a==='approve-specs'){await send({action:'approve-specs',quote:''},'Drawing specs approved.');return;}   // design/106 D5
+  if(a==='correct-spec'){const sh=b.dataset.shot,w=(($('sp-c-'+sh)||{}).value||'').trim();if(!w){needWords('sp-c-'+sh,'Say which value is wrong and what it should be.');return;}
+    await send({action:'correct-spec',shot_id:sh,words:w},'Correction sent: the assistant revises the spec.');return;}   // design/106 D4
   if(a==='measure'){const sh=b.dataset.shot,sel=$('ms-f-'+sh),q=(($('ms-q-'+sh)||{}).value||'').trim(),refs=sel?[...sel.selectedOptions].map(o=>o.value):[];   // design/89 D2: the same server function as `vw visuals measure`
     if(!refs.length||!q){msg('Pick the footage frames and say what to measure.',true);return;}await send({action:'measure',reference_ids:refs,question:q},'Measured; the sizes are under the spec.');return;}
   if(a==='approve-reuse'){const w=(($('rw-'+b.dataset.shot)||{}).value||'').trim();if(!w){needWords('rw-'+b.dataset.shot,'Say in your words why the same footage is right here.');return;}

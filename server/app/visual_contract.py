@@ -98,6 +98,7 @@ class Dimension(Model):   # design/89 D1, D3
     unit: str = Field(default='', max_length=40)
     source: str = Field(default='', max_length=1000)   # the client's material, the footage (clip and time), a standard's URL, an approved picture
     status: Literal['confirmed', 'measured', 'unknown']
+    tried: str = Field(default='', max_length=1000)   # design/106 D3: for an unknown size, the sources tried and why each failed
 
 
 class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sources, the relationships that must hold
@@ -105,6 +106,7 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     dimensions: list[Dimension] = Field(default_factory=list, max_length=60)
     relationships: list[str] = Field(default_factory=list, max_length=30)
     label: str = Field(default='', max_length=200)
+    proportions: list[str] = Field(default_factory=list, max_length=20)   # design/106 D2: the ratios that matter, always, even on an illustrative drawing
 
 
 class VisualFact(Model):   # design/91 N6: how something real looks and is done, with its source; an unknown fact is never invented
@@ -476,8 +478,13 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         else:
                             spec = shot.drawing_spec
                             for d in spec.dimensions:
+                                need(d.status != 'unknown' or d.tried.strip(), f'shot {shot.id}: {d.part} {d.measure} is unknown: record the sources tried and why each failed (tried): '
+                                     'the client material, `measure` on footage frames, a standard or a maker figure, an approved picture (design/106 D3).')
                                 need(d.status != 'unknown' or d.value is None, f'shot {shot.id}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
                                 need(d.status == 'unknown' or d.source.strip(), f'shot {shot.id}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
+                            if not spec.proportions:   # design/106 D2
+                                warnings.append({'shot_id': shot.id, 'kind': 'spec_proportions_missing', 'message': f'shot {shot.id}: give the proportions that matter (proportions), '
+                                                 'for example a brick about 3 : 1.5 : 1, both leaves the same thickness; "illustrative" means no numbers printed, never free proportions'})
                             if any(d.status == 'unknown' for d in spec.dimensions):
                                 need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
                     for n, st in enumerate(shot.states, 1):
@@ -605,6 +612,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         if key not in document['foundation']: result['foundation'].pop(key)
     for element, original_element in zip(result['elements'], document.get('elements', [])):
         if 'size' not in original_element: element.pop('size')   # design/103: absent stays absent
+        for d, od in zip(element.get('size') or [], original_element.get('size') or []):
+            if 'tried' not in od: d.pop('tried', None)
     # New presentation fields must not change legacy approval digests when absent.
     for gap, original_gap in zip(result['gaps'], document.get('gaps', [])):
         for key in ('title', 'choices', 'recommended_choice', 'decision_reason', 'source_strategy', 'candidates'):
@@ -622,6 +631,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds',
                             'transition_in', 'transition_out', 'transition_reason', 'size', 'size_reason', 'camera_reason', 'claim'):   # design/89, 91, 103: absent stays absent
                     if key not in original_shot: shot.pop(key)
+                if shot.get('drawing_spec') and original_shot.get('drawing_spec'):   # design/106: absent stays absent
+                    if 'proportions' not in original_shot['drawing_spec']: shot['drawing_spec'].pop('proportions', None)
+                    for d, od in zip(shot['drawing_spec'].get('dimensions') or [], original_shot['drawing_spec'].get('dimensions') or []):
+                        if 'tried' not in od: d.pop('tried', None)
                 for st, original_st in zip(shot.get('states') or [], original_shot.get('states') or []):
                     if 'words' not in original_st: st.pop('words', None)
                 for sub, original_sub in zip(shot.get('subjects') or [], original_shot.get('subjects') or []):
@@ -637,8 +650,18 @@ def _drop(d, keys):
     return {k: v for k, v in d.items() if k not in keys}
 
 
+def _note_free_shot(sh):
+    out = _drop(sh, SHOT_NOTES)
+    if isinstance(out.get('drawing_spec'), dict):   # design/106: a spec's proportions and tried sources are approved with the spec, not the gap
+        sp = _drop(out['drawing_spec'], ('proportions',))
+        if 'dimensions' in sp:
+            sp['dimensions'] = [_drop(d, ('tried',)) for d in sp['dimensions']]
+        out['drawing_spec'] = sp
+    return out
+
+
 def note_free_scene(scene):
-    return {**_drop(scene, SCENE_NOTES), **({'shots': [_drop(sh, SHOT_NOTES) for sh in scene['shots']]} if 'shots' in scene else {})}
+    return {**_drop(scene, SCENE_NOTES), **({'shots': [_note_free_shot(sh) for sh in scene['shots']]} if 'shots' in scene else {})}
 
 
 def note_free_gap(gap):

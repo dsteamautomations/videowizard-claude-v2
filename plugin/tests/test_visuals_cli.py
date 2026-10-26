@@ -650,8 +650,8 @@ def test_spec_posts_the_operators_words_and_measure_posts_the_frames_and_questio
     posted = []
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.append((path, body)) or {'shot_id': 'DG1', 'table': [{'part': 'leaf', 'measure': 'thickness', 'size': '110 mm', 'source': 'brochure', 'status': 'confirmed'}],
                                                                                                      'measure_id': 'm1', 'measurements': [{'part': 'brick', 'measure': 'length', 'value': 230, 'unit': 'mm', 'source': 'clip c1 at 4.5 s'}]}))
-    code, out, err = run(args(what='spec', shot='DG1'), capsys)
-    assert code == 2 and '--quote' in out['message'] and not posted
+    code, out, err = run(args(what='spec', shot='DG1'), capsys)   # design/106 D4 (was: refused without --quote): no words needed
+    assert code == 0 and posted[-1][1] == {'shot_id': 'DG1', 'quote': ''}
     code, out, err = run(args(what='spec', shot='DG1', quote='The sizes are right.'), capsys)
     assert code == 0 and posted[-1] == (posted[-1][0], {'shot_id': 'DG1', 'quote': 'The sizes are right.'}) and posted[-1][0].endswith('/visuals/spec') and 'leaf thickness 110 mm' in err
     code, out, err = run(args(what='measure', refs=['F1,F2'], question='How long is a brick?'), capsys)
@@ -874,3 +874,15 @@ def test_status_wait_keeps_waiting_for_running_jobs_and_names_an_old_failed_job_
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: answers.pop(0) if answers else jobs_answer(('j1', 'VS1', 'video', 'ready'), ('j0', 'VS1', 'video', 'failed', 'x')))
     code, out, err = run(args(what='status', wait=600), capsys)
     assert code == 0 and slept == [15] and 'all done: 1 ready' in err and err.count('need a decision') == 1 and 'j0' in err
+
+
+def test_spec_approves_every_spec_without_words_or_sends_one_correction(harness, monkeypatch, capsys):
+    """design/106 D4, D5."""
+    sent = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, **kw: sent.append((path.rsplit('/', 1)[1], body)) or {'approved': [{'shot_id': 'DG1', 'table': []}], 'next': '1 drawing spec approved.', 'shot_id': 'DG1'})
+    code, out, err = run(args(what='spec'), capsys)
+    assert code == 0 and sent[-1] == ('specs', {'quote': ''}) and '1 drawing spec approved' in err
+    code, out, err = run(args(what='spec', shot='DG1', notes='the cavity is 50 mm'), capsys)
+    assert code == 0 and sent[-1] == ('spec-correction', {'shot_id': 'DG1', 'words': 'the cavity is 50 mm'})
+    code, out, err = run(args(what='spec', notes='the cavity is 50 mm'), capsys)
+    assert code == 2 and '--shot S --notes' in out['message']

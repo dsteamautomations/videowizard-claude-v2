@@ -13,7 +13,8 @@ from test_visuals_pure import GAPS, plan, shot as pshot, states
 
 SPEC = {'parts': ['inner leaf', 'outer leaf', 'cavity'], 'relationships': ['the two leaves are the same thickness', 'the cavity is inside the wall'],
         'dimensions': [{'part': 'leaf', 'measure': 'thickness', 'value': 110, 'unit': 'mm', 'source': 'client brochure p.4', 'status': 'confirmed'},
-                       {'part': 'cavity', 'measure': 'width', 'value': None, 'unit': 'mm', 'source': '', 'status': 'unknown'}],
+                       {'part': 'cavity', 'measure': 'width', 'value': None, 'unit': 'mm', 'source': '', 'status': 'unknown',
+                        'tried': 'not in the client brochure; no footage frame shows the cavity'}],   # design/106 D3: an unknown size records the sources tried
         'label': 'illustrative, not to scale'}
 
 
@@ -132,8 +133,7 @@ def test_the_operator_approves_the_drawing_spec_as_a_table():
     """D4: one approval per spec, with the operator's words; the same function for the page and chat."""
     doc, sess = graphic_session()
     store = store_with(sess, doc)
-    with pytest.raises(Problem, match="operator's words"):
-        g(lambda: VS.approve_spec(store, USER, RUN, [], 'DG1', ''))
+    # design/106 D4 (was: the operator's words were required): a spec is approved without words; the sizes come from the planner
     with pytest.raises(Problem, match='no drawing spec'):
         g(lambda: VS.approve_spec(store, USER, RUN, [], 'IM1', 'yes'))
     out = VS.approve_spec(store, USER, RUN, [], 'DG1', 'The sizes are right.')
