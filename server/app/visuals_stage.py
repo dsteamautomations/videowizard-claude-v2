@@ -1458,6 +1458,8 @@ def _keyframe_gates(session, plan, body, parents, named=None):
     elements = {e['id']: e for e in plan['elements']}
     parent_frames = {p['element_id'] for p in parents if p.get('kind') == 'frame'}
     for gap, sh in pairs:   # L41
+        if named is not None and sh['id'] != named['id']:   # defect 28: the picture's own shot, not every shot its element appears in
+            continue
         for eid in sh.get('element_ids') or []:
             e = elements.get(eid)
             if not e or eid == body['element_id'] or e['kind'] != 'object' or e['identity'] != 'exact':
@@ -1492,8 +1494,12 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         return {**row, 'placed': sid, 'next': nxt, **({k: placed[k] for k in ('replaced', 'warnings') if k in placed})}
     pe = row.get('pending_end')
     if pe and conn is not None and not row.get('end_queued'):   # design/86 K1: the end image follows the approved start without a chat turn
-        out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
-                                                               'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer')})
+        try:
+            out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
+                                                                   'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer')})
+        except (ValueError, Problem) as exc:   # defect 28: the start stays approved; the reason goes back, and approving it again tries the end again
+            why = exc.message if isinstance(exc, Problem) else str(exc)
+            return {**row, 'next': f"Approved; the end image was not made: {why} Make the end from this start (it is Image 1), or approve this start again to retry."}
         session = session_of(store, run, outputs)
         session['references'][ref_id]['end_queued'] = out['reference_id']
         save_session(store, run, session)
