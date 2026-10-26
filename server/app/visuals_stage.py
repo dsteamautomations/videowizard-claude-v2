@@ -481,7 +481,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                              rejection={k: (r.get('rejection') or {}).get(k) for k in ('notes', 'quote', 'by', 'at')} if r.get('rejection') else None,   # design/74 L7
                              checklist=(r.get('answer') or {}).get('checklist') if r.get('answer') else None,   # design/74 L6
                              check=({k: image_check.expand(r['check'], r).get(k) for k in ('lines', 'must_failed', 'error', 'fix_error', 'model')} if r.get('check') else None),   # design/86 K2; design/92
-                             pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'), fix_for=r.get('fix_for'))   # design/86 K1, K2
+                             pending_end=bool(r.get('pending_end')), end_queued=r.get('end_queued'), role=r.get('role'), fix_of=r.get('fix_of'), fix_queued=r.get('fix_queued'), fix_for=r.get('fix_for'))   # design/86 K1, K2
     takes, take_rows = {}, take_jobs(conn, run)
     for j in take_rows:
         res = j.get('result') or {}
@@ -1204,12 +1204,18 @@ def generate_image(conn, store, user, run, outputs, body):
             library.check_answer(answer, body['prompt'])
         except ValueError as exc:
             need(False, str(exc))
+    role = body.get('role') or ''   # design/106 T1, T2: a start made from an old start says so; without a role, a keyframe parent means an end
+    need(role in ('', 'start', 'end'), 'role is start or end.')
+    need(not role or body['kind'] == 'keyframe', 'A role (start or end) is for a keyframe.')
+    is_end = role == 'end' if role else any(p['kind'] == 'keyframe' for p in parents)
+    if body['kind'] == 'keyframe':
+        body = {**body, 'role': 'end' if is_end else 'start'}   # a copy: the caller's request is never changed
     variants = int(body.get('variants') or 1)   # design/86 K4: two candidates for a start keyframe, the operator picks
     need(variants in (1, 2), 'variants is 1 or 2.')
-    need(variants == 1 or (body['kind'] == 'keyframe' and not any(p['kind'] == 'keyframe' for p in parents)), 'Two candidates are for a start keyframe only.')
+    need(variants == 1 or (body['kind'] == 'keyframe' and not is_end), 'Two candidates are for a start keyframe only.')
     pending_end = None
     if body.get('end_prompt'):   # design/86 K1: the end prompt written with the start; the server makes the end from the approved start
-        need(body['kind'] == 'keyframe' and not any(p['kind'] == 'keyframe' for p in parents), 'An end prompt goes with a start keyframe.')
+        need(body['kind'] == 'keyframe' and not is_end, 'An end prompt goes with a start keyframe.')
         library.check_prompt(body['end_prompt'])
         need(re.search(r'\bimage 1\b', body['end_prompt'], re.I), 'The end prompt names Image 1 as the start image.')
         if body.get('end_answer') is not None:
@@ -1419,7 +1425,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size,
                'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
-                             **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}}   # design/96 X3: the spend counts fixes apart
+                             **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {})}}   # design/96 X3; design/106 T1
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
                        (run['id'], ref_id, Jsonb(request), request_id)).fetchone()
     session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents')},
@@ -1428,8 +1434,19 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
 
 
-CAMERA_MOVE = re.compile(r"(camera(?![^.;]{0,40}?\b(does not|doesn't|never|no|without|unmoved|stays|static|fixed|locked)\b)[^.;]{0,40}?\b(push|drift|dolly|zoom|pan|tilt|track|mov)\w*)"
+CAMERA_MOVE = re.compile(r"(camera(?![^.;]{0,40}?\b(not|\w+n't|never|no|without|unmoved|stays|still|static|fixed|locked)\b)[^.;]{0,40}?\b(push|drift|dolly|zoom|pan|tilt|track|mov)\w*)"
                          r"|\b(push[- ]in|pull[- ]out|dolly|zoom\w*|tracking shot|pan(ning)? (left|right)|tilt(ing)? (up|down))\b", re.I)
+
+
+def camera_move(text):
+    """design/106 T6: the first camera move the text asks for; a negated one ('no camera move', 'did not move', 'stays still', 'locked off') is not a move."""
+    text = text or ''
+    for m in CAMERA_MOVE.finditer(text):
+        before = text[max(0, m.start() - 20):m.start()]
+        if re.search(r"(\b(no|not|never|without)\b|n't)[^.;,]{0,12}$", before, re.I):
+            continue
+        return m.group(0).strip()
+    return None
 
 
 def _shots_with(plan, session, element_id):
@@ -1453,7 +1470,7 @@ def _keyframe_gates(session, plan, body, parents, named=None):
     never moves the camera; L41 a shot that shows a client's own material (an exact object element with approved footage frames) sends one of
     those frames as a parent."""
     pairs = _shots_with(plan, session, body['element_id'])
-    end = any(p['kind'] == 'keyframe' for p in parents)
+    end = body['role'] == 'end' if body.get('role') else any(p['kind'] == 'keyframe' for p in parents)   # design/106 T1
     video = [(gap, sh) for gap, sh in pairs if sh['visual_type'] == 'video' and (named is None or sh['id'] == named['id'])]   # defect 24: a named image shot is a still, no bind or packet
     if video and not end:   # L35
         read = [sh['id'] for gap, sh in video if (session['bindings'].get(sh['id']) or {}).get('packet_read_at') and session['bindings'][sh['id']].get('gap_digest') == gap_digest(plan, gap)]
@@ -1461,9 +1478,9 @@ def _keyframe_gates(session, plan, body, parents, named=None):
         need(read, f"Bind the shot and read its packet before composing its start image (`vw visuals bind --shot {first} …`, then `vw visuals packet --shot {first}`): "
                    "the packet carries the pair instructions and the library's job form.")
     if end:   # L38
-        m = CAMERA_MOVE.search(body['prompt'])
+        m = camera_move(body['prompt'])
         if m:
-            need(False, f"The end image moves the camera ({m.group(0).strip()!r}): the camera does not move between the start and the end; show the action's visible result instead.")
+            need(False, f"The end image moves the camera ({m!r}): the camera does not move between the start and the end; show the action's visible result instead.")
     elements = {e['id']: e for e in plan['elements']}
     parent_frames = {p['element_id'] for p in parents if p.get('kind') == 'frame'}
     for gap, sh in pairs:   # L41
@@ -1505,14 +1522,15 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     if pe and conn is not None and not row.get('end_queued'):   # design/86 K1: the end image follows the approved start without a chat turn
         try:
             out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
-                                                                   'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer')})
+                                                                   'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer'), 'role': 'end'})
         except (ValueError, Problem) as exc:   # defect 28: the start stays approved; the reason goes back, and approving it again tries the end again
             why = exc.message if isinstance(exc, Problem) else str(exc)
             return {**row, 'next': f"Approved; the end image was not made: {why} Make the end from this start (it is Image 1), or approve this start again to retry."}
         session = session_of(store, run, outputs)
         session['references'][ref_id]['end_queued'] = out['reference_id']
         save_session(store, run, session)
-        return {**session['references'][ref_id], 'end_reference_id': out['reference_id'], 'next': 'Approved: the end image is being made from it.'}
+        return {**session['references'][ref_id], 'end_reference_id': out['reference_id'], 'end_job_id': out['job_id'],   # design/106 T2
+                'next': f"Approved: end image queued (job {out['job_id']}); it appears here in about a minute."}
     return {**row, 'next': _approved_next(store, session, row)}
 
 
@@ -1540,7 +1558,7 @@ def _picture_word(store, session, row):
     """What the picture is, in the operator's words."""
     kind = row.get('kind')
     if kind == 'keyframe':
-        if any((session['references'].get(p.get('id')) or {}).get('kind') == 'keyframe' for p in (row.get('generation') or {}).get('parents') or []):
+        if row.get('role') == 'end' or (not row.get('role') and any((session['references'].get(p.get('id')) or {}).get('kind') == 'keyframe' for p in (row.get('generation') or {}).get('parents') or [])):
             return 'end image'
         return 'start image' if made_for(session, row) and _shot_is_video(store, session, made_for(session, row)) else 'picture'
     return {'state': 'state', 'sheet': 'reference sheet', 'style': 'style sheet'}.get(kind, 'reference picture')
@@ -2052,6 +2070,8 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
 
 def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes=''):
     """design/45 10.4: with notes, the accepted review and the selection are one call; without, the latest review must be accepted."""
+    need(not re.search(r'\breject', f'{quote or ""} {notes or ""}', re.I),   # design/106 T3: select places a take; words that reject it never do
+         'Your words say reject: select places the take in the film. To reject a take, run `vw visuals review --job J --decision rejected --notes "…"`.')
     session = session_of(store, run, outputs)
     quote = said(quote, 'Selected', user)   # design/99 C2
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()

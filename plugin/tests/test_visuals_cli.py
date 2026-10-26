@@ -100,11 +100,12 @@ def test_status_wait_until_no_job_is_open(harness, monkeypatch, capsys):
     assert code == 0 and slept == [15] and 'all done' in err and '2 ready' in err
 
 
-def test_status_wait_stops_when_a_job_needs_a_decision(harness, monkeypatch, capsys):
+def test_status_wait_keeps_waiting_while_a_job_runs_and_names_the_one_needing_a_decision(harness, monkeypatch, capsys):
+    """design/106 T5 (was: the wait stopped at once when an old job needed a decision)."""
     _, slept = harness
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: jobs_answer(('j1', 'VS1', 'video', 'running'), ('j2', 'VS2', 'video', 'failed', 'Provider reported failed.')))
     code, out, err = run(args(what='status', wait=600), capsys)
-    assert code == 0 and slept == [] and '1 need a decision: j2 (failed' in err
+    assert code == 0 and len(slept) == 40 and err.count('need a decision') == 1 and '1 need a decision: j2 (failed' in err
 
 
 def test_status_wait_expiry_counts_open_jobs(harness, monkeypatch, capsys):
@@ -853,3 +854,23 @@ def test_a_rejected_take_is_not_counted_ready_and_a_shot_names_its_one_unrejecte
     code, out, err = run(args(what='status'), capsys)
     assert code == 0 and 'all done: 1 ready, 2 rejected' in err
     assert vw._take_job('/api/runs/run-1/visuals', 'VS1') == 'j3'
+
+
+# ---------- design/106 T3, T5 ----------
+
+def test_a_flag_the_subcommand_does_not_use_is_refused_by_name(harness, monkeypatch, capsys):
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: pytest.fail('nothing may reach the server'))
+    monkeypatch.setattr(vw, 'write', lambda *a, **k: pytest.fail('nothing may reach the server'))
+    code, out, err = run(args(what='select', job='j1', decision='reject', notes='a cut', quote='no'), capsys)
+    assert code == 2 and 'vw visuals review --job J --decision rejected' in out['message']
+    code, out, err = run(args(what='approve', ref='r1', sha='s', shot='S1'), capsys)
+    assert code == 2 and '--shot' in out['message'] and 'approve' in out['message']
+
+
+def test_status_wait_keeps_waiting_for_running_jobs_and_names_an_old_failed_job_once(harness, monkeypatch, capsys):
+    _, slept = harness
+    answers = [jobs_answer(('j1', 'VS1', 'video', 'running'), ('j0', 'VS1', 'video', 'failed', 'Storage not reachable')),
+               jobs_answer(('j1', 'VS1', 'video', 'ready'), ('j0', 'VS1', 'video', 'failed', 'Storage not reachable'))]
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: answers.pop(0) if answers else jobs_answer(('j1', 'VS1', 'video', 'ready'), ('j0', 'VS1', 'video', 'failed', 'x')))
+    code, out, err = run(args(what='status', wait=600), capsys)
+    assert code == 0 and slept == [15] and 'all done: 1 ready' in err and err.count('need a decision') == 1 and 'j0' in err

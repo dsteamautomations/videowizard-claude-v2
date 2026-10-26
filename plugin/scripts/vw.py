@@ -1232,6 +1232,34 @@ VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose'
                 'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix']   # design/74 L26, L7; design/76; design/73; design/79
 
 
+# design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
+_PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
+_REUSE = {'reuse', 'considered', 'crop'}
+VISUALS_FLAGS = {
+    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote'},
+    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
+    'round': {'file', 'verdicts', 'picks', 'quote'}, 'search': {'element', 'keywords', 'quote'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
+    'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role'},
+    'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
+    'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
+    'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'},
+    'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
+    'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote'},
+    'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'quote'},
+    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}}
+_VISUALS_ALL = set().union(*VISUALS_FLAGS.values()) | {'inr'}
+
+
+def visuals_flags_refused(a):
+    """The flags given to this subcommand that it does not read (empty when all are read)."""
+    given = [k for k in sorted(_VISUALS_ALL) if getattr(a, k, None) not in (None, 0, '', [], False)]
+    if a.what == 'select' and 'decision' in given:
+        return 'select places a take in the film; it takes no --decision. To reject a take, run `vw visuals review --job J --decision rejected --notes "…"`.'
+    bad = [k for k in given if k not in VISUALS_FLAGS.get(a.what, set())]
+    return f"vw visuals {a.what} does not take {', '.join('--' + k.replace('_', '-') for k in bad)}; nothing was sent." if bad else ''
+
+
 def _short_status(st, shot=None, gap=None):
     """design/81 (defect 21): the whole status is too long for the assistant's shell; one line per job, the references as counts, the rest in the file."""
     jobs_ = st.get('jobs') or []
@@ -1265,6 +1293,9 @@ def _take_job(base, value):
 
 
 def cmd_visuals(a):
+    refused = visuals_flags_refused(a)   # design/106 T3
+    if refused:
+        emit({'action': 'refused', 'message': refused}, 2)
     m = active()
     run = m['run_id']
     base = f'/api/runs/{run}/visuals'
@@ -1401,7 +1432,8 @@ def cmd_visuals(a):
                         'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt'), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
                         **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
-                        **_pair_fields(m, it.get('variants'), it.get('end_answer')), **({'shot_id': it['shot']} if it.get('shot') else {})}   # design/86 K1, K4; design/91 N8
+                        **_pair_fields(m, it.get('variants'), it.get('end_answer')), **({'shot_id': it['shot']} if it.get('shot') else {}),   # design/86 K1, K4; design/91 N8
+                        **({'role': it['role']} if it.get('role') else {})}   # design/106 T1: start or end, said
                 payload, code = request('POST', base + '/images', json=body)
                 if code:
                     if code == 401:
@@ -1416,7 +1448,7 @@ def cmd_visuals(a):
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
-                **({'shot_id': a.shot} if a.shot else {})}   # design/91 N8: the shot this picture is for
+                **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {})}   # design/91 N8; design/106 T1
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
                      (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
@@ -1494,21 +1526,21 @@ def cmd_visuals(a):
             open_ = [j for j in jobs_ if j.get('status') in VISUALS_OPEN]
             decide = [j for j in jobs_ if j.get('status') in ('failed', 'rejected', 'cancelled', 'submission_unknown')]
             round_open = (st.get('round') or {}).get('pass') in (1, 2)   # design/79: the operator is answering the round on the page
-            if (not open_ and not round_open) or decide or time.monotonic() >= deadline:
+            if (not open_ and not round_open) or time.monotonic() >= deadline:   # design/106 T5: an old job needing a decision never ends the wait
                 break
             time.sleep(15)
         ready = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') != 'rejected')   # defect 30: a rejected take stays 'ready' as a job
         rejected = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') == 'rejected')
         rd = st.get('round') or {}
         round_line = f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': read the verdicts and make the sheets') if rd else ''
-        if decide:
-            line = f"{len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
-        elif open_:
+        if open_:
             images, takes = sum(1 for j in open_ if j.get('provider') == 'openai'), sum(1 for j in open_ if j.get('provider') == 'video')
             line = ', '.join(x for x in (f'{images} image{"s" if images != 1 else ""}' if images else '', f'{takes} take{"s" if takes != 1 else ""}' if takes else '') if x) + f' open; {ready} ready' + \
                    ('; run again with --wait' if a.wait else '')
         else:
             line = f'all done: {ready} ready' + (f', {rejected} rejected' if rejected else '') if jobs_ else 'no image or take jobs yet'
+        if decide:   # design/106 T5: named once in the line
+            line += f"; {len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
         waiting_line = (f'; {len(wt)} waiting for the operator: ' + '; '.join(f"{w['label']} {server_url()}{w['link']}" for w in wt)) if wt else ''
@@ -2035,7 +2067,7 @@ def build_parser():
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move'):   # design/73, design/79; design/94 --move
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role'):   # design/73, design/79; design/94 --move; design/106 --role
         s.add_argument(flag)
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')

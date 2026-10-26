@@ -354,7 +354,7 @@ function filmAt(s){return fmt(s.start_frame)+'–'+fmt(s.end_frame);}
 function isWaiting(id){return (data.waiting||[]).some(w=>w.item===id);}
 function typeOf(s){return s.route==='graphic_sequence'?'Graphics':s.route==='video'?'AI video':'Still';}   // design/97 W2
 function headOf(s){return esc(typeOf(s))+' · '+esc(s.shot_id)+(s.title?' · '+esc(s.title):'');}
-function picWord(r){const by=refsById();return (r.parents||[]).some(p=>(by[p]||{}).kind==='keyframe')?'end image':'start image';}   // defect 28: two start candidates are not a start and an end
+function picWord(r){const by=refsById();return r.role?r.role+' image':((r.parents||[]).some(p=>(by[p]||{}).kind==='keyframe')?'end image':'start image');}   // design/106 T1: the role, when said   // defect 28: two start candidates are not a start and an end
 function big(r){return r&&r.url?'<img src="'+esc(r.url)+'" alt="" data-view="'+esc(r.id)+'">':'';}
 function actBox(btns){return '<div class="act"><div class="btns">'+btns+'</div></div>';}   // design/97 P1, P3; design/99 C2: no typed words for a click
 const RCHIPS=['wrong subject','text wrong','light or colour','framing','not like the footage'];
@@ -596,7 +596,7 @@ function play(url,name){const pl=$('pl');$('player').hidden=false;pl.src=url;$('
 function takeRejected(k){return !!(k.reviews&&k.reviews.length&&k.reviews[k.reviews.length-1].decision==='rejected');}   // defect 30: the job stays 'ready'; its latest review says rejected
 function shotState(s){   // design/86 K3: whose turn it is on this shot, and how long to wait
   const d=data, kf=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'&&r.status!=='rejected'&&r.status!=='failed');
-  const ids=new Set(kf.map(r=>r.id)), isStart=r=>!(r.parents||[]).some(p=>ids.has(p));
+  const ids=new Set(kf.map(r=>r.id)), isStart=r=>{if(r.role)return r.role==='start';return !(r.parents||[]).some(p=>ids.has(p));};   // design/106 T1
   const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected&&!takeRejected(k));
   if(s.takes.some(k=>k.selected))return ['ok','Take selected.'];
   if(s.asset&&s.asset.kind==='clip')return ['ok','Filled with a stretch of '+(s.asset.name||'a clip')+'.'];   // design/89 B3
@@ -627,8 +627,10 @@ function renderTakes(){
       const st=states[s.shot_id];
       let sh='<div class="card" id="card-'+esc(s.shot_id)+'"><span class="nm">'+headOf(s)+'</span> <span class="ds">'+filmAt(s)+' · '+secs(s.end_frame-s.start_frame)+(s.bound&&s.bound.length?' · bound':'')+(s.prepared?' · take prepared':'')+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s)+
         '<div class="turn '+st[0]+'">'+esc(st[1])+'</div>';
-      const pair=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe');
-      if(pair.length){sh+='<div class="ds" style="margin-top:6px">The pictures: click a picture to see it large, approve or reject it.</div><div class="strip">'+pair.map(r=>refCard({...r,name:picWord(r)+' · '+r.name},'',true)).join('')+'</div>'+pairPlan(s);}
+      const pair=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'), live=pair.filter(r=>r.status!=='rejected'&&r.status!=='failed');   // design/106 T1: the latest start and end in view
+      const latest=['start','end'].map(role=>live.filter(r=>picWord(r)===role+' image').pop()).filter(Boolean), older=pair.filter(r=>!latest.includes(r));
+      const card=r=>refCard({...r,name:picWord(r)+' · '+r.name},'',true);
+      if(pair.length){sh+='<div class="ds" style="margin-top:6px">The pictures: click a picture to see it large, approve or reject it.</div><div class="strip">'+latest.map(card).join('')+'</div>'+(older.length?'<details class="chkd"><summary class="ds">'+older.length+' earlier picture'+(older.length>1?'s':'')+'</summary><div class="strip">'+older.map(card).join('')+'</div></details>':'')+pairPlan(s);}
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+reviewsOf(k)+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
       h+=sh+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
