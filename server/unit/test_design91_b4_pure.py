@@ -136,6 +136,17 @@ def test_a_clip_stretch_that_would_keep_bars_warns():
     assert not [w for w in out.get('warnings') or [] if 'bars' in w]
 
 
+def test_the_frame_size_is_read_as_a_list_as_real_runs_store_it():
+    """Defect 26 (VW-9): the visuals session stores the film's size as [1920, 1080] (from the master's summary); the bars check read only '1920x1080'."""
+    doc, sess = clip_session()
+    sess['source']['resolution'] = [1920, 1080]
+    store = store_with(sess, doc)
+    media = json.loads(json.dumps(MEDIA))
+    media['summary']['clips'][0].update(width=1080, height=1920)
+    out = VS.fill_clip(store, USER, RUN, [media], 'VS1', 'c1', 4.0, 'This stretch, yes.')
+    assert any('1920x1080 frame' in w for w in out['warnings'])
+
+
 # ---------- N16 in assembly ----------
 
 def ev_(kind, sid, media=None, transition=None):

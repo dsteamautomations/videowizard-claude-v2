@@ -2201,7 +2201,8 @@ def _bars(clip, crop, session):
         w, h = h, w
     if crop is not None:
         w, h = w * crop[2], h * crop[3]
-    W, H = (int(x) for x in str(session['source'].get('resolution') or '1920x1080').split('x'))
+    res = session['source'].get('resolution') or [1920, 1080]   # defect 26: a run stores [1920, 1080] (the master's summary); '1920x1080' read too
+    W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).split('x')))
     fill, zoom = fit(w, h, W, H)
     return None if fill else (f"clip {clip.get('name')} is {int(w)}x{int(h)}: filling the {W}x{H} frame needs {zoom:.2f}x, over the {FILL_MAX_ZOOM}x cap, so it keeps bars; "
                               'give a crop with the frame\'s shape (--crop x,y,w,h), or choose another clip')
