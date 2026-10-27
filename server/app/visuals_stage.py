@@ -2005,16 +2005,45 @@ def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
     return {'shot_id': shot_id, 'elements': sorted(bindings)}
 
 
+def place_words(marks, pos):
+    """design/110 F2: '<amount> <unit> <relation> <landmark>' (the amount and unit when the plan has them)."""
+    pos = pos or {}
+    amt = f"{pos['amount']:g} {pos['unit']} " if pos.get('amount') is not None and pos.get('unit') else ''
+    return f"{amt}{pos.get('relation', '')} {marks.get(pos.get('landmark_id'), pos.get('landmark_id', ''))}".strip()
+
+
+def moved_words(start, end):
+    """design/110 F2: how far the subject moved from its place in Image 1, when both places are measured against the same landmark in the same unit."""
+    a, b = start or {}, end or {}
+    if a.get('amount') is None or b.get('amount') is None or a.get('landmark_id') != b.get('landmark_id') or a.get('unit') != b.get('unit') or a['amount'] == b['amount']:
+        return ''
+    return f"{abs(b['amount'] - a['amount']):g} {b['unit']} from where it stood in Image 1"
+
+
 def end_targets(scene, shot):
-    """design/86 K6: each subject's end state, from the plan's data, as one sentence; the writer cannot send a person the wrong way."""
+    """design/86 K6: each subject's end state, from the plan's data, as one sentence; the writer cannot send a person the wrong way.
+    design/110 F1: for an acting subject the cause, the path and the result come first; F2: the place is measured, and how far it moved."""
     marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
     out = []
     for s in shot.get('subjects') or []:
         e = s.get('end') or {}
         pos = e.get('position') or {}
         held = ', '.join(e.get('holding') or []) or 'nothing'
-        out.append(f"{s['element_id']} ends {pos.get('relation', '')} {marks.get(pos.get('landmark_id'), pos.get('landmark_id', ''))}, facing {e.get('facing', '')}, {e.get('pose', '')}, holding {held}; {e.get('progress', '')}.")
+        cause = ''
+        if s.get('behaviour') == 'acts' and s.get('beats'):   # F1
+            b = s['beats'][-1]
+            cause = (f"Because {s['element_id']} has {b.get('done') or b['action']}, {b['path']}, from {place_words(marks, (s.get('start') or {}).get('position'))} "
+                     f"to {place_words(marks, pos)}, {b['result']} is now in frame. ")
+        moved = moved_words((s.get('start') or {}).get('position'), pos)
+        out.append(cause + f"{s['element_id']} ends {place_words(marks, pos)}{', ' + moved if moved else ''}, facing {heading_words(marks, e.get('facing'))}, {e.get('pose', '')}, holding {held}; {e.get('progress', '')}.")
     return out
+
+
+def heading_words(marks, facing):
+    """A facing as words: the old free text, or (design/110 F6, later in this batch) a heading."""
+    if isinstance(facing, dict):
+        return f"front toward {marks.get(facing.get('landmark_id'), facing.get('landmark_id', ''))} at the {facing.get('edge', '')} edge, the {facing.get('camera_side', '')} toward the camera"
+    return str(facing or '')
 
 
 def packet_context(session, plan, gap, shot):

@@ -61,7 +61,7 @@ class FakeConn:
 RUN = {'id': 'run-1', 'code': 'VW-9'}
 USER = {'id': 'u1', 'name': 'SK'}
 GAPS = {'G1': {'start_frame': 0, 'end_frame': 500, 'passage_ids': ['P001'], 'requirement': 'the cavity'}, 'G2': {'start_frame': 900, 'end_frame': 1150, 'passage_ids': ['P002'], 'requirement': 'curing'}}
-STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it'}, 'facing': 'camera', 'pose': 'upright', 'holding': [], 'progress': 'whole'}
+STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it', 'amount': 0, 'unit': 'hand'}, 'facing': 'camera', 'pose': 'upright', 'holding': [], 'progress': 'whole'}
 
 
 def shot(sid, a, b, vt, **extra):
@@ -868,7 +868,7 @@ def test_a_start_keyframe_for_a_video_shot_waits_for_its_packet(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     sess = video_session(doc)
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the yard, the wall centre'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the yard, the wall two paces from the gate'}
     with pytest.raises(Problem, match='Bind the shot and read its packet') as exc:
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     assert 'VS1' in exc.value.message

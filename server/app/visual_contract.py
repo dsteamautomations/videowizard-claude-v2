@@ -49,6 +49,8 @@ class Element(Model):
 class Position(Model):
     landmark_id: str = Field(min_length=1, max_length=80)
     relation: str = Field(min_length=1, max_length=1000)
+    amount: float | None = None   # design/110 F2: the measured distance from the landmark, in a unit the picture shows
+    unit: str = Field(default='', max_length=40)   # bricks, paces, body-lengths, hands, a doorway
 
 
 class State(Model):
@@ -70,6 +72,7 @@ class Beat(Model):
     start: State
     end: State
     min_s: float = Field(default=0, ge=0)   # design/91 N2: the realistic minimum time for this action, from the facts of the process
+    done: str = Field(default='', max_length=3000)   # design/110 F1: the action in the past tense ('set the third brick on edge beside the second'); the server never invents verb forms
 
 
 class Subject(Model):
@@ -246,6 +249,9 @@ def _dimension_needs(label, dims):
              'the client material, `measure` on footage frames, a standard or a maker figure, an approved picture (design/106 D3).')
         need(d.status != 'unknown' or d.value is None, f'{label}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
         need(d.status == 'unknown' or d.source.strip(), f'{label}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
+
+
+VAGUE_PLACE = re.compile(r'(?:(?:at|in|to|on)\s+)?(?:the\s+)?(?:centre|center|middle|nearby|near|closer|further|beside|next to|close by)', re.I)   # design/110 F2
 
 
 def need(value, message):
@@ -535,6 +541,15 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         for state in states:
                             need(state.position.landmark_id in landmarks, 'Subject positions must refer to a named scene landmark.')
                             need(set(state.holding) <= elements, 'Held objects must have element identities.')
+                            if shot.visual_type == 'video':   # design/110 F2: landmark + measured amount in a visible unit; a vague relation alone is refused
+                                pos = state.position
+                                need(not VAGUE_PLACE.fullmatch(pos.relation.strip()), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation}" alone says nothing a picture can place: '
+                                     'name the landmark and how far from it (design/110 F2).')
+                                need(pos.amount is not None and pos.unit.strip(), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation} {pos.landmark_id}" needs a measured amount and a '
+                                     'visible unit (amount, unit: bricks, paces, body-lengths, a hand, a doorway) (design/110 F2).')
+                        if shot.visual_type == 'video':   # design/110 F1: the past tense comes from the plan, never from the server
+                            for beat in subject.beats:
+                                need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second") (design/110 F1).')
                         last_states[subject.element_id] = subject.end.model_dump()
                     if shot.visual_type == 'video':   # design/91 N1, N2
                         own = {b.id: b for s in shot.subjects for b in s.beats}

@@ -6,7 +6,7 @@ import pytest
 from app import visual_contract as VC
 from app.visual_workers import backoff_minutes, timing_evidence
 
-STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it'}, 'facing': 'camera', 'pose': 'upright', 'holding': [], 'progress': 'whole'}
+STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it', 'amount': 0, 'unit': 'hand'}, 'facing': 'camera', 'pose': 'upright', 'holding': [], 'progress': 'whole'}
 
 
 def shot(sid, a, b, visual_type):

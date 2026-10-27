@@ -180,6 +180,11 @@ def check_prompt(prompt):
     m = re.search(r'\b(720p|1080p|2160p)\b', text, re.I)
     if m:
         raise ValueError(f'The prompt names a resolution ({m.group(0)!r}): the server sets it; describe the picture only.')
+    for sentence in re.split(r'(?<=[.;:!?\n])\s+', text):   # design/110 F2: a place is a landmark and a measured distance, never 'the centre' alone
+        m = re.search(r'\b(centre|center|middle|nearby|closer|further)\b', sentence, re.I)
+        if m and not re.search(r'\d|\b(one|two|three|four|five|six|half|bricks?|paces?|body-lengths?|arm-lengths?|hands?|doorways?|courses?|metres?|meters?)\b', sentence, re.I):
+            raise ValueError(f'The prompt places something at {m.group(1)!r} with no landmark and measured distance ({sentence.strip()[:80]!r}): say the landmark and how far from it, '
+                             'in a unit the picture shows (bricks, paces, a hand, a doorway) (design/110 F2).')
     m = re.search(r'Change only:(.*?)(?:\n\s*(?:Keep|Constraints|Render only)\b|$)', text, re.S | re.I)   # design/86 K5: an edit makes one change, two at most
     if m:
         changes = [s for s in re.split(r'(?<=[.;])\s+', m.group(1).strip()) if s.strip()]
