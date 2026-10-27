@@ -712,6 +712,72 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/111 F7, F8, F9: the eye lines, the fixed background, how a placed thing sits ----------
+
+PLACING = re.compile(r'\b(lay|lays|laid|laying|set|sets|setting|put|puts|putting|fit|fits|fitted|fitting|stacks|stacked|stacking|join|joins|joined|joining|fixes|fixed|fixing|place|places|placed|placing)\b', re.I)   # verbs only: 'the stack' and 'a fix' are not placings
+
+
+def _target_words(plan, marks, target):
+    return marks.get(target) or next((e['name'] for e in plan.get('elements') or [] if e['id'] == target), target)
+
+
+def gaze_lines(plan, scene, shot, when):
+    """F7: per person, where the eyes are, the head turn and the mouth; the two constraints."""
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    kinds = {e['id']: e.get('kind') for e in plan.get('elements') or []}
+    out = []
+    for s in shot.get('subjects') or []:
+        state = s.get('end' if when in ('end', 'motion') else 'start') or {}
+        gz = state.get('gaze')
+        if not gz or kinds.get(s['element_id']) != 'person':
+            continue
+        out.append(f"{s['element_id']}'s eyes are on {_target_words(plan, marks, gz.get('target'))}; head turned {gz.get('head_turn')}; mouth {gz.get('mouth')}.")
+    if out:
+        out[-1] += ' No one looks at the lens' + ('; no one looks where they looked in Image 1 unless named here.' if when in ('end', 'motion') else '.')
+    return out
+
+
+def fixed_line(scene, shot):
+    """F8: the background is Image 1's, three fixed things named from the landmarks."""
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    names = [marks.get(lid, lid) for lid in shot.get('fixed') or []]
+    return f"The background is Image 1's background: {', '.join(names)} are in the same place, same size, same light." if names else ''
+
+
+def sits_lines(plan, scene, shot):
+    """F9: for each thing the action sets down (a beat with a placing verb and a thing whose count grew, or a prop set down), how it sits: on what, full contact,
+    in line, the joint from the spec, the facts' words; never a guessed number."""
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    elements = {e['id']: e for e in plan.get('elements') or []}
+    facts = {f.get('about'): f for f in plan.get('visual_facts') or [] if f.get('status') != 'unknown' and f.get('how')}
+    placed = []
+    for s in shot.get('subjects') or []:
+        if not any(PLACING.search(b.get('action', '') + ' ' + b.get('done', '')) for b in s.get('beats') or []):
+            continue
+        before = {o['element_id']: o['count'] for o in (s.get('start') or {}).get('objects') or []}
+        for o in (s.get('end') or {}).get('objects') or []:
+            if o['count'] > before.get(o['element_id'], 0):
+                placed.append((o['element_id'], o.get('place')))
+    for p in shot.get('props') or []:
+        if (p.get('end') or {}).get('where') == 'set_down':
+            placed.append((p['element_id'], (p['end'] or {}).get('position')))
+    out, seen = [], set()
+    for eid, pos in placed:
+        if eid in seen:
+            continue
+        seen.add(eid)
+        e = elements.get(eid) or {'name': eid}
+        bits = [f"{e['name']} rests on {marks.get((pos or {}).get('landmark_id'), (pos or {}).get('landmark_id', 'its support'))} with full contact", 'lined up with its neighbours']
+        spec = e.get('material_spec') or {}
+        if spec.get('joint'):
+            bits.append(spec['joint'])
+        if facts.get(eid):
+            bits.append(facts[eid]['how'])
+        bits.append('not tilted, not floating')
+        out.append('; '.join(bits) + '.')
+    return out
+
+
 # ---------- design/111 F12: every element carries a "not this" list, made by one method, pasted into every prompt ----------
 
 NOT_THIS_MODEL = 'gemini-3.8-flash'   # SK's answer 5: the check model, once per element
@@ -1005,7 +1071,8 @@ def heading_lines(scene, shot, when, names=None):
 
 def composed_block(plan, scene, shot, when):
     """What the server writes under the writer's prompt of a start or an end picture: the targets (F1, F3), the headings (F6), the tools (F5), the inventory (F4)."""
-    lines = (start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + heading_lines(scene, shot, when, _names(plan)) + tool_lines(plan, scene, shot, when)
+    lines = ((start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + gaze_lines(plan, scene, shot, when) + heading_lines(scene, shot, when, _names(plan))
+             + tool_lines(plan, scene, shot, when) + (([fixed_line(scene, shot)] if fixed_line(scene, shot) else []) + sits_lines(plan, scene, shot) if when == 'end' else []))   # design/111 F7, F8, F9
     inv = inventory_line(plan, scene, shot, when)
     return '\n'.join(lines + ([inv] if inv else []))
 
@@ -1025,6 +1092,14 @@ def picture_rule_lines(plan, scene, shot, when):
     if inv:
         out.append({'check': 'inventory', 'weight': 'must', 'pass_when': 'the picture holds exactly these things, in these counts and places, and nothing else of these kinds: ' + inv[len('Inventory, exactly: '):]})
     if when == 'end':
+        if gaze_lines(plan, scene, shot, 'end'):   # design/111 F7
+            out.append({'check': 'eye lines', 'weight': 'must', 'pass_when': 'each person\'s eyes are on the named target, head turned and mouth as written: ' + ' '.join(gaze_lines(plan, scene, shot, 'end'))
+                        + '; no one looks at the lens; no one looks where they looked in Image 1 unless named'})
+        if fixed_line(scene, shot):   # design/111 F8
+            marks_ = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+            out.append({'check': 'background kept', 'weight': 'must', 'pass_when': ', '.join(marks_.get(l, l) for l in shot.get('fixed') or []) + ' are in the same place, size and light as in Image 1; none has moved or gone'})
+        for sl in sits_lines(plan, scene, shot):   # design/111 F9
+            out.append({'check': 'sits: ' + sl.split(' rests')[0], 'weight': 'must', 'pass_when': sl.rstrip('.') + '; the placed thing sits on its support with full contact and in line with its neighbours'})
         for p in shot.get('props') or []:
             out.append({'check': 'same tool', 'weight': 'must', 'pass_when': f"the {names.get(p['element_id'], p['element_id'])} {p['holder']} held is the same one as in Image 1 (shape, size, colour, handle where it has one), "
                                                                              f"and it is {_prop_end_words(marks, p)}; it has not changed into another thing or vanished"})
@@ -2729,6 +2804,8 @@ def prepare_take(store, user, run, outputs, body):
               **({'ambient': base['preparation']['scene']['ambient']} if base['preparation']['scene'].get('ambient') else {}),
               **({'tool_lines': tool_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if shot.get('props') else {}),   # design/110 F5: the whole plan, for the tool's name
               **({'heading_lines': heading_lines(base['preparation']['scene'], shot, 'motion')} if heading_lines(base['preparation']['scene'], shot, 'motion') else {}),   # design/110 F6
+              **({'gaze_lines': gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion') else {}),   # design/111 F7
+              **({'fixed_line': fixed_line(base['preparation']['scene'], shot)} if fixed_line(base['preparation']['scene'], shot) else {}),   # design/111 F8
               **({'light': base['preparation']['scene']['light']} if base['preparation']['scene'].get('light') else {})}   # design/103 A1   # design/101 M3, M4: the take text and the take check read it
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)

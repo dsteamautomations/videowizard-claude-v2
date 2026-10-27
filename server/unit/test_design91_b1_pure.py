@@ -26,7 +26,7 @@ def subject(*beats, landmark='L1'):
 
 
 def video(sid, a, b, beats, **extra):
-    return {**pshot(sid, a, b, 'video'), 'subjects': [subject(*beats)], **extra}
+    return {**pshot(sid, a, b, 'video'), 'subjects': [subject(*beats)], 'fixed': ['L1'], **extra}   # design/111 F8: the scene's one landmark
 
 
 def found(doc):

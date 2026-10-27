@@ -61,6 +61,12 @@ class Heading(Model):   # design/110 F6: which way the front points, against a l
     camera_side: str = Field(min_length=1, max_length=200)
 
 
+class Gaze(Model):   # design/111 F7: where the eyes are, per state
+    target: str = Field(min_length=1, max_length=80)        # a landmark id or an element id
+    head_turn: str = Field(min_length=1, max_length=200)   # 'toward the gate, about 45°'
+    mouth: str = Field(min_length=1, max_length=200)       # 'closed smile'
+
+
 class ObjectInFrame(Model):   # design/110 F4: a movable thing in the frame, counted and placed
     element_id: str = Field(min_length=1, max_length=80)
     count: int = Field(ge=0)
@@ -74,6 +80,7 @@ class State(Model):
     holding: list[str] = Field(default_factory=list, max_length=20)
     progress: str = Field(min_length=1, max_length=2000)
     objects: list[ObjectInFrame] = Field(default_factory=list, max_length=30)   # design/110 F4
+    gaze: Gaze | None = None   # design/111 F7: a person's eye line, head turn and mouth
 
 
 class Beat(Model):
@@ -198,6 +205,8 @@ class Shot(Model):
     changes: list[Change] = Field(default_factory=list, max_length=20)   # design/91 N1: a video shot's change list
     props: list[Prop] = Field(default_factory=list, max_length=20)   # design/110 F5
     allows: list[str] = Field(default_factory=list, max_length=10)   # design/111 F12: a named exception to an element's not-this list, in this shot only (a jali in a wall)
+    face_in_frame: bool = True   # design/111 F7: false for a view from behind or hands in close; then no eye line is asked
+    fixed: list[str] = Field(default_factory=list, max_length=3)   # design/111 F8: three landmark ids that must not change between the start and the end
     fact_ids: list[str] = Field(default_factory=list, max_length=20)   # design/91 N6: the facts this shot rests on
     descriptors: list[str] = Field(default_factory=list, max_length=10)   # design/91 N8: the narration's descriptive words about the subject
     evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)
@@ -613,10 +622,23 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                     need(any(eid.lower() in ch.what.lower() or name_ in ch.what.lower() for ch in shot.changes),
                                          f'shot {shot.id}: {subject.element_id}\'s {eid} goes from {before.get(eid, 0)} to {after.get(eid, 0)} between the start and the end; name the change that does it '
                                          '(changes), so the counts agree with the action (design/110 F4).')
+                        if shot.visual_type == 'video' and ekind.get(subject.element_id) == 'person' and shot.face_in_frame:   # design/111 F7: the eyes have a state too
+                            for state in states:
+                                need(state.gaze is not None, f'shot {shot.id}: {subject.element_id} is a person with the face in frame: give gaze (target, head_turn, mouth) on every state, or set face_in_frame false for a back view or hands in close (design/111 F7).')
+                                need(state.gaze.target in landmarks or state.gaze.target in elements, f'shot {shot.id}: {subject.element_id}\'s gaze target is a landmark of the scene or a named element ({state.gaze.target} is neither) (design/111 F7).')
                         if shot.visual_type == 'video':   # design/110 F1: the past tense comes from the plan, never from the server
                             for beat in subject.beats:
                                 need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second") (design/110 F1).')
                         last_states[subject.element_id] = subject.end.model_dump()
+                    if shot.visual_type == 'video' and shot.subjects:   # design/111 F8: three fixed things of the place, from the landmarks, never an element (a shot with an action: it gets an end or a take)
+                        wanted = min(3, len(landmarks))
+                        need(len(shot.fixed) == wanted and len(set(shot.fixed)) == wanted, f'shot {shot.id}: names three fixed things of the background in fixed (landmark ids; all of them when the scene has fewer than three) (design/111 F8).')
+                        for lid in shot.fixed:
+                            need(lid in landmarks, f'shot {shot.id}: {lid} is not a landmark of the scene (fixed names landmarks only) (design/111 F8).')
+                            need(lid not in elements, f'shot {shot.id}: {lid} is an element, a thing that can be carried: it belongs to objects, not to fixed (design/111 F8).')
+                        if shot.changes and all(re.search(r'\b(look|looks|gaze|glance|expression|eyes|smile)\b', ch.what, re.I) for ch in shot.changes):   # F7's planning rule
+                            warnings.append({'shot_id': shot.id, 'kind': 'look_only', 'message': f'shot {shot.id}: its only change is a look or an expression, a weak point of the picture models; prefer a '
+                                             'profile, a view from behind or the hands in close, so the shot does not depend on it (design/111 F7)'})
                     if shot.visual_type == 'video':   # design/110 F5: every held thing is a prop with a holder and an end
                         held = {h for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for h in stt.holding}
                         props = {p.element_id: p for p in shot.props}
