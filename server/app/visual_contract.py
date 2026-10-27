@@ -53,12 +53,25 @@ class Position(Model):
     unit: str = Field(default='', max_length=40)   # bricks, paces, body-lengths, hands, a doorway
 
 
+class Heading(Model):   # design/110 F6: which way the front points, against a landmark and a frame edge, and the side toward the camera
+    landmark_id: str = Field(min_length=1, max_length=80)
+    edge: Literal['left', 'right', 'top', 'bottom', 'toward camera', 'away from camera']
+    camera_side: str = Field(min_length=1, max_length=200)
+
+
+class ObjectInFrame(Model):   # design/110 F4: a movable thing in the frame, counted and placed
+    element_id: str = Field(min_length=1, max_length=80)
+    count: int = Field(ge=0)
+    place: Position
+
+
 class State(Model):
     position: Position
-    facing: str = Field(min_length=1, max_length=1000)
+    facing: Heading | str   # design/110 F6: a heading on a video shot's subject (the check requires it there); the old free words still load for a still's subject
     pose: str = Field(min_length=1, max_length=2000)
     holding: list[str] = Field(default_factory=list, max_length=20)
     progress: str = Field(min_length=1, max_length=2000)
+    objects: list[ObjectInFrame] = Field(default_factory=list, max_length=30)   # design/110 F4
 
 
 class Beat(Model):
@@ -128,6 +141,19 @@ class Change(Model):   # design/91 N1: what differs between a take's start and e
     beat_id: str = Field(min_length=1, max_length=80)
 
 
+class PropEnd(Model):   # design/110 F5: where the action leaves a tool
+    where: Literal['in_hand', 'set_down', 'carried_out']
+    position: Position | None = None
+    cause: str = Field(default='', max_length=500)
+
+
+class Prop(Model):   # design/110 F5: a held tool or prop, a named thing of the shot like a person
+    element_id: str = Field(min_length=1, max_length=80)
+    holder: str = Field(min_length=1, max_length=80)
+    start: Position
+    end: PropEnd
+
+
 class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
     claim: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=1000)
@@ -161,6 +187,7 @@ class Shot(Model):
     claims_left_out: list[ClaimOut] = Field(default_factory=list, max_length=10)
     drawing_spec: DrawingSpec | None = None   # design/89 D1: a technical drawing of a real object
     changes: list[Change] = Field(default_factory=list, max_length=20)   # design/91 N1: a video shot's change list
+    props: list[Prop] = Field(default_factory=list, max_length=20)   # design/110 F5
     fact_ids: list[str] = Field(default_factory=list, max_length=20)   # design/91 N6: the facts this shot rests on
     descriptors: list[str] = Field(default_factory=list, max_length=10)   # design/91 N8: the narration's descriptive words about the subject
     evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)
@@ -521,9 +548,16 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         if previous and previous != subject.start.model_dump() and not subject.continuity_note.strip():
                             warnings.append({'shot_id': shot.id, 'element_id': subject.element_id,
                                              'message': 'Subject state changed between shots; explain the movement, elapsed time or intended discontinuity.'})
+                        living = shot.visual_type == 'video' and ekind.get(subject.element_id) in ('person', 'animal')
                         if subject.behaviour == 'holds':
                             need(not subject.beats and subject.hold_reason.strip(), 'A held subject needs its reason, not invented beats.')
-                            need(subject.start == subject.end, 'A held subject cannot change position or progress.')
+                            if living:   # design/110 F6: a living thing that is not the actor still gets its own small change
+                                need(subject.start.position != subject.end.position, f'shot {shot.id}: {subject.element_id} is a living thing that stands still from start to end; give it a small move '
+                                     '(its end position a body-length or so from its start, against a landmark) (design/110 F6).')
+                                need(subject.start.pose == subject.end.pose and subject.start.holding == subject.end.holding and subject.start.progress == subject.end.progress,
+                                     'A held subject cannot change what it holds or its progress.')
+                            else:
+                                need(subject.start == subject.end, 'A held subject cannot change position or progress.')
                         else:
                             need(bool(subject.beats), 'Every acting subject, including background subjects, needs beats.')
                         end = shot.start_frame
@@ -547,10 +581,36 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                      'name the landmark and how far from it (design/110 F2).')
                                 need(pos.amount is not None and pos.unit.strip(), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation} {pos.landmark_id}" needs a measured amount and a '
                                      'visible unit (amount, unit: bricks, paces, body-lengths, a hand, a doorway) (design/110 F2).')
+                        if shot.visual_type == 'video':   # design/110 F4, F6: counted objects; a heading on every state
+                            for state in states:
+                                need(isinstance(state.facing, Heading), f'shot {shot.id}: {subject.element_id}\'s facing is a heading: landmark_id, edge (left, right, top, bottom, toward camera, away from camera) '
+                                     'and camera_side, the side that faces the camera (design/110 F6).')
+                                need(state.facing.landmark_id in landmarks, f'shot {shot.id}: {subject.element_id}\'s heading names a landmark of the scene (design/110 F6).')
+                                for o in state.objects:
+                                    need(o.element_id in elements, f'shot {shot.id}: {subject.element_id}\'s objects name elements of the plan ({o.element_id} is not one) (design/110 F4).')
+                                    need(o.place.landmark_id in landmarks, f'shot {shot.id}: the place of {o.element_id} names a landmark of the scene (design/110 F4).')
+                            before = {o.element_id: o.count for o in subject.start.objects}
+                            after = {o.element_id: o.count for o in subject.end.objects}
+                            for eid in set(before) | set(after):
+                                if before.get(eid, 0) != after.get(eid, 0):
+                                    name_ = next((e.name for e in plan.elements if e.id == eid), eid).lower()
+                                    need(any(eid.lower() in ch.what.lower() or name_ in ch.what.lower() for ch in shot.changes),
+                                         f'shot {shot.id}: {subject.element_id}\'s {eid} goes from {before.get(eid, 0)} to {after.get(eid, 0)} between the start and the end; name the change that does it '
+                                         '(changes), so the counts agree with the action (design/110 F4).')
                         if shot.visual_type == 'video':   # design/110 F1: the past tense comes from the plan, never from the server
                             for beat in subject.beats:
                                 need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second") (design/110 F1).')
                         last_states[subject.element_id] = subject.end.model_dump()
+                    if shot.visual_type == 'video':   # design/110 F5: every held thing is a prop with a holder and an end
+                        held = {h for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for h in stt.holding}
+                        props = {p.element_id: p for p in shot.props}
+                        for h in held:
+                            need(h in props, f'shot {shot.id}: {h} is held but has no props entry (element_id, holder, start position, end: in_hand, set_down with its position, or carried_out with its cause) (design/110 F5).')
+                        for p in shot.props:
+                            need(p.holder in {s.element_id for s in shot.subjects}, f'shot {shot.id}: the holder of {p.element_id} is a subject of the shot (design/110 F5).')
+                            need(p.start.landmark_id in landmarks and (p.end.position is None or p.end.position.landmark_id in landmarks), f'shot {shot.id}: the places of {p.element_id} name landmarks of the scene (design/110 F5).')
+                            need(p.end.where != 'set_down' or p.end.position is not None, f'shot {shot.id}: {p.element_id} set down needs its position (against a landmark) (design/110 F5).')
+                            need(p.end.where != 'carried_out' or p.end.cause.strip(), f'shot {shot.id}: {p.element_id} carried out needs its cause (who carries it, where) (design/110 F5).')
                     if shot.visual_type == 'video':   # design/91 N1, N2
                         own = {b.id: b for s in shot.subjects for b in s.beats}
                         for ch in shot.changes:

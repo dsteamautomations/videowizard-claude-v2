@@ -60,11 +60,11 @@ def test_the_end_sentence_says_the_cause_the_path_the_result_and_how_far_it_move
     scene = {'landmarks': [{'id': 'L1', 'description': 'the wall'}]}
     lines = VS.end_targets(scene, sh)
     assert lines == ['Because E1 has laid one brick, along the course, from 1 pace at the wall to 3 pace to the right of the wall, one more brick on the course is now in frame. '
-                     'E1 ends 3 pace to the right of the wall, 2 pace from where it stood in Image 1, facing the wall, bending, holding nothing; 2 laid.']
+                     'E1 ends 3 pace to the right of the wall, 2 pace from where it stood in Image 1, facing front toward the wall at the right edge, the left side toward the camera, bending, holding nothing; 2 laid.']
     held = {**sh, 'subjects': [{**sh['subjects'][0], 'behaviour': 'holds', 'beats': [], 'end': sh['subjects'][0]['start']}]}
-    assert VS.end_targets(scene, held) == ['E1 ends 1 pace at the wall, facing the wall, bending, holding nothing; 0 laid.']   # no action: no cause, no distance
+    assert VS.end_targets(scene, held) == ['E1 ends 1 pace at the wall, facing front toward the wall at the right edge, the left side toward the camera, bending, holding nothing; 0 laid.']   # no action: no cause, no distance
     old = {**sh, 'subjects': [{**sh['subjects'][0], 'start': st('0 laid'), 'end': {**st('2 laid'), 'position': {'landmark_id': 'L1', 'relation': 'at the far end of'}}}]}
-    assert VS.end_targets(scene, old)[0].endswith('E1 ends at the far end of the wall, facing the wall, bending, holding nothing; 2 laid.')   # an old plan without amounts still composes
+    assert VS.end_targets(scene, old)[0].endswith('E1 ends at the far end of the wall, facing front toward the wall at the right edge, the left side toward the camera, bending, holding nothing; 2 laid.')   # an old plan without amounts still composes
 
 
 # ---------- the prompt check ----------

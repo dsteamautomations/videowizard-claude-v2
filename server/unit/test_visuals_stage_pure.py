@@ -61,7 +61,7 @@ class FakeConn:
 RUN = {'id': 'run-1', 'code': 'VW-9'}
 USER = {'id': 'u1', 'name': 'SK'}
 GAPS = {'G1': {'start_frame': 0, 'end_frame': 500, 'passage_ids': ['P001'], 'requirement': 'the cavity'}, 'G2': {'start_frame': 900, 'end_frame': 1150, 'passage_ids': ['P002'], 'requirement': 'curing'}}
-STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it', 'amount': 0, 'unit': 'hand'}, 'facing': 'camera', 'pose': 'upright', 'holding': [], 'progress': 'whole'}
+STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it', 'amount': 0, 'unit': 'hand'}, 'facing': {'landmark_id': 'L1', 'edge': 'toward camera', 'camera_side': 'front'}, 'pose': 'upright', 'holding': [], 'progress': 'whole'}
 
 
 def shot(sid, a, b, vt, **extra):

@@ -700,6 +700,116 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/110 F4, F5, F6: what the server composes into every start and end prompt, and the take ----------
+
+def _names(plan):
+    return {e['id']: e['name'] for e in plan.get('elements') or []}
+
+
+def inventory_line(plan, scene, shot, when):
+    """F4: every movable thing of the shot, counted and placed; the end is the start after the action."""
+    names = _names(plan)
+    scene_marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    items, holders = [], []
+    for s in shot.get('subjects') or []:
+        state = s.get(when) or {}
+        for o in state.get('objects') or []:
+            items.append(f"{names.get(o['element_id'], o['element_id'])} \u00d7 {o['count']} {place_words(scene_marks, o.get('place'))}".strip())
+        held = state.get('holding') or []
+        if held:
+            items += [f"{names.get(h, h)} \u00d7 1 in {s['element_id']}'s hands" for h in held]
+        elif any((x.get('holding') for x in (s.get('start'), s.get('end')) if x)):
+            holders.append(f"{s['element_id']} holds nothing")
+    if not items and not holders:
+        return ''
+    return 'Inventory, exactly: ' + '; '.join(items + holders) + '. Nothing else of these kinds in frame; nothing rests on top of the stack.'
+
+
+def _prop_end_words(marks, p):
+    e = p.get('end') or {}
+    if e.get('where') == 'set_down':
+        return f"set down {place_words(marks, e.get('position'))}"
+    if e.get('where') == 'carried_out':
+        return f"out of frame, carried out by {e.get('cause') or 'the action'}"
+    return f"still in {p['holder']}'s hand"
+
+
+def tool_lines(plan, scene, shot, when):
+    """F5: the same sentence for every held tool in the start prompt, the end prompt and the motion text; where it is at the end comes from the action."""
+    names, marks = _names(plan), {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    out = []
+    for p in shot.get('props') or []:
+        name = names.get(p['element_id'], p['element_id'])
+        same = (f"The same {name}: it keeps its shape, size, colour and handle in every picture it appears in; {p['holder']} holds nothing else; no second tool appears; "
+                "the tool is fully inside the frame. ")
+        if when == 'start':
+            out.append(same + f"At the start it is {place_words(marks, p.get('start'))}.")
+        elif when == 'end':
+            out.append(same + f"At the end it is {_prop_end_words(marks, p)}.")
+        else:
+            out.append(same + f"By the end it is {_prop_end_words(marks, p)}; it never changes into another thing and never simply disappears.")
+    return out
+
+
+def _turns(shot):
+    return any(re.search(r'\bturn', (ch.get('what') or ''), re.I) for ch in shot.get('changes') or [])
+
+
+def heading_lines(scene, shot, when):
+    """F6: each subject's heading against a landmark and a frame edge, the side toward the camera, kept unless the action is a turn; a living thing that
+    is not the actor gets its own small change at the end."""
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    out = []
+    for s in shot.get('subjects') or []:
+        state = s.get(when if when != 'motion' else 'end') or {}
+        h = state.get('facing')
+        if not isinstance(h, dict):
+            continue
+        lm = marks.get(h.get('landmark_id'), h.get('landmark_id', ''))
+        if s.get('behaviour') == 'holds':
+            if when in ('end', 'motion') and s.get('start', {}).get('position') != state.get('position'):
+                out.append(f"{s['element_id']} has moved at least one body-length toward {marks.get((state.get('position') or {}).get('landmark_id'), '')} and turned a little; it does not stand where it stood in the start.")
+            else:
+                out.append(f"Heading of {s['element_id']}: front toward {lm} at the {h.get('edge')} edge; the {h.get('camera_side')} faces the camera.")
+            continue
+        if when in ('end', 'motion') and _turns(shot):
+            out.append(f"Heading of {s['element_id']}: it turns, as the change says; at the end its front is toward {lm} at the {h.get('edge')} edge; the {h.get('camera_side')} faces the camera.")
+        else:
+            out.append(f"Heading of {s['element_id']}: front toward {lm} at the {h.get('edge')} edge; the {h.get('camera_side')} faces the camera; it must not turn, reverse or show its other side.")
+    return out
+
+
+def composed_block(plan, scene, shot, when):
+    """What the server writes under the writer's prompt of a start or an end picture: the targets (F1, F3), the headings (F6), the tools (F5), the inventory (F4)."""
+    lines = (start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + heading_lines(scene, shot, when) + tool_lines(plan, scene, shot, when)
+    inv = inventory_line(plan, scene, shot, when)
+    return '\n'.join(lines + ([inv] if inv else []))
+
+
+def with_composed(prompt, block):
+    """The block's lines that the prompt does not carry yet, appended; nothing twice."""
+    missing = [l for l in block.split('\n') if l.strip() and l.strip()[:40] not in prompt]
+    return prompt.rstrip() + '\n' + '\n'.join(missing) if missing else prompt
+
+
+def picture_rule_lines(plan, scene, shot, when):
+    """The must lines of F4 (start and end), F5 and F6 (the end) on a keyframe's check."""
+    names = _names(plan)
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    out = []
+    inv = inventory_line(plan, scene, shot, when)
+    if inv:
+        out.append({'check': 'inventory', 'weight': 'must', 'pass_when': 'the picture holds exactly these things, in these counts and places, and nothing else of these kinds: ' + inv[len('Inventory, exactly: '):]})
+    if when == 'end':
+        for p in shot.get('props') or []:
+            out.append({'check': 'same tool', 'weight': 'must', 'pass_when': f"the {names.get(p['element_id'], p['element_id'])} is the same tool as in Image 1 (shape, size, colour, handle), "
+                                                                             f"and it is {_prop_end_words(marks, p)}; it has not changed into another thing or vanished"})
+        if any(isinstance((s.get('end') or {}).get('facing'), dict) for s in shot.get('subjects') or []):
+            out.append({'check': 'heading kept', 'weight': 'must', 'pass_when': 'each travelling subject faces the same landmark and shows the same side as in Image 1' +
+                        (' (except the subject whose change is a turn, which faces its new heading)' if _turns(shot) else '') + '; no subject is flipped or reversed'})
+    return out
+
+
 # ---------- design/110 rule 0: an open question is a server state ----------
 
 def _item_kind(store, session, item):
@@ -1432,6 +1542,10 @@ def generate_image(conn, store, user, run, outputs, body):
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
+    if body['kind'] == 'keyframe' and found and named.get('visual_type') == 'video':   # design/110 F4, F5, F6: the lines, and the block under the writer's prompt
+        lines = lines + picture_rule_lines(plan, found[2], named, 'end' if is_end else 'start')
+        if not body.get('fix_of'):
+            body = {**body, 'prompt': with_composed(body['prompt'], composed_block(plan, found[2], named, 'end' if is_end else 'start'))}
     lw = light_warning(found[2], body['kind'], body['prompt']) if found else None   # design/103 A1
     if found and element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated'):   # design/104 C5: the scene's light and air, the shot's size, real sizes
         lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements'])
@@ -2232,7 +2346,7 @@ AMBIENT_START = ("Put in the frame what the scene's ambient line says moves (the
 
 def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
-    _, _, _, planned = guarded(lambda: locate(store, session, body['shot_id']))
+    plan_full, _, _, planned = guarded(lambda: locate(store, session, body['shot_id']))
     _route_gate(planned, 'video')
     _no_question(session, body['shot_id'], body.get('start_image'), body.get('end_image'))   # design/110 rule 0
     need(body.get('start_image'), 'A start image is required.')
@@ -2295,6 +2409,8 @@ def prepare_take(store, user, run, outputs, body):
               'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {}),
               **({'changes': changes} if changes else {}),   # design/91 N1: the take check reads them too (N3)
               **({'ambient': base['preparation']['scene']['ambient']} if base['preparation']['scene'].get('ambient') else {}),
+              **({'tool_lines': tool_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if shot.get('props') else {}),   # design/110 F5: the whole plan, for the tool's name
+              **({'heading_lines': heading_lines(base['preparation']['scene'], shot, 'motion')} if heading_lines(base['preparation']['scene'], shot, 'motion') else {}),   # design/110 F6
               **({'light': base['preparation']['scene']['light']} if base['preparation']['scene'].get('light') else {})}   # design/103 A1   # design/101 M3, M4: the take text and the take check read it
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)

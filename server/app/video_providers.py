@@ -26,6 +26,7 @@ def motion_text(snapshot):
     prompt+='\nNatural, unhurried motion; no sudden, exaggerated or floating movement.'   # design/102 B3: how things move, not how much
     prompt+='\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
     prompt+='\nContinuity: '+(snapshot.get('continuity_notes') or '')
+    for l in (snapshot.get('heading_lines') or [])+(snapshot.get('tool_lines') or []):prompt+='\n'+l   # design/110 F5, F6: the same sentences as the pictures carry
     if (snapshot.get('light') or '').strip():prompt+='\nThe light does not change: '+snapshot['light'].strip().rstrip('.')+'.'   # design/103 A1
     prompt+='\nIn a single unbroken scene, one continuous shot, no scene cuts, no jump cuts. No dialogue. No music. No captions or overlay text.'
     prompt+='\nUse Image1 as the starting frame'+(' and Image2 as the final frame; the transition follows the action above' if two else '')+'. Preserve the depicted identities.'

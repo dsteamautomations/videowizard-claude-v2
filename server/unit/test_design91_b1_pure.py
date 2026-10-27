@@ -12,7 +12,8 @@ from test_visuals_pure import GAPS, plan, shot as pshot
 
 
 def st(progress, landmark='L1'):
-    return {'position': {'landmark_id': landmark, 'relation': 'at', 'amount': 1, 'unit': 'pace'}, 'facing': 'the wall', 'pose': 'bending', 'holding': [], 'progress': progress}   # design/110 F2
+    return {'position': {'landmark_id': landmark, 'relation': 'at', 'amount': 1, 'unit': 'pace'}, 'facing': {'landmark_id': landmark, 'edge': 'right', 'camera_side': 'left side'},
+            'pose': 'bending', 'holding': [], 'progress': progress}   # design/110 F2, F6
 
 
 def subject(*beats, landmark='L1'):

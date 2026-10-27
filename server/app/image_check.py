@@ -37,6 +37,8 @@ TAKE_LINES = [   # design/91 N3: the fixed questions every take is read against
     {'check': 'planned end', 'pass_when': 'the clip ends in the state the plan below describes', 'weight': 'must'},
     {'check': 'frozen person', 'pass_when': 'no person stands frozen while others move', 'weight': 'should'}]   # design/104 C4
 LIGHT_KEPT = {'check': 'light kept', 'pass_when': "the light keeps the direction and brightness the plan's light line gives, from the first frame to the last", 'weight': 'must'}   # design/104 C5
+TOOL_KEPT = {'check': 'tool kept', 'pass_when': 'every held tool keeps its identity (shape, size, colour, handle) from the first frame to the last and ends where the tool line says; it never changes into another thing or vanishes without a cause', 'weight': 'must'}   # design/110 F5
+HEADING_KEPT = {'check': 'heading kept', 'pass_when': 'each travelling subject keeps the heading its line gives (front toward its landmark, the same side to the camera) and never flips or reverses, unless its change is a turn', 'weight': 'must'}   # design/110 F6
 AMBIENT_LINE = {'check': 'surroundings move', 'pass_when': "what the plan's ambient line names moves visibly through the shot; nothing that should move is frozen", 'weight': 'must'}   # design/101 M4
 
 
@@ -64,8 +66,10 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
                          [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
                          (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []) +
                          (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if ambient_moves(snapshot) else []) +
-                         (['The light (the light line): ' + str(snapshot['light'])[:1000]] if snapshot.get('light') else []))
-        take_lines = TAKE_LINES + ([AMBIENT_LINE] if ambient_moves(snapshot) else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])   # design/101 M4; design/104 C5
+                         (['The light (the light line): ' + str(snapshot['light'])[:1000]] if snapshot.get('light') else []) +
+                         [str(l)[:600] for l in (snapshot.get('tool_lines') or []) + (snapshot.get('heading_lines') or [])])   # design/110 F5, F6
+        take_lines = (TAKE_LINES + ([AMBIENT_LINE] if ambient_moves(snapshot) else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])   # design/101 M4; design/104 C5
+                      + ([TOOL_KEPT] if snapshot.get('tool_lines') else []) + ([HEADING_KEPT] if snapshot.get('heading_lines') else []))   # design/110 F5, F6
         asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(take_lines, 1))
         received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
             'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
