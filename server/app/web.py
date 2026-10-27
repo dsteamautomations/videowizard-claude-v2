@@ -2,14 +2,19 @@
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Cookie, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+import hashlib
+from io import BytesIO
+
+from fastapi import APIRouter, Cookie, Form, Header, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from PIL import Image
 from fastapi.templating import Jinja2Templates
 
 from . import auth, connect, core
 from .config import settings
 from .db import connect as db_connect
 from .errors import Problem
+from .files import file_redirect
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / 'templates'))
@@ -239,7 +244,7 @@ def _stored_file(request, code, key, vw2_session):
     store = storage()
     if not key.startswith(f"{run['id']}/") or not store.exists(key):
         raise Problem(404, 'FILE_MISSING', 'No such file on this run.')
-    return RedirectResponse(store.signed_download(key), status_code=307)
+    return file_redirect(store.signed_download(key))
 
 
 @router.get('/runs/{code}/audio/{key:path}')
@@ -255,6 +260,50 @@ def run_film(request: Request, code: str, key: str, vw2_session: str | None = Co
 @router.get('/runs/{code}/file/{key:path}')
 def run_file(request: Request, code: str, key: str, vw2_session: str | None = Cookie(default=None)):
     return _stored_file(request, code, key, vw2_session)   # design/65: reference images, states and takes on the visuals page
+
+
+THUMB_WIDTH, THUMB_CACHE = 768, 'private, max-age=86400'   # design/108 I1, I2
+PICTURE_EXT = ('.png', '.jpg', '.jpeg', '.webp')
+
+
+def thumb_bytes(store, key):
+    """design/108 I1: a JPEG at most THUMB_WIDTH wide, made from the full picture once and stored beside it; served from storage after that."""
+    tk = key + '.thumb.jpg'
+    if store.exists(tk):
+        return store.get(tk)
+    img = Image.open(BytesIO(store.get(key))).convert('RGB')
+    if img.width > THUMB_WIDTH:
+        img = img.resize((THUMB_WIDTH, max(1, round(img.height * THUMB_WIDTH / img.width))))
+    buf = BytesIO()
+    img.save(buf, 'JPEG', quality=82, optimize=True)
+    data = buf.getvalue()
+    store.put(tk, data, 'image/jpeg')
+    return data
+
+
+def thumb_response(store, run_id, key, if_none_match):
+    """design/108 I2: the small copy with a day's cache and an ETag (a key never changes its picture); 304 when the browser has it; a file that is not a picture goes the usual way."""
+    if not key.startswith(f'{run_id}/') or not store.exists(key):
+        raise Problem(404, 'FILE_MISSING', 'No such file on this run.')
+    if not key.lower().endswith(PICTURE_EXT):
+        return file_redirect(store.signed_download(key))
+    data = thumb_bytes(store, key)
+    etag = '"' + hashlib.sha256(data).hexdigest()[:32] + '"'
+    headers = {'Cache-Control': THUMB_CACHE, 'ETag': etag}
+    if if_none_match == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=data, media_type='image/jpeg', headers=headers)
+
+
+@router.get('/runs/{code}/thumb/{key:path}')
+def run_thumb(request: Request, code: str, key: str, vw2_session: str | None = Cookie(default=None), if_none_match: str | None = Header(default=None)):
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+    return thumb_response(storage(), str(run['id']), key, if_none_match)
 
 
 @router.get('/runs/{code}/visuals', response_class=HTMLResponse)

@@ -1151,26 +1151,92 @@ def _json_file(m, rel):
         emit({'action': 'refused', 'message': f'{rel} is missing or not valid JSON ({exc.__class__.__name__}).'}, 2)
 
 
-def _download(m, key, rel):
+DOWNLOAD_PART_MIN, DOWNLOAD_PARTS, DOWNLOAD_WAITS = 16 * 1024 * 1024, 4, (5, 15, 30)   # design/108 D3: a file over 16 MB comes in 4 ranged parts at once
+
+
+def _storage_client():
+    return httpx.Client(timeout=httpx.Timeout(60, read=600), follow_redirects=True)
+
+
+def _sha256_of(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fetch_to(url, part, size):
+    """design/108 D1, D3: the storage link streamed into `part` in 1 MB pieces; a known size over DOWNLOAD_PART_MIN in DOWNLOAD_PARTS ranges at once,
+    each with its own retries (D4's waits)."""
+    from concurrent.futures import ThreadPoolExecutor
+    n = DOWNLOAD_PARTS if size and size >= DOWNLOAD_PART_MIN else 1
+    with open(part, 'wb') as f:
+        if size:
+            f.truncate(size)
+    ranges = [(i * size // n, (i + 1) * size // n - 1) for i in range(n)] if n > 1 else [None]
+
+    def one(rg):
+        for i, wait in enumerate((*DOWNLOAD_WAITS, None)):
+            try:
+                with _storage_client() as c, c.stream('GET', url, headers={'Range': f'bytes={rg[0]}-{rg[1]}'} if rg else {}) as resp:
+                    if resp.status_code >= 300:
+                        raise RuntimeError(f'HTTP {resp.status_code}')
+                    with open(part, 'r+b') as f:
+                        f.seek(rg[0] if rg else 0)
+                        for chunk in resp.iter_bytes(1024 * 1024):
+                            f.write(chunk)
+                return
+            except httpx.RequestError as exc:
+                if wait is None:
+                    raise
+                print(f'download interrupted ({exc.__class__.__name__}); retrying in {wait} s', file=sys.stderr, flush=True)
+                time.sleep(wait)
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        list(pool.map(one, ranges))
+
+
+def _download(m, key, rel, expect=None):
+    """design/108: streamed to disk (D1); skipped when already here with the manifest's fingerprint (D2); big files in parallel parts (D3); verified (D4).
+    `expect`: the manifest's row, with sha256 and bytes, when there is one."""
     ws = workspace(m['code'])
+    dest = ws / rel
+    want_sha, want_bytes = (expect or {}).get('sha256'), (expect or {}).get('bytes')
+    if want_sha and dest.exists() and (not want_bytes or dest.stat().st_size == want_bytes) and _sha256_of(dest) == want_sha:
+        return str(dest)   # D2
     with api() as c:
-        r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=True)
-    if r.status_code != 200:
+        r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=False)
+    direct = r.status_code == 200   # served by the server itself (small answers); the usual answer is a redirect to the storage link
+    if not direct and (r.status_code not in (301, 302, 303, 307, 308) or not r.headers.get('location')):
         emit({'action': 'tell_builder', 'message': f'Download of {key} failed: HTTP {r.status_code}.'}, 2)
-    (ws / rel).parent.mkdir(parents=True, exist_ok=True)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + '.part')
+    for attempt in (1, 2):
+        try:
+            if direct:
+                part.write_bytes(r.content)
+            else:
+                _fetch_to(r.headers['location'], part, want_bytes)
+        except (httpx.RequestError, RuntimeError) as exc:
+            part.unlink(missing_ok=True)
+            emit({'action': 'tell_builder', 'message': f'Download of {key} failed after retries ({exc.__class__.__name__}: {exc}).'}, 2)
+        if not want_sha or _sha256_of(part) == want_sha:
+            break
+        part.unlink(missing_ok=True)   # D4: once more, then it is named
+    else:
+        emit({'action': 'tell_builder', 'message': f"{dest.name}: downloaded twice and its fingerprint differs from the manifest's; nothing was kept."}, 2)
+    part.replace(dest)
     if rel.startswith('work/') and rel.endswith('.json'):   # make it readable in parts (ticket 8)
         try:
-            data = json.loads(r.content)
+            data = json.loads(dest.read_bytes())
         except ValueError:
             data = None
         if data is not None:
             if rel in READ_BACK:
-                save_json(ws / rel, data)      # the tool reads this one back: line breaks only, values unchanged
+                save_json(dest, data)      # the tool reads this one back: line breaks only, values unchanged
             else:
-                readable_json(ws / rel, data)  # read by the assistant only: long texts move to .md files beside it
-            return str(ws / rel)
-    (ws / rel).write_bytes(r.content)
-    return str(ws / rel)
+                readable_json(dest, data)  # read by the assistant only: long texts move to .md files beside it
+    return str(dest)
 
 
 def cmd_planning(a):
@@ -1907,7 +1973,7 @@ def download_bundle(m, manifest):
 
     def one(f):
         try:
-            p = _download(m, f['key'], 'bundle/' + f['name'])
+            p = _download(m, f['key'], 'bundle/' + f['name'], expect=f)   # design/108 D2, D4: skipped when already here, verified when not
         except SystemExit:
             raise RuntimeError(f['name'])
         done.append(f['name'])

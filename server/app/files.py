@@ -44,6 +44,13 @@ def received(conn, run_id, keys):
     return {r['key'] for r in conn.execute('select key from vw2_files where run_id=%s and key = any(%s)', (run_id, list(keys)))}
 
 
+REDIRECT_CACHE = {'Cache-Control': 'private, max-age=3000'}   # design/108 I4: under the signed link's hour, so a redraw or a replay re-fetches nothing
+
+
+def file_redirect(url):
+    return RedirectResponse(url, status_code=307, headers=REDIRECT_CACHE)
+
+
 @router.get('/api/runs/{run_id}/files/{key:path}')
 def download(run_id: UUID, key: str, user=User):
     with connect() as conn:
@@ -52,7 +59,7 @@ def download(run_id: UUID, key: str, user=User):
     store = storage()
     if not row and not (key.startswith(f"{run['id']}/") and store.exists(key)):  # working files (planning package, ledger…) live under the run prefix without a receipt row
         raise Problem(404, 'FILE_MISSING', 'No such retained file.')
-    return RedirectResponse(store.signed_download(key), status_code=307)
+    return file_redirect(store.signed_download(key))
 
 
 # Local storage backend only (tests / local dev): PUT and GET objects directly through the server.

@@ -30,7 +30,7 @@ def test_bundle_download_is_pooled_and_reports_each_file(harness, monkeypatch, c
     files = [{'role': 'original', 'name': f'Media/Originals/C{i}.MP4', 'key': f'k{i}', 'bytes': 20_000_000} for i in range(5)] + \
             [{'role': 'narration', 'name': 'Audio/narration.mp3', 'key': 'kn', 'bytes': 4_000_000}, {'role': 'generated', 'name': 'Subtitles.srt', 'key': 'ks', 'bytes': 100}]
     done = []
-    monkeypatch.setattr(vw, '_download', lambda m, key, rel: (done.append(rel) or str(ws / rel)))
+    monkeypatch.setattr(vw, '_download', lambda m, key, rel, expect=None: (done.append(rel) or str(ws / rel)))
     got = vw.download_bundle(m, {'files': files})
     assert len(got) == 6 and sorted(done) == sorted('bundle/' + f['name'] for f in files if f['role'] != 'generated')
     err = capsys.readouterr().err
@@ -41,7 +41,7 @@ def test_bundle_download_stops_on_a_failed_file(harness, monkeypatch, capsys):
     ws, m = harness
     files = [{'role': 'original', 'name': 'Media/Originals/C1.MP4', 'key': 'k1', 'bytes': 1}, {'role': 'original', 'name': 'Media/Originals/C2.MP4', 'key': 'k2', 'bytes': 1}]
 
-    def download(m, key, rel):
+    def download(m, key, rel, expect=None):
         if key == 'k2':
             raise SystemExit(2)
         return str(ws / rel)
