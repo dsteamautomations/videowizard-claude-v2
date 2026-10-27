@@ -59,3 +59,7 @@ A fifth route, **drawn**, for diagrams, charts, maps, timelines and technical dr
 ## Not covered (known before the build)
 
 - server/tests (Docker). The reading of the sample by SK is the acceptance of the look; no benchmark of Gemini's reading of drawn frames. Curves, 3-D, charts with axes beyond lines and rects, and animation easing other than linear wait for a later set. design/112's K rules already apply to drawn stills (a drawn graphic that does not move is a still with motion none).
+
+## SK's answers (27 Oct 2026)
+
+1. The drawing set as listed (rect, line, arrow, circle, polygon, text, image, group, repeat; appear, build, move, highlight, fade); no curves or 3-D in this release.
