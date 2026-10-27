@@ -476,6 +476,11 @@ def page_view(conn, store, run, outputs, code, repair=True):
         refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
         refs[r['id']]['from_thumbnail'] = bool((r.get('source') or {}).get('from_thumbnail'))   # design/100 S2
         refs[r['id']]['sources_changed'] = bool(r.get('sources_changed'))   # design/110
+        gold_ = golden_of(session, r.get('element_id'))   # design/111 F11
+        refs[r['id']]['golden'] = bool(gold_) and gold_ == r['id']
+        first = ((r.get('generation') or {}).get('parents') or [{}])[0].get('id')
+        refs[r['id']]['from_golden'] = (first == gold_) if gold_ and r.get('kind') in ('keyframe', 'isolated') and r.get('role') != 'end' and not r.get('golden_candidate') and r['id'] != gold_ else None
+        refs[r['id']]['edit'] = r.get('edit')
         refs[r['id']]['shot_id'] = made_for(session, r)   # design/94 R1.3: listed only under its own shot
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
@@ -546,6 +551,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                          for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0
+            'golden': dict(session.get('golden') or {}),   # design/111 F11
             'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
@@ -703,6 +709,50 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     if row['id'] not in (session.get('questions') or {}):
         _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({prices()['image_inr']:g} INR)", 'approve anyway'], 'server', fork='not_yet')
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
+
+
+# ---------- design/111 F11 (+F41): one golden picture per element; every later picture is an edit of it ----------
+
+REGION_MAX = 1 / 3   # an edit changes one region, about a third of the frame at most
+
+
+def golden_of(session, element_id):
+    return (session.get('golden') or {}).get(element_id)
+
+
+def golden_due(session, plan):
+    """The elements whose golden picture the assistant writes now: a non-person, non-graphic element with an approved sheet (and an approved material spec when it has one),
+    no golden picture yet and none being made."""
+    out = []
+    for e in plan.get('elements') or []:
+        if e.get('kind') in ('person', 'graphic') or e['id'] == STYLE or golden_of(session, e['id']):
+            continue
+        sheet = [r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == e['id'] and r.get('status') == 'approved']
+        if not sheet or (e.get('material_spec') and not material_approved(session, e)):
+            continue
+        if any(r.get('golden_candidate') and r.get('element_id') == e['id'] and r.get('status') in ('generating', 'candidate') for r in session['references'].values()):
+            continue
+        frames = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == e['id'] and r.get('status') == 'approved']
+        parents = ','.join([sheet[0]['id']] + frames[:1])
+        out.append({'element_id': e['id'], 'next': f"write the golden picture of {e['id']} now: `vw visuals image --element {e['id']} --kind isolated --golden --parents {parents} …`"})
+    return out
+
+
+def _derived(session, p):
+    """A picture made from another generated picture (a keyframe or a state among its parents)."""
+    return any((session['references'].get(q.get('id')) or {}).get('kind') in ('keyframe', 'state') for q in (p.get('generation') or {}).get('parents') or [])
+
+
+def check_region(region):
+    """A rectangle in fractions of the frame, inside it, a third of the frame at most."""
+    need(isinstance(region, dict) and all(k in region for k in ('left', 'top', 'width', 'height')), 'A region is {left, top, width, height}, fractions of the frame.')
+    try:
+        l, t, w, h = (float(region[k]) for k in ('left', 'top', 'width', 'height'))
+    except (TypeError, ValueError):
+        need(False, 'A region is four numbers between 0 and 1.')
+    need(0 <= l < 1 and 0 <= t < 1 and 0 < w <= 1 and 0 < h <= 1 and l + w <= 1 + 1e-9 and t + h <= 1 + 1e-9, 'The region lies inside the frame: left + width and top + height are at most 1.')
+    need(w * h <= REGION_MAX + 1e-9, f'The region covers {w * h * 100:.0f} % of the frame: an edit changes one region of a third at most; a bigger change is a new picture made with the golden picture as a reference (design/111 F11).')
+    return {'left': l, 'top': t, 'width': w, 'height': h}
 
 
 # ---------- design/111 F10: a repeating material has one measured spec, used in numbers by every picture ----------
@@ -1547,6 +1597,15 @@ def generate_image(conn, store, user, run, outputs, body):
     for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
         if p and p.get('status') == 'rejected':
             need(False, f"{p['id']} was rejected: make the next {'state from the last approved state' if body['kind'] == 'state' else 'end image from the approved start, not from the candidate chain'}.")
+    gold = golden_of(session, body['element_id'])
+    if body.get('golden'):   # design/111 F11: the golden picture, written on the server's cue after the sheet (and the spec) are approved
+        need(body['kind'] == 'isolated' and element['kind'] not in ('person', 'graphic', 'style'), 'A golden picture is a picture of an object, a place, an animal, a material or a process (kind isolated); a person\'s golden picture is its identity sheet.')
+        need(not gold, f"{body['element_id']} already has its golden picture ({gold[:8] if gold else ''}); replacing it is the operator's decision (reject it first).")
+        need(any(p and p.get('kind') == 'sheet' and p.get('status') == 'approved' and p.get('element_id') == body['element_id'] for p in parents), 'The golden picture is made from the element\'s approved sheet: name it among the parents.')
+        if element.get('identity') == 'exact' and element['kind'] == 'object':   # L41 lives here now: the golden picture carries the footage; every edit inherits it
+            frames = [r for r in session['references'].values() if r.get('element_id') == body['element_id'] and r.get('kind') == 'frame' and r.get('status') == 'approved']
+            need(not frames or any(p and p.get('kind') == 'frame' and p.get('element_id') == body['element_id'] for p in parents),
+                 f"{body['element_id']} is the client's own: send one of its approved footage frames as a parent of the golden picture ({', '.join(r['id'][:8] for r in frames)}).")
     if body['kind'] == 'state':   # design/65: a state is made from the previous state, which is approved only when the whole sequence is
         need(len(parents) == 1, 'A state is generated from the previous state: give one parent.')
         need(parents[0] and parents[0]['status'] in ('approved', 'candidate'), 'The parent must be a candidate or approved reference of this run.')
@@ -1591,6 +1650,17 @@ def generate_image(conn, store, user, run, outputs, body):
     need(not role or body['kind'] == 'keyframe', 'A role (start or end) is for a keyframe.')
     is_end = role == 'end' if role else any(p['kind'] == 'keyframe' for p in parents)
     need(not is_end or any(p['kind'] == 'keyframe' for p in parents), 'An end image is made from its start: name the start keyframe among its parents.')   # review 27 Oct
+    if gold and body['kind'] in ('keyframe', 'isolated') and not is_end and not body.get('golden') and not body.get('fix_of'):   # design/111 F11: Image 1 is the golden picture
+        need(parents and parents[0] and parents[0]['id'] == gold, f"{body['element_id']} has its golden picture ({gold[:8]}): it is Image 1 of every picture of {body['element_id']}; name it first in --parents and change one thing.")
+    for p in parents:   # F11: the chain always goes back to the golden picture
+        if not p or body.get('fix_of') or body['kind'] == 'state':
+            continue
+        need(not p.get('fix_of'), f"{p['id']} is a fix round's output: a fix round is never a parent; use the golden picture" + (f' ({gold[:8]})' if gold else '') + ' or the approved start.')
+        if p.get('kind') in ('keyframe', 'state') and _derived(session, p) and not (is_end and _picture_word(store, session, p) == 'start image'):
+            need(False, f"{p['id']} is a derived picture (made from {', '.join(q.get('id', '')[:8] for q in (p.get('generation') or {}).get('parents') or [])}): a derived picture is never the parent of another; "
+                        + (f'use the golden picture {gold[:8]}' if gold else 'use an approved sheet or the golden picture') + ' (an end is made from its approved start).')
+    region = check_region(body['region']) if body.get('region') else None   # F11's edit rule: one change inside one region, masked, the start copied back outside it; without a region the
+    # picture is rule 2's new picture (several things change, or the framing), made whole as before
     if body['kind'] == 'keyframe':
         body = {**body, 'role': 'end' if is_end else 'start'}   # a copy: the caller's request is never changed
     variants = int(body.get('variants') or 1)   # design/86 K4: two candidates for a start keyframe, the operator picks
@@ -1606,7 +1676,7 @@ def generate_image(conn, store, user, run, outputs, body):
                 library.check_answer(body['end_answer'], body['end_prompt'])
             except ValueError as exc:
                 need(False, 'end answer: ' + str(exc))
-        pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
+        pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer'), **({'region': check_region(body['end_region'])} if body.get('end_region') else {})}   # design/111 F11
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
@@ -1642,7 +1712,7 @@ def generate_image(conn, store, user, run, outputs, body):
     for n in range(variants):
         suffix = '' if variants == 1 else '-ab'[n + 1]
         request_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"{body['request_id']}-{suffix}")) if suffix else body['request_id']   # defect 27: the jobs' request_id is a uuid; one per candidate, the same on a retry
-        made.append(_queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), request_id, pending_end))
+        made.append(_queue_image(conn, store, session, run, outputs, element, {**body, 'region': region}, parents, answer, op, body['name'] + ('-' + suffix if suffix else ''), request_id, pending_end))
         if lines:
             session['references'][made[-1]['reference_id']]['server_checklist'] = lines
         if found:   # design/91 N9: the check measures its light against the footage beside the shot's gap
@@ -1906,10 +1976,12 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size,
                'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
-                             **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {})}}   # design/96 X3; design/106 T1
+                             **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
+                             **({'golden_candidate': True} if body.get('golden') else {})},   # design/96 X3; design/106 T1; design/111 F11
+               **({'region': body['region']} if body.get('region') else {})}
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
                        (run['id'], ref_id, Jsonb(request), request_id)).fetchone()
-    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents')},
+    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents') + (('region',) if request.get('region') else ())},
                                      **({'answer': answer} if answer is not None else {}), **({'pending_end': pending_end} if pending_end else {}),
                                      **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
@@ -1969,7 +2041,7 @@ def _keyframe_gates(session, plan, body, parents, named=None):
             continue
         for eid in sh.get('element_ids') or []:
             e = elements.get(eid)
-            if not e or eid == body['element_id'] or e['kind'] != 'object' or e['identity'] != 'exact':
+            if not e or eid == body['element_id'] or e['kind'] != 'object' or e['identity'] != 'exact' or golden_of(session, eid):   # design/111 F11: the golden picture carries the frame
                 continue
             frames = [r for r in session['references'].values() if r.get('element_id') == eid and r.get('kind') == 'frame' and r.get('status') == 'approved']
             need(not frames or eid in parent_frames, f"{eid} is the client's own: send one of its approved footage frames as a parent, named by number as the material reference "
@@ -1997,8 +2069,20 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
             _open(session, sid, f"Two {word}s for {sid} would be approved: {', '.join(others)} (approved) and {ref_id}. Keep which?", others + [ref_id], 'server', fork='slot')
             save_session(store, run, session)
             need(False, f"Two {word}s for {sid}: {', '.join(others)} is approved already. Answer which to keep on the shot's card (or `vw visuals answer --item {sid} --answer <id>`); the other is rejected, then approve again.")
+    if row.get('golden_candidate'):   # design/111 F11: a flawed picture cannot be golden
+        flaw = 'approved anyway after the not-yet-done check failed' if row.get('not_yet_ok') else ('rejected before, with words' if row.get('rejection') else '')
+        need(not flaw, f"{ref_id} cannot be the golden picture: it was approved with a stated flaw ({flaw}); make a new golden picture of {row.get('element_id')}.")
     quote = said(quote, 'Approved', user)   # design/99 C2
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
+    if row.get('golden_candidate'):
+        session.setdefault('golden', {})[row['element_id']] = ref_id
+    if row.get('kind') == 'sheet':   # a person's identity sheet is its golden picture
+        try:
+            kinds_ = {e['id']: e['kind'] for e in current_plan(store, session)['elements']} if session.get('current') else {}
+        except (ValueError, Problem):
+            kinds_ = {}
+        if kinds_.get(row.get('element_id')) == 'person':
+            session.setdefault('golden', {})[row['element_id']] = ref_id
     placed = None
     sid = made_for(session, row)
     if sid and row.get('kind') in ('keyframe', 'state'):   # design/94 A1: approving a still shot's picture places it, in the same save; a refusal approves nothing
@@ -2022,7 +2106,8 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     if pe and conn is not None and not row.get('end_queued'):   # design/86 K1: the end image follows the approved start without a chat turn
         try:
             out = generate_image(conn, store, user, run, outputs, {'request_id': str(uuid.uuid4()), 'element_id': row['element_id'], 'name': re.sub(r'\bstart\b', 'end', row['name']) if 'start' in row['name'] else 'end-' + row['name'],
-                                                                   'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer'), 'role': 'end'})
+                                                                   'kind': 'keyframe', 'subject': row['subject'], 'prompt': pe['prompt'], 'parents': [ref_id], 'answer': pe.get('answer'), 'role': 'end',
+                                                                   **({'region': pe['region']} if pe.get('region') else {})})   # design/111 F11: the end's region, written with the start
         except (ValueError, Problem) as exc:   # defect 28: the start stays approved; the reason goes back, and approving it again tries the end again
             why = exc.message if isinstance(exc, Problem) else str(exc)
             return {**row, 'next': f"Approved; the end image was not made: {why} Make the end from this start (it is Image 1), or approve this start again to retry."}
@@ -2969,6 +3054,7 @@ def status(conn, store, run, outputs, repair=True):
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0: the open questions, by item
             'material_specs': {e['id']: {'approved': material_approved(session, e), 'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')}
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
+            'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 

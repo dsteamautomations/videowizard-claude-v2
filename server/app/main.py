@@ -241,6 +241,9 @@ class ImageGenerate(Write):
     end_answer: dict | None = None
     fix_of: str | None = None              # design/86 K2
     shot_id: str | None = None             # design/91 N8: the shot this picture is for
+    golden: bool = False                   # design/111 F11: the element's golden picture
+    region: dict | None = None             # design/111 F11: an edit's region, fractions of the frame
+    end_region: dict | None = None         # design/111 F11: the end's region, written with the start
 
 
 class ReferenceApprove(Write):

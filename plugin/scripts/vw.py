@@ -1310,7 +1310,7 @@ VISUALS_FLAGS = {
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
-    'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role'},
+    'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
     'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
     'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'},
@@ -1360,6 +1360,19 @@ def _take_job(base, value):
     if len(ready) != 1:
         emit({'action': 'refused', 'message': f"{value} has {len(ready)} ready takes; give the job id (`vw visuals status --shot {value}`)."}, 2)
     return str(ready[0]['id'])
+
+
+def _region(value):
+    """design/111 F11: --region left,top,width,height (fractions of the frame), or the same as an object in a file."""
+    if isinstance(value, dict):
+        return value
+    parts = [p.strip() for p in str(value).split(',')]
+    if len(parts) != 4:
+        emit({'action': 'refused', 'message': '--region is left,top,width,height, four fractions of the frame (for example 0.55,0.3,0.3,0.3).'}, 2)
+    try:
+        return dict(zip(('left', 'top', 'width', 'height'), (float(p) for p in parts)))
+    except ValueError:
+        emit({'action': 'refused', 'message': '--region is four numbers between 0 and 1.'}, 2)
 
 
 def cmd_visuals(a):
@@ -1513,6 +1526,8 @@ def cmd_visuals(a):
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
                         **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
                         **_pair_fields(m, it.get('variants'), it.get('end_answer')), **({'shot_id': it['shot']} if it.get('shot') else {}),   # design/86 K1, K4; design/91 N8
+                        **({'golden': True} if it.get('golden') else {}), **({'region': _region(it['region'])} if it.get('region') else {}),   # design/111 F11
+                        **({'end_region': _region(it['end_region'])} if it.get('end_region') else {}),
                         **({'role': it['role']} if it.get('role') else {})}   # design/106 T1: start or end, said
                 payload, code = request('POST', base + '/images', json=body)
                 if code:
@@ -1528,7 +1543,9 @@ def cmd_visuals(a):
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
-                **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {})}   # design/91 N8; design/106 T1
+                **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {}),   # design/91 N8; design/106 T1
+                **({'golden': True} if getattr(a, 'golden', False) else {}), **({'region': _region(a.region)} if getattr(a, 'region', None) else {}),
+                **({'end_region': _region(a.end_region)} if getattr(a, 'end_region', None) else {})}   # design/111 F11
         out = write(base + '/images', body)
         emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
                      (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
@@ -2240,6 +2257,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost'):   # design/73, design/79; design/94 --move; design/106 --role; design/110
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
+    s.add_argument('--golden', action='store_true', help="image: the element's golden picture (design/111 F11)"); s.add_argument('--region', help='image: an edit\'s region left,top,width,height (design/111 F11)'); s.add_argument('--end-region', dest='end_region', help='image: the end\'s region, written with the start')
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable

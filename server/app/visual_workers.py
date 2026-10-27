@@ -60,6 +60,8 @@ def process_image(job):
                 r = _openai('/images/generations', json={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality'], 'output_format': 'png', 'n': 1})
             else:
                 files = [('image[]', (p['id'] + '.png', store.get(p['key']), 'image/png')) for p in req['parents']]
+                if req.get('region'):   # design/111 F11: the edit is masked to its region
+                    files.append(('mask', ('mask.png', region_mask(store.get(req['parents'][0]['key']), req['region']), 'image/png')))
                 r = _openai('/images/edits', data={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality']}, files=files)
             if r.status_code == 404 or (r.status_code == 400 and 'model' in r.text.lower() and 'not' in r.text.lower()):
                 return 'rejected', {'failure': 'MODEL_UNAVAILABLE', 'http_status': r.status_code}, f"OpenAI reports the model {req['model']} is unavailable on this account.", None, None
@@ -82,13 +84,18 @@ def process_image(job):
                 out = BytesIO()
                 im.convert('RGB').save(out, format='PNG')
                 png = out.getvalue()
+        edit = None
+        if req.get('region') and req.get('parents'):   # design/111 F11: the start copied back outside the region; how much the model changed there is kept
+            png, edit = composite_back(store.get(req['parents'][0]['key']), png, req['region'])
+            width, height = Image.open(BytesIO(png)).size
         ref = req['reference']
         k = f"{job['run_id']}/visuals/references/{ref['id']}.png"
         store.put(k, png, 'image/png')
         sha = hashlib.sha256(png).hexdigest()
         usage = body.get('usage') or {}
         cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
-        return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost}, None, cost, None
+        return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
+                            **({'edit': edit} if edit else {})}, None, cost, None
     except (Problem, OSError, ValueError, KeyError, TypeError, httpx.RequestError) as exc:
         if raw_path.exists():
             return 'storage_pending', {'phase': 'store'}, f'Image saved locally; storage will be retried ({exc.__class__.__name__}).', None, 10
@@ -116,10 +123,51 @@ def refusal(r):
     return result, f'OpenAI rejected the request (HTTP {r.status_code}).'
 
 
+def region_mask(parent_png, region):
+    """design/111 F11: a PNG the size of Image 1, opaque everywhere but the region (GPT Image edits where the mask is clear)."""
+    from PIL import Image
+    from io import BytesIO
+    with Image.open(BytesIO(parent_png)) as im:
+        w, h = im.size
+    mask = Image.new('RGBA', (w, h), (0, 0, 0, 255))
+    box = region_box(region, w, h)
+    mask.paste((0, 0, 0, 0), box)
+    out = BytesIO()
+    mask.save(out, format='PNG')
+    return out.getvalue()
+
+
+def region_box(region, w, h):
+    l, t = int(round(float(region['left']) * w)), int(round(float(region['top']) * h))
+    return (l, t, min(w, int(round((float(region['left']) + float(region['width'])) * w))), min(h, int(round((float(region['top']) + float(region['height'])) * h))))
+
+
+def composite_back(parent_png, result_png, region):
+    """design/111 F11: the model's region pasted onto the start; the rest is the start, pixel for pixel. Returns (png, the edit record with how much the model
+    had changed outside the region, in percent of the grey range)."""
+    from PIL import Image, ImageChops, ImageStat
+    from io import BytesIO
+    with Image.open(BytesIO(parent_png)) as p, Image.open(BytesIO(result_png)) as r:
+        parent, result = p.convert('RGB'), r.convert('RGB')
+        if result.size != parent.size:
+            result = result.resize(parent.size)
+        box = region_box(region, *parent.size)
+        diff = ImageChops.difference(parent, result)   # per channel, so a colour shift counts
+        outside = Image.new('L', parent.size, 255)
+        outside.paste(0, box)
+        stat = ImageStat.Stat(diff, mask=outside)
+        changed = round(sum(stat.mean) / 3 / 255 * 100, 1) if stat.count and stat.count[0] else 0.0
+        out = parent.copy()
+        out.paste(result.crop(box), box)
+        buf = BytesIO()
+        out.save(buf, format='PNG')
+    return buf.getvalue(), {'region': region, 'outside_changed_pct': changed, 'composited': True}
+
+
 def apply_image_result(conn, run_id, ref, status, result, error, cost):
     """A finished image job's outcome on its reference: retained → candidate, rejected/failed → failed. Returns True when it changed."""
     if status == 'retained':
-        ref.update(status='candidate', key=result['key'], sha256=result['sha256'], bytes=result['bytes'], width=result['width'], height=result['height'])
+        ref.update(status='candidate', key=result['key'], sha256=result['sha256'], bytes=result['bytes'], width=result['width'], height=result['height'], **({'edit': result['edit']} if result.get('edit') else {}))
         ref['generation'] = {**ref.get('generation', {}), 'cost': cost, 'revised_prompt': result.get('revised_prompt')}
         jobs.record_file(conn, run_id, 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'image/png')
         return True
