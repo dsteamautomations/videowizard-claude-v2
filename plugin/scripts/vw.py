@@ -2064,6 +2064,9 @@ def cmd_delivery(a):
     if a.what == 'open':   # design/107 Step F: Studio imports the timeline by scripting and reads it back; free Resolve gets the three steps
         found = handoff.find_resolve()
         if found.get('edition') == 'studio':
+            led = call('GET', f'/api/runs/{run}/stage3').get('resolve') or {}   # review 27 Oct: never imported twice
+            if led.get('state') in ('reserved', 'dispatched', 'reported'):
+                emit({'action': 'refused', 'ledger': led, 'message': f"The Resolve step is already {led['state']} on {led.get('machine')}: the timeline is in Resolve there. Next: `vw delivery zip`, or `vw delivery resolve --inspect`."}, 2)
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import resolve_bridge
             manifest = _json_file(m, 'work/manifest.json')
@@ -2082,10 +2085,14 @@ def cmd_delivery(a):
             emit({'action': 'refused', 'message': 'Name the folder that holds the camera originals: `vw delivery relink-check --originals "<folder>"`.'}, 2)
         import csv
         rows = list(csv.DictReader((ws / 'edit' / 'Relink-list.csv').open(encoding='utf-8', newline='')))
-        rep = handoff.relink_check(ws / 'edit', m['code'], rows, a.originals)
+        try:
+            rep = handoff.relink_check(ws / 'edit', m['code'], rows, a.originals)
+        except ValueError as exc:   # review 27 Oct: a malformed timecode tag in the CSV or an original
+            emit({'action': 'refused', 'message': f'The relink check could not read a timecode: {exc}. Fix the tag or leave it empty, then run again.'}, 2)
         if rep['checklist']:
-            with (ws / 'edit' / 'Finishing-checklist.md').open('a', encoding='utf-8') as f:
-                f.write('\n## Relink\n\n' + ''.join(f'- {l}\n' for l in rep['checklist']))
+            ck = ws / 'edit' / 'Finishing-checklist.md'
+            kept = ck.read_text(encoding='utf-8').split('\n## Relink\n')[0] if ck.exists() else ''   # review 27 Oct: one section, rewritten each run
+            ck.write_text(kept + '\n## Relink\n\n' + ''.join(f'- {l}\n' for l in rep['checklist']), encoding='utf-8')
         emit(rep, 0, '\n'.join(l['line'] for l in rep['lines']) + (f"\nRelinked timeline: {rep['relinked']}" if rep['relinked'] else ''))
     if a.what == 'confirm':   # design/107 Step F, free route: the operator's side-by-side check goes on the ledger
         if not (a.quote or '').strip():

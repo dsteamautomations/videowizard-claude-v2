@@ -239,6 +239,15 @@ class Plan(Model):
     visual_facts: list[VisualFact] = Field(default_factory=list, max_length=100)   # design/91 N6
 
 
+def _dimension_needs(label, dims):
+    """design/106 D3, D6: an unknown size names what was tried and carries no number; a known one names its source."""
+    for d in dims:
+        need(d.status != 'unknown' or d.tried.strip(), f'{label}: {d.part} {d.measure} is unknown: record the sources tried and why each failed (tried): '
+             'the client material, `measure` on footage frames, a standard or a maker figure, an approved picture (design/106 D3).')
+        need(d.status != 'unknown' or d.value is None, f'{label}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
+        need(d.status == 'unknown' or d.source.strip(), f'{label}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
+
+
 def need(value, message):
     if not value:
         raise ValueError(message)
@@ -358,6 +367,8 @@ def timing_warnings(gap_id, shots, timing, fps):
 def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE):
     plan = Plan.model_validate(document)
     elements = unique(plan.elements, 'id', 'element')
+    for e in plan.elements:   # review 27 Oct: an element's sizes (design/103 A5) are checked like a drawing spec's
+        _dimension_needs(f'element {e.id}', e.size)
     unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
     facts, ekind = {f.id: f for f in plan.visual_facts}, {e.id: e.kind for e in plan.elements}
     for f in plan.visual_facts:
@@ -477,11 +488,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                              'its sources; a chart, a timeline or a label needs none: say so in production_method'})
                         else:
                             spec = shot.drawing_spec
-                            for d in spec.dimensions:
-                                need(d.status != 'unknown' or d.tried.strip(), f'shot {shot.id}: {d.part} {d.measure} is unknown: record the sources tried and why each failed (tried): '
-                                     'the client material, `measure` on footage frames, a standard or a maker figure, an approved picture (design/106 D3).')
-                                need(d.status != 'unknown' or d.value is None, f'shot {shot.id}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
-                                need(d.status == 'unknown' or d.source.strip(), f'shot {shot.id}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
+                            _dimension_needs(f'shot {shot.id}', spec.dimensions)
                             if not spec.proportions:   # design/106 D2
                                 warnings.append({'shot_id': shot.id, 'kind': 'spec_proportions_missing', 'message': f'shot {shot.id}: give the proportions that matter (proportions), '
                                                  'for example a brick about 3 : 1.5 : 1, both leaves the same thickness; "illustrative" means no numbers printed, never free proportions'})
@@ -711,7 +718,8 @@ def course_warnings(plan, fps):
                 if not shot.camera_reason.strip():   # A4
                     out.append({'shot_id': shot.id, 'kind': 'camera_reason_missing',
                                 'message': f'shot {shot.id}: say what the viewer should feel or read, and why this angle, size and move give it (camera_reason)'})
-                if not shot.size:
+                if not shot.size:   # review 27 Oct: an unsized shot breaks the run and is the opener if it comes first; it is never skipped over
+                    sizes.append(None)
                     continue
                 reason = shot.size_reason.strip()
                 if not sizes and shot.size not in OPEN_SIZES and not reason:   # A3 (1)

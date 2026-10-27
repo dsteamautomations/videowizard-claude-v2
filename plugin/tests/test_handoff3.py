@@ -169,6 +169,7 @@ def test_open_on_studio_imports_and_reports_and_on_free_shows_the_steps(cli, mon
     (tmp_path / 'runs' / 'VW-9' / 'work' / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
     H.write_timeline_for(d, manifest, base=str(d))
     monkeypatch.setenv('VW2_RESOLVE_FAKE', '1')
+    monkeypatch.setattr(vw, 'call', lambda *a, **k: {'bundle': {}, 'resolve': None})   # review 27 Oct: `open` reads the ledger first
     monkeypatch.setattr(vw.handoff, 'find_resolve', lambda: {'found': True, 'version': '21.1', 'edition': 'studio'})
     code, out, err = run(args(what='open'), capsys)
     assert code == 0 and out['report']['drt_verified'] and [s[0] for s in sent] == ['resolve/reserve', 'resolve/mark', 'resolve/mark'] and sent[2][1]['report']['route'] == 'studio'

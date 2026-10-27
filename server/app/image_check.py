@@ -187,15 +187,19 @@ def detail_line(store, session, ref, png):
 
 def run_check(store, session, ref, result, transport_factory):
     """The whole check for one retained candidate, Gemini's lines and then the measured light (design/91 N9); returns the check record. Never raises."""
-    record = _model_check(store, session, ref, result, transport_factory)
     try:
-        light = light_line(store, session, ref, store.get(result['key']))
+        png = store.get(result['key'])   # review 27 Oct: read once, used by the model check, the light line and the detail line
+    except Exception:
+        png = None
+    record = _model_check(store, session, ref, result, transport_factory, png)
+    try:
+        light = light_line(store, session, ref, png)
     except Exception:
         light = None
     if light:
         record['lines'] = list(record.get('lines') or []) + [light]
     try:
-        detail = detail_line(store, session, ref, store.get(result['key']))   # design/104 C3
+        detail = detail_line(store, session, ref, png)   # design/104 C3
     except Exception:
         detail = None
     if detail:
@@ -218,7 +222,7 @@ def expand(record, ref):
     return {**record, 'lines': full(record.get('lines')), 'must_failed': full(record.get('must_failed'))}
 
 
-def _model_check(store, session, ref, result, transport_factory):
+def _model_check(store, session, ref, result, transport_factory, png=None):
     """Gemini's part of the check: the lines and the code checks. Never raises."""
     parents = [session['references'].get(p.get('id')) or {} for p in (ref.get('generation') or {}).get('parents') or []]
     lines = lines_of(ref)
@@ -230,7 +234,7 @@ def _model_check(store, session, ref, result, transport_factory):
             return record
         pngs = [(('scene' if p.get('kind') == 'frame' else p.get('kind') or 'reference'), store.get(p['key'])) for p in parents if p.get('key')]
         transport = transport_factory(key, CHECK_MODEL, terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
-        received = transport.generate(build(store.get(result['key']), pngs, lines, (ref.get('generation') or {}).get('prompt')))
+        received = transport.generate(build(png if png is not None else store.get(result['key']), pngs, lines, (ref.get('generation') or {}).get('prompt')))
         body = received.get('body')
         if not isinstance(body, dict):
             body = json.loads(received.get('raw') or '{}')

@@ -12,6 +12,6 @@ def test_render_empties_every_step_not_shown():
 
 
 def test_every_step_change_goes_through_render():
-    for site in ("step=s;remember('step',s);render();", "step=st;remember('step',st);"):
+    for site in ("step=s;confirmPicks=false;remember('step',s);render();", "step=st;remember('step',st);"):
         assert site in PAGE
     assert PAGE.count("remember('step'") == 2

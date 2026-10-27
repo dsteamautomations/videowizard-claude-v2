@@ -184,6 +184,8 @@ def cross_check(edit_dir, manifest):
 
 def with_base(text, folder):
     base = str(folder).replace('\\', '/').rstrip('/')
+    if base.startswith('//'):   # review 27 Oct: a network share keeps its host: file://nas/share/...
+        return text.replace(REL, 'file://' + quote(base[2:], safe='/:') + '/')
     if not base.startswith('/'):
         base = '/' + base
     return text.replace(REL, 'file://' + quote(base, safe='/:') + '/')
@@ -230,7 +232,10 @@ def tc_seconds(tc, fps):
     """'14:23:10:05' at fps -> seconds (a Fraction); '' -> 0."""
     if not tc:
         return Fraction(0)
-    h, m, s, ff = (int(x) for x in re.split(r'[:;]', tc.strip()))
+    parts = re.split(r'[:;]', tc.strip())
+    if len(parts) != 4 or not all(p.isdigit() for p in parts):
+        raise ValueError(f'timecode {tc!r} is not hh:mm:ss:ff')   # review 27 Oct: a refusal, not a traceback
+    h, m, s, ff = (int(x) for x in parts)
     return Fraction(h * 3600 + m * 60 + s) + Fraction(ff) / Fraction(str(fps))
 
 

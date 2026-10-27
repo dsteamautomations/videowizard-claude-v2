@@ -48,7 +48,7 @@ def test_a1_a4_a5_warn_until_filled():
     k = kinds(d)
     assert ('SC1', 'light_missing') in k and ('VS1', 'camera_reason_missing') in k and ('E1', 'element_size_missing') in k
     d = doc_({**pshot('VS1', 0, 500, 'video'), 'camera_reason': 'eye level, honest'}, {**pshot('VS2', 500, 1000, 'video'), 'camera_reason': 'a slow push draws in'}, light=LIGHT)
-    d['elements'][0]['size'] = [{'part': 'block', 'measure': 'length', 'value': 29, 'unit': 'cm', 'status': 'confirmed'}]
+    d['elements'][0]['size'] = [{'part': 'block', 'measure': 'length', 'value': 29, 'unit': 'cm', 'status': 'confirmed', 'source': 'the client brief'}]   # review 27 Oct: a known size names its source
     k = kinds(d)
     assert not {'light_missing', 'camera_reason_missing', 'element_size_missing'} & {w for _, w in k}
     d['elements'][0].update(kind='place', size=[])

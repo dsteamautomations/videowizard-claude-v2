@@ -54,7 +54,7 @@ def test_a_keyframe_records_its_role_and_the_page_reads_it():
     view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')
     assert {r['id']: r.get('role') for r in view['references']}[out['reference_id']] == 'end'
     assert "r.role?r.role+' image'" in PAGE and "if(r.role)return r.role==='start'" in PAGE
-    assert "live.filter(r=>picWord(r)===role+' image').pop()" in PAGE and "' earlier picture'" in PAGE   # T1: the latest start and end in view, the rest folded
+    assert "const of=live.filter(r=>picWord(r)===role+' image')" in PAGE and "' earlier picture'" in PAGE   # T1: the latest start and end in view, the rest folded
 
 
 # ---------- T2: approving a start always makes its end, and says so ----------
