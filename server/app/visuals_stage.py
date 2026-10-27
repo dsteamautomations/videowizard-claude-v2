@@ -3187,7 +3187,7 @@ def take_jobs(conn, run, shot_id=None):
 def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing_notes, quote):
     session = session_of(store, run, outputs)
     quote = said(quote, 'Rejected' if decision == 'rejected' else 'Accepted', user)   # design/99 C3: a take's reason is optional
-    job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()
+    job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('video', 'drawn')", (job_id, run['id'])).fetchone()   # design/113 E3: a drawing is reviewed like a take
     need(job and job['status'] == 'ready', 'Review a ready take.')
     ev = job['result']['evidence']
     need(decision != 'accepted' or ev.get('timing_matches_placement') or (timing_notes or '').strip(), 'The take duration differs from the placement; explain in timing_notes before accepting.')
@@ -3208,7 +3208,7 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
          'Your words say reject: select places the take in the film. To reject a take, run `vw visuals review --job J --decision rejected --notes "…"`.')
     session = session_of(store, run, outputs)
     quote = said(quote, 'Selected', user)   # design/99 C2
-    job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()
+    job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('video', 'drawn')", (job_id, run['id'])).fetchone()   # design/113 E3: a drawing is reviewed like a take
     need(job and job['status'] == 'ready', 'Select a ready take.')
     _no_question(session, job['unit'])   # design/110 rule 0
     if str(notes or '').strip():
@@ -3218,10 +3218,15 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
                                                                  'decision': 'accepted', 'notes': notes, 'timing_notes': timing_notes or '', 'quote': quote, 'by': user['id'], 'sha256': job['result']['sha256']})
     reviews = session['reviews'].get(str(job_id), [])
     need(reviews and reviews[-1]['decision'] == 'accepted', 'Select only a take whose latest review is accepted.')
-    live = packet(store, run, outputs, job['unit'], session)
     prep = load_json(store, job['request']['request_key'])
-    need(live['preparation_digest'] == prep['base_preparation_digest'], 'The plan, references or generator changed since this take was prepared; prepare a current take.')
-    session['selections'][job['unit']] = {'job_id': str(job_id), 'review_id': reviews[-1]['id'], 'preparation_id': job['request']['preparation_id'], 'context_digest': live['preparation_digest'],
+    if prep.get('kind') == 'drawn':   # design/113 E3: a drawing stands on the plan it was rendered from
+        need(prep.get('plan_digest') == digest(current_plan(store, session)), 'The plan changed since this drawing was rendered; render it again (`vw visuals draw --shot S`).')
+        context = prep['plan_digest']
+    else:
+        live = packet(store, run, outputs, job['unit'], session)
+        need(live['preparation_digest'] == prep['base_preparation_digest'], 'The plan, references or generator changed since this take was prepared; prepare a current take.')
+        context = live['preparation_digest']
+    session['selections'][job['unit']] = {'job_id': str(job_id), 'review_id': reviews[-1]['id'], 'preparation_id': job['request']['preparation_id'], 'context_digest': context,
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id']}
     _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
     save_session(store, run, session)
@@ -3257,6 +3262,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     exact = Fraction(frames) / Fraction(str(fps))
     request = {'kind': 'drawn', 'shot_id': shot['id'], 'scene': shot['scene_drawn'], 'labels': drawn_labels(shot), 'width': W, 'height': H, 'fps': str(fps), 'frames': frames, 'cues': cues,
                'images': images, 'plan_digest': digest(plan), **({'font_key': session['font']['key']} if session.get('font') else {}),
+               'claims': shot.get('claims') or [], 'relationships': spec.get('relationships') or [], 'view': spec_view(shot)[0],   # design/113 E3: what the two-frame read asks
                'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
     identity = digest(request)
     key_ = key(run, f'takes/{identity}.drawn.json')

@@ -1353,7 +1353,7 @@ def _short_status(st, shot=None, gap=None):
 
 def _take_job(base, value):
     """design/81 T2: a shot id in place of the job id when the shot has exactly one ready take."""
-    mine = [j for j in (call('GET', base).get('jobs') or []) if j.get('unit') == value and j.get('provider') == 'video']
+    mine = [j for j in (call('GET', base).get('jobs') or []) if j.get('unit') == value and j.get('provider') in ('video', 'drawn')]   # design/113: a drawing is reviewed like a take
     if not mine:
         return value   # a job id
     ready = [j for j in mine if j.get('status') == 'ready' and j.get('verdict') != 'rejected']   # defect 30

@@ -199,6 +199,28 @@ def _model_take_check(snapshot, video_path, sha256, transport_factory):
     return record
 
 
+def drawn_lines_check(first_png, last_png, lines, prompt, transport_factory):
+    """design/113 E3 (SK's answer 3): one Gemini Flash read of a drawing's first and last frame against its claims, relationships and labels. Never raises."""
+    record = {'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
+    if not lines:
+        return record
+    try:
+        key = settings().GEMINI_API_KEY.get_secret_value().strip()
+        if not key:
+            record['error'] = 'no Gemini key on the server'
+            return record
+        transport = transport_factory(key, CHECK_MODEL, terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
+        received = transport.generate(build(last_png, [('first frame', first_png)], lines, 'A drawn graphic rendered by the server from a plan; Reference 1 is its first frame, the candidate its last. ' + str(prompt or '')))
+        body = received.get('body')
+        if not isinstance(body, dict):
+            body = json.loads(received.get('raw') or '{}')
+        got = read(body, lines)
+        record.update(lines=got['lines'], must_failed=got['must_failed'])
+    except Exception as exc:   # the check never blocks a drawing
+        record['error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
+    return record
+
+
 def lines_of(ref):
     """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
     own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]

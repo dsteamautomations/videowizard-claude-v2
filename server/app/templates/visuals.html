@@ -193,8 +193,8 @@ function autoStep(){const d=data;if(!d||d.state!=='prepared')return 'treatment';
   if(!d.plan_digest||d.gaps.some(g=>!g.accepted&&!g.recorded&&g.shots.length))return 'plan';
   const els=(d.elements||[]).filter(e=>e.kind!=='graphic');
   if(roundOpen()||els.some(e=>!(d.references||[]).some(r=>r.element_id===e.id&&r.kind==='sheet'&&r.status==='approved')))return 'references';
-  if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>s.route!=='video'&&!s.asset)))return 'pictures';
-  if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>s.route==='video'&&!s.takes.some(k=>k.selected))))return 'takes';
+  if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>!['video','drawn'].includes(s.route)&&!s.asset)))return 'pictures';
+  if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>['video','drawn'].includes(s.route)&&!s.takes.some(k=>k.selected))))return 'takes';
   return 'record';}
 function unsavedTicks(){return Object.values(picks).reduce((k,l)=>k+((l||[]).length),0);}   // design/99 C5
 window.addEventListener('beforeunload',ev=>{if(unsavedTicks()){ev.preventDefault();ev.returnValue='';}});
@@ -376,7 +376,7 @@ function noteBox(r){   // design/106 N4: a saved picture's note, editable until 
 function refsById(){const o={};(data.references||[]).forEach(r=>{o[r.id]=r;});return o;}
 function filmAt(s){return fmt(s.start_frame)+'–'+fmt(s.end_frame);}
 function isWaiting(id){return (data.waiting||[]).some(w=>w.item===id);}
-function typeOf(s){return s.route==='graphic_sequence'?'Graphics':s.route==='video'?'AI video':'Still';}   // design/97 W2
+function typeOf(s){return s.route==='graphic_sequence'?'Graphics':s.route==='video'?'AI video':s.route==='drawn'?'Drawn':'Still';}   // design/113   // design/97 W2
 function headOf(s){return esc(typeOf(s))+' · '+esc(s.shot_id)+(s.title?' · '+esc(s.title):'');}
 function picWord(r){const by=refsById();return r.role?r.role+' image':((r.parents||[]).some(p=>(by[p]||{}).kind==='keyframe')?'end image':'start image');}   // design/106 T1: the role, when said   // defect 28: two start candidates are not a start and an end
 function qBox(id){const q=(data.questions||{})[id];if(!q)return '';   // design/110 rule 0: an open question is a server state; nothing is made from the item until answered
@@ -429,7 +429,7 @@ function panel(){
   if(selPic.take){   // design/97 P2: a take is judged beside its player
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
     if(!k)return '<div class="empty">That take is gone.</div>';
-    return '<div class="ds"><b>Take · '+headOf(s).replace('AI video · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+checklist(k.checklist)+takeCheck(k.check)+
+    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+checklist(k.checklist)+takeCheck(k.check)+
       (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
   }
   const by=refsById(), r=by[selPic.ref];
@@ -585,14 +585,14 @@ function wireChips(){
 // ---------- pictures ----------
 function renderPictures(){
   const d=data, can=stage()==='visuals'&&!!d.treatment;
-  const gaps=d.gaps.filter(g=>g.accepted&&g.shots.some(s=>s.route!=='video'));
+  const gaps=d.gaps.filter(g=>g.accepted&&g.shots.some(s=>!['video','drawn'].includes(s.route)));
   if(!gaps.length){$('s-pictures').innerHTML='<div class="empty">No still or graphic shot in an accepted gap yet.</div>';return;}
   const shown=gaps.filter(g=>!gapFilter||g.gap_id===gapFilter);
   let h='<div class="tabs"><button data-g="" class="'+(gapFilter?'':'on')+'">All gaps</button>'+gaps.map(g=>'<button data-g="'+esc(g.gap_id)+'" class="'+(gapFilter===g.gap_id?'on':'')+'">'+esc(g.gap_id)+'</button>').join('')+'</div>';
   h+=styleCard()+specsBlock();
   shown.forEach(g=>{
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
-    g.shots.filter(s=>s.route!=='video').forEach(s=>{
+    g.shots.filter(s=>!['video','drawn'].includes(s.route)).forEach(s=>{
       let sh='<div class="card" id="card-'+esc(s.shot_id)+'"><span class="nm">'+headOf(s)+'</span> <span class="ds">'+secs(s.end_frame-s.start_frame)+' · '+filmAt(s)+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s);   // design/97 W2
       const pics=(d.references||[]).filter(r=>['keyframe','state'].includes(r.kind));
       const mine=pics.filter(r=>r.shot_id===s.shot_id);   // design/94 S1: only the pictures made for this shot
@@ -634,6 +634,13 @@ function shotState(s){   // design/86 K3: whose turn it is on this shot, and how
   const d=data, kf=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'&&r.status!=='rejected'&&r.status!=='failed');
   const ids=new Set(kf.map(r=>r.id)), isStart=r=>{if(r.role)return r.role==='start';return !(r.parents||[]).some(p=>ids.has(p));};   // design/106 T1
   const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected&&!takeRejected(k));
+  if(s.route==='drawn'){   // design/113 E3: a drawing has no start or end image; it is rendered, free, and judged here
+    if(s.takes.some(k=>k.selected))return ['ok','Drawing approved.'];
+    if(ready)return ['you','Your turn: watch the drawing and select it, or reject it with what to change.'];
+    if(open)return ['wait','Rendering the drawing, a few seconds. The page refreshes itself.'];
+    if(s.takes.some(takeRejected))return ['assistant','Rejected: the assistant revises the scene and renders again, free. Nothing to do here.'];
+    return ['assistant','Waiting for the assistant to render the drawing (vw visuals draw). Nothing to do here.'];
+  }
   if(s.takes.some(k=>k.selected))return ['ok','Take selected.'];
   if(s.asset&&s.asset.kind==='clip')return ['ok','Filled with a stretch of '+(s.asset.name||'a clip')+'.'];   // design/89 B3
   if(ready)return ['you','Your turn: watch the take and select it, or reject it with what is wrong.'];
@@ -652,14 +659,14 @@ function shotState(s){   // design/86 K3: whose turn it is on this shot, and how
 }
 function renderTakes(){
   const d=data, can=stage()==='visuals'&&!!d.treatment;
-  const gaps=d.gaps.filter(g=>g.accepted&&g.shots.some(s=>s.route==='video'));
-  if(!gaps.length){$('s-takes').innerHTML='<div class="empty">No video shot in an accepted gap yet.</div>';return;}
-  const states={};gaps.forEach(g=>g.shots.filter(s=>s.route==='video').forEach(s=>{states[s.shot_id]=shotState(s);}));
+  const gaps=d.gaps.filter(g=>g.accepted&&g.shots.some(s=>['video','drawn'].includes(s.route)));   // design/113: drawn graphics are reviewed here too
+  if(!gaps.length){$('s-takes').innerHTML='<div class="empty">No video or drawn shot in an accepted gap yet.</div>';return;}
+  const states={};gaps.forEach(g=>g.shots.filter(s=>['video','drawn'].includes(s.route)).forEach(s=>{states[s.shot_id]=shotState(s);}));
   const n=k=>Object.values(states).filter(x=>x[0]===k).length;
   let h='<div class="turn head"><b>'+n('you')+'</b> want your decision · <b>'+n('wait')+'</b> being made · <b>'+n('assistant')+'</b> wait for the assistant · <b>'+n('ok')+'</b> done</div>';
   gaps.forEach(g=>{
     h+='<h3>'+esc(g.gap_id)+(g.recorded?' <span class="badge ok">recorded</span>':'')+'</h3>';
-    g.shots.filter(s=>s.route==='video').forEach(s=>{
+    g.shots.filter(s=>['video','drawn'].includes(s.route)).forEach(s=>{
       const st=states[s.shot_id];
       let sh='<div class="card" id="card-'+esc(s.shot_id)+'"><span class="nm">'+headOf(s)+'</span> <span class="ds">'+filmAt(s)+' · '+secs(s.end_frame-s.start_frame)+(s.bound&&s.bound.length?' · bound':'')+(s.prepared?' · take prepared':'')+'</span><div class="ds">'+esc(s.purpose)+'</div>'+shotFacts(s)+
         '<div class="turn '+st[0]+'">'+esc(st[1])+'</div>';

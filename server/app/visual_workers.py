@@ -343,6 +343,9 @@ def process_drawn(job):
             durable(fp, store.get(request['font_key']))
             request = {**request, 'font': str(fp)}
         drawn.render(request, video_path, images)
+        first, last = drawn.frame_png(request, 0, images), drawn.frame_png(request, int(request['frames']) - 1, images)   # design/113 E3: the two frames the check reads
+        store.put(f"{job['run_id']}/visuals/drawn/{jid}-first.png", first, 'image/png')
+        store.put(f"{job['run_id']}/visuals/drawn/{jid}-last.png", last, 'image/png')
         data = video_path.read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         k = f"{job['run_id']}/visuals/drawn/{jid}.mp4"
@@ -353,21 +356,34 @@ def process_drawn(job):
         evidence.update(requested_duration_seconds=float(exact), placement=request['placement'], creative_approval=False, **timing_evidence(evidence['duration_seconds'], str(exact)))
         code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(evidence['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(evidence['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},
                 {'check': 'size', 'weight': 'must', 'pass': (evidence.get('width'), evidence.get('height')) == (int(request['width']), int(request['height'])), 'seen': f"{evidence.get('width')}x{evidence.get('height')}"}]
-        return 'ready', {'provider_id': 'drawn', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': code}, None, {'provider': 'drawn', 'seconds': float(exact), 'inr': 0}, None
+        return 'ready', {'provider_id': 'drawn', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': code,
+                         'first_png_key': f"{job['run_id']}/visuals/drawn/{jid}-first.png", 'last_png_key': f"{job['run_id']}/visuals/drawn/{jid}-last.png"}, None, {'provider': 'drawn', 'seconds': float(exact), 'inr': 0}, None
     except Exception as exc:   # a render that fails is reported, never retried blindly
         return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
 
 
 def check_drawn(job, result):
-    """design/113 E3: the rendered drawing's lines on the session like a take's: the code lines now; the model read of the first and last frame joins here."""
+    """design/113 E3: the rendered drawing's lines on the session like a take's: the code lines (frames, size), then one Gemini read of the first and
+    last frame against the shot's claims, the spec's relationships, every label and the view (SK's answer 3). Never raises; never holds the drawing back."""
+    from . import image_check
+    from .analysis_jobs import transport_factory
     store = storage()
     try:
+        request = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
+        texts = [l['text'] for l in request.get('labels') or []] + [s['text'] for s in request['scene'].get('shapes') or [] if s.get('kind') == 'text' and s.get('text')]
+        asks = ([{'check': 'claim: ' + c, 'pass_when': f'the drawing shows that {c}, plainly, without the narration', 'weight': 'must'} for c in request.get('claims') or []]
+                + [{'check': 'relationship: ' + r, 'pass_when': f'in the drawing, {r}', 'weight': 'must'} for r in request.get('relationships') or []]
+                + [{'check': 'label: ' + t, 'pass_when': f'the label reads exactly "{t}", spelled as written, readable', 'weight': 'must'} for t in texts]
+                + ([{'check': 'view: ' + request['view'], 'pass_when': f"the drawing is a {request['view']} view", 'weight': 'must'}] if request.get('view') else []))
+        first, last = store.get(result['first_png_key']), store.get(result['last_png_key'])
+        rec = image_check.drawn_lines_check(first, last, asks, f"{request.get('view') or ''} drawing of the shot {request.get('shot_id')}", transport_factory)
         with connect() as conn:
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             k = f"{job['run_id']}/visuals/session.json"
             session = json.loads(store.get(k).decode('utf-8'))
-            lines = [dict(c) for c in result.get('code') or []]
-            session.setdefault('take_checks', {})[str(job['id'])] = {'lines': lines, 'must_failed': [c for c in lines if c.get('pass') is False], 'model': None}
+            code = [dict(c) for c in result.get('code') or []]
+            session.setdefault('take_checks', {})[str(job['id'])] = {'lines': code + list(rec.get('lines') or []), 'must_failed': [c for c in code if c.get('pass') is False] + list(rec.get('must_failed') or []),
+                                                                  'model': rec.get('model'), **({'error': rec['error']} if rec.get('error') else {})}
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
     except Exception:   # a drawing is never held back by its check
         return
