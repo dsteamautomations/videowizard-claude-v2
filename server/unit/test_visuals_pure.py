@@ -36,7 +36,7 @@ def test_routes_count_video_stills_and_graphic_sequences_with_no_file_warning():
     assert not [w for w in warnings if w.get('kind') == 'route']
     r = VC.routes(result)
     assert r['video'] == 1 and r['still'] == 2 and r['graphic_sequence'] == 1
-    assert r['seconds'] == {'video': 4.0, 'still': 24.0, 'graphic_sequence': 12.0} and r['graphic_seconds'] == 16.0   # diagram 4 s + sequence 12 s
+    assert r['seconds'] == {'video': 4.0, 'still': 24.0, 'graphic_sequence': 12.0, 'drawn': 0.0} and r['graphic_seconds'] == 16.0   # diagram 4 s + sequence 12 s; design/113 adds the drawn route
     assert r['images_estimated'] == 1 + 3 + 1 + 1   # a start image (design/112 S1: no end unless exact), three states, a diagram, a picture
 
 

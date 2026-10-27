@@ -191,6 +191,146 @@ class Group(Model):   # design/111 F17: several of a kind in frame, all alike fo
 GROUP_WORDS = re.compile(r'\b(people|workers|labourers|villagers|onlookers|bystanders|crowd|men|women|children|boys|girls|cows|goats|chickens|dogs|animals)\b', re.I)
 
 
+Num = float | int
+
+
+class DrawnShape(Model):   # design/113 E1: a shape of a drawn graphic, plain data in the canvas's units
+    id: str = Field(min_length=1, max_length=40, pattern=r'^[A-Za-z0-9_-]+$')
+    kind: Literal['rect', 'line', 'arrow', 'circle', 'polygon', 'text', 'image', 'group', 'repeat']
+    x: Num | None = None
+    y: Num | None = None
+    w: Num | None = None
+    h: Num | None = None
+    x2: Num | None = None
+    y2: Num | None = None
+    r: Num | None = None
+    points: list[list[Num]] = Field(default_factory=list, max_length=200)
+    text: str = Field(default='', max_length=200)
+    size_pct: Num = 4            # text height as a share of the frame height
+    bold: bool = False
+    stroke: str = Field(default='', max_length=7)   # #RRGGBB
+    fill: str = Field(default='', max_length=7)
+    weight: Num = 2              # stroke width in px at the film's size
+    dim: str = Field(default='', max_length=200)    # the spec dimension this length draws ('leaf thickness')
+    members: list[str] = Field(default_factory=list, max_length=100)   # group
+    of: str = Field(default='', max_length=40)     # repeat: the shape repeated
+    count: int = 0
+    dx: Num = 0
+    dy: Num = 0
+    image_ref: str = Field(default='', max_length=100)   # image: an approved reference id
+
+
+class DrawnAction(Model):   # design/113 E1: keyed to a second of the shot or a word of its narration
+    kind: Literal['appear', 'build', 'move', 'highlight', 'fade']
+    ids: list[str] = Field(min_length=1, max_length=100)
+    at_s: Num | None = None
+    word: str = Field(default='', max_length=80)
+    every_s: Num = 0.5           # build: the gap between one shape and the next
+    path: list[list[Num]] = Field(default_factory=list, max_length=50)   # move
+    seconds: Num = 1             # move, highlight, fade
+
+
+class DrawnLabel(Model):   # design/113 answer 2: the planner may move a server-placed size label
+    dim: str = Field(min_length=1, max_length=200)
+    x: Num
+    y: Num
+
+
+class DrawnScene(Model):   # design/113 E1: the declarative scene; never code
+    unit: Literal['mm', 'cm', 'm', '%']
+    width: Num = Field(gt=0)
+    height: Num = Field(gt=0)
+    background: str = Field(default='#FFFFFF', max_length=7)
+    shapes: list[DrawnShape] = Field(min_length=1, max_length=300)
+    actions: list[DrawnAction] = Field(default_factory=list, max_length=100)
+    labels: list[DrawnLabel] = Field(default_factory=list, max_length=60)
+
+
+DRAWN_TEXT_MIN_PCT, DRAWN_SAFE = 4, 0.05   # design/91 N13's label minimum; the safe area is the inner 90 % of the canvas
+HEX = re.compile(r'^#[0-9A-Fa-f]{6}$')
+NEEDS = {'rect': ('x', 'y', 'w', 'h'), 'image': ('x', 'y', 'w', 'h'), 'text': ('x', 'y'), 'line': ('x', 'y', 'x2', 'y2'), 'arrow': ('x', 'y', 'x2', 'y2'), 'circle': ('x', 'y', 'r')}
+
+
+def _dim_key(d):
+    return f'{d.part} {d.measure}'.strip().lower() if hasattr(d, 'part') else f"{d.get('part', '')} {d.get('measure', '')}".strip().lower()
+
+
+def drawn_needs(shot, seconds):
+    """design/113 E1, E5: the scene is complete and drawable: ids once, the geometry each kind needs, colours as #RRGGBB, text readable and inside the
+    safe area, every dim a dimension of the spec, no figure for an unknown size, every action keyed and naming shapes."""
+    label = f'shot {shot.id}'
+    need(shot.scene_drawn is not None, f'{label}: {shot.id} is drawn: give scene_drawn (the canvas, the shapes in real units, the actions) (design/113 E1).')
+    need(shot.drawing_spec is not None, f'{label}: {shot.id} is drawn: it needs a drawing_spec (the sourced sizes, design/89 D) approved on the References step; its units are the scene\'s (design/113 E5).')
+    sc, spec = shot.scene_drawn, shot.drawing_spec
+    ids = {}
+    for s in sc.shapes:
+        need(s.id not in ids, f"{label}: shape id '{s.id}' twice.")
+        ids[s.id] = s
+        missing = [k for k in NEEDS.get(s.kind, ()) if getattr(s, k) is None]
+        need(not missing, f"{label}: shape '{s.id}' ({s.kind}) needs {', '.join(NEEDS[s.kind])}.")
+        need(s.kind != 'polygon' or len(s.points) >= 3, f"{label}: shape '{s.id}' (polygon) needs three points or more.")
+        need(s.kind != 'text' or s.text.strip(), f"{label}: shape '{s.id}' (text) needs its text.")
+        need(s.kind != 'repeat' or (s.count >= 2 and s.of), f"{label}: shape '{s.id}' (repeat) needs of (a shape) and count (2 or more).")
+        for c in (s.stroke, s.fill, sc.background):
+            need(not c or HEX.match(c), f"{label}: colour '{c}' on '{s.id}': give #RRGGBB.")
+        if s.kind == 'text':
+            need(s.size_pct >= DRAWN_TEXT_MIN_PCT, f"{label}: text '{s.id}' is {s.size_pct} % of the frame height: at least {DRAWN_TEXT_MIN_PCT} % (design/91 N13).")
+            need(DRAWN_SAFE * sc.width <= s.x <= (1 - DRAWN_SAFE) * sc.width and DRAWN_SAFE * sc.height <= s.y <= (1 - DRAWN_SAFE) * sc.height,
+                 f"{label}: text '{s.id}' sits outside the safe area (the inner 90 % of the canvas).")
+    for s in sc.shapes:
+        for ref in list(s.members) + ([s.of] if s.of else []):
+            need(ref in ids, f"{label}: '{s.id}' names '{ref}', which is not a shape.")
+        if s.dim:
+            need(s.dim.strip().lower() in {_dim_key(d) for d in spec.dimensions}, f"{label}: '{s.id}': dim '{s.dim}' is not a dimension of the spec ({', '.join(_dim_key(d) for d in spec.dimensions)}).")
+    for d in spec.dimensions:   # design/106 D6: an unknown size never shows a figure
+        if d.status == 'unknown':
+            for s in sc.shapes:
+                need(not (s.kind == 'text' and d.part.lower() in s.text.lower() and re.search(r'\d', s.text)),
+                     f"{label}: text '{s.id}' gives a figure for the {_dim_key(d)}; {_dim_key(d)} is unknown: no figure, the drawing carries the illustrative label (design/106 D6).")
+    known = {_dim_key(d) for d in spec.dimensions if d.status != 'unknown' and d.value is not None}
+    for lb in sc.labels:
+        need(lb.dim.strip().lower() in known, f'{label}: labels names {lb.dim}, which is unknown or not a dimension of the spec; the server labels the known sizes only.')
+    words = ' '.join(_tokens(shot.narration))
+    for n, a in enumerate(sc.actions, 1):
+        for ref in a.ids:
+            need(ref in ids, f"{label}: action {n} names '{ref}', which is not a shape.")
+        need((a.at_s is not None) != bool(a.word.strip()), f'{label}: action {n}: give at_s or word, one of the two.')
+        if a.at_s is not None and seconds is not None:
+            need(0 <= a.at_s <= seconds + 0.04, f'{label}: action {n} is at {float(a.at_s):.1f} s, past the end of {shot.id} ({seconds:.1f} s).')
+        if a.word.strip():
+            need(' '.join(_tokens(a.word)) in words, f"{label}: action {n}: the word '{a.word}' is not in the narration of {shot.id}.")
+        need(a.kind != 'move' or len(a.path) >= 2, f'{label}: action {n}: move needs a path of two points or more.')
+        need(a.kind != 'build' or len(a.ids) >= 1, f'{label}: action {n}: build names the shapes in order.')
+
+
+def drawn_labels(shot):
+    """design/113 answer 2: the spec's known sizes as text shapes beside their parts: a planner-moved position when given, else just right of the shape
+    that draws the dimension (with a leader to it), else stacked at the left margin. Never dropped."""
+    sc, spec = shot.get('scene_drawn') or {}, shot.get('drawing_spec') or {}
+    if not sc or not spec:
+        return []
+    moved = {l['dim'].strip().lower(): l for l in sc.get('labels') or []}
+    by_dim = {s['dim'].strip().lower(): s for s in sc.get('shapes') or [] if s.get('dim')}
+    out, i = [], 0
+    for d in spec.get('dimensions') or []:
+        if d.get('status') == 'unknown' or d.get('value') is None:
+            continue
+        i += 1
+        k = _dim_key(d)
+        text = f"{k} {d['value']:g} {d.get('unit') or ''}".strip()
+        label = {'id': f'label-{i}', 'kind': 'text', 'text': text, 'size_pct': DRAWN_TEXT_MIN_PCT, 'stroke': '#222222', 'bold': False}
+        if k in moved:
+            label.update(x=moved[k]['x'], y=moved[k]['y'])
+        elif k in by_dim:
+            s = by_dim[k]
+            right, top = (s.get('x') or 0) + (s.get('w') or 0), s.get('y') or 0
+            label.update(x=right + 0.02 * sc['width'], y=top, leader=[right, top])
+        else:
+            label.update(x=0.02 * sc['width'], y=(0.05 + 0.06 * (i - 1)) * sc['height'])
+        out.append(label)
+    return out
+
+
 class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
     claim: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=1000)
@@ -201,7 +341,7 @@ class Shot(Model):
     id: str = Field(min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
     start_frame: int = Field(ge=0)
     end_frame: int = Field(gt=0)
-    visual_type: Literal['image', 'video', 'diagram', 'animation']
+    visual_type: Literal['image', 'video', 'diagram', 'animation', 'drawn']   # design/113: drawn, a graphic the server renders from a declarative scene
     graphic_kind: Literal['diagram', 'chart', 'map', 'title', 'text'] = 'diagram'   # design/96 J2: what a graphic is checked for; leader lines only on a diagram
     narration: str = Field(max_length=12000)
     purpose: str = Field(min_length=1, max_length=4000)
@@ -221,6 +361,7 @@ class Shot(Model):
     motion: Literal['push_in', 'push_out', 'pan_left', 'pan_right', 'none'] = 'push_in'   # design/89 B2: a still or a graphic moves 5 % across its shot
     motion_reason: str = Field(default='', max_length=1000)   # why a still stays frozen (`none`)
     carries_text: bool = False   # design/112 K2, K4: the still shows words (a label, a title, a caption): push_in only, placed whole, never cropped or panned
+    scene_drawn: DrawnScene | None = None   # design/113 E1
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
@@ -399,14 +540,14 @@ def _default_generator():
 
 
 def route_of(shot):
-    return 'video' if shot['visual_type'] == 'video' else 'graphic_sequence' if shot['visual_type'] == 'animation' else 'still'
+    return 'video' if shot['visual_type'] == 'video' else 'graphic_sequence' if shot['visual_type'] == 'animation' else 'drawn' if shot['visual_type'] == 'drawn' else 'still'   # design/113
 
 
 def routes(plan, fps=25):
     """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
     graphics, and the images the plan will need: a start image per video shot and an end only where the shot's final state must be exact (design/112 S1),
     a start-only shot after an exact end starting on that end; one picture per still, one per state of a sequence."""
-    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0,
+    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'drawn': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0, 'drawn': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0,
            'still_moving': 0, 'still_frozen': 0}   # design/112 K3
     for gap in plan.get('gaps', []):
         scenes = gap.get('scenes') or []
@@ -420,7 +561,7 @@ def routes(plan, fps=25):
                 seconds = (shot['end_frame'] - shot['start_frame']) / float(fps)
                 out[kind] += 1
                 out['seconds'][kind] = round(out['seconds'][kind] + seconds, 2)
-                if shot['visual_type'] in GRAPHIC_TYPES:
+                if shot['visual_type'] in GRAPHIC_TYPES + ('drawn',):
                     out['graphic_seconds'] = round(out['graphic_seconds'] + seconds, 2)
                 if kind == 'video':
                     out['images_estimated'] += (0 if prev_exact else 1) + (1 if shot.get('end_state_exact') else 0)   # design/112 S1
@@ -429,6 +570,8 @@ def routes(plan, fps=25):
                     prev_exact = False
                     if kind == 'still':   # design/112 K3
                         out['still_frozen' if (shot.get('motion') or 'push_in') == 'none' else 'still_moving'] += 1
+                    if kind == 'drawn':   # design/113: rendered, no picture
+                        out['images_estimated'] -= 1
                     out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
     return out
 
@@ -539,7 +682,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     need(ekind.get(pid) == 'person', f'scene {scene.id}: outfit names {pid}, which is not a person element (design/111 F16).')
                 for pid in {eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'place'}:   # design/111 F18
                     place_marks.setdefault(pid, set()).update(landmarks)
-                if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES for s in scene.shots):   # design/91 N4: life in the frame
+                if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES + ('drawn',) for s in scene.shots):   # design/91 N4: life in the frame
                     if not scene.activity_level:
                         warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
                                          'from the narration and the brief'})
@@ -577,7 +720,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             need(abs(total - seconds) <= 0.2, f"shot {shot.id}: the states' holds add up to {total:.1f} s; the shot is {seconds:.1f} s.")
                     else:
                         need(not shot.states, f'states belong to an animation shot (shot {shot.id} is a {shot.visual_type}).')
-                    if seconds is not None and shot.visual_type in GRAPHIC_TYPES and seconds < MIN_GRAPHIC_S:
+                    if shot.visual_type == 'drawn':   # design/113 E1, E5
+                        drawn_needs(shot, seconds)
+                    if seconds is not None and shot.visual_type in GRAPHIC_TYPES + ('drawn',) and seconds < MIN_GRAPHIC_S:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
                     if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
                         need(shot.visual_type not in GRAPHIC_TYPES or shot.motion in ('push_in', 'none'), f'shot {shot.id}: a graphic moves closer only (push_in) or not at all, so its labels never slide out of frame.')
@@ -608,7 +753,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if any(ekind.get(e) in ('material', 'process') for e in shot.element_ids) and not rests_on:
                         warnings.append({'shot_id': shot.id, 'kind': 'facts_missing', 'message': f'shot {shot.id} shows a material or a process: give the facts it rests on (visual_facts, '
                                          'fact_ids): how it looks and is done, with the source'})
-                    if shot.visual_type not in GRAPHIC_TYPES and shot.narration.strip():   # design/91 N8, N17
+                    if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and shot.narration.strip():   # design/91 N8, N17
                         if not shot.claims and not shot.claims_left_out and not shot.descriptors:
                             warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims and the descriptive words spoken over it (claims, '
                                              'descriptors); the picture never shows their opposite' + NEXT_RELEASE})
@@ -618,7 +763,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if (re.match(r'\s*(then|next|after (that|this)|once)\b', shot.narration, re.I) or re.search(r'\bon top of\b', shot.narration, re.I)) and not shot.carries_over:
                         warnings.append({'shot_id': shot.id, 'kind': 'carries_over_missing', 'message': f'shot {shot.id} is the next step of a process: name what the step before left that '
                                          'must still be visible (carries_over)'})   # design/91 N14
-                    if shot.visual_type in GRAPHIC_TYPES:   # design/89 C1, D1, D3
+                    if shot.visual_type in GRAPHIC_TYPES + ('drawn',):   # design/89 C1, D1, D3; design/113: a drawn shot too
                         if not shot.depicts.strip():   # design/91 N10
                             warnings.append({'shot_id': shot.id, 'kind': 'depicts_missing', 'message': f'shot {shot.id}: say what the graphic depicts (depicts), in the subject\'s own form, '
                                              'or an alternative labelled as the contrast; the operator approves it with the treatment' + NEXT_RELEASE})

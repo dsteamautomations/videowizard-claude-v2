@@ -31,7 +31,7 @@ from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TY
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
 REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state', 'style')   # design/65: a state of a graphic sequence, generated from the previous state
-TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video')
+TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video', 'drawn')   # design/113
 DISSOLVE_S = 0.5   # between the states of a graphic sequence
 MAX_INPUTS = 16    # design/71 P2: GPT Image's limit on input pictures (the library's fact sheet A5)
 
@@ -633,11 +633,11 @@ def split_of(shots, fps):
     """design/97 G3: a gap's seconds and shots per route."""
     out = {}
     for sh in shots:
-        k = 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else ('still (frozen)' if (sh.get('motion') or 'push_in') == 'none' else 'still (moving)')   # design/112 K3
+        k = 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else 'drawn' if sh['visual_type'] == 'drawn' else ('still (frozen)' if (sh.get('motion') or 'push_in') == 'none' else 'still (moving)')   # design/112 K3; design/113
         row = out.setdefault(k, {'route': k, 'seconds': 0.0, 'shots': 0})
         row['seconds'] = round(row['seconds'] + (sh['end_frame'] - sh['start_frame']) / float(fps), 1)
         row['shots'] += 1
-    return [out[k] for k in ('graphics', 'AI video', 'still (moving)', 'still (frozen)') if k in out]
+    return [out[k] for k in ('graphics', 'drawn', 'AI video', 'still (moving)', 'still (frozen)') if k in out]
 
 
 def _still_text(shot, ref):
