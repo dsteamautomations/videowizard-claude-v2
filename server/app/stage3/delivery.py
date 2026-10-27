@@ -11,7 +11,7 @@ from fractions import Fraction
 from .. import core, jobs
 from ..errors import Problem
 from ..stage2 import stage as S2
-from . import CONTRACT_BUNDLE
+from . import CONTRACT_BUNDLE, timeline as TL
 from .assembly import key, session_of, save_session, fail
 
 FINAL_WORDS = {'watched': ('watch',), 'listened': ('listen',), 'subtitles read': ('srt', 'subtitle'), 'timeline verified': ('drt', 'timeline'), 'package complete': ('package', 'bundle')}
@@ -210,7 +210,7 @@ def bundle(conn, store, user, run, outputs):
     files = [{'role': 'approved_film', 'name': 'Approved-film.mp4', **{k: film[k] for k in ('key', 'sha256', 'bytes')}}]
     for f in voice_o['files']:
         if f['name'] in ('narration.mp3', 'timing.json'):
-            files.append({'role': 'narration', 'name': 'Audio/' + f['name'], **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
+            files.append({'role': 'narration', 'name': layout('narration', f['name']), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
     used_clips = {}
     for ev in assembly['events']:
         if ev['kind'] == 'event':
@@ -219,10 +219,11 @@ def bundle(conn, store, user, run, outputs):
     clips = {c['id']: c for c in media_o['summary']['clips']}
     for cid, name in used_clips.items():
         c = clips[cid]
-        files.append({'role': 'original', 'name': 'Media/Originals/' + name, 'key': f"{run['id']}/media/{name}", 'sha256': c['sha256'], 'bytes': c['bytes']})
+        files.append({'role': 'original', 'name': layout('original', name), 'key': f"{run['id']}/media/{name}", 'sha256': c['sha256'], 'bytes': c['bytes']})
+    fills = {(ev.get('file') or {}).get('name') for ev in assembly['events'] if ev['kind'] == 'fill'}
     for f in asm_o['files']:
         if f['name'].startswith('normalised/'):
-            files.append({'role': 'normalised', 'name': 'Media/Normalised/' + f['name'].split('/', 1)[1], **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
+            files.append({'role': 'normalised', 'name': layout('normalised', f['name'].split('/', 1)[1], fills), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
     for o, name in ((master_o, f"master-v{master_o['summary']['version']}.json"), (asm_o, f"assembly-v{asm_o['summary']['version']}.json")):
         f = next(x for x in o['files'] if x['name'] == name)
         files.append({'role': 'plan', 'name': 'Plans/' + name, **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
@@ -245,24 +246,31 @@ def bundle(conn, store, user, run, outputs):
     checklist = checklist + [{'section': 'editor', 'kind': r['kind'], 'rule': r['rule'], 'where': r['where'], 'shot': r['shot'], 'item': r['line']} for r in table]
     csv_text = media_pool_csv(pk).encode('utf-8')
     open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots)).encode('utf-8')
-    generated = {'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
+    events = resolve_events(assembly, pk, master)
+    pieces = [{'file': layout('narration', 'narration.mp3'), 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
+              for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': assembly['duration_frames'], 'timeline_start_frame': 0}])]
+    used = [e['clip_id'] for e in events if e.get('clip_id')]
+    cuts_per_clip = {cid: used.count(cid) for cid in set(used)}
+    timeline_files = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, asm_o['summary'].get('finishing') or [], assembly.get('sfx_cues') or [], assembly['duration_frames']).encode('utf-8'), 'application/xml'),
+                      f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
+                      'Relink-list.csv': (TL.relink_csv(media_o['summary']['clips'], set(used), cuts_per_clip).encode('utf-8'), 'text/csv')}   # design/107 slice 1
+    generated = {**timeline_files, 'Subtitles.srt': (srt, 'text/plain'), 'Finishing-checklist.md': (md.encode('utf-8'), 'text/markdown'), 'Finishing-checklist.json': (json.dumps(checklist, ensure_ascii=False, indent=1).encode('utf-8'), 'application/json'),
                  'Media-pool.csv': (csv_text, 'text/csv'), 'OPEN-EDIT.md': (open_edit, 'text/markdown'),
                  **({'AI-shots.md': (ai_shots_md(shots).encode('utf-8'), 'text/markdown')} if shots else {})}   # design/105 E-c
     for name, (data, mime) in generated.items():
         k = key(run, 'delivery/' + name)
         store.put(k, data, mime)
-        files.append({'role': 'generated', 'name': name, 'key': k, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)})
+        files.append({'role': 'generated', 'name': layout('generated', name), 'key': k, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)})
     manifest = {'contract': CONTRACT_BUNDLE, 'run': run['code'], 'client': run.get('client'), 'created_at': datetime.now(timezone.utc).isoformat(), 'film_sha256': film['sha256'],
-                'assembly_digest': asm_o['summary']['assembly_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': resolve_events(assembly, pk, master),
-                'narration_pieces': [{'file': 'Audio/narration.mp3', 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
-                                     for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': assembly['duration_frames'], 'timeline_start_frame': 0}])]}
+                'assembly_digest': asm_o['summary']['assembly_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': events, 'narration_pieces': pieces,
+                'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': assembly['duration_frames'], 'cuts': len(events)}   # design/107: what Step D checks against
     mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
     session['bundle'] = {'manifest': mk, 'film_sha256': film['sha256'], 'files': len(files), 'bytes': sum(f['bytes'] for f in files)}
     session['resolve'] = None if (session.get('resolve') or {}).get('film_sha256') != film['sha256'] else session['resolve']
     save_session(store, run, session)
-    return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the Mac: `vw pull <code>` then `vw delivery resolve --check`, then `--run --authorization "<operator words>"`'}
+    return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the operator\'s computer (Windows or Mac): `vw pull <code>` then `vw delivery resolve --check`, then `--run --authorization "<operator words>"`'}
 
 
 NAMES = {'youtube': 'YouTube', 'tiktok': 'TikTok', 'linkedin': 'LinkedIn', 'twitter': 'X'}
@@ -300,13 +308,25 @@ def brand_lines(card, fetched):
 
 
 def open_edit_text(run, card=None, differences=None, ai=False):
-    """OPEN-EDIT.md (design/47 12.3: the subtitles are one cue per sentence since design/19; design/50: the brand section and the recorded differences)."""
-    text = (f"# OPEN-EDIT\n\nRun {run['code']} — client {run.get('client')}.\n\n1. Open Approved-timeline.drt in DaVinci Resolve 21.1.1 (File > Import > Timeline) with Media/ next to it.\n"
-            "2. Approved-film.mp4 is the film the operator approved; the timeline reproduces its cuts, crops and zooms. A2 fades are listed in the checklist.\n"
-            "3. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do.\n"
-            "4. The finishing checklist ends with the Editor's table: suggestions from the film's data, one line each; nothing in it is applied.\n")
+    """OPEN-EDIT.md (design/107: a timeline file any Resolve imports, then relink to the originals; design/105: the Editor's table and the AI-shot list;
+    design/50: the brand section and the recorded differences). On the operator's computer, Windows or Mac."""
+    code = run['code']
+    text = (f"# OPEN-EDIT\n\nRun {code} — client {run.get('client')}.\n\nThis folder is the whole edit. It opens on the operator's computer, Windows or Mac, in DaVinci Resolve, free or Studio.\n\n"
+            "## Open the edit\n\n"
+            "1. Open DaVinci Resolve and make a new project.\n"
+            f"2. File > Import > Timeline, and pick `Timeline/{code}.fcpxml`. Every cut lands at its frame, with the voiceover on A1 and the nat sound on A2; A3 and A4 are yours.\n"
+            "3. Approved-film.mp4 is the film the operator approved; the timeline reproduces its cuts, crops and zooms. The track named REFERENCE – approved film holds it, switched off: turn it on to compare any moment.\n"
+            f"4. `Timeline/{code}.edl` is the same cut list as plain text, a second way in if an import ever fails.\n"
+            "5. Subtitles.srt has one cue per narrated sentence, shifted by the approved pauses. Finishing-checklist.md lists everything the API could not do, and ends with the Editor's table: suggestions from the film's data, one line each; nothing in it is applied.\n")
     if ai:   # design/105 E-c
-        text += "5. AI-shots.md lists every AI shot with its timecode: tick the platform's AI-generated or altered-content option when uploading.\n"
+        text += "6. AI-shots.md lists every AI shot with its timecode: tick the platform's AI-generated or altered-content option when uploading.\n"
+    text += ("\n## Relink to the full-quality originals\n\n"
+             "Media/Camera/ holds the camera files as they were uploaded, which may be compressed copies. Media/AI/ and Media/Voiceover/ are made by VideoWizard and never need relinking.\n\n"
+             "1. In the Media Pool, select the camera clips, right-click, Relink, and pick the folder that holds the originals. Resolve matches by file name and timecode; every cut moves to the original.\n"
+             "2. Relink-list.csv has one line per camera file: name, length, frame rate, size and timecode, so a renamed original can be found. When the originals' names differ, import the relinked timeline the relink check writes instead.\n"
+             "3. Turn on the REFERENCE track and spot-check a few cuts against the approved film.\n"
+             "4. In Project Settings, set \"Mismatched resolution files\" to \"Scale entire image to fit\", so zoom and position stay right on the larger originals.\n"
+             "\nOn Resolve Studio the plugin can do the import itself and export the project (.drp) and the timeline (.drt) into Timeline/.\n")
     if card:
         text += '\n## Brand\n\nFrom the client directory, for the end card and the graphics (Graphics/ holds the logo files when the directory had them): see the Brand lines of the checklist.\n'
     if differences:
@@ -345,6 +365,19 @@ def fetch_brand_files(conn, store, run, card):
     return {'files': files, 'skipped': skipped}
 
 
+def layout(role, name, fills=None):
+    """design/107 §4: the fixed layout of the bundle, every run."""
+    if role == 'original':
+        return 'Media/Camera/' + name
+    if role == 'normalised':
+        return ('Media/AI/' if name in (fills or set()) else 'Media/Camera/Stabilised/') + name
+    if role == 'narration':
+        return 'Media/Voiceover/' + name
+    if role == 'generated' and name.rsplit('.', 1)[-1] in ('fcpxml', 'edl', 'drp', 'drt'):
+        return 'Timeline/' + name
+    return name
+
+
 def resolve_events(assembly, pk, master):
     """What the Resolve timeline must contain: per event the file, source in/out, record in/out, zoom/pan/tilt/rotation, marker, colour group."""
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
@@ -354,18 +387,19 @@ def resolve_events(assembly, pk, master):
             r = rows[ev['sub_clip_id']]
             crop = ev.get('crop') in ('solver', 'hands_only') and r.get('zoom')
             if ev.get('stabilize'):   # the stabilised render is the source; crop and zoom are already applied in it
-                out.append({'file': f"Media/Normalised/{ev['sub_clip_id'].replace(':', '-')}-{ev['timeline_in_frame']}.mp4", 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'],
+                out.append({'file': layout('normalised', f"{ev['sub_clip_id'].replace(':', '-')}-{ev['timeline_in_frame']}.mp4"), 'kind': 'camera', 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'],
                             'record_in_frame': ev['timeline_in_frame'], 'record_out_frame': ev['timeline_out_frame'], 'source_fps': str(pk['timeline']['fps']), 'zoom': 1.0, 'pan': 0.0, 'tilt': 0.0,
                             'rotation': 0.0, 'color_group': r.get('color_group'), 'marker': {'name': ev['sub_clip_id'], 'note': f"option #{ev.get('approved_from_option')}, stabilised copy", 'colour': 'Blue'},
                             'a2': ev.get('a2_intervals') or [], 'stabilized': True})
                 continue
-            out.append({'file': 'Media/Originals/' + r['clip_name'], 'source_in_frame': ev['source_in_frame'], 'source_out_frame': ev['source_out_frame'],
+            out.append({'file': layout('original', r['clip_name']), 'kind': 'camera', 'clip_id': r['clip_id'], 'source_in_frame': ev['source_in_frame'], 'source_out_frame': ev['source_out_frame'],
                         'record_in_frame': ev['timeline_in_frame'], 'record_out_frame': ev['timeline_out_frame'], 'source_fps': r['source_fps'],
                         'zoom': r['zoom'] if crop else 1.0, 'pan': (r['position'] or [0, 0])[0] if crop else 0.0, 'tilt': (r['position'] or [0, 0])[1] if crop else 0.0,
                         'rotation': r.get('horizon_rotation_deg') or 0.0, 'color_group': r.get('color_group'), 'marker': {'name': ev['sub_clip_id'], 'note': f"option #{ev.get('approved_from_option')}", 'colour': 'Blue'},
                         'a2': ev.get('a2_intervals') or [], 'stabilized': False})
         else:
-            out.append({'file': 'Media/Normalised/' + ev['shot_id'] + '.mp4', 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'], 'record_in_frame': ev['timeline_in_frame'],
+            name = (ev.get('file') or {}).get('name') or ev['shot_id'] + '.mp4'   # design/107: the fill's real file (a still is a .png)
+            out.append({'file': layout('normalised', name, {name}), 'kind': 'still' if (ev.get('media') or {}).get('kind') == 'still' else 'movie', 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'], 'record_in_frame': ev['timeline_in_frame'],
                         'record_out_frame': ev['timeline_out_frame'], 'source_fps': str(pk['timeline']['fps']), 'zoom': 1.0, 'pan': 0.0, 'tilt': 0.0, 'rotation': 0.0, 'color_group': None,
                         'marker': {'name': ev['shot_id'], 'note': 'visuals fill', 'colour': 'Green'}, 'a2': [], 'stabilized': False})
     return out
