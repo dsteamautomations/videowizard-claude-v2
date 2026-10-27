@@ -53,7 +53,9 @@ def doc_with(*shots):
     d['elements'] += [{'id': 'TROWEL', 'name': 'Pointing trowel', 'kind': 'object', 'identity': 'exact', 'requirements': 'a steel trowel with a wooden handle'},
                       {'id': 'BRICK', 'name': 'Red brick', 'kind': 'object', 'identity': 'representative', 'requirements': 'a fired brick'},
                       {'id': 'COW', 'name': 'Cow', 'kind': 'animal', 'identity': 'representative', 'requirements': 'a village cow'}]
-    d['elements'][0].update(kind='person', name='Mason')
+    d['elements'][0].update(kind='person', name='Mason', description='a lean man of about forty, dark skin, short grey hair; a cotton shirt with the sleeves rolled, a lungi to the knee')   # design/111 F16
+    for sc in d['gaps'][0]['scenes']:
+        sc['outfit'] = {'E1': 'a faded blue shirt, a white lungi'}
     return d
 
 
@@ -122,12 +124,12 @@ def test_the_picture_lines_count_the_inventory_keep_the_tool_and_the_heading():
     d = doc_with(rich())
     scene, sh = d['gaps'][0]['scenes'][0], d['gaps'][0]['scenes'][0]['shots'][0]
     start = VS.picture_rule_lines(d, scene, sh, 'start')
-    assert [l['check'] for l in start] == ['inventory'] and 'Red brick × 2' in start[0]['pass_when'] and start[0]['weight'] == 'must'
+    assert [l['check'] for l in start] == ['person kept: Mason', 'inventory'] and 'Red brick × 2' in start[-1]['pass_when'] and start[-1]['weight'] == 'must'   # design/111 F16 adds the person line
     end = VS.picture_rule_lines(d, scene, sh, 'end')
     assert [l['check'] for l in end if l['check'] in ('inventory', 'same tool', 'heading kept')] == ['inventory', 'same tool', 'heading kept']
     by = {l['check']: l['pass_when'] for l in end}
     assert 'set down on the top course of the table, 2 bricks from it' in by['same tool'] and 'same landmark and shows the same side as in Image 1' in by['heading kept']
-    assert VS.picture_rule_lines(d, scene, {**sh, 'subjects': [], 'props': [], 'fixed': []}, 'end') == []
+    assert VS.picture_rule_lines(d, scene, {**sh, 'subjects': [], 'props': [], 'fixed': [], 'element_ids': []}, 'end') == []
 
 
 # ---------- the prompts get the block; the take gets its lines ----------

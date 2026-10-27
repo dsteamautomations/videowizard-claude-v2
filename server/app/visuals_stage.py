@@ -712,6 +712,18 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/111 F16: the person's two layers, the fixed description and the scene's colours ----------
+
+def person_lines(plan, scene, shot):
+    """One line per person in the shot: the fixed description, then this scene's garment colours."""
+    out = []
+    for e in plan.get('elements') or []:
+        if e['kind'] == 'person' and e['id'] in (shot.get('element_ids') or []) and (e.get('description') or '').strip():
+            colours = ((scene.get('outfit') or {}).get(e['id']) or '').strip().rstrip('.')
+            out.append(f"{e['name']}: {e['description'].strip().rstrip('.')}" + (f'; wearing in this scene: {colours}' if colours else '') + '.')
+    return out
+
+
 # ---------- design/111 F14, F15: techniques are elements; size as the message carries a number and a comparison ----------
 
 def technique_words(text):
@@ -937,13 +949,14 @@ def _not_this_add(store, session, plan, element_id, line):
     _keep_library(store, name, rec['lines'])
 
 
-def not_this_line(session, plan, element_id, shot=None):
-    """The constraint line for a prompt: the list minus the shot's named exceptions, which are said instead."""
-    rec = (session.get('not_this') or {}).get(element_id)
-    if not rec or not rec.get('lines'):
-        return ''
+def not_this_line(session, plan, element_id, shot=None, scene=None):
+    """The constraint line for a prompt: the list minus the shot's named exceptions, which are said instead; a person's garment negatives (design/111 F16)."""
+    rec = (session.get('not_this') or {}).get(element_id) or {}
+    colours = ((scene or {}).get('outfit') or {}).get(element_id, '').strip().rstrip('.')
     allows = [a.strip().lower() for a in (shot or {}).get('allows') or []]
-    kept = [l for l in rec['lines'] if not any(a and a in l.lower() for a in allows)]
+    kept = [l for l in rec.get('lines') or [] if not any(a and a in l.lower() for a in allows)] + ([f'garment colours other than {colours}'] if colours else [])
+    if not kept:
+        return ''
     name = next((e['name'] for e in (plan or {}).get('elements') or [] if e['id'] == element_id), element_id)
     return f"Not this ({name}): " + '; '.join(kept) + '.' + (f" Except in this shot: {'; '.join((shot or {}).get('allows') or [])}." if allows else '')
 
@@ -1134,7 +1147,7 @@ def heading_lines(scene, shot, when, names=None):
 def composed_block(plan, scene, shot, when):
     """What the server writes under the writer's prompt of a start or an end picture: the targets (F1, F3), the headings (F6), the tools (F5), the inventory (F4)."""
     lines = ((start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + gaze_lines(plan, scene, shot, when) + heading_lines(scene, shot, when, _names(plan))
-             + ([size_line(plan, shot)] if size_line(plan, shot) else [])   # design/111 F15
+             + ([size_line(plan, shot)] if size_line(plan, shot) else []) + person_lines(plan, scene, shot)   # design/111 F15, F16
              + tool_lines(plan, scene, shot, when) + (([fixed_line(scene, shot)] if fixed_line(scene, shot) else []) + sits_lines(plan, scene, shot) if when == 'end' else []))   # design/111 F7, F8, F9
     inv = inventory_line(plan, scene, shot, when)
     return '\n'.join(lines + ([inv] if inv else []))
@@ -1151,6 +1164,8 @@ def picture_rule_lines(plan, scene, shot, when):
     names = _names(plan)
     marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
     out = []
+    for pl_ in person_lines(plan, scene, shot):   # design/111 F16: both layers are checked
+        out.append({'check': 'person kept: ' + pl_.split(':')[0], 'weight': 'must', 'pass_when': pl_.rstrip('.') + '; no other garment colours, no other build, hair or skin'})
     if size_line(plan, shot):   # design/111 F15: the true-sizes question is a must when size is the message
         out.append({'check': 'size is the point', 'weight': 'must', 'pass_when': size_line(plan, shot)[len('Size is the point: '):].rstrip('.')})
     inv = inventory_line(plan, scene, shot, when)
@@ -1950,7 +1965,7 @@ def generate_image(conn, store, user, run, outputs, body):
         lines = lines + [l for l in exact_text_lines(answer, {lm['id']: lm['description'] for lm in (found[2].get('landmarks') if found else []) or []}) if l['check'] not in {x['check'] for x in lines}]
         body = {**body, 'prompt': with_composed(body['prompt'], exact_text_block(answer))}
     for eid in [body['element_id']] + [x for x in (named or {}).get('element_ids') or [] if x != body['element_id']]:   # design/111 F12: 'none of these', in every prompt that shows the element
-        nl = not_this_line(session, plan, eid, named)
+        nl = not_this_line(session, plan, eid, named, found[2] if found else None)
         if nl:
             body = {**body, 'prompt': with_composed(body['prompt'], nl)}
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
@@ -2888,6 +2903,7 @@ def prepare_take(store, user, run, outputs, body):
               **({'ambient': base['preparation']['scene']['ambient']} if base['preparation']['scene'].get('ambient') else {}),
               **({'tool_lines': tool_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if shot.get('props') else {}),   # design/110 F5: the whole plan, for the tool's name
               **({'heading_lines': heading_lines(base['preparation']['scene'], shot, 'motion')} if heading_lines(base['preparation']['scene'], shot, 'motion') else {}),   # design/110 F6
+              **({'person_lines': person_lines(plan_full, base['preparation']['scene'], shot)} if person_lines(plan_full, base['preparation']['scene'], shot) else {}),   # design/111 F16
               **({'gaze_lines': gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion') else {}),   # design/111 F7
               **({'fixed_line': fixed_line(base['preparation']['scene'], shot)} if fixed_line(base['preparation']['scene'], shot) else {}),   # design/111 F8
               **({'light': base['preparation']['scene']['light']} if base['preparation']['scene'].get('light') else {})}   # design/103 A1   # design/101 M3, M4: the take text and the take check read it

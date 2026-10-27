@@ -46,6 +46,7 @@ class Element(Model):
     size: list['Dimension'] = Field(default_factory=list, max_length=20)   # design/103 A5: real size, each with its source and status, never invented
     repeating: bool = False   # design/111 F10: built from repeated units (bricks, tiles, blocks, planks, pavers); a kind 'material' always is
     material_spec: 'MaterialSpec | None' = None   # design/111 F10
+    description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (build, age, skin, hair, posture, garment types and how worn), in every prompt
 
 
 class Position(Model):
@@ -242,6 +243,8 @@ class Scene(Model):
     ambient: str = Field(default='', max_length=1000)   # design/101 M1: what moves around the action in a take, or 'still'
     light: str = Field(default='', max_length=1000)   # design/103 A1: the sources against the landmarks, the main one, hard or soft, colour, strength
     air: str = Field(default='', max_length=500)   # design/103 A2: what hangs in the air, lit by that light, or 'clean'
+    outfit: dict[str, str] = Field(default_factory=dict)   # design/111 F16: person element id -> the garment colours of this scene
+    time_jump: str = Field(default='', max_length=500)   # design/111 F16: the script's words when the colours change from the scene before
 
 
 class SourceCandidate(Model):
@@ -459,6 +462,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     frozen, starts, returns = 0.0, {}, []   # design/89 B4, H7
     said = []   # design/91 N11: the counted shots, for the repeated messages
     graphic_seen = False   # design/89 C2
+    last_outfit = {}   # design/111 F16: the colours each person wore last, in film order
     for gap in plan.gaps:
         need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
         window = source_gaps[gap.gap_id]
@@ -479,6 +483,14 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                 need(scene.id not in scene_ids, 'Duplicate scene identity.')
                 scene_ids.add(scene.id)
                 landmarks = unique(scene.landmarks, 'id', 'landmark')
+                for pid in sorted({eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'person'}):   # design/111 F16: the fixed layer and this scene's colours
+                    need(next(e.description.strip() for e in plan.elements if e.id == pid), f'{pid} is a person: give description (build, age, skin, hair, posture, garment types and how worn), the fixed layer every prompt carries (design/111 F16).')
+                    need((scene.outfit.get(pid) or '').strip(), f'scene {scene.id} shows {pid}: give outfit[{pid}], the garment colours of this scene (design/111 F16).')
+                    if pid in last_outfit and last_outfit[pid].strip().lower() != scene.outfit[pid].strip().lower():
+                        need(scene.time_jump.strip(), f'scene {scene.id} changes the colours of {pid} ({last_outfit[pid]} -> {scene.outfit[pid]}): give time_jump, the script\'s words for the time that passed, or keep the colours (design/111 F16).')
+                    last_outfit[pid] = scene.outfit[pid]
+                for pid in scene.outfit:
+                    need(ekind.get(pid) == 'person', f'scene {scene.id}: outfit names {pid}, which is not a person element (design/111 F16).')
                 if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES for s in scene.shots):   # design/91 N4: life in the frame
                     if not scene.activity_level:
                         warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
