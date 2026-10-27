@@ -126,3 +126,20 @@ Plugin: `vw visuals ask` / `answer` / `supply` (unchanged) / `round undo` flags 
 - Live check (f3-live, 27 Oct): VW-7's own B07B_S2 prompt with the line gives the before-state picture and passes; without it the third brick is already on the bed and fails; the negative control fails; steady across two reads. Two earlier line wordings were not steady and were dropped.
 - Tests: `server/unit/test_design110_f3_pure.py` (6). Server unit suite: 516 passed. Plugin untouched.
 - Not covered: the model's reading is sampled on two shots, not benchmarked; the F1 `done` field (next) will tidy the start_targets grammar.
+
+## As built: F1 and F2
+
+- `Beat.done` (the action in the past tense) is required on every beat of a video shot; `Position.amount` and `unit` on every subject state's position of a video shot; a relation that is only "centre", "middle", "nearby", "closer", "further", "beside", "next to" is refused there. A still's subject keeps the old freedom. Old plans load; the rules fire when a video shot's plan is submitted again, and the revised plan needs its gaps accepted again (one "accept all").
+- `end_targets` opens each acting subject's line with "Because <subject> has <done>, <path>, from <start place> to <end place>, <result> is now in frame." (or "at <place>" when it did not move), then the end state with the measured place and "<n> <unit> from where it stood in Image 1" when both places are measured against the same landmark.
+- `library.check_prompt` refuses a sentence that places something at "centre", "middle", "nearby", "closer" or "further" with no digit, number word or visible unit in it.
+
+## As built: F4, F5, F6
+
+- Schema: `State.objects` (element, count, place), `Shot.props` (element, holder, start place, end: in_hand | set_down + position | carried_out + cause), `State.facing` is a `Heading` (landmark_id, edge, camera_side) on every video subject state (free words still load for a still's subject). The plan check: objects and places name the plan's elements and the scene's landmarks; a count that changes between a subject's start and end is named in `changes`; every held thing has a props entry with its holder a subject of the shot; set_down has a position, carried_out a cause; a heading names a scene landmark; a living thing that is not the actor ends a body-length or so from where it started (pose, holding and progress unchanged).
+- Composition (`inventory_line`, `tool_lines`, `heading_lines`, `composed_block`): the server writes under every start and end keyframe prompt of a video shot the targets (F3 start, F1 end), the headings ("it must not turn, reverse or show its other side", or "it turns, as the change says" for the subject whose change names a turn; a secondary living thing: "has moved at least one body-length toward … and turned a little"), the tool sentences and the inventory line, each line once (`with_composed`); the take's record carries `tool_lines` and `heading_lines` and `motion_text` writes them.
+- Checks: start keyframe gets "inventory"; end keyframe "inventory", "same tool" per prop, "heading kept"; the take check gets "tool kept" and "heading kept" when the record carries the lines.
+- Procedure: the plan-authoring step names the new fields and says the server writes the rules under the writer's prompt.
+- Live check (f3-live/f456-live-check-2026-10-27.md): the start block gives the before state; the end block fixed the helper's heading; GPT Image still drew a fourth brick on both ends and the inventory and same-tool lines caught it on both. Composed wording tidied after the run.
+- Tests: `test_design110_f1f2_pure.py` (3), `test_design110_f456_pure.py` (5); shared fixtures carry amount, unit, done and a heading. Server unit suite: 524 passed. Plugin: 310 passed, the 3 known Windows-only failures; no plugin code changed after rule 0.
+- Versions: server 0.59.0, plugin 0.51.0 (one deploy for the batch, on SK's word).
+- Not covered: Gemini's counting is sampled on one shot; the edits in the live check went without the identity sheets; the prompt cannot force a count, only the check refuses it.

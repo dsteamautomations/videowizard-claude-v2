@@ -717,7 +717,7 @@ def inventory_line(plan, scene, shot, when):
             items.append(f"{names.get(o['element_id'], o['element_id'])} \u00d7 {o['count']} {place_words(scene_marks, o.get('place'))}".strip())
         held = state.get('holding') or []
         if held:
-            items += [f"{names.get(h, h)} \u00d7 1 in {s['element_id']}'s hands" for h in held]
+            items += [f"{names.get(h, h)} \u00d7 {held.count(h)} in {s['element_id']}'s hands" for h in dict.fromkeys(held)]   # ['BRICK', 'BRICK'] counts two
         elif any((x.get('holding') for x in (s.get('start'), s.get('end')) if x)):
             holders.append(f"{s['element_id']} holds nothing")
     if not items and not holders:
@@ -740,8 +740,8 @@ def tool_lines(plan, scene, shot, when):
     out = []
     for p in shot.get('props') or []:
         name = names.get(p['element_id'], p['element_id'])
-        same = (f"The same {name}: it keeps its shape, size, colour and handle in every picture it appears in; {p['holder']} holds nothing else; no second tool appears; "
-                "the tool is fully inside the frame. ")
+        same = (f"The same {name}: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; {p['holder']} holds nothing else; no second one appears; "
+                "it is fully inside the frame. ")
         if when == 'start':
             out.append(same + f"At the start it is {place_words(marks, p.get('start'))}.")
         elif when == 'end':
@@ -751,11 +751,22 @@ def tool_lines(plan, scene, shot, when):
     return out
 
 
-def _turns(shot):
-    return any(re.search(r'\bturn', (ch.get('what') or ''), re.I) for ch in shot.get('changes') or [])
+def _side(h):
+    """'the left side', 'his back': the camera side with its own article."""
+    side = str(h.get('camera_side') or '').strip()
+    return side if re.match(r'(the|his|her|its|their)\b', side, re.I) else 'the ' + side
 
 
-def heading_lines(scene, shot, when):
+def _turns(shot, subject_id=None, name=''):
+    """A change of this shot that is a turn; of this subject when one is named (its id or name in the change's words)."""
+    for ch in shot.get('changes') or []:
+        what = (ch.get('what') or '').lower()
+        if re.search(r'\bturn', what) and (subject_id is None or subject_id.lower() in what or (name and name.lower() in what)):
+            return True
+    return False
+
+
+def heading_lines(scene, shot, when, names=None):
     """F6: each subject's heading against a landmark and a frame edge, the side toward the camera, kept unless the action is a turn; a living thing that
     is not the actor gets its own small change at the end."""
     marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
@@ -770,18 +781,18 @@ def heading_lines(scene, shot, when):
             if when in ('end', 'motion') and s.get('start', {}).get('position') != state.get('position'):
                 out.append(f"{s['element_id']} has moved at least one body-length toward {marks.get((state.get('position') or {}).get('landmark_id'), '')} and turned a little; it does not stand where it stood in the start.")
             else:
-                out.append(f"Heading of {s['element_id']}: front toward {lm} at the {h.get('edge')} edge; the {h.get('camera_side')} faces the camera.")
+                out.append(f"Heading of {s['element_id']}: front toward {lm} at the {h.get('edge')} edge; {_side(h)} faces the camera.")
             continue
-        if when in ('end', 'motion') and _turns(shot):
-            out.append(f"Heading of {s['element_id']}: it turns, as the change says; at the end its front is toward {lm} at the {h.get('edge')} edge; the {h.get('camera_side')} faces the camera.")
+        if when in ('end', 'motion') and _turns(shot, s['element_id'], (names or {}).get(s['element_id'], '')):
+            out.append(f"Heading of {s['element_id']}: it turns, as the change says; at the end its front is toward {lm} at the {h.get('edge')} edge; {_side(h)} faces the camera.")
         else:
-            out.append(f"Heading of {s['element_id']}: front toward {lm} at the {h.get('edge')} edge; the {h.get('camera_side')} faces the camera; it must not turn, reverse or show its other side.")
+            out.append(f"Heading of {s['element_id']}: front toward {lm} at the {h.get('edge')} edge; {_side(h)} faces the camera; it must not turn, reverse or show its other side.")
     return out
 
 
 def composed_block(plan, scene, shot, when):
     """What the server writes under the writer's prompt of a start or an end picture: the targets (F1, F3), the headings (F6), the tools (F5), the inventory (F4)."""
-    lines = (start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + heading_lines(scene, shot, when) + tool_lines(plan, scene, shot, when)
+    lines = (start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + heading_lines(scene, shot, when, _names(plan)) + tool_lines(plan, scene, shot, when)
     inv = inventory_line(plan, scene, shot, when)
     return '\n'.join(lines + ([inv] if inv else []))
 
@@ -802,7 +813,7 @@ def picture_rule_lines(plan, scene, shot, when):
         out.append({'check': 'inventory', 'weight': 'must', 'pass_when': 'the picture holds exactly these things, in these counts and places, and nothing else of these kinds: ' + inv[len('Inventory, exactly: '):]})
     if when == 'end':
         for p in shot.get('props') or []:
-            out.append({'check': 'same tool', 'weight': 'must', 'pass_when': f"the {names.get(p['element_id'], p['element_id'])} is the same tool as in Image 1 (shape, size, colour, handle), "
+            out.append({'check': 'same tool', 'weight': 'must', 'pass_when': f"the {names.get(p['element_id'], p['element_id'])} {p['holder']} held is the same one as in Image 1 (shape, size, colour, handle where it has one), "
                                                                              f"and it is {_prop_end_words(marks, p)}; it has not changed into another thing or vanished"})
         if any(isinstance((s.get('end') or {}).get('facing'), dict) for s in shot.get('subjects') or []):
             out.append({'check': 'heading kept', 'weight': 'must', 'pass_when': 'each travelling subject faces the same landmark and shows the same side as in Image 1' +
@@ -2122,8 +2133,10 @@ def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
 def place_words(marks, pos):
     """design/110 F2: '<amount> <unit> <relation> <landmark>' (the amount and unit when the plan has them)."""
     pos = pos or {}
-    amt = f"{pos['amount']:g} {pos['unit']} " if pos.get('amount') is not None and pos.get('unit') else ''
-    return f"{amt}{pos.get('relation', '')} {marks.get(pos.get('landmark_id'), pos.get('landmark_id', ''))}".strip()
+    words = f"{pos.get('relation', '')} {marks.get(pos.get('landmark_id'), pos.get('landmark_id', ''))}".strip()
+    if pos.get('amount') and pos.get('unit'):   # live check 27 Oct: '<relation> <landmark>, <amount> <unit> from it'; nothing for 0
+        words += f", {pos['amount']:g} {pos['unit']} from it"
+    return words
 
 
 def moved_words(start, end):
@@ -2146,8 +2159,9 @@ def end_targets(scene, shot):
         cause = ''
         if s.get('behaviour') == 'acts' and s.get('beats'):   # F1
             b = s['beats'][-1]
-            cause = (f"Because {s['element_id']} has {b.get('done') or b['action']}, {b['path']}, from {place_words(marks, (s.get('start') or {}).get('position'))} "
-                     f"to {place_words(marks, pos)}, {b['result']} is now in frame. ")
+            here, there = place_words(marks, (s.get('start') or {}).get('position')), place_words(marks, pos)
+            where = f'at {there}' if here == there else f'from {here} to {there}'   # live check 27 Oct: no "from X to X"
+            cause = f"Because {s['element_id']} has {b.get('done') or b['action']}, {b['path']}, {where}, {b['result']} is now in frame. "
         moved = moved_words((s.get('start') or {}).get('position'), pos)
         out.append(cause + f"{s['element_id']} ends {place_words(marks, pos)}{', ' + moved if moved else ''}, facing {heading_words(marks, e.get('facing'))}, {e.get('pose', '')}, holding {held}; {e.get('progress', '')}.")
     return out
@@ -2156,7 +2170,7 @@ def end_targets(scene, shot):
 def heading_words(marks, facing):
     """A facing as words: the old free text, or (design/110 F6, later in this batch) a heading."""
     if isinstance(facing, dict):
-        return f"front toward {marks.get(facing.get('landmark_id'), facing.get('landmark_id', ''))} at the {facing.get('edge', '')} edge, the {facing.get('camera_side', '')} toward the camera"
+        return f"front toward {marks.get(facing.get('landmark_id'), facing.get('landmark_id', ''))} at the {facing.get('edge', '')} edge, {_side(facing)} toward the camera"
     return str(facing or '')
 
 

@@ -97,18 +97,18 @@ def test_the_server_composes_the_inventory_the_tool_sentence_and_the_headings():
     d = doc_with(rich())
     scene, sh = d['gaps'][0]['scenes'][0], d['gaps'][0]['scenes'][0]['shots'][0]
     inv = VS.inventory_line(d, scene, sh, 'start')
-    assert inv == 'Inventory, exactly: Red brick × 2 0 hand on the table; Pointing trowel × 1 in E1\'s hands. Nothing else of these kinds in frame; nothing rests on top of the stack.'
-    assert VS.inventory_line(d, scene, sh, 'end') == 'Inventory, exactly: Red brick × 4 0 hand on the table; E1 holds nothing. Nothing else of these kinds in frame; nothing rests on top of the stack.'
+    assert inv == 'Inventory, exactly: Red brick × 2 on the table; Pointing trowel × 1 in E1\'s hands. Nothing else of these kinds in frame; nothing rests on top of the stack.'
+    assert VS.inventory_line(d, scene, sh, 'end') == 'Inventory, exactly: Red brick × 4 on the table; E1 holds nothing. Nothing else of these kinds in frame; nothing rests on top of the stack.'
     tools = VS.tool_lines(d, scene, sh, 'start')
-    assert tools == ["The same Pointing trowel: it keeps its shape, size, colour and handle in every picture it appears in; E1 holds nothing else; no second tool appears; the tool is fully inside the frame. "
-                     'At the start it is 1 hand in the hand above the table.']
-    assert VS.tool_lines(d, scene, sh, 'end')[0].endswith('At the end it is set down 2 bricks on the top course of the table.')
-    assert VS.tool_lines(d, scene, sh, 'motion')[0].endswith('By the end it is set down 2 bricks on the top course of the table; it never changes into another thing and never simply disappears.')
+    assert tools == ["The same Pointing trowel: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; E1 holds nothing else; no second one appears; it is fully inside the frame. "
+                     'At the start it is in the hand above the table, 1 hand from it.']
+    assert VS.tool_lines(d, scene, sh, 'end')[0].endswith('At the end it is set down on the top course of the table, 2 bricks from it.')
+    assert VS.tool_lines(d, scene, sh, 'motion')[0].endswith('By the end it is set down on the top course of the table, 2 bricks from it; it never changes into another thing and never simply disappears.')
     heads = VS.heading_lines(scene, sh, 'end')
     assert heads[0] == 'Heading of E1: front toward the table at the right edge; the left side faces the camera; it must not turn, reverse or show its other side.'
     assert heads[1] == 'COW has moved at least one body-length toward the table and turned a little; it does not stand where it stood in the start.'
     turned = copy.deepcopy(sh)
-    turned['changes'].append({'what': 'the mason turns to the stack', 'beat_id': 'B2'})
+    turned['changes'].append({'what': 'E1 turns to the stack', 'beat_id': 'B2'})
     turned['subjects'][0]['end']['facing'] = {**HEAD, 'edge': 'left'}
     assert VS.heading_lines(scene, turned, 'end')[0] == 'Heading of E1: it turns, as the change says; at the end its front is toward the table at the left edge; the left side faces the camera.'
     block = VS.composed_block(d, scene, sh, 'start')
@@ -123,7 +123,7 @@ def test_the_picture_lines_count_the_inventory_keep_the_tool_and_the_heading():
     assert [l['check'] for l in start] == ['inventory'] and 'Red brick × 2' in start[0]['pass_when'] and start[0]['weight'] == 'must'
     end = VS.picture_rule_lines(d, scene, sh, 'end')
     assert [l['check'] for l in end] == ['inventory', 'same tool', 'heading kept']
-    assert 'set down 2 bricks on the top course' in end[1]['pass_when'] and 'same landmark and shows the same side as in Image 1' in end[2]['pass_when']
+    assert 'set down on the top course of the table, 2 bricks from it' in end[1]['pass_when'] and 'same landmark and shows the same side as in Image 1' in end[2]['pass_when']
     assert VS.picture_rule_lines(d, scene, {**sh, 'subjects': [], 'props': []}, 'end') == []
 
 
