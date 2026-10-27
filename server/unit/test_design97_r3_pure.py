@@ -72,7 +72,7 @@ def test_each_gap_carries_its_split_by_route_on_the_page_and_in_check():
     assert g1['split'] == [{'route': 'graphics', 'seconds': 20.0, 'shots': 2}]
     g2 = next(g for g in view['gaps'] if g['gap_id'] == 'G2')
     assert g2['split'] == [{'route': 'graphics', 'seconds': 4.0, 'shots': 1}, {'route': 'AI video', 'seconds': 6.0, 'shots': 1}]
-    assert VS.split_of([{'visual_type': 'image', 'start_frame': 0, 'end_frame': 50}], 25) == [{'route': 'still', 'seconds': 2.0, 'shots': 1}]
+    assert VS.split_of([{'visual_type': 'image', 'start_frame': 0, 'end_frame': 50}], 25) == [{'route': 'still (moving)', 'seconds': 2.0, 'shots': 1}]   # design/112 K3
 
 
 # ---------- the page (P, V, K, R, W, A2, A5, L4) and the review page (O4) ----------

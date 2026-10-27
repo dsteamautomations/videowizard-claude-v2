@@ -633,11 +633,16 @@ def split_of(shots, fps):
     """design/97 G3: a gap's seconds and shots per route."""
     out = {}
     for sh in shots:
-        k = 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else 'still'
+        k = 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else ('still (frozen)' if (sh.get('motion') or 'push_in') == 'none' else 'still (moving)')   # design/112 K3
         row = out.setdefault(k, {'route': k, 'seconds': 0.0, 'shots': 0})
         row['seconds'] = round(row['seconds'] + (sh['end_frame'] - sh['start_frame']) / float(fps), 1)
         row['shots'] += 1
-    return [out[k] for k in ('graphics', 'AI video', 'still') if k in out]
+    return [out[k] for k in ('graphics', 'AI video', 'still (moving)', 'still (frozen)') if k in out]
+
+
+def _still_text(shot, ref):
+    """design/112 K4: a still with words: the plan says so, every graphic, or the picture's answer carries exact text."""
+    return bool(shot.get('carries_text')) or shot.get('visual_type') in ('diagram', 'animation') or bool(library.exact_entries((ref or {}).get('answer') or {}))
 
 
 def _accepted_shots(plan, session):
@@ -3651,7 +3656,8 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
             files.append({'name': name, 'key': asset['key'], 'sha256': asset['sha256'], 'bytes': asset['bytes'], 'location': 'storage', 'receipt': True})
             jobs.record_file(conn, run['id'], STAGE, asset['key'], name, asset['sha256'], asset.get('bytes') or 0, 'video/mp4' if asset['kind'] == 'movie' else 'image/png')   # design/82 U1: a still from a reference was never an upload
             shots.append({'shot_id': s['id'], 'source': 'asset', 'kind': asset['kind'], 'placement': asset['placement'],
-                          **({'media': {'kind': 'still', 'motion': s.get('motion') or 'push_in', 'graphic': s['visual_type'] in ('diagram', 'animation')}} if asset['kind'] == 'still' else {})})   # design/89 B2
+                          **({'media': {'kind': 'still', 'motion': s.get('motion') or 'push_in', 'graphic': s['visual_type'] in ('diagram', 'animation'),
+                                        'text': _still_text(s, session['references'].get(asset.get('reference_id')))}} if asset['kind'] == 'still' else {})})   # design/89 B2; design/112 K4
         binding = session['bindings'].get(s['id']) or {}
         for eid, rows in binding.get('references', {}).items():
             for b in rows:

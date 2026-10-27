@@ -123,3 +123,12 @@ Status: proposed by Revathi, 27 Oct 2026, from operating VW-7's Takes step. Chec
 | GPT Image sheet: a mask is guidance, not a guarantee | — | unchanged: the composite is the guarantee; the outside-unchanged figure is on the edit record |
 
 No other line of the served snapshot was found to differ from the server's behaviour in the take path. Versions for the S-set deploy: server 0.61.0, plugin 0.53.0 (`prepare-take` takes `--start` alone); numpy joins the server's requirements (the deploy script installs it).
+
+## As built: K1–K4 (27 Oct)
+
+- K1: a video shot under 4 s (STILL_MOVING_MAX_S) with no acting subject that has beats is warned `short_route` unless its purpose gives the reason ("because …", "since", "so that", "needs the motion"): the default for such a shot is a moving still. A graphic build is never under 4 s (a state holds 3 s at least), so the rule is about AI video.
+- K2: `Shot.carries_text` (a label, a title, a caption on the picture); the plan check refuses a pan on it (push_in or none only), as it already did for every graphic.
+- K3: `routes()` counts `still_moving` and `still_frozen` beside `still`; the page's per-gap split shows "still (moving)" and "still (frozen)" rows.
+- K4: the handover marks a still `text` when the plan says `carries_text`, the shot is a graphic, or the approved picture's answer carries exact text; the renderer contains such a still whole (bars rather than a crop, like a graphic) and refuses a pan on it as a backstop. The 5 % push stays within the picture's own centre, so words inside the safe area stay in frame.
+- Tests: `test_design112_k_pure.py` (4, the renderer part skipped where ffmpeg is absent). Two older assertions updated (the handover's still media gains `text`; the split row is "still (moving)"). Server unit suite 581; plugin 310 plus the 3 known Windows-only.
+- Not covered: the safe area itself is not measured on the picture (design/96's label-size line reads it on the check); the K1 reason words are a short list.

@@ -103,7 +103,7 @@ def test_stills_and_sequences_carry_the_plans_motion_at_record(monkeypatch):
     rec = []
     monkeypatch.setattr(VS.core, 'output', lambda conn, user, run, body: (rec.append(body) or {'id': 'o1'}))
     VS.record_gap(FakeConn(), store, USER, RUN, [], 'G1', 'record')
-    assert rec[0]['summary']['shots'][0]['media'] == {'kind': 'still', 'motion': 'pan_left', 'graphic': False}
+    assert rec[0]['summary']['shots'][0]['media'] == {'kind': 'still', 'motion': 'pan_left', 'graphic': False, 'text': False}   # design/112 K4: a photograph without words
 
 
 # ---------- H2-H5: no repeated pictures ----------

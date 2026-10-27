@@ -220,6 +220,7 @@ class Shot(Model):
     states: list[GraphicState] = Field(default_factory=list, max_length=12)   # design/65: an animation shot is two to four states (validate_plan says so in words)
     motion: Literal['push_in', 'push_out', 'pan_left', 'pan_right', 'none'] = 'push_in'   # design/89 B2: a still or a graphic moves 5 % across its shot
     motion_reason: str = Field(default='', max_length=1000)   # why a still stays frozen (`none`)
+    carries_text: bool = False   # design/112 K2, K4: the still shows words (a label, a title, a caption): push_in only, placed whole, never cropped or panned
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
@@ -379,6 +380,7 @@ MIN_STATE_S = 3                            # a state is read, not glanced
 MIN_GRAPHIC_S = 3                          # a graphic shorter than this is warned
 STILL_MOVING_MAX_S = 4                     # design/89 B1 (SK, 23 Oct): a still that moves, at most 4 s
 STILL_FROZEN_MAX_S = 3                     # a still marked motion none, at most 3 s
+ROUTE_REASON = re.compile(r'\b(because|since|so that|needs? (?:the )?(?:motion|movement|moving))\b', re.I)   # design/112 K1: the purpose says why a short shot is not a moving still
 STATE_MAX_S = 5                            # one state of a graphic, at most 5 s
 GRAPHIC_BUILD_S = 4                        # a graphic on screen longer than this is a build of states or a drawn animation
 FROZEN_SHARE = 0.10                        # design/89 B4 (SK): warn when frozen pictures pass 10 % of the film
@@ -404,7 +406,8 @@ def routes(plan, fps=25):
     """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
     graphics, and the images the plan will need: a start image per video shot and an end only where the shot's final state must be exact (design/112 S1),
     a start-only shot after an exact end starting on that end; one picture per still, one per state of a sequence."""
-    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0}
+    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0,
+           'still_moving': 0, 'still_frozen': 0}   # design/112 K3
     for gap in plan.get('gaps', []):
         scenes = gap.get('scenes') or []
         if gap.get('choices'):
@@ -424,6 +427,8 @@ def routes(plan, fps=25):
                     prev_exact = bool(shot.get('end_state_exact'))
                 else:
                     prev_exact = False
+                    if kind == 'still':   # design/112 K3
+                        out['still_frozen' if (shot.get('motion') or 'push_in') == 'none' else 'still_moving'] += 1
                     out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
     return out
 
@@ -576,9 +581,15 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
                     if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
                         need(shot.visual_type not in GRAPHIC_TYPES or shot.motion in ('push_in', 'none'), f'shot {shot.id}: a graphic moves closer only (push_in) or not at all, so its labels never slide out of frame.')
+                        need(not shot.carries_text or shot.motion in ('push_in', 'none'), f'shot {shot.id} carries text (a label, a title, a caption): it moves by push_in or not at all, never a pan; no crop or pan cuts into its words (design/112 K2, K4).')
                         need(shot.motion != 'none' or shot.motion_reason.strip(), f'shot {shot.id}: motion none needs a reason (motion_reason).')
                         if seconds is not None and shot.motion == 'none' and scenes is counted:
                             frozen += seconds
+                    if (seconds is not None and seconds < STILL_MOVING_MAX_S and scenes is counted and not ROUTE_REASON.search(shot.purpose)   # design/112 K1: a short shot with no visible action is a moving still first
+                            and shot.visual_type == 'video' and not any(s.behaviour == 'acts' and s.beats for s in shot.subjects)):   # a graphic build is never under 4 s (a state holds 3 s)
+                        what = 'AI video'
+                        warnings.append({'shot_id': shot.id, 'kind': 'short_route', 'message': f'shot {shot.id} is {seconds:.1f} s of {what} with no visible action: under {STILL_MOVING_MAX_S} s the default is a moving still '
+                                         f"(a footage frame or an AI still with a push or a pan); say in purpose why this shot needs {what} ('because …'), or make it a still (design/112 K1)"})
                     if seconds is not None and shot.visual_type == 'image':   # design/89 B1 (SK): 4 s moving, 3 s frozen
                         limit = STILL_FROZEN_MAX_S if shot.motion == 'none' else STILL_MOVING_MAX_S
                         if seconds > limit + 0.04:

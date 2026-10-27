@@ -181,12 +181,14 @@ class Renderer:
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
         return out
 
-    def still(self, png_path, sha, n_tl, motion='none', graphic=True, name=None):
+    def still(self, png_path, sha, n_tl, motion='none', graphic=True, name=None, text=False):
         """A still asset held for n_tl frames; with a motion it moves 5 % (design/89 B2), drawn from a 4× canvas so it does not judder. A graphic is contained so its
-        labels stay in frame; a picture fills the frame by cropping within the cap (design/91 N15)."""
+        labels stay in frame; a picture fills the frame by cropping within the cap (design/91 N15); a still that carries text is contained like a graphic and never panned (design/112 K4)."""
         from PIL import Image
+        if text and motion in ('pan_left', 'pan_right'):
+            raise ValueError(f'{name or sha[:8]} carries text: no pan and no crop cuts into its words (design/112 K4); it moves by push_in or not at all')
         with Image.open(png_path) as im:
-            fill = not graphic and fit(im.width, im.height, self.W, self.H)[0]
+            fill = not graphic and not text and fit(im.width, im.height, self.W, self.H)[0]
         if not graphic and not fill and name:
             self.padded.append(name)
         key = digest({'still': sha, 'n': n_tl, 'tl': self.tl, **({'motion': motion} if motion != 'none' else {}), **({'fit': 'fill'} if fill else {})})
@@ -414,7 +416,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
         """One piece of n frames; with tail, past its planned end (a still or a graphic holds longer; a take or footage runs on, holding its last frame if it ends)."""
         name = item.get('label') or item.get('name') or item.get('sub_clip_id')
         if item['kind'] == 'still':
-            return r.still(sources[item['file']['sha256']], item['file']['sha256'], n, item.get('motion') or 'none', bool(item.get('graphic')), None if tail else name)
+            return r.still(sources[item['file']['sha256']], item['file']['sha256'], n, item.get('motion') or 'none', bool(item.get('graphic')), None if tail else name, bool(item.get('text')))   # design/112 K4
         if item['kind'] == 'sequence':
             states = [(sources[st['file']['sha256']], st['file']['sha256'], st['hold_frames']) for st in item['states']]
             if n > int(item['timeline_frames']):
