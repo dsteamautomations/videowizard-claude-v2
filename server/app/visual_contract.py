@@ -722,6 +722,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         need(not shot.states, f'states belong to an animation shot (shot {shot.id} is a {shot.visual_type}).')
                     if shot.visual_type == 'drawn':   # design/113 E1, E5
                         drawn_needs(shot, seconds)
+                    if shot.visual_type in GRAPHIC_TYPES and scenes is counted and (any(d.status != 'unknown' and d.value is not None for d in (shot.drawing_spec.dimensions if shot.drawing_spec else []))
+                                                                                    or any(re.search(r'\d', c) for c in shot.claims)):   # design/113 E6: a warning until SK approves the sample (answer 6)
+                        warnings.append({'shot_id': shot.id, 'kind': 'route_drawn', 'message': f'shot {shot.id} is a {shot.visual_type} with exact sizes or numbers: the drawn route draws them exactly '
+                                         '(visual_type drawn, a scene_drawn from the spec, rendered free and reviewed on the Takes step); the AI-image graphic stays available (design/113 E6)'})
                     if seconds is not None and shot.visual_type in GRAPHIC_TYPES + ('drawn',) and seconds < MIN_GRAPHIC_S:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
                     if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
