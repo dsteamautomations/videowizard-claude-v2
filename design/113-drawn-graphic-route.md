@@ -77,3 +77,7 @@ A fifth route, **drawn**, for diagrams, charts, maps, timelines and technical dr
 - E6: a diagram or build with exact sizes or numeric claims gets the warning `route_drawn` (answer 6: a warning until the sample is approved); the procedure describes the route; AI video for graphics stays refused as before.
 - Tests: `test_design113_e1_pure.py` (5), `_e2_pure.py` (8, two of them render with ffmpeg and a system TTF and are skipped where either is absent), `_e3_pure.py` (4), `_e6_pure.py` (2), `plugin/tests/test_design113.py` (1). Server unit suite 600; plugin 311 plus the 3 known Windows-only; the page script parses; the procedure JSON parses; the plugin parses under the 3.9 grammar.
 - Not built: the slates do not yet read the brand font (they keep Pillow's default until the fonts land in the repo; one line in `stage2/render.py` once they do); rotation and easing in actions; charts with axes; the sample render (answer 4) waits for the deploy and the Noto files.
+
+## The sample (27 Oct, answer 4)
+
+Rendered on the VM from the deployed 0.62.0: VW-7's B02B_S1 (the cavities of a rat-trap wall in section, 4 s, illustrative with its label since the spec's one size is unknown), 100 frames at 1920×1080, 25 fps, cued to the recorded words. Files and the scene: `f3-live/drawn-sample/` beside the repo, with its README. Awaiting SK's approval before the route becomes the default (answer 6): then the `route_drawn` warning becomes the planner's rule in the procedure and the check refuses a diagram with exact sizes that is not drawn.
