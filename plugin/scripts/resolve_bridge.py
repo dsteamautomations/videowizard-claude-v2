@@ -20,7 +20,7 @@ class FakeAdapter:
         return {'resolve': 'fake', 'version': '21.1.1-fake', 'scripting': True}
 
     def project(self, name, timeline):
-        self.name = name
+        self.name, self.fps = name, timeline['fps']
         return name
 
     def import_media(self, paths):
@@ -64,6 +64,14 @@ class FakeAdapter:
     def export_project(self, path):
         Path(path).write_bytes(b'fake project export')
         return path
+
+    def import_timeline(self, path, name):   # design/107 slice 3: the whole edit in one import
+        import handoff
+        self.tl, self.cuts = name, handoff.read_timeline(Path(path).read_bytes().decode('utf-8'), self.fps)[0]
+        return name
+
+    def readback(self):
+        return self.cuts
 
 
 class ResolveAdapter:
@@ -143,6 +151,22 @@ class ResolveAdapter:
         self.pm.ExportProject(self.p.GetName(), str(path))
         return path
 
+    def import_timeline(self, path, name):   # design/107 slice 3
+        self.tl = self.mp.ImportTimelineFromFile(str(path), {'timelineName': name, 'importSourceClips': True})
+        if not self.tl:
+            raise SystemExit(f'Resolve could not import {Path(path).name}.')
+        self.p.SaveProject()
+        return name
+
+    def readback(self):
+        out = []
+        for lane, track, idx in ((1, 'video', 1), (-1, 'audio', 1)):
+            for it in self.tl.GetItemListInTrack(track, idx) or []:
+                mp = it.GetMediaPoolItem()
+                out.append({'file': (mp.GetClipProperty('File Path') if mp else '') or it.GetName(), 'lane': lane, 'record_in': it.GetStart(), 'record_out': it.GetEnd(),
+                            'source_in': it.GetLeftOffset(), 'source_out': it.GetLeftOffset() + it.GetDuration()})
+        return out
+
 
 def build(adapter, bundle_dir, manifest, run_code, out_dir):
     tl = manifest['timeline']
@@ -188,6 +212,20 @@ def build(adapter, bundle_dir, manifest, run_code, out_dir):
     project_export = adapter.export_project(out_dir / 'project.drp')
     return {'timeline': name, 'events': len(expected), 'narration_pieces': len(expected_audio), 'readback_events': len(readback), 'differences': differences, 'drt_verified': not differences,
             'drt_path': str(drt), 'project_export_path': str(project_export), 'check': adapter.check()}
+
+
+def studio_import(adapter, edit_dir, manifest, code):
+    """design/107 Step F, Studio: import Timeline/VW-n.fcpxml, save, export .drp and .drt into Timeline/, read back and compare with the plan at 0 frames."""
+    import handoff
+    edit_dir = Path(edit_dir)
+    adapter.project(code, manifest['timeline'])
+    adapter.import_timeline(edit_dir / 'Timeline' / f'{code}.fcpxml', code)
+    drt = adapter.export_drt(edit_dir / 'Timeline' / f'{code}.drt')
+    drp = adapter.export_project(edit_dir / 'Timeline' / f'{code}.drp')
+    cuts = adapter.readback()
+    differences = handoff.compare(cuts, manifest.get('resolve_events') or [], manifest.get('narration_pieces') or [])
+    return {'timeline': code, 'events': len(manifest.get('resolve_events') or []), 'readback_events': len([c for c in cuts if c['lane'] == 1]), 'differences': differences,
+            'drt_verified': not differences, 'drt': str(drt), 'drp': str(drp), 'check': adapter.check()}
 
 
 def adapter():

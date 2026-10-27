@@ -263,7 +263,8 @@ def bundle(conn, store, user, run, outputs):
         files.append({'role': 'generated', 'name': layout('generated', name), 'key': k, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)})
     manifest = {'contract': CONTRACT_BUNDLE, 'run': run['code'], 'client': run.get('client'), 'created_at': datetime.now(timezone.utc).isoformat(), 'film_sha256': film['sha256'],
                 'assembly_digest': asm_o['summary']['assembly_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': events, 'narration_pieces': pieces,
-                'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': assembly['duration_frames'], 'cuts': len(events)}   # design/107: what Step D checks against
+                'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': assembly['duration_frames'], 'cuts': len(events),   # design/107: what Step D checks against
+                'camera_copies': media_o['summary'].get('copies')}   # design/107 §6: the delivery reminds the operator to relink
     mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')

@@ -763,7 +763,7 @@ def cmd_stage(a):
             footage = ({'camera': a.camera, 'support': getattr(a, 'support', None), 'look': getattr(a, 'look', None), 'quote': getattr(a, 'footage_note', None) or ''}
                        if getattr(a, 'camera', None) else None)   # design/77 L42: the operator's confirmed footage character
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
-                            camera_audio=a.camera_audio, note=a.note, progress=progress, footage=footage)
+                            camera_audio=a.camera_audio, note=a.note, progress=progress, footage=footage, copies=getattr(a, 'copies', None))   # design/107 §6
         elif a.stage == 'voice':
             job = None
             if a.job:   # design/52 D: the record from a kept narration, fetched for the operator to listen to
@@ -2056,10 +2056,35 @@ def cmd_delivery(a):
             emit({'action': 'refused', 'check': rep, 'message': 'The download is incomplete or wrong: ' + '; '.join(rep['problems'][:6]) + '. Run `vw delivery download` again: only what is missing or wrong moves.'}, 2)
         handoff.write_timeline_for(edit_dir, manifest)
         how = handoff.free_route_text(m['code']) if found.get('edition') != 'studio' else \
-            'Resolve Studio found. Until the plugin imports the timeline itself (design/107 slice 3), follow the free route: ' + handoff.free_route_text(m['code'])
-        emit({'resolve': found, 'check': rep, 'edit': str(edit_dir), 'open': how}, 0, f"{words} {rep['present']} checked, {rep['cuts']} cuts, {rep['timeline_frames']} frames: the edit is in {edit_dir}. {how}")
-    if a.what == 'open':
+            'Resolve Studio found: `vw delivery open` imports the timeline into Resolve and reads it back (Resolve must be running with external scripting on).'
+        copies = " The camera files are copies made by an editor: get the originals' folder and run `vw delivery relink-check --originals \"<folder>\"` before the handover." if manifest.get('camera_copies') == 'copies' else ''   # design/107 §6
+        emit({'resolve': found, 'check': rep, 'edit': str(edit_dir), 'open': how, 'camera_copies': manifest.get('camera_copies')}, 0, f"{words} {rep['present']} checked, {rep['cuts']} cuts, {rep['timeline_frames']} frames: the edit is in {edit_dir}.{copies} {how}")
+    if a.what == 'open':   # design/107 Step F: Studio imports the timeline by scripting and reads it back; free Resolve gets the three steps
+        found = handoff.find_resolve()
+        if found.get('edition') == 'studio':
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import resolve_bridge
+            manifest = _json_file(m, 'work/manifest.json')
+            try:
+                report = resolve_bridge.studio_import(resolve_bridge.adapter(), ws / 'edit', manifest, m['code'])
+            except (SystemExit, Exception) as exc:   # Resolve not running, scripting off, or an import failure: the free route still works
+                emit({'open': handoff.free_route_text(m['code']), 'studio_error': str(exc)}, 0, f'Resolve Studio could not import by scripting ({exc}). ' + handoff.free_route_text(m['code']))
+            write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': 'Resolve Studio import by the plugin'})
+            write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
+            led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported', 'report': {'route': 'studio', 'timeline_verified': report['drt_verified'], **report}})
+            emit({'report': report, 'ledger': led}, 0, (f"Imported into Resolve Studio: {report['readback_events']} cuts read back, 0 frames off; .drp and .drt in Timeline/. Next: `vw delivery zip`." if report['drt_verified']
+                                                        else f"Imported, but the readback differs from the plan in {len(report['differences'])} place(s): " + '; '.join(f"cut {d['cut']} {d['field']} {d['timeline']} vs {d['plan']}" for d in report['differences'][:5]) + '. Tell the builder.'))
         emit({'open': handoff.free_route_text(m['code'])}, 0, handoff.free_route_text(m['code']))
+    if a.what == 'relink-check':   # design/107 §6
+        if not a.originals:
+            emit({'action': 'refused', 'message': 'Name the folder that holds the camera originals: `vw delivery relink-check --originals "<folder>"`.'}, 2)
+        import csv
+        rows = list(csv.DictReader((ws / 'edit' / 'Relink-list.csv').open(encoding='utf-8', newline='')))
+        rep = handoff.relink_check(ws / 'edit', m['code'], rows, a.originals)
+        if rep['checklist']:
+            with (ws / 'edit' / 'Finishing-checklist.md').open('a', encoding='utf-8') as f:
+                f.write('\n## Relink\n\n' + ''.join(f'- {l}\n' for l in rep['checklist']))
+        emit(rep, 0, '\n'.join(l['line'] for l in rep['lines']) + (f"\nRelinked timeline: {rep['relinked']}" if rep['relinked'] else ''))
     if a.what == 'confirm':   # design/107 Step F, free route: the operator's side-by-side check goes on the ledger
         if not (a.quote or '').strip():
             emit({'action': 'refused', 'message': 'The operator\'s words are required: that the start, the middle and the end match the approved film (`--quote`).'}, 2)
@@ -2165,6 +2190,7 @@ def build_parser():
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
     s.add_argument('--camera', choices=['cinema', 'mirrorless', 'phone', 'mixed'], help='media record: accepted for one release and kept as the correction; the footage is measured at visuals (design/88)')
     s.add_argument('--support', choices=['handheld', 'tripod', 'gimbal', 'mixed']); s.add_argument('--look', choices=['natural', 'graded', 'log']); s.add_argument('--footage-note', help="media record: the operator's words on the footage")
+    s.add_argument('--copies', choices=['originals', 'copies'], help='media record: are these the camera originals, or copies made by an editor (design/107)')
     s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)
@@ -2211,9 +2237,9 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0)
     s.add_argument('--accept-as-is', action='store_true'); s.add_argument('--frame-note', action='append'); s.set_defaults(fn=cmd_assembly)
-    s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'check', 'download', 'open', 'confirm', 'zip', 'resolve', 'final'])   # design/107
+    s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'check', 'download', 'open', 'confirm', 'zip', 'relink-check', 'resolve', 'final'])   # design/107
     s.add_argument('--check', action='store_true'); s.add_argument('--run', dest='run_it', action='store_true'); s.add_argument('--inspect', action='store_true'); s.add_argument('--close', action='store_true')
-    s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.set_defaults(fn=cmd_delivery)
+    s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.add_argument('--originals', help="relink-check: the folder that holds the camera originals (design/107)"); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     return p

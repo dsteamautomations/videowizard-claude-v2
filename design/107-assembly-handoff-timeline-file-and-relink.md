@@ -308,3 +308,23 @@ Server 0.56.0, plugin 0.49.0. Not committed or deployed.
   - `server/unit`: 482 passed, 1 new.
   - The 3 known Windows-only failures remain.
 - **Not covered:** the Resolve detection on a real PC and Mac (this PC has no Resolve); the free-Resolve import by hand (Revathi's PC); a real film through the flow (no run has reached delivery). The Studio route, the relink check and the media-stage metadata are slice 3.
+
+### Slice 3 as built (27 Oct 2026)
+
+Server 0.57.0, plugin 0.50.0. Not committed or deployed.
+
+- **The media stage (§6, "prevent the problem"):**
+  - the probe records each clip's start timecode, reel and the camera's original file name when the file carries them (`relink_fields`); they travel in the media summary and into `Relink-list.csv`;
+  - prepare prints a one-line `copies_note` naming clips with no timecode or a different frame rate ("A good copy keeps the original's name, length, frame rate and timecode");
+  - record asks once, "originals or copies?" (`--copies originals|copies`), and keeps the answer; the bundle's manifest carries it, and `vw delivery download` reminds the operator to run the relink check when the camera files are copies.
+- **The relink check** (`vw delivery relink-check --originals "<folder>"`, `handoff.relink_check`): each camera file of `Relink-list.csv` against the folder, by exact name, then by the name with case, extension and copy endings (`_proxy`, `_lowres`, `_compressed`, `-1`, `(1)`) removed, confirmed by length, frame rate and timecode. One line per file:
+  - **match:** "name, length, frame rate and timecode match. Relinks as is.";
+  - **renamed** (another extension or a copy name): the relinked timeline points at the original's real path;
+  - **timecode:** the copy has none or another one: `Timeline/VW-n-relinked.fcpxml` is written with the asset's start and every cut's source moved by the original's timecode;
+  - **by hand:** trimmed or another frame rate: the cuts listed with the time inside the copy, a frame grab per cut in `Timeline/grabs/`, and a line added to the finishing checklist;
+  - **ask:** two originals fit: the candidates listed, nothing written until the operator picks;
+  - **missing:** named with its cuts.
+- **The Studio route** (`vw delivery open` when Step B found Studio): `resolve_bridge.studio_import` imports `Timeline/VW-n.fcpxml` into a project named after the run, saves it, exports `VW-n.drt` and `VW-n.drp` into `Timeline/`, reads the timeline back and compares it with the plan cut by cut at 0 frames (`handoff.compare`, the same rule as the server's). The ledger gets the report (route studio); a Resolve that is not running or cannot import falls back to the free route's steps. The old append-by-append build stays in the bridge until the real-Resolve test; `vw delivery resolve --run` is no longer in any step.
+- **Texts:** the media steps ask the question and name the copies note; the delivery steps and the chat guide name the Studio import and the relink check.
+- **Tests:** `plugin/tests` 298 passed, 9 of them new in `test_handoff3.py` (the probe's fields, the copies note, the recorded answer, the relink check's six outcomes including "never guesses", the Studio route's readback at 0 frames and a one-frame difference caught, the two commands); older media tests pass the new answer. `server/unit` 482 passed. The 3 known Windows-only failures remain.
+- **Not covered:** Resolve Studio's import on a real PC (this PC has none; the fake adapter stands in); ffprobe's timecode and reel tags on the client's real camera files; frame grabs with a real ffmpeg on the operator's PC; a real film through the whole flow.

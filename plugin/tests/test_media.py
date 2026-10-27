@@ -77,9 +77,9 @@ def test_prepare_guesses_the_footage_character_from_the_probe_and_record_stores_
     assert 'prores' in footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'prores'}])
     assert footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'h264'}]).startswith('looks like phone footage')
     calls = []
-    res = media_record(ws, PROC, prior, fake_upload(calls), camera_audio='allowed', note='ok', footage={'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'})
+    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='ok', footage={'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'})
     assert res['summary']['footage_character'] == {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'}
-    res = media_record(ws, PROC, prior, fake_upload(calls), camera_audio='allowed', note='ok')
+    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='ok')
     assert res['summary']['footage_character'] is None
     assert {'codec', 'pix_fmt', 'bit_rate', 'make', 'model'} <= set(res['summary']['clips'][0])   # design/88 F1: what the server measures from
     steps = ' '.join(PROC['steps'])
@@ -135,12 +135,12 @@ def test_record_stores_the_sound_answer_and_reports_progress(ws):
     clip(ws / 'in' / 'b.mp4', tone=500)
     media_prepare(ws, PROC, prior)
     calls, progress = [], []
-    res = media_record(ws, PROC, prior, fake_upload(calls), camera_audio='allowed', note='site noise only', progress=lambda k, n, name, size: progress.append((k, n, name)))
+    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='site noise only', progress=lambda k, n, name, size: progress.append((k, n, name)))
     s = res['summary']
     assert s['camera_audio'] == 'allowed' and s['camera_audio_note'] == 'site noise only' and len(s['clips']) == 2
     assert sorted(calls) == ['a.mp4', 'b.mp4'] and sorted(progress) == [(1, 2, 'a.mp4'), (2, 2, 'b.mp4')] or sorted(progress) == [(1, 2, 'b.mp4'), (2, 2, 'a.mp4')]
     assert [k for k, _, _ in sorted(progress)] == [1, 2]
-    res = media_record(ws, PROC, prior, fake_upload([]))
+    res = media_record(ws, PROC, prior, fake_upload([]), copies='originals')
     assert res['summary']['camera_audio'] is None and res['summary']['camera_audio_note'] == ''
 
 
@@ -152,15 +152,15 @@ def test_record_refuses_a_clip_changed_since_prepare(ws):
     time.sleep(0.02)
     (ws / 'in' / 'b.mp4').write_bytes(data[:-1] + bytes([data[-1] ^ 1]))   # same size, different bytes, new mtime
     with pytest.raises(Refused) as exc:
-        media_record(ws, PROC, prior, fake_upload([]))
+        media_record(ws, PROC, prior, fake_upload([]), copies='originals')
     assert 'changed since prepare' in str(exc.value) and 'b.mp4' in str(exc.value) and 'a.mp4' not in str(exc.value)
     media_prepare(ws, PROC, prior)
     os.utime(ws / 'in' / 'a.mp4')   # touched: same bytes, new mtime; prepare again is seconds
     with pytest.raises(Refused) as exc:
-        media_record(ws, PROC, prior, fake_upload([]))
+        media_record(ws, PROC, prior, fake_upload([]), copies='originals')
     assert 'a.mp4' in str(exc.value)
     media_prepare(ws, PROC, prior)
-    assert media_record(ws, PROC, prior, fake_upload([]))['summary']['clips']
+    assert media_record(ws, PROC, prior, fake_upload([]), copies='originals')['summary']['clips']
 
 
 def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, capsys):
@@ -179,14 +179,14 @@ def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, c
         posted.update(body)
         return {'id': 'out-1', 'stage': 'media', 'files': body['files'], 'summary': body['summary'], 'next': {'stage': 'analysis', 'paid': 'gemini-3.8-flash'}}
     monkeypatch.setattr(vw, 'write', write)
-    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound',
+    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound', copies='originals',   # design/107 §6
                            camera='mirrorless', support='handheld', look='graded', footage_note='Sony, handheld, graded in camera')
     with pytest.raises(SystemExit) as exc:
         vw.cmd_stage(a)
     out, err = capsys.readouterr()
     assert exc.value.code == 0, err
     assert 'uploaded 1/2 ' in err and 'uploaded 2/2 ' in err and '(0 MB)' in err and 'Recorded media. Next: analysis.' in err
-    assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound' and len(posted['summary']['clips']) == 2
+    assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound' and len(posted['summary']['clips']) == 2 and posted['summary']['copies'] == 'originals'
     assert posted['summary']['footage_character'] == {'camera': 'mirrorless', 'support': 'handheld', 'look': 'graded', 'quote': 'Sony, handheld, graded in camera'}   # design/77 L42
     shown = json.loads(out)   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
     assert shown['id'] == 'out-1' and shown['next']['stage'] == 'analysis' and shown['clips_recorded'] == 2 and 'total_mb' in shown

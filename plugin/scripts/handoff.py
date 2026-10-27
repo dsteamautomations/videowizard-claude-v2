@@ -4,6 +4,7 @@ Step B the Resolve check, Step D the count and cross-check of the downloaded edi
 Step F the free route's words, Step G the zip. Python 3.9: the operator's laptops run it."""
 import hashlib
 import platform
+import re
 import shutil
 import xml.etree.ElementTree as ET
 import zipfile
@@ -118,11 +119,14 @@ def read_timeline(text, fps):
     """The timeline file's connected clips: file, lane, record in/out at the film's rate (kept the same as the server's reader, design/107 slice 1)."""
     fps = Fraction(str(fps))
     root = ET.fromstring(text)
-    assets = {a.get('id'): _path(a.find('media-rep').get('src')) for a in root.findall('./resources/asset')}
+    rates = {f.get('id'): 1 / Fraction(f.get('frameDuration').rstrip('s')) for f in root.findall('./resources/format')}
+    assets = {a.get('id'): (_path(a.find('media-rep').get('src')), rates.get(a.get('format'), fps)) for a in root.findall('./resources/asset')}
     cuts = []
     for c in root.iter('asset-clip'):
-        rec_in = Fraction(c.get('offset').rstrip('s')) * fps
-        cuts.append({'file': assets[c.get('ref')], 'lane': int(c.get('lane') or 0), 'record_in': int(round(rec_in)), 'record_out': int(round(rec_in + Fraction(c.get('duration').rstrip('s')) * fps))})
+        path, rate = assets[c.get('ref')]
+        rec_in, start = Fraction(c.get('offset').rstrip('s')) * fps, Fraction(c.get('start').rstrip('s'))
+        cuts.append({'file': path, 'lane': int(c.get('lane') or 0), 'record_in': int(round(rec_in)), 'record_out': int(round(rec_in + Fraction(c.get('duration').rstrip('s')) * fps)),
+                     'source_in': int(round(start * rate)), 'source_out': int(round((start + Fraction(c.get('duration').rstrip('s'))) * rate))})
     seq = root.find('.//sequence')
     return cuts, int(round(Fraction(seq.get('duration').rstrip('s')) * fps)) if seq is not None else 0
 
@@ -202,4 +206,145 @@ def zip_edit(edit_dir, code):
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zf:
         for p in files:
             zf.write(p, f'{code}-edit/{p.relative_to(edit_dir).as_posix()}')
+    return out
+
+
+# ---------- design/107 §6: the relink check ----------
+
+COPY_ENDINGS = ('_proxy', '_lowres', '_compressed', '_copy', '-1', '(1)', '_1')
+
+
+def tc_seconds(tc, fps):
+    """'14:23:10:05' at fps -> seconds (a Fraction); '' -> 0."""
+    if not tc:
+        return Fraction(0)
+    h, m, s, ff = (int(x) for x in re.split(r'[:;]', tc.strip()))
+    return Fraction(h * 3600 + m * 60 + s) + Fraction(ff) / Fraction(str(fps))
+
+
+def _norm_stem(name):
+    stem = name.rsplit('.', 1)[0].lower()
+    changed = True
+    while changed:
+        changed = False
+        for e in COPY_ENDINGS:
+            if stem.endswith(e) and len(stem) > len(e):
+                stem, changed = stem[:-len(e)], True
+    return stem
+
+
+def probe_original(path):
+    """An original read with the media stage's probe: frames, fps, start timecode, width, height."""
+    import stages_av
+    meta = stages_av.probe(Path(path))
+    rate = Fraction(str(meta.get('fps') or 25))
+    return {'frames': int(round(float(meta.get('duration_s') or 0) * float(rate))), 'fps': str(rate), 'start_timecode': meta.get('start_timecode') or '', 'width': meta.get('width'), 'height': meta.get('height')}
+
+
+def grab_frame(src, at_s, out):
+    """One frame of the original at at_s, as a PNG for the editor (ffmpeg); None when ffmpeg cannot."""
+    import subprocess
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{float(at_s):.3f}', '-i', str(src), '-frames:v', '1', str(out)], check=True, capture_output=True, timeout=60)
+        return out
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def relink_check(edit_dir, code, rows, originals_dir, probe=None, grab=None):
+    """Each camera file against the originals folder: match, renamed (extension or a copy ending), timecode (a corrected timeline is written), by_hand (trimmed or
+    another frame rate: its cuts listed with the time inside the copy and a frame grab), ask (two originals fit: nothing written), missing."""
+    probe, grab = probe or probe_original, grab or grab_frame
+    edit_dir, originals_dir = Path(edit_dir), Path(originals_dir)
+    portable = edit_dir / 'Timeline' / f'{code}.portable.fcpxml'
+    text = portable.read_bytes().decode('utf-8')
+    cuts = [c for c in read_timeline(text, 25)[0] if c['lane'] == 1]
+    by_file = {}
+    for i, c in enumerate(cuts, 1):
+        by_file.setdefault(c['file'].rsplit('/', 1)[-1].lower(), []).append((i, c))
+    files = [p for p in originals_dir.rglob('*') if p.is_file()]
+    lines, checklist, relink, asking = [], [], {}, False
+    for row in rows:
+        name, fps = row['name'], Fraction(str(row.get('fps') or 25))
+        frames = int(float(row.get('frames') or 0))
+        mine = by_file.get(name.lower(), [])
+        exact = [p for p in files if p.name.lower() == name.lower()]
+        cands = exact or [p for p in files if _norm_stem(p.name) == _norm_stem(name)]
+        line = {'copy': name, 'cuts': [i for i, _ in mine]}
+        if not cands:
+            lines.append({**line, 'outcome': 'missing', 'line': f'{name}: no original with this name. Look for a renamed file. Cuts: {", ".join(str(i) for i, _ in mine) or "none"}.'})
+            continue
+        probed = {p: probe(p) for p in cands}
+        agree = lambda p: probed[p]['frames'] == frames and Fraction(str(probed[p]['fps'])) == fps and (not row.get('start_timecode') or probed[p]['start_timecode'] == row['start_timecode'])
+        confirmed = [p for p in cands if agree(p)]
+        if len(cands) > 1 and len(confirmed) != 1:
+            asking = True
+            lines.append({**line, 'outcome': 'ask', 'candidates': [p.name for p in cands], 'line': f"{name}: {len(cands)} originals fit this name ({', '.join(p.name for p in cands)}); pick one. Nothing is written until then."})
+            continue
+        p = confirmed[0] if confirmed else cands[0]
+        o = probed[p]
+        if o['frames'] != frames or Fraction(str(o['fps'])) != fps:
+            diff = o['frames'] - frames
+            why = (f"the copy is {abs(diff)} frames {'shorter' if diff > 0 else 'longer'} than the original" if Fraction(str(o['fps'])) == fps
+                   else f"the frame rate differs: the copy {float(fps):g}, the original {float(Fraction(str(o['fps']))):g}")
+            grabs = []
+            for i, c in mine:
+                at = float(Fraction(c['source_in']) / fps)
+                out = f'Timeline/grabs/{name}-cut{i}.png'
+                grab(p, at, edit_dir / out)
+                grabs.append({'cut': i, 'at_s': at, 'grab': out})
+            lines.append({**line, 'outcome': 'by_hand', 'original': p.name, 'cuts': grabs, 'line': f'{name}: {why}. This clip must be lined up by hand (cuts listed below).'})
+            checklist.append(f"{name} → {p.name}: {why}; line up cut{'s' if len(grabs) != 1 else ''} {', '.join(str(g['cut']) for g in grabs)} by hand ({'; '.join(f'{g[chr(97)+chr(116)+chr(95)+chr(115)]:.1f} s' for g in grabs)} into the copy; grab in Timeline/grabs/)".replace("f'{g[chr(97)+chr(116)+chr(95)+chr(115)]:.1f} s'", ''))
+            continue
+        offset = tc_seconds(o['start_timecode'], fps) - tc_seconds(row.get('start_timecode'), fps)
+        if offset:
+            lines.append({**line, 'outcome': 'timecode', 'original': p.name, 'line': f"{name}: the copy has {'no timecode' if not row.get('start_timecode') else 'timecode ' + row['start_timecode']}; the original starts at {o['start_timecode']}. A corrected timeline is written."})
+            relink[name.lower()] = (p, offset)
+        elif p.name != name:
+            lines.append({**line, 'outcome': 'renamed', 'original': p.name, 'line': f'copy {name} = original {p.name} (length, frame rate, timecode agree). The relinked timeline points at it.'})
+            relink[name.lower()] = (p, Fraction(0))
+        else:
+            lines.append({**line, 'outcome': 'match', 'original': p.name, 'line': f'{name}: name, length, frame rate and timecode match. Relinks as is.'})
+    relinked = None
+    if relink and not asking:
+        relinked = edit_dir / 'Timeline' / f'{code}-relinked.fcpxml'
+        relinked.write_bytes(_relinked(text, relink).encode('utf-8'))
+    return {'lines': lines, 'checklist': checklist, 'relinked': str(relinked) if relinked else None}
+
+
+def _relinked(text, relink):
+    """The portable timeline with each relinked asset pointing at the original's real path and its cuts moved by the timecode offset."""
+    root = ET.fromstring(text)
+    shift = {}
+    for a in root.findall('./resources/asset'):
+        rep = a.find('media-rep')
+        name = _path(rep.get('src')).rsplit('/', 1)[-1].lower()
+        if name in relink:
+            p, offset = relink[name]
+            base = str(p.resolve()).replace('\\', '/')
+            rep.set('src', 'file://' + quote(base if base.startswith('/') else '/' + base, safe='/:'))
+            a.set('start', f'{offset.numerator}/{offset.denominator}s' if offset.denominator != 1 else f'{offset.numerator}s')
+            shift[a.get('id')] = offset
+    for c in root.iter('asset-clip'):
+        off = shift.get(c.get('ref'))
+        if off:
+            start = Fraction(c.get('start').rstrip('s')) + off
+            c.set('start', f'{start.numerator}/{start.denominator}s' if start.denominator != 1 else f'{start.numerator}s')
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE fcpxml>\n' + ET.tostring(root, encoding='unicode')
+
+
+def compare(cuts, events, narration_pieces):
+    """The readback against the plan, cut by cut (design/17 A47, 0 frames); [] when they agree. The same rule as the server's differences()."""
+    out = []
+    plan = [(1, [c for c in cuts if c['lane'] == 1], [{'file': e['file'], 'record_in': e['record_in_frame'], 'record_out': e['record_out_frame'], 'source_in': e['source_in_frame'], 'source_out': e['source_out_frame']} for e in events]),
+            (-1, [c for c in cuts if c['lane'] == -1], [{'file': p.get('file') or 'Media/Voiceover/narration.mp3', 'record_in': p['record_in_frame'], 'record_out': p['record_in_frame'] + p['source_out_frame'] - p['source_in_frame'],
+                                                         'source_in': p['source_in_frame'], 'source_out': p['source_out_frame']} for p in narration_pieces or []])]
+    for lane, got, want in plan:
+        for i, (g, w) in enumerate(zip(got, want), 1):
+            for k in ('file', 'record_in', 'record_out', 'source_in', 'source_out'):
+                if (not g['file'].replace('\\', '/').endswith(w['file'])) if k == 'file' else g.get(k) != w[k]:
+                    out.append({'cut': i if lane == 1 else f'voiceover {i}', 'file': w['file'], 'field': k, 'timeline': g.get(k), 'plan': w[k]})
+        if len(got) != len(want):
+            out.append({'cut': None, 'file': 'voiceover' if lane == -1 else 'video', 'field': 'count', 'timeline': len(got), 'plan': len(want)})
     return out
