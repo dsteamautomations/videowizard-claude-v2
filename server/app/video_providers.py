@@ -22,7 +22,7 @@ def motion_text(snapshot):
     two=bool(snapshot.get('end_image'))
     prompt='[# Sources <FIRST_FRAME>@Image1'+(' <LAST_FRAME>@Image2' if two else '')+']\n'
     prompt+=snapshot['motion_prompt']
-    if (snapshot.get('ambient') or '').strip():prompt+='\nThroughout the shot the surroundings stay alive: '+snapshot['ambient'].strip().rstrip('.')+'.'   # design/101 M3
+    if (snapshot.get('ambient') or '').strip() and not re.match(r'\s*still\b',snapshot['ambient'],re.I):prompt+='\nThroughout the shot the surroundings stay alive: '+snapshot['ambient'].strip().rstrip('.')+'.'   # design/101 M3; a `still:` line asks for nothing
     prompt+='\nNatural, unhurried motion; no sudden, exaggerated or floating movement.'   # design/102 B3: how things move, not how much
     prompt+='\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
     prompt+='\nContinuity: '+(snapshot.get('continuity_notes') or '')

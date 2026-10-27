@@ -670,7 +670,7 @@ def waiting(session, plan, code, take_rows):
             if chain and len(chain) == len(sh.get('states') or []) and any(r['status'] == 'candidate' for r in chain) and not any(r.get('check_pending') for r in chain):
                 add(sh['start_frame'], f"Graphics · {sid}{title(sh)} · {len(chain)} states", 'pictures', sid, chain[-1]['id'])
         spec = sh.get('drawing_spec')
-        if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec):
+        if spec and (session.get('spec_approvals') or {}).get(sid, {}).get('digest') != spec_digest(spec) and not correction_pending(session, sid, spec):
             pending_specs.append(sh['start_frame'])
     if pending_specs:   # design/106 D5: one item, one table, one approval
         add(min(pending_specs), f"Drawing specs · {len(pending_specs)} to approve", 'pictures', 'specs', 'specs')
@@ -1211,6 +1211,7 @@ def generate_image(conn, store, user, run, outputs, body):
     need(role in ('', 'start', 'end'), 'role is start or end.')
     need(not role or body['kind'] == 'keyframe', 'A role (start or end) is for a keyframe.')
     is_end = role == 'end' if role else any(p['kind'] == 'keyframe' for p in parents)
+    need(not is_end or any(p['kind'] == 'keyframe' for p in parents), 'An end image is made from its start: name the start keyframe among its parents.')   # review 27 Oct
     if body['kind'] == 'keyframe':
         body = {**body, 'role': 'end' if is_end else 'start'}   # a copy: the caller's request is never changed
     variants = int(body.get('variants') or 1)   # design/86 K4: two candidates for a start keyframe, the operator picks
@@ -1364,6 +1365,7 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
+    need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; approve the revised one.')   # review 27 Oct
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     (session.get('spec_corrections') or {}).pop(shot_id, None)
     save_session(store, run, session)
@@ -1402,7 +1404,7 @@ def correct_spec(store, user, run, outputs, shot_id, words):
     session = session_of(store, run, outputs)
     _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
     need(shot.get('drawing_spec'), f'Shot {shot_id} has no drawing spec.')
-    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': spec_digest(shot['drawing_spec'])}
     save_session(store, run, session)
     return {'shot_id': shot_id, 'correction': words, 'next': f'Correction sent: the assistant revises the spec of {shot_id}, then you approve it.'}
 
@@ -1412,15 +1414,24 @@ def approve_specs(store, user, run, outputs, quote=''):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     quote = said(quote, 'Approved', user)
-    approved = []
+    approved, waiting_ = [], []
     for _, sh in _accepted_shots(plan, session):
         spec = sh.get('drawing_spec')
-        if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
+        if spec and correction_pending(session, sh['id'], spec):   # review 27 Oct: the assistant's turn, not approved over
+            waiting_.append(sh['id'])
+        elif spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
             session.setdefault('spec_approvals', {})[sh['id']] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(sh['id'], None)
             approved.append({'shot_id': sh['id'], 'table': spec_table(spec)})
     save_session(store, run, session)
-    return {'approved': approved, 'next': f"{len(approved)} drawing spec{'s' if len(approved) != 1 else ''} approved." if approved else 'No drawing spec was waiting.'}
+    return {'approved': approved, 'waiting': waiting_, 'next': (f"{len(approved)} drawing spec{'s' if len(approved) != 1 else ''} approved." if approved else 'No drawing spec was waiting.')
+            + (f" {', '.join(waiting_)}: a correction waits for the assistant; approve the revised spec." if waiting_ else '')}
+
+
+def correction_pending(session, shot_id, spec):
+    """design/106 D4: a correction stays until the spec it was made on changes (an old record without a digest counts as pending)."""
+    c = (session.get('spec_corrections') or {}).get(shot_id)
+    return bool(c) and c.get('digest', spec_digest(spec)) == spec_digest(spec)
 
 
 def _gemini_transport():
@@ -1485,7 +1496,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
 
 
-CAMERA_MOVE = re.compile(r"(camera(?![^.;]{0,40}?\b(not|\w+n't|never|no|without|unmoved|stays|still|static|fixed|locked)\b)[^.;]{0,40}?\b(push|drift|dolly|zoom|pan|tilt|track|mov)\w*)"
+CAMERA_MOVE = re.compile(r"(\bcamera\s+(?:(?:\w+ly|has|had|is|was|then|now|also|begins? to|starts? to)\s+)*(push|drift|dolly|zoom|pan|tilt|track|mov)\w*)"   # review 27 Oct: the camera is the one moving, not something near the word
                          r"|\b(push[- ]in|pull[- ]out|dolly|zoom\w*|tracking shot|pan(ning)? (left|right)|tilt(ing)? (up|down))\b", re.I)
 
 
@@ -2470,6 +2481,7 @@ def status(conn, store, run, outputs, repair=True):
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
             'footage': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/88
             'waiting': waiting(session, plan, run.get('code'), take_rows),   # design/97 W4: each with its label and link
+            'spec_corrections': {sid: c.get('words') for sid, c in (session.get('spec_corrections') or {}).items()},   # review 27 Oct: the assistant revises these specs
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 

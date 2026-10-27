@@ -7,6 +7,7 @@ failed line asks for) is made only on request (design/96 X1: `visuals_stage.requ
 the check failed."""
 import base64
 import json
+import re
 import uuid
 from io import BytesIO
 
@@ -37,6 +38,14 @@ TAKE_LINES = [   # design/91 N3: the fixed questions every take is read against
     {'check': 'frozen person', 'pass_when': 'no person stands frozen while others move', 'weight': 'should'}]   # design/104 C4
 LIGHT_KEPT = {'check': 'light kept', 'pass_when': "the light keeps the direction and brightness the plan's light line gives, from the first frame to the last", 'weight': 'must'}   # design/104 C5
 AMBIENT_LINE = {'check': 'surroundings move', 'pass_when': "what the plan's ambient line names moves visibly through the shot; nothing that should move is frozen", 'weight': 'must'}   # design/101 M4
+
+
+def ambient_moves(snapshot):
+    """design/101 M1 allows `still: nothing else moves`; such a line asks for no movement and gets no must line."""
+    line = str(snapshot.get('ambient') or '').strip()
+    return line if line and not re.match(r'still\b', line, re.I) else ''
+
+
 TAKE_SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'object', 'properties': {'n': {'type': 'integer'}, 'pass': {'type': 'boolean'}, 'seen': {'type': 'string'},
                                                                                      'at_s': {'type': 'number'}}, 'required': ['n', 'pass', 'seen']}}}, 'required': ['lines']}
 
@@ -54,9 +63,9 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
         plan = '\n'.join(['The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
                          [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
                          (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []) +
-                         (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if snapshot.get('ambient') else []) +
+                         (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if ambient_moves(snapshot) else []) +
                          (['The light (the light line): ' + str(snapshot['light'])[:1000]] if snapshot.get('light') else []))
-        take_lines = TAKE_LINES + ([AMBIENT_LINE] if snapshot.get('ambient') else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])   # design/101 M4; design/104 C5
+        take_lines = TAKE_LINES + ([AMBIENT_LINE] if ambient_moves(snapshot) else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])   # design/101 M4; design/104 C5
         asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(take_lines, 1))
         received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
             'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
@@ -240,4 +249,6 @@ def fix_body(ref, failed):
               'Render only explicitly requested image text. Do not add unrelated logos, signatures or captions.')
     return {'request_id': str(uuid.uuid4()), 'element_id': ref['element_id'], 'name': ref['name'] + '-fix', 'kind': ref['kind'], 'subject': ref.get('subject') or '',
             'prompt': prompt, 'parents': [ref['id']], 'fix_of': ref['id'], 'shot_id': ref.get('shot_id'),   # design/94 R1.1: listed under its original's shot
+            **({'role': ref['role']} if ref.get('role') else {}),   # review 27 Oct: a fix of a start is a start, with the same end to make
+            **({'end_prompt': ref['pending_end']['prompt'], 'end_answer': ref['pending_end'].get('answer')} if ref.get('pending_end') else {}),
             'answer': {**(ref.get('answer') or {}), 'prompt': prompt, 'base_image_id': ref['id'], 'single_change': failed['pass_when']} if ref.get('answer') else None}

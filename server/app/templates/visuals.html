@@ -276,7 +276,7 @@ function specBox(s){   // design/89 D2, D4: the drawing spec as a table, approve
     (s.claims.length?'<div class="ds">Claims the picture must show: '+s.claims.map(esc).join(' · ')+'</div>':'');
   if(s.spec.correction)h+='<div class="ds">Correction sent: '+esc(s.spec.correction)+' (the assistant revises the spec)</div>';
   if(can&&!s.spec.approved)h+='<div class="btns"><button class="go" data-a="approve-spec" data-shot="'+id+'">Approve the spec</button></div>'+   // design/106 D4: the sizes come from the planner, never typed
-    '<textarea id="sp-c-'+id+'" class="words" style="width:100%;margin-top:6px" placeholder="correct a value, if one is wrong (optional): the cavity is 50 mm"></textarea><div class="btns"><button data-a="correct-spec" data-shot="'+id+'">Send the correction</button></div>';
+    '<textarea id="sp-c-'+id+'" class="words keep" style="width:100%;margin-top:6px" placeholder="correct a value, if one is wrong (optional): the cavity is 50 mm"></textarea><div class="btns"><button data-a="correct-spec" data-shot="'+id+'">Send the correction</button></div>';
   if(can&&frames.length)h+='<div class="ds" style="margin-top:6px">Measure from your footage frames:</div><select id="ms-f-'+id+'" multiple size="3">'+frames.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('')+'</select>'+
     '<input id="ms-q-'+id+'" placeholder="what to measure, for example: how thick is the wall?" style="width:100%;margin-top:4px"><div class="btns"><button data-a="measure" data-shot="'+id+'">Measure</button></div>';
   const ms=(data.measurements||[]).flatMap(m=>m.measurements.map(x=>esc(x.part)+' '+esc(x.measure)+' '+esc(x.value)+' '+esc(x.unit)+' ('+esc(x.source)+')'));
@@ -365,7 +365,7 @@ function placedIn(rid){for(const g of (data.gaps||[]))for(const s of g.shots){co
 function noteBox(r){   // design/106 N4: a saved picture's note, editable until its element's sheet is made
   if(!['web','frame','supplied','isolated'].includes(r.kind)||r.status==='rejected'||stage()!=='visuals')return '';
   if((data.references||[]).some(x=>x.kind==='sheet'&&x.element_id===r.element_id&&x.status!=='rejected'))return r.note?'<div class="ds">Note: '+esc(r.note)+'</div>':'';
-  return '<textarea id="ref-note" class="pnote" placeholder="note for the sheet: keep … / avoid …">'+esc(r.note||'')+'</textarea><div class="btns"><button data-a="save-note" data-ref="'+esc(r.id)+'">Save the note</button></div>';}
+  return '<textarea id="ref-note" class="pnote keep" placeholder="note for the sheet: keep … / avoid …">'+esc(r.note||'')+'</textarea><div class="btns"><button data-a="save-note" data-ref="'+esc(r.id)+'">Save the note</button></div>';}
 function refsById(){const o={};(data.references||[]).forEach(r=>{o[r.id]=r;});return o;}
 function filmAt(s){return fmt(s.start_frame)+'–'+fmt(s.end_frame);}
 function isWaiting(id){return (data.waiting||[]).some(w=>w.item===id);}
@@ -765,9 +765,11 @@ async function click(b){
 function render(){
   if(!step)step=recall('step')||autoStep();
   frame();
+  const typed={};document.querySelectorAll('textarea.keep').forEach(t=>typed[t.id]=t.value);   // review 27 Oct: a note or correction being typed survives the redraw
   STEPS.forEach(([k])=>{const sec=$('s-'+k);sec.hidden=(k!==step);if(k!==step)sec.innerHTML='';});   // defect 29: one panel at a time, so its buttons are the wired ones
   if(!data||data.state!=='prepared'){STEPS.forEach(([k])=>$('s-'+k).innerHTML='<div class="empty">Nothing to show yet.</div>');footer();if(stage()==='visuals')schedule(60000);return;}
   if(step==='treatment'){renderTreatment();wireFootage();}if(step==='plan')renderPlan();if(step==='references')renderReferences();if(step==='pictures')renderPictures();if(step==='takes')renderTakes();if(step==='record')renderRecord();
+  Object.entries(typed).forEach(([id,v])=>{const t=$(id);if(t&&v)t.value=v;});
   footer();
   const busy=data.references.some(r=>r.status==='generating')||data.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status))));
   if(stage()==='visuals')schedule(busy?15000:60000);   // design/74 L29

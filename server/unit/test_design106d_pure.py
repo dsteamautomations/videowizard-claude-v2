@@ -83,6 +83,11 @@ def test_a_spec_is_approved_without_words_and_a_correction_waits_for_the_assista
     store = spec_store()
     VS.correct_spec(store, USER, RUN, [], 'DG1', 'the cavity is 50 mm, not unknown')
     assert saved(store)['spec_corrections']['DG1']['words'] == 'the cavity is 50 mm, not unknown'
+    with pytest.raises(Problem, match='waits for the assistant'):   # review 27 Oct: never approved over the correction
+        g(lambda: VS.approve_spec(store, USER, RUN, [], 'DG1', ''))
+    s = saved(store)
+    s['spec_corrections']['DG1']['digest'] = 'before the revision'   # the assistant revised the spec
+    store.files['run-1/visuals/session.json'] = json.dumps(s).encode('utf-8')
     out = VS.approve_spec(store, USER, RUN, [], 'DG1', '')
     s = saved(store)
     assert s['spec_approvals']['DG1']['quote'] == 'Approved by SK' and 'DG1' not in s.get('spec_corrections', {})
