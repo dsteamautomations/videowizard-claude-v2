@@ -328,6 +328,51 @@ def check_take(job, result):
         return
 
 
+def process_drawn(job):
+    """design/113 E2: render the shot's scene (free, no provider). Returns (status, result, error, cost, retry_in)."""
+    from . import drawn
+    req, jid = job['request'], str(job['id'])
+    store = storage()
+    folder = SPOOL / jid
+    video_path = folder / 'output.mp4'
+    try:
+        request = json.loads(store.get(req['request_key']).decode('utf-8'))
+        images = {rid: store.get(k) for rid, k in (request.get('images') or {}).items()}
+        if request.get('font_key'):
+            fp = folder / Path(request['font_key']).name
+            durable(fp, store.get(request['font_key']))
+            request = {**request, 'font': str(fp)}
+        drawn.render(request, video_path, images)
+        data = video_path.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        k = f"{job['run_id']}/visuals/drawn/{jid}.mp4"
+        store.put(k, data, 'video/mp4')
+        evidence = probe(video_path)
+        planned, fps = int(request['frames']), Fraction(str(request['fps']))
+        exact = planned / fps
+        evidence.update(requested_duration_seconds=float(exact), placement=request['placement'], creative_approval=False, **timing_evidence(evidence['duration_seconds'], str(exact)))
+        code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(evidence['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(evidence['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},
+                {'check': 'size', 'weight': 'must', 'pass': (evidence.get('width'), evidence.get('height')) == (int(request['width']), int(request['height'])), 'seen': f"{evidence.get('width')}x{evidence.get('height')}"}]
+        return 'ready', {'provider_id': 'drawn', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': code}, None, {'provider': 'drawn', 'seconds': float(exact), 'inr': 0}, None
+    except Exception as exc:   # a render that fails is reported, never retried blindly
+        return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
+
+
+def check_drawn(job, result):
+    """design/113 E3: the rendered drawing's lines on the session like a take's: the code lines now; the model read of the first and last frame joins here."""
+    store = storage()
+    try:
+        with connect() as conn:
+            conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
+            k = f"{job['run_id']}/visuals/session.json"
+            session = json.loads(store.get(k).decode('utf-8'))
+            lines = [dict(c) for c in result.get('code') or []]
+            session.setdefault('take_checks', {})[str(job['id'])] = {'lines': lines, 'must_failed': [c for c in lines if c.get('pass') is False], 'model': None}
+            store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+    except Exception:   # a drawing is never held back by its check
+        return
+
+
 def claim_take(conn):
     return conn.execute('''update vw2_jobs set status = case when status in ('queued','submitted') then 'running' else status end, lease_until = now() + interval '20 minutes',
                            attempt = attempt + 1, updated_at = now()
@@ -349,6 +394,17 @@ def tick():
     from . import worker
     if worker.STOP:
         return busy
+    with connect() as conn:
+        job = jobs.claim(conn, 'drawn')   # design/113 E2: a render, a few seconds, free
+    if job:
+        status, result, error, cost, retry_in = process_drawn(job)
+        with connect() as conn:
+            jobs.finish(conn, job['id'], status, result=result, error=error, cost=cost, retry_in=retry_in)
+            if status == 'ready':
+                jobs.record_file(conn, job['run_id'], 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'video/mp4')
+        if status == 'ready':
+            check_drawn(job, result)
+        busy = True
     with connect() as conn:
         job = claim_take(conn)
     if job:

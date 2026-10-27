@@ -1299,7 +1299,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this']   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font']   # design/113   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1313,7 +1313,7 @@ VISUALS_FLAGS = {
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
     'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
-    'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'},
+    'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'}, 'draw': {'shot'}, 'font': {'file'},   # design/113
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
     'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote'},
     'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'element', 'quote', 'notes'},
@@ -1594,6 +1594,18 @@ def cmd_visuals(a):
         body = {'shot_id': a.shot, 'start_image': a.start, **({'end_image': a.end} if a.end else {}), 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
                 **({'duration_seconds': int(a.seconds)} if a.seconds else {}), **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5
         emit(write(base + '/prepare-take', body))
+    if a.what == 'draw':   # design/113 E2: the plan's scene of a drawn shot, rendered free
+        if not a.shot:
+            emit({'action': 'refused', 'message': 'Give the drawn shot: `draw --shot S`.'}, 2)
+        out = write(base + '/draw', {'shot_id': a.shot})
+        emit(out, 0, out.get('next'))
+    if a.what == 'font':   # design/113 E4: the film's brand font
+        import base64 as _b64
+        p = Path(a.file or '')
+        if not a.file or not p.is_file() or p.suffix.lower() not in ('.ttf', '.otf'):
+            emit({'action': 'refused', 'message': 'Give one .ttf or .otf file: `font --file brand.ttf`.'}, 2)
+        out = write(base + '/font', {'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
+        emit(out, 0, out.get('next'))
     if a.what == 'take':
         shots = list(a.shots or ([a.shot] if a.shot else []))
         if not shots:

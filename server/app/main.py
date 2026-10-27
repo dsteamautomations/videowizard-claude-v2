@@ -1229,6 +1229,26 @@ def visuals_reference(run_id: UUID, body: ReferenceAdd, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_reference(conn, storage(), user, run, outputs, body_dict(body), content), 201)
 
 
+class Draw(Write):   # design/113 E2
+    shot_id: str
+
+
+class FontUpload(Write):   # design/113 E4
+    name: str
+    content_base64: str
+
+
+@app.post('/api/runs/{run_id}/visuals/draw', status_code=201)
+def visuals_draw(run_id: UUID, body: Draw, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.render_drawn(conn, storage(), user, run, outputs, body_dict(body)), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/font')
+def visuals_font(run_id: UUID, body: FontUpload, user=User, conn=DB):
+    import base64 as b64
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_font(storage(), user, run, outputs, body.name, b64.b64decode(body.content_base64)))
+
+
 @app.post('/api/runs/{run_id}/visuals/images', status_code=201)
 def visuals_image(run_id: UUID, body: ImageGenerate, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.generate_image(conn, storage(), user, run, outputs, body_dict(body)), 201)

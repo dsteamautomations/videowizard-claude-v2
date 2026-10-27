@@ -3229,6 +3229,67 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     return {**session['selections'][job['unit']], 'next': f"Take selected: in the film at {film_time(session, shot)} ({job['unit']})."}   # design/97 A4
 
 
+# ---------- design/113 E2, E4: the drawn graphic rendered by the server, free, reviewed like a take ----------
+
+def render_drawn(conn, store, user, run, outputs, body):
+    """The plan's scene of a drawn shot, rendered at the film's size and frame rate: the spec approved first (E5), the cues from the timed
+    narration, the server's size labels, the run's brand font; cached by the request's digest; never counted against the cap."""
+    from . import drawn
+    from .visual_contract import drawn_labels
+    session = session_of(store, run, outputs)
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, body['shot_id']))
+    need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_drawn).")
+    _no_question(session, shot['id'])   # design/110 rule 0
+    spec = shot.get('drawing_spec')
+    need(spec and (session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
+         f"the drawing spec of {shot['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {shot['id']} --quote`, or on the page) before the drawing is rendered (design/113 E5).")
+    fps = session['source']['fps']
+    W, H = (int(v) for v in str(session['source'].get('resolution') or '1920x1080').lower().split('x'))
+    words = ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words')
+    cues = guarded(lambda: drawn.cue_seconds(shot['scene_drawn'], shot, words, fps))
+    images = {}
+    for s in shot['scene_drawn'].get('shapes') or []:
+        if s['kind'] == 'image':
+            ref = session['references'].get(s.get('image_ref'))
+            need(ref and ref.get('status') == 'approved' and ref.get('key'), f"shape '{s['id']}' names {s.get('image_ref')}, which is not an approved picture of this run.")
+            images[s['image_ref']] = ref['key']
+    frames = shot['end_frame'] - shot['start_frame']
+    exact = Fraction(frames) / Fraction(str(fps))
+    request = {'kind': 'drawn', 'shot_id': shot['id'], 'scene': shot['scene_drawn'], 'labels': drawn_labels(shot), 'width': W, 'height': H, 'fps': str(fps), 'frames': frames, 'cues': cues,
+               'images': images, 'plan_digest': digest(plan), **({'font_key': session['font']['key']} if session.get('font') else {}),
+               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
+    identity = digest(request)
+    key_ = key(run, f'takes/{identity}.drawn.json')
+    save_json(store, key_, request)
+    same = [j for j in take_jobs(conn, run, shot['id']) if j.get('provider') == 'drawn' and (j.get('request') or {}).get('preparation_id') == identity and j['status'] not in ('failed', 'rejected', 'cancelled')]
+    session['preparations'][shot['id']] = {'preparation_id': identity, 'key': key_, 'drawn': True}
+    if same:
+        save_session(store, run, session)
+        return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this scene (nothing changed): see it on the Takes step.'}
+    row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
+                       (run['id'], shot['id'], Jsonb({'kind': 'drawn', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': float(exact)}))).fetchone()
+    save_session(store, run, session)
+    return {'job_id': str(row['id']), 'preparation_id': identity, 'frames': frames, 'next': f'Rendering {frames} frames, free: it appears on the Takes step in a few seconds; approve it there or reject it with what to change.'}
+
+
+def set_font(store, user, run, outputs, name, content):
+    """design/113 E4: the film's brand font, one TTF or OTF kept with the run; the drawn route and the slates use it; nothing is substituted when it cannot be read."""
+    from io import BytesIO
+    from PIL import ImageFont
+    session = session_of(store, run, outputs)
+    need(re.search(r'\.(ttf|otf)$', name or '', re.I), 'The font is one .ttf or .otf file.')
+    need(content and len(content) <= 5_000_000, 'The font file is empty or over 5 MB.')
+    try:
+        ImageFont.truetype(BytesIO(content), 12)
+    except Exception as exc:
+        need(False, f'Pillow cannot read {name} ({exc.__class__.__name__}): the film keeps the repo font until a readable file is given.')
+    k = f"{run['id']}/fonts/{re.sub(r'[^A-Za-z0-9._-]', '_', name)}"
+    store.put(k, content, 'font/ttf' if name.lower().endswith('.ttf') else 'font/otf')
+    session['font'] = {'key': k, 'name': name, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'font': session['font'], 'next': f'{name} is the font of this film: every drawn graphic uses it from the next render.'}
+
+
 def made_for(session, row):
     """design/94 R1.1: the shot a picture was made for; a fix made before shots were recorded takes its original's."""
     return row.get('shot_id') or (session['references'].get(row.get('fix_of')) or {}).get('shot_id')
