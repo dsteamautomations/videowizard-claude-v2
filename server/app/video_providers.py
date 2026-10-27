@@ -27,6 +27,7 @@ def motion_text(snapshot):
     prompt+='\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
     prompt+='\nContinuity: '+(snapshot.get('continuity_notes') or '')
     for l in snapshot.get('person_lines') or []:prompt+='\n'+l   # design/111 F16: the fixed layer and the scene's colours
+    if 'camera_move' in snapshot:prompt+='\nCamera: '+((snapshot['camera_move'] or '').strip().rstrip('.')+'; nothing else about the frame changes' if (snapshot['camera_move'] or '').strip() else 'locked off on a tripod; the frame does not move, drift, zoom or slide')+'.'   # design/112 S4
     for l in (snapshot.get('gaze_lines') or [])+(snapshot.get('heading_lines') or [])+(snapshot.get('tool_lines') or [])+([snapshot['fixed_line']] if snapshot.get('fixed_line') else []):prompt+='\n'+l   # design/110 F5, F6; design/111 F7, F8
     if (snapshot.get('light') or '').strip():prompt+='\nThe light does not change: '+snapshot['light'].strip().rstrip('.')+'.'   # design/103 A1
     prompt+='\nIn a single unbroken scene, one continuous shot, no scene cuts, no jump cuts. No dialogue. No music. No captions or overlay text.'

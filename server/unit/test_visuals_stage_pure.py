@@ -211,7 +211,7 @@ def test_budget_reports_spend_cap_and_what_the_plan_still_needs(monkeypatch):
     doc = plan_doc([shot('AN1', 0, 500, 'animation', states=[{'what_appears': 'a', 'hold_s': 10}, {'what_appears': 'b', 'hold_s': 10}])], [shot('VS1', 900, 1150, 'video')])
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1')
     b = VS.budget(FakeConn([job('openai')]), store_with(sess, doc), RUN, [])
-    assert b['spent_inr'] == 20.0 and b['cap_inr'] == 5000.0 and b['planned'] == {'images': 4, 'video_seconds': 10.0, 'inr': 4 * 20.0 + 10 * 8.0}   # two states, a start and an end image
+    assert b['spent_inr'] == 20.0 and b['cap_inr'] == 5000.0 and b['planned'] == {'images': 3, 'video_seconds': 10.0, 'inr': 3 * 20.0 + 10 * 8.0}   # two states, a start image (design/112 S1: no end unless exact)
     assert b['left_inr'] == 4980.0
 
 
@@ -289,8 +289,10 @@ def test_prepare_take_needs_a_start_and_a_distinct_end_image_and_freezes_both():
     body = {'shot_id': 'VS1', 'motion_prompt': 'water poured along the top', 'subject_reconciliation': {}, 'start_image': 'R1', 'continuity_notes': 'the wall and the yard light stay'}
     with pytest.raises(Problem, match='Continuity notes are required'):   # design/84 V2
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'R2', 'continuity_notes': ' '}))
-    with pytest.raises(Problem, match='start and an end image') as exc:
-        g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], body))
+    doc_exact = plan_doc([shot('IM1', 0, 500, 'image')], [{**shot('VS1', 900, 1150, 'video', subjects=[]), 'end_state_exact': True}])   # design/112 S1: the end only when the shot asks
+    sess_exact = {**sess, 'accepted': accepted(doc_exact), 'bindings': {'VS1': {**sess['bindings']['VS1'], 'gap_digest': gap_digest(doc_exact, doc_exact['gaps'][1])}}}
+    with pytest.raises(Problem, match='final state must be exact') as exc:
+        g(lambda: VS.prepare_take(store_with(sess_exact, doc_exact), USER, RUN, [], body))
     assert '--kind keyframe --parents <start>' in exc.value.message and '--start R --end R2' in exc.value.message
     with pytest.raises(Problem, match='distinct'):
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'R1'}))

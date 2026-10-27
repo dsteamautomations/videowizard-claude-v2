@@ -135,8 +135,11 @@ def test_prepare_take_needs_the_end_image_before_any_request(harness, monkeypatc
     """design/66 D1: every take has a start and an end image; the plugin refuses without one and posts nothing."""
     posted = {}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body, path=path) or {'preparation_id': 'p1', 'duration_seconds': 6}))
-    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', motion='pours', subject=['E1="pours water"']), capsys)
-    assert code == 2 and 'start and an end image' in out['message'] and '--end' in out['message'] and not posted
+    code, out, err = run(args(what='prepare-take', shot='VS1', motion='pours', subject=['E1="pours water"']), capsys)
+    assert code == 2 and 'start image' in out['message'] and not posted
+    code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', motion='pours', subject=['E1="pours water"'], continuity='the wall stays'), capsys)   # design/112 S1: start alone is a request
+    assert code == 0 and posted['start_image'] == 'R1' and 'end_image' not in posted
+    posted.clear()
     code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"']), capsys)
     assert code == 2 and '--continuity' in out['message'] and not posted   # design/84 V2
     code, out, err = run(args(what='prepare-take', shot='VS1', start='R1', end='R2', motion='pours', subject=['E1="pours water"'], continuity='the wall stays; grey hair, white shirt'), capsys)

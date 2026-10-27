@@ -3028,9 +3028,9 @@ def prepare_take(store, user, run, outputs, body):
         except ValueError:
             save_session(store, run, session)
             raise
-    need(body.get('end_image'), 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
-                                'approve both, then `--start R --end R2`.')   # design/66 C2
-    need(body['start_image'] != body['end_image'], 'The start and end images are distinct pictures: the end is the start one small action further on.')
+    need(body.get('end_image') or not planned.get('end_state_exact'), "This shot's final state must be exact (end_state_exact): generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), "
+                                                                      'approve both, then `--start R --end R2`.')   # design/66 C2, narrowed by design/112 S1: start alone by default
+    need(body['start_image'] != body.get('end_image'), 'The start and end images are distinct pictures: the end is the start one small action further on.')
     library.check_prompt(body['motion_prompt'])   # design/71 F2 (a ValueError: the API wraps this call in guarded())
     answer = body.get('answer')
     if answer is not None:   # design/68 L5
@@ -3050,15 +3050,15 @@ def prepare_take(store, user, run, outputs, body):
                                       "split the shot or choose another generator (`vw visuals generator`)")   # design/45 10.7: refuse, never clamp
     duration = body.get('duration_seconds') or max(cap['min_seconds'], -(-exact.numerator // exact.denominator))  # ceil, at least the generator's minimum
     need(cap['min_seconds'] <= duration <= cap['max_seconds'], f"Duration {duration}s is outside {cap['label']} ({cap['min_seconds']}–{cap['max_seconds']}s).")
-    images = {}
-    for role in ('start_image', 'end_image'):
+    images, form = {}, []
+    for role in ['start_image'] + (['end_image'] if body.get('end_image') else []):   # design/112 S1
         rid = body[role]
         row = session['references'].get(rid)
         need(row and row['status'] == 'approved', f'{role} must be an approved reference.')
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}
     used = [sid for sid, rid in _start_images(store, session).items() if rid == body['start_image'] and sid != body['shot_id']] + \
            [sid for sid, a in session['assets'].items() if sid != body['shot_id'] and a.get('reference_id') == body['start_image']]
-    warns, form = [], [] if answer is not None else ['no answer form with this take: write the motion prompt with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]   # design/89 C4
+    warns, form = [], form + ([] if answer is not None else ['no answer form with this take: write the motion prompt with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE])   # design/89 C4
     beats = {b['id']: b for s in planned.get('subjects') or [] for b in s.get('beats') or []}   # design/91 N1: when each change happens is its beat's frames
     changes = [{'what': c['what'], 'beat_id': c['beat_id'], 'at_s': [round((beats[c['beat_id']]['start_frame'] - planned['start_frame']) / float(fps), 2),
                                                                      round((beats[c['beat_id']]['end_frame'] - planned['start_frame']) / float(fps), 2)]}
@@ -3066,14 +3066,23 @@ def prepare_take(store, user, run, outputs, body):
     if not changes:
         form.append('no change list on this shot: list what differs between the start and the end picture and the beat that causes each (changes), so the pair is checked' + NEXT_RELEASE)
     _rule(session, not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
-    s, e = images['start_image'], images['end_image']
-    if all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
+    s, e = images['start_image'], images.get('end_image')
+    align = None
+    if e:   # design/112 S3: the pair's alignment, measured in code before anything else reads it
+        try:
+            align = image_check.pair_alignment(store.get(s['key']), store.get(e['key']))
+        except Exception as exc:
+            form.append(f'the pair alignment was not measured ({exc.__class__.__name__}): compare the framing of the two pictures yourself')
+        if align:
+            need(align['pass'], f"The end image is not aligned with the start: {align['seen']} (design/112 S3): make the end again as an edit of the start inside a region (`--region`), "
+                                'or set the shot start-only (end_state_exact false).')
+    if e and all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
         a, b = s['width'] / s['height'], e['width'] / e['height']
         need(abs(a - b) <= 0.01 * a, f"The start ({s['width']}x{s['height']}) and the end ({e['width']}x{e['height']}) differ in aspect ratio; "
                                      "generate the end from the start at the start's own size, or pick a start of the film's frame.")
     record = {'contract': 'videowizard-video-request-v1', 'run_id': str(run['id']), 'shot_id': body['shot_id'], 'plan_digest': base['plan_digest'],
               'base_preparation_digest': base['preparation_digest'], 'motion_prompt': body['motion_prompt'], 'subject_reconciliation': body['subject_reconciliation'],
-              'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration),
+              'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration), 'camera_move': shot.get('camera_move') or '',   # design/112 S4
               'aspect_ratio': default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), body),   # design/53 L7
               'resolution': body.get('resolution') or ('720p' if selected['model'] != video_generators.CATALOG[1]['model'] else None),
               **images, 'provider': selected['provider'], 'model': selected['model'],
@@ -3091,7 +3100,7 @@ def prepare_take(store, user, run, outputs, body):
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)
     pair = None
-    if changes:   # design/91 N1: Gemini lists what differs; a difference no change explains is marked, never refused
+    if changes and e:   # design/91 N1: Gemini lists what differs; a difference no change explains is marked, never refused
         pk = digest({'start': s['sha256'], 'end': e['sha256'], 'changes': changes})
         pair = (session.get('pair_checks') or {}).get(pk)
         if pair is None or pair.get('error'):
@@ -3101,8 +3110,8 @@ def prepare_take(store, user, run, outputs, body):
                  'or the end image is changed' for d in pair.get('uncaused') or []]
         if pair.get('error'):
             form.append(f"the pair check could not run ({pair['error']}): compare the two pictures with the change list yourself")
-    session['preparations'][body['shot_id']] = {'preparation_id': identity, 'key': key(run, f'takes/{identity}.request.json'), 'start_image': body['start_image'], 'end_image': body['end_image'],
-                                                'motion_prompt': body['motion_prompt'], **({'pair_check': pair} if pair else {}),
+    session['preparations'][body['shot_id']] = {'preparation_id': identity, 'key': key(run, f'takes/{identity}.request.json'), 'start_image': body['start_image'], 'end_image': body.get('end_image'),
+                                                'motion_prompt': body['motion_prompt'], **({'pair_check': pair} if pair else {}), **({'alignment': align} if align else {}),   # design/112 S3
                                                 **({'repeat_warnings': warns} if warns else {}),
                                                 **({'checklist': answer.get('checklist') or []} if answer is not None else {})}   # design/74 L6
     save_session(store, run, session)

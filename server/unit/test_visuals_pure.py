@@ -37,16 +37,16 @@ def test_routes_count_video_stills_and_graphic_sequences_with_no_file_warning():
     r = VC.routes(result)
     assert r['video'] == 1 and r['still'] == 2 and r['graphic_sequence'] == 1
     assert r['seconds'] == {'video': 4.0, 'still': 24.0, 'graphic_sequence': 12.0} and r['graphic_seconds'] == 16.0   # diagram 4 s + sequence 12 s
-    assert r['images_estimated'] == 2 + 3 + 1 + 1   # a start and an end image, three states, a diagram, a picture
+    assert r['images_estimated'] == 1 + 3 + 1 + 1   # a start image (design/112 S1: no end unless exact), three states, a diagram, a picture
 
 
 def test_video_images_count_a_run_of_segments_plus_one():
     """design/66 C1: every take has a start and an end image; consecutive video shots in a scene share their boundary picture."""
     result, _ = VC.validate_plan(plan([shot('V1', 0, 250, 'video'), shot('V2', 250, 500, 'video'), shot('V3', 500, 750, 'video'), shot('IM1', 750, 1000, 'image')]), GAPS, Fraction(25))
     r = VC.routes(result)
-    assert r['video'] == 3 and r['images_estimated'] == 4 + 1   # three segments, four images; the still
+    assert r['video'] == 3 and r['images_estimated'] == 3 + 1   # three starts (design/112 S1); the still
     result, _ = VC.validate_plan(plan([shot('V1', 0, 250, 'video'), shot('DG1', 250, 500, 'diagram'), shot('V2', 500, 1000, 'video')]), GAPS, Fraction(25))
-    assert VC.routes(result)['images_estimated'] == 2 + 1 + 2   # separated by a still: two images each
+    assert VC.routes(result)['images_estimated'] == 1 + 1 + 1   # a start each, the diagram between (design/112 S1)
 
 
 def test_an_animation_shot_needs_two_to_four_states_that_fill_it():

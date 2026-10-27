@@ -44,6 +44,55 @@ BACKGROUND_KEPT = {'check': 'background kept', 'pass_when': 'the three fixed thi
 AMBIENT_LINE = {'check': 'surroundings move', 'pass_when': "what the plan's ambient line names moves visibly through the shot; nothing that should move is frozen", 'weight': 'must'}   # design/101 M4
 
 
+CAMERA_STEADY = {'check': 'camera steady', 'pass_when': 'the framing does not move, drift, zoom or slide from the first frame to the last; only the subjects move', 'weight': 'must'}   # design/112 S4
+
+
+def take_lines_for(snapshot):
+    """The fixed take lines plus those the snapshot earns (design/101 M4, design/104 C5, design/110 F5, F6, design/111 F8, F16, design/112 S4)."""
+    return (TAKE_LINES + ([AMBIENT_LINE] if ambient_moves(snapshot) else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])
+            + ([TOOL_KEPT] if snapshot.get('tool_lines') else []) + ([HEADING_KEPT] if snapshot.get('heading_lines') else []) + ([BACKGROUND_KEPT] if snapshot.get('fixed_line') else [])
+            + ([PERSON_KEPT] if snapshot.get('person_lines') else []) + ([CAMERA_STEADY] if 'camera_move' in snapshot and not (snapshot.get('camera_move') or '').strip() else []))
+
+
+ALIGN_SHIFT, ALIGN_SCALE, ALIGN_W, ALIGN_H = 0.01, 0.01, 256, 144   # design/112 S3: about 1 % of the frame; starting values, the first film tunes them
+
+
+def _grey(png, scale=1.0):
+    im = Image.open(BytesIO(png)).convert('L').resize((ALIGN_W, ALIGN_H), Image.BILINEAR)
+    if scale != 1.0:
+        w2, h2 = max(2, round(ALIGN_W * scale)), max(2, round(ALIGN_H * scale))
+        scaled = im.resize((w2, h2), Image.BILINEAR)
+        canvas = Image.new('L', (ALIGN_W, ALIGN_H), int(ImageStat.Stat(im).mean[0]))
+        canvas.paste(scaled, ((ALIGN_W - w2) // 2, (ALIGN_H - h2) // 2))
+        im = canvas.crop((0, 0, ALIGN_W, ALIGN_H))
+    return im
+
+
+def pair_alignment(start_png, end_png):
+    """design/112 S3: the end registered against the start in code: translation by phase correlation on grey copies, scale by a small search
+    (the end resized about its centre and the best peak kept). A must line with the measured shift and scale; no model call."""
+    import numpy as np
+    win = np.outer(np.hanning(ALIGN_H), np.hanning(ALIGN_W))
+    a = np.asarray(_grey(start_png), dtype=float)
+    fa = np.fft.fft2((a - a.mean()) * win)
+    best = None
+    for z in np.arange(0.95, 1.0501, 0.005):   # ponytail: a brute-force scale search, 21 FFTs on 256x144; no rotation
+        b = np.asarray(_grey(end_png, float(z)), dtype=float)
+        cross = fa * np.conj(np.fft.fft2((b - b.mean()) * win))
+        r = np.fft.ifft2(cross / (np.abs(cross) + 1e-9)).real
+        dy, dx = np.unravel_index(int(np.argmax(r)), r.shape)
+        dy, dx = (dy - ALIGN_H if dy > ALIGN_H / 2 else dy), (dx - ALIGN_W if dx > ALIGN_W / 2 else dx)
+        if best is None or r.max() > best[0]:
+            best = (float(r.max()), int(dx), int(dy), float(z))
+    _, dx, dy, z = best
+    scale = round(1 / z, 3)   # the end as a zoom of the start
+    shift = (dx * dx + dy * dy) ** 0.5 / ALIGN_W
+    ok = shift <= ALIGN_SHIFT and abs(scale - 1) <= ALIGN_SCALE
+    return {'check': 'pair aligned', 'pass_when': 'the end frames the start: no shift, zoom or slide of the background', 'weight': 'must', 'pass': ok,
+            'seen': f'shift {shift * 100:.1f} % of the frame ({dx:+d}, {dy:+d} px at {ALIGN_W} wide), scale {scale:.3f}' + ('' if ok else ': the pair would glide'),
+            'shift_pct': round(shift * 100, 2), 'scale': scale}
+
+
 def ambient_moves(snapshot):
     """design/101 M1 allows `still: nothing else moves`; such a line asks for no movement and gets no must line."""
     line = str(snapshot.get('ambient') or '').strip()
@@ -70,9 +119,9 @@ def run_take_check(snapshot, video_path, sha256, transport_factory):
                          (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if ambient_moves(snapshot) else []) +
                          (['The light (the light line): ' + str(snapshot['light'])[:1000]] if snapshot.get('light') else []) +
                          [str(l)[:600] for l in (snapshot.get('tool_lines') or []) + (snapshot.get('heading_lines') or []) + (snapshot.get('gaze_lines') or [])
-                          + ([snapshot['fixed_line']] if snapshot.get('fixed_line') else []) + (snapshot.get('person_lines') or [])])   # design/110 F5, F6; design/111 F7, F8, F16
-        take_lines = (TAKE_LINES + ([AMBIENT_LINE] if ambient_moves(snapshot) else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])   # design/101 M4; design/104 C5
-                      + ([TOOL_KEPT] if snapshot.get('tool_lines') else []) + ([HEADING_KEPT] if snapshot.get('heading_lines') else []) + ([BACKGROUND_KEPT] if snapshot.get('fixed_line') else []) + ([PERSON_KEPT] if snapshot.get('person_lines') else []))   # design/110 F5, F6; design/111 F8, F16
+                          + ([snapshot['fixed_line']] if snapshot.get('fixed_line') else []) + (snapshot.get('person_lines') or [])
+                          + (['The camera: ' + ((snapshot.get('camera_move') or '').strip() or 'locked off, no move')] if 'camera_move' in snapshot else [])])   # design/110 F5, F6; design/111 F7, F8, F16; design/112 S4
+        take_lines = take_lines_for(snapshot)
         asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(take_lines, 1))
         received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
             'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +

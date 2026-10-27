@@ -208,6 +208,8 @@ class Shot(Model):
     relation: Literal['illustration', 'explanation', 'evocation', 'counterpoint', 'anticipation', 'bridge', 'context']
     framing: str = Field(min_length=1, max_length=2000)
     camera: str = Field(min_length=1, max_length=2000)
+    camera_move: str = Field(default='', max_length=200)   # design/112 S4: the camera's one move, in words; empty is a locked-off camera on a tripod
+    end_state_exact: bool = False   # design/112 S1: the take ends on an exact end image; otherwise the start image and the motion alone
     focus: str = Field(min_length=1, max_length=2000)
     subjects: list[Subject] = Field(default_factory=list, max_length=100)
     element_ids: list[str] = Field(default_factory=list, max_length=100)
@@ -400,8 +402,8 @@ def route_of(shot):
 
 def routes(plan, fps=25):
     """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
-    graphics, and the images the plan will need: a start and an end image per video shot, where consecutive video shots in a scene share their
-    boundary picture (design/66: a run of n segments needs n + 1), one picture per still, one per state of a sequence."""
+    graphics, and the images the plan will need: a start image per video shot and an end only where the shot's final state must be exact (design/112 S1),
+    a start-only shot after an exact end starting on that end; one picture per still, one per state of a sequence."""
     out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0}
     for gap in plan.get('gaps', []):
         scenes = gap.get('scenes') or []
@@ -409,7 +411,7 @@ def routes(plan, fps=25):
             chosen = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])
             scenes = chosen['scenes']
         for scene in scenes:
-            segments = 0   # consecutive video shots so far
+            prev_exact = False   # design/112 S1: a start-only shot after an exact end starts on that end
             for shot in scene['shots']:
                 kind = route_of(shot)
                 seconds = (shot['end_frame'] - shot['start_frame']) / float(fps)
@@ -418,10 +420,10 @@ def routes(plan, fps=25):
                 if shot['visual_type'] in GRAPHIC_TYPES:
                     out['graphic_seconds'] = round(out['graphic_seconds'] + seconds, 2)
                 if kind == 'video':
-                    out['images_estimated'] += 2 if segments == 0 else 1
-                    segments += 1
+                    out['images_estimated'] += (0 if prev_exact else 1) + (1 if shot.get('end_state_exact') else 0)   # design/112 S1
+                    prev_exact = bool(shot.get('end_state_exact'))
                 else:
-                    segments = 0
+                    prev_exact = False
                     out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
     return out
 
@@ -753,6 +755,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         own = {b.id: b for s in shot.subjects for b in s.beats}
                         for ch in shot.changes:
                             need(ch.beat_id in own, f"shot {shot.id}: the change '{ch.what}' names {ch.beat_id}, which is not a beat of this shot.")
+                        if shot.changes and not shot.end_state_exact:   # design/112 S1: start-only by default; a planned visible result is a choice made on purpose
+                            warnings.append({'shot_id': shot.id, 'kind': 'end_state', 'message': f'shot {shot.id} has a change list and no exact end: its take is made from the start image alone '
+                                             '(the motion carries the change); set end_state_exact true if the final state must be exact, then an end image is made (design/112 S1)'})
                         if not shot.changes:
                             warnings.append({'shot_id': shot.id, 'kind': 'changes_missing', 'message': f'shot {shot.id}: list what differs between its start and end picture and the beat that '
                                              'causes each (changes); the pair is checked against it' + NEXT_RELEASE})
