@@ -285,7 +285,7 @@ class ReuseApprove(Write):   # design/89 H7: the operator's own words for a prop
     quote: str = Field(min_length=1)
 
 
-class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec as a table; design/106 D4: no words needed
+class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec as a table; design/106 D4: no words needed; design/111 F10: 'element:E' for a material spec
     shot_id: str
     quote: str = ''
 

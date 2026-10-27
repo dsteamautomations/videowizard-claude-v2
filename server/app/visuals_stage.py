@@ -538,7 +538,12 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'graphic_style': ((plan or {}).get('foundation') or {}).get('graphic_style'),   # design/89 C2
             'measurements': [{'id': k, **{f: m.get(f) for f in ('question', 'measurements', 'limits', 'at')}} for k, m in (session.get('measurements') or {}).items()],   # design/89 D2
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
-            'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views', 'size')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
+            'elements': [{**{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views', 'size')},
+                          'material_spec': ({'table': spec_table(e['material_spec']) + [{'part': 'laid', 'measure': '', 'size': e['material_spec']['laid'], 'source': '', 'status': 'rule'},
+                                                                                       {'part': 'pattern', 'measure': '', 'size': e['material_spec']['pattern'], 'source': '', 'status': 'rule'}],
+                                            'sentence': material_sentence(e), 'approved': material_approved(session, e),
+                                            'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')} if e.get('material_spec') else None)}   # design/111 F10
+                         for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0
             'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
@@ -698,6 +703,55 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     if row['id'] not in (session.get('questions') or {}):
         _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({prices()['image_inr']:g} INR)", 'approve anyway'], 'server', fork='not_yet')
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
+
+
+# ---------- design/111 F10: a repeating material has one measured spec, used in numbers by every picture ----------
+
+def materials_of(plan, element_id=None, shot=None):
+    """The repeating materials a picture shows: the element itself, or the materials among its shot's elements."""
+    ids = {element_id} | set((shot or {}).get('element_ids') or [])
+    return [e for e in plan.get('elements') or [] if e['id'] in ids and e.get('material_spec')]
+
+
+def material_sentence(element):
+    spec = element['material_spec']
+    sizes = ', '.join(f"{d['part']} {d['measure']} {d['value']:g} {d.get('unit') or ''}".strip() for d in spec.get('dimensions') or [] if d.get('value') is not None)
+    parts = [f"Material spec, {element['name']}: {sizes}" if sizes else f"Material spec, {element['name']}", f"laid {spec['laid']}"]
+    if spec.get('joint'):
+        parts.append(f"joints {spec['joint']}")
+    parts.append(f"pattern: {spec['pattern']}")
+    if spec.get('proportions'):
+        parts.append('proportions: ' + '; '.join(spec['proportions']))
+    return '; '.join(parts) + '.'
+
+
+def material_ratio(spec):
+    """The long face against the height, from the spec's unit sizes: '2.1 : 1'; '' when a side is missing."""
+    by = {}
+    for d in spec.get('dimensions') or []:
+        if d.get('value'):
+            by.setdefault(d['measure'].lower(), float(d['value']))
+    long_, high = by.get('length') or by.get('long'), by.get('height') or by.get('thickness') if 'length' in by and 'height' not in by and len(by) == 2 else by.get('height')
+    if not long_ or not high:
+        return ''
+    return f'{long_ / high:.1f} : 1'
+
+
+def material_lines(element):
+    """F10's must line: the unit ratio measured on three units and the pattern across three courses."""
+    spec = element['material_spec']
+    ratio = material_ratio(spec)
+    return [{'check': f"material: {element['name']}", 'weight': 'must',
+             'pass_when': 'measured on three units, ' + (f"the long face is {ratio} (length to height) and " if ratio else '') + f"the units are laid {spec['laid']}; across three courses the pattern is: {spec['pattern']}"
+                          + (f"; joints {spec['joint']}" if spec.get('joint') else '')}]
+
+
+def material_key(element_id):
+    return 'element:' + element_id
+
+
+def material_approved(session, element):
+    return (session.get('spec_approvals') or {}).get(material_key(element['id']), {}).get('digest') == spec_digest(element['material_spec'])
 
 
 # ---------- design/110 F4, F5, F6: what the server composes into every start and end prompt, and the take ----------
@@ -975,6 +1029,9 @@ def waiting(session, plan, code, take_rows):
             pending_specs.append(sh['start_frame'])
     if pending_specs:   # design/106 D5: one item, one table, one approval
         add(min(pending_specs), f"Drawing specs · {len(pending_specs)} to approve", 'pictures', 'specs', 'specs')
+    mats = [e for e in plan.get('elements') or [] if e.get('material_spec') and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), e['material_spec'])]
+    if mats:   # design/111 F10: approved once, on the References step
+        add(-1, f"Material specs · {len(mats)} to approve", 'references', mats[0]['id'], 'specs')
     for item, q in (session.get('questions') or {}).items():   # design/110 rule 0: an open question comes first
         r = session['references'].get(item)
         sh = shots.get(made_for(session, r) if r else item)
@@ -1553,6 +1610,14 @@ def generate_image(conn, store, user, run, outputs, body):
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
+    for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
+        need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: approve it on the References step (or `vw visuals spec --element {m['id']}`) before a picture shows it.")
+        try:
+            library.check_material_prompt(body['prompt'])
+        except ValueError as exc:
+            need(False, str(exc))
+        lines = lines + material_lines(m)
+        body = {**body, 'prompt': with_composed(body['prompt'], material_sentence(m))}
     if body['kind'] == 'keyframe' and found and named.get('visual_type') == 'video':   # design/110 F4, F5, F6: the lines, and the block under the writer's prompt
         lines = lines + picture_rule_lines(plan, found[2], named, 'end' if is_end else 'start')
         if not body.get('fix_of'):
@@ -1690,6 +1755,16 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval.
     design/106 D4: no words needed; the operator never types sizes, and a correction goes to the assistant instead."""
     session = session_of(store, run, outputs)
+    if shot_id.startswith('element:'):   # design/111 F10: a material spec, approved once on the References step
+        plan = guarded(lambda: current_plan(store, session))
+        element = next((e for e in plan['elements'] if e['id'] == shot_id[len('element:'):]), None)
+        need(element and element.get('material_spec'), f'{shot_id[len("element:"):]} has no material spec.')
+        spec = element['material_spec']
+        need(not correction_pending(session, shot_id, spec), f'The correction of {element["id"]}\'s material spec waits for the assistant to revise it; approve the revised one.')
+        session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+        (session.get('spec_corrections') or {}).pop(shot_id, None)
+        save_session(store, run, session)
+        return {'element_id': element['id'], 'table': spec_table(spec), 'sentence': material_sentence(element), 'next': f"Material spec of {element['id']} approved: every picture that shows it carries it word for word."}
     _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
@@ -1730,9 +1805,16 @@ def correct_spec(store, user, run, outputs, shot_id, words):
     words = str(words or '').strip()
     need(words, 'Say what to correct in the spec (a value, a part, a proportion).')
     session = session_of(store, run, outputs)
-    _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
-    need(shot.get('drawing_spec'), f'Shot {shot_id} has no drawing spec.')
-    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': spec_digest(shot['drawing_spec'])}
+    if shot_id.startswith('element:'):   # design/111 F10
+        plan = guarded(lambda: current_plan(store, session))
+        element = next((e for e in plan['elements'] if e['id'] == shot_id[len('element:'):]), None)
+        need(element and element.get('material_spec'), f'{shot_id[len("element:"):]} has no material spec.')
+        spec = element['material_spec']
+    else:
+        _, _, _, shot = guarded(lambda: locate(store, session, shot_id))
+        need(shot.get('drawing_spec'), f'Shot {shot_id} has no drawing spec.')
+        spec = shot['drawing_spec']
+    session.setdefault('spec_corrections', {})[shot_id] = {'words': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': spec_digest(spec)}
     save_session(store, run, session)
     return {'shot_id': shot_id, 'correction': words, 'next': f'Correction sent: the assistant revises the spec of {shot_id}, then you approve it.'}
 
@@ -1751,6 +1833,15 @@ def approve_specs(store, user, run, outputs, quote=''):
             session.setdefault('spec_approvals', {})[sh['id']] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(sh['id'], None)
             approved.append({'shot_id': sh['id'], 'table': spec_table(spec)})
+    for e in plan.get('elements') or []:   # design/111 F10: the material specs too
+        spec = e.get('material_spec')
+        k = material_key(e['id']) if spec else None
+        if spec and correction_pending(session, k, spec):
+            waiting_.append(k)
+        elif spec and not material_approved(session, e):
+            session.setdefault('spec_approvals', {})[k] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+            (session.get('spec_corrections') or {}).pop(k, None)
+            approved.append({'shot_id': k, 'element_id': e['id'], 'table': spec_table(spec)})
     save_session(store, run, session)
     return {'approved': approved, 'waiting': waiting_, 'next': (f"{len(approved)} drawing spec{'s' if len(approved) != 1 else ''} approved." if approved else 'No drawing spec was waiting.')
             + (f" {', '.join(waiting_)}: a correction waits for the assistant; approve the revised spec." if waiting_ else '')}
@@ -2876,6 +2967,8 @@ def status(conn, store, run, outputs, repair=True):
             'waiting': waiting(session, plan, run.get('code'), take_rows),   # design/97 W4: each with its label and link
             'spec_corrections': {sid: c.get('words') for sid, c in (session.get('spec_corrections') or {}).items()},   # review 27 Oct: the assistant revises these specs
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0: the open questions, by item
+            'material_specs': {e['id']: {'approved': material_approved(session, e), 'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')}
+                               for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 

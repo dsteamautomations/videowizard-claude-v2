@@ -44,6 +44,8 @@ class Element(Model):
     requirements: str = Field(min_length=1, max_length=4000)
     required_views: list[str] = Field(default_factory=list, max_length=20)
     size: list['Dimension'] = Field(default_factory=list, max_length=20)   # design/103 A5: real size, each with its source and status, never invented
+    repeating: bool = False   # design/111 F10: built from repeated units (bricks, tiles, blocks, planks, pavers); a kind 'material' always is
+    material_spec: 'MaterialSpec | None' = None   # design/111 F10
 
 
 class Position(Model):
@@ -123,6 +125,13 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     relationships: list[str] = Field(default_factory=list, max_length=30)
     label: str = Field(default='', max_length=200)
     proportions: list[str] = Field(default_factory=list, max_length=20)   # design/106 D2: the ratios that matter, always, even on an illustrative drawing
+
+
+class MaterialSpec(DrawingSpec):   # design/111 F10: one measured spec per repeating material, made like a drawing spec, approved once, pasted into every prompt
+    laid: str = Field(min_length=1, max_length=500)       # how the unit is laid ('on edge, header ends to the camera')
+    joint: str = Field(default='', max_length=200)        # the joint in words ('10 mm mortar joints'); the number is a dimension too
+    pattern: str = Field(min_length=1, max_length=1000)   # what alternates with what, how courses offset
+    not_this: list[str] = Field(default_factory=list, max_length=40)   # design/111 F12: the common wrong forms, 'none of these'
 
 
 class VisualFact(Model):   # design/91 N6: how something real looks and is done, with its source; an unknown fact is never invented
@@ -402,6 +411,12 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     elements = unique(plan.elements, 'id', 'element')
     for e in plan.elements:   # review 27 Oct: an element's sizes (design/103 A5) are checked like a drawing spec's
         _dimension_needs(f'element {e.id}', e.size)
+        if e.kind == 'material' or e.repeating:   # design/111 F10: one measured spec per repeating material
+            need(e.material_spec is not None, f'element {e.id} is a repeating material: give its material_spec (unit sizes with sources, laid, joint, pattern, proportions), made like a drawing spec, never typed by the operator (design/111 F10).')
+            need(not e.size, f'element {e.id}: its sizes live in its material_spec, not in size (design/111 F10).')
+            _dimension_needs(f'material spec of {e.id}', e.material_spec.dimensions)
+            need(e.material_spec.dimensions, f'material spec of {e.id}: give the unit sizes (length, width, height) with their sources (design/111 F10).')
+            need(e.material_spec.proportions, f'material spec of {e.id}: give the proportions that matter (design/106 D2, design/111 F10).')
     unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
     facts, ekind = {f.id: f for f in plan.visual_facts}, {e.id: e.kind for e in plan.elements}
     for f in plan.visual_facts:

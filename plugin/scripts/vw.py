@@ -1316,7 +1316,7 @@ VISUALS_FLAGS = {
     'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'},
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
     'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote'},
-    'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'quote', 'notes'},
+    'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'element', 'quote', 'notes'},
     'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'}}
 _VISUALS_ALL = set().union(*VISUALS_FLAGS.values()) | {'inr'}
 
@@ -1667,7 +1667,9 @@ def cmd_visuals(a):
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
     if a.what == 'reuse':   # design/89 H7: the operator approves a proposed reuse with their words
         emit(write(base + '/reuse', {'shot_id': a.shot, 'quote': a.quote}), 0, f'Reuse approved for {a.shot} with the operator\'s words.')
-    if a.what == 'spec':   # design/89 D4; design/106 D4, D5: no words needed, no sizes typed; every spec at once, or one correction
+    if a.what == 'spec':   # design/89 D4; design/106 D4, D5: no words needed, no sizes typed; every spec at once, or one correction; design/111 F10: --element E for a material spec
+        if a.element and not a.shot:
+            a.shot = 'element:' + a.element
         if a.notes:
             if not a.shot:
                 emit({'action': 'refused', 'message': 'A correction names its drawing: `vw visuals spec --shot S --notes "<what is wrong and what it should be>"`.'}, 2)

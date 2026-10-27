@@ -193,6 +193,18 @@ def check_prompt(prompt):
     return None
 
 
+MATERIAL_UNITS = r'(bricks?|tiles?|blocks?|planks?|pavers?|stones?|units?|slabs?|boards?)'
+
+
+def check_material_prompt(prompt):
+    """design/111 F10: a prompt that shows a repeating material says its sizes in numbers (the server pastes the spec); relative words are refused."""
+    text = str(prompt or '')
+    m = (re.search(r'\b(short|long|small|large|big|thin|thick)\s+' + MATERIAL_UNITS + r'\b', text, re.I) or re.search(r'\babout\s+\d+(?:\.\d+)?\s*:\s*\d+', text, re.I)
+         or re.search(r'\b(roughly|approximately|typical|standard)\b', text, re.I))
+    if m:
+        raise ValueError(f'The prompt describes the material in relative words ({m.group(0)!r}): the material spec gives the numbers and the server pastes them; take the words out (design/111 F10).')
+
+
 def image_names_missing(prompt, n):
     """design/96 C1 (the course's C03-2): the numbers of the n pictures an edit sends that its prompt does not name as Image k; a range
     ("images 2–4") and "images 2 onward" count."""

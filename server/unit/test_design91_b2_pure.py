@@ -150,7 +150,9 @@ FACT = {'id': 'F1', 'about': 'M1', 'looks': 'sun-dried, reddish brown, solid, ne
 
 def with_material(shots, facts=None):
     d = plan(shots)
-    d['elements'].append({'id': 'M1', 'name': 'Unburnt brick', 'kind': 'material', 'identity': 'representative', 'requirements': 'green brick'})
+    d['elements'].append({'id': 'M1', 'name': 'Unburnt brick', 'kind': 'material', 'identity': 'representative', 'requirements': 'green brick',   # design/111 F10: a material carries its spec
+                          'material_spec': {'dimensions': [{'part': 'brick', 'measure': 'length', 'value': 230, 'unit': 'mm', 'source': 'the maker', 'status': 'confirmed'}],
+                                            'laid': 'flat, in rows', 'pattern': 'rows drying side by side', 'proportions': ['about twice as long as wide']}})
     if facts is not None:
         d['visual_facts'] = facts
     return d

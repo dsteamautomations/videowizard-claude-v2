@@ -58,7 +58,7 @@ Source: Revathi's builder note "Pictures and takes that do what the plan says, b
 
 ## SK's answers so far (27 Oct)
 
-1. All fourteen rules before one deploy (commits pushed per rule). 2. The steady-takes note is design/112 now: F11's edit route is built now with the rectangle region and the composite-back (S2's method); F19's drawing part waits for the drawn route (E1–E5) and its labels and view are that route's inputs. 3. The region is a rectangle in fractions of the frame, the landmark named for the record.
+1. All fourteen rules before one deploy (commits pushed per rule). 2. The steady-takes note is design/112 now: F11's edit route is built now with the rectangle region and the composite-back (S2's method); F19's drawing part waits for the drawn route (E1–E5) and its labels and view are that route's inputs. 3. The region is a rectangle in fractions of the frame, the landmark named for the record. 4. The server puts a waiting item; the assistant writes the golden picture's prompt in the same turn, no question to the operator. 5. Gemini 3.8 Flash for the not-this call, once per element at the spec step. 6. The plan names the three fixed things per video shot; the check refuses a shot without them. 7. The figure-level check within the same scene in batch 2; film-wide later. 8. The measured light check becomes a must now, current threshold, tuned if VW-7 shows false refusals. 9. Revathi revises VW-7's plan once, after batch 2 is deployed. Sequence (27 Oct): batch 2 without F19's drawing part, then design/112 with F19's labels and view, two deploys; commits pushed per rule; one live image check before the deploy.
 
 ## Questions for SK (answer in order, or say "go with the recommendations")
 
@@ -77,3 +77,11 @@ Source: Revathi's builder note "Pictures and takes that do what the plan says, b
 - The steady-takes note's own rules, until it arrives.
 - The model's reading of counts, ratios, gaze and sameness is sampled per sub-set by a live check, not benchmarked.
 - The page changes are checked as text and by a node syntax check, not in a browser.
+
+## As built: F10 (27 Oct)
+
+- Schema: `MaterialSpec(DrawingSpec)` adds `laid`, `joint`, `pattern`, `not_this` (F12 fills it); `Element.repeating` and `Element.material_spec`. The plan check requires the spec on every element of kind material or marked repeating, its dimensions sourced like a drawing spec's, proportions given, and no separate `size` list.
+- One approval, on the References step: `approve_spec` / `correct_spec` / `approve_specs` take `element:E` as the target (the page's card, `vw visuals spec --element E`), keyed `element:E` in `spec_approvals` and `spec_corrections`, with rule 0's correction wait; `status.material_specs`, the page element's `material_spec` (table, sentence, approved, correction), one waiting item "Material specs · n to approve".
+- Every picture that shows the material (its own pictures, or a shot whose elements include it): refused until the spec is approved; the writer's prompt refused on relative words (`library.check_material_prompt`: short/long/small/large/big/thin/thick + a unit noun, "about n:m", roughly, approximately, typical, standard); the server appends `material_sentence` once; the check gets the must line "material: <name>" (the long face's ratio length to height from the spec, how it is laid, the pattern across three courses, the joint).
+- Tests: `test_design111_f10_pure.py` (6); one design/91 fixture gained a spec. Server unit suite 530; plugin 310 plus the 3 known Windows-only; page script and procedure JSON parse.
+- Not covered: a drawing shot of a material still carries its own `drawing_spec` (the two are not yet merged; F19 revisits with the drawn route); the measure step is not extended to the material spec's own table (the planner uses `measure` on frames as today).
