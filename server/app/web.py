@@ -242,9 +242,14 @@ def _stored_file(request, code, key, vw2_session):
     with db_connect() as conn:
         run = _run_by_code(conn, user, code)
     store = storage()
-    if not key.startswith(f"{run['id']}/") or not store.exists(key):
+    if not own_key(run['id'], key) or not store.exists(key):
         raise Problem(404, 'FILE_MISSING', 'No such file on this run.')
     return file_redirect(store.signed_download(key))
+
+
+def own_key(run_id, key):
+    """A storage key of this run and nothing else: no `.`, `..` or empty segment, no backslash (review 27 Oct)."""
+    return key.startswith(f'{run_id}/') and '\\' not in key and not any(seg in ('', '.', '..') for seg in key.split('/'))
 
 
 @router.get('/runs/{code}/audio/{key:path}')
@@ -283,11 +288,14 @@ def thumb_bytes(store, key):
 
 def thumb_response(store, run_id, key, if_none_match):
     """design/108 I2: the small copy with a day's cache and an ETag (a key never changes its picture); 304 when the browser has it; a file that is not a picture goes the usual way."""
-    if not key.startswith(f'{run_id}/') or not store.exists(key):
+    if not own_key(run_id, key) or not store.exists(key):
         raise Problem(404, 'FILE_MISSING', 'No such file on this run.')
     if not key.lower().endswith(PICTURE_EXT):
         return file_redirect(store.signed_download(key))
-    data = thumb_bytes(store, key)
+    try:
+        data = thumb_bytes(store, key)
+    except Exception:   # review 27 Oct: a broken or half-written picture is the full file's problem, never a 500 here
+        return file_redirect(store.signed_download(key))
     etag = '"' + hashlib.sha256(data).hexdigest()[:32] + '"'
     headers = {'Cache-Control': THUMB_CACHE, 'ETag': etag}
     if if_none_match == etag:

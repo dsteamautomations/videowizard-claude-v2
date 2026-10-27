@@ -64,9 +64,9 @@ def test_the_transform_is_relative_to_the_frame_and_a_stabilised_copy_has_none()
 def test_the_voiceover_the_nat_sound_and_the_reference_track_are_connected_with_their_lanes():
     root = ET.fromstring(doc())
     a1 = [c for c in root.iter('asset-clip') if c.get('lane') == '-1']
-    assert len(a1) == 1 and frames(a1[0].get('offset')) == 0 and frames(a1[0].get('duration')) == 400 and a1[0].get('role') == 'dialogue.voiceover'
+    assert len(a1) == 1 and frames(a1[0].get('offset')) == 0 and frames(a1[0].get('duration')) == 400 and a1[0].get('audioRole') == 'dialogue.voiceover'
     a2 = [c for c in root.iter('asset-clip') if c.get('lane') == '-2']
-    assert len(a2) == 1 and frames(a2[0].get('offset')) == 10 and frames(a2[0].get('duration')) == 40 and a2[0].get('role') == 'effects.nat-sound'   # 260-250 frames into the cut
+    assert len(a2) == 1 and frames(a2[0].get('offset')) == 10 and frames(a2[0].get('duration')) == 40 and a2[0].get('audioRole') == 'effects.nat-sound'   # 260-250 frames into the cut
     ref = [c for c in root.iter('asset-clip') if c.get('lane') == '2']
     assert len(ref) == 1 and ref[0].get('enabled') == '0' and ref[0].get('name') == 'REFERENCE – approved film' and frames(ref[0].get('duration')) == 400
     assert root.find('.//spine/gap').get('duration') == '16s'   # the primary story: one gap the length of the film, everything connected to it
@@ -148,7 +148,7 @@ def test_resolve_events_use_the_new_layout_and_a_stills_real_file():
                       {'kind': 'fill', 'shot_id': 'DG1', 'file': {'name': 'DG1-asset.png'}, 'media': {'kind': 'still'}, 'timeline_in_frame': 100, 'timeline_out_frame': 175, 'timeline_frames': 75}]}
     rows = D.resolve_events(asm, pk, {})
     assert rows[0]['file'] == 'Media/Camera/C0120.MP4' and rows[0]['kind'] == 'camera' and rows[0]['zoom'] == 1.2
-    assert rows[1]['file'] == 'Media/AI/DG1-asset.png' and rows[1]['kind'] == 'still'
+    assert rows[1]['file'] == 'Media/AI/DG1.mp4' and rows[1]['kind'] == 'still'   # review 27 Oct: the rendered file, which the bundle carries
 
 
 def test_open_edit_tells_the_editor_how_to_open_and_relink_on_any_computer():

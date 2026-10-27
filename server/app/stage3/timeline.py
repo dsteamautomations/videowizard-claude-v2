@@ -85,14 +85,17 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames)
         if e.get('color_group'):
             note += f"; colour group {e['color_group']}"
         ET.SubElement(clip, 'marker', start=_t(Fraction(e['source_in_frame']) / src_fps), duration=_t(1 / fps), value=e['marker']['name'], note=note)
-        for iv in e.get('a2') or []:   # the nat sound of this cut, in its place
-            at = rec_in + Fraction(iv['in_frame'] - e['source_in_frame']) / src_fps
-            ET.SubElement(gap, 'asset-clip', ref=aid, lane='-2', offset=_t(at), name=f"{e['marker']['name']} nat sound", start=_t(Fraction(iv['in_frame']) / src_fps),
-                          duration=_t(Fraction(iv['out_frame'] - iv['in_frame']) / src_fps), role='effects.nat-sound', enabled='1')
+        for iv in e.get('a2') or []:   # the nat sound of this cut, in its place; on the original when the cut is a stabilised copy (review 27 Oct)
+            a_fps = Fraction(str(e.get('a2_source_fps') or src_fps))
+            a_in = e.get('a2_source_in_frame', e['source_in_frame'])
+            a_id = asset(e['a2_file'], 'camera', a_fps, e.get('a2_source_frames') or iv['out_frame']) if e.get('a2_file') else aid
+            at = rec_in + Fraction(iv['in_frame'] - a_in) / a_fps
+            ET.SubElement(gap, 'asset-clip', ref=a_id, lane='-2', offset=_t(at), name=f"{e['marker']['name']} nat sound", start=_t(Fraction(iv['in_frame']) / a_fps),
+                          duration=_t(Fraction(iv['out_frame'] - iv['in_frame']) / a_fps), audioRole='effects.nat-sound', enabled='1')   # audioRole: the 1.9 DTD's name (review 27 Oct)
     for p in narration_pieces or []:
         aid = asset(p.get('file') or 'Media/Voiceover/narration.mp3', 'audio', fps, p['source_out_frame'])
         ET.SubElement(gap, 'asset-clip', ref=aid, lane='-1', offset=_t(Fraction(p['record_in_frame']) / fps), name='Voiceover', start=_t(Fraction(p['source_in_frame']) / fps),
-                      duration=_t(Fraction(p['source_out_frame'] - p['source_in_frame']) / fps), role='dialogue.voiceover', enabled='1')
+                      duration=_t(Fraction(p['source_out_frame'] - p['source_in_frame']) / fps), audioRole='dialogue.voiceover', enabled='1')
     ref = asset('Approved-film.mp4', 'reference', fps, film_frames)
     ET.SubElement(gap, 'asset-clip', ref=ref, lane='2', offset='0s', name=REFERENCE, start='0s', duration=_t(Fraction(film_frames) / fps), format=main, enabled='0')
     for item in finishing or []:
@@ -153,10 +156,8 @@ def with_base(text, folder):
 # ---------- the EDL ----------
 
 def tc(frames, fps):
-    fps = Fraction(str(fps))
-    total = Fraction(frames) / fps
-    whole = int(total)
-    ff = int((total - whole) * fps)
+    """Non-drop-frame timecode counts frames at the nominal rate (30 for 29.97), never real seconds (review 27 Oct)."""
+    whole, ff = divmod(int(round(Fraction(frames))), round(float(Fraction(str(fps)))))
     return f'{whole // 3600:02d}:{whole % 3600 // 60:02d}:{whole % 60:02d}:{ff:02d}'
 
 

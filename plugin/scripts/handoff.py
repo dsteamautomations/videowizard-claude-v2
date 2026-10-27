@@ -80,6 +80,16 @@ def find_resolve(system=None, entries=None, plist=None):
     return none
 
 
+def present_bytes(folder):
+    folder = Path(folder)
+    return sum(p.stat().st_size for p in folder.rglob('*') if p.is_file()) if folder.exists() else 0
+
+
+def needed_bytes(bundle_bytes, edit_dir):
+    """review 27 Oct: a second download needs only what is not in the edit folder yet."""
+    return max(0, int(bundle_bytes or 0) - present_bytes(edit_dir))
+
+
 def free_bytes(folder):
     folder = Path(folder)
     while not folder.exists() and folder.parent != folder:
@@ -137,8 +147,11 @@ def cross_check(edit_dir, manifest):
     edit_dir = Path(edit_dir)
     problems, present = [], 0
     rows = manifest.get('files') or []
+    tl = edit_dir / (manifest.get('timeline_file') or f"Timeline/{manifest.get('run')}.fcpxml")
+    portable = tl.with_name(tl.name.replace('.fcpxml', '.portable.fcpxml'))
+    src = portable if portable.exists() else tl   # review 27 Oct: once `download` wrote this computer's paths, the portable copy is what the manifest describes
     for f in rows:
-        p = edit_dir / f['name']
+        p = src if edit_dir / f['name'] == tl else edit_dir / f['name']
         if not p.exists():
             problems.append(f"{f['name']}: missing")
             continue
@@ -148,12 +161,11 @@ def cross_check(edit_dir, manifest):
         elif f.get('sha256') and sha256_of(p) != f['sha256']:
             problems.append(f"{f['name']}: the fingerprint differs from the manifest's" + (' (the voiceover is not the approved one)' if f['name'].endswith('narration.mp3') else ''))
     out = {'present': f'{present} of {len(rows)} files', 'cuts': 0, 'timeline_frames': 0, 'problems': problems}
-    tl = edit_dir / (manifest.get('timeline_file') or f"Timeline/{manifest.get('run')}.fcpxml")
-    if not tl.exists():
+    if not src.exists():
         problems.append(f'{tl.name}: the timeline file is missing')
         out['ok'] = False
         return out
-    cuts, frames = read_timeline(tl.read_bytes().decode('utf-8'), (manifest.get('timeline') or {}).get('fps') or 25)
+    cuts, frames = read_timeline(src.read_bytes().decode('utf-8'), (manifest.get('timeline') or {}).get('fps') or 25)
     video = [c for c in cuts if c['lane'] == 1]
     out['cuts'], out['timeline_frames'] = len(video), frames
     for i, c in enumerate(video, 1):
@@ -233,6 +245,11 @@ def _norm_stem(name):
     return stem
 
 
+def same_rate(a, b):
+    """29.970 in the CSV is 30000/1001 from ffprobe: rates agree to three decimals (review 27 Oct)."""
+    return abs(float(Fraction(str(a))) - float(Fraction(str(b)))) < 0.002
+
+
 def probe_original(path):
     """An original read with the media stage's probe: frames, fps, start timecode, width, height."""
     import stages_av
@@ -276,7 +293,7 @@ def relink_check(edit_dir, code, rows, originals_dir, probe=None, grab=None):
             lines.append({**line, 'outcome': 'missing', 'line': f'{name}: no original with this name. Look for a renamed file. Cuts: {", ".join(str(i) for i, _ in mine) or "none"}.'})
             continue
         probed = {p: probe(p) for p in cands}
-        agree = lambda p: probed[p]['frames'] == frames and Fraction(str(probed[p]['fps'])) == fps and (not row.get('start_timecode') or probed[p]['start_timecode'] == row['start_timecode'])
+        agree = lambda p: probed[p]['frames'] == frames and same_rate(probed[p]['fps'], fps) and (not row.get('start_timecode') or probed[p]['start_timecode'] == row['start_timecode'])
         confirmed = [p for p in cands if agree(p)]
         if len(cands) > 1 and len(confirmed) != 1:
             asking = True
@@ -284,9 +301,9 @@ def relink_check(edit_dir, code, rows, originals_dir, probe=None, grab=None):
             continue
         p = confirmed[0] if confirmed else cands[0]
         o = probed[p]
-        if o['frames'] != frames or Fraction(str(o['fps'])) != fps:
+        if o['frames'] != frames or not same_rate(o['fps'], fps):
             diff = o['frames'] - frames
-            why = (f"the copy is {abs(diff)} frames {'shorter' if diff > 0 else 'longer'} than the original" if Fraction(str(o['fps'])) == fps
+            why = (f"the copy is {abs(diff)} frames {'shorter' if diff > 0 else 'longer'} than the original" if same_rate(o['fps'], fps)
                    else f"the frame rate differs: the copy {float(fps):g}, the original {float(Fraction(str(o['fps']))):g}")
             grabs = []
             for i, c in mine:

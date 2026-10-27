@@ -1182,6 +1182,8 @@ def _fetch_to(url, part, size):
         for i, wait in enumerate((*DOWNLOAD_WAITS, None)):
             try:
                 with _storage_client() as c, c.stream('GET', url, headers={'Range': f'bytes={rg[0]}-{rg[1]}'} if rg else {}) as resp:
+                    if resp.status_code >= 500:
+                        raise httpx.TransportError(f'HTTP {resp.status_code}')   # review 27 Oct: storage's own hiccup, retried like a broken connection
                     if resp.status_code >= 300:
                         raise RuntimeError(f'HTTP {resp.status_code}')
                     with open(part, 'r+b') as f:
@@ -2040,7 +2042,7 @@ def cmd_delivery(a):
         if not st.get('bundle'):
             emit({'action': 'refused', 'message': 'No bundle yet; run `vw delivery bundle` first.'}, 2)
         found = handoff.find_resolve()
-        needed, free = int(st['bundle'].get('bytes') or 0), handoff.free_bytes(ws)
+        needed, free = handoff.needed_bytes(st['bundle'].get('bytes'), ws / 'edit'), handoff.free_bytes(ws)   # review 27 Oct: what is here already needs no space
         words = handoff.check_words(found, needed, free)
         if not found.get('found') or needed > free:
             emit({'action': 'refused', 'resolve': found, 'needed_bytes': needed, 'free_bytes': free, 'message': words}, 2)

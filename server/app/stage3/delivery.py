@@ -220,7 +220,7 @@ def bundle(conn, store, user, run, outputs):
     for cid, name in used_clips.items():
         c = clips[cid]
         files.append({'role': 'original', 'name': layout('original', name), 'key': f"{run['id']}/media/{name}", 'sha256': c['sha256'], 'bytes': c['bytes']})
-    fills = {(ev.get('file') or {}).get('name') for ev in assembly['events'] if ev['kind'] == 'fill'}
+    fills = fill_names(assembly)   # review 27 Oct: the rendered fills, by the name assembly gave them
     for f in asm_o['files']:
         if f['name'].startswith('normalised/'):
             files.append({'role': 'normalised', 'name': layout('normalised', f['name'].split('/', 1)[1], fills), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
@@ -246,7 +246,7 @@ def bundle(conn, store, user, run, outputs):
     checklist = checklist + [{'section': 'editor', 'kind': r['kind'], 'rule': r['rule'], 'where': r['where'], 'shot': r['shot'], 'item': r['line']} for r in table]
     csv_text = media_pool_csv(pk).encode('utf-8')
     open_edit = open_edit_text(run, card, brief_summary.get('directory_differences') or [], ai=has_ai(shots)).encode('utf-8')
-    events = resolve_events(assembly, pk, master)
+    events = resolve_events(assembly, pk, master, clips)
     pieces = [{'file': layout('narration', 'narration.mp3'), 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
               for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': assembly['duration_frames'], 'timeline_start_frame': 0}])]
     used = [e['clip_id'] for e in events if e.get('clip_id')]
@@ -366,6 +366,11 @@ def fetch_brand_files(conn, store, run, card):
     return {'files': files, 'skipped': skipped}
 
 
+def fill_names(assembly):
+    """The file assembly rendered for every fill shot (normalised/{shot}.mp4, a still too): what goes under Media/AI."""
+    return {ev['shot_id'] + '.mp4' for ev in assembly['events'] if ev['kind'] == 'fill'}
+
+
 def layout(role, name, fills=None):
     """design/107 §4: the fixed layout of the bundle, every run."""
     if role == 'original':
@@ -379,8 +384,15 @@ def layout(role, name, fills=None):
     return name
 
 
-def resolve_events(assembly, pk, master):
-    """What the Resolve timeline must contain: per event the file, source in/out, record in/out, zoom/pan/tilt/rotation, marker, colour group."""
+def clip_frames(clips, clip_id):
+    """A camera file's real length in its own frames, from the media summary (review 27 Oct: the timeline declares it, so a deep cut never exceeds it)."""
+    c = (clips or {}).get(clip_id) or {}
+    return int(round(float(c.get('duration_s') or 0) * float(Fraction(str(c.get('fps') or 25))))) or None
+
+
+def resolve_events(assembly, pk, master, clips=None):
+    """What the Resolve timeline must contain: per event the file, source in/out, record in/out, zoom/pan/tilt/rotation, marker, colour group,
+    the file's length (clips: the media summary's clips by id)."""
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     out = []
     for ev in assembly['events']:
@@ -388,21 +400,23 @@ def resolve_events(assembly, pk, master):
             r = rows[ev['sub_clip_id']]
             crop = ev.get('crop') in ('solver', 'hands_only') and r.get('zoom')
             if ev.get('stabilize'):   # the stabilised render is the source; crop and zoom are already applied in it
-                out.append({'file': layout('normalised', f"{ev['sub_clip_id'].replace(':', '-')}-{ev['timeline_in_frame']}.mp4"), 'kind': 'camera', 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'],
+                out.append({'file': layout('normalised', f"{ev['sub_clip_id'].replace(':', '-')}-{ev['timeline_in_frame']}.mp4"), 'kind': 'camera', 'clip_id': r['clip_id'], 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'],
                             'record_in_frame': ev['timeline_in_frame'], 'record_out_frame': ev['timeline_out_frame'], 'source_fps': str(pk['timeline']['fps']), 'zoom': 1.0, 'pan': 0.0, 'tilt': 0.0,
                             'rotation': 0.0, 'color_group': r.get('color_group'), 'marker': {'name': ev['sub_clip_id'], 'note': f"option #{ev.get('approved_from_option')}, stabilised copy", 'colour': 'Blue'},
-                            'a2': ev.get('a2_intervals') or [], 'stabilized': True})
+                            'a2': ev.get('a2_intervals') or [], 'stabilized': True,   # review 27 Oct: the clip id for the relink list; the nat sound stays on the original, in the original's frames
+                            'a2_file': layout('original', r['clip_name']), 'a2_source_fps': r['source_fps'], 'a2_source_in_frame': ev['source_in_frame'],
+                            'source_frames': ev['timeline_frames'], 'a2_source_frames': clip_frames(clips, r['clip_id'])})
                 continue
             out.append({'file': layout('original', r['clip_name']), 'kind': 'camera', 'clip_id': r['clip_id'], 'source_in_frame': ev['source_in_frame'], 'source_out_frame': ev['source_out_frame'],
                         'record_in_frame': ev['timeline_in_frame'], 'record_out_frame': ev['timeline_out_frame'], 'source_fps': r['source_fps'],
                         'zoom': r['zoom'] if crop else 1.0, 'pan': (r['position'] or [0, 0])[0] if crop else 0.0, 'tilt': (r['position'] or [0, 0])[1] if crop else 0.0,
                         'rotation': r.get('horizon_rotation_deg') or 0.0, 'color_group': r.get('color_group'), 'marker': {'name': ev['sub_clip_id'], 'note': f"option #{ev.get('approved_from_option')}", 'colour': 'Blue'},
-                        'a2': ev.get('a2_intervals') or [], 'stabilized': False})
+                        'a2': ev.get('a2_intervals') or [], 'stabilized': False, 'source_frames': clip_frames(clips, r['clip_id'])})
         else:
-            name = (ev.get('file') or {}).get('name') or ev['shot_id'] + '.mp4'   # design/107: the fill's real file (a still is a .png)
+            name = ev['shot_id'] + '.mp4'   # review 27 Oct: the file assembly rendered and the bundle carries (a still is rendered to an .mp4 too)
             out.append({'file': layout('normalised', name, {name}), 'kind': 'still' if (ev.get('media') or {}).get('kind') == 'still' else 'movie', 'source_in_frame': 0, 'source_out_frame': ev['timeline_frames'], 'record_in_frame': ev['timeline_in_frame'],
                         'record_out_frame': ev['timeline_out_frame'], 'source_fps': str(pk['timeline']['fps']), 'zoom': 1.0, 'pan': 0.0, 'tilt': 0.0, 'rotation': 0.0, 'color_group': None,
-                        'marker': {'name': ev['shot_id'], 'note': 'visuals fill', 'colour': 'Green'}, 'a2': [], 'stabilized': False})
+                        'marker': {'name': ev['shot_id'], 'note': 'visuals fill', 'colour': 'Green'}, 'a2': [], 'stabilized': False, 'source_frames': ev['timeline_frames']})
     return out
 
 
