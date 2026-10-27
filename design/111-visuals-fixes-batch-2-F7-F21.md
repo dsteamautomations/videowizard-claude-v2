@@ -148,3 +148,7 @@ Source: Revathi's builder note "Pictures and takes that do what the plan says, b
 - Not built here (SK, 27 Oct): the sizes as exact-text labels on the parts of a drawing, and the check "sizes on the parts or the illustrative label"; they are inputs of design/112's drawn route.
 - Tests: `test_design111_f19_pure.py` (3); the shared drawing spec names its view and all four sources tried. Server unit suite 568; plugin 310 plus the 3 known Windows-only; page script parses; procedure JSON parses.
 - Across the batch: the new plan fields default, so old plans load; an accepted gap's digest moves when its plan is submitted again with the new fields, which VW-7's one revision after the deploy does on purpose (SK's answer 9).
+
+## Live check before the deploy (27 Oct)
+
+One shot (VW-7's B07B_S2), two paid pictures on GPT Image 2.5 with the batch's composed blocks, read by Gemini 3.8 Flash: every new line passed on both (person kept for the mason and the labourer, group alike, signs of use, occupied, the measured light as a must); the end kept three bricks where the batch-1 check had grown a fourth. The inventory line failed on both for the helper's hands: plan data (a held thing counts as one; two carried bricks belong in `objects` with a count). Report and pictures: `f3-live/batch2-live-check-2026-10-27.md`, `B07B_S2-batch2-S.png`, `B07B_S2-batch2-E1.png` beside the repo. Versions for the deploy: server 0.60.0, plugin 0.52.0 (`vw.py` gained `spec --element`, `not-this`, `--golden`, `--region`, `--end-region` in F10–F12).
