@@ -6,6 +6,7 @@ The code checks size, aspect and parent. A failed must line marks the picture; a
 failed line asks for) is made only on request (design/96 X1: `visuals_stage.request_fix`). The check never blocks: a transport error leaves the candidate a candidate with the error on it. The operator may approve a picture
 the check failed."""
 import base64
+import subprocess
 import json
 import re
 import uuid
@@ -57,8 +58,7 @@ def take_lines_for(snapshot):
 ALIGN_SHIFT, ALIGN_SCALE, ALIGN_W, ALIGN_H = 0.01, 0.01, 256, 144   # design/112 S3: about 1 % of the frame; starting values, the first film tunes them
 
 
-def _grey(png, scale=1.0):
-    im = Image.open(BytesIO(png)).convert('L').resize((ALIGN_W, ALIGN_H), Image.BILINEAR)
+def _scaled(im, scale=1.0):
     if scale != 1.0:
         w2, h2 = max(2, round(ALIGN_W * scale)), max(2, round(ALIGN_H * scale))
         scaled = im.resize((w2, h2), Image.BILINEAR)
@@ -68,29 +68,73 @@ def _grey(png, scale=1.0):
     return im
 
 
+def _grey(png, scale=1.0):
+    return _scaled(Image.open(BytesIO(png)).convert('L').resize((ALIGN_W, ALIGN_H), Image.BILINEAR), scale)
+
+
 def pair_alignment(start_png, end_png):
     """design/112 S3: the end registered against the start in code: translation by phase correlation on grey copies, scale by a small search
     (the end resized about its centre and the best peak kept). A must line with the measured shift and scale; no model call."""
     import numpy as np
-    win = np.outer(np.hanning(ALIGN_H), np.hanning(ALIGN_W))
-    a = np.asarray(_grey(start_png), dtype=float)
-    fa = np.fft.fft2((a - a.mean()) * win)
+    m = _match(_fft(np.asarray(_grey(start_png), dtype=float)), lambda z: _grey(end_png, z))
+    dx, dy, scale, shift = m['dx'], m['dy'], m['scale'], m['shift']   # the scale: the end as a zoom of the start
+    ok = shift <= ALIGN_SHIFT and abs(scale - 1) <= ALIGN_SCALE
+    return {'check': 'pair aligned', 'pass_when': 'the end frames the start: no shift, zoom or slide of the background', 'weight': 'must', 'pass': ok,
+            'seen': f'shift {shift * 100:.1f} % of the frame ({dx:+d}, {dy:+d} px at {ALIGN_W} wide), scale {scale:.3f}' + ('' if ok else ': the pair would glide'),
+            'shift_pct': round(shift * 100, 2), 'scale': scale}
+
+
+def _fft(a):
+    import numpy as np
+    return np.fft.fft2((a - a.mean()) * np.outer(np.hanning(ALIGN_H), np.hanning(ALIGN_W)))
+
+
+def _match(fa, grey_fn):
+    """The best shift and scale of a picture against a prepared one: translation by phase correlation, scale by a small search (the best peak kept)."""
+    import numpy as np
     best = None
     for z in np.arange(0.95, 1.0501, 0.005):   # ponytail: a brute-force scale search, 21 FFTs on 256x144; no rotation
-        b = np.asarray(_grey(end_png, float(z)), dtype=float)
-        cross = fa * np.conj(np.fft.fft2((b - b.mean()) * win))
+        b = np.asarray(grey_fn(float(z)), dtype=float)
+        cross = fa * np.conj(_fft(b))
         r = np.fft.ifft2(cross / (np.abs(cross) + 1e-9)).real
         dy, dx = np.unravel_index(int(np.argmax(r)), r.shape)
         dy, dx = (dy - ALIGN_H if dy > ALIGN_H / 2 else dy), (dx - ALIGN_W if dx > ALIGN_W / 2 else dx)
         if best is None or r.max() > best[0]:
             best = (float(r.max()), int(dx), int(dy), float(z))
     _, dx, dy, z = best
-    scale = round(1 / z, 3)   # the end as a zoom of the start
-    shift = (dx * dx + dy * dy) ** 0.5 / ALIGN_W
-    ok = shift <= ALIGN_SHIFT and abs(scale - 1) <= ALIGN_SCALE
-    return {'check': 'pair aligned', 'pass_when': 'the end frames the start: no shift, zoom or slide of the background', 'weight': 'must', 'pass': ok,
-            'seen': f'shift {shift * 100:.1f} % of the frame ({dx:+d}, {dy:+d} px at {ALIGN_W} wide), scale {scale:.3f}' + ('' if ok else ': the pair would glide'),
-            'shift_pct': round(shift * 100, 2), 'scale': scale}
+    return {'dx': dx, 'dy': dy, 'scale': round(1 / z, 3), 'shift': (dx * dx + dy * dy) ** 0.5 / ALIGN_W}
+
+
+DRIFT_MAX = 0.02   # design/112 S5: 2 % of the frame width, or 2 % of zoom, across a take; a starting value
+
+
+def _frames(video_path, per_second=2, limit=12):
+    """Up to twelve small grey frames of a take, two a second, straight from ffmpeg."""
+    out = subprocess.run([settings().FFMPEG_EXECUTABLE, '-v', 'error', '-i', str(video_path), '-vf', f'fps={per_second},scale={ALIGN_W}:{ALIGN_H}', '-frames:v', str(limit),
+                          '-f', 'rawvideo', '-pix_fmt', 'gray', '-'], capture_output=True, check=True, timeout=120).stdout
+    size = ALIGN_W * ALIGN_H
+    return [Image.frombytes('L', (ALIGN_W, ALIGN_H), out[i * size:(i + 1) * size]) for i in range(len(out) // size)]
+
+
+def take_drift(video_path, snapshot, frames=None):
+    """design/112 S5: every later frame registered against the first; the worst shift and zoom. A must line for a locked-off camera (the take fails
+    over DRIFT_MAX); measured and reported, not judged, when the shot names a camera move or the take was prepared before design/112. Code only."""
+    import numpy as np
+    frames = _frames(video_path) if frames is None else frames
+    if len(frames) < 2:
+        return None
+    fa = _fft(np.asarray(frames[0], dtype=float))
+    shift, zoom = 0.0, 0.0
+    for fr in frames[1:]:
+        m = _match(fa, lambda z, im=fr: _scaled(im, z))
+        shift, zoom = max(shift, m['shift']), max(zoom, abs(m['scale'] - 1))
+    locked = 'camera_move' in snapshot and not (snapshot.get('camera_move') or '').strip()
+    ok = shift <= DRIFT_MAX and zoom <= DRIFT_MAX
+    return {'check': 'camera drift', 'weight': 'must' if locked else 'should', 'pass': ok if locked else None,
+            'pass_when': 'the frame holds still across the take: no drift, zoom or slide of the whole picture',
+            'seen': f'drift up to {shift * 100:.1f} % of the frame, zoom up to {zoom * 100:.1f} %, over {len(frames)} frames'
+                    + ('' if locked else ' (a camera move is planned, or the take is from before design/112: reported, not judged)'),
+            'at_s': None, 'drift_pct': round(shift * 100, 2), 'zoom_pct': round(zoom * 100, 2)}
 
 
 def ambient_moves(snapshot):
@@ -104,6 +148,22 @@ TAKE_SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'item
 
 
 def run_take_check(snapshot, video_path, sha256, transport_factory):
+    """design/91 N3 and design/112 S5: the drift measured in code, then the take read by Gemini Flash against the fixed questions; the drift line joins the record either way. Never raises."""
+    try:
+        drift = take_drift(video_path, snapshot)
+    except Exception as exc:   # ffmpeg missing, a short clip: the take is never held back by its measurement
+        drift, drift_error = None, f'{exc.__class__.__name__}: {str(exc)[:200]}'
+    record = _model_take_check(snapshot, video_path, sha256, transport_factory)
+    if drift:
+        record['lines'] = list(record.get('lines') or []) + [drift]
+        if drift['pass'] is False and drift['weight'] == 'must':
+            record['must_failed'] = list(record.get('must_failed') or []) + [drift]
+    elif 'drift_error' in dir():
+        record['drift_error'] = drift_error
+    return record
+
+
+def _model_take_check(snapshot, video_path, sha256, transport_factory):
     """design/91 N3: a ready take read by Gemini Flash against the fixed questions, the plan beside them; the lines with the second each is decided. Never raises."""
     record = {'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
     try:

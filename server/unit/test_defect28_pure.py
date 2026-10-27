@@ -30,7 +30,7 @@ def two_shots():
 
 def start_body(sid='VS1', **over):
     return {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-' + sid, 'kind': 'keyframe', 'shot_id': sid, 'subject': 'the labourer', 'prompt': 'Image 1 is the sheet: take identity. The labourer walks the lane',   # design/111 F21
-            'parents': ['S1'], **over}
+            'parents': ['S1'], 'end_region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, **over}   # design/112 S2: the end's region with the start
 
 
 def test_the_clients_own_check_reads_only_the_pictures_own_shot():
@@ -67,7 +67,7 @@ def test_an_end_that_cannot_be_made_leaves_the_start_approved_and_says_why_and_a
     assert 'the end image was not made' in row['next'] and 'moves the camera' in row['next']
     s = saved(store)
     assert s['references'][sid]['status'] == 'approved' and not s['references'][sid].get('end_queued') and s['references'][sid]['pending_end']
-    s['references'][sid]['pending_end'] = {'prompt': END['prompt'], 'answer': END}   # the assistant writes the end again; approving the start again makes it
+    s['references'][sid]['pending_end'] = {'prompt': END['prompt'], 'answer': END, 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}}   # the assistant writes the end again (with its region, design/112 S2); approving the start again makes it
     conn = FakeConn([])
     row = VS.approve_reference(store_with(s, doc), USER, RUN, [], sid, 'a' * 64, '', conn)
     assert row['end_reference_id'] and len(conn.inserted) == 1

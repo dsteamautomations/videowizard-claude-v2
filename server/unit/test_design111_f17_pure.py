@@ -97,7 +97,7 @@ def test_background_figures_are_compared_with_the_approved_pictures_of_the_scene
     called = []
     monkeypatch.setattr(VS, '_has_figures', lambda plan, shot: True)
     monkeypatch.setattr(VS, 'figure_repeat', lambda store_, session_, row_, scene_: called.append(row_['id']) or {'against': ['K1'], 'repeated': True, 'detail': 'the same cow'})
-    rid = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r11', 'element_id': 'E1', 'name': 'end-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer',
+    rid = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r11', 'element_id': 'E1', 'name': 'end-VS1', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the labourer',
                                                                 'prompt': 'Image 1 is the start; the labourer at the edge.', 'parents': ['K1']})['reference_id']   # an end: no second start
     VS.approve_reference(approvable(store, rid), USER, RUN, [], rid, 'a' * 64, '', FakeConn([]))
     assert called == [rid] and saved(store)['references'][rid]['figure_check']['repeated'] is True

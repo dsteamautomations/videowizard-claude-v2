@@ -2099,7 +2099,7 @@ def generate_image(conn, store, user, run, outputs, body):
             need(False, f"{p['id']} is a derived picture (made from {', '.join(q.get('id', '')[:8] for q in (p.get('generation') or {}).get('parents') or [])}): a derived picture is never the parent of another; "
                         + (f'use the golden picture {gold[:8]}' if gold else 'use an approved sheet or the golden picture') + ' (an end is made from its approved start).')
     region = check_region(body['region']) if body.get('region') else None   # F11's edit rule: one change inside one region, masked, the start copied back outside it; without a region the
-    # picture is rule 2's new picture (several things change, or the framing), made whole as before
+    # picture was rule 2's new picture (several things change, or the framing), made whole; since design/112 S2 an end always has its region: the alternative is a start-only take
     if body['kind'] == 'keyframe':
         body = {**body, 'role': 'end' if is_end else 'start'}   # a copy: the caller's request is never changed
     variants = int(body.get('variants') or 1)   # design/86 K4: two candidates for a start keyframe, the operator picks
@@ -2116,7 +2116,13 @@ def generate_image(conn, store, user, run, outputs, body):
             except ValueError as exc:
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer'), **({'region': check_region(body['end_region'])} if body.get('end_region') else {})}   # design/111 F11
+    if body['kind'] == 'keyframe' and is_end and not region and not body.get('fix_of'):   # design/112 S2
+        whats = '; '.join(c.get('what', '') for c in (named or {}).get('changes') or []) or 'the change'
+        need(False, f'An end image is an edit inside one region of its start (design/112 S2): give --region left,top,width,height (fractions of the frame, a third at most) covering where {whats} happens; '
+                    'the server masks it and copies the start back outside it, so nothing else moves. Several places, or the framing itself: make the shot start-only (end_state_exact false) and let the motion carry the change.')
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    if body.get('end_prompt') and not body.get('end_region') and not body.get('fix_of'):   # design/112 S2: the end the server queues needs its region too
+        warns.append('the end written with this start has no region: the server will refuse to make it (design/112 S2); give --end-region left,top,width,height with the start')
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
     if answer is not None and library.exact_entries(answer):   # design/111 F13: every picture with exact text, not only a graphic

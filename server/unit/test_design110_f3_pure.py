@@ -53,7 +53,7 @@ def test_every_start_keyframe_of_a_video_shot_carries_the_must_line_and_an_end_d
     s = saved(approvable(store, rid))
     s['references'][rid]['status'] = 'approved'
     put(store, s)
-    end = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r-end', 'element_id': 'E1', 'name': 'keyframe-end-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer',
+    end = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r-end', 'element_id': 'E1', 'name': 'keyframe-end-VS1', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the labourer',
                                                                 'prompt': 'Image 1 is the start; the labourer at the edge.', 'parents': [rid], 'role': 'end'})
     assert 'not yet done' not in [l['check'] for l in saved(store)['references'][end['reference_id']].get('server_checklist') or []]
 

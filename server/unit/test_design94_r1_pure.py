@@ -45,6 +45,8 @@ def image(store, **body):
     prompt = body.pop('prompt', 'A wall in section.')
     if parents and not any(f'Image {k}' in prompt for k in range(1, len(parents) + 1)):   # design/111 F21: every picture sent has its job line
         prompt = ' '.join(f'Image {k} is reference {k}: take its look.' for k in range(1, len(parents) + 1)) + ' ' + prompt
+    if parents and body.get('kind', 'keyframe') == 'keyframe' and 'region' not in body and 'role' not in body:   # design/112 S2: an end is a region edit
+        body['region'] = {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}
     return VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': body.pop('request_id', 'q1'), 'element_id': 'E1', 'name': 'wall', 'kind': 'keyframe',
                                                                  'subject': 'the wall', 'prompt': prompt, **body})
 

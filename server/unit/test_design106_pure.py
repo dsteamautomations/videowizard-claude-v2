@@ -32,7 +32,7 @@ def start_store():
 def revise_start(store, **over):
     body = {'request_id': 'r9', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer',
             'prompt': "Image 1 is the old start; the labourer at the stack, the lane behind. Image 2 is the labourer's sheet: take identity from it, nothing else.", 'parents': ['K1', 'R1'],   # design/111 F21
-            'end_prompt': END['prompt'], 'end_answer': END, **over}
+            'end_prompt': END['prompt'], 'end_answer': END, 'end_region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, **over}   # design/112 S2: the end's region with the start
     return VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
 
 
@@ -49,7 +49,7 @@ def test_a_start_made_from_an_old_start_is_a_start_when_its_role_says_so():
 
 def test_a_keyframe_records_its_role_and_the_page_reads_it():
     store = start_store()
-    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r11', 'element_id': 'E1', 'name': 'end-VS1', 'kind': 'keyframe', 'shot_id': 'VS1',
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r11', 'element_id': 'E1', 'name': 'end-VS1', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1',
                                                                 'subject': 'the labourer', 'prompt': 'Image 1 is the start; the labourer at the edge.', 'parents': ['K1']})
     assert saved(store)['references'][out['reference_id']]['role'] == 'end'
     view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9')
