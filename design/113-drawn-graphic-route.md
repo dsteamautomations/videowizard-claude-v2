@@ -65,3 +65,4 @@ A fifth route, **drawn**, for diagrams, charts, maps, timelines and technical dr
 1. The drawing set as listed (rect, line, arrow, circle, polygon, text, image, group, repeat; appear, build, move, highlight, fade); no curves or 3-D in this release.
 2. The server places the spec's size labels (a leader line to the part, the text outside it); the planner may move a label; a dropped label is put back.
 3. Review: the code check (frames, size, fps, safe area, sizes or the illustrative label) and one Gemini 3.8 Flash read of the first and the last frame against the claims, the relationships and the labels.
+4. The sample: VW-7's wall-section shot, rendered on the VM from a scene the builder writes, posted beside the repo with its scene text, before the route becomes the default.
