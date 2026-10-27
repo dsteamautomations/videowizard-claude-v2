@@ -39,7 +39,7 @@ class Foundation(Model):
 class Element(Model):
     id: str = Field(min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
     name: str = Field(min_length=1, max_length=200)
-    kind: Literal['person', 'object', 'place', 'graphic', 'animal', 'material', 'process']   # design/91 N6: a material or a process the film relies on
+    kind: Literal['person', 'object', 'place', 'graphic', 'animal', 'material', 'process', 'technique']   # design/91 N6: a material or a process; design/111 F14: a way of doing (pointing, plastering)
     identity: Literal['exact', 'representative']
     requirements: str = Field(min_length=1, max_length=4000)
     required_views: list[str] = Field(default_factory=list, max_length=20)
@@ -207,6 +207,7 @@ class Shot(Model):
     allows: list[str] = Field(default_factory=list, max_length=10)   # design/111 F12: a named exception to an element's not-this list, in this shot only (a jali in a wall)
     face_in_frame: bool = True   # design/111 F7: false for a view from behind or hands in close; then no eye line is asked
     fixed: list[str] = Field(default_factory=list, max_length=3)   # design/111 F8: three landmark ids that must not change between the start and the end
+    compare_to: str = Field(default='', max_length=80)   # design/111 F15: the thing in frame the subject's size is read against, when size is the message
     fact_ids: list[str] = Field(default_factory=list, max_length=20)   # design/91 N6: the facts this shot rests on
     descriptors: list[str] = Field(default_factory=list, max_length=10)   # design/91 N8: the narration's descriptive words about the subject
     evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)
@@ -298,6 +299,24 @@ def _dimension_needs(label, dims):
 
 
 VAGUE_PLACE = re.compile(r'(?:(?:at|in|to|on)\s+)?(?:the\s+)?(?:centre|center|middle|nearby|near|closer|further|beside|next to|close by)', re.I)   # design/110 F2
+
+
+TECHNIQUE_VERBS = {'pointing': r'point(s|ed|ing)?', 'plastering': r'plaster(s|ed|ing)?', 'planing': r'plan(e|es|ed|ing)', 'rendering': r'render(s|ed|ing)?', 'curing': r'cur(e|es|ed|ing)',
+                   'welding': r'weld(s|ed|ing)?', 'soldering': r'solder(s|ed|ing)?', 'grouting': r'grout(s|ed|ing)?', 'painting': r'paint(s|ed|ing)?', 'sanding': r'sand(s|ed|ing)',
+                   'polishing': r'polish(es|ed|ing)?', 'chiselling': r'chisel(s|led|ling)?', 'sawing': r'saw(s|ed|ing)', 'drilling': r'drill(s|ed|ing)?', 'stitching': r'stitch(es|ed|ing)?',
+                   'weaving': r'weav(e|es|ing)|wove|woven', 'kneading': r'knead(s|ed|ing)?', 'moulding': r'mould(s|ed|ing)?', 'thatching': r'thatch(es|ed|ing)?', 'tying': r'tie(s|d)?|tying'}   # design/111 F14
+SIZE_WORDS = re.compile(r'\b(small|smaller|smallest|large|larger|largest|big|bigger|biggest|less|fewer|thin|thinner|thick|thicker|short|shorter|light|lighter|tall|taller|heavy|heavier|tiny|huge|mini|compact|narrow|narrower|wide|wider)\b', re.I)   # design/111 F15
+
+
+def technique_words(text):
+    """design/111 F14: the techniques a beat's words name, in order of appearance, each once."""
+    found = []
+    for m in re.finditer(r'[A-Za-z]+', str(text or '')):
+        w = m.group(0).lower()
+        for name, pat in TECHNIQUE_VERBS.items():
+            if re.fullmatch(pat, w) and name not in found:
+                found.append(name)
+    return found
 
 
 def need(value, message):
@@ -630,6 +649,19 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             for beat in subject.beats:
                                 need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second") (design/110 F1).')
                         last_states[subject.element_id] = subject.end.model_dump()
+                    if shot.visual_type == 'video':   # design/111 F14: every technique the beats name is an element, so it gets its reference like a person or a tool
+                        names_ = {e.name.lower() for e in plan.elements if e.kind == 'technique'} | {e.id.lower() for e in plan.elements if e.kind == 'technique'}
+                        for s in shot.subjects:
+                            for b in s.beats:
+                                for tech in technique_words(b.action + ' ' + b.done):
+                                    need(tech in names_, f"shot {shot.id}: the technique '{tech}' (beat {b.id}: {b.action}) is not an element: add it (kind technique, id {tech.upper()}) so it joins the reference round and gets its own picture (design/111 F14).")
+                    if SIZE_WORDS.search(' '.join(shot.claims + shot.descriptors)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message
+                        subj = shot.subjects[0].element_id if shot.subjects else shot.element_ids[0]
+                        el = next((e for e in plan.elements if e.id == subj), None)
+                        sized_ = bool(el) and any(d.value is not None for d in (el.size or []) + list((el.material_spec.dimensions if el.material_spec else [])))
+                        need(sized_, f"shot {shot.id}: its claim or descriptor is about size ({SIZE_WORDS.search(' '.join(shot.claims + shot.descriptors)).group(0)}): give the subject a size value and name compare_to, a thing in frame to read it against (design/111 F15).")
+                        need(shot.compare_to.strip(), f'shot {shot.id}: size is the message: name compare_to, the thing in frame the size of {subj} is read against (design/111 F15).')
+                        need(shot.compare_to in shot.element_ids and shot.compare_to != subj, f'shot {shot.id}: compare_to names an element in frame other than the subject ({shot.compare_to} is not) (design/111 F15).')
                     if shot.visual_type == 'video' and shot.subjects:   # design/111 F8: three fixed things of the place, from the landmarks, never an element (a shot with an action: it gets an end or a take)
                         wanted = min(3, len(landmarks))
                         need(len(shot.fixed) == wanted and len(set(shot.fixed)) == wanted, f'shot {shot.id}: names three fixed things of the background in fixed (landmark ids; all of them when the scene has fewer than three) (design/111 F8).')

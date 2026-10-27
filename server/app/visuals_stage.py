@@ -712,6 +712,45 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/111 F14, F15: techniques are elements; size as the message carries a number and a comparison ----------
+
+def technique_words(text):
+    from .visual_contract import technique_words as tw
+    return tw(text)
+
+
+def needed_elements(plan):
+    """F14: the technique elements the plan's beats need and do not have yet, for the planner to add before the round."""
+    have = {e['id'].lower() for e in plan.get('elements') or []} | {e['name'].lower() for e in plan.get('elements') or []}
+    out, seen = [], set()
+    for g in plan.get('gaps') or []:
+        for sc in (g.get('scenes') or []) + [sc for ch in g.get('choices') or [] for sc in ch.get('scenes') or []]:
+            for sh in sc.get('shots') or []:
+                for s in sh.get('subjects') or []:
+                    for b in s.get('beats') or []:
+                        for tech in technique_words((b.get('action') or '') + ' ' + (b.get('done') or '')):
+                            if tech not in have and tech not in seen:
+                                seen.add(tech)
+                                out.append({'id': tech.upper(), 'kind': 'technique', 'from': f"{sh['id']} {b.get('id')}: {b.get('action')}"})
+    return out
+
+
+def size_line(plan, shot):
+    """F15: one number and one comparison when the shot's claim or descriptor is about size."""
+    from .visual_contract import SIZE_WORDS
+    if not SIZE_WORDS.search(' '.join((shot.get('claims') or []) + (shot.get('descriptors') or []))) or not shot.get('compare_to'):
+        return ''
+    elements = {e['id']: e for e in plan.get('elements') or []}
+    subj = shot['subjects'][0]['element_id'] if shot.get('subjects') else (shot.get('element_ids') or [''])[0]
+    el = elements.get(subj) or {}
+    dims = [d for d in (el.get('size') or []) + ((el.get('material_spec') or {}).get('dimensions') or []) if d.get('value') is not None]
+    if not dims:
+        return ''
+    sizes = ', '.join(f"{d['part']} {d['measure']} {d['value']:g} {d.get('unit') or ''}".strip() for d in dims[:2])
+    comp = elements.get(shot['compare_to'], {}).get('name', shot['compare_to'])
+    return f"Size is the point: {el.get('name', subj)}, {sizes}, against the {comp} beside it; the sizes read true against each other and the place."
+
+
 # ---------- design/111 F13: words to be read, letter for letter, in their place ----------
 
 def exact_text_lines(answer, marks):
@@ -1095,6 +1134,7 @@ def heading_lines(scene, shot, when, names=None):
 def composed_block(plan, scene, shot, when):
     """What the server writes under the writer's prompt of a start or an end picture: the targets (F1, F3), the headings (F6), the tools (F5), the inventory (F4)."""
     lines = ((start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + gaze_lines(plan, scene, shot, when) + heading_lines(scene, shot, when, _names(plan))
+             + ([size_line(plan, shot)] if size_line(plan, shot) else [])   # design/111 F15
              + tool_lines(plan, scene, shot, when) + (([fixed_line(scene, shot)] if fixed_line(scene, shot) else []) + sits_lines(plan, scene, shot) if when == 'end' else []))   # design/111 F7, F8, F9
     inv = inventory_line(plan, scene, shot, when)
     return '\n'.join(lines + ([inv] if inv else []))
@@ -1111,6 +1151,8 @@ def picture_rule_lines(plan, scene, shot, when):
     names = _names(plan)
     marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
     out = []
+    if size_line(plan, shot):   # design/111 F15: the true-sizes question is a must when size is the message
+        out.append({'check': 'size is the point', 'weight': 'must', 'pass_when': size_line(plan, shot)[len('Size is the point: '):].rstrip('.')})
     inv = inventory_line(plan, scene, shot, when)
     if inv:
         out.append({'check': 'inventory', 'weight': 'must', 'pass_when': 'the picture holds exactly these things, in these counts and places, and nothing else of these kinds: ' + inv[len('Inventory, exactly: '):]})
@@ -3303,6 +3345,7 @@ def status(conn, store, run, outputs, repair=True):
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
+            'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 
