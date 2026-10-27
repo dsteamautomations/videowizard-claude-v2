@@ -51,7 +51,7 @@ def test_a1_a4_a5_warn_until_filled():
     d['elements'][0]['size'] = [{'part': 'block', 'measure': 'length', 'value': 29, 'unit': 'cm', 'status': 'confirmed', 'source': 'the client brief'}]   # review 27 Oct: a known size names its source
     k = kinds(d)
     assert not {'light_missing', 'camera_reason_missing', 'element_size_missing'} & {w for _, w in k}
-    d['elements'][0].update(kind='place', size=[])
+    d['elements'][0].update(kind='place', size=[], signs_of_use=[{'what': 'mortar droppings', 'landmark_id': 'L1'}, {'what': 'offcuts', 'landmark_id': 'L1'}])   # design/111 F18
     assert ('E1', 'element_size_missing') not in kinds(d)   # a place's size is optional
 
 

@@ -712,6 +712,61 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/111 F18: the place in use, the real light of the footage ----------
+
+OCCUPIED = {'check': 'occupied', 'weight': 'must', 'pass_when': 'the place looks occupied or in use: traces of work or living at its landmarks, nothing showroom-clean or empty'}
+
+
+def _place_in(plan, element_id, shot):
+    kinds = {e['id']: e['kind'] for e in plan.get('elements') or []}
+    return any(kinds.get(i) == 'place' for i in [element_id] + list(shot.get('element_ids') or []))
+
+
+def signs_lines(session, plan, scene, shot, element_id):
+    """Two signs of use per shot, from the places in frame, taken in turn (the next shot gets the next pair); a shot keeps the pair it was given."""
+    elements = {e['id']: e for e in plan.get('elements') or []}
+    places = [elements[i] for i in dict.fromkeys([element_id] + list(shot.get('element_ids') or [])) if i in elements and elements[i]['kind'] == 'place' and elements[i].get('signs_of_use')]
+    if not places:
+        return []
+    chosen = session.setdefault('signs', {})
+    if shot['id'] not in chosen:
+        pick = []
+        for p in places:
+            pool, cur = p['signs_of_use'], session.setdefault('signs_cursor', {}).get(p['id'], 0)
+            pick += [pool[(cur + i) % len(pool)] for i in range(min(2, len(pool)))]
+            session['signs_cursor'][p['id']] = (cur + 2) % len(pool)   # ponytail: round robin; a place with two signs repeats its pair, add more signs to vary
+            if len(pick) >= 2:
+                break
+        chosen[shot['id']] = pick[:2]
+    marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
+    return ['Signs of use: ' + '; '.join(f"{s['what']} at {marks.get(s['landmark_id'], s['landmark_id'])}" for s in chosen[shot['id']]) + '.'] if chosen[shot['id']] else []
+
+
+def real_light_line(store, session):
+    """Composed once per run from the footage character and the measured light of the approved footage frames, then kept on the session."""
+    if session.get('real_light'):
+        return session['real_light']
+    f = (session.get('footage') or {}).get('summary') or {}
+    stats = []
+    for r in [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')][:6]:
+        try:
+            stats.append(image_check._light(store.get(r['key'])))
+        except Exception:
+            continue
+    words = []
+    if f.get('look') and f['look'] not in ('unknown', 'mixed'):
+        words.append(f"{f['look']} look" + (f", {FM.CAMERA_WORDS.get(f['camera'], f['camera'])}" if f.get('camera') and f['camera'] not in ('unknown', 'mixed') else ''))
+    if stats:
+        m = {k: sum(s[k] for s in stats) / len(stats) for k in ('brightness', 'saturation', 'warmth')}
+        words.append(('dim' if m['brightness'] < 0.35 else 'bright' if m['brightness'] > 0.65 else 'mid') + ' light, '   # ponytail: first-guess bands on 0..1 means, tune on real films
+                     + ('muted' if m['saturation'] < 0.3 else 'rich' if m['saturation'] > 0.55 else 'ordinary') + ' colour, '
+                     + ('cool' if m['warmth'] < -0.03 else 'warm' if m['warmth'] > 0.05 else 'neutral') + ' cast')
+    if not words:
+        return ''
+    session['real_light'] = 'Real light, as the footage has it: ' + '; '.join(words) + '. No studio light, no glow, no added saturation; the same light and colour as the footage beside it.'
+    return session['real_light']
+
+
 # ---------- design/111 F17: groups of a kind, said; background figures compared within the scene ----------
 
 def group_lines(plan, shot):
@@ -2047,6 +2102,17 @@ def generate_image(conn, store, user, run, outputs, body):
     lw = light_warning(found[2], body['kind'], body['prompt']) if found else None   # design/103 A1
     if found and element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated'):   # design/104 C5: the scene's light and air, the shot's size, real sizes
         lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements'])
+        sg = signs_lines(session, plan, found[2], found[3], body['element_id'])   # design/111 F18: two signs of use, the place in use
+        if sg:
+            lines.append({'check': 'signs of use', 'weight': 'must', 'pass_when': sg[0][len('Signs of use: '):].rstrip('.') + ': both visible at their places'})
+            if not body.get('fix_of'):
+                body = {**body, 'prompt': with_composed(body['prompt'], sg[0])}
+        if _place_in(plan, body['element_id'], found[3]):
+            lines.append(OCCUPIED)
+    if element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated') and not body.get('fix_of'):   # design/111 F18: the real light, once per run, in every prompt
+        rl = real_light_line(store, session)
+        if rl:
+            body = {**body, 'prompt': with_composed(body['prompt'], rl)}
     if lw:
         warns.append(lw)
     missing = [] if body.get('fix_of') else library.image_names_missing(body['prompt'], len(body.get('parents') or []))   # design/96 C1: the pictures it names, not those the server adds

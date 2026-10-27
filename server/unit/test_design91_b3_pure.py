@@ -93,7 +93,7 @@ def frames_store():
 def test_a_picture_much_brighter_and_more_saturated_than_the_footage_beside_it_is_marked():
     store, sess = frames_store()
     line = IC.light_line(store, sess, {'gap_id': 'G1', 'element_kind': 'object', 'kind': 'keyframe'}, png((240, 205, 50)))
-    assert line['pass'] is False and line['weight'] == 'should' and 'brighter' in line['seen'] and 'saturated' in line['seen']
+    assert line['pass'] is False and line['weight'] == 'must' and 'brighter' in line['seen'] and 'saturated' in line['seen']   # design/111 F18: a must
     assert IC.light_line(store, sess, {'gap_id': 'G1', 'element_kind': 'object', 'kind': 'keyframe'}, png((72, 88, 66)))['pass'] is True
     # without the gap, the film's footage frames together: the bright one pulls the average up
     assert IC.light_line(store, sess, {'element_kind': 'object', 'kind': 'keyframe'}, png((150, 148, 62)))['pass'] is True
@@ -112,4 +112,4 @@ def test_the_light_line_joins_the_check_even_when_gemini_cannot_run(monkeypatch)
     store.files['run-1/visuals/references/K1.png'] = png((240, 205, 50))
     rec = IC.run_check(store, sess, {'id': 'K1', 'gap_id': 'G1', 'element_kind': 'object', 'kind': 'keyframe', 'generation': {'parents': []}},
                        {'key': 'run-1/visuals/references/K1.png'}, None)
-    assert rec['error'] == 'no Gemini key on the server' and rec['lines'][-1]['check'] == 'light and colour' and rec['lines'][-1]['pass'] is False and not rec['must_failed']
+    assert rec['error'] == 'no Gemini key on the server' and rec['lines'][-1]['check'] == 'light and colour' and rec['lines'][-1]['pass'] is False and rec['must_failed'] == [rec['lines'][-1]]   # design/111 F18

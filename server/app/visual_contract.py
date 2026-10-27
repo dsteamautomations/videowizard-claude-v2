@@ -47,6 +47,7 @@ class Element(Model):
     repeating: bool = False   # design/111 F10: built from repeated units (bricks, tiles, blocks, planks, pavers); a kind 'material' always is
     material_spec: 'MaterialSpec | None' = None   # design/111 F10
     description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (build, age, skin, hair, posture, garment types and how worn), in every prompt
+    signs_of_use: list['SignOfUse'] = Field(default_factory=list, max_length=30)   # design/111 F18: a place's traces of use, two written per shot
 
 
 class Position(Model):
@@ -169,6 +170,11 @@ class Prop(Model):   # design/110 F5: a held tool or prop, a named thing of the 
     holder: str = Field(min_length=1, max_length=80)
     start: Position
     end: PropEnd
+
+
+class SignOfUse(Model):   # design/111 F18: a trace of work or living at one of the place's landmarks
+    what: str = Field(min_length=1, max_length=300)
+    landmark_id: str = Field(min_length=1, max_length=80)
 
 
 class Group(Model):   # design/111 F17: several of a kind in frame, all alike for a reason or no two alike with a trait each
@@ -475,6 +481,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     said = []   # design/91 N11: the counted shots, for the repeated messages
     graphic_seen = False   # design/89 C2
     last_outfit = {}   # design/111 F16: the colours each person wore last, in film order
+    place_marks = {}   # design/111 F18: the landmarks of the scenes that show each place
     for gap in plan.gaps:
         need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
         window = source_gaps[gap.gap_id]
@@ -503,6 +510,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     last_outfit[pid] = scene.outfit[pid]
                 for pid in scene.outfit:
                     need(ekind.get(pid) == 'person', f'scene {scene.id}: outfit names {pid}, which is not a person element (design/111 F16).')
+                for pid in {eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'place'}:   # design/111 F18
+                    place_marks.setdefault(pid, set()).update(landmarks)
                 if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES for s in scene.shots):   # design/91 N4: life in the frame
                     if not scene.activity_level:
                         warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
@@ -761,6 +770,11 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     for prev, cur in zip(placed, placed[1:]):
         if prev[2] in GRAPHIC_TYPES and cur[2] in GRAPHIC_TYPES and (prev[0] == cur[0] or prev[4] == cur[3]):
             warnings.append({'shot_id': cur[1], 'kind': 'graphics_back_to_back', 'message': f"shots {prev[1]} and {cur[1]} are graphics back to back: the second shot's purpose must say why it stays a graphic"})
+    for e in plan.elements:   # design/111 F18: a place the film shows carries its signs of use, each at a landmark of a scene that shows it
+        if e.id in place_marks:
+            need(len(e.signs_of_use) >= 2, f'{e.id} is a place the film shows: give signs_of_use, two or more traces of work or living, each at one of its landmarks (design/111 F18).')
+            for s in e.signs_of_use:
+                need(s.landmark_id in place_marks[e.id], f'{e.id}: {s.landmark_id} is not a landmark of a scene that shows {e.id} (signs_of_use) (design/111 F18).')
     for gap in plan.gaps:   # design/85 G2, G3: a run of AI video over AI_RUN_S in one gap, unbroken by a frame, a still or a graphic
         own = sorted((p for p in placed if p[0] == gap.gap_id), key=lambda p: p[3])
         run_, runs = [], []

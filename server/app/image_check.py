@@ -141,7 +141,7 @@ def _light(png):
 
 def light_line(store, session, ref, png):
     """design/91 N9: a picture in the film against the approved footage frames beside its gap (else all of the film's): brightness, saturation and warmth.
-    None for a graphic, a sheet, or a film without footage frames. Code, not a model: free, and a should line, so it never starts a fix round."""
+    None for a graphic, a sheet, or a film without footage frames. Code, not a model: free; a must line since design/111 F18."""
     if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') not in ('keyframe', 'isolated'):
         return None
     frames = [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')]
@@ -160,7 +160,7 @@ def light_line(store, session, ref, png):
     words = {'brightness': ('brighter', 'darker'), 'saturation': ('more saturated', 'less saturated'), 'warmth': ('warmer', 'cooler')}
     jumps = [f"{words[k][0] if mine[k] > footage[k] else words[k][1]} by {abs(mine[k] - footage[k]):.2f}" for k in LIGHT_JUMP if abs(mine[k] - footage[k]) >= LIGHT_JUMP[k]]
     seen = (', '.join(jumps) + ' than' if jumps else 'close to') + f" the footage beside it ({len(stats)} frame{'s' if len(stats) > 1 else ''})"
-    return {'check': 'light and colour', 'pass_when': 'the light, colour and saturation match the footage beside it', 'weight': 'should', 'pass': not jumps, 'seen': seen}
+    return {'check': 'light and colour', 'pass_when': 'the light, colour and saturation match the footage beside it', 'weight': 'must', 'pass': not jumps, 'seen': seen}   # design/111 F18: a must (SK, 27 Oct), the jumps untuned
 
 
 DETAIL_MIN, DETAIL_FRAMES = 0.6, 3   # design/104 C3; ponytail: the handover's 40 % smoother, untuned; tune it from the ratios the line reports
@@ -205,6 +205,8 @@ def run_check(store, session, ref, result, transport_factory):
         light = None
     if light:
         record['lines'] = list(record.get('lines') or []) + [light]
+        if light.get('pass') is False:   # design/111 F18: a failed light line fails the picture
+            record['must_failed'] = list(record.get('must_failed') or []) + [light]
     try:
         detail = detail_line(store, session, ref, png)   # design/104 C3
     except Exception:
