@@ -14,8 +14,8 @@ from test_visuals_pure import GAPS, plan, shot as pshot, states
 SPEC = {'parts': ['inner leaf', 'outer leaf', 'cavity'], 'relationships': ['the two leaves are the same thickness', 'the cavity is inside the wall'],
         'dimensions': [{'part': 'leaf', 'measure': 'thickness', 'value': 110, 'unit': 'mm', 'source': 'client brochure p.4', 'status': 'confirmed'},
                        {'part': 'cavity', 'measure': 'width', 'value': None, 'unit': 'mm', 'source': '', 'status': 'unknown',
-                        'tried': 'not in the client brochure; no footage frame shows the cavity'}],   # design/106 D3: an unknown size records the sources tried
-        'label': 'illustrative, not to scale'}
+                        'tried': 'not in the client brochure; no footage frame shows the cavity; no standard or maker figure for this wall; no approved picture shows it'}],   # design/106 D3, design/111 F19: all four sources tried
+        'label': 'illustrative, not to scale', 'illustrative': True, 'view': 'cutaway', 'view_reason': 'the cavity is inside the wall'}   # design/111 F19
 
 
 def kinds(doc, gaps=GAPS):

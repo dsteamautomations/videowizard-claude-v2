@@ -213,7 +213,7 @@ function frame(){
   let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(dr?(t?'<strong>New treatment draft</strong>: it replaces the approved one; read it and approve it at the foot':'<strong>Treatment drafted</strong>: read it and approve it at the foot'):(!t?'The assistant is preparing the treatment':'<strong>'+esc(STEPS.find(x=>x[0]===at)[1])+'</strong> is the step the run is at'));
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
   const wn=(d.waiting||[]).length;
-  $('line').innerHTML=line+meter+(wn?' · <a id="wcount" style="cursor:pointer"><b>'+wn+'</b> waiting for your verdict</a> <button id="wnext">Next waiting</button>':'');   // design/97 W3
+  $('line').innerHTML=line+meter+(d.illustrative&&d.illustrative.warning?' · <span class="err">'+esc(d.illustrative.warning)+'</span>':'')+(wn?' · <a id="wcount" style="cursor:pointer"><b>'+wn+'</b> waiting for your verdict</a> <button id="wnext">Next waiting</button>':'');   // design/97 W3
   if($('wcount'))$('wcount').addEventListener('click',()=>{const l=$('wlist');l.hidden=!l.hidden;l.innerHTML=(d.waiting||[]).map(w=>'<a href="'+esc(w.link)+'">'+esc(w.label)+'</a>').join('');});
   if($('wnext'))$('wnext').addEventListener('click',()=>{const w=d.waiting||[];if(!w.length)return;wi=(wi+1)%w.length;const h=w[wi].link.split('#')[1];if(location.hash==='#'+h)applyHash();else location.hash=h;});
 }

@@ -553,6 +553,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0
             'golden': dict(session.get('golden') or {}),   # design/111 F11
+            'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
             'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
@@ -710,6 +711,44 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     if row['id'] not in (session.get('questions') or {}):
         _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({prices()['image_inr']:g} INR)", 'approve anyway'], 'server', fork='not_yet')
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
+
+
+# ---------- design/111 F19 (plan-check and count parts): illustrative earned, the share counted, the view named ----------
+
+def spec_view(shot):
+    """The drawing's view and its reason; a section with no view given is a cutaway."""
+    spec = shot.get('drawing_spec') or {}
+    if spec.get('view'):
+        return spec['view'], (spec.get('view_reason') or '').strip()
+    words = ' '.join(str(shot.get(k) or '') for k in ('depicts', 'purpose', 'title')).lower()
+    return ('cutaway', 'a section is cut through the wall') if 'section' in words else ('', '')
+
+
+def view_line(shot):
+    if not shot.get('drawing_spec'):
+        return None
+    v, why = spec_view(shot)
+    return {'check': 'view: ' + v, 'pass_when': f'the drawing is a {v} view' + (f' ({why})' if why else ''), 'weight': 'must'} if v else None
+
+
+def illustrative_share(plan):
+    """The run's illustrative specs against all its specs (drawing specs on shots, material specs on elements); a warning above one in four."""
+    ids, n = [], 0
+    for g in plan.get('gaps') or []:
+        for sc in (g.get('scenes') or []) + [sc for ch in g.get('choices') or [] for sc in ch.get('scenes') or []]:
+            for sh in sc.get('shots') or []:
+                if sh.get('drawing_spec'):
+                    n += 1
+                    if sh['drawing_spec'].get('illustrative'):
+                        ids.append('shot ' + sh['id'])
+    for e in plan.get('elements') or []:
+        if e.get('material_spec'):
+            n += 1
+            if e['material_spec'].get('illustrative'):
+                ids.append('element ' + e['id'])
+    warn = (f"{len(ids)} of {n} specs are illustrative (above one in four): {', '.join(ids)}: measure them (the client material, the footage frames, a standard or maker figure, an approved picture)"
+            if ids and len(ids) * 4 > n else None)
+    return {'illustrative': ids, 'specs': n, 'warning': warn}
 
 
 # ---------- design/111 F18: the place in use, the real light of the footage ----------
@@ -2225,6 +2264,8 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
                          {'check': f"size: {name} {r['size']}", 'pass_when': f"any figure shown for the {name} reads {r['size']}, and its proportion to the other parts looks right", 'weight': 'should'})
         if spec.get('label'):
             lines.append({'check': 'label: ' + spec['label'], 'pass_when': f"the drawing carries the words \"{spec['label']}\"", 'weight': 'must'})
+        if view_line(sh):   # design/111 F19
+            lines.append(view_line(sh))
     if body['kind'] != 'state' and not any(p.get('kind') == 'style' and p.get('status') == 'approved' for p in parents):   # a state is made from the previous state
         warns.append(f'no approved style sheet among the parents: make it once (`vw visuals image --element {STYLE} --kind style`), approve it, and name it in --parents' + NEXT_RELEASE)
     for sh in shots:
@@ -3501,6 +3542,7 @@ def status(conn, store, run, outputs, repair=True):
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14
+            'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
             'figure_repeats': [{'reference_id': r['id'], 'shot_id': made_for(session, r), 'detail': r['figure_check'].get('detail', '')} for r in session['references'].values()
                                if (r.get('figure_check') or {}).get('repeated') and r.get('status') == 'approved'],   # design/111 F17
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7

@@ -15,7 +15,7 @@ from test_visuals_pure import GAPS, plan, shot as pshot
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = (ROOT / 'app' / 'templates' / 'visuals.html').read_text(encoding='utf-8')
-TRIED = 'not in the client material; the footage frames show no ruler or known object at the cavity; no standard gives it'
+TRIED = 'not in the client material; the footage frames show no ruler or known object at the cavity; no standard gives it; no approved picture shows it'   # design/111 F19: all four
 
 
 def spec(**over):
@@ -52,6 +52,7 @@ def test_the_new_spec_fields_stay_absent_and_change_no_gap_digest():
     sp['dimensions'][1]['status'] = 'confirmed'
     sp['dimensions'][1].update(value=40, source='client drawing')
     sp['dimensions'][1].pop('tried', None)   # an old spec: the new keys absent
+    sp.pop('illustrative', None)   # design/111 F19: nothing unknown, so not illustrative
     out, _ = checked(sp)
     stored = out['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec']
     assert 'proportions' not in stored and all('tried' not in d for d in stored['dimensions'])

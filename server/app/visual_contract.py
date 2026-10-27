@@ -134,6 +134,9 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     relationships: list[str] = Field(default_factory=list, max_length=30)
     label: str = Field(default='', max_length=200)
     proportions: list[str] = Field(default_factory=list, max_length=20)   # design/106 D2: the ratios that matter, always, even on an illustrative drawing
+    illustrative: bool = False   # design/111 F19: earned per unknown value, only after all four sources were tried
+    view: Literal['', 'cutaway', 'plan', 'side', 'elevation'] = ''   # design/111 F19: which view the drawing is; a section defaults to cutaway
+    view_reason: str = Field(default='', max_length=500)
 
 
 class MaterialSpec(DrawingSpec):   # design/111 F10: one measured spec per repeating material, made like a drawing spec, approved once, pasted into every prompt
@@ -319,6 +322,22 @@ def _dimension_needs(label, dims):
         need(d.status == 'unknown' or d.source.strip(), f'{label}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
 
 
+FOUR_SOURCES = [('the client material', re.compile(r'client|brochure|material', re.I)), ('the footage frames', re.compile(r'footage|frame|clip', re.I)),
+                ('a standard or a maker figure', re.compile(r'standard|maker|manufacturer|datasheet|catalogue|\bIS\b', re.I)), ('an approved picture', re.compile(r'picture|reference|sheet', re.I))]   # design/111 F19
+
+
+def _illustrative_needs(label, spec):
+    """design/111 F19: 'illustrative' is earned, per unknown value, only after all four sources were tried; never claimed when nothing is unknown."""
+    unknown = [d for d in spec.dimensions if d.status == 'unknown']
+    if unknown:
+        need(spec.illustrative, f'{label}: a size is unknown: the drawing is illustrative only when illustrative is true, earned by trying all four sources for each unknown value (design/111 F19).')
+        for d in unknown:
+            missing = [name for name, pat in FOUR_SOURCES if not pat.search(d.tried)]
+            need(not missing, f"{label}: {d.part} {d.measure}: 'illustrative' is earned only after all four sources were tried; tried does not name: {', '.join(missing)} (design/111 F19).")
+    else:
+        need(not spec.illustrative, f'{label}: nothing is unknown: drop illustrative (design/111 F19).')
+
+
 VAGUE_PLACE = re.compile(r'(?:(?:at|in|to|on)\s+)?(?:the\s+)?(?:centre|center|middle|nearby|near|closer|further|beside|next to|close by)', re.I)   # design/110 F2
 
 
@@ -465,6 +484,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             need(e.material_spec is not None, f'element {e.id} is a repeating material: give its material_spec (unit sizes with sources, laid, joint, pattern, proportions), made like a drawing spec, never typed by the operator (design/111 F10).')
             need(not e.size, f'element {e.id}: its sizes live in its material_spec, not in size (design/111 F10).')
             _dimension_needs(f'material spec of {e.id}', e.material_spec.dimensions)
+            _illustrative_needs(f'material spec of {e.id}', e.material_spec)   # design/111 F19
             need(e.material_spec.dimensions, f'material spec of {e.id}: give the unit sizes (length, width, height) with their sources (design/111 F10).')
             need(e.material_spec.proportions, f'material spec of {e.id}: give the proportions that matter (design/106 D2, design/111 F10).')
     unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
@@ -599,6 +619,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         else:
                             spec = shot.drawing_spec
                             _dimension_needs(f'shot {shot.id}', spec.dimensions)
+                            _illustrative_needs(f'shot {shot.id}', spec)   # design/111 F19
+                            section = 'section' in (shot.depicts + ' ' + shot.purpose + ' ' + shot.title).lower()   # F19: a wall section defaults to cutaway
+                            need(spec.view or section, f'shot {shot.id}: give view (cutaway, plan, side or elevation) and view_reason: which view shows what the drawing is for (design/111 F19).')
+                            need(not spec.view or spec.view_reason.strip(), f'shot {shot.id}: view {spec.view}: give view_reason (design/111 F19).')
                             if not spec.proportions:   # design/106 D2
                                 warnings.append({'shot_id': shot.id, 'kind': 'spec_proportions_missing', 'message': f'shot {shot.id}: give the proportions that matter (proportions), '
                                                  'for example a brick about 3 : 1.5 : 1, both leaves the same thickness; "illustrative" means no numbers printed, never free proportions'})
