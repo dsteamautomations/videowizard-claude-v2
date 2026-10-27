@@ -284,8 +284,8 @@
       "cap": 1,
       "steps": [
         "`vw delivery bundle` writes the package manifest (approved film, narration, originals used, normalised fills, plans, SRT, finishing checklist, media-pool CSV, OPEN-EDIT).",
-        "On the Mac: `vw pull <code>`, `vw delivery resolve --check`, then once `vw delivery resolve --run --authorization \"<the operator's words>\"`: builds one Resolve 21.1.1 timeline from the bundle, exports and reopens the DRT, uploads DRT and report. Never run twice; `--inspect` and `--close` manage a dispatched step.",
-        "Back on the build machine: ask the five questions (watched the film, listened, read the subtitles, timeline verified, package complete) and `vw delivery final --quote \"<their words>\"`. Then `vw close` (retention: final film and package, narration, approved visuals, records; everything else deleted)."
+        "On the operator's computer (Windows or Mac): `vw pull <code>`, then `vw delivery check` (is Resolve installed, Studio or free, which version, enough disk; the download does not start without it), `vw delivery download` (the whole edit into runs/<code>/edit/, three files at a time, then counted and cross-checked: every file's size and fingerprint, the voiceover byte-identical, every cut pointing at a present file, the timeline's length and cut count equal to the film; the timeline is then written with this computer's paths), `vw delivery open` (free Resolve: three steps, File > Import > Timeline, then the operator plays the start, the middle and the end next to Approved-film.mp4; on their yes `vw delivery confirm --quote \"<their words>\"`; Resolve Studio: the plugin imports it, design/107 slice 3), then `vw delivery zip` for the editor. `vw delivery resolve --run` is replaced; never run it (design/107).",
+        "Back on the build machine: ask the five questions (watched the film, listened, read the subtitles, the timeline matched the film, package complete) and `vw delivery final --quote \"<their words>\"`. Then `vw close` (retention: final film and package, narration, approved visuals, records; everything else deleted)."
       ]
     }
   ],

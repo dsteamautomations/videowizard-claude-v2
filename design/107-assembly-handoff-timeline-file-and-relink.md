@@ -290,3 +290,21 @@ Server 0.55.0, plugin unchanged. Not committed or deployed.
 - **Known until slice 3:** the old `vw delivery resolve --run` reads `Audio/narration.mp3` from the bundle, which is now `Media/Voiceover/narration.mp3`; that step was never run against Resolve and is replaced by slices 2 and 3.
 - **Tests:** `server/unit` 481 passed, 11 of them new in `test_design107_s1_pure.py`.
 - **Not covered:** a real film through the bundle (no run has reached delivery); an import into Resolve by hand (Revathi's PC, after slice 2).
+
+### Slice 2 as built (27 Oct 2026)
+
+Server 0.56.0, plugin 0.49.0. Not committed or deployed.
+
+- **`plugin/scripts/handoff.py` (new, Python 3.9):**
+  - **Step B:** `find_resolve()` reads Windows' installed programs (the registry) or the Mac app's Info.plist: found or not, the version, Studio or free. `free_bytes()` and `check_words()` say it in plain words, with the bundle's size against the free disk.
+  - **Step D:** `cross_check()` counts the files ("142 of 142 files"), checks each size and fingerprint against the manifest, names a voiceover that is not the approved one, reads the timeline file with the same reader as the server, and refuses a cut pointing at a missing file, a length other than the film's (naming the first cut that differs) or a cut count other than the plan's.
+  - **Step E:** `write_timeline_for()` keeps the portable file as `VW-n.portable.fcpxml` and writes `VW-n.fcpxml` with this computer's paths (Windows drive letters, Mac paths, spaces and other scripts encoded).
+  - **Steps F and G:** `free_route_text()` (the three steps and the side-by-side check) and `zip_edit()` (`VW-n-edit.zip`, OPEN-EDIT.md first).
+- **`vw delivery`:** `check` (Step B; refuses, and nothing downloads, when Resolve is not found or the disk is short), `download` (B, then the whole bundle into `runs/VW-n/edit/` three files at a time with design/108's downloader, then D and E; a failed check names what is wrong and a second run moves only that), `open` (the free route's steps), `confirm --quote` (the operator's side-by-side yes goes on the ledger as `timeline_verified`, after the cross-check passes again), `zip`. `download_bundle` takes a folder and every file. `vw delivery resolve --run` stays until slice 3 replaces it with the Studio route.
+- **Server:** `verification_missing()`: the final approval accepts either Studio's readback (`drt_verified`) or the operator's check on free Resolve (`timeline_verified`); its missing line reads "the timeline matched the film".
+- **Texts:** the delivery stage's steps and the chat guide describe the new flow; "on the Mac" is gone.
+- **Tests:**
+  - `plugin/tests`: 289 passed, 11 of them new in `test_handoff.py` (the check on Windows and Mac, the words, the cross-check's five refusals, the paths, the free route, the zip, and the command's refusal before any download without Resolve).
+  - `server/unit`: 482 passed, 1 new.
+  - The 3 known Windows-only failures remain.
+- **Not covered:** the Resolve detection on a real PC and Mac (this PC has no Resolve); the free-Resolve import by hand (Revathi's PC); a real film through the flow (no run has reached delivery). The Studio route, the relink check and the media-stage metadata are slice 3.

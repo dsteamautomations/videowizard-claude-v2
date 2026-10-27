@@ -32,6 +32,8 @@ def plugin_version():
 
 
 VERSION = plugin_version()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import handoff   # design/107 slice 2: the handover on the operator's computer  # noqa: E402
 HOME = Path(os.environ.get('VW2_HOME') or (Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'vw2' if os.name == 'nt' else Path.home() / '.vw2'))
 RUNS = Path(os.environ.get('VW2_RUNS') or Path.cwd() / 'runs')
 
@@ -1965,15 +1967,17 @@ def cmd_assembly(a):
         emit(out, 0, f"Assembly recorded (watched and listened); next {out.get('next') or '`vw delivery bundle`'}.")
 
 
-def download_bundle(m, manifest):
-    """design/47 12.4: the originals, normalised copies and narration three at a time, one line per finished file; a failure stops before dispatch."""
+def download_bundle(m, manifest, into=None, roles=('original', 'normalised', 'narration')):
+    """design/47 12.4: three at a time, one line per finished file; a failure stops before dispatch. design/107 Step C: `into` a folder (runs/VW-n/edit/),
+    every file of the manifest when `roles` is None."""
     from concurrent.futures import ThreadPoolExecutor
-    wanted = [f for f in manifest['files'] if f['role'] in ('original', 'normalised', 'narration')]
+    wanted = [f for f in manifest['files'] if roles is None or f['role'] in roles]
+    folder = Path(into).relative_to(workspace(m['code'])).as_posix() if into else 'bundle'
     done, paths = [], {}
 
     def one(f):
         try:
-            p = _download(m, f['key'], 'bundle/' + f['name'], expect=f)   # design/108 D2, D4: skipped when already here, verified when not
+            p = _download(m, f['key'], folder + '/' + f['name'], expect=f)   # design/108 D2, D4: skipped when already here, verified when not
         except SystemExit:
             raise RuntimeError(f['name'])
         done.append(f['name'])
@@ -1996,7 +2000,7 @@ def cmd_delivery(a):
     if a.what == 'bundle':
         out = write(base + '/bundle', {})
         _download(m, out['manifest']['key'], 'work/manifest.json')
-        emit(out, 0, f"Bundle manifest: {out['files']} files, {out['bytes'] / 1e6:.0f} MB. On the Mac: `vw pull {m['code']}` then `vw delivery resolve --check`.")
+        emit(out, 0, f"Bundle manifest: {out['files']} files, {out['bytes'] / 1e6:.0f} MB. On the operator's computer (Windows or Mac): `vw pull {m['code']}`, `vw delivery check`, then `vw delivery download`.")
     if a.what == 'status':
         emit(call('GET', f'/api/runs/{run}/stage3'))
     if a.what == 'resolve':
@@ -2031,6 +2035,48 @@ def cmd_delivery(a):
             led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported', 'report': {**{k: report[k] for k in ('timeline', 'events', 'readback_events', 'differences', 'drt_verified', 'check')},
                                                                                                            'readback': {'events': report['readback_events']}, 'drt': drt, 'report': rep}})
             emit({'ledger': led, 'differences': report['differences']}, 0, 'Resolve timeline built, DRT exported and verified; report uploaded.' if report['drt_verified'] else 'Resolve timeline built but the DRT readback differs; show the differences to the operator.')
+    if a.what in ('check', 'download'):   # design/107 Steps B to E
+        st = call('GET', f'/api/runs/{run}/stage3')
+        if not st.get('bundle'):
+            emit({'action': 'refused', 'message': 'No bundle yet; run `vw delivery bundle` first.'}, 2)
+        found = handoff.find_resolve()
+        needed, free = int(st['bundle'].get('bytes') or 0), handoff.free_bytes(ws)
+        words = handoff.check_words(found, needed, free)
+        if not found.get('found') or needed > free:
+            emit({'action': 'refused', 'resolve': found, 'needed_bytes': needed, 'free_bytes': free, 'message': words}, 2)
+        if a.what == 'check':
+            emit({'resolve': found, 'needed_bytes': needed, 'free_bytes': free, 'message': words}, 0, words + ' Next: `vw delivery download`.')
+        if not (ws / 'work' / 'manifest.json').exists():
+            _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
+        manifest = _json_file(m, 'work/manifest.json')
+        edit_dir = ws / 'edit'
+        download_bundle(m, manifest, into=edit_dir, roles=None)
+        rep = handoff.cross_check(edit_dir, manifest)
+        if not rep['ok']:
+            emit({'action': 'refused', 'check': rep, 'message': 'The download is incomplete or wrong: ' + '; '.join(rep['problems'][:6]) + '. Run `vw delivery download` again: only what is missing or wrong moves.'}, 2)
+        handoff.write_timeline_for(edit_dir, manifest)
+        how = handoff.free_route_text(m['code']) if found.get('edition') != 'studio' else \
+            'Resolve Studio found. Until the plugin imports the timeline itself (design/107 slice 3), follow the free route: ' + handoff.free_route_text(m['code'])
+        emit({'resolve': found, 'check': rep, 'edit': str(edit_dir), 'open': how}, 0, f"{words} {rep['present']} checked, {rep['cuts']} cuts, {rep['timeline_frames']} frames: the edit is in {edit_dir}. {how}")
+    if a.what == 'open':
+        emit({'open': handoff.free_route_text(m['code'])}, 0, handoff.free_route_text(m['code']))
+    if a.what == 'confirm':   # design/107 Step F, free route: the operator's side-by-side check goes on the ledger
+        if not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': 'The operator\'s words are required: that the start, the middle and the end match the approved film (`--quote`).'}, 2)
+        manifest = _json_file(m, 'work/manifest.json')
+        rep = handoff.cross_check(ws / 'edit', manifest)
+        if not rep['ok']:
+            emit({'action': 'refused', 'check': rep, 'message': 'The edit folder does not pass the cross-check: ' + '; '.join(rep['problems'][:6]) + '. Run `vw delivery download` again first.'}, 2)
+        write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': a.quote})
+        write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
+        led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported',
+                                             'report': {'route': 'free', 'timeline_verified': True, 'drt_verified': False, 'cuts': rep['cuts'], 'timeline_frames': rep['timeline_frames'], 'check': rep, 'quote': a.quote}})
+        emit({'ledger': led}, 0, 'The timeline matched the film, on the operator\'s word. Next: `vw delivery zip`, then the five questions and `vw delivery final`.')
+    if a.what == 'zip':   # design/107 Step G
+        if not (ws / 'edit' / 'OPEN-EDIT.md').exists():
+            emit({'action': 'refused', 'message': 'No edit folder yet; run `vw delivery download` first.'}, 2)
+        z = handoff.zip_edit(ws / 'edit', m['code'])
+        emit({'zip': str(z), 'bytes': z.stat().st_size}, 0, f'{z} ({z.stat().st_size / 1e6:.0f} MB): hand this to the editor.')
     if a.what == 'final':
         emit(write(base + '/final', {'quote': a.quote}), 0, 'Delivery recorded; `vw close` when the operator is done.')
 
@@ -2165,7 +2211,7 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0)
     s.add_argument('--accept-as-is', action='store_true'); s.add_argument('--frame-note', action='append'); s.set_defaults(fn=cmd_assembly)
-    s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'resolve', 'final'])
+    s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'check', 'download', 'open', 'confirm', 'zip', 'resolve', 'final'])   # design/107
     s.add_argument('--check', action='store_true'); s.add_argument('--run', dest='run_it', action='store_true'); s.add_argument('--inspect', action='store_true'); s.add_argument('--close', action='store_true')
     s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)

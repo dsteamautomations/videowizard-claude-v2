@@ -441,6 +441,14 @@ def resolve_mark(store, user, run, state, machine, report=None, note=None):
     return led
 
 
+def verification_missing(led, film_sha256):
+    """design/107 Step G: 'the timeline matched the film', by Studio's readback (drt_verified) or the operator's check on free Resolve (timeline_verified)."""
+    if (led or {}).get('state') != 'reported' or led.get('film_sha256') != film_sha256:
+        return ['a report that the timeline matched this film']
+    rep = led.get('report') or {}
+    return [] if rep.get('drt_verified') or rep.get('timeline_verified') else ['the timeline matched the film (the report says it did not)']
+
+
 def final(conn, store, user, run, outputs, quote):
     session = session_of(store, run)
     asm_o = S2._output(outputs, 'assembly')
@@ -450,10 +458,7 @@ def final(conn, store, user, run, outputs, quote):
     missing = []
     if not b or b['film_sha256'] != film['sha256']:
         missing.append('bundle for the current assembly film')
-    if led.get('state') != 'reported' or led.get('film_sha256') != film['sha256']:
-        missing.append('Resolve report for this film')
-    elif not (led.get('report') or {}).get('drt_verified'):
-        missing.append('DRT reopened and verified (the report says it was not)')
+    missing += verification_missing(led, film['sha256'])   # design/107: Studio's readback, or the operator's side-by-side check on free Resolve
     if any(o.get('stale') for o in outputs):
         missing.append('no stale stage outputs')
     q = (quote or '').lower()
