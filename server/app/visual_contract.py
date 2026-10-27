@@ -267,7 +267,7 @@ def drawn_needs(shot, seconds):
         need(s.id not in ids, f"{label}: shape id '{s.id}' twice.")
         ids[s.id] = s
         missing = [k for k in NEEDS.get(s.kind, ()) if getattr(s, k) is None]
-        need(not missing, f"{label}: shape '{s.id}' ({s.kind}) needs {', '.join(NEEDS[s.kind])}.")
+        need(not missing, f"{label}: shape '{s.id}' ({s.kind}) needs {', '.join(NEEDS.get(s.kind, ()))}.")
         need(s.kind != 'polygon' or len(s.points) >= 3, f"{label}: shape '{s.id}' (polygon) needs three points or more.")
         need(s.kind != 'text' or s.text.strip(), f"{label}: shape '{s.id}' (text) needs its text.")
         need(s.kind != 'repeat' or (s.count >= 2 and s.of), f"{label}: shape '{s.id}' (repeat) needs of (a shape) and count (2 or more).")
