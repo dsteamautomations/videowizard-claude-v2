@@ -158,10 +158,51 @@ def check_answer(answer, prompt):
     checklist = answer.get('checklist')
     if not isinstance(checklist, list) or not any(isinstance(c, dict) and c.get('weight') == 'must' for c in checklist):
         raise ValueError('The checklist needs at least one must line.')
-    for s in answer.get('exact_text') or []:
-        if str(s) not in prompt:
-            raise ValueError(f'The exact text {str(s)!r} is not in the prompt.')
+    for e in exact_entries(answer):
+        if e['text'] not in prompt:
+            raise ValueError(f'The exact text {e["text"]!r} is not in the prompt.')
     return answer
+
+
+def exact_entries(answer):
+    """design/111 F13: an exact-text entry is {text, place, size_pct}; a bare string (the old form) loads with no place, and a new picture refuses it."""
+    out = []
+    for s in (answer or {}).get('exact_text') or []:
+        if isinstance(s, dict):
+            text = str(s.get('text') or '').strip()
+            if text:
+                out.append({'text': text, 'place': s.get('place') or None, 'size_pct': s.get('size_pct')})
+        elif str(s).strip():
+            out.append({'text': str(s).strip(), 'place': None, 'size_pct': None})
+    return out
+
+
+def check_exact_places(answer, landmarks):
+    """design/111 F13: every entry says where it sits (a landmark id of the scene, or a frame region) and how big (percent of the frame height)."""
+    for e in exact_entries(answer):
+        place = e.get('place') or {}
+        if not (place.get('landmark_id') or str(place.get('region') or '').strip()):
+            raise ValueError(f'The exact text {e["text"]!r} has no place: say on what surface or object it sits (place.landmark_id, a landmark of the scene) or which region of the frame (place.region) (design/111 F13).')
+        if place.get('landmark_id') and place['landmark_id'] not in landmarks:
+            raise ValueError(f'The exact text {e["text"]!r}: {place["landmark_id"]} is not a landmark of the scene (design/111 F13).')
+        try:
+            ok = float(e.get('size_pct')) > 0
+        except (TypeError, ValueError):
+            ok = False
+        if not ok:
+            raise ValueError(f'The exact text {e["text"]!r} has no size: give size_pct, its height as a percent of the frame (design/111 F13).')
+
+
+QUOTED = re.compile(r'["\u201c\u201d]([^"\u201c\u201d]{2,80})["\u201c\u201d]|(?<![A-Za-z])\'([^\']{2,80})\'(?![A-Za-z])')
+
+
+def check_quoted(prompt, entries):
+    """design/111 F13: words in quotes are words to be read; they go through the exact-text field, never prose. A single word in quotes is a word, not lettering."""
+    texts = {e['text'] for e in entries}
+    for m in QUOTED.finditer(str(prompt or '')):
+        words = (m.group(1) or m.group(2) or '').strip()
+        if ' ' in words and words not in texts and not words.startswith('Render exactly'):
+            raise ValueError(f'The quoted words {words!r} are not an exact-text entry: anything to be read in the picture goes in exact_text with its place and size (design/111 F13).')
 
 
 def check_prompt(prompt):

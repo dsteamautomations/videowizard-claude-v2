@@ -83,7 +83,8 @@ def test_a_graphics_labels_are_must_lines_with_the_size_and_a_sign_in_place_of_w
                    [shot('VS1', 900, 1150, 'video', subjects=[])])
     store = store_with(session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc)), doc)
     prompt = 'A wall section labelled "25% fewer bricks", "↓ 25%" and "110".'
-    answer = {'status': 'ready', 'prompt': prompt, 'checklist': [{'check': 'look', 'pass_when': 'flat', 'weight': 'must'}], 'exact_text': ['25% fewer bricks', '↓ 25%', '110']}
+    answer = {'status': 'ready', 'prompt': prompt, 'checklist': [{'check': 'look', 'pass_when': 'flat', 'weight': 'must'}],
+              'exact_text': [{'text': t, 'place': {'region': 'beside the part it names'}, 'size_pct': 4} for t in ('25% fewer bricks', '↓ 25%', '110')]}   # design/111 F13
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'l1', 'element_id': 'E1', 'name': 'wall', 'kind': 'isolated', 'subject': 'wall', 'prompt': prompt, 'answer': answer})
     lines = {l['check']: l for l in saved(store)['references'][out['reference_id']]['server_checklist']}
     assert lines['label: 25% fewer bricks']['weight'] == 'must' and 'leader line' in lines['label: 25% fewer bricks']['pass_when'] and '4 %' in lines['label: 25% fewer bricks']['pass_when']

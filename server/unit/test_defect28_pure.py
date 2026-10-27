@@ -29,7 +29,7 @@ def two_shots():
 
 
 def start_body(sid='VS1', **over):
-    return {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-' + sid, 'kind': 'keyframe', 'shot_id': sid, 'subject': 'the labourer', 'prompt': 'the labourer walks the lane',
+    return {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-' + sid, 'kind': 'keyframe', 'shot_id': sid, 'subject': 'the labourer', 'prompt': 'Image 1 is the sheet: take identity. The labourer walks the lane',   # design/111 F21
             'parents': ['S1'], **over}
 
 

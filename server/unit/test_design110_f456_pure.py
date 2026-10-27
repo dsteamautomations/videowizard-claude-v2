@@ -138,7 +138,7 @@ def test_the_server_appends_its_block_to_a_keyframe_prompt_once_and_never_to_a_f
     row = saved(store)['references'][rid]
     p = row['generation']['prompt']
     assert p.count('E1: about to lays one brick') == 1 and p.startswith('Image 1 is the old start') and 'Heading of E1' in p
-    again = revise_start(store, role='start', request_id='r-again', prompt='Image 1 is the old start; the labourer at the stack.\n' + VS.composed_block(
+    again = revise_start(store, role='start', request_id='r-again', prompt='Image 1 is the old start; the labourer at the stack. Image 2 is the sheet: take identity.\n' + VS.composed_block(
         json.loads(store.files['run-1/visuals/plan-v1.json'])['document'], *VS.locate(store, saved(store), 'VS1')[2:], 'start'))
     assert saved(store)['references'][again['reference_id']]['generation']['prompt'].count('E1: about to lays one brick') == 1   # already there: not twice
     assert [l['check'] for l in row['server_checklist'] if l['check'] in ('inventory', 'not yet done')] == ['not yet done']   # no objects in this fixture: no inventory line

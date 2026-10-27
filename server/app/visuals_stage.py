@@ -712,6 +712,29 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/111 F13: words to be read, letter for letter, in their place ----------
+
+def exact_text_lines(answer, marks):
+    """The must lines on every picture with exact text: reads exactly, placed as the entry says at that size, no other lettering."""
+    entries = library.exact_entries(answer)
+    out = []
+    for e in entries:
+        place = e.get('place') or {}
+        where = f"on {marks.get(place['landmark_id'], place['landmark_id'])}" if place.get('landmark_id') else (f"in the {place.get('region')}" if place.get('region') else 'where the prompt says')
+        out.append({'check': f"reads: {e['text']}", 'weight': 'must', 'pass_when': f'the words read exactly "{e["text"]}", spelled as written'})
+        out.append({'check': f"placed: {e['text']}", 'weight': 'must', 'pass_when': f'"{e["text"]}" sits {where}' + (f", about {float(e['size_pct']):g} % of the frame height" if e.get('size_pct') else '')})
+    if entries:
+        out.append({'check': 'no other lettering', 'weight': 'must', 'pass_when': 'no letters, numbers or logos anywhere but the exact text named'})
+    return out
+
+
+def exact_text_block(answer):
+    entries = library.exact_entries(answer)
+    if not entries:
+        return ''
+    return '\n'.join(f'Render exactly this text, letter for letter, nothing else: "{e["text"]}".' for e in entries) + '\nConstraints: no other letters, numbers or logos anywhere.'
+
+
 # ---------- design/111 F7, F8, F9: the eye lines, the fixed background, how a placed thing sits ----------
 
 PLACING = re.compile(r'\b(lay|lays|laid|laying|set|sets|setting|put|puts|putting|fit|fits|fitted|fitting|stacks|stacked|stacking|join|joins|joined|joining|fixes|fixed|fixing|place|places|placed|placing)\b', re.I)   # verbs only: 'the stack' and 'a fix' are not placings
@@ -1778,6 +1801,7 @@ def generate_image(conn, store, user, run, outputs, body):
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style'), 'Generated references are isolated, sheet, keyframe, state or style.')
     parents = [session['references'].get(p) for p in body.get('parents') or []]
+    writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own
     for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
         if p and p.get('status') == 'rejected':
             need(False, f"{p['id']} was rejected: make the next {'state from the last approved state' if body['kind'] == 'state' else 'end image from the approved start, not from the candidate chain'}.")
@@ -1807,6 +1831,15 @@ def generate_image(conn, store, user, run, outputs, body):
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
+    need(len(parents) <= 4, f"{len(parents)} pictures: at most four go in with a prompt (the picture edited or the scene parent, one identity sheet per person in frame, one material or look frame); "
+         f"say the rest in words. Extra: {', '.join(p['id'][:8] for p in parents[4:] if p)} (design/111 F21).")
+    named_n = len(body.get('parents') or [])
+    for k, p in enumerate(parents[named_n:], named_n + 1):   # F21: the server names the pictures it added itself (the start's own sheets)
+        if p:
+            body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} is the approved {p.get('kind') or 'reference'} of {p.get('element_id')}: take identity from it, nothing else.")}
+    if parents and not body.get('fix_of'):   # F21: one job line per picture
+        missing_ = library.image_names_missing(body['prompt'], len(parents))
+        need(not missing_, f"the prompt does not say what Image {', '.join(map(str, missing_))} is for: one job line per picture ('Image k is …: take …') (design/111 F21).")
     if not body.get('shot_id') and body['kind'] in ('keyframe', 'state'):   # design/94 R1.1: a state, an end image or a fix takes its parent's shot
         body['shot_id'] = next((p['shot_id'] for p in parents if p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id')), None)
         need(body['shot_id'] or body.get('fix_of'), f"Name the shot this {body['kind']} is for (--shot): a picture is listed, checked and placed only in its own shot.")
@@ -1826,7 +1859,14 @@ def generate_image(conn, store, user, run, outputs, body):
     answer = body.get('answer')
     if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
         try:
-            library.check_answer(answer, body['prompt'])
+            library.check_answer(answer, writer_prompt)
+            library.check_exact_places(answer, {lm['id'] for lm in (found[2].get('landmarks') if found else []) or []})   # design/111 F13
+            library.check_quoted(writer_prompt, library.exact_entries(answer))
+        except ValueError as exc:
+            need(False, str(exc))
+    elif not body.get('fix_of'):
+        try:
+            library.check_quoted(writer_prompt, [])   # design/111 F13: quoted words with no exact-text field at all
         except ValueError as exc:
             need(False, str(exc))
     role = body.get('role') or ''   # design/106 T1, T2: a start made from an old start says so; without a role, a keyframe parent means an end
@@ -1864,7 +1904,9 @@ def generate_image(conn, store, user, run, outputs, body):
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
-    writer_prompt = body['prompt']   # the writer's words, before the server adds its own lines
+    if answer is not None and library.exact_entries(answer):   # design/111 F13: every picture with exact text, not only a graphic
+        lines = lines + [l for l in exact_text_lines(answer, {lm['id']: lm['description'] for lm in (found[2].get('landmarks') if found else []) or []}) if l['check'] not in {x['check'] for x in lines}]
+        body = {**body, 'prompt': with_composed(body['prompt'], exact_text_block(answer))}
     for eid in [body['element_id']] + [x for x in (named or {}).get('element_ids') or [] if x != body['element_id']]:   # design/111 F12: 'none of these', in every prompt that shows the element
         nl = not_this_line(session, plan, eid, named)
         if nl:
@@ -1968,7 +2010,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
         lines += [_fact_line(facts[f]) for f in named.get('fact_ids') or [] if f in facts]
     shots = [named] if graphic else []   # design/94 R1.2: its own shot's lines only, never every shot of the element
     if shots or any(sh['visual_type'] in GRAPHIC_TYPES for _, sh in _shots_with(plan, session, body['element_id'])):   # design/91 N13: labels say what they mean, readable on a phone
-        labels = [str(s) for s in (answer or {}).get('exact_text') or [] if str(s).strip()]
+        labels = [e['text'] for e in library.exact_entries(answer)]   # design/111 F13: entries with their place and size
         said = ((lambda s: f'the words read exactly "{s}", spelled as written, at least {TITLE_MIN_PCT} % of the frame height, readable on a phone') if wordy else
                 (lambda s: f'the label reads exactly "{s}", is at least {LABEL_MIN_PCT} % of the frame height, and its leader line ends on the part it names') if kind == 'diagram' else
                 (lambda s: f'the label reads exactly "{s}", spelled as written, at least {LABEL_MIN_PCT} % of the frame height'))   # J2: leader lines only on a diagram

@@ -84,7 +84,7 @@ def graphic_session(**over):
     return doc, sess
 
 
-ANSWER = {'status': 'ready', 'prompt': 'A flat drawing of the wall section.', 'checklist': [{'check': 'look', 'pass_when': 'flat', 'weight': 'must'}], 'exact_text': []}
+ANSWER = {'status': 'ready', 'prompt': 'Image 1 is the style sheet: take its style. A flat drawing of the wall section.', 'checklist': [{'check': 'look', 'pass_when': 'flat', 'weight': 'must'}], 'exact_text': []}
 
 
 def test_a_graphic_picture_carries_the_claims_and_relationships_as_must_lines_and_warns_without_style_spec_or_answer(monkeypatch):

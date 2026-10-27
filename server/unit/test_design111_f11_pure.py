@@ -51,7 +51,10 @@ def golden_store(with_frame=True):
 def image(store, **body):
     base = {'request_id': body.pop('request_id', 'q-' + str(abs(hash(json.dumps(body, sort_keys=True))))[:8]), 'element_id': 'E2', 'name': 'wall', 'kind': 'isolated', 'subject': 'the wall',
             'prompt': 'Image 1 is the sheet of the wall. The wall in its yard.', 'parents': ['S2']}
-    return VS.generate_image(FakeConn([]), store, USER, RUN, [], {**base, **body})
+    b = {**base, **body}
+    if len(b['parents']) > 1 and 'Image 2' not in b['prompt']:   # design/111 F21: a job line per picture
+        b['prompt'] += ' ' + ' '.join(f'Image {k} is reference {k}: take its look.' for k in range(2, len(b['parents']) + 1))
+    return VS.generate_image(FakeConn([]), store, USER, RUN, [], b)
 
 
 # ---------- the golden picture: due, made, approved ----------

@@ -31,7 +31,8 @@ def start_store():
 
 def revise_start(store, **over):
     body = {'request_id': 'r9', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer',
-            'prompt': 'Image 1 is the old start; the labourer at the stack, the lane behind.', 'parents': ['K1', 'R1'], 'end_prompt': END['prompt'], 'end_answer': END, **over}
+            'prompt': "Image 1 is the old start; the labourer at the stack, the lane behind. Image 2 is the labourer's sheet: take identity from it, nothing else.", 'parents': ['K1', 'R1'],   # design/111 F21
+            'end_prompt': END['prompt'], 'end_answer': END, **over}
     return VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
 
 

@@ -127,7 +127,7 @@ def kind_film(kind):
 
 
 def answered(text):
-    return {'exact_text': [text]}
+    return {'exact_text': [{'text': text, 'place': {'region': 'centre of the frame'}, 'size_pct': 6}]}   # design/111 F13: an entry with its place and size
 
 
 @pytest.mark.parametrize('kind', ['title', 'text'])
@@ -174,10 +174,10 @@ def test_an_edit_that_does_not_name_each_picture_is_warned():
     assert library.image_names_missing('A wall.', 0) == []
 
 
-def test_generate_image_warns_an_edit_naming_too_few_pictures_but_not_a_generate():
+def test_generate_image_refuses_an_edit_naming_too_few_pictures_but_not_a_generate():   # design/111 F21: the warning of design/96 C1 became the refusal
     doc, sess = film(references=refs(pic('S1', status='approved', kind='sheet'), pic('S2', status='approved', kind='sheet')))
     store = store_with(sess, doc)
-    out = image(store, shot_id='DG1', parents=['S1', 'S2'], prompt='Image 1 is the wall section.')
-    assert any('Image 2' in w and 'refused from the next' in w for w in out['warnings'])
+    with pytest.raises(Problem, match='does not say what Image 2 is for'):
+        g(lambda: image(store, shot_id='DG1', parents=['S1', 'S2'], prompt='Image 1 is the wall section.'))
     out = image(store, shot_id='DG1', request_id='q2')
     assert not any('Image 1 to Image' in w for w in out.get('warnings') or [])

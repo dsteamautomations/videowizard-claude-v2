@@ -383,7 +383,7 @@ def test_two_candidates_queue_jobs_with_valid_request_ids(monkeypatch):
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': {**ref('R1', 'approved'), 'kind': 'sheet'}}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     rid = 'a6638116-0fe9-4305-9ea3-db7263d79c01'
-    body = {'request_id': rid, 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the wall, bucket full', 'parents': ['R1'], 'variants': 2}
+    body = {'request_id': rid, 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the sheet: take identity. The wall, bucket full', 'parents': ['R1'], 'variants': 2}
     conn = FakeConn([])
     out = VS.generate_image(conn, store_with(sess, doc), USER, RUN, [], body)
     ids = [params[3] for params in conn.inserted]
@@ -405,7 +405,7 @@ def test_two_candidates_for_a_start_and_the_end_written_with_it_is_queued_on_app
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'R1': {**ref('R1', 'approved'), 'kind': 'sheet'}}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     end_answer = {'status': 'ready', 'prompt': 'Image 1 is the start; the bucket now empty.', 'checklist': [{'check': 'bucket', 'pass_when': 'empty', 'weight': 'must'}], 'exact_text': []}
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'the wall, bucket full', 'parents': ['R1'],
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the sheet: take identity. The wall, bucket full', 'parents': ['R1'],
             'variants': 2, 'end_prompt': end_answer['prompt'], 'end_answer': end_answer}
     conn, store = FakeConn([]), store_with(sess, doc)
     out = VS.generate_image(conn, store, USER, RUN, [], body)
@@ -588,7 +588,7 @@ def test_an_end_keyframe_carries_the_start_keyframes_own_references(monkeypatch)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['K1', 'S1', 'S2']
     store = store_with(sess, doc)
-    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r2', 'parents': ['K1', 'S2']})   # a sheet named by the child is not repeated
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r2', 'parents': ['K1', 'S2'], 'prompt': body['prompt'] + '. Image 2 is a sheet: take identity.'})   # a sheet named by the child is not repeated
     assert [p['id'] for p in saved(store)['references'][out['reference_id']]['generation']['parents']] == ['K1', 'S2', 'S1']
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'r3', 'kind': 'isolated', 'parents': ['S1']})   # not a keyframe: as today
@@ -672,9 +672,9 @@ def test_more_than_16_inputs_after_inheritance_are_refused_with_the_count(monkey
     start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': s, 'key': sheets[s]['key'], 'sha256': 'x'} for s in sheets]}}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references={**sheets, 'K1': start})
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty.', 'parents': ['K1']}
-    with pytest.raises(Problem, match='17 input pictures'):
+    with pytest.raises(Problem, match='17 input pictures'):   # design/71 P2's ceiling fires first; design/111 F21's four below it
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
-    fewer = {**start, 'generation': {'op': 'edit', 'parents': start['generation']['parents'][:15]}}
+    fewer = {**start, 'generation': {'op': 'edit', 'parents': start['generation']['parents'][:3]}}
     out = VS.generate_image(FakeConn([]), store_with(session(**{**sess, 'references': {**sheets, 'K1': fewer}}), doc), USER, RUN, [], body)
     assert out['op'] == 'edit'
 
@@ -685,7 +685,7 @@ def test_the_image_size_follows_the_frame_and_an_edit_takes_its_parents_size(mon
     refs = {'K1': {**ref('K1'), 'width': 1088, 'height': 1936}, 'F1': {**ref('F1', 'approved'), 'kind': 'frame', 'width': 1920, 'height': 1080}, 'S1': {**ref('S1', 'approved'), 'kind': 'sheet', 'width': 1536, 'height': 864}}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references=refs)
     brief = [{'stage': 'brief', 'unit': None, 'summary': {'production': {'format': {'frame': '9:16'}}}}]
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'IM1', 'subject': 'the wall', 'prompt': 'a wall'}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'IM1', 'subject': 'the wall', 'prompt': 'Image 1 is the reference: take its look. A wall'}
 
     def size_of(outputs, **over):
         store = store_with(sess, doc)
@@ -909,7 +909,7 @@ def test_a_keyframe_for_a_shot_with_a_client_material_needs_a_footage_frame_as_a
     frame = {**ref('F1', 'approved'), 'kind': 'frame', 'element_id': 'WALL', 'width': 1920, 'height': 1080}
     sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'F1': frame})
     sess['bindings']['VS1'] = {'gap_digest': gap_digest(doc, doc['gaps'][1]), 'references': {'E1': [{'id': 'S1', 'sha256': 'sha-S1'}], 'WALL': [{'id': 'F1', 'sha256': 'sha-F1'}]}, 'packet_read_at': 't'}
-    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the mason at the wall', 'prompt': 'the mason lays a brick on the wall', 'parents': ['S1']}
+    body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'start', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the mason at the wall', 'prompt': 'Image 1 is the mason sheet: take identity. Image 2 is the footage frame: take the brick texture. The mason lays a brick on the wall', 'parents': ['S1']}
     with pytest.raises(Problem, match="WALL is the client's own: send one of its approved footage frames as a parent"):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
     out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'parents': ['S1', 'F1']})

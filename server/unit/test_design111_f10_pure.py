@@ -145,7 +145,7 @@ def test_no_picture_of_the_material_before_its_spec_is_approved_then_the_sentenc
     row = saved(store)['references'][rid]
     assert row['generation']['prompt'].count('Material spec, Red brick:') == 1 and [l['check'] for l in row['server_checklist'] if l['check'].startswith('material')] == ['material: Red brick']
     with pytest.raises(Problem, match='relative'):
-        g(lambda: revise_start(store, role='start', request_id='r-short', prompt='Image 1 is the old start; short bricks on the course.'))
+        g(lambda: revise_start(store, role='start', request_id='r-short', prompt='Image 1 is the old start; short bricks on the course. Image 2 is the sheet: take identity.'))
     sheet = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r-sheet', 'element_id': 'BRICK', 'name': 'sheet-BRICK', 'kind': 'sheet', 'subject': 'the brick',
                                                                    'prompt': 'Image 1 is the footage frame; one reference sheet of the brick.', 'parents': ['R1']})
     assert 'Material spec, Red brick:' in saved(store)['references'][sheet['reference_id']]['generation']['prompt']

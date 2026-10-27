@@ -41,8 +41,12 @@ def cheap(monkeypatch):
 
 
 def image(store, **body):
+    parents = body.get('parents') or []
+    prompt = body.pop('prompt', 'A wall in section.')
+    if parents and not any(f'Image {k}' in prompt for k in range(1, len(parents) + 1)):   # design/111 F21: every picture sent has its job line
+        prompt = ' '.join(f'Image {k} is reference {k}: take its look.' for k in range(1, len(parents) + 1)) + ' ' + prompt
     return VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': body.pop('request_id', 'q1'), 'element_id': 'E1', 'name': 'wall', 'kind': 'keyframe',
-                                                                 'subject': 'the wall', 'prompt': 'A wall in section.', **body})
+                                                                 'subject': 'the wall', 'prompt': prompt, **body})
 
 
 # ---------- R1.1 (S3): every picture records its shot ----------
