@@ -116,3 +116,13 @@ Plugin: `vw visuals ask` / `answer` / `supply` (unchanged) / `round undo` flags 
 - Routes: `/visuals/ask`, `/visuals/answer`, `/visuals/round/undo`; page actions `answer`, `supply`, `round-undo`. Plugin 0.51.0 (pending): `vw visuals ask --item --question --choices "a|b" [--cost]`, `vw visuals answer --item --answer`, `vw visuals round --undo`. The procedure's visuals prompt opens with "0. STOP AND ASK, NEVER GUESS" (the fork list, the question form, what never asks); the references step names the additions; `vw.md` carries the rule in one paragraph.
 - Tests: `server/unit/test_design110_r0_pure.py` (10), `plugin/tests/test_design110_r0.py` (2); two design/106 tests now go through the fork-3 question. Server unit suite: 510 passed. Plugin: 310 passed, the 3 known Windows-only failures. Page script passes `node --check`.
 - Not covered: forks 1, 2, 6–10 are the assistant's judgment, by the procedure text; the page is checked as text and by node, not in a browser; `supply` from a link is not tried against a real site; fork 5 waits for F3.
+
+## As built: F3 (+F44)
+
+- Packet: `context.start_targets` = one line per acting subject ("E1: about to <action>; not yet done: <result>; still as at the start: <start progress>.") with the instruction to carry it word for word; in the context, so no preparation digest moves.
+- Check: `not_yet_lines(shot)` gives the must line "not yet done" for every start keyframe of a video shot with an acting subject (a fix of a start too); it names the start state and the result and says when the line fails. Added to `server_checklist` in `generate_image`.
+- Approval (`_not_yet_gate`, at approval): the stored line decides; failed or undecided refuses the approval and opens the question on the picture (rule 0 fork 5, choices "make a new start (4 INR)" / "approve anyway"); a stored check without the line (a picture checked before this release) is asked the line once through `image_check.check_lines` and the answer kept with the check; no stored check at all means nothing to read. "Approve anyway" sets `not_yet_ok` and `parent_ok`.
+- Takes: `prepare_take` reads the start image's stored line; a failed line refuses the take with the same question.
+- Live check (f3-live, 27 Oct): VW-7's own B07B_S2 prompt with the line gives the before-state picture and passes; without it the third brick is already on the bed and fails; the negative control fails; steady across two reads. Two earlier line wordings were not steady and were dropped.
+- Tests: `server/unit/test_design110_f3_pure.py` (6). Server unit suite: 516 passed. Plugin untouched.
+- Not covered: the model's reading is sampled on two shots, not benchmarked; the F1 `done` field (next) will tidy the start_targets grammar.

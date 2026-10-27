@@ -222,10 +222,16 @@ def expand(record, ref):
     return {**record, 'lines': full(record.get('lines')), 'must_failed': full(record.get('must_failed'))}
 
 
-def _model_check(store, session, ref, result, transport_factory, png=None):
+def check_lines(store, session, ref, lines, transport_factory):
+    """design/110 F3: a few lines asked of a stored picture outside its check (a start made before this release, at approval). Never raises;
+    with no key or no answer the lines come back undecided, never passed."""
+    return _model_check(store, session, ref, {'key': ref['key'], 'width': ref.get('width'), 'height': ref.get('height')}, transport_factory, lines=lines)
+
+
+def _model_check(store, session, ref, result, transport_factory, png=None, lines=None):
     """Gemini's part of the check: the lines and the code checks. Never raises."""
     parents = [session['references'].get(p.get('id')) or {} for p in (ref.get('generation') or {}).get('parents') or []]
-    lines = lines_of(ref)
+    lines = lines or lines_of(ref)
     record = {'code': code_checks(ref, result, parents), 'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
     try:
         key = settings().GEMINI_API_KEY.get_secret_value().strip()

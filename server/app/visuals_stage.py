@@ -638,6 +638,68 @@ def _accepted_shots(plan, session):
     return sorted(out, key=lambda gs: gs[1]['start_frame'])
 
 
+# ---------- design/110 F3: the start shows the action not yet done ----------
+
+NOT_YET_START = ('Carry each line of start_targets word for word in the start prompt: the start is the moment before the action; the result of the shot\'s action is not visible '
+                 'in it (the count, the position, the surface the action changes is still as the start state says). The server checks the picture against it, when it is made and '
+                 'again at approval.')
+
+
+def _acting_beats(shot):
+    return [(s, s['beats'][0]) for s in shot.get('subjects') or [] if s.get('behaviour') == 'acts' and s.get('beats')]
+
+
+def start_targets(scene, shot):
+    """One line per acting subject: about to <action>; has not yet <done>: <what the start state still shows>."""
+    return [f"{s['element_id']}: about to {b['action']}; not yet done: {b['result']}; still as at the start: {(s.get('start') or {}).get('progress', '')}."
+            for s, b in _acting_beats(shot) if shot.get('visual_type') == 'video']   # live check 27 Oct: the plan's action is third person, so "about to:" not "about to <verb>"
+
+
+def not_yet_lines(shot):
+    """The must line on a start keyframe of a video shot with an action: the picture shows the moment before it (design/110 F3)."""
+    if shot.get('visual_type') != 'video':
+        return []
+    return [{'check': 'not yet done', 'weight': 'must',
+             'pass_when': f"the picture still shows the start state ({s['element_id']}: {(s.get('start') or {}).get('progress', '')}) and {b['result']} has NOT happened yet; "
+                          f"this line FAILS when {b['result']} is already in the picture, even with a hand still on it"}   # live check 27 Oct (f3-live): steady on VW-7's B07B_S2, two reads each
+            for s, b in _acting_beats(shot)]
+
+
+def _not_yet_gate(store, session, row, at_approval=False, shot=None):
+    """F3 at approval and before a take: the stored "not yet done" line decides; failed or undecided refuses and asks the operator (rule 0, fork 5);
+    at approval a start checked before this release is asked the line once; the operator's "approve anyway" lets it through."""
+    if row.get('not_yet_ok') or (shot is None and (row.get('kind') != 'keyframe' or _picture_word(store, session, row) != 'start image')):
+        return
+    sid = shot['id'] if shot else made_for(session, row)
+    if shot is None:
+        try:
+            shot = locate(store, session, sid)[3] if sid else None
+        except (ValueError, Problem):
+            shot = None
+    wanted = not_yet_lines(shot) if shot else []
+    if not wanted:
+        return
+    check = row.get('check')
+    if not check:
+        return   # never checked (no checklist, or the check still running): nothing stored to read
+    line = next((l for l in check.get('lines') or [] if l.get('check') == 'not yet done'), None)
+    if line is None and not at_approval:
+        return   # a take from an older start: nothing stored to read; the approval gate covers new pictures
+    if line is None:
+        from . import image_check
+        from .analysis_jobs import transport_factory
+        rec = image_check.check_lines(store, session, row, wanted, transport_factory)
+        line = next((l for l in rec.get('lines') or [] if l.get('check') == 'not yet done'), None) or {'check': 'not yet done', 'pass': None, 'seen': rec.get('error') or 'no answer'}
+        row['check'] = {**check, 'lines': list(check.get('lines') or []) + [line], 'must_failed': list(check.get('must_failed') or []) + ([line] if line.get('pass') is False else [])}
+    if line.get('pass') is True:
+        return
+    why = (f"{row['id']} already shows the result of {sid}'s action ({line.get('seen') or 'no detail'})" if line.get('pass') is False
+           else f"whether {row['id']} already shows the result of {sid}'s action could not be decided ({line.get('seen') or 'no answer'})")
+    if row['id'] not in (session.get('questions') or {}):
+        _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({prices()['image_inr']:g} INR)", 'approve anyway'], 'server', fork='not_yet')
+    need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
+
+
 # ---------- design/110 rule 0: an open question is a server state ----------
 
 def _item_kind(store, session, item):
@@ -699,6 +761,8 @@ def answer(store, user, run, outputs, item, words):
                 r.update(status='rejected', rejection={'notes': f'rule 0: the operator kept {words} for {item}', 'quote': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     if q.get('fork') == 'parent' and words == q['choices'][0]:
         session['references'][item]['parent_ok'] = True
+    if q.get('fork') == 'not_yet' and words == q['choices'][1]:   # F3: approved anyway, on the operator's word; the flaw is theirs to carry as a parent too
+        session['references'][item].update(not_yet_ok=True, parent_ok=True)
     record = {**q, 'answer': words, 'answered_by': user['id'], 'answered_at': datetime.now(timezone.utc).isoformat()}
     del session['questions'][item]
     session.setdefault('answered', []).append(record)
@@ -1366,6 +1430,8 @@ def generate_image(conn, store, user, run, outputs, body):
                 need(False, 'end answer: ' + str(exc))
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer')}
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    if body['kind'] == 'keyframe' and not is_end and named is not None:
+        lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
     lw = light_warning(found[2], body['kind'], body['prompt']) if found else None   # design/103 A1
     if found and element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated'):   # design/104 C5: the scene's light and air, the shot's size, real sizes
         lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements'])
@@ -1701,6 +1767,12 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     _no_question(session, ref_id, made_for(session, row))   # design/110 rule 0
     if row['sha256'] != sha256:
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
+    if row['status'] == 'candidate':
+        try:
+            _not_yet_gate(store, session, row, at_approval=True)   # design/110 F3, rule 0 fork 5
+        except ValueError:
+            save_session(store, run, session)   # the question, and the line asked once, are kept
+            raise
     if row.get('kind') == 'keyframe' and row['status'] == 'candidate' and made_for(session, row) and _shot_is_video(store, session, made_for(session, row)):   # rule 0, fork 3: two pictures approved for one slot (a start or an end) : the operator keeps one; a still's second picture replaces (design/94)
         sid, word = made_for(session, row), _picture_word(store, session, row)
         others = [r['id'] for r in session['references'].values() if r['id'] != ref_id and r.get('kind') == 'keyframe' and r.get('status') == 'approved' and made_for(session, r) == sid
@@ -2026,7 +2098,8 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'provider': {k: generator[k] for k in ('provider', 'model')}}
     prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START},
                          'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {}),   # design/102: in the context, so no take goes stale
-                         'bind_advice': bind_advice(plan, session, shot)}   # design/104 D1, D2   # design/101 M5: in the context, so no take goes stale
+                         'bind_advice': bind_advice(plan, session, shot),   # design/104 D1, D2   # design/101 M5: in the context, so no take goes stale
+                         'start_targets': {'lines': start_targets(scene, shot), 'instruction': NOT_YET_START}}   # design/110 F3: in the context, so no take goes stale
     identity = digest({**{k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}, 'scene': note_free_scene(prompt['scene']),   # design/101, 103
                        'shot': note_free_scene({'shots': [prompt['shot']]})['shots'][0], 'elements': note_free_elements(prompt['elements'])})   # the composition only: the context, the footage and the library inform the writer and never make a prepared take stale (design/88)
     brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
@@ -2134,6 +2207,12 @@ def prepare_take(store, user, run, outputs, body):
     _route_gate(planned, 'video')
     _no_question(session, body['shot_id'], body.get('start_image'), body.get('end_image'))   # design/110 rule 0
     need(body.get('start_image'), 'A start image is required.')
+    if session['references'].get(body['start_image']):
+        try:
+            _not_yet_gate(store, session, session['references'][body['start_image']], shot=planned)   # design/110 F3: never a take from a start that shows the result
+        except ValueError:
+            save_session(store, run, session)
+            raise
     need(body.get('end_image'), 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
                                 'approve both, then `--start R --end R2`.')   # design/66 C2
     need(body['start_image'] != body['end_image'], 'The start and end images are distinct pictures: the end is the start one small action further on.')
