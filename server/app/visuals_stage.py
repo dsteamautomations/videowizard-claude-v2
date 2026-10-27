@@ -475,6 +475,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
         refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height', 'check_pending')}   # design/92: being checked
         refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
         refs[r['id']]['from_thumbnail'] = bool((r.get('source') or {}).get('from_thumbnail'))   # design/100 S2
+        refs[r['id']]['sources_changed'] = bool(r.get('sources_changed'))   # design/110
         refs[r['id']]['shot_id'] = made_for(session, r)   # design/94 R1.3: listed only under its own shot
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
@@ -539,6 +540,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'treatment': session.get('treatment'), 'treatment_draft': session.get('treatment_draft'), 'intended_visuals': package.get('intended_visuals') or [],
             'elements': [{k: e.get(k) for k in ('id', 'name', 'kind', 'identity', 'requirements', 'required_views', 'size')} for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
+            'questions': dict(session.get('questions') or {}),   # design/110 rule 0
             'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
@@ -550,6 +552,7 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     _route_gate(shot, 'animation')
+    _no_question(session, shot_id, *(reference_ids or []))   # design/110 rule 0
     states = shot.get('states') or []
     quote = said(quote, 'Approved', user)   # design/99 C2
     rows, warnings = state_chain(session, shot_id), []
@@ -635,6 +638,119 @@ def _accepted_shots(plan, session):
     return sorted(out, key=lambda gs: gs[1]['start_frame'])
 
 
+# ---------- design/110 rule 0: an open question is a server state ----------
+
+def _item_kind(store, session, item):
+    """picture, element or shot of this run; None for anything else."""
+    if item in session['references']:
+        return 'picture'
+    plan = current_plan(store, session) if session.get('current') else None
+    if plan and any(e['id'] == item for e in plan['elements']):
+        return 'element'
+    try:
+        locate(store, session, item)
+        return 'shot'
+    except (ValueError, Problem):
+        return None
+
+
+def _open(session, item, question, choices, by, cost_inr=None, fork=None):
+    qs = session.setdefault('questions', {})
+    need(item not in qs, f"{item} already waits for an answer: {qs.get(item, {}).get('question', '')}")
+    need(str(question or '').strip(), 'Say the question in one sentence.')
+    choices = [str(c).strip() for c in (choices or []) if str(c).strip()]
+    need(len(choices) >= 2, 'Give at least two choices, the concrete ones (and the paid cost of each where there is one).')
+    qs[item] = {'item': item, 'question': str(question).strip(), 'choices': choices, 'by': by, 'at': datetime.now(timezone.utc).isoformat(),
+                **({'cost_inr': float(cost_inr)} if cost_inr is not None else {}), **({'fork': fork} if fork else {})}
+    return qs[item]
+
+
+def _no_question(session, *items):
+    """Derived work from an item with an open question waits (rule 0): the end, a fix, a take, a binding, a placement, a picture made from it."""
+    qs = session.get('questions') or {}
+    for item in items:
+        q = qs.get(item) if item else None
+        need(not q, f"{item} waits for the operator's answer: {q['question'] if q else ''} Answer it on the page or with `vw visuals answer --item {item} --answer \"…\"`; "
+                    f"nothing is made from {item} until then.")
+
+
+def ask(store, user, run, outputs, item, question, choices, cost_inr=None):
+    """The assistant's question at a fork: one sentence, the concrete choices, the paid cost; recorded on the item, shown on its card, in status and in waiting."""
+    session = session_of(store, run, outputs)
+    need(_item_kind(store, session, item), f'{item} is not a picture, a shot or an element of this run.')
+    q = _open(session, item, question, choices, user['id'], cost_inr)
+    save_session(store, run, session)
+    return {**q, 'next': f"Question recorded on {item}: the operator answers on the page (the buttons on its card) or you record their words with `vw visuals answer --item {item} --answer \"…\"`; "
+                         f"nothing is made from {item} until then. Wait with `vw visuals status --wait`."}
+
+
+def answer(store, user, run, outputs, item, words):
+    """The operator's answer closes the question; a server-raised one acts on it (fork 3 keeps one picture for the slot; fork 4 clears the parent)."""
+    session = session_of(store, run, outputs)
+    q = (session.get('questions') or {}).get(item)
+    need(q, f'No open question on {item}.')
+    words = str(words or '').strip()
+    need(words, 'Say the answer: one of the choices, or your own words.')
+    if q.get('fork') == 'slot':
+        need(words in q['choices'], f"Answer with one of {', '.join(q['choices'])}: the picture to keep.")
+        for rid in q['choices']:
+            r = session['references'].get(rid)
+            if rid != words and r and r.get('status') != 'rejected':
+                r.update(status='rejected', rejection={'notes': f'rule 0: the operator kept {words} for {item}', 'quote': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+    if q.get('fork') == 'parent' and words == q['choices'][0]:
+        session['references'][item]['parent_ok'] = True
+    record = {**q, 'answer': words, 'answered_by': user['id'], 'answered_at': datetime.now(timezone.utc).isoformat()}
+    del session['questions'][item]
+    session.setdefault('answered', []).append(record)
+    save_session(store, run, session)
+    return {**record, 'next': f'Answered: {words}. Work on {item} goes on from this answer.'}
+
+
+def round_undo(store, user, run, outputs, quote):
+    """Done on a pass is undone until the next step used its result: pass 1 until a pick is saved, pass 2 until a sheet was made from the pictures."""
+    session = session_of(store, run, outputs)
+    rd = session.get('round')
+    need(rd and rd.get('pass') in (2, 'complete'), 'Nothing to undo: the round is at pass 1 or has not started.')
+    searches = session.get('searches') or {}
+    own = [r['search_id'] for r in rd['elements'].values() if r.get('search_id')]
+    if rd['pass'] == 2:
+        picked = [sid for sid in own if (searches.get(sid) or {}).get('picked')]
+        need(not picked, f"Pass 1 cannot be undone: a pick is saved from {', '.join(picked)}; reject the pictures you do not want instead.")
+        to = 1
+    else:
+        sources = {r['id'] for r in session['references'].values() if r.get('element_id') in rd['elements'] and r.get('kind') in ('frame', 'web', 'supplied', 'isolated')}
+        used = [r['id'] for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('status') != 'rejected' and r.get('element_id') in rd['elements']
+                and any(p.get('id') in sources for p in (r.get('generation') or {}).get('parents') or [])]
+        need(not used, f"Pass 2 cannot be undone: sheet {used[0] if used else ''} was made from this round's pictures; reject that sheet first.")
+        to = 2 if own else 1
+    rd.setdefault('undone', []).append({'from': rd['pass'], 'to': to, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': said(quote, 'Undone', user)})
+    rd['pass'] = to
+    save_session(store, run, session)
+    return {'pass': to, 'next': f'Done undone: the round is at pass {to} again; nothing already saved was removed.'}
+
+
+def supply_own(conn, store, user, run, outputs, element_id, content=None, url='', name=''):
+    """design/110 rule 0 (Revathi's addition): the operator's own picture from the page, a file or an https link, stored as an approved reference of the element."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    element = next((e for e in plan['elements'] if e['id'] == element_id), None)
+    need(element, f'{element_id} is not an element of the plan.')
+    url = str(url or '').strip()
+    need(content or url.startswith('https://'), 'Give a file or an https link to the picture.')
+    if not content:
+        content = fetch_image(url)
+    body = {'request_id': str(uuid.uuid4()), 'element_id': element_id, 'name': str(name or '').strip() or f'own-{element_id}', 'kind': 'supplied', 'subject': element['name']}
+    row = add_reference(conn, store, user, run, outputs, body, content)
+    session = session_of(store, run, outputs)
+    r = session['references'][row['id']]
+    r.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': r['sha256'], 'quote': 'Added by the operator on the page'})
+    if url:
+        r.setdefault('source', {})['url'] = url
+    save_session(store, run, session)
+    return {**r, 'next': f"Your picture is saved and approved for {element_id}" + ('; its sheet is marked "sources changed": the assistant makes a new one.' if any(
+        x.get('kind') == 'sheet' and x.get('sources_changed') and x.get('element_id') == element_id for x in session['references'].values()) else '.')}
+
+
 def waiting(session, plan, code, take_rows):
     """design/97 W1, W3, W4: what waits for the operator's verdict, in film order, each with its label and link: a checked candidate (a reference,
     the style sheet, a still, a start or end image, a sequence once every state is made), a ready take, a drawing spec, a reuse."""
@@ -674,6 +790,14 @@ def waiting(session, plan, code, take_rows):
             pending_specs.append(sh['start_frame'])
     if pending_specs:   # design/106 D5: one item, one table, one approval
         add(min(pending_specs), f"Drawing specs · {len(pending_specs)} to approve", 'pictures', 'specs', 'specs')
+    for item, q in (session.get('questions') or {}).items():   # design/110 rule 0: an open question comes first
+        r = session['references'].get(item)
+        sh = shots.get(made_for(session, r) if r else item)
+        step = 'references' if (r and r.get('kind') in ('frame', 'supplied', 'web', 'isolated', 'sheet')) or (not r and not sh) else 'takes' if sh and route_of(sh) == 'video' else 'pictures'
+        add(-2, f"Question · {item} · {q['question'][:80]}", step, (r or {}).get('element_id') if step == 'references' else (sh or {}).get('id') or item, item)
+    for r in session['references'].values():
+        if r.get('kind') == 'sheet' and r.get('sources_changed') and r.get('status') != 'rejected':
+            add(-1, f"Reference sheet · {r['element_id']} · sources changed", 'references', r['element_id'], r['id'])
     for sid in session.get('reuse_pending') or {}:
         sh = shots.get(sid) or {'start_frame': 0}
         add(sh['start_frame'], f'Reuse · {sid}', 'takes' if sh.get('visual_type') == 'video' else 'pictures', sid, 'reuse')
@@ -817,6 +941,10 @@ def _store_reference(store, run, session, ref_id, png, meta):
     row = {**meta, 'id': ref_id, 'key': k, 'sha256': hashlib.sha256(png).hexdigest(), 'bytes': len(png), 'status': 'candidate', 'approval': None,
            'created_at': datetime.now(timezone.utc).isoformat()}
     session['references'][ref_id] = row
+    if meta.get('kind') in ('frame', 'supplied', 'web', 'isolated'):   # design/110: a sheet made before this picture is stale; the old one stays approved until the new one is
+        for r in session['references'].values():
+            if r.get('kind') == 'sheet' and r.get('element_id') == meta.get('element_id') and r.get('status') != 'rejected':
+                r['sources_changed'] = True
     return row
 
 
@@ -1197,6 +1325,15 @@ def generate_image(conn, store, user, run, outputs, body):
     if not body.get('shot_id') and body['kind'] in ('keyframe', 'state'):   # design/94 R1.1: a state, an end image or a fix takes its parent's shot
         body['shot_id'] = next((p['shot_id'] for p in parents if p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id')), None)
         need(body['shot_id'] or body.get('fix_of'), f"Name the shot this {body['kind']} is for (--shot): a picture is listed, checked and placed only in its own shot.")
+    _no_question(session, body['element_id'], body.get('shot_id'), *[p['id'] for p in parents if p])   # design/110 rule 0
+    if not body.get('fix_of'):   # rule 0, fork 4: a parent approved with a failed must line is asked about once; a fix is that line's remedy
+        for p in parents:
+            failed = [l.get('check') for l in ((p or {}).get('check') or {}).get('must_failed') or []]
+            if p and p.get('status') == 'approved' and p.get('kind') in ('keyframe', 'state') and failed and not p.get('parent_ok'):
+                _open(session, p['id'], f"{p['id']} was approved with a failed must line ({', '.join(failed)}): use it as the parent of new pictures anyway, or make a new one?",
+                      ['use it as the parent', 'make a new one'], 'server', fork='parent')
+                save_session(store, run, session)
+                need(False, f"{p['id']} was approved with a failed must line ({', '.join(failed)}): the operator decides first; the question is on its card (`vw visuals answer --item {p['id']} …`).")
     found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
     named = found[3] if found else None
     if body['kind'] == 'keyframe':
@@ -1561,8 +1698,17 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     session = session_of(store, run, outputs)
     row = session['references'].get(ref_id)
     need(row and row['status'] in ('candidate', 'approved'), 'Reference is not a candidate.')
+    _no_question(session, ref_id, made_for(session, row))   # design/110 rule 0
     if row['sha256'] != sha256:
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
+    if row.get('kind') == 'keyframe' and row['status'] == 'candidate' and made_for(session, row) and _shot_is_video(store, session, made_for(session, row)):   # rule 0, fork 3: two pictures approved for one slot (a start or an end) : the operator keeps one; a still's second picture replaces (design/94)
+        sid, word = made_for(session, row), _picture_word(store, session, row)
+        others = [r['id'] for r in session['references'].values() if r['id'] != ref_id and r.get('kind') == 'keyframe' and r.get('status') == 'approved' and made_for(session, r) == sid
+                  and _picture_word(store, session, r) == word]
+        if others:
+            _open(session, sid, f"Two {word}s for {sid} would be approved: {', '.join(others)} (approved) and {ref_id}. Keep which?", others + [ref_id], 'server', fork='slot')
+            save_session(store, run, session)
+            need(False, f"Two {word}s for {sid}: {', '.join(others)} is approved already. Answer which to keep on the shot's card (or `vw visuals answer --item {sid} --answer <id>`); the other is rejected, then approve again.")
     quote = said(quote, 'Approved', user)   # design/99 C2
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
     placed = None
@@ -1575,6 +1721,10 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         if shot and route_of(shot) == 'still':
             placed = _place_still(store, user, run, outputs, session, sid, ref_id, quote)
     row['dhash'] = _fingerprints(store, row['key'])   # design/89 H6, finding 9: kept once, never read again for the look-alike check
+    if row.get('kind') == 'sheet':   # design/110: the new sheet answers the changed sources
+        for r in session['references'].values():
+            if r.get('kind') == 'sheet' and r.get('element_id') == row.get('element_id'):
+                r.pop('sources_changed', None)
     _feedback_image(session, run, user, row, 'pass', quote, '')
     save_session(store, run, session)
     if placed:   # design/97 A4: what happens next, with the film time
@@ -1602,6 +1752,7 @@ def request_fix(conn, store, user, run, outputs, ref_id):
     session = session_of(store, run, outputs)
     ref = session['references'].get(ref_id)
     need(ref, f'{ref_id} is not a picture of this run.')
+    _no_question(session, ref_id, made_for(session, ref))   # design/110 rule 0
     need(not ref.get('fix_of'), 'a fix is not fixed again: reject it and make a new picture.')
     need(not ref.get('fix_queued'), f"a fix of this picture is already made: {ref.get('fix_queued')}.")
     need(ref.get('status') == 'candidate', f"only a candidate is fixed; {ref_id} is {ref.get('status')}.")
@@ -1762,6 +1913,7 @@ def bind(store, user, run, outputs, shot_id, references, selectors, quote=''):
     """design/45 10.4: the approved references are the operator's yes; a quote is kept when given."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    _no_question(session, shot_id)   # design/110 rule 0
     need(set(references) == set(shot['element_ids']), 'Cover every required shot element with approved references: ' + ', '.join(sorted(set(shot['element_ids']) - set(references))))
     elements = {e['id']: e for e in plan['elements']}
     bindings = {}
@@ -1980,6 +2132,7 @@ def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
     _, _, _, planned = guarded(lambda: locate(store, session, body['shot_id']))
     _route_gate(planned, 'video')
+    _no_question(session, body['shot_id'], body.get('start_image'), body.get('end_image'))   # design/110 rule 0
     need(body.get('start_image'), 'A start image is required.')
     need(body.get('end_image'), 'Every take has a start and an end image: generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), '
                                 'approve both, then `--start R --end R2`.')   # design/66 C2
@@ -2138,6 +2291,7 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     quote = said(quote, 'Selected', user)   # design/99 C2
     job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider='video'", (job_id, run['id'])).fetchone()
     need(job and job['status'] == 'ready', 'Select a ready take.')
+    _no_question(session, job['unit'])   # design/110 rule 0
     if str(notes or '').strip():
         ev = job['result']['evidence']
         need(ev.get('timing_matches_placement') or str(timing_notes or '').strip(), 'The take is shorter than its placement; explain in timing_notes before accepting.')
@@ -2173,6 +2327,7 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     """The placement on a loaded session, saved by the caller (design/94 A1: approving places in the same save)."""
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     _route_gate(shot, 'still')
+    _no_question(session, shot_id, reference_id)   # design/110 rule 0
     row = session['references'].get(reference_id)
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
     quote = said(quote, 'Placed', user)   # design/99 C2
@@ -2466,7 +2621,7 @@ def status(conn, store, run, outputs, repair=True):
                 entry['shots'].append({'shot_id': s['id'], 'visual_type': s['visual_type'], 'bound': s['id'] in session['bindings'], 'prepared': s['id'] in session['preparations'],
                                        'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
         gaps.append(entry)
-    refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}, 'note': (r.get('source') or {}).get('note') or ''}   # design/106 N4: the latest note
+    refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}, 'note': (r.get('source') or {}).get('note') or '', 'sources_changed': bool(r.get('sources_changed'))}   # design/106 N4; design/110
             for r in session['references'].values()]
     take_rows = take_jobs(conn, run)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6
@@ -2482,6 +2637,7 @@ def status(conn, store, run, outputs, repair=True):
             'footage': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/88
             'waiting': waiting(session, plan, run.get('code'), take_rows),   # design/97 W4: each with its label and link
             'spec_corrections': {sid: c.get('words') for sid, c in (session.get('spec_corrections') or {}).items()},   # review 27 Oct: the assistant revises these specs
+            'questions': dict(session.get('questions') or {}),   # design/110 rule 0: the open questions, by item
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 

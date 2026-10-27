@@ -1299,7 +1299,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note']   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer']   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1308,7 +1308,7 @@ _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
-    'round': {'file', 'verdicts', 'picks', 'quote'}, 'search': {'element', 'keywords', 'quote'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role'},
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
@@ -1440,7 +1440,17 @@ def cmd_visuals(a):
             hits = (out.get('matches') or {}).get(e['id']) or []
             lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else 'not seen in the footage: the operator picks a picture (`vw visuals search`) or the sheet is generated from words'))
         emit({'file': 'work/visuals/elements.json', 'elements': len(out.get('elements') or [])}, 0, 'Elements against the footage (work/visuals/elements.json): ' + '; '.join(lines))
+    if a.what == 'ask':   # design/110 rule 0: the question is a server state on the item
+        choices = [c.strip() for c in str(a.choices or '').split('|') if c.strip()]
+        out = write(base + '/ask', {'item': a.item, 'question': a.question or '', 'choices': choices, 'cost_inr': float(a.cost) if a.cost else None})
+        emit(out, 0, out.get('next') or 'Question recorded.')
+    if a.what == 'answer':
+        out = write(base + '/answer', {'item': a.item, 'answer': a.answer or ''})
+        emit(out, 0, out.get('next') or 'Answer recorded.')
     if a.what == 'round':   # design/79: every element at once; the operator answers on the page in two passes
+        if getattr(a, 'undo', False):   # design/110 rule 0: Done undone until the next step used it
+            out = write(base + '/round/undo', {'quote': a.quote or ''})
+            emit(out, 0, out.get('next') or f"The round is at pass {out.get('pass')} again.")
         if a.verdicts:
             out = write(base + '/round/done', {'verdicts': _json_file(m, a.verdicts), 'quote': a.quote})
             emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} search(es) ran" + (f"; failed: {', '.join(out['errors'])}" if out.get('errors') else '') + f"; the round is at pass {out.get('pass')}.")
@@ -2225,8 +2235,9 @@ def build_parser():
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role'):   # design/73, design/79; design/94 --move; design/106 --role
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost'):   # design/73, design/79; design/94 --move; design/106 --role; design/110
         s.add_argument(flag)
+    s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable

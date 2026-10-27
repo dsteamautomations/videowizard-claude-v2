@@ -2,6 +2,7 @@
 from pathlib import Path
 from uuid import UUID
 
+import base64
 import hashlib
 from io import BytesIO
 
@@ -395,6 +396,10 @@ def _visuals_act(code, vw2_session, body):
             'approve-specs': lambda: V.approve_specs(store, user, run, outputs, quote),   # design/106 D5
             'note': lambda: V.note_reference(store, user, run, outputs, body['reference_id'], body.get('note')),   # design/106 N4
             'correct-spec': lambda: V.correct_spec(store, user, run, outputs, body['shot_id'], body.get('words')),   # design/106 D4
+            'answer': lambda: V.answer(store, user, run, outputs, body['item'], str(body.get('answer') or '')),   # design/110 rule 0
+            'round-undo': lambda: V.round_undo(store, user, run, outputs, quote),   # design/110 rule 0
+            'supply': lambda: V.supply_own(conn, store, user, run, outputs, body['element_id'], content=base64.b64decode(body['content_base64']) if body.get('content_base64') else None,
+                                           url=str(body.get('url') or ''), name=str(body.get('name') or '')),   # design/110 rule 0: the operator's own picture from the page
             'measure': lambda: V.measure(store, user, run, outputs, list(body.get('reference_ids') or []), str(body.get('question') or '')),   # design/89 D2
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),

@@ -347,6 +347,22 @@ class NothingFits(Write):  # design/73 R4b
     reason: str = Field(min_length=1)
 
 
+class Ask(Write):   # design/110 rule 0
+    item: str
+    question: str = Field(min_length=1, max_length=2000)
+    choices: list[str]
+    cost_inr: float | None = None
+
+
+class Answer(Write):   # design/110 rule 0
+    item: str
+    answer: str = Field(max_length=2000)
+
+
+class RoundUndo(Write):   # design/110 rule 0
+    quote: str = ''
+
+
 class RoundStart(Write):   # design/79 Q1
     elements: list[dict[str, Any]] = Field(min_length=1, max_length=80)
 
@@ -1315,6 +1331,21 @@ def visuals_round_picks(run_id: UUID, body: RoundPicks, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/nothing-fits')
 def visuals_nothing_fits(run_id: UUID, body: NothingFits, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.nothing_fits(storage(), user, run, outputs, body.search_id, body.reason))   # design/73 R4b
+
+
+@app.post('/api/runs/{run_id}/visuals/ask')
+def visuals_ask(run_id: UUID, body: Ask, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.ask(storage(), user, run, outputs, body.item, body.question, body.choices, body.cost_inr))   # design/110 rule 0
+
+
+@app.post('/api/runs/{run_id}/visuals/answer')
+def visuals_answer(run_id: UUID, body: Answer, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.answer(storage(), user, run, outputs, body.item, body.answer))   # design/110 rule 0
+
+
+@app.post('/api/runs/{run_id}/visuals/round/undo')
+def visuals_round_undo(run_id: UUID, body: RoundUndo, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_undo(storage(), user, run, outputs, body.quote))   # design/110 rule 0
 
 
 @app.post('/api/runs/{run_id}/visuals/revise')

@@ -70,7 +70,10 @@ def test_approving_a_revised_start_queues_its_end_and_names_the_job():
     store = start_store()
     rid = revise_start(store, role='start')['reference_id']
     conn = FakeConn([])
-    row = VS.approve_reference(approvable(store, rid), USER, RUN, [], rid, 'a' * 64, '', conn)
+    with pytest.raises(Problem, match='Two start images for VS1'):   # design/110 rule 0, fork 3: K1 is approved already; the operator keeps one
+        g(lambda: VS.approve_reference(approvable(store, rid), USER, RUN, [], rid, 'a' * 64, '', conn))
+    VS.answer(store, USER, RUN, [], 'VS1', rid)
+    row = VS.approve_reference(store, USER, RUN, [], rid, 'a' * 64, '', conn)
     assert row['end_reference_id'] and row['end_job_id'] == 'job-1' and len(conn.inserted) == 1
     assert 'end image queued' in row['next'] and 'job-1' in row['next'] and 'take' not in row['next']
 
@@ -79,7 +82,10 @@ def test_a_start_approved_without_an_end_prompt_never_names_the_take_as_next():
     store = start_store()
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r12', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1',
                                                                 'subject': 'the labourer', 'prompt': 'Image 1 is the old start; the labourer at the stack.', 'parents': ['K1'], 'role': 'start'})
-    row = VS.approve_reference(approvable(store, out['reference_id']), USER, RUN, [], out['reference_id'], 'a' * 64, '', FakeConn([]))
+    with pytest.raises(Problem, match='Two start images for VS1'):   # design/110 rule 0, fork 3
+        g(lambda: VS.approve_reference(approvable(store, out['reference_id']), USER, RUN, [], out['reference_id'], 'a' * 64, '', FakeConn([])))
+    VS.answer(store, USER, RUN, [], 'VS1', out['reference_id'])
+    row = VS.approve_reference(store, USER, RUN, [], out['reference_id'], 'a' * 64, '', FakeConn([]))
     assert 'take' not in row['next'] and 'end image' in row['next']
 
 
