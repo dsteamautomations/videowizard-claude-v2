@@ -63,3 +63,4 @@ A fifth route, **drawn**, for diagrams, charts, maps, timelines and technical dr
 ## SK's answers (27 Oct 2026)
 
 1. The drawing set as listed (rect, line, arrow, circle, polygon, text, image, group, repeat; appear, build, move, highlight, fade); no curves or 3-D in this release.
+2. The server places the spec's size labels (a leader line to the part, the text outside it); the planner may move a label; a dropped label is put back.
