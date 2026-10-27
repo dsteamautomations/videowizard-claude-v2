@@ -110,3 +110,16 @@ Status: proposed by Revathi, 27 Oct 2026, from operating VW-7's Takes step. Chec
 - S5: `image_check.take_drift` reads up to twelve small grey frames of the retained take with ffmpeg (two a second) and registers each against the first with S3's method (phase correlation and the scale search, shared as `_match`); the worst shift and zoom are reported. For a locked-off camera (the take record's `camera_move` empty) it is the must line "camera drift", failing over 2 % (DRIFT_MAX, a starting value) with the figure on the take's card; for a planned camera move, or a take prepared before design/112, it is measured and reported, not judged. `run_take_check` measures first, in code, then asks Gemini; the drift line joins the record even when Gemini cannot run, and a failed measurement (no ffmpeg, a one-frame clip) never holds the take back (`drift_error` on the record).
 - Tests: `test_design112_s2s5_pure.py` (4: the refusal and the warning; synthetic frame runs that drift 3 %, zoom 4 %, hold steady with a moving subject, and a planned move; the frames read from a real mp4 encoded with ffmpeg, skipped where ffmpeg is absent; the drift line on the take record without a Gemini key). Thirteen older fixtures that made an end without a region now give one. Server unit suite 577; plugin 310 plus the 3 known Windows-only.
 - Not covered: rotation; a take whose subject fills most of the frame (the registration follows the subject, not the background); the 2 % threshold is tuned on VW-7's first takes.
+
+## S6: the library against the server, conflicts found while building the S set (27 Oct)
+
+| Library line (vwlib-2026-10-21) | Server before | Now |
+|---|---|---|
+| Video-clip playbook: clip-from-frame (one approved frame and one move) is the default | every take needed a start and an end (design/66 C2) | S1: start alone by default; an end only for `end_state_exact` |
+| Omni sheet B9: first-and-last-frame is for orbits, zoom transitions and loops | every take used it | S1, same |
+| GPT Image sheet A5, B5: a mask limits the edit; composite the approved edit back where pixels must be identical; repeated edits drift | ends were whole-frame edits, nothing composited | F11 (design/111) built the mask and the composite-back; S2 makes the region required on every end |
+| Video-frame playbook, first-last-frame: "same aspect, same light, same traits; only the move's change differs" (a must) | the aspect was checked; nothing measured the framing | S3: shift and scale measured in code before the operator sees the pair |
+| Omni house shape (B1, B2, B7, B9): the frame tags, the motion brief, the continuity line, one unbroken shot, no dialogue or music, the roles of the pictures, the length last | followed; no camera sentence anywhere in the shape | S4 adds "Camera: …" after the continuity part; the house shape's order is kept. The library has no line on the camera: a line for the next snapshot, not a conflict |
+| GPT Image sheet: a mask is guidance, not a guarantee | — | unchanged: the composite is the guarantee; the outside-unchanged figure is on the edit record |
+
+No other line of the served snapshot was found to differ from the server's behaviour in the take path. Versions for the S-set deploy: server 0.61.0, plugin 0.53.0 (`prepare-take` takes `--start` alone); numpy joins the server's requirements (the deploy script installs it).
