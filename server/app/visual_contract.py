@@ -197,6 +197,7 @@ class Shot(Model):
     drawing_spec: DrawingSpec | None = None   # design/89 D1: a technical drawing of a real object
     changes: list[Change] = Field(default_factory=list, max_length=20)   # design/91 N1: a video shot's change list
     props: list[Prop] = Field(default_factory=list, max_length=20)   # design/110 F5
+    allows: list[str] = Field(default_factory=list, max_length=10)   # design/111 F12: a named exception to an element's not-this list, in this shot only (a jali in a wall)
     fact_ids: list[str] = Field(default_factory=list, max_length=20)   # design/91 N6: the facts this shot rests on
     descriptors: list[str] = Field(default_factory=list, max_length=10)   # design/91 N8: the narration's descriptive words about the subject
     evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)

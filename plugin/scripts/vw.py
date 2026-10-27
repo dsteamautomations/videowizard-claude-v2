@@ -1299,7 +1299,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer']   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this']   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1308,7 +1308,7 @@ _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
-    'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
@@ -1460,6 +1460,9 @@ def cmd_visuals(a):
     if a.what == 'answer':
         out = write(base + '/answer', {'item': a.item, 'answer': a.answer or ''})
         emit(out, 0, out.get('next') or 'Answer recorded.')
+    if a.what == 'not-this':   # design/111 F12: built by the server from the round, one model call and the rejections
+        out = write(base + '/not-this', {'element_id': a.element})
+        emit(out, 0, (out.get('next') or '') + ' ' + '; '.join(out.get('lines') or []))
     if a.what == 'round':   # design/79: every element at once; the operator answers on the page in two passes
         if getattr(a, 'undo', False):   # design/110 rule 0: Done undone until the next step used it
             out = write(base + '/round/undo', {'quote': a.quote or ''})

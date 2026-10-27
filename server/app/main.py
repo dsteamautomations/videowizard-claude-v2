@@ -366,6 +366,10 @@ class RoundUndo(Write):   # design/110 rule 0
     quote: str = ''
 
 
+class NotThis(Write):   # design/111 F12
+    element_id: str
+
+
 class RoundStart(Write):   # design/79 Q1
     elements: list[dict[str, Any]] = Field(min_length=1, max_length=80)
 
@@ -1349,6 +1353,11 @@ def visuals_answer(run_id: UUID, body: Answer, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/round/undo')
 def visuals_round_undo(run_id: UUID, body: RoundUndo, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_undo(storage(), user, run, outputs, body.quote))   # design/110 rule 0
+
+
+@app.post('/api/runs/{run_id}/visuals/not-this')
+def visuals_not_this(run_id: UUID, body: NotThis, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.not_this(storage(), user, run, outputs, body.element_id))   # design/111 F12
 
 
 @app.post('/api/runs/{run_id}/visuals/revise')

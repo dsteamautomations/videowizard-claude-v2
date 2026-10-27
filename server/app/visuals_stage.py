@@ -547,7 +547,8 @@ def page_view(conn, store, run, outputs, code, repair=True):
                           'material_spec': ({'table': spec_table(e['material_spec']) + [{'part': 'laid', 'measure': '', 'size': e['material_spec']['laid'], 'source': '', 'status': 'rule'},
                                                                                        {'part': 'pattern', 'measure': '', 'size': e['material_spec']['pattern'], 'source': '', 'status': 'rule'}],
                                             'sentence': material_sentence(e), 'approved': material_approved(session, e),
-                                            'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')} if e.get('material_spec') else None)}   # design/111 F10
+                                            'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')} if e.get('material_spec') else None),
+                          'not_this': list(((session.get('not_this') or {}).get(e['id']) or {}).get('lines') or [])}   # design/111 F10, F12
                          for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0
@@ -709,6 +710,114 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     if row['id'] not in (session.get('questions') or {}):
         _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({prices()['image_inr']:g} INR)", 'approve anyway'], 'server', fork='not_yet')
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
+
+
+# ---------- design/111 F12: every element carries a "not this" list, made by one method, pasted into every prompt ----------
+
+NOT_THIS_MODEL = 'gemini-3.8-flash'   # SK's answer 5: the check model, once per element
+NOT_THIS_SCHEMA = {'type': 'object', 'properties': {'lines': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['lines']}
+
+
+def _slug(text):
+    return re.sub(r'[^a-z0-9]+', '-', str(text or '').lower()).strip('-')[:60] or 'thing'
+
+
+def not_this_key(name):
+    return f'library/not-this/{_slug(name)}.json'
+
+
+def _dedupe_lines(lines):
+    out = []
+    for l in lines:
+        l = str(l or '').strip().rstrip('.')
+        if l and l.lower() not in {x.lower() for x in out}:
+            out.append(l)
+    return out
+
+
+def _library_lines(store, name):
+    try:
+        return list(json.loads(store.get(not_this_key(name)).decode('utf-8')).get('lines') or []) if store.exists(not_this_key(name)) else []
+    except (ValueError, Problem, AttributeError):
+        return []
+
+
+def _keep_library(store, name, lines):
+    try:
+        store.put(not_this_key(name), json.dumps({'element': name, 'lines': lines}, ensure_ascii=False).encode('utf-8'), 'application/json')
+    except Exception:   # the run's own list stands even when the shared store is unreachable
+        pass
+
+
+def _rejection_lines(session, element_id):
+    return [r['rejection']['notes'] for r in session['references'].values() if r.get('element_id') == element_id and r.get('status') == 'rejected' and (r.get('rejection') or {}).get('notes', '').strip()]
+
+
+def not_this(store, user, run, outputs, element_id):
+    """The list, by the one method: the library's lines for this thing (earlier films), one model call on the spec and the round's near misses
+    (the unticked web results and the nothing-fits reasons), then this film's rejections; kept on the session and in the library's store."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    element = next((e for e in plan['elements'] if e['id'] == element_id), None)
+    need(element, f'{element_id} is not an element of the plan.')
+    lib = _library_lines(store, element['name'])
+    near = []
+    for s_ in (session.get('searches') or {}).values():
+        if s_.get('element_id') != element_id:
+            continue
+        picked = set(s_.get('picked') or [])
+        near += [str(r.get('title') or '').strip() for r in s_.get('results') or [] if r.get('n') not in picked and str(r.get('title') or '').strip()]
+        if (s_.get('nothing_fits') or {}).get('reason'):
+            near.append(s_['nothing_fits']['reason'])
+    spec = material_sentence(element) if element.get('material_spec') else f"{element['name']}: {element.get('requirements') or ''}"
+    text = (f"The thing: {spec}\nList the common variants of this thing that a picture model draws instead of it, each as one short 'no …' line naming the difference "
+            "(the bond, the shape, the surface, the colour, the size, the fittings), eight lines at most, no explanations." +
+            ('\nThe operator rejected these web results or wrote why nothing fit; turn each difference into a line too: ' + '; '.join(near[:20]) if near else ''))
+    key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
+    need(key_, 'No Gemini key on the server.')
+    try:
+        received = _gemini_transport()(key_, NOT_THIS_MODEL, terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False).generate(
+            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'maxOutputTokens': 1024}})
+        body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
+    except Exception as exc:
+        raise Problem(502, 'NOT_THIS_FAILED', f'The not-this call failed: {exc.__class__.__name__}: {str(exc)[:200]}')
+    model = _dedupe_lines(body.get('lines') or [])[:12]
+    rejections = _rejection_lines(session, element_id)
+    lines = _dedupe_lines(lib + model + rejections)
+    record = {'lines': lines, 'from': {'library': len(_dedupe_lines(lib)), 'model': len([l for l in model if l.lower() not in {x.lower() for x in lib}]),
+                                       'rejections': len([l for l in _dedupe_lines(rejections) if l.lower() not in {x.lower() for x in lib + model}])},
+              'model': NOT_THIS_MODEL, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    session.setdefault('not_this', {})[element_id] = record
+    _keep_library(store, element['name'], lines)
+    save_session(store, run, session)
+    return {'element_id': element_id, **record, 'next': f"Not-this list of {element_id} ({len(lines)} lines): shown with the spec on the References step; the server pastes it into every prompt that shows {element_id}."}
+
+
+def _not_this_add(store, session, plan, element_id, line):
+    """A rejection's words join the list at once (source 3), on the session and in the library's store."""
+    line = str(line or '').strip().rstrip('.')
+    if not line or not element_id:
+        return
+    rec = (session.get('not_this') or {}).get(element_id)
+    if rec is None:
+        return   # no list yet: the rejection is read when the list is built
+    if line.lower() in {x.lower() for x in rec['lines']}:
+        return
+    rec['lines'].append(line)
+    rec['from']['rejections'] = rec['from'].get('rejections', 0) + 1
+    name = next((e['name'] for e in (plan or {}).get('elements') or [] if e['id'] == element_id), element_id)
+    _keep_library(store, name, rec['lines'])
+
+
+def not_this_line(session, plan, element_id, shot=None):
+    """The constraint line for a prompt: the list minus the shot's named exceptions, which are said instead."""
+    rec = (session.get('not_this') or {}).get(element_id)
+    if not rec or not rec.get('lines'):
+        return ''
+    allows = [a.strip().lower() for a in (shot or {}).get('allows') or []]
+    kept = [l for l in rec['lines'] if not any(a and a in l.lower() for a in allows)]
+    name = next((e['name'] for e in (plan or {}).get('elements') or [] if e['id'] == element_id), element_id)
+    return f"Not this ({name}): " + '; '.join(kept) + '.' + (f" Except in this shot: {'; '.join((shot or {}).get('allows') or [])}." if allows else '')
 
 
 # ---------- design/111 F11 (+F41): one golden picture per element; every later picture is an edit of it ----------
@@ -1680,10 +1789,15 @@ def generate_image(conn, store, user, run, outputs, body):
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
+    writer_prompt = body['prompt']   # the writer's words, before the server adds its own lines
+    for eid in [body['element_id']] + [x for x in (named or {}).get('element_ids') or [] if x != body['element_id']]:   # design/111 F12: 'none of these', in every prompt that shows the element
+        nl = not_this_line(session, plan, eid, named)
+        if nl:
+            body = {**body, 'prompt': with_composed(body['prompt'], nl)}
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
         need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: approve it on the References step (or `vw visuals spec --element {m['id']}`) before a picture shows it.")
         try:
-            library.check_material_prompt(body['prompt'])
+            library.check_material_prompt(writer_prompt)
         except ValueError as exc:
             need(False, str(exc))
         lines = lines + material_lines(m)
@@ -1831,6 +1945,12 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
         need(element and element.get('material_spec'), f'{shot_id[len("element:"):]} has no material spec.')
         spec = element['material_spec']
         need(not correction_pending(session, shot_id, spec), f'The correction of {element["id"]}\'s material spec waits for the assistant to revise it; approve the revised one.')
+        if not (session.get('not_this') or {}).get(element['id']):   # design/111 F12: the list is the spec's second half, built with it
+            try:
+                not_this(store, user, run, outputs, element['id'])
+                session = session_of(store, run, outputs)
+            except (Problem, ValueError):   # the model call failed: the approval stands; `vw visuals not-this --element` builds the list when the model answers
+                pass
         session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
         (session.get('spec_corrections') or {}).pop(shot_id, None)
         save_session(store, run, session)
@@ -2174,12 +2294,20 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
     if row and row.get('status') == 'rejected' and reason and row.get('rejection'):   # design/99 C3: the reason given after the click joins the same rejection
         row['rejection']['notes'] = reason
         _feedback_image(session, run, user, row, 'reject', row['rejection']['quote'], reason)
+        try:
+            _not_this_add(store, session, current_plan(store, session) if session.get('current') else None, row.get('element_id'), reason)   # design/111 F12
+        except (ValueError, Problem):
+            pass
         save_session(store, run, session)
         return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}
     need(row and row['status'] in ('candidate', 'approved'), f"Reference {ref_id} is not a candidate or approved picture (it is {(row or {}).get('status') or 'unknown'}); only those can be rejected.")
     quote = said(words, 'Rejected', user)   # design/99 C3: the reason is optional
     row.update(status='rejected', rejection={'notes': reason, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     _feedback_image(session, run, user, row, 'reject', quote, row['rejection']['notes'])
+    try:   # design/111 F12: the rejection's words join the element's not-this list at once
+        _not_this_add(store, session, current_plan(store, session) if session.get('current') else None, row.get('element_id'), reason)
+    except (ValueError, Problem):
+        pass
     save_session(store, run, session)
     return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}   # design/97 A4
 
@@ -3055,6 +3183,7 @@ def status(conn, store, run, outputs, repair=True):
             'material_specs': {e['id']: {'approved': material_approved(session, e), 'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')}
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
+            'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 

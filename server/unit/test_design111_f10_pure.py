@@ -129,7 +129,14 @@ def test_the_material_spec_is_approved_once_corrected_through_rule_0_and_shown_e
 
 # ---------- every picture that shows the material carries the sentence; none before the approval ----------
 
-def test_no_picture_of_the_material_before_its_spec_is_approved_then_the_sentence_rides_with_every_prompt():
+def test_no_picture_of_the_material_before_its_spec_is_approved_then_the_sentence_rides_with_every_prompt(monkeypatch):
+    class Down:
+        def __init__(self, *a, **k):
+            pass
+
+        def generate(self, payload):
+            raise RuntimeError('no network in a unit test')
+    monkeypatch.setattr(VS, '_gemini_transport', lambda: Down)   # F12's list cannot be built here: the approval stands without it
     store = material_store()
     with pytest.raises(Problem, match='material spec of BRICK is not approved'):
         g(lambda: revise_start(store, role='start'))
