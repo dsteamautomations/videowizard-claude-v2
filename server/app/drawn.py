@@ -13,15 +13,20 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .config import settings
 
-FONTS = Path(__file__).resolve().parents[1] / 'fonts'   # server/fonts: NotoSans-Regular.ttf, NotoSans-Bold.ttf (OFL)
+FONTS = Path(__file__).resolve().parents[1] / 'fonts'   # server/fonts: NotoSans-Variable.ttf (Google Fonts' one file for every weight, OFL), the Bold instance chosen by name
 MARGIN = 0.04            # the canvas is contained in the frame with this margin on every side
 HIGHLIGHT = '#FFC43D'    # the highlight ring
 SUPER = 2                # drawn at twice the size, then downsampled: clean edges without an extra dependency
 
 
 def font_file(bold=False, brand=None):
-    """The font to draw with: the brand font when the run carries one, else the repo's Noto Sans. Missing or unreadable: a named failure."""
-    p = Path(brand) if brand else FONTS / ('NotoSans-Bold.ttf' if bold else 'NotoSans-Regular.ttf')
+    """The font to draw with: the brand font when the run carries one, else the repo's Noto Sans (static Regular/Bold files when present, else the one
+    variable file, whose Bold instance is chosen by name). Missing or unreadable: a named failure."""
+    if brand:
+        p = Path(brand)
+    else:
+        static = FONTS / ('NotoSans-Bold.ttf' if bold else 'NotoSans-Regular.ttf')
+        p = static if static.exists() else FONTS / 'NotoSans-Variable.ttf'
     if not p.exists():
         raise ValueError(f'font {p.name} is not there ({"the brand font of this run" if brand else "under server/fonts"}); nothing is substituted (design/113 E4)')
     try:
@@ -29,6 +34,19 @@ def font_file(bold=False, brand=None):
     except OSError as exc:
         raise ValueError(f'font {p.name} cannot be read by Pillow: {exc}') from None
     return p
+
+
+def typeface(path, size, bold=False):
+    """A Pillow font at a size; a variable font takes its Bold or Regular instance by name, a static file is used as it is."""
+    f = ImageFont.truetype(str(path), size)
+    try:
+        names = [n.decode() if isinstance(n, bytes) else n for n in f.get_variation_names()]
+    except OSError:
+        return f   # a static font has no instances
+    want = 'Bold' if bold else 'Regular'
+    if want in names:
+        f.set_variation_by_name(want)
+    return f
 
 
 def _tokens(text):
@@ -183,7 +201,7 @@ def draw_frame(scene, labels, state, W, H, fonts, images=None):
         elif k == 'text':
             x0, y0 = to(s['x'] + ox, s['y'] + oy)
             size = max(8, int(round(float(s.get('size_pct') or 4) / 100 * H * S)))
-            fnt = ImageFont.truetype(str(fonts['bold' if s.get('bold') else 'regular']), size)
+            fnt = typeface(fonts['bold' if s.get('bold') else 'regular'], size, bool(s.get('bold')))
             if st['highlight']:
                 box = d.textbbox((x0, y0), s['text'], font=fnt)
                 d.rectangle((box[0] - wt * 2, box[1] - wt * 2, box[2] + wt * 2, box[3] + wt * 2), fill=_rgb(HIGHLIGHT, HIGHLIGHT) + (a,))

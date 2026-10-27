@@ -60,9 +60,12 @@ def test_the_canvas_is_contained_with_a_margin():
     assert abs(scale - 1080 * 0.92 / 300) < 1e-9 and to(0, 0)[1] == pytest.approx(1080 * 0.04) and to(400, 300)[1] == pytest.approx(1080 * 0.96)
 
 
-def test_a_missing_or_unreadable_font_fails_by_name(tmp_path):
-    with pytest.raises(ValueError, match='NotoSans-Regular.ttf is not there'):
-        D.font_file(False, None) if not (D.FONTS / 'NotoSans-Regular.ttf').exists() else (_ for _ in ()).throw(ValueError('NotoSans-Regular.ttf is not there (skip)'))
+def test_a_missing_or_unreadable_font_fails_by_name(tmp_path, monkeypatch):
+    assert D.font_file(False, None).name == 'NotoSans-Variable.ttf' and D.font_file(True, None).name == 'NotoSans-Variable.ttf'   # the repo font, one file for both weights
+    assert D.typeface(D.font_file(True), 40, True).getlength('Rat-trap') > D.typeface(D.font_file(False), 40, False).getlength('Rat-trap')   # the Bold instance is wider
+    monkeypatch.setattr(D, 'FONTS', tmp_path / 'no-fonts')
+    with pytest.raises(ValueError, match='NotoSans-Variable.ttf is not there \(under server/fonts\)'):
+        D.font_file(False, None)
     bad = tmp_path / 'brand.ttf'
     bad.write_bytes(b'not a font')
     with pytest.raises(ValueError, match='brand.ttf cannot be read by Pillow'):
