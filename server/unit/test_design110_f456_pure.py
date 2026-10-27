@@ -45,6 +45,7 @@ def rich(sid='VS1', a=0, b=500):
     sh['element_ids'] = ['E1', 'TROWEL', 'BRICK', 'COW']
     sh['fixed'] = ['L1']   # design/111 F8: the scene's one landmark
     sh['face_in_frame'] = False   # design/111 F7: hands in close; the person tests set it true and give the gaze
+    sh['groups'] = [{'kind': 'BRICK', 'count': 4, 'mode': 'same', 'reason': 'one kiln batch'}]   # design/111 F17
     return sh
 
 
@@ -124,12 +125,12 @@ def test_the_picture_lines_count_the_inventory_keep_the_tool_and_the_heading():
     d = doc_with(rich())
     scene, sh = d['gaps'][0]['scenes'][0], d['gaps'][0]['scenes'][0]['shots'][0]
     start = VS.picture_rule_lines(d, scene, sh, 'start')
-    assert [l['check'] for l in start] == ['person kept: Mason', 'inventory'] and 'Red brick × 2' in start[-1]['pass_when'] and start[-1]['weight'] == 'must'   # design/111 F16 adds the person line
+    assert [l['check'] for l in start] == ['group alike: Red brick', 'person kept: Mason', 'inventory'] and 'Red brick × 2' in start[-1]['pass_when'] and start[-1]['weight'] == 'must'   # design/111 F16 adds the person line
     end = VS.picture_rule_lines(d, scene, sh, 'end')
     assert [l['check'] for l in end if l['check'] in ('inventory', 'same tool', 'heading kept')] == ['inventory', 'same tool', 'heading kept']
     by = {l['check']: l['pass_when'] for l in end}
     assert 'set down on the top course of the table, 2 bricks from it' in by['same tool'] and 'same landmark and shows the same side as in Image 1' in by['heading kept']
-    assert VS.picture_rule_lines(d, scene, {**sh, 'subjects': [], 'props': [], 'fixed': [], 'element_ids': []}, 'end') == []
+    assert VS.picture_rule_lines(d, scene, {**sh, 'subjects': [], 'props': [], 'fixed': [], 'element_ids': [], 'groups': []}, 'end') == []
 
 
 # ---------- the prompts get the block; the take gets its lines ----------

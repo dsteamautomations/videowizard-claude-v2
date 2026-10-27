@@ -171,6 +171,17 @@ class Prop(Model):   # design/110 F5: a held tool or prop, a named thing of the 
     end: PropEnd
 
 
+class Group(Model):   # design/111 F17: several of a kind in frame, all alike for a reason or no two alike with a trait each
+    kind: str = Field(min_length=1, max_length=80)   # an element id, or the frame's own word (workers, people, cows)
+    count: int = Field(ge=2)
+    mode: Literal['same', 'different']
+    reason: str = Field(default='', max_length=500)   # same: why they are alike
+    items: list[str] = Field(default_factory=list, max_length=30)   # different: one trait each
+
+
+GROUP_WORDS = re.compile(r'\b(people|workers|labourers|villagers|onlookers|bystanders|crowd|men|women|children|boys|girls|cows|goats|chickens|dogs|animals)\b', re.I)
+
+
 class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
     claim: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=1000)
@@ -209,6 +220,7 @@ class Shot(Model):
     face_in_frame: bool = True   # design/111 F7: false for a view from behind or hands in close; then no eye line is asked
     fixed: list[str] = Field(default_factory=list, max_length=3)   # design/111 F8: three landmark ids that must not change between the start and the end
     compare_to: str = Field(default='', max_length=80)   # design/111 F15: the thing in frame the subject's size is read against, when size is the message
+    groups: list[Group] = Field(default_factory=list, max_length=20)   # design/111 F17
     fact_ids: list[str] = Field(default_factory=list, max_length=20)   # design/91 N6: the facts this shot rests on
     descriptors: list[str] = Field(default_factory=list, max_length=10)   # design/91 N8: the narration's descriptive words about the subject
     evidence: str = Field(default='', max_length=1000)   # design/91 N17: how the picture shows its claims (a test, a table, the result)
@@ -661,6 +673,17 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             for beat in subject.beats:
                                 need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second") (design/110 F1).')
                         last_states[subject.element_id] = subject.end.model_dump()
+                    if shot.visual_type == 'video':   # design/111 F17: several of a kind are a group, same or different
+                        several = {o.element_id for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for o in stt.objects if o.count > 1}
+                        several |= {w.lower() for w in GROUP_WORDS.findall(shot.framing + ' ' + shot.appearance)}
+                        have_ = {g.kind.lower() for g in shot.groups}
+                        for k_ in sorted(several):
+                            need(k_.lower() in have_, f'shot {shot.id} shows several {k_} (more than one in frame): give groups an entry for it, mode same with the reason or different with one trait each (design/111 F17).')
+                        for g in shot.groups:
+                            if g.mode == 'same':
+                                need(g.reason.strip(), f'shot {shot.id}: the {g.kind} are all alike: give the reason (one batch, one uniform) (design/111 F17).')
+                            else:
+                                need(len([i for i in g.items if i.strip()]) >= g.count, f'shot {shot.id}: the {g.kind} are {g.count} and different: give one trait each in items (design/111 F17).')
                     if shot.visual_type == 'video':   # design/111 F14: every technique the beats name is an element, so it gets its reference like a person or a tool
                         names_ = {e.name.lower() for e in plan.elements if e.kind == 'technique'} | {e.id.lower() for e in plan.elements if e.kind == 'technique'}
                         for s in shot.subjects:

@@ -712,6 +712,69 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
+# ---------- design/111 F17: groups of a kind, said; background figures compared within the scene ----------
+
+def group_lines(plan, shot):
+    """One line per group: all alike with the reason, or no two alike with the traits."""
+    names = _names(plan)
+    out = []
+    for g in shot.get('groups') or []:
+        head = f"Every {names[g['kind']]}" if g['kind'] in names else f"{g['count']} {g['kind']}"
+        out.append(head + (f": all alike ({g.get('reason', '').strip().rstrip('.')})." if g['mode'] == 'same' else ': no two alike: ' + '; '.join(i.strip().rstrip('.') for i in g.get('items') or []) + '.'))
+    return out
+
+
+def group_rule_lines(plan, shot):
+    """The two must lines: the count (for a group that is no element; the inventory counts elements) and the sameness."""
+    names = _names(plan)
+    out = []
+    for g, line in zip(shot.get('groups') or [], group_lines(plan, shot)):
+        name = names.get(g['kind'], g['kind'])
+        if g['kind'] not in names:
+            out.append({'check': f'group count: {name}', 'weight': 'must', 'pass_when': f"exactly {g['count']} {name} are in frame, no more, no fewer"})
+        out.append({'check': f'group alike: {name}', 'weight': 'must', 'pass_when': (f'the {name} are all alike in shape, size, colour and wear' if g['mode'] == 'same'
+                                                                                     else f'no two alike among the {name}; each shows its own trait: ' + '; '.join(g.get('items') or []))})
+    return out
+
+
+def _has_figures(plan, shot):
+    kinds = {e['id']: e['kind'] for e in plan.get('elements') or []}
+    return any(s.get('role') in ('secondary', 'background') and kinds.get(s['element_id']) in ('person', 'animal') for s in shot.get('subjects') or [])
+
+
+FIGURE_SCHEMA = {'type': 'object', 'properties': {'repeated': {'type': 'boolean'}, 'detail': {'type': 'string'}}, 'required': ['repeated', 'detail']}
+
+
+def figure_repeat(store, session, row, scene):
+    """SK's answer 7: one Gemini question when a picture with background figures is approved, against the approved pictures of the same scene.
+    None when there is nothing to compare with; never raises."""
+    import base64
+    sids = {s['id'] for s in scene.get('shots') or []}
+    others = [r for r in session['references'].values() if r['id'] != row['id'] and r.get('status') == 'approved' and r.get('kind') in ('keyframe', 'isolated')
+              and made_for(session, r) in sids and r.get('key')]
+    if not others:
+        return None
+    rec = {'against': [r['id'] for r in others], 'repeated': None, 'detail': '', 'model': image_check.CHECK_MODEL}
+    try:
+        key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
+        if not key_:
+            return {**rec, 'error': 'no Gemini key on the server'}
+        parts = []
+        for i, r in enumerate(others, 1):
+            parts += [{'text': f"Picture {i} ({r['id']})."}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(r['key'])).decode()}}]
+        parts += [{'text': 'The new picture.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(row['key'])).decode()}}]
+        parts.append({'text': 'Look only at the background and secondary figures (people and animals), not the main subject. Does any figure in the new picture look like the same '
+                              'individual as a figure in an earlier picture (same face, build, hair, clothes, markings)? Answer repeated true or false, and in detail name the pair '
+                              'and what matches. Be literal; two figures of one kind that differ in face, clothes or markings are not repeated.'})
+        received = _gemini_transport()(key_, image_check.CHECK_MODEL, terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False).generate(
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'maxOutputTokens': 512}})
+        body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
+        rec.update(repeated=bool(body.get('repeated')), detail=str(body.get('detail') or '')[:500])
+    except Exception as exc:   # the comparison never blocks an approval
+        rec['error'] = f'{exc.__class__.__name__}: {str(exc)[:200]}'
+    return rec
+
+
 # ---------- design/111 F16: the person's two layers, the fixed description and the scene's colours ----------
 
 def person_lines(plan, scene, shot):
@@ -1147,7 +1210,7 @@ def heading_lines(scene, shot, when, names=None):
 def composed_block(plan, scene, shot, when):
     """What the server writes under the writer's prompt of a start or an end picture: the targets (F1, F3), the headings (F6), the tools (F5), the inventory (F4)."""
     lines = ((start_targets(scene, shot) if when == 'start' else end_targets(scene, shot)) + gaze_lines(plan, scene, shot, when) + heading_lines(scene, shot, when, _names(plan))
-             + ([size_line(plan, shot)] if size_line(plan, shot) else []) + person_lines(plan, scene, shot)   # design/111 F15, F16
+             + ([size_line(plan, shot)] if size_line(plan, shot) else []) + person_lines(plan, scene, shot) + group_lines(plan, shot)   # design/111 F15, F16, F17
              + tool_lines(plan, scene, shot, when) + (([fixed_line(scene, shot)] if fixed_line(scene, shot) else []) + sits_lines(plan, scene, shot) if when == 'end' else []))   # design/111 F7, F8, F9
     inv = inventory_line(plan, scene, shot, when)
     return '\n'.join(lines + ([inv] if inv else []))
@@ -1164,6 +1227,7 @@ def picture_rule_lines(plan, scene, shot, when):
     names = _names(plan)
     marks = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
     out = []
+    out += group_rule_lines(plan, shot)   # design/111 F17
     for pl_ in person_lines(plan, scene, shot):   # design/111 F16: both layers are checked
         out.append({'check': 'person kept: ' + pl_.split(':')[0], 'weight': 'must', 'pass_when': pl_.rstrip('.') + '; no other garment colours, no other build, hair or skin'})
     if size_line(plan, shot):   # design/111 F15: the true-sizes question is a must when size is the message
@@ -2387,6 +2451,15 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         if shot and route_of(shot) == 'still':
             placed = _place_still(store, user, run, outputs, session, sid, ref_id, quote)
     row['dhash'] = _fingerprints(store, row['key'])   # design/89 H6, finding 9: kept once, never read again for the look-alike check
+    if sid and row.get('kind') in ('keyframe', 'isolated'):   # design/111 F17: background figures against the approved pictures of the scene
+        try:
+            pl_, _, sc_, sh_ = locate(store, session, sid)
+        except ValueError:
+            sh_ = None
+        if sh_ and _has_figures(pl_, sh_):
+            fc = figure_repeat(store, session, row, sc_)
+            if fc:
+                row['figure_check'] = fc
     if row.get('kind') == 'sheet':   # design/110: the new sheet answers the changed sources
         for r in session['references'].values():
             if r.get('kind') == 'sheet' and r.get('element_id') == row.get('element_id'):
@@ -3362,6 +3435,8 @@ def status(conn, store, run, outputs, repair=True):
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14
+            'figure_repeats': [{'reference_id': r['id'], 'shot_id': made_for(session, r), 'detail': r['figure_check'].get('detail', '')} for r in session['references'].values()
+                               if (r.get('figure_check') or {}).get('repeated') and r.get('status') == 'approved'],   # design/111 F17
             'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}      # design/65 B7
 
 
