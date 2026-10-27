@@ -25,7 +25,8 @@ def spec(**over):
 
 
 def checked(sp):
-    doc = plan([{**pshot('DG1', 0, 100, 'diagram'), 'drawing_spec': sp}, pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
+    from drawn_fixture import as_drawn
+    doc = plan([as_drawn({**pshot('DG1', 0, 100, 'diagram'), 'drawing_spec': sp}), pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])   # SK 27 Oct: exact sizes are drawn
     return VC.validate_plan(doc, GAPS, Fraction(25))
 
 

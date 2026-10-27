@@ -13,7 +13,8 @@ from test_visuals_stage_pure import RUN, FakeConn
 
 
 def base(spec, **shot):
-    return plan([{**pshot('DG1', 0, 100, 'diagram'), 'depicts': 'the wall section', 'drawing_spec': spec, **shot}, pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
+    from drawn_fixture import as_drawn
+    return plan([as_drawn({**pshot('DG1', 0, 100, 'diagram'), 'depicts': 'the wall section', 'drawing_spec': spec, **shot}), pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])   # SK 27 Oct: exact sizes are drawn
 
 
 def check(d):

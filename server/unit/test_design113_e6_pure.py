@@ -2,6 +2,8 @@
 the procedure says when a graphic is drawn; AI video for graphics stays off."""
 import copy
 import json
+
+import pytest
 from fractions import Fraction
 from pathlib import Path
 
@@ -16,15 +18,16 @@ def kinds(d):
     return {(w.get('shot_id'), w.get('kind')) for w in VC.validate_plan(d, GAPS, Fraction(25))[1]}
 
 
-def test_a_graphic_with_exact_sizes_or_numbers_is_warned_toward_the_drawn_route():
+def test_a_graphic_with_exact_sizes_or_numbers_is_refused_unless_drawn():
+    """SK, 27 Oct, after the sample: the drawn route is the default; the warning became the rule."""
     d = plan([{**pshot('DG1', 0, 100, 'diagram'), 'drawing_spec': copy.deepcopy(SPEC)}, pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
-    assert ('DG1', 'route_drawn') in kinds(d)
-    w = next(w for w in VC.validate_plan(d, GAPS, Fraction(25))[1] if w.get('kind') == 'route_drawn')
-    assert 'drawn route' in w['message'] and 'exact' in w['message']
+    with pytest.raises(ValueError, match='DG1 is a diagram with exact sizes or numbers: the drawn route is the default'):
+        VC.validate_plan(d, GAPS, Fraction(25))
     d = plan([{**pshot('DG1', 0, 100, 'diagram'), 'claims': ['1 brick in 4 is saved against a solid wall']}, pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
-    assert ('DG1', 'route_drawn') in kinds(d)
+    with pytest.raises(ValueError, match='the drawn route is the default'):
+        VC.validate_plan(d, GAPS, Fraction(25))
     d = plan([{**pshot('DG1', 0, 100, 'diagram'), 'claims': ['the wall breathes']}, pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
-    assert ('DG1', 'route_drawn') not in kinds(d)
+    assert ('DG1', 'route_drawn') not in kinds(d)   # nothing exact: the AI graphic stays
 
 
 def test_the_procedure_says_when_a_graphic_is_drawn():

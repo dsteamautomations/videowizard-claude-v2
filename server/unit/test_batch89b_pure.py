@@ -63,7 +63,8 @@ def test_each_state_of_a_build_starts_on_the_words_it_illustrates():
 
 def test_a_drawing_spec_never_invents_a_number_and_says_where_each_comes_from():
     """D1, D3."""
-    base = lambda spec: plan([{**pshot('DG1', 0, 100, 'diagram'), 'drawing_spec': spec}, pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
+    from drawn_fixture import as_drawn
+    base = lambda spec: plan([as_drawn({**pshot('DG1', 0, 100, 'diagram'), 'drawing_spec': spec}), pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])   # SK 27 Oct: exact sizes are drawn
     VC.validate_plan(base(SPEC), GAPS, Fraction(25))
     with pytest.raises(ValueError, match='never invented'):
         VC.validate_plan(base({**SPEC, 'dimensions': [{**SPEC['dimensions'][1], 'value': 60}]}), GAPS, Fraction(25))

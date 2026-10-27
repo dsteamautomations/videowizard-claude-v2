@@ -9,15 +9,7 @@ from app import visual_contract as VC, visuals_stage as VS
 from test_batch89b_pure import SPEC
 from test_visuals_pure import GAPS, plan, shot as pshot
 
-SCENE = {'unit': 'mm', 'width': 400, 'height': 300, 'background': '#F6F1E8',
-         'shapes': [{'id': 'outer', 'kind': 'rect', 'x': 40, 'y': 30, 'w': 110, 'h': 240, 'stroke': '#7A2E1D', 'fill': '#C9573A', 'weight': 3, 'dim': 'leaf thickness'},
-                    {'id': 'inner', 'kind': 'rect', 'x': 250, 'y': 30, 'w': 110, 'h': 240, 'stroke': '#7A2E1D', 'fill': '#C9573A', 'weight': 3},
-                    {'id': 'cavity', 'kind': 'rect', 'x': 150, 'y': 30, 'w': 100, 'h': 240, 'stroke': '#7A2E1D', 'fill': '#F6F1E8', 'weight': 2},
-                    {'id': 'air', 'kind': 'arrow', 'x': 200, 'y': 250, 'x2': 200, 'y2': 60, 'stroke': '#2B5D8C', 'weight': 3},
-                    {'id': 'title', 'kind': 'text', 'x': 40, 'y': 285, 'text': 'Rat-trap bond, section', 'size_pct': 6, 'bold': True, 'stroke': '#222222'}],
-         'actions': [{'kind': 'appear', 'ids': ['outer', 'inner'], 'at_s': 0},
-                     {'kind': 'build', 'ids': ['cavity', 'air'], 'word': 'cavity', 'every_s': 0.5},
-                     {'kind': 'highlight', 'ids': ['cavity'], 'at_s': 2.5, 'seconds': 1}]}
+from drawn_fixture import SCENE  # noqa: E402
 
 
 def drawn(**over):

@@ -81,3 +81,7 @@ A fifth route, **drawn**, for diagrams, charts, maps, timelines and technical dr
 ## The sample (27 Oct, answer 4)
 
 Rendered on the VM from the deployed 0.62.0: VW-7's B02B_S1 (the cavities of a rat-trap wall in section, 4 s, illustrative with its label since the spec's one size is unknown), 100 frames at 1920×1080, 25 fps, cued to the recorded words. Files and the scene: `f3-live/drawn-sample/` beside the repo, with its README. Awaiting SK's approval before the route becomes the default (answer 6): then the `route_drawn` warning becomes the planner's rule in the procedure and the check refuses a diagram with exact sizes that is not drawn.
+
+## The default (27 Oct, SK after the sample)
+
+SK approved the sample. The drawn route is the default for technical diagrams, charts, maps and timelines: a diagram or build with exact sizes or numeric claims that is not drawn is refused by the plan check (the E6 warning became the rule); the procedure says so; the AI-image graphic sequence stays for a painterly look where nothing must be exact; AI video for graphics stays off. The spec tests of design/89 D, design/106 and design/111 F19 now run on drawn shots (`unit/drawn_fixture.py`), and the drawn checks run after the spec's own, so a spec fault is named first. Server 0.63.0 (server only; the plugin is unchanged at 0.54.0).
