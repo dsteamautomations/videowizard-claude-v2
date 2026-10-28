@@ -6,6 +6,8 @@ The code checks size, aspect and parent. A failed must line marks the picture; a
 failed line asks for) is made only on request (design/96 X1: `visuals_stage.request_fix`). The check never blocks: a transport error leaves the candidate a candidate with the error on it. The operator may approve a picture
 the check failed."""
 import base64
+
+from . import keys   # design/114
 import subprocess
 import json
 import re
@@ -167,12 +169,9 @@ def _model_take_check(snapshot, video_path, sha256, transport_factory):
     """design/91 N3: a ready take read by Gemini Flash against the fixed questions, the plan beside them; the lines with the second each is decided. Never raises."""
     record = {'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
     try:
-        key = settings().GEMINI_API_KEY.get_secret_value().strip()
-        if not key:
+        if not keys.pool('gemini', settings()):
             record['error'] = 'no Gemini key on the server'
             return record
-        transport = transport_factory(key, CHECK_MODEL, terminal_deadline_seconds=300, initial_soft_wait_seconds=60, on_update=lambda e: None, capture_answer_deltas=False)
-        uploaded = transport.upload(video_path, 'video/mp4', sha256)
         plan = '\n'.join(['The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
                          [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
                          (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []) +
@@ -183,10 +182,13 @@ def _model_take_check(snapshot, video_path, sha256, transport_factory):
                           + (['The camera: ' + ((snapshot.get('camera_move') or '').strip() or 'locked off, no move')] if 'camera_move' in snapshot else [])])   # design/110 F5, F6; design/111 F7, F8, F16; design/112 S4
         take_lines = take_lines_for(snapshot)
         asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(take_lines, 1))
-        received = transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
-            'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
-            '\n\nFor each numbered line answer pass true or false, say in one sentence what you see that decides it, and give the second (at_s) where it happens. Be literal.\n' + asks}]}],
-            'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': TAKE_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 4096}})
+        def read_take(transport):   # design/114 P3: the upload and the read on one key; a limited key is cooled and both are done again on the next
+            uploaded = transport.upload(video_path, 'video/mp4', sha256)
+            return transport.generate({'contents': [{'role': 'user', 'parts': [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text':
+                'You check a generated video clip, looking only at what is visible. The plan it was made from:\n' + plan +
+                '\n\nFor each numbered line answer pass true or false, say in one sentence what you see that decides it, and give the second (at_s) where it happens. Be literal.\n' + asks}]}],
+                'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': TAKE_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 4096}})
+        received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, read_take, settings(), terminal_deadline_seconds=300, initial_soft_wait_seconds=60, on_update=lambda e: None, capture_answer_deltas=False)
         body = received.get('body')
         if not isinstance(body, dict):
             body = json.loads(received.get('raw') or '{}')
@@ -205,12 +207,11 @@ def drawn_lines_check(first_png, last_png, lines, prompt, transport_factory):
     if not lines:
         return record
     try:
-        key = settings().GEMINI_API_KEY.get_secret_value().strip()
-        if not key:
+        if not keys.pool('gemini', settings()):
             record['error'] = 'no Gemini key on the server'
             return record
-        transport = transport_factory(key, CHECK_MODEL, terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
-        received = transport.generate(build(last_png, [('first frame', first_png)], lines, 'A drawn graphic rendered by the server from a plan; Reference 1 is its first frame, the candidate its last. ' + str(prompt or '')))
+        received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, lambda t: t.generate(build(last_png, [('first frame', first_png)], lines, 'A drawn graphic rendered by the server from a plan; Reference 1 is its first frame, the candidate its last. ' + str(prompt or ''))),
+                                               settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
         body = received.get('body')
         if not isinstance(body, dict):
             body = json.loads(received.get('raw') or '{}')
@@ -374,13 +375,12 @@ def _model_check(store, session, ref, result, transport_factory, png=None, lines
     lines = lines or lines_of(ref)
     record = {'code': code_checks(ref, result, parents), 'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
     try:
-        key = settings().GEMINI_API_KEY.get_secret_value().strip()
-        if not key:
+        if not keys.pool('gemini', settings()):
             record['error'] = 'no Gemini key on the server'
             return record
         pngs = [(('scene' if p.get('kind') == 'frame' else p.get('kind') or 'reference'), store.get(p['key'])) for p in parents if p.get('key')]
-        transport = transport_factory(key, CHECK_MODEL, terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
-        received = transport.generate(build(png if png is not None else store.get(result['key']), pngs, lines, (ref.get('generation') or {}).get('prompt')))
+        payload = build(png if png is not None else store.get(result['key']), pngs, lines, (ref.get('generation') or {}).get('prompt'))
+        received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, lambda t: t.generate(payload), settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
         body = received.get('body')
         if not isinstance(body, dict):
             body = json.loads(received.get('raw') or '{}')

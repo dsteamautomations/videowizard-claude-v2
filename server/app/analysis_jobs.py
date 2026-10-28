@@ -40,6 +40,25 @@ TERMINAL = ('retained', 'retained_unstructured', 'rejected', 'failed')
 transport_factory = GeminiTransport
 
 
+def _key():
+    """design/114: the next Gemini key of the pool for an analysis job, with its index (None, '' when the server has none)."""
+    from . import keys
+    return next(iter(keys.each('gemini', settings())), (None, ''))
+
+
+def _receipt(rec, idx):
+    """An upload receipt is good on the key's own project only: a receipt made with another key is ignored and the file uploaded again."""
+    return rec if rec and rec.get('key_index', idx) == idx else None
+
+
+def _cool(exc, idx):
+    """design/114 (SK's answer 4): a rate limit, a quota answer or a revoked key cools that key, so the capacity retry takes the next one."""
+    from . import keys
+    reason = keys.reason_of(exc.http_status, classify_failure(exc).get('category')) if exc.code == 'http_error' else None
+    if reason and idx is not None:
+        keys.cool('gemini', idx, reason)
+
+
 def durable(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(path.suffix + '.tmp')
@@ -293,7 +312,8 @@ def process_inspection(job):
                     version = conn.execute('select procedure_version from vw2_runs where id=%s', (job['run_id'],)).fetchone()['procedure_version']
             procedure = core._stage(core.stage_table(version), 'analysis')  # the model is never a literal here
             inspection = procedure.get('inspection') or {}
-            transport = transport_factory(settings().GEMINI_API_KEY.get_secret_value(), procedure['model'], terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS,
+            k_idx, k_key = _key()
+            transport = transport_factory(k_key, procedure['model'], terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS,
                                           initial_soft_wait_seconds=60, on_update=lambda e: None, capture_answer_deltas=False, allow_agentic_video=True)
             parts = []
             with tempfile.TemporaryDirectory(prefix='vw2-inspect-') as directory:
@@ -309,8 +329,8 @@ def process_inspection(job):
                             raise Problem(409, 'ANALYSIS_SOURCE', 'Stored clip hash differs from the media record.')
                         path.write_bytes(data)
                         receipt_path = SPOOL / f'{jid}.{sid}.upload.json'
-                        uploaded = transport.upload(path, 'video/mp4', src['sha256'], existing_receipt=read_json(receipt_path))
-                        durable(receipt_path, json.dumps(uploaded).encode('utf-8'))
+                        uploaded = transport.upload(path, 'video/mp4', src['sha256'], existing_receipt=_receipt(read_json(receipt_path), k_idx))
+                        durable(receipt_path, json.dumps({**uploaded, 'key_index': k_idx}).encode('utf-8'))
                         parts += [{'text': 'Original source ' + sid + '; its own original-source seconds clock.'}, {'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}]
                 parts.append({'text': req['prompt']})
                 payload = {'contents': [{'role': 'user', 'parts': parts}],
@@ -322,8 +342,9 @@ def process_inspection(job):
                     received = transport.generate(payload)
                     durable(raw_path, json.dumps({'raw': received.get('raw') or json.dumps(received['body']), 'metadata': received['metadata'], 'model': procedure['model']}, ensure_ascii=False).encode('utf-8'))
                 except GeminiTransportError as exc:
+                    _cool(exc, k_idx)
                     if exc.code == 'http_error' and exc.http_status in (400, 401, 403, 404, 413, 429):
-                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status}, f'Provider rejected the inspection ({exc.code}, HTTP {exc.http_status}).', None, None
+                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status, 'key_index': k_idx}, f'Provider rejected the inspection ({exc.code}, HTTP {exc.http_status}).', None, None
                     if exc.code in ('incomplete_response', 'empty_response', 'model_json', 'blocked_response', 'provider_stream_error'):
                         return 'failed', {'failure': exc.code}, str(exc), None, None
                     return 'submission_unknown', {'failure': exc.code}, f'Outcome unknown after dispatch ({exc.code}).', None, None
@@ -387,12 +408,13 @@ def process(job):
                 original.write_bytes(data)
                 attachment = original if request['identity']['understand_audio'] else silent_copy(original, directory)
                 sha = hashlib.sha256(attachment.read_bytes()).hexdigest()
-                transport = transport_factory(settings().GEMINI_API_KEY.get_secret_value(), request['identity']['model'],
+                k_idx, k_key = _key()
+                transport = transport_factory(k_key, request['identity']['model'],
                                               terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS, initial_soft_wait_seconds=60,
                                               on_update=lambda e: None, capture_answer_deltas=False, allow_agentic_video=True)
                 renew(jid, 'upload')
-                uploaded = transport.upload(attachment, request['mime'], sha, existing_receipt=read_json(paths['upload.json']))
-                durable(paths['upload.json'], json.dumps(uploaded).encode('utf-8'))
+                uploaded = transport.upload(attachment, request['mime'], sha, existing_receipt=_receipt(read_json(paths['upload.json']), k_idx))
+                durable(paths['upload.json'], json.dumps({**uploaded, 'key_index': k_idx}).encode('utf-8'))
                 mode = request['identity']['settings']['processing_mode']
                 wire_schema = request['wire_schema'] if request.get('contract_version') == 'clip-log-v1' else provider_schema(request['schema'], mode)
                 parts = [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text': request['prompt']}]
@@ -411,9 +433,10 @@ def process(job):
                     durable(paths['response.json'], json.dumps({'raw': raw, 'metadata': received['metadata'], 'received_at': datetime.now(timezone.utc).isoformat()}, ensure_ascii=False).encode('utf-8'))
                 except GeminiTransportError as exc:
                     cls = classify_failure(exc)
+                    _cool(exc, k_idx)
                     meta = exc.metadata or {}
                     if exc.code == 'http_error' and exc.http_status in (400, 401, 403, 404, 413, 429) or cls['category'] in ('spending_or_billing_limit', 'quota_limit'):
-                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status, 'category': cls['category']}, f'Provider rejected the request ({exc.code}, HTTP {exc.http_status}).', None, None
+                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status, 'category': cls['category'], 'key_index': k_idx}, f'Provider rejected the request ({exc.code}, HTTP {exc.http_status}).', None, None
                     if exc.code in ('incomplete_response', 'empty_response', 'model_json', 'blocked_response'):
                         return 'failed', {'failure': exc.code}, str(exc), None, None
                     if exc.code == 'provider_stream_error':
@@ -474,10 +497,16 @@ def finalize(conn, user_id, job, status, result, error, cost, retry_in):
         if not existing:
             core.output(conn, user, run, {'stage': 'analysis', 'unit': clip['id'], 'files': files,
                                           'summary': {**result['summary'], 'cost': cost, 'job_id': str(job['id'])}})
-    elif status == 'rejected' and (result or {}).get('http_status') in (429, 503) and (result or {}).get('category') not in ('spending_or_billing_limit', 'quota_limit')             and not job['request'].get('capacity_retry_of') and not job['request'].get('retry_of'):
+    elif status == 'rejected' and (result or {}).get('http_status') in (429, 503) and ((result or {}).get('category') not in ('spending_or_billing_limit', 'quota_limit') or _pool_size() > 1)             and not job['request'].get('capacity_retry_of') and not job['request'].get('retry_of'):
         # one automatic capacity retry (v1 rule): same frozen request, fresh row
         conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id, attempt) values (%s,'analysis',%s,%s,%s, gen_random_uuid(), 1)''',
                      (job['run_id'], job['unit'], PROVIDER, Jsonb({**job['request'], 'capacity_retry_of': str(job['id'])})))
+
+
+def _pool_size():
+    """design/114 (SK's answer 4): with more than one key, a quota answer earns the one capacity retry too, on the next key."""
+    from . import keys
+    return len(keys.pool('gemini', settings()))
 
 
 def tick():

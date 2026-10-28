@@ -39,12 +39,22 @@ def durable(path, data):
 # ---------- OpenAI images ----------
 
 def _openai(path, **kw):
+    """design/114 P2: the call through the key pool; a 429 or a revoked key cools it and the same request goes to the next key at once, within this attempt."""
     if openai_client:
         return openai_client(path, **kw)
-    key = settings().OPENAI_API_KEY.get_secret_value()
-    if not key:
+    from . import keys
+    tries = keys.each('openai', settings())
+    if not tries:
         raise Problem(503, 'IMAGE_CONFIGURATION', 'Configure VW2_OPENAI_API_KEY on the server.')
-    return httpx.post('https://api.openai.com/v1' + path, headers={'Authorization': 'Bearer ' + key}, timeout=300, **kw)
+    r = None
+    for idx, key in tries:
+        r = httpx.post('https://api.openai.com/v1' + path, headers={'Authorization': 'Bearer ' + key}, timeout=300, **kw)
+        r.key_index = idx
+        reason = keys.reason_of(r.status_code)
+        if reason is None:
+            return r
+        keys.cool('openai', idx, reason)
+    return r   # every key answered a limit: the last answer, so the job requeues as before (design/82 U3)
 
 
 def process_image(job):
@@ -95,6 +105,7 @@ def process_image(job):
         usage = body.get('usage') or {}
         cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
         return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
+                            **({'key_index': r.key_index} if getattr(r, 'key_index', None) is not None else {}),   # design/114: which key, never the key
                             **({'edit': edit} if edit else {})}, None, cost, None
     except (Problem, OSError, ValueError, KeyError, TypeError, httpx.RequestError) as exc:
         if raw_path.exists():

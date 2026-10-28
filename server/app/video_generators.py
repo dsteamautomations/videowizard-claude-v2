@@ -50,7 +50,9 @@ def selection(part, shot_id):
 
 def connection_check(client=None):
     """Read one model record; never use generateContent or create an interaction."""
-    key = settings().GEMINI_API_KEY.get_secret_value().strip()
+    from . import keys as _keys
+    pool = _keys.pool('gemini', settings())   # design/114
+    key = pool[0] if pool else ''
     if not key or any(ord(c) < 33 or ord(c) > 126 for c in key):
         raise Problem(503, 'OMNI_CONFIGURATION', 'Configure the existing backend GEMINI_API_KEY, then check again.')
     request = client.get if client else httpx.get

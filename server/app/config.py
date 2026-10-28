@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.63.0'
+    SERVER_VERSION: str = '0.64.0'
     PLUGIN_MIN_VERSION: str = '0.42.0'   # design/95 F5; design/97: the procedure gives the links `vw visuals status` prints from 0.42.0
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     ELEVENLABS_API_KEY: SecretStr = SecretStr('')
     GEMINI_API_KEY: SecretStr = SecretStr('')
     OPENAI_API_KEY: SecretStr = SecretStr('')
+    GEMINI_API_KEYS: SecretStr = SecretStr('')   # design/114: more keys, comma-separated, used in turn after the single one
+    OPENAI_API_KEYS: SecretStr = SecretStr('')
     WORKERS: int = 5  # one process per concurrent job; must be at least ANALYSIS_CAP plus room for voice, images, takes and renders
     ANALYSIS_CAP: int = 5  # concurrent Gemini analysis calls across all runs; 15 on the live VM since 18 Oct 2026 (design/35 row 29: 10 and 20 at once tested clean)
     HF_API_KEY: SecretStr = SecretStr('')

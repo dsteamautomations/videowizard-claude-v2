@@ -1659,7 +1659,9 @@ def procedure(version: str, stage: str, user=User):
 
 @app.get('/api/meta')
 def meta():
-    return Response({'server_version': settings().SERVER_VERSION, 'plugin_min_version': settings().PLUGIN_MIN_VERSION, 'app_origin': settings().APP_ORIGIN})
+    from . import keys
+    return Response({'server_version': settings().SERVER_VERSION, 'plugin_min_version': settings().PLUGIN_MIN_VERSION, 'app_origin': settings().APP_ORIGIN,
+                     'keys': {'pools': keys.sizes(), 'cooling': {'openai': keys.cooling('openai'), 'gemini': keys.cooling('gemini')}}})   # design/114 P4: sizes and indexes, never keys
 
 
 # ---------- connect flow ----------

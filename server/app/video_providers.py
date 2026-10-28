@@ -37,7 +37,10 @@ def motion_text(snapshot):
 
 def configured(provider):
     if provider not in ('google','higgsfield'):raise ValueError('Unknown video provider.')
-    key=(settings().GEMINI_API_KEY if provider=='google' else settings().HF_API_KEY).get_secret_value().strip()
+    from . import keys as _keys
+    idx,key=(next(iter(_keys.each('gemini',settings())),(None,'')) if provider=='google' else (None,settings().HF_API_KEY.get_secret_value().strip()))   # design/114: the next key of the pool
+    key=key.strip()
+    configured.last_index=idx
     if not key or any(ord(c)<33 or ord(c)>126 for c in key):
         raise Problem(503,'VIDEO_CONFIGURATION','Configure the selected provider key on the backend/worker. No automatic provider fallback.')
     return key
@@ -65,7 +68,7 @@ def transfer(url,method='GET',data=None,headers=None,limit=MAX_VIDEO):
 
 
 class Provider:
-    def __init__(self,name):self.name=name;self.key=configured(name)
+    def __init__(self,name):self.name=name;self.key=configured(name);self.key_index=getattr(configured,'last_index',None)
 
     def request(self,method,url,body=None,identity=None,paid=False):
         headers={'x-goog-api-key':self.key,'Api-Revision':'2026-05-20'} if self.name=='google' else {'Authorization':'Key '+self.key}
@@ -73,6 +76,8 @@ class Provider:
         try:
             with httpx.stream(method,url,json=body,headers=headers,timeout=60,follow_redirects=False) as response:
                 if not response.is_success:
+                    if self.name=='google' and self.key_index is not None and response.status_code in (429,401,403):   # design/114: the key cools; the next attempt takes another
+                        from . import keys as _keys;_keys.cool('gemini',self.key_index,_keys.reason_of(response.status_code))
                     code='VIDEO_REJECTED' if paid and 400<=response.status_code<500 and response.status_code not in (408,429) else 'VIDEO_UNKNOWN' if paid else 'VIDEO_PROVIDER'
                     raise Problem(502,code,'Provider request was not accepted or could not be confirmed. Review this saved attempt; no automatic resubmission.')
                 raw=bytearray()

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import apify, core, image_check, jobs, library, video_generators
+from . import apify, core, image_check, jobs, keys, library, video_generators
 from . import footage as FM   # design/88
 from .config import settings
 from .errors import Problem
@@ -855,8 +855,7 @@ def figure_repeat(store, session, row, scene):
         return None
     rec = {'against': [r['id'] for r in others], 'repeated': None, 'detail': '', 'model': image_check.CHECK_MODEL}
     try:
-        key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
-        if not key_:
+        if not keys.pool('gemini', settings()):
             return {**rec, 'error': 'no Gemini key on the server'}
         parts = []
         for i, r in enumerate(others, 1):
@@ -865,8 +864,9 @@ def figure_repeat(store, session, row, scene):
         parts.append({'text': 'Look only at the background and secondary figures (people and animals), not the main subject. Does any figure in the new picture look like the same '
                               'individual as a figure in an earlier picture (same face, build, hair, clothes, markings)? Answer repeated true or false, and in detail name the pair '
                               'and what matches. Be literal; two figures of one kind that differ in face, clothes or markings are not repeated.'})
-        received = _gemini_transport()(key_, image_check.CHECK_MODEL, terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False).generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'maxOutputTokens': 512}})
+        received, rec['key_index'] = keys.gemini(_gemini_transport(), image_check.CHECK_MODEL, lambda t: t.generate(
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'maxOutputTokens': 512}}),
+            settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
         rec.update(repeated=bool(body.get('repeated')), detail=str(body.get('detail') or '')[:500])
     except Exception as exc:   # the comparison never blocks an approval
@@ -1075,11 +1075,11 @@ def not_this(store, user, run, outputs, element_id):
     text = (f"The thing: {spec}\nList the common variants of this thing that a picture model draws instead of it, each as one short 'no …' line naming the difference "
             "(the bond, the shape, the surface, the colour, the size, the fittings), eight lines at most, no explanations." +
             ('\nThe operator rejected these web results or wrote why nothing fit; turn each difference into a line too: ' + '; '.join(near[:20]) if near else ''))
-    key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
-    need(key_, 'No Gemini key on the server.')
+    need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
-        received = _gemini_transport()(key_, NOT_THIS_MODEL, terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False).generate(
-            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'maxOutputTokens': 1024}})
+        received, _ = keys.gemini(_gemini_transport(), NOT_THIS_MODEL, lambda t: t.generate(
+            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'maxOutputTokens': 1024}}),
+            settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
     except Exception as exc:
         raise Problem(502, 'NOT_THIS_FAILED', f'The not-this call failed: {exc.__class__.__name__}: {str(exc)[:200]}')
@@ -2421,11 +2421,11 @@ def measure(store, user, run, outputs, ref_ids, question):
         parts += [{'text': f'Frame {n}, {w}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(f['key'])).decode()}}]
     parts.append({'text': 'Measure from these frames: ' + question.strip()[:1000] + '\nScale each size against something of known size in the same frame (a brick, a door, a level, a person) '
                           'and say which in how. Give the frame number each size is read from. Measure only what is visible; say in limits what cannot be read.'})
-    key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
-    need(key_, 'No Gemini key on the server.')
+    need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
-        received = _gemini_transport()(key_, MEASURE_MODEL, terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False).generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 4096}})
+        received, _ = keys.gemini(_gemini_transport(), MEASURE_MODEL, lambda t: t.generate(
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 4096}}),
+            settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
     except Exception as exc:
         raise Problem(502, 'MEASURE_FAILED', f'The measure call failed: {exc.__class__.__name__}: {str(exc)[:200]}')
@@ -3137,8 +3137,7 @@ def _pair_check(store, start, end, changes):
     """design/91 N1: one Gemini Flash call on the two pictures; every visible difference, matched to the change that causes it (0: none). Never raises."""
     rec = {'model': MEASURE_MODEL, 'differences': [], 'uncaused': []}
     try:
-        key_ = settings().GEMINI_API_KEY.get_secret_value().strip()
-        if not key_:
+        if not keys.pool('gemini', settings()):
             return {**rec, 'error': 'no Gemini key on the server'}
         listed = '\n'.join(f"{n}. {c['what']}" for n, c in enumerate(changes, 1))
         parts = [{'text': 'Image 1: the start of a video shot.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(store.get(start['key'])).decode()}},
@@ -3146,8 +3145,9 @@ def _pair_check(store, start, end, changes):
                  {'text': 'List every visible difference between Image 1 and Image 2: anything that appears, disappears, moves, opens, grows, shrinks, changes shape, count, colour '
                           'or state; a person\'s place, pose or what they hold; the light. Ignore the camera\'s framing. For each difference give the number of the planned change '
                           'below that causes it, or 0 when none does. Be literal.\nPlanned changes:\n' + listed}]
-        received = _gemini_transport()(key_, MEASURE_MODEL, terminal_deadline_seconds=120, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False).generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'maxOutputTokens': 4096}})
+        received, rec['key_index'] = keys.gemini(_gemini_transport(), MEASURE_MODEL, lambda t: t.generate(
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'maxOutputTokens': 4096}}),
+            settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
         diffs = [{'what': str(d.get('what') or '')[:300], 'change': d.get('change') if isinstance(d.get('change'), int) else 0} for d in body.get('differences') or [] if isinstance(d, dict)]
         return {**rec, 'differences': diffs, 'uncaused': [d for d in diffs if not 1 <= d['change'] <= len(changes)]}
