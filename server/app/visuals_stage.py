@@ -2170,6 +2170,7 @@ def generate_image(conn, store, user, run, outputs, body):
                 extra = also_shows(p, own=own_words)
                 if extra:
                     body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} also shows {', '.join(extra)}: show none of them.")}
+                    lines = list(lines or []) + [{'check': f'not shown: {x}', 'weight': 'must', 'pass_when': f'no {x} anywhere in the frame: it belongs to Image {k}, not to this shot'} for x in extra]   # design/119 rule 4
     if body['kind'] == 'keyframe' and found and named.get('visual_type') == 'video':   # design/110 F4, F5, F6: the lines, and the block under the writer's prompt
         lines = lines + picture_rule_lines(plan, found[2], named, 'end' if is_end else 'start')
         if not body.get('fix_of'):
