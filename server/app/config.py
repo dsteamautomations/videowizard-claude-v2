@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.69.0'
+    SERVER_VERSION: str = '0.70.0'
     DRAWN_FIX_MODEL: str = 'gemini-3.8-flash'   # design/117 answer 3: Flash first; the Pro model is this one line
     PLUGIN_MIN_VERSION: str = '0.42.0'   # design/95 F5; design/97: the procedure gives the links `vw visuals status` prints from 0.42.0
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)

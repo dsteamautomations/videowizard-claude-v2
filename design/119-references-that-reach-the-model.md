@@ -77,3 +77,15 @@ One commit per set, in the order of the test files (a: 5, 6, 3; b: 4; c: 1; d: 2
 
 - Nothing is built; this note is the agreement on the words.
 - Whether more pictures with exclusion lines beat four without them is not measured; the first run after the deploy tells.
+
+## 9. As built (28 Oct 2026, server 0.70.0, plugin 0.57.0; not deployed), one commit per set
+
+- **Set A (rules 5, 6, 3).** `generate_image`: a parent whose element is not in the shot's `element_ids` (nor the picture's own element, the style, or a keyframe/state of the start chain) is refused by name; `size_sentence` writes every known size of the shot's elements under "Sizes:" (materials keep their F10 sentence); `also_shows(parent, own)` reads a look parent's stored prompt for its "Details:" sentence, drops camera notes and the shot's own things, and the prompt gets "Image k also shows …: show none of them".
+- **Set B (rule 4).** Each such thing is a must line `not shown: <thing>` on the picture's checklist.
+- **Set C (rule 1).** `ImageGenerate.crops` {parent id: region}; `check_crop` (inside the frame, no upper bound); `cropped_parent` crops with Pillow at queue time, stores `<id>-crop-<sha8>.png`, and the request's parent entry carries `key` (the crop), `crop` and `full_key`; the worker sends what the entry names; `image_check._model_check` reads the crop for that parent. Plugin: `--parents K1,L2@l,t,w,h`.
+- **Set D (rule 2).** `sheet_due` beside `golden_due` in `status`; `sheet_block` on a sheet's prompt; `sheet_lines` (one must per required view, "nothing but the thing") on its checklist.
+- **Set E (rules 7, 8, 9).** `visual_contract.footage_cited` and the plan warnings `footage_identity` and `passer_by` in `course_warnings`; `generate_image` refuses a picture of a footage-cited thing without an approved frame, and a picture (other than the sheet) of a thing with a frame and an unknown size until it is measured; `height_lines` and `height_sentence` from the scene's layout.
+- **Procedure.** The F21 sentence extended with the nine rules.
+- **Tests.** `test_design119_a..e_pure.py` (3, 2, 6, 3, 5), the plugin's `_parents_and_crops` test; the suites after each set.
+
+**Not covered.** The look of a prompt with ten pictures against four (the first run after the deploy); the page shows no crop yet (the crop file is stored and named in the generation record; a card view is a later line); `also_shows` is a heuristic over the planner's own "Details:" sentence and finds nothing in a prompt written without one; the height regex reads "<thing> at <word> height" and "<word>-high <thing>" only.
