@@ -12,6 +12,8 @@ VM=vw2
 ZONE=asia-south1-a
 PROJECT=sm-project-435806
 URL=https://8-234-82-225.sslip.io
+SERVICES="vw2-server vw2-worker"   # --server-only (hotfix lane, 28 Oct): a fix in the server process alone restarts no worker, so no running job drains
+if [ "${1:-}" = "--server-only" ]; then SERVICES=vw2-server; fi
 
 cd "$(dirname "$0")/.."
 
@@ -51,9 +53,9 @@ git bundle create -q "$TMP/vw2.bundle" main
 "$GCLOUD" compute ssh "$VM" --zone "$ZONE" --project "$PROJECT" --tunnel-through-iap --command \
   "set -e; chmod a+r $REMOTE; sudo -u vw2 git -C /opt/vw2/app pull $REMOTE main \
    && sudo -u vw2 /opt/vw2/venv/bin/pip install -q -r /opt/vw2/app/server/requirements.txt \
-   && sudo systemctl restart vw2-server vw2-worker \
+   && sudo systemctl restart $SERVICES \
    && echo \"VM now at \$(sudo -u vw2 git -C /opt/vw2/app rev-parse --short HEAD)\" \
-   && systemctl is-active vw2-server vw2-worker; rm -f $REMOTE"
+   && systemctl is-active $SERVICES; rm -f $REMOTE"
 
 # 4. Poll the public health route and print server_version.
 echo "polling $URL/api/meta ..."
