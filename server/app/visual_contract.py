@@ -482,6 +482,7 @@ def _illustrative_needs(label, spec):
         need(not spec.illustrative, f'{label}: nothing is unknown: drop illustrative (design/111 F19).')
 
 
+NO_SPEC_WORDS = re.compile(r'\b(label|title|caption|chart|timeline|calendar|icon|icons)\b', re.I)   # defect 35: a graphic that is no drawing of a real object
 VAGUE_PLACE = re.compile(r'(?:(?:at|in|to|on)\s+)?(?:the\s+)?(?:centre|center|middle|nearby|near|closer|further|beside|next to|close by)', re.I)   # design/110 F2
 
 
@@ -774,8 +775,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
                                              'or name one left out on purpose with the reason (claims_left_out)' + NEXT_RELEASE})
                         if shot.drawing_spec is None:
-                            warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
-                                             'its sources; a chart, a timeline or a label needs none: say so in production_method'})
+                            if shot.graphic_kind not in ('title', 'text') and not NO_SPEC_WORDS.search(shot.production_method):   # defect 35: the words the message asks for are read
+                                warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
+                                                 'its sources; a chart, a timeline or a label needs none: say so in production_method'})
                         else:
                             spec = shot.drawing_spec
                             _dimension_needs(f'shot {shot.id}', spec.dimensions)
@@ -1076,7 +1078,7 @@ def course_warnings(plan, fps):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
     for e in plan.elements:   # A5
-        if e.kind in ('person', 'object', 'animal', 'material') and not e.size:
+        if e.kind in ('person', 'object', 'animal') and not e.size and not e.material_spec:   # defect 35: a material's sizes live in its material_spec (design/111 F10), never in a size list
             out.append({'element_id': e.id, 'kind': 'element_size_missing', 'message': f'element {e.id} ({e.kind}): give its real size (size: height, width, depth or length, '
                                                                                        'each with its source and status: confirmed, measured or unknown); never invent one'})
     for gap in plan.gaps:
