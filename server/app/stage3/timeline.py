@@ -109,9 +109,8 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames,
     for i, c in enumerate(captions or [], 1):   # design/115 H3: the same cues as the .srt, on a caption track Resolve imports as subtitles
         cap = ET.SubElement(gap, 'caption', lane='3', offset=_t(Fraction(c['start_frame']) / fps), name=f'Caption {i}', start='0s', duration=_t(Fraction(c['end_frame'] - c['start_frame']) / fps), role='iTT?captionFormat=ITT.en')
         txt = ET.SubElement(cap, 'text', placement='bottom')
-        ET.SubElement(txt, 'text-style', ref='ts1').text = c['text']
-        if i == 1:
-            ET.SubElement(ET.SubElement(cap, 'text-style-def', id='ts1'), 'text-style', font='Noto Sans', fontSize='48', fontColor='1 1 1 1', alignment='center')
+        ET.SubElement(txt, 'text-style', ref=f'ts{i}').text = c['text']
+        ET.SubElement(ET.SubElement(cap, 'text-style-def', id=f'ts{i}'), 'text-style', font='Noto Sans', fontSize='48', fontColor='1 1 1 1', alignment='center')   # a style def is scoped to its caption
     ET.indent(root)
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE fcpxml>\n' + ET.tostring(root, encoding='unicode')
 

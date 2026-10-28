@@ -366,9 +366,7 @@ def process_drawn(job):
             if not out:
                 root = svg_scene.parse(svg)
                 out = svg_scene.action_problems(actions, root) + svg_scene.spec_problems(root, request.get('spec'))
-            if not out:
-                out = [f"text '{b['text'][:40]}' leaves the safe area (the inner 90 % of the frame)" for b in drawn.outside(drawn.measure(svg, W, H, fonts, images), W, H)]
-            return out
+            return out   # the text boxes are measured by the render itself (drawn.TextOutside)
 
         bad = problems_of(svg0)
         if bad:
@@ -385,10 +383,18 @@ def process_drawn(job):
         for p in range(1, image_check.DRAWN_PASSES + 1):
             path = folder / f'pass-{p}.mp4'
             try:
-                out = drawn.render(request, path, svg, images, fonts, keep=keep)
-            except Exception:   # design/117 §5: a crashed browser is started again once
-                drawn.reset()
-                out = drawn.render(request, path, svg, images, fonts, keep=keep)
+                try:
+                    out = drawn.render(request, path, svg, images, fonts, keep=keep)
+                except drawn.TextOutside:
+                    raise
+                except Exception:   # design/117 §5: a crashed browser is started again once
+                    drawn.reset()
+                    out = drawn.render(request, path, svg, images, fonts, keep=keep)
+            except drawn.TextOutside as exc:
+                if p == 1:
+                    return 'failed', {'phase': 'rules', 'problems': [str(exc)]}, 'The scene cannot be rendered: ' + str(exc), None, None
+                passes[-1]['fix_dropped'] = [str(exc)]   # the model's fix pushed a text out of the frame: the pass before stands
+                break
             sheet = drawn.sheet(out['kept'], str(fps), W, H)
             ev = probe(path)
             code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(ev['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(ev['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},

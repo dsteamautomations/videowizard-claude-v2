@@ -201,3 +201,14 @@ Run after the build: the full server suite, the full plugin suite, as always.
 - No database-backed test; the loop and the routes are exercised with fakes.
 - The page's drawn card is checked by its text and `node --check`, not in a browser; the first render on the VM is the look at it.
 - A brand font's family name is taken as the file's stem; a font whose internal name differs renders in Noto Sans in Chromium (the rule accepts the stem). Named here; a run with a brand font tells.
+
+## 13. Self-review of design/115 and design/117 (28 Oct 2026, one round, eight findings, all fixed in the next commit)
+
+1. `vw delivery open --originals` now stops on the relink outcome `timecode` as well as missing, ask and by_hand (`handoff.relink_bad`, `RELINK_BAD`); the CSV is read under `with`.
+2. `early.events_of` takes the camera rows in the plan's order (an iterator over `resolve_events`), so a sub-clip placed twice keeps both placements.
+3. `svg_scene.embed` rewrites `ref:` hrefs in single or double quotes, as the parser accepts both.
+4. Every FCPXML caption carries its own `text-style-def` (`ts1`, `ts2`, …), since a definition is scoped to its caption.
+5. Defect 33's list-form resolution has its test again (`test_render_drawn_reads_the_frame_size_a_real_run_stores_as_a_list`).
+6. The root `width`/`height` rule checks each against its own viewBox value.
+7. The render measures the text boxes on its own page before frame 0 (`drawn.TextOutside`); `measure()` stays for tests. In the loop a first-pass overflow fails the job by name, a fix's overflow drops that fix and keeps the pass before.
+8. (With 1.) The relink list's file handle is closed.

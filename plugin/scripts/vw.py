@@ -2137,12 +2137,13 @@ def cmd_delivery(a):
             relinked = None
             if a.originals:   # design/115 H4: the relink check first; its corrected timeline is the one imported
                 import csv
-                rows = list(csv.DictReader((ws / 'edit' / 'Relink-list.csv').open(encoding='utf-8', newline='')))
+                with (ws / 'edit' / 'Relink-list.csv').open(encoding='utf-8', newline='') as fh:
+                    rows = list(csv.DictReader(fh))
                 try:
                     rc = handoff.relink_check(ws / 'edit', m['code'], rows, a.originals)
                 except ValueError as exc:
                     emit({'action': 'refused', 'message': f'The relink check could not read a timecode: {exc}. Fix the tag or leave it empty, then run again.'}, 2)
-                bad = [l for l in rc['lines'] if l.get('outcome') in ('missing', 'ask', 'by_hand')]
+                bad = handoff.relink_bad(rc)   # review 28 Oct: a timecode disagreement stops the import too
                 if bad:
                     emit({'action': 'refused', 'relink': rc, 'message': 'The originals do not match every camera file: ' + ' '.join(l['line'] for l in bad[:4]) + ' Fix that first, or run `vw delivery open` without --originals and relink by hand.'}, 2)
                 relinked = rc.get('relinked')

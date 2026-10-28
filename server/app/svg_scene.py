@@ -14,7 +14,7 @@ TEXT_MIN_SHARE, TEXT_MAX_WORDS, SAFE = 0.04, 8, 0.05   # design/91 N13; design/1
 MAX_BYTES = 2_000_000
 COLOUR = re.compile(r'^(none|currentColor|#[0-9A-Fa-f]{6}|url\(#[A-Za-z0-9_-]+\))$')
 REF = re.compile(r'^ref:([A-Za-z0-9_-]+)$')
-HREF_RE = re.compile(r'((?:xlink:)?href=")ref:([A-Za-z0-9_-]+)(")')
+HREF_RE = re.compile(r'((?:xlink:)?href=["\'])ref:([A-Za-z0-9_-]+)(["\'])')   # either quote, as the parser takes either
 
 
 def local(tag):
@@ -126,9 +126,9 @@ def check(text, aspect=(16, 9), fonts=('Noto Sans',), refs=None):
     want = aspect[0] / aspect[1]
     if abs(vb[2] / vb[3] - want) > want * 0.01:
         out.append(f'the viewBox is {vb[2]:g}:{vb[3]:g}; the film is {aspect[0]}:{aspect[1]}')
-    for k in ('width', 'height'):
+    for k, own in (('width', vb[2]), ('height', vb[3])):
         v = root.get(k)
-        if v and re.sub(r'px$', '', v) not in (f'{vb[2]:g}', f'{vb[3]:g}'):
+        if v and re.sub(r'px$', '', v) != f'{own:g}':
             out.append(f'the root {k}="{v}" differs from the viewBox; leave width and height out')
     ids, allowed_fonts = {}, {f.lower() for f in fonts} | {'sans-serif', 'serif', 'monospace'}
     for el, parents in _walk(root):

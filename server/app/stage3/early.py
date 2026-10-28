@@ -25,11 +25,11 @@ def events_of(plan, pk, outputs, clips):
     fps = Fraction(str(pk['timeline']['fps']))
     by_gap = {o['unit']: o for o in outputs if o['stage'] == 'visuals' and o['unit']}
     events, ai_files, seen = [], [], set()
-    camera = {e['timeline_in_frame']: e for e in plan['events'] if e['kind'] == 'event'}
-    cam_rows = {e['sub_clip_id']: r for e, r in zip(camera.values(), resolve_events({'events': list(camera.values())}, pk, plan, clips))}
+    camera = [e for e in plan['events'] if e['kind'] == 'event']
+    cam_rows = iter(resolve_events({'events': camera}, pk, plan, clips))   # one row per event, in the plan's order (a sub-clip may be placed twice)
     for ev in plan['events']:
         if ev['kind'] == 'event':
-            events.append(cam_rows[ev['sub_clip_id']])
+            events.append(next(cam_rows))
             continue
         gid = ev.get('gap_id') or ev['beat_id']
         vo = by_gap.get(gid)

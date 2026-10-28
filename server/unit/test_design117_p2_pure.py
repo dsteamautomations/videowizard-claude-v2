@@ -43,6 +43,7 @@ def test_the_fixture_scene_passes_and_its_parts_are_read():
     (with_(old='font-size="40"', new='font-size="30"'), '4 %'),
     (with_(old='course pitch 75 mm', new='the pitch of one course of this wall is seventy five millimetres'), 'eight words'),
     (with_(old='<rect id="c2"', new='<rect id="c1"'), "'c1' twice"),
+    (with_(old='viewBox="0 0 1600 900"', new='viewBox="0 0 1600 900" width="900" height="1600"'), 'differs from the viewBox'),   # review 28 Oct: each against its own
     (with_(old='<path id="arrow"', new='<use href="#nothing"/><path id="arrow"'), 'nothing'),
 ])
 def test_each_rule_refuses_with_its_reason(svg, says):
@@ -77,6 +78,8 @@ def test_the_spec_rule_wants_every_known_size_as_text_and_no_figure_for_an_unkno
 def test_pictures_are_embedded_as_data_uris_and_nothing_else_changes():
     out = S.embed(SVG, {'comp-1': ('image/png', b'\x89PNG')})
     assert 'href="data:image/png;base64,iVBORw==' in out and 'ref:' not in out and out.count('<rect') == SVG.count('<rect')
+    single = S.embed(with_(old='href="ref:comp-1"', new="href='ref:comp-1'"), {'comp-1': ('image/png', b'\x89PNG')})   # review 28 Oct: the parser takes single quotes, so does the embed
+    assert "href='data:image/png;base64,iVBORw=='" in single and 'ref:' not in single
     with pytest.raises(ValueError, match='comp-1'):
         S.embed(SVG, {})
 

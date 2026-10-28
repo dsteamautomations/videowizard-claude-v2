@@ -1,6 +1,8 @@
 """design/115: the editor's early package. The events from the master plan and the recorded gaps (a take, a picture, a clip stretch, a sequence),
 the AI files under Media/AI, the cut list, the caption cues broken at the recorded pauses, the timeline without the reference track, the refusal
 while a gap has no recorded visuals."""
+import copy
+import re
 from fractions import Fraction
 
 from app.stage3 import delivery as D, early as E, timeline as TL
@@ -65,3 +67,21 @@ def test_the_captions_are_one_cue_per_sentence_broken_at_the_recorded_pauses_two
     text = E.srt(cues, FPS)
     assert text.startswith('1\n00:00:00,000 --> 00:00:02,000\nThe wall stands.\n\n2\n00:00:02,000 --> ')
     assert 'File > Import > Subtitle' in E.open_edit_text('VW-9') and 'vw delivery open --originals' in E.open_edit_text('VW-9')
+
+
+def test_a_sub_clip_placed_twice_keeps_both_placements_in_the_early_events():
+    """Review 28 Oct: the camera rows were keyed by sub_clip_id, so a callback to an earlier shot took the later placement's time."""
+    plan = copy.deepcopy(PLAN)
+    plan['events'] = [plan['events'][0], {'kind': 'gap', 'beat_id': 'B2', 'gap_id': 'G1', 'timeline_in_frame': 100, 'timeline_out_frame': 200, 'timeline_frames': 100},
+                      {'kind': 'event', 'sub_clip_id': 'c1:S1', 'source_in_frame': 300, 'source_out_frame': 400, 'timeline_in_frame': 200, 'timeline_out_frame': 300, 'timeline_frames': 100, 'crop': 'solver', 'a2_intervals': []}]
+    vis = copy.deepcopy(VIS)
+    vis['summary']['shots'] = [{'shot_id': 'VS1', 'source': 'take', 'placement': {'start_frame': 100, 'end_frame': 200}, 'media': {'kind': 'movie', 'duration_s': 4.0}}]
+    events, _ = E.events_of(plan, PK, [vis], CLIPS)
+    cams = [e for e in events if e['kind'] == 'camera']
+    assert [(c['record_in_frame'], c['source_in_frame']) for c in cams] == [(0, 250), (200, 300)]
+
+
+def test_every_caption_carries_its_own_text_style_definition():
+    cues = E.cues(PK['narration']['sentences'], PK['narration']['words'], FPS)
+    text = TL.fcpxml('VW-9', PK['timeline'], [], [], [], [], 300, reference=False, captions=cues)
+    assert text.count('<caption ') == len(cues) == text.count('<text-style-def ') and len(set(re.findall(r'text-style-def id="([^"]+)"', text))) == len(cues)

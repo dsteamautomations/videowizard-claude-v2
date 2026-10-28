@@ -375,3 +375,11 @@ def compare(cuts, events, narration_pieces):
         if len(got) != len(want):
             out.append({'cut': None, 'file': 'voiceover' if lane == -1 else 'video', 'field': 'count', 'timeline': len(got), 'plan': len(want)})
     return out
+
+
+RELINK_BAD = ('missing', 'ask', 'by_hand', 'timecode')   # design/115 H4 (review 28 Oct): the outcomes that stop an import on the originals
+
+
+def relink_bad(rc):
+    """The relink lines that must be settled before the relinked timeline is imported."""
+    return [l for l in rc.get('lines') or [] if l.get('outcome') in RELINK_BAD]

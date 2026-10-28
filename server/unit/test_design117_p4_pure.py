@@ -211,9 +211,37 @@ def test_a_crashed_browser_is_started_again_once_and_a_text_outside_the_safe_are
     calls = fakes(monkeypatch, store, tmp_path, [PASS], render_fail_first=True)
     status, result, error, _, _ = VW.process_drawn(JOB)
     assert status == 'ready' and calls['reset'] == 1 and len(calls['render']) == 2
-    monkeypatch.setattr(D, 'measure', lambda *a, **k: [{'id': 'title', 'text': 'Bricks for the same wall', 'x': 600, 'y': 20, 'w': 100, 'h': 30}])
+    def off(request, out_path, svg, images, fonts, keep=None):   # review 28 Oct: the render's own page measures the text before frame 0
+        raise D.TextOutside([{'id': 'title', 'text': 'Bricks for the same wall', 'x': 600, 'y': 20, 'w': 100, 'h': 30}])
+    monkeypatch.setattr(D, 'render', off)
     status, result, error, _, _ = VW.process_drawn(JOB)
-    assert status == 'failed' and 'leaves the safe area' in error and 'Bricks for the same wall' in error
+    assert status == 'failed' and 'leaves the safe area' in error and 'Bricks for the same wall' in error and calls['reset'] == 1   # no browser restart for a rule
+
+
+def test_a_fix_whose_text_leaves_the_frame_is_dropped_not_failed(monkeypatch, tmp_path):
+    store = loop_store()
+    fixed = with_(old='x="800" y="130"', new='x="1500" y="130"')
+    calls = fakes(monkeypatch, store, tmp_path, [FAIL, PASS], fix={'svg': fixed, 'changed': 'moved the title right'})
+    good = D.render
+
+    def render(request, out_path, svg, images, fonts, keep=None):
+        if svg == fixed:
+            raise D.TextOutside([{'id': 'title', 'text': 'Bricks for the same wall', 'x': 1800, 'y': 20, 'w': 300, 'h': 30}])
+        return good(request, out_path, svg, images, fonts, keep)
+    monkeypatch.setattr(D, 'render', render)
+    status, result, error, _, _ = VW.process_drawn(JOB)
+    assert status == 'ready' and result['check']['best_pass'] == 1 and 'leaves the safe area' in ' '.join(result['check']['passes'][0]['fix_dropped']) and result['fixed_svg_key'] is None
+
+
+def test_render_drawn_reads_the_frame_size_a_real_run_stores_as_a_list():
+    """Defect 33 (Revathi, 28 Oct): a run stores resolution as [1920, 1080]; the fixtures say '1920x1080'. Both read (the design/113 test, carried over)."""
+    store = svg_store()
+    s = saved(store)
+    s['source']['resolution'] = [1280, 720]
+    store.files['run-1/visuals/session.json'] = json.dumps(s).encode('utf-8')
+    out = VS.render_drawn(FakeConn([]), store, USER, RUN, [], {'shot_id': 'DR1'})
+    req = json.loads(store.files[saved(store)['preparations']['DR1']['key']])
+    assert (req['width'], req['height']) == (1280, 720) and out['frames'] == 100
 
 
 def test_check_drawn_keeps_the_loops_record_on_the_session(monkeypatch):

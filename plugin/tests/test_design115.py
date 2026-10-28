@@ -41,3 +41,10 @@ def test_the_studio_import_takes_the_relinked_timeline_when_one_is_given(tmp_pat
     ad = Adapter()
     RB.studio_import(ad, d, manifest, 'VW-9')
     assert ad.took == d / 'Timeline' / 'VW-9.fcpxml'
+
+
+def test_relink_bad_names_every_outcome_that_must_stop_the_import():
+    rc = {'lines': [{'outcome': 'match', 'line': 'a'}, {'outcome': 'renamed', 'line': 'b'}, {'outcome': 'timecode', 'line': 'c: the copy has timecode 01:00:00:00, the original 00:00:00:00'},
+                    {'outcome': 'missing', 'line': 'd'}, {'outcome': 'ask', 'line': 'e'}, {'outcome': 'by_hand', 'line': 'f'}]}
+    assert [l['line'][:1] for l in H.relink_bad(rc)] == ['c', 'd', 'e', 'f']   # review 28 Oct: a timecode disagreement stops the import too
+    assert H.relink_bad({'lines': []}) == []

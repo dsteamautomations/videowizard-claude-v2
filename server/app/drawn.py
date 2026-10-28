@@ -208,6 +208,14 @@ def measure(svg_text, W, H, fonts, images):
         page.close()
 
 
+class TextOutside(ValueError):
+    """A text's box leaves the safe area; .boxes names them. Raised by the render before frame 0 (the page measures itself, no second load)."""
+
+    def __init__(self, boxes):
+        self.boxes = boxes
+        super().__init__('; '.join(f"text '{b['text'][:40]}' leaves the safe area (the inner 90 % of the frame)" for b in boxes))
+
+
 def outside(boxes, W, H, safe=svg_scene.SAFE):
     """The texts whose box leaves the inner (1 - 2·safe) of the frame."""
     return [b for b in boxes if b['w'] > 0 and (b['x'] < safe * W or b['y'] < safe * H or b['x'] + b['w'] > (1 - safe) * W or b['y'] + b['h'] > (1 - safe) * H)]
@@ -221,6 +229,9 @@ def _frames(request, svg_text, images, fonts, every=None):
     sts = states(request['scene'].get('actions') or [], request['cues'], fps, n, ids, svg_scene.children_of(root))
     page = _page(page_html(svg_text, W, H, fonts, images), W, H)
     try:
+        off = outside(page.evaluate(MEASURE), W, H)   # review 28 Oct: measured on the render's own page, before frame 0
+        if off:
+            raise TextOutside(off)
         for i in range(n):
             if every and i % every and i != n - 1:
                 continue
