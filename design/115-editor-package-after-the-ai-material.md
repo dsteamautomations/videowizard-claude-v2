@@ -52,3 +52,7 @@ Not VW-3 or VW-4: neither has AI material. VW-9 reached the first cut; filling i
 ## Not covered until built
 
 - Nothing is built; this note is the agreement on the words.
+
+## SK's answers (28 Oct 2026)
+
+"Proceed": the five recommendations stand. 1. The trigger is every shot placed; an open shot refuses the bundle by name. 2. `--no-camera` is the default on the operator's PC. 3. SRT with the cue rule. 4. The relink inside `vw delivery open` on Studio. 5. VFX later. Regular lane: tests first, full suites, deploy on SK's word; the test run is decided after the build.
