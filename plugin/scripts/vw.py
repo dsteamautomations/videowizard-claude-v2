@@ -1544,7 +1544,7 @@ def cmd_visuals(a):
             emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`." +
                  (' Warnings: ' + '; '.join(warned) if warned else ''))
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
-                'parents': a.parents.split(',') if a.parents else [], **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),
+                **_parents_and_crops(a.parents), **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),   # design/119 rule 1: id or id@left,top,width,height
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
                 **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {}),   # design/91 N8; design/106 T1
                 **({'golden': True} if getattr(a, 'golden', False) else {}), **({'region': _region(a.region)} if getattr(a, 'region', None) else {}),
@@ -2342,3 +2342,32 @@ if __name__ == '__main__':
         raise
     except Exception as exc:  # last resort: never a traceback into the chat
         emit({'action': 'tell_builder', 'message': f'vw failed unexpectedly: {exc.__class__.__name__}: {exc}'}, 1)
+
+
+def _parents_and_crops(text):
+    """design/119 rule 1: `--parents K1,L2@0.5,0,0.5,0.5`: the ids, and a crop (left, top, width, height as fractions) for the ones that carry one."""
+    parents, crops = [], {}
+    for item in _split_at(text):
+        if not item:
+            continue
+        if '@' in item:
+            pid, box = item.split('@', 1)
+            parents.append(pid)
+            crops[pid] = _region(box)
+        else:
+            parents.append(item)
+    return {'parents': parents, **({'crops': crops} if crops else {})}
+
+
+def _split_at(text):
+    """Split `K1,L2@0.5,0,0.5,0.5,M3` into ids, keeping each @box's four numbers with its id."""
+    out, parts = [], (text or '').split(',')
+    i = 0
+    while i < len(parts):
+        if '@' in parts[i]:
+            out.append(','.join(parts[i:i + 4]))
+            i += 4
+        else:
+            out.append(parts[i])
+            i += 1
+    return out

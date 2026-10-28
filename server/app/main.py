@@ -232,6 +232,7 @@ class ImageGenerate(Write):
     subject: str
     prompt: str = Field(min_length=1, max_length=8000)
     parents: list[str] = []
+    crops: dict[str, dict] | None = None   # design/119 rule 1: {parent id: {left, top, width, height}}
     model: str | None = None
     size: str | None = None
     quality: str | None = None

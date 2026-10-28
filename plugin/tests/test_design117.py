@@ -30,3 +30,9 @@ def test_image_passes_the_component_kind_through(harness, monkeypatch, capsys):
 
 def test_scene_takes_only_its_flags():
     assert vw.VISUALS_FLAGS['scene'] == {'shot', 'file', 'download'} and 'scene' in vw.VISUALS_WHAT
+
+
+def test_parents_take_a_crop_after_an_at_sign():
+    assert vw._parents_and_crops('K1,R1') == {'parents': ['K1', 'R1']}
+    assert vw._parents_and_crops('K1,L2@0.5,0,0.5,0.5,M3') == {'parents': ['K1', 'L2', 'M3'], 'crops': {'L2': {'left': 0.5, 'top': 0.0, 'width': 0.5, 'height': 0.5}}}   # design/119 rule 1
+    assert vw._parents_and_crops('') == {'parents': []}

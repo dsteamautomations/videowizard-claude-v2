@@ -2029,6 +2029,10 @@ def generate_image(conn, store, user, run, outputs, body):
         body = {**body, 'prompt': with_composed(body['prompt'], COMPONENT_BLOCK.format(name=element.get('name') or body['element_id']))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
     writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own
+    crops = body.get('crops') or {}   # design/119 rule 1: {parent id: region}; the server crops before the upload
+    for pid, region in crops.items():
+        need(pid in (body.get('parents') or []), f'crops names {pid}, which is not among the parents.')
+        check_crop(region)
     for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
         if p and p.get('status') == 'rejected':
             need(False, f"{p['id']} was rejected: make the next {'state from the last approved state' if body['kind'] == 'state' else 'end image from the approved start, not from the candidate chain'}.")
@@ -2480,7 +2484,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
     size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
     request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size, **({'background': 'transparent'} if body['kind'] == 'component' else {}),
-               'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
+               'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents],
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
                              **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
                              **({'golden_candidate': True} if body.get('golden') else {})},   # design/96 X3; design/106 T1; design/111 F11
@@ -3851,3 +3855,36 @@ def also_shows(parent, own=()):
             continue
         out.append(ph)
     return out
+
+
+CROP_MIN_PX = 64   # design/119 rule 1: a crop smaller than this either way is too small to tell the model anything
+
+
+def check_crop(region):
+    """design/119 rule 1: a crop is a rectangle in fractions of the frame, inside it; unlike an edit's region it has no upper bound."""
+    need(isinstance(region, dict) and all(k in region for k in ('left', 'top', 'width', 'height')), 'A crop is {left, top, width, height}, fractions of the frame.')
+    try:
+        l, t, w, h = (float(region[k]) for k in ('left', 'top', 'width', 'height'))
+    except (TypeError, ValueError):
+        need(False, 'A crop is four numbers between 0 and 1.')
+    need(0 <= l < 1 and 0 <= t < 1 and 0 < w <= 1 and 0 < h <= 1 and l + w <= 1 + 1e-9 and t + h <= 1 + 1e-9, 'The crop lies inside the frame: left + width and top + height are at most 1.')
+
+
+def cropped_parent(store, run, p, region):
+    """The parent entry of a request: the full picture, or, with a region, the crop stored beside the reference (`<id>-crop-<hash>.png`) sent as that picture."""
+    entry = {'id': p['id'], 'key': p['key'], 'sha256': p['sha256']}
+    if not region:
+        return entry
+    from io import BytesIO
+    from PIL import Image
+    from .visual_workers import region_box
+    with Image.open(BytesIO(store.get(p['key']))) as im:
+        box = region_box(region, *im.size)
+        need(box[2] - box[0] >= CROP_MIN_PX and box[3] - box[1] >= CROP_MIN_PX, f"the crop of {p['id']} is {box[2] - box[0]} x {box[3] - box[1]} px: too small to send (at least {CROP_MIN_PX} px each way).")
+        buf = BytesIO()
+        im.crop(box).save(buf, format='PNG')
+    data = buf.getvalue()
+    sha = hashlib.sha256(data).hexdigest()
+    k = f"{run['id']}/visuals/references/{p['id']}-crop-{sha[:8]}.png"
+    store.put(k, data, 'image/png')
+    return {**entry, 'key': k, 'sha256': sha, 'crop': {x: float(region[x]) for x in ('left', 'top', 'width', 'height')}, 'full_key': p['key']}
