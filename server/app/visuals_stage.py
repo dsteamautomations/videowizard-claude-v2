@@ -1150,6 +1150,36 @@ def golden_due(session, plan):
     return out
 
 
+def sheet_due(session, plan):
+    """design/119 rule 2: the elements whose reference sheet the assistant writes now: an element (not the style) with an approved source (a frame, a
+    supplied or a web picture) and no sheet approved, candidate or being made."""
+    out = []
+    for e in plan.get('elements') or []:
+        if e['id'] == STYLE:
+            continue
+        refs = [r for r in session['references'].values() if r.get('element_id') == e['id']]
+        sources = [r['id'] for r in refs if r.get('kind') in ('frame', 'supplied', 'web') and r.get('status') == 'approved']
+        if not sources or any(r.get('kind') == 'sheet' and r.get('status') in ('approved', 'candidate', 'generating') for r in refs):
+            continue
+        views = ', '.join(e.get('required_views') or []) or 'the views the plan needs'
+        who = 'the person' if e.get('kind') == 'person' else 'the thing'
+        out.append({'element_id': e['id'], 'next': f"write the reference sheet of {e['id']} now: `vw visuals image --element {e['id']} --kind sheet --parents {','.join(sources)} …` ({views}; {who} alone on plain ground)"})
+    return out
+
+
+def sheet_block(element):
+    views = ', '.join(element.get('required_views') or []) or 'the views the plan needs'
+    who = 'the person' if element.get('kind') == 'person' else 'the thing'
+    return f"Reference sheet of {element.get('name') or element['id']}: the views {views}, each labelled; {who} alone on plain ground, nothing else in the frame."
+
+
+def sheet_lines(element):
+    name = element.get('name') or element['id']
+    who = 'the person' if element.get('kind') == 'person' else 'the thing'
+    return ([{'check': f'view: {v}', 'weight': 'must', 'pass_when': f'the sheet shows {name} in a {v} view, labelled as such'} for v in element.get('required_views') or []]
+            + [{'check': 'nothing but the thing', 'weight': 'must', 'pass_when': f'nothing in the frame but {who} on plain ground: no setting, no other people, no other objects'}])
+
+
 def _derived(session, p):
     """A picture made from another generated picture (a keyframe or a state among its parents)."""
     return any((session['references'].get(q.get('id')) or {}).get('kind') in ('keyframe', 'state') for q in (p.get('generation') or {}).get('parents') or [])
@@ -2027,6 +2057,8 @@ def generate_image(conn, store, user, run, outputs, body):
         if style_ref['id'] not in (body.get('parents') or []):
             body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
         body = {**body, 'prompt': with_composed(body['prompt'], COMPONENT_BLOCK.format(name=element.get('name') or body['element_id']))}
+    if body['kind'] == 'sheet' and body['element_id'] != STYLE:   # design/119 rule 2: the server's lines on a reference sheet
+        body = {**body, 'prompt': with_composed(body['prompt'], sheet_block(element))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
     writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own
     crops = body.get('crops') or {}   # design/119 rule 1: {parent id: region}; the server crops before the upload
@@ -2144,6 +2176,8 @@ def generate_image(conn, store, user, run, outputs, body):
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'component':
         lines = list(lines or []) + COMPONENT_LINES
+    if body['kind'] == 'sheet' and body['element_id'] != STYLE:
+        lines = list(lines or []) + sheet_lines(element)   # design/119 rule 2
     if body.get('end_prompt') and not body.get('end_region') and not body.get('fix_of'):   # design/112 S2: the end the server queues needs its region too
         warns.append('the end written with this start has no region: the server will refuse to make it (design/112 S2); give --end-region left,top,width,height with the start')
     if body['kind'] == 'keyframe' and not is_end and named is not None:
@@ -3711,6 +3745,7 @@ def status(conn, store, run, outputs, repair=True):
             'material_specs': {e['id']: {'approved': material_approved(session, e), 'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')}
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
+            'sheet_due': sheet_due(session, plan) if plan else [],   # design/119 rule 2
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
