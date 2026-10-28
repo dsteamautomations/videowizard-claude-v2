@@ -2058,8 +2058,7 @@ def generate_image(conn, store, user, run, outputs, body):
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
-    need(len(parents) <= 4, f"{len(parents)} pictures: at most four go in with a prompt (the picture edited or the scene parent, one identity sheet per person in frame, one material or look frame); "
-         f"say the rest in words. Extra: {', '.join(p['id'][:8] for p in parents[4:] if p)} (design/111 F21).")
+    # design/111 F21's cap of four removed (SK, 28 Oct 2026): every applicable reference may go in, each with its job line; the model's MAX_INPUTS is the ceiling
     named_n = len(body.get('parents') or [])
     for k, p in enumerate(parents[named_n:], named_n + 1):   # F21: the server names the pictures it added itself (the start's own sheets)
         if p:

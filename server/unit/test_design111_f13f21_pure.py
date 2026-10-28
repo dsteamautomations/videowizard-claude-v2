@@ -73,18 +73,21 @@ def test_a_keyframe_with_exact_text_carries_the_render_line_and_the_checks_and_a
                                end_prompt=None, end_answer=None, request_id='r-quoted'))
 
 
-# ---------- F21: four pictures, one job line each ----------
+# ---------- F21: one job line per picture; SK, 28 Oct 2026: the cap of four removed, the model's sixteen is the only ceiling ----------
 
-def test_more_than_four_pictures_are_refused_and_each_needs_its_job_line():
+def test_pictures_up_to_the_models_ceiling_pass_with_a_job_line_each():
     store = start_store()
     s = saved(store)
-    for i in range(2, 7):
+    for i in range(2, 20):
         s['references'][f'X{i}'] = {**ref(f'X{i}', 'approved'), 'kind': 'web', 'element_id': 'E1'}
     put(store, s)
     base = {'request_id': 'r-many', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer', 'role': 'start',
             'prompt': 'Image 1 is the old start. Image 2 is the sheet. Image 3 is a texture. Image 4 is a look. Image 5 is another.'}
-    with pytest.raises(Problem, match='5 pictures: at most four go in with a prompt'):
-        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**base, 'parents': ['K1', 'X2', 'X3', 'X4', 'X5']}))
+    out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**base, 'parents': ['K1', 'X2', 'X3', 'X4', 'X5']})   # five, each with its line: allowed since 28 Oct
+    assert out['reference_id']
+    many = ['K1'] + [f'X{i}' for i in range(2, 18)]   # seventeen: past the model's own limit
+    with pytest.raises(Problem, match='17 input pictures.*GPT Image takes at most 16'):
+        g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**base, 'request_id': 'r-17', 'parents': many, 'prompt': ' '.join(f'Image {k} is picture {k}: take its look.' for k in range(1, 18))}))
     with pytest.raises(Problem, match='does not say what Image 2 is for'):
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**base, 'request_id': 'r-nojob', 'parents': ['K1', 'X2'], 'prompt': 'Image 1 is the old start; the labourer.'}))
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**base, 'request_id': 'r-four', 'parents': ['K1', 'X2', 'X3', 'X4'],
@@ -92,6 +95,6 @@ def test_more_than_four_pictures_are_refused_and_each_needs_its_job_line():
     assert out['reference_id']
 
 
-def test_the_procedure_names_the_exact_text_entry_and_the_four_picture_rule():
+def test_the_procedure_names_the_exact_text_entry_and_the_picture_rule():
     proc = (ROOT / 'procedures' / 'v2.json').read_text(encoding='utf-8')
-    assert 'size_pct' in proc and 'at most four' in proc.lower() and 'Render exactly this text' in proc
+    assert 'size_pct' in proc and 'at most four pictures' not in proc.lower() and 'Up to sixteen pictures' in proc and 'Render exactly this text' in proc
