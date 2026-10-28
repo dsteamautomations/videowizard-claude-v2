@@ -61,3 +61,4 @@ The server spends the API quota for every run; the operators hold no key. Today 
 1. Cooling: 60 s on a rate limit, 10 minutes on a quota or billing answer, 1 hour on a revoked key; constants in `keys.py`.
 2. Cooling is kept in each worker process's memory; no shared table.
 3. Workers: 8, after the VM's free memory is read; 12 only if the week's queue shows waits and the memory allows.
+4. An analysis job retries once on the next key before a quota answer rejects it. All four answered on 28 Oct: build P1–P5, tests first, commit and push per rule, tell SK before the deploy.
