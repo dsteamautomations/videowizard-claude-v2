@@ -977,10 +977,32 @@ CLOSE_SIZES, OPEN_SIZES = ('MCU', 'CU', 'ECU'), ('EWS', 'WS', 'MWS')
 SIZE_ORDER = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
 
 
+FOOTAGE_CITED = re.compile(r'\b(footage|frame)\b', re.I)   # design/119 rule 7
+PASSER_BY = re.compile(r'passer|passing by|walk(?:s|ing)? by|in the background|background person', re.I)   # design/119 rule 9
+
+
+def _get(o, name, default=None):
+    return o.get(name, default) if isinstance(o, dict) else getattr(o, name, default)
+
+
+def footage_cited(element, facts):
+    """The first source line of the element's sizes or facts that cites the footage, else ''. Takes the model or the plan's dict."""
+    eid = _get(element, 'id')
+    sources = [_get(d, 'source') for d in _get(element, 'size') or []]
+    sources += [_get(f, 'source') for f in facts or [] if _get(f, 'about') == eid]
+    return next((s for s in sources if s and FOOTAGE_CITED.search(s)), '')
+
+
 def course_warnings(plan, fps):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
     for e in plan.elements:   # A5
+        if e.kind not in ('person', 'graphic') and e.identity != 'exact' and footage_cited(e, plan.visual_facts):   # design/119 rule 7
+            out.append({'element_id': e.id, 'kind': 'footage_identity', 'message': f'element {e.id}: its fact or size cites the footage ({footage_cited(e, plan.visual_facts)[:80]}): a thing the footage shows is '
+                                                                                   'identity exact with an approved footage frame as its identity; set identity exact and approve a frame of it before any picture'})
+        if e.kind == 'person' and PASSER_BY.search(f'{e.requirements} {e.description}'):   # design/119 rule 9
+            out.append({'element_id': e.id, 'kind': 'passer_by', 'message': f'element {e.id} reads as a passer-by: a background person who only passes is never a named element with a sheet; '
+                                                                            "describe them in each scene's own words, different every time"})
         if e.kind in ('person', 'object', 'animal') and not e.size and not e.material_spec:   # defect 35: a material's sizes live in its material_spec (design/111 F10), never in a size list
             out.append({'element_id': e.id, 'kind': 'element_size_missing', 'message': f'element {e.id} ({e.kind}): give its real size (size: height, width, depth or length, '
                                                                                        'each with its source and status: confirmed, measured or unknown); never invent one'})

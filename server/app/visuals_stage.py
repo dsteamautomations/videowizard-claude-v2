@@ -2050,6 +2050,17 @@ def generate_image(conn, store, user, run, outputs, body):
     element = {'id': STYLE, 'kind': 'style'} if body['element_id'] == STYLE else next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
+    if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE:
+        from .visual_contract import footage_cited
+        frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
+        cited = footage_cited(element, plan.get('visual_facts'))
+        need(not cited or frames_ok, f"{element['id']}'s fact or size cites the footage ({cited[:80]}): approve a footage frame of {element['id']} (`vw visuals frame --element {element['id']} ...`) "
+                                     f"before any picture of it, and mark it identity exact in the plan (design/119 rule 7).")
+        unknown = [d for d in element.get('size') or [] if d.get('value') is None]   # design/119 rule 8: measure before the first picture
+        if frames_ok and unknown and body['kind'] != 'sheet':
+            d = unknown[0]
+            need(False, f"{element['id']} has a size still unknown ({d.get('part')} {d.get('measure')}) and an approved footage frame {frames_ok[0]['id']}: measure it first "
+                        f"(`vw visuals measure --refs {frames_ok[0]['id']} --question ...`), then put the value in the plan with status measured, before its first picture (design/119 rule 8).")
     if body['kind'] == 'component':   # design/117 P1: a thing alone, in the approved style, on a transparent background; the style picture is Image 1
         need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
         style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
@@ -2215,7 +2226,9 @@ def generate_image(conn, store, user, run, outputs, body):
             body = {**body, 'prompt': with_composed(body['prompt'], composed_block(plan, found[2], named, 'end' if is_end else 'start'))}
     lw = light_warning(found[2], body['kind'], body['prompt']) if found else None   # design/103 A1
     if found and element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated'):   # design/104 C5: the scene's light and air, the shot's size, real sizes
-        lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements'])
+        lines = list(lines or []) + picture_lines(found[2], found[3], plan['elements']) + height_lines(found[2])   # design/119 rule 8
+        if height_sentence(found[2]) and not body.get('fix_of'):
+            body = {**body, 'prompt': with_composed(body['prompt'], height_sentence(found[2]))}
         sg = signs_lines(session, plan, found[2], found[3], body['element_id'])   # design/111 F18: two signs of use, the place in use
         if sg:
             lines.append({'check': 'signs of use', 'weight': 'must', 'pass_when': sg[0][len('Signs of use: '):].rstrip('.') + ': both visible at their places'})
@@ -3923,3 +3936,32 @@ def cropped_parent(store, run, p, region):
     k = f"{run['id']}/visuals/references/{p['id']}-crop-{sha[:8]}.png"
     store.put(k, data, 'image/png')
     return {**entry, 'key': k, 'sha256': sha, 'crop': {x: float(region[x]) for x in ('left', 'top', 'width', 'height')}, 'full_key': p['key']}
+
+
+HEIGHT_WORD = re.compile(r"([a-z][a-z\- ]{2,40}?)\s+(?:at|to|up to)\s+(knee|waist|chest|shoulder|head)[- ]height|(knee|waist|chest|shoulder|head)[- ]high\s+((?:[a-z\-]+\s+){0,2}[a-z\-]+)", re.I)   # design/119 rule 8
+VERBS = re.compile(r"\b(runs|stands|sits|lies|rises|crosses|reaches)\b", re.I)
+
+
+def _heights(scene):
+    out = []
+    for m in HEIGHT_WORD.finditer((scene or {}).get('layout') or ''):
+        thing = (m.group(1) or m.group(4) or '').strip(' ,;.')
+        word = (m.group(2) or m.group(3) or '').lower()
+        v = VERBS.search(thing)
+        if v:   # 'A plinth top runs across the frame at knee height' -> 'plinth top'
+            thing = thing[:v.start()].strip(' ,;.')
+        thing = re.sub(r"^(?:a|an|the)\s+", '', thing, flags=re.I).strip()
+        if thing and (thing, word) not in out:
+            out.append((thing, word))
+    return out
+
+
+def height_lines(scene):
+    """design/119 rule 8: a height word in the layout is a must line: the thing reaches a standing person's knee, waist, chest, shoulder or head, no higher."""
+    return [{'check': f'{thing} at {word} height', 'weight': 'must',
+             'pass_when': f"the {thing} reaches a standing person's {word} and no higher; the rest of the person is above it, feet on the same ground"} for thing, word in _heights(scene)]
+
+
+def height_sentence(scene):
+    hs = _heights(scene)
+    return ('Heights: ' + '; '.join(f"the {thing} reaches a standing person's {word} and no higher; the rest of the person is above it, feet on the same ground" for thing, word in hs) + '.') if hs else ''
