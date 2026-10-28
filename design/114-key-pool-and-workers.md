@@ -59,3 +59,4 @@ The server spends the API quota for every run; the operators hold no key. Today 
 ## SK's answers (28 Oct 2026)
 
 1. Cooling: 60 s on a rate limit, 10 minutes on a quota or billing answer, 1 hour on a revoked key; constants in `keys.py`.
+2. Cooling is kept in each worker process's memory; no shared table.
