@@ -32,4 +32,4 @@ def test_a_graphic_with_exact_sizes_or_numbers_is_refused_unless_drawn():
 
 def test_the_procedure_says_when_a_graphic_is_drawn():
     text = json.dumps(PROC, ensure_ascii=False)
-    assert 'design/113' in text and 'vw visuals draw' in text and 'scene_drawn' in text and 'the drawn route' in text
+    assert 'design/117' in text and 'vw visuals draw' in text and 'scene_svg' in text and 'the drawn route' in text and 'scene_drawn' not in text

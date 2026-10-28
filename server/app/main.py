@@ -228,7 +228,7 @@ class ReferenceAdd(Write):
 class ImageGenerate(Write):
     element_id: str
     name: str
-    kind: Literal['isolated', 'sheet', 'keyframe', 'state', 'style']   # design/65: a state of a graphic sequence; design/89 C2: the style sheet
+    kind: Literal['isolated', 'sheet', 'keyframe', 'state', 'style', 'component']   # design/65: a state of a graphic sequence; design/89 C2: the style sheet; design/117 P1: a component
     subject: str
     prompt: str = Field(min_length=1, max_length=8000)
     parents: list[str] = []
@@ -1238,6 +1238,12 @@ class FontUpload(Write):   # design/113 E4
     content_base64: str
 
 
+class SceneUpload(Write):   # design/117 P2
+    shot_id: str
+    name: str
+    content_base64: str
+
+
 @app.post('/api/runs/{run_id}/visuals/draw', status_code=201)
 def visuals_draw(run_id: UUID, body: Draw, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.render_drawn(conn, storage(), user, run, outputs, body_dict(body)), 201)
@@ -1247,6 +1253,18 @@ def visuals_draw(run_id: UUID, body: Draw, user=User, conn=DB):
 def visuals_font(run_id: UUID, body: FontUpload, user=User, conn=DB):
     import base64 as b64
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_font(storage(), user, run, outputs, body.name, b64.b64decode(body.content_base64)))
+
+
+@app.post('/api/runs/{run_id}/visuals/scene')
+def visuals_scene(run_id: UUID, body: SceneUpload, user=User, conn=DB):   # design/117 P2: the SVG scene of a drawn shot
+    import base64 as b64
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_scene(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64)))
+
+
+@app.get('/api/runs/{run_id}/visuals/scene/{shot_id}')
+def visuals_scene_get(run_id: UUID, shot_id: str, user=User, conn=DB):   # design/117 P4: the scene as the loop left it
+    run, outputs = _visuals_run(conn, user, run_id)
+    return visuals_stage.guarded(lambda: visuals_stage.scene_of(conn, storage(), run, outputs, shot_id))
 
 
 @app.post('/api/runs/{run_id}/visuals/images', status_code=201)
@@ -1661,7 +1679,8 @@ def procedure(version: str, stage: str, user=User):
 def meta():
     from . import keys
     return Response({'server_version': settings().SERVER_VERSION, 'plugin_min_version': settings().PLUGIN_MIN_VERSION, 'app_origin': settings().APP_ORIGIN,
-                     'keys': {'pools': keys.sizes(), 'cooling': {'openai': keys.cooling('openai'), 'gemini': keys.cooling('gemini')}}})   # design/114 P4: sizes and indexes, never keys
+                     'keys': {'pools': keys.sizes(), 'cooling': {'openai': keys.cooling('openai'), 'gemini': keys.cooling('gemini')}},   # design/114 P4: sizes and indexes, never keys
+                     'chromium': __import__('app.drawn', fromlist=['available']).available()})   # design/117 §5: can this host render drawn shots
 
 
 # ---------- connect flow ----------

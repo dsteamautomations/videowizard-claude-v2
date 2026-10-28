@@ -1299,7 +1299,7 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font']   # design/113   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1313,7 +1313,7 @@ VISUALS_FLAGS = {
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
     'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
-    'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'}, 'draw': {'shot'}, 'font': {'file'},   # design/113
+    'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'}, 'draw': {'shot'}, 'font': {'file'}, 'scene': {'shot', 'file', 'download'},   # design/113; design/117
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
     'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote'},
     'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'element', 'quote', 'notes'},
@@ -1605,6 +1605,22 @@ def cmd_visuals(a):
         if not a.file or not p.is_file() or p.suffix.lower() not in ('.ttf', '.otf'):
             emit({'action': 'refused', 'message': 'Give one .ttf or .otf file: `font --file brand.ttf`.'}, 2)
         out = write(base + '/font', {'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
+        emit(out, 0, out.get('next'))
+    if a.what == 'scene':   # design/117 P2: the SVG scene of a drawn shot, one file named by the plan through its sha256; --download: the scene as the loop left it
+        import base64 as _b64
+        if not a.shot:
+            emit({'action': 'refused', 'message': 'Give the drawn shot: `scene --shot S --file scene.svg`, or `scene --shot S --download`.'}, 2)
+        if getattr(a, 'download', False):
+            out = call('GET', base + f'/scene/{a.shot}')
+            p = ws / 'work' / f"scene-{a.shot}{'-fixed' if out.get('fixed') else ''}.svg"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(out['svg'], encoding='utf-8')
+            emit({**{k: out.get(k) for k in ('shot_id', 'job_id', 'fixed', 'passes')}, 'file': str(p)}, 0,
+                 f"Saved {p}" + (" (the scene as the server corrected it; put it in the plan as the shot's scene if you keep the changes)." if out.get('fixed') else ' (the plan\'s scene; the server changed nothing).'))
+        p = Path(a.file or '')
+        if not a.file or not p.is_file() or p.suffix.lower() != '.svg':
+            emit({'action': 'refused', 'message': 'Give one .svg file: `scene --shot S --file scene.svg`.'}, 2)
+        out = write(base + '/scene', {'shot_id': a.shot, 'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
         emit(out, 0, out.get('next'))
     if a.what == 'take':
         shots = list(a.shots or ([a.shot] if a.shot else []))
@@ -2288,6 +2304,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost'):   # design/73, design/79; design/94 --move; design/106 --role; design/110
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
+    s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')
     s.add_argument('--golden', action='store_true', help="image: the element's golden picture (design/111 F11)"); s.add_argument('--region', help='image: an edit\'s region left,top,width,height (design/111 F11)'); s.add_argument('--end-region', dest='end_region', help='image: the end\'s region, written with the start')
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')

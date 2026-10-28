@@ -84,7 +84,7 @@ def test_a_gemini_call_is_retried_on_the_next_key_and_the_record_carries_the_ind
     assert idx == 2 and made == ['g1', 'g2', 'g3'] and K.cooling('gemini') == [0, 1]
     monkeypatch.setattr(IC, 'settings', lambda: s)
     monkeypatch.setattr(IC, 'transport_factory', Transport, raising=False)
-    rec = IC.drawn_lines_check(b'a', b'b', [{'check': 'x', 'pass_when': 'y', 'weight': 'must'}], 'p', Transport)
+    rec = IC.drawn_sheet_check(b'a', [], [{'check': 'x', 'pass_when': 'y', 'weight': 'must'}], 'p', Transport)   # design/117: the sheet read
     assert rec['key_index'] == 2 and rec['lines'][0]['pass'] is True
 
     class Blocked(Transport):

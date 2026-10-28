@@ -201,8 +201,33 @@ def _model_take_check(snapshot, video_path, sha256, transport_factory):
     return record
 
 
-def drawn_lines_check(first_png, last_png, lines, prompt, transport_factory):
-    """design/113 E3 (SK's answer 3): one Gemini Flash read of a drawing's first and last frame against its claims, relationships and labels. Never raises."""
+def _mime(data):
+    return 'image/jpeg' if bytes(data[:2]) == b'\xff\xd8' else 'image/png'
+
+
+DRAWN_PASSES = 3   # design/117 P4: a render, a read of the sheet, a fix; three passes at most
+DRAWN_FIXED = [   # design/117 P4: what two frames never showed
+    {'check': 'text whole', 'pass_when': 'every text is whole and inside the frame in every frame of the sheet, nothing cut off at an edge', 'weight': 'must'},
+    {'check': 'things look like their names', 'pass_when': 'each named object looks like the thing it is named, as its picture shows it (a wall shows its courses, a flame looks like a flame), '
+                                                          'never a bare rectangle or polygon standing for a thing', 'weight': 'must'},
+    {'check': 'builds step', 'pass_when': 'things that build or appear in sequence come one after another across the frames, not all at once', 'weight': 'must'},
+    {'check': 'palette', 'pass_when': 'the colours are those of the approved style (Reference 1) and its palette: {palette}', 'weight': 'must'}]
+FIX_SCHEMA = {'type': 'object', 'properties': {'svg': {'type': 'string'}, 'changed': {'type': 'string'}}, 'required': ['svg', 'changed']}
+
+
+def drawn_asks(request, texts):
+    """The lines a drawn shot's sheet is read against: the claims, the spec's relationships, every text as a label, the view, then the fixed lines."""
+    palette = (request.get('palette') or 'the colours of the style picture').strip()
+    return ([{'check': 'claim: ' + c, 'pass_when': f'the drawing shows that {c}, plainly, without the narration', 'weight': 'must'} for c in request.get('claims') or []]
+            + [{'check': 'relationship: ' + r, 'pass_when': f'in the drawing, {r}', 'weight': 'must'} for r in request.get('relationships') or []]
+            + [{'check': 'label: ' + x, 'pass_when': f'the label reads exactly "{x}", spelled as written, readable', 'weight': 'must'} for x in texts]
+            + ([{'check': 'view: ' + request['view'], 'pass_when': f"the drawing is a {request['view']} view", 'weight': 'must'}] if request.get('view') else [])
+            + [{**l, 'pass_when': l['pass_when'].format(palette=palette)} for l in DRAWN_FIXED])
+
+
+def drawn_sheet_check(sheet, pictures, lines, prompt, transport_factory):
+    """design/117 P4: one Gemini Flash read of a drawn shot's contact sheet (every frame of the move, the time under each) against its lines, with the
+    style picture and the shot's pictures as references. Never raises."""
     record = {'lines': [], 'must_failed': [], 'model': CHECK_MODEL}
     if not lines:
         return record
@@ -210,8 +235,10 @@ def drawn_lines_check(first_png, last_png, lines, prompt, transport_factory):
         if not keys.pool('gemini', settings()):
             record['error'] = 'no Gemini key on the server'
             return record
-        received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, lambda t: t.generate(build(last_png, [('first frame', first_png)], lines, 'A drawn graphic rendered by the server from a plan; Reference 1 is its first frame, the candidate its last. ' + str(prompt or ''))),
-                                               settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
+        payload = build(sheet, pictures, lines, 'A contact sheet of a drawn graphic rendered by the server from a plan: every frame of the shot in order, the time under each tile; '
+                                                'Reference 1 is the approved style of the film, the other references are the approved pictures the drawing places. ' + str(prompt or ''))
+        received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, lambda t: t.generate(payload), settings(),
+                                                    terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
         body = received.get('body')
         if not isinstance(body, dict):
             body = json.loads(received.get('raw') or '{}')
@@ -222,18 +249,41 @@ def drawn_lines_check(first_png, last_png, lines, prompt, transport_factory):
     return record
 
 
+def drawn_fix(svg, sheet, failed, rules, transport_factory):
+    """design/117 P4: the model corrects the SVG for the failed lines and says in one line what it changed. {'svg', 'changed', 'key_index'} or {'error'}."""
+    try:
+        model = getattr(settings(), 'DRAWN_FIX_MODEL', None) or CHECK_MODEL
+        if not keys.pool('gemini', settings()):
+            return {'error': 'no Gemini key on the server'}
+        asks = '\n'.join(f"- {l['check']}: {l.get('seen') or 'failed'}" for l in failed)
+        parts = [{'text': 'The contact sheet of the drawing as rendered (every frame, the time under each).'}, {'inlineData': {'mimeType': _mime(sheet), 'data': base64.b64encode(sheet).decode()}},
+                 {'text': 'You correct an SVG scene so that the failed checks below pass, changing as little as possible and nothing else: keep every id, every element the actions name, '
+                          'the viewBox, the fonts and the ref: pictures. Rules the scene must keep:\n' + rules + '\n\nFailed checks:\n' + asks +
+                          '\n\nReturn the whole corrected SVG document in "svg" and one sentence in "changed" saying what you changed.\n\nThe SVG:\n' + svg}]
+        payload = {'contents': [{'role': 'user', 'parts': parts}],
+                   'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIX_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 32768}}
+        received, idx = keys.gemini(transport_factory, model, lambda t: t.generate(payload), settings(),
+                                    terminal_deadline_seconds=240, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
+        body = received.get('body')
+        if not isinstance(body, dict):
+            body = json.loads(received.get('raw') or '{}')
+        return {'svg': str(body.get('svg') or ''), 'changed': str(body.get('changed') or '')[:300], 'key_index': idx, 'model': model}
+    except Exception as exc:
+        return {'error': f'{exc.__class__.__name__}: {str(exc)[:200]}'}
+
+
 def lines_of(ref):
     """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
     own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]
-    return own + FIXED + ([] if ref.get('element_kind') in ('graphic', 'style') else SCENE_FIXED)
+    return own + FIXED + ([] if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') == 'component' else SCENE_FIXED)   # design/117 P1: a cut-out has no scene
 
 
 def build(candidate_png, parents, lines, prompt):
     """The Gemini request: the parents first (named by their tag), the candidate last, then the questions."""
     parts = []
     for i, (tag, png) in enumerate(parents, 1):
-        parts += [{'text': f'Reference {i} ({tag}).'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(png).decode()}}]
-    parts += [{'text': 'The candidate picture.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(candidate_png).decode()}}]
+        parts += [{'text': f'Reference {i} ({tag}).'}, {'inlineData': {'mimeType': _mime(png), 'data': base64.b64encode(png).decode()}}]
+    parts += [{'text': 'The candidate picture.'}, {'inlineData': {'mimeType': _mime(candidate_png), 'data': base64.b64encode(candidate_png).decode()}}]
     asks = '\n'.join(f"{n}. {c['check']}: passes when {c['pass_when']}" for n, c in enumerate(lines, 1))
     parts.append({'text': 'You check a generated picture against the list below, looking only at what is visible. The prompt it was made from, for context only:\n' + str(prompt or '')[:3000] +
                           '\n\nFor each numbered line answer pass true or false and say in one sentence what you see that decides it. Be literal; do not infer intent.\n' + asks})
@@ -345,7 +395,29 @@ def run_check(store, session, ref, result, transport_factory):
         detail = None
     if detail:
         record['lines'] = list(record.get('lines') or []) + [detail]
+    if ref.get('kind') == 'component' and png:   # design/117 P1: the cut-out really is one
+        al = alpha_line(png)
+        record['lines'] = list(record.get('lines') or []) + [al]
+        if al['pass'] is False:
+            record['must_failed'] = list(record.get('must_failed') or []) + [al]
     return compact(record, ref)
+
+
+ALPHA_MIN_SHARE = 0.2   # design/117 P1: a component's PNG has an alpha channel and at least this share of fully transparent pixels
+
+
+def alpha_line(png):
+    """Code, not a model: the PNG's transparent share. A must line for a component."""
+    from io import BytesIO
+    from PIL import Image
+    with Image.open(BytesIO(png)) as im:
+        if im.mode not in ('RGBA', 'LA') and 'transparency' not in im.info:
+            return {'check': 'transparent background', 'pass_when': f'the PNG has an alpha channel and at least {ALPHA_MIN_SHARE:.0%} of it is transparent', 'weight': 'must', 'pass': False, 'seen': 'no alpha channel'}
+        a = im.convert('RGBA').getchannel('A')
+        hist = a.histogram()
+        share = hist[0] / max(sum(hist), 1)
+    return {'check': 'transparent background', 'pass_when': f'the PNG has an alpha channel and at least {ALPHA_MIN_SHARE:.0%} of it is transparent', 'weight': 'must',
+            'pass': share >= ALPHA_MIN_SHARE, 'seen': f'{share:.0%} transparent'}
 
 
 def compact(record, ref):

@@ -129,6 +129,8 @@
 .v2 .pclose .ic{font-size:22px;line-height:1}
 .v2 .rsn{margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:10px}
 @media (max-width:600px){.v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding:6px 0;z-index:2}}
+img.sheet{display:block;max-width:100%;margin-top:6px;border-radius:4px;border:1px solid #333}
+.passes li{margin:2px 0}
 </style>
 <div class="v2" id="app" data-code="{{ run.code }}">
 <div class="top">
@@ -356,6 +358,12 @@ function takeCheck(c){   // design/91 N3: the take read by Gemini before you wat
 function reviewsOf(k){   // the latest verdict with its reason; earlier ones folded
   const all=k.reviews||[];if(!all.length)return '';const said=all.filter(r=>r.notes), top=said.length?said[said.length-1]:all[all.length-1], more=said.filter(r=>r!==top);
   return '<div class="ds">'+esc(top.decision)+(top.notes?': '+esc(top.notes):'')+'</div>'+(more.length?'<details class="chkd"><summary class="ds">'+more.length+' earlier</summary>'+more.map(r=>'<div class="ds">'+esc(r.decision)+': '+esc(r.notes)+'</div>').join('')+'</details>':'');}
+function drawnPasses(c){   // design/117 P4: what the server's loop did with the drawing, and whether it is held
+  if(!c||!c.passes)return '';
+  const held=(c.must_failed||[]).length;
+  return '<details class="chkd"'+(held?' open':'')+'><summary class="'+(held?'err':'ok')+'">'+esc('Server passes: '+c.passes.length+(held?' · held: '+c.must_failed.map(l=>l.check).join(', ')+' still failed':' · clean'))+'</summary><ul class="passes">'+
+    c.passes.map(p=>'<li>Pass '+p.pass+': '+(p.failed&&p.failed.length?'marked '+esc(p.failed.join(', ')):'clean')+(p.changed?' · fixed: '+esc(p.changed):'')+(p.fix_dropped?' · a fix was dropped: '+esc(p.fix_dropped.join('; ')):'')+(p.fix_error?' · no fix: '+esc(p.fix_error):'')+'</li>').join('')+'</ul>'+
+    (held?'<div class="ds err">Held: look at the sheet and the drawing; select it with your reason in the note, or reject it with what to change.</div>':'')+'</details>';}
 function checklist(lines,check){   // design/74 L6; design/86 K2; design/97 K1: one line, coloured by the worst result, a failed must's text in it; a click opens the lines
   if(check&&check.lines&&check.lines.length){const bad=check.lines.filter(c=>c.pass===false), must=bad.filter(c=>c.weight==='must'), ok=check.lines.filter(c=>c.pass===true).length;
     const sum=ok+' passed'+(bad.length?' · '+bad.length+' to look at':'')+(must.length?': '+must.map(c=>c.check).join('; '):'');
@@ -406,7 +414,7 @@ function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; t
     '<div class="cap" title="'+esc(r.title||'')+'">'+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+'</div>'+
     (p?'<input class="gnote" data-gnote="'+esc(s.search_id)+':'+r.n+'" value="'+esc(p.note||'')+'" placeholder="note: keep … / avoid …" style="width:calc(100% - 12px);margin:0 6px 6px">':'')+'</div>';   // design/106 N1
 }
-function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id&&['frame','supplied','web','isolated','sheet'].includes(r.kind));   // keyframes and states are compositions, not references
+function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id&&['frame','supplied','web','isolated','sheet','component'].includes(r.kind));   // design/117 P1   // keyframes and states are compositions, not references
   if(refs.some(r=>r.kind==='sheet'&&r.status==='approved'))return ['ok','sheet approved'];
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
   if(refs.some(r=>r.status==='approved'))return ['dec','pictures approved, sheet to make'];
@@ -429,7 +437,7 @@ function panel(){
   if(selPic.take){   // design/97 P2: a take is judged beside its player
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
     if(!k)return '<div class="empty">That take is gone.</div>';
-    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+checklist(k.checklist)+takeCheck(k.check)+
+    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+(k.sheet_url?'<img class="sheet" src="'+esc(k.sheet_url)+'" alt="every frame of the drawing, the time under each">':'')+checklist(k.checklist)+takeCheck(k.check)+drawnPasses(k.check)+
       (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
   }
   const by=refsById(), r=by[selPic.ref];
@@ -474,7 +482,7 @@ function wirePanel(){
 // ---------- design/97 V1, V3: the viewer, full size, with zoom, pan, arrows and the panel beside it ----------
 function viewList(id){const by=refsById(), r=by[id];if(!r)return [];const sh=r.shot_id?shotOf(r.shot_id):null;
   let list=sh&&sh.route==='graphic_sequence'?(sh.state_order||[]).map(x=>by[x]).filter(Boolean):sh?(data.references||[]).filter(x=>x.shot_id===sh.shot_id&&x.url&&x.status!=='rejected'):
-    (data.references||[]).filter(x=>x.element_id===r.element_id&&x.url&&['frame','supplied','web','isolated','sheet','style'].includes(x.kind));
+    (data.references||[]).filter(x=>x.element_id===r.element_id&&x.url&&['frame','supplied','web','isolated','sheet','style','component'].includes(x.kind));   // design/117 P1
   if(!list.some(x=>x.id===id))list.unshift(r);return list;}
 function openViewer(id){const list=viewList(id);if(!list.length)return;view={list:list,i:Math.max(0,list.findIndex(x=>x.id===id)),z:1,x:0,y:0};drawViewer();}
 function closeViewer(){view=null;drawViewer();}
@@ -636,7 +644,8 @@ function shotState(s){   // design/86 K3: whose turn it is on this shot, and how
   const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected&&!takeRejected(k));
   if(s.route==='drawn'){   // design/113 E3: a drawing has no start or end image; it is rendered, free, and judged here
     if(s.takes.some(k=>k.selected))return ['ok','Drawing approved.'];
-    if(ready)return ['you','Your turn: watch the drawing and select it, or reject it with what to change.'];
+    if(ready&&s.takes.some(k=>k.status==='ready'&&!takeRejected(k)&&k.check&&(k.check.must_failed||[]).length))return ['you','Held: a line still failed after the server\'s passes. Look at the sheet; select the drawing with your reason, or reject it.'];   // design/117 answer 1
+    if(ready)return ['you','Your turn: look at the sheet and the drawing; select it, or reject it with what to change.'];
     if(open)return ['wait','Rendering the drawing, a few seconds. The page refreshes itself.'];
     if(s.takes.some(takeRejected))return ['assistant','Rejected: the assistant revises the scene and renders again, free. Nothing to do here.'];
     return ['assistant','Waiting for the assistant to render the drawing (vw visuals draw). Nothing to do here.'];

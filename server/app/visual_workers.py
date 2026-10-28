@@ -67,12 +67,14 @@ def process_image(job):
         if not raw_path.exists():
             dispatched = True
             if req['op'] == 'generate':
-                r = _openai('/images/generations', json={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality'], 'output_format': 'png', 'n': 1})
+                r = _openai('/images/generations', json={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality'], 'output_format': 'png', 'n': 1,
+                                                         **({'background': req['background']} if req.get('background') else {})})   # design/117 P1: a component's transparent background
             else:
                 files = [('image[]', (p['id'] + '.png', store.get(p['key']), 'image/png')) for p in req['parents']]
                 if req.get('region'):   # design/111 F11: the edit is masked to its region
                     files.append(('mask', ('mask.png', region_mask(store.get(req['parents'][0]['key']), req['region']), 'image/png')))
-                r = _openai('/images/edits', data={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality']}, files=files)
+                r = _openai('/images/edits', data={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality'],
+                                                   **({'background': req['background']} if req.get('background') else {})}, files=files)
             if r.status_code == 404 or (r.status_code == 400 and 'model' in r.text.lower() and 'not' in r.text.lower()):
                 return 'rejected', {'failure': 'MODEL_UNAVAILABLE', 'http_status': r.status_code}, f"OpenAI reports the model {req['model']} is unavailable on this account.", None, None
             if r.status_code >= 500 or r.status_code == 429:   # design/82 U3: back to the queue 1, 2 then 4 minutes later; the fourth attempt is rejected
@@ -340,61 +342,105 @@ def check_take(job, result):
 
 
 def process_drawn(job):
-    """design/113 E2: render the shot's scene (free, no provider). Returns (status, result, error, cost, retry_in)."""
-    from . import drawn
+    """design/117 P3, P4: the shot's SVG scene checked by the rules and measured, rendered in Chromium, its contact sheet read by Gemini against the shot's
+    lines with the style and the shot's pictures, the SVG corrected and rendered again up to DRAWN_PASSES times, the best pass kept (fewest must failures).
+    Free (no video provider). Returns (status, result, error, cost, retry_in)."""
+    from . import drawn, image_check, svg_scene
+    from .analysis_jobs import transport_factory
     req, jid = job['request'], str(job['id'])
     store = storage()
     folder = SPOOL / jid
-    video_path = folder / 'output.mp4'
     try:
         request = json.loads(store.get(req['request_key']).decode('utf-8'))
-        images = {rid: store.get(k) for rid, k in (request.get('images') or {}).items()}
+        svg0 = store.get(request['svg_key']).decode('utf-8')
+        images = {rid: ('image/png', store.get(k)) for rid, k in (request.get('images') or {}).items()}
+        fonts = {'Noto Sans': drawn.font_file().read_bytes()}
         if request.get('font_key'):
-            fp = folder / Path(request['font_key']).name
-            durable(fp, store.get(request['font_key']))
-            request = {**request, 'font': str(fp)}
-        drawn.render(request, video_path, images)
-        first, last = drawn.frame_png(request, 0, images), drawn.frame_png(request, int(request['frames']) - 1, images)   # design/113 E3: the two frames the check reads
-        store.put(f"{job['run_id']}/visuals/drawn/{jid}-first.png", first, 'image/png')
-        store.put(f"{job['run_id']}/visuals/drawn/{jid}-last.png", last, 'image/png')
-        data = video_path.read_bytes()
+            fonts[request.get('font_name') or 'Brand'] = store.get(request['font_key'])
+        refs = {rid: {'status': 'approved'} for rid in images}
+        W, H = int(request['width']), int(request['height'])
+        actions = request['scene'].get('actions') or []
+
+        def problems_of(svg):
+            out = svg_scene.check(svg, fonts=tuple(fonts), refs=refs)
+            if not out:
+                root = svg_scene.parse(svg)
+                out = svg_scene.action_problems(actions, root) + svg_scene.spec_problems(root, request.get('spec'))
+            if not out:
+                out = [f"text '{b['text'][:40]}' leaves the safe area (the inner 90 % of the frame)" for b in drawn.outside(drawn.measure(svg, W, H, fonts, images), W, H)]
+            return out
+
+        bad = problems_of(svg0)
+        if bad:
+            return 'failed', {'phase': 'rules', 'problems': bad[:6]}, 'The scene cannot be rendered: ' + '; '.join(bad[:4]), None, None
+        style_png = store.get(request['style_key']) if request.get('style_key') else None
+        pictures = ([('the approved style', style_png)] if style_png else []) + [(f'picture {rid}', data) for rid, (_, data) in images.items()]
+        asks = image_check.drawn_asks(request, [x for _, x in svg_scene.texts_of(svg_scene.parse(svg0))])
+        planned, fps = int(request['frames']), Fraction(str(request['fps']))
+        exact = planned / fps
+        keep = set(drawn.sheet_indexes(str(fps), planned))
+        rules = 'viewBox of the film\'s aspect; only plain SVG shapes, text, g, use, gradients, filters, clipPath and mask; no script, no style element, no animation, no external links; '
+        rules += 'image href only ref:<id> as given; fonts ' + ', '.join(fonts) + '; colours #RRGGBB, none or url(#id); every text at least 4 % of the frame height and at most eight words, inside the inner 90 % of the frame.'
+        passes, svg = [], svg0
+        for p in range(1, image_check.DRAWN_PASSES + 1):
+            path = folder / f'pass-{p}.mp4'
+            try:
+                out = drawn.render(request, path, svg, images, fonts, keep=keep)
+            except Exception:   # design/117 §5: a crashed browser is started again once
+                drawn.reset()
+                out = drawn.render(request, path, svg, images, fonts, keep=keep)
+            sheet = drawn.sheet(out['kept'], str(fps), W, H)
+            ev = probe(path)
+            code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(ev['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(ev['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},
+                    {'check': 'size', 'weight': 'must', 'pass': (ev.get('width'), ev.get('height')) == (W, H), 'seen': f"{ev.get('width')}x{ev.get('height')} for {W}x{H}"}]
+            rec = image_check.drawn_sheet_check(sheet, pictures, asks, f"{request.get('view') or ''} drawing of the shot {request.get('shot_id')}", transport_factory)
+            entry = {'pass': p, 'path': path, 'sheet': sheet, 'svg': svg, 'evidence': ev, 'code': code, 'lines': code + list(rec.get('lines') or []),
+                     'must_failed': [c for c in code if c['pass'] is False] + list(rec.get('must_failed') or []), 'model': rec.get('model'), **({'error': rec['error']} if rec.get('error') else {})}
+            passes.append(entry)
+            if not entry['must_failed'] or rec.get('error') or p == image_check.DRAWN_PASSES:
+                break
+            fix = image_check.drawn_fix(svg, sheet, entry['must_failed'], rules, transport_factory)
+            if fix.get('error') or not fix.get('svg'):
+                entry['fix_error'] = fix.get('error') or 'the model returned no SVG'
+                break
+            probs = problems_of(fix['svg'])
+            if probs:
+                entry['fix_dropped'] = probs[:3]
+                break
+            entry['changed'] = fix.get('changed') or ''
+            svg = fix['svg']
+        best = min(passes, key=lambda e: (len(e['must_failed']), -e['pass']))
+        data = Path(best['path']).read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         k = f"{job['run_id']}/visuals/drawn/{jid}.mp4"
         store.put(k, data, 'video/mp4')
-        evidence = probe(video_path)
-        planned, fps = int(request['frames']), Fraction(str(request['fps']))
-        exact = planned / fps
+        for e in passes:
+            store.put(f"{job['run_id']}/visuals/drawn/{jid}-sheet-{e['pass']}.jpg", e['sheet'], 'image/jpeg')
+        sheet_key = f"{job['run_id']}/visuals/drawn/{jid}-sheet-{best['pass']}.jpg"
+        fixed_key = None
+        if best['svg'] != svg0:
+            fixed_key = f"{job['run_id']}/visuals/drawn/{jid}-fixed.svg"
+            store.put(fixed_key, best['svg'].encode('utf-8'), 'image/svg+xml')
+        evidence = dict(best['evidence'])
         evidence.update(requested_duration_seconds=float(exact), placement=request['placement'], creative_approval=False, **timing_evidence(evidence['duration_seconds'], str(exact)))
-        code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(evidence['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(evidence['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},
-                {'check': 'size', 'weight': 'must', 'pass': (evidence.get('width'), evidence.get('height')) == (int(request['width']), int(request['height'])), 'seen': f"{evidence.get('width')}x{evidence.get('height')}"}]
-        return 'ready', {'provider_id': 'drawn', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': code,
-                         'first_png_key': f"{job['run_id']}/visuals/drawn/{jid}-first.png", 'last_png_key': f"{job['run_id']}/visuals/drawn/{jid}-last.png"}, None, {'provider': 'drawn', 'seconds': float(exact), 'inr': 0}, None
+        check = {'lines': best['lines'], 'must_failed': best['must_failed'], 'model': best.get('model'), 'best_pass': best['pass'], 'sheet_key': sheet_key, 'fixed_svg_key': fixed_key,
+                 'passes': [{'pass': e['pass'], 'failed': [l['check'] for l in e['must_failed']], **{x: e[x] for x in ('changed', 'fix_dropped', 'fix_error', 'error') if e.get(x)}} for e in passes],
+                 **({'error': best['error']} if best.get('error') else {})}
+        return 'ready', {'provider_id': 'drawn', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': best['code'], 'sheet_key': sheet_key, 'fixed_svg_key': fixed_key,
+                         'check': check}, None, {'provider': 'drawn', 'seconds': float(exact), 'inr': 0}, None
     except Exception as exc:   # a render that fails is reported, never retried blindly
         return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
 
 
 def check_drawn(job, result):
-    """design/113 E3: the rendered drawing's lines on the session like a take's: the code lines (frames, size), then one Gemini read of the first and
-    last frame against the shot's claims, the spec's relationships, every label and the view (SK's answer 3). Never raises; never holds the drawing back."""
-    from . import image_check
-    from .analysis_jobs import transport_factory
+    """design/117 P4: the loop's record (the lines of the best pass, every pass, the sheet) kept on the session like a take's check. Never raises."""
     store = storage()
     try:
-        request = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
-        texts = [l['text'] for l in request.get('labels') or []] + [s['text'] for s in request['scene'].get('shapes') or [] if s.get('kind') == 'text' and s.get('text')]
-        asks = ([{'check': 'claim: ' + c, 'pass_when': f'the drawing shows that {c}, plainly, without the narration', 'weight': 'must'} for c in request.get('claims') or []]
-                + [{'check': 'relationship: ' + r, 'pass_when': f'in the drawing, {r}', 'weight': 'must'} for r in request.get('relationships') or []]
-                + [{'check': 'label: ' + t, 'pass_when': f'the label reads exactly "{t}", spelled as written, readable', 'weight': 'must'} for t in texts]
-                + ([{'check': 'view: ' + request['view'], 'pass_when': f"the drawing is a {request['view']} view", 'weight': 'must'}] if request.get('view') else []))
-        first, last = store.get(result['first_png_key']), store.get(result['last_png_key'])
-        rec = image_check.drawn_lines_check(first, last, asks, f"{request.get('view') or ''} drawing of the shot {request.get('shot_id')}", transport_factory)
         with connect() as conn:
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             k = f"{job['run_id']}/visuals/session.json"
             session = json.loads(store.get(k).decode('utf-8'))
-            code = [dict(c) for c in result.get('code') or []]
-            session.setdefault('take_checks', {})[str(job['id'])] = {'lines': code + list(rec.get('lines') or []), 'must_failed': [c for c in code if c.get('pass') is False] + list(rec.get('must_failed') or []),
-                                                                  'model': rec.get('model'), **({'error': rec['error']} if rec.get('error') else {})}
+            session.setdefault('take_checks', {})[str(job['id'])] = result.get('check') or {'lines': list(result.get('code') or []), 'must_failed': [c for c in result.get('code') or [] if c.get('pass') is False]}
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
     except Exception:   # a drawing is never held back by its check
         return

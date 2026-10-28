@@ -30,7 +30,7 @@ from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TY
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
-REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state', 'style')   # design/65: a state of a graphic sequence, generated from the previous state
+REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state', 'style', 'component')   # design/117 P1: a thing alone on a transparent background, placed by SVG scenes   # design/65: a state of a graphic sequence, generated from the previous state
 TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video', 'drawn')   # design/113
 DISSOLVE_S = 0.5   # between the states of a graphic sequence
 MAX_INPUTS = 16    # design/71 P2: GPT Image's limit on input pictures (the library's fact sheet A5)
@@ -495,7 +495,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                  'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
                                                  'reviews': [{k: rv.get(k) for k in ('decision', 'notes', 'quote', 'by')} for rv in session['reviews'].get(str(j['id']), [])],
                                                  'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j),
-                                                 'check': (session.get('take_checks') or {}).get(str(j['id']))})   # design/91 N3
+                                                 'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key')) if res.get('sheet_key') else None})   # design/91 N3; design/117 P4
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
         entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, **_accepted_words(session, gid)}
@@ -2019,7 +2019,14 @@ def generate_image(conn, store, user, run, outputs, body):
     need((body['kind'] == 'style') == (body['element_id'] == STYLE), f'The style sheet is kind style with element {STYLE}, and only it.')   # design/89 C2
     element = {'id': STYLE, 'kind': 'style'} if body['element_id'] == STYLE else next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
-    need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style'), 'Generated references are isolated, sheet, keyframe, state or style.')
+    need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
+    if body['kind'] == 'component':   # design/117 P1: a thing alone, in the approved style, on a transparent background; the style picture is Image 1
+        need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
+        style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
+        need(style_ref, 'A component is made in the approved style: approve the style picture first (the Pictures step).')
+        if style_ref['id'] not in (body.get('parents') or []):
+            body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
+        body = {**body, 'prompt': with_composed(body['prompt'], COMPONENT_BLOCK.format(name=element.get('name') or body['element_id']))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
     writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own
     for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
@@ -2126,6 +2133,8 @@ def generate_image(conn, store, user, run, outputs, body):
         need(False, f'An end image is an edit inside one region of its start (design/112 S2): give --region left,top,width,height (fractions of the frame, a third at most) covering where {whats} happens; '
                     'the server masks it and copies the start back outside it, so nothing else moves. Several places, or the framing itself: make the shot start-only (end_state_exact false) and let the motion carry the change.')
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
+    if body['kind'] == 'component':
+        lines = list(lines or []) + COMPONENT_LINES
     if body.get('end_prompt') and not body.get('end_region') and not body.get('fix_of'):   # design/112 S2: the end the server queues needs its region too
         warns.append('the end written with this start has no region: the server will refuse to make it (design/112 S2); give --end-region left,top,width,height with the start')
     if body['kind'] == 'keyframe' and not is_end and named is not None:
@@ -2197,6 +2206,10 @@ LABEL_BARE = re.compile(r'^\s*[\d.,]+\s*$')
 WORLD_LINE = {'check': "the film's world", 'pass_when': 'the subject is in a real place of the film (its ground, light and surroundings), not on a plain studio or neutral '
                                                        'background, and not an object alone out of its place of use', 'weight': 'should'}   # design/91 N9, N11
 STYLE = '_STYLE'   # design/89 C2: the film's style sheet, one picture every graphic is made from
+COMPONENT_BLOCK = ('Image 1 is the approved style of this film: take its palette, line and finish from it. One {name} alone, nothing else in the frame, '
+                   'on a transparent background: no ground, no setting, no shadow outside its own edge, the whole thing inside the frame.')   # design/117 P1
+COMPONENT_LINES = [{'check': 'one thing only', 'pass_when': 'one thing alone: no background, no ground, no setting, no second object, no shadow outside its edge', 'weight': 'must'},
+                   {'check': 'clean edge', 'pass_when': 'the edge of the thing is clean and nothing of it is cut off by the frame', 'weight': 'must'}]
 
 
 def spec_digest(spec):
@@ -2449,7 +2462,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     frame = default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), {})   # design/71 P3: the size follows the brief's frame
     first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
     size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
-    request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size,
+    request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size, **({'background': 'transparent'} if body['kind'] == 'component' else {}),
                'quality': body.get('quality') or 'high', 'parents': [{'id': p['id'], 'key': p['key'], 'sha256': p['sha256']} for p in parents],
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
                              **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
@@ -2457,7 +2470,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
                **({'region': body['region']} if body.get('region') else {})}
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
                        (run['id'], ref_id, Jsonb(request), request_id)).fetchone()
-    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents') + (('region',) if request.get('region') else ())},
+    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents') + (('background',) if request.get('background') else ()) + (('region',) if request.get('region') else ())},
                                      **({'answer': answer} if answer is not None else {}), **({'pending_end': pending_end} if pending_end else {}),
                                      **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
@@ -3221,6 +3234,8 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     prep = load_json(store, job['request']['request_key'])
     if prep.get('kind') == 'drawn':   # design/113 E3: a drawing stands on the plan it was rendered from
         need(prep.get('plan_digest') == digest(current_plan(store, session)), 'The plan changed since this drawing was rendered; render it again (`vw visuals draw --shot S`).')
+        failed = [l.get('check') for l in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('must_failed') or []]   # design/117 answer 1: held after the loop
+        need(not failed or str(notes or '').strip(), f"This drawing is held: {', '.join(failed)} still failed after the server's passes. Select it with --notes saying why it is taken anyway, or reject it with what to change.")
         context = prep['plan_digest']
     else:
         live = packet(store, run, outputs, job['unit'], session)
@@ -3237,33 +3252,41 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
 # ---------- design/113 E2, E4: the drawn graphic rendered by the server, free, reviewed like a take ----------
 
 def render_drawn(conn, store, user, run, outputs, body):
-    """The plan's scene of a drawn shot, rendered at the film's size and frame rate: the spec approved first (E5), the cues from the timed
-    narration, the server's size labels, the run's brand font; cached by the request's digest; never counted against the cap."""
-    from . import drawn
-    from .visual_contract import drawn_labels
+    """design/117 P3: the plan's SVG scene of a drawn shot, rendered at the film's size and frame rate in the worker: the scene uploaded and named by the
+    plan, its pictures approved, the spec approved when the shot has one (E5), the cues from the timed narration, the run's brand font, the style and the
+    palette for the read; cached by the request's digest; never counted against the cap."""
+    from . import drawn, svg_scene
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, body['shot_id']))
-    need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_drawn).")
+    need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_svg).")
     _no_question(session, shot['id'])   # design/110 rule 0
+    sv = shot.get('scene_svg') or {}
+    row = (session.get('scenes') or {}).get(sv.get('sha256') or '')
+    need(row, f"the plan's scene_svg of {shot['id']} names no uploaded scene: upload it (`vw visuals scene --shot {shot['id']} --file scene.svg`) and put its sha256 in the plan (design/117 P2).")
     spec = shot.get('drawing_spec')
-    need(spec and (session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-         f"the drawing spec of {shot['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {shot['id']} --quote`, or on the page) before the drawing is rendered (design/113 E5).")
+    if spec:
+        need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
+             f"the drawing spec of {shot['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {shot['id']} --quote`, or on the page) before the drawing is rendered (design/113 E5).")
     fps = session['source']['fps']
     res = session['source'].get('resolution') or [1920, 1080]   # defect 33: a run stores [1920, 1080] (the master's summary), the fixtures '1920x1080'; both read, as defect 26 did
     W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
     words = ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words')
-    cues = guarded(lambda: drawn.cue_seconds(shot['scene_drawn'], shot, words, fps))
+    cues = guarded(lambda: drawn.cue_seconds(sv, shot, words, fps))
+    svg_text = store.get(row['key']).decode('utf-8')
     images = {}
-    for s in shot['scene_drawn'].get('shapes') or []:
-        if s['kind'] == 'image':
-            ref = session['references'].get(s.get('image_ref'))
-            need(ref and ref.get('status') == 'approved' and ref.get('key'), f"shape '{s['id']}' names {s.get('image_ref')}, which is not an approved picture of this run.")
-            images[s['image_ref']] = ref['key']
+    for rid in svg_scene.image_refs(guarded(lambda: svg_scene.parse(svg_text))):
+        ref = session['references'].get(rid)
+        need(ref and ref.get('status') == 'approved' and ref.get('key'), f"the scene places ref:{rid}, which is not an approved picture of this run.")
+        images[rid] = ref['key']
+    style = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved' and r.get('key')), None)
     frames = shot['end_frame'] - shot['start_frame']
     exact = Fraction(frames) / Fraction(str(fps))
-    request = {'kind': 'drawn', 'shot_id': shot['id'], 'scene': shot['scene_drawn'], 'labels': drawn_labels(shot), 'width': W, 'height': H, 'fps': str(fps), 'frames': frames, 'cues': cues,
-               'images': images, 'plan_digest': digest(plan), **({'font_key': session['font']['key']} if session.get('font') else {}),
-               'claims': shot.get('claims') or [], 'relationships': spec.get('relationships') or [], 'view': spec_view(shot)[0],   # design/113 E3: what the two-frame read asks
+    request = {'kind': 'drawn', 'shot_id': shot['id'], 'scene': {'sha256': sv['sha256'], 'actions': sv.get('actions') or []}, 'svg_key': row['key'], 'width': W, 'height': H, 'fps': str(fps),
+               'frames': frames, 'cues': cues, 'images': images, 'plan_digest': digest(plan), 'style_key': style['key'] if style else None,
+               'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
+               **({'font_key': session['font']['key'], 'font_name': Path(session['font']['name']).stem} if session.get('font') else {}),
+               'claims': shot.get('claims') or [], 'relationships': (spec or {}).get('relationships') or [], 'view': spec_view(shot)[0] if spec else None,
+               'spec': {'dimensions': (spec or {}).get('dimensions') or []},   # design/117 P2: the sizes checked against the scene's text at render
                'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
     identity = digest(request)
     key_ = key(run, f'takes/{identity}.drawn.json')
@@ -3273,10 +3296,49 @@ def render_drawn(conn, store, user, run, outputs, body):
     if same:
         save_session(store, run, session)
         return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this scene (nothing changed): see it on the Takes step.'}
-    row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
-                       (run['id'], shot['id'], Jsonb({'kind': 'drawn', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': float(exact)}))).fetchone()
+    row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
+                        (run['id'], shot['id'], Jsonb({'kind': 'drawn', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': float(exact)}))).fetchone()
     save_session(store, run, session)
-    return {'job_id': str(row['id']), 'preparation_id': identity, 'frames': frames, 'next': f'Rendering {frames} frames, free: it appears on the Takes step in a few seconds; approve it there or reject it with what to change.'}
+    return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames,
+            'next': f'Rendering {frames} frames, free: the server reads a sheet of every frame, fixes the scene up to twice, then shows the drawing and its sheet on the Takes step; '
+                    'select it there or reject it with what to change.'}
+
+
+def set_scene(store, user, run, outputs, shot_id, name, content):
+    """design/117 P2: a drawn shot's SVG scene, one file kept with the run and named by the plan through its sha256; refused with the reasons when it
+    breaks a rule (never rendered). The plan's scene_svg points at it."""
+    from . import svg_scene
+    session = session_of(store, run, outputs)
+    need(re.search(r'\.svg$', name or '', re.I), 'The scene is one .svg file.')
+    need(content and len(content) <= svg_scene.MAX_BYTES, f'The scene file is empty or over {svg_scene.MAX_BYTES // 1_000_000} MB: use <use> for repeats and components for things.')
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError:
+        need(False, 'The scene is not UTF-8 text.')
+    fonts = ('Noto Sans',) + ((Path(session['font']['name']).stem,) if session.get('font') else ())
+    problems = svg_scene.check(text, fonts=fonts, refs=session['references'])
+    need(not problems, 'The scene breaks the rules (design/117 P2): ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    sha = hashlib.sha256(content).hexdigest()
+    k = f"{run['id']}/visuals/scenes/{sha}.svg"
+    store.put(k, content, 'image/svg+xml')
+    session.setdefault('scenes', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    root = svg_scene.parse(text)
+    return {'sha256': sha, 'bytes': len(content), 'ids': list(svg_scene.ids_of(root)), 'pictures': svg_scene.image_refs(root), 'texts': [x for _, x in svg_scene.texts_of(root)],
+            'next': f"Scene stored. Put scene_svg: {{sha256: {sha}, actions: [...]}} on {shot_id} in the plan, then `vw visuals draw --shot {shot_id}`."}
+
+
+def scene_of(conn, store, run, outputs, shot_id):
+    """design/117 P4: the shot's latest rendered scene as the loop left it (the fixed SVG when a pass changed it, else the plan's), for the planner to take back."""
+    session = session_of(store, run, outputs)
+    jobs_ = [j for j in take_jobs(conn, run, shot_id) if j.get('provider') == 'drawn' and j['status'] == 'ready']
+    need(jobs_, f'{shot_id} has no rendered drawing yet.')
+    res = jobs_[-1].get('result') or {}
+    if res.get('fixed_svg_key'):
+        return {'shot_id': shot_id, 'job_id': str(jobs_[-1]['id']), 'fixed': True, 'svg': store.get(res['fixed_svg_key']).decode('utf-8'),
+                'passes': ((session.get('take_checks') or {}).get(str(jobs_[-1]['id'])) or {}).get('passes')}
+    prep = load_json(store, jobs_[-1]['request']['request_key'])
+    return {'shot_id': shot_id, 'job_id': str(jobs_[-1]['id']), 'fixed': False, 'svg': store.get(prep['svg_key']).decode('utf-8')}
 
 
 def set_font(store, user, run, outputs, name, content):

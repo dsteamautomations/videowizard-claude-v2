@@ -194,32 +194,6 @@ GROUP_WORDS = re.compile(r'\b(people|workers|labourers|villagers|onlookers|bysta
 Num = float | int
 
 
-class DrawnShape(Model):   # design/113 E1: a shape of a drawn graphic, plain data in the canvas's units
-    id: str = Field(min_length=1, max_length=40, pattern=r'^[A-Za-z0-9_-]+$')
-    kind: Literal['rect', 'line', 'arrow', 'circle', 'polygon', 'text', 'image', 'group', 'repeat']
-    x: Num | None = None
-    y: Num | None = None
-    w: Num | None = None
-    h: Num | None = None
-    x2: Num | None = None
-    y2: Num | None = None
-    r: Num | None = None
-    points: list[list[Num]] = Field(default_factory=list, max_length=200)
-    text: str = Field(default='', max_length=200)
-    size_pct: Num = 4            # text height as a share of the frame height
-    bold: bool = False
-    stroke: str = Field(default='', max_length=7)   # #RRGGBB
-    fill: str = Field(default='', max_length=7)
-    weight: Num = 2              # stroke width in px at the film's size
-    dim: str = Field(default='', max_length=200)    # the spec dimension this length draws ('leaf thickness')
-    members: list[str] = Field(default_factory=list, max_length=100)   # group
-    of: str = Field(default='', max_length=40)     # repeat: the shape repeated
-    count: int = 0
-    dx: Num = 0
-    dy: Num = 0
-    image_ref: str = Field(default='', max_length=100)   # image: an approved reference id
-
-
 class DrawnAction(Model):   # design/113 E1: keyed to a second of the shot or a word of its narration
     kind: Literal['appear', 'build', 'move', 'highlight', 'fade']
     ids: list[str] = Field(min_length=1, max_length=100)
@@ -230,105 +204,34 @@ class DrawnAction(Model):   # design/113 E1: keyed to a second of the shot or a 
     seconds: Num = 1             # move, highlight, fade
 
 
-class DrawnLabel(Model):   # design/113 answer 2: the planner may move a server-placed size label
-    dim: str = Field(min_length=1, max_length=200)
-    x: Num
-    y: Num
-
-
-class DrawnScene(Model):   # design/113 E1: the declarative scene; never code
-    unit: Literal['mm', 'cm', 'm', '%']
-    width: Num = Field(gt=0)
-    height: Num = Field(gt=0)
-    background: str = Field(default='#FFFFFF', max_length=7)
-    shapes: list[DrawnShape] = Field(min_length=1, max_length=300)
+class SvgScene(Model):   # design/117 P2: the scene is one SVG file (data, never code), uploaded apart from the plan and named here by its hash
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
     actions: list[DrawnAction] = Field(default_factory=list, max_length=100)
-    labels: list[DrawnLabel] = Field(default_factory=list, max_length=60)
 
 
-DRAWN_TEXT_MIN_PCT, DRAWN_SAFE = 4, 0.05   # design/91 N13's label minimum; the safe area is the inner 90 % of the canvas
 HEX = re.compile(r'^#[0-9A-Fa-f]{6}$')
-NEEDS = {'rect': ('x', 'y', 'w', 'h'), 'image': ('x', 'y', 'w', 'h'), 'text': ('x', 'y'), 'line': ('x', 'y', 'x2', 'y2'), 'arrow': ('x', 'y', 'x2', 'y2'), 'circle': ('x', 'y', 'r')}
+FIGURE = re.compile(r'\d')
 
 
 def _dim_key(d):
     return f'{d.part} {d.measure}'.strip().lower() if hasattr(d, 'part') else f"{d.get('part', '')} {d.get('measure', '')}".strip().lower()
 
 
-def drawn_needs(shot, seconds):
-    """design/113 E1, E5: the scene is complete and drawable: ids once, the geometry each kind needs, colours as #RRGGBB, text readable and inside the
-    safe area, every dim a dimension of the spec, no figure for an unknown size, every action keyed and naming shapes."""
+def svg_needs(shot, seconds):
+    """design/117 P2: a drawn shot names its uploaded scene and keys every action inside the shot; the spec is required when the shot carries figures
+    (a claim with a number), and its sizes are checked against the scene's text at render, when the file is read."""
     label = f'shot {shot.id}'
-    need(shot.scene_drawn is not None, f'{label}: {shot.id} is drawn: give scene_drawn (the canvas, the shapes in real units, the actions) (design/113 E1).')
-    need(shot.drawing_spec is not None, f'{label}: {shot.id} is drawn: it needs a drawing_spec (the sourced sizes, design/89 D) approved on the References step; its units are the scene\'s (design/113 E5).')
-    sc, spec = shot.scene_drawn, shot.drawing_spec
-    ids = {}
-    for s in sc.shapes:
-        need(s.id not in ids, f"{label}: shape id '{s.id}' twice.")
-        ids[s.id] = s
-        missing = [k for k in NEEDS.get(s.kind, ()) if getattr(s, k) is None]
-        need(not missing, f"{label}: shape '{s.id}' ({s.kind}) needs {', '.join(NEEDS.get(s.kind, ()))}.")
-        need(s.kind != 'polygon' or len(s.points) >= 3, f"{label}: shape '{s.id}' (polygon) needs three points or more.")
-        need(s.kind != 'text' or s.text.strip(), f"{label}: shape '{s.id}' (text) needs its text.")
-        need(s.kind != 'repeat' or (s.count >= 2 and s.of), f"{label}: shape '{s.id}' (repeat) needs of (a shape) and count (2 or more).")
-        for c in (s.stroke, s.fill, sc.background):
-            need(not c or HEX.match(c), f"{label}: colour '{c}' on '{s.id}': give #RRGGBB.")
-        if s.kind == 'text':
-            need(s.size_pct >= DRAWN_TEXT_MIN_PCT, f"{label}: text '{s.id}' is {s.size_pct} % of the frame height: at least {DRAWN_TEXT_MIN_PCT} % (design/91 N13).")
-            need(DRAWN_SAFE * sc.width <= s.x <= (1 - DRAWN_SAFE) * sc.width and DRAWN_SAFE * sc.height <= s.y <= (1 - DRAWN_SAFE) * sc.height,
-                 f"{label}: text '{s.id}' sits outside the safe area (the inner 90 % of the canvas).")
-    for s in sc.shapes:
-        for ref in list(s.members) + ([s.of] if s.of else []):
-            need(ref in ids, f"{label}: '{s.id}' names '{ref}', which is not a shape.")
-        if s.dim:
-            need(s.dim.strip().lower() in {_dim_key(d) for d in spec.dimensions}, f"{label}: '{s.id}': dim '{s.dim}' is not a dimension of the spec ({', '.join(_dim_key(d) for d in spec.dimensions)}).")
-    for d in spec.dimensions:   # design/106 D6: an unknown size never shows a figure
-        if d.status == 'unknown':
-            for s in sc.shapes:
-                need(not (s.kind == 'text' and d.part.lower() in s.text.lower() and re.search(r'\d', s.text)),
-                     f"{label}: text '{s.id}' gives a figure for the {_dim_key(d)}; {_dim_key(d)} is unknown: no figure, the drawing carries the illustrative label (design/106 D6).")
-    known = {_dim_key(d) for d in spec.dimensions if d.status != 'unknown' and d.value is not None}
-    for lb in sc.labels:
-        need(lb.dim.strip().lower() in known, f'{label}: labels names {lb.dim}, which is unknown or not a dimension of the spec; the server labels the known sizes only.')
+    need(shot.scene_svg is not None, f'{label}: {shot.id} is drawn: give scene_svg (the uploaded SVG\'s sha256 and the actions) (design/117 P2).')
+    figures = any(FIGURE.search(c) for c in shot.claims)
+    need(shot.drawing_spec is not None or not figures, f'{label}: {shot.id} is drawn: it carries figures, so it needs a drawing_spec (the sourced sizes, design/89 D) approved on the References step.')
     words = ' '.join(_tokens(shot.narration))
-    for n, a in enumerate(sc.actions, 1):
-        for ref in a.ids:
-            need(ref in ids, f"{label}: action {n} names '{ref}', which is not a shape.")
+    for n, a in enumerate(shot.scene_svg.actions, 1):
         need((a.at_s is not None) != bool(a.word.strip()), f'{label}: action {n}: give at_s or word, one of the two.')
         if a.at_s is not None and seconds is not None:
             need(0 <= a.at_s <= seconds + 0.04, f'{label}: action {n} is at {float(a.at_s):.1f} s, past the end of {shot.id} ({seconds:.1f} s).')
         if a.word.strip():
             need(' '.join(_tokens(a.word)) in words, f"{label}: action {n}: the word '{a.word}' is not in the narration of {shot.id}.")
         need(a.kind != 'move' or len(a.path) >= 2, f'{label}: action {n}: move needs a path of two points or more.')
-        need(a.kind != 'build' or len(a.ids) >= 1, f'{label}: action {n}: build names the shapes in order.')
-
-
-def drawn_labels(shot):
-    """design/113 answer 2: the spec's known sizes as text shapes beside their parts: a planner-moved position when given, else just right of the shape
-    that draws the dimension (with a leader to it), else stacked at the left margin. Never dropped."""
-    sc, spec = shot.get('scene_drawn') or {}, shot.get('drawing_spec') or {}
-    if not sc or not spec:
-        return []
-    moved = {l['dim'].strip().lower(): l for l in sc.get('labels') or []}
-    by_dim = {s['dim'].strip().lower(): s for s in sc.get('shapes') or [] if s.get('dim')}
-    out, i = [], 0
-    for d in spec.get('dimensions') or []:
-        if d.get('status') == 'unknown' or d.get('value') is None:
-            continue
-        i += 1
-        k = _dim_key(d)
-        text = f"{k} {d['value']:g} {d.get('unit') or ''}".strip()
-        label = {'id': f'label-{i}', 'kind': 'text', 'text': text, 'size_pct': DRAWN_TEXT_MIN_PCT, 'stroke': '#222222', 'bold': False}
-        if k in moved:
-            label.update(x=moved[k]['x'], y=moved[k]['y'])
-        elif k in by_dim:
-            s = by_dim[k]
-            right, top = (s.get('x') or 0) + (s.get('w') or 0), s.get('y') or 0
-            label.update(x=right + 0.02 * sc['width'], y=top, leader=[right, top])
-        else:
-            label.update(x=0.02 * sc['width'], y=(0.05 + 0.06 * (i - 1)) * sc['height'])
-        out.append(label)
-    return out
 
 
 class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
@@ -361,7 +264,7 @@ class Shot(Model):
     motion: Literal['push_in', 'push_out', 'pan_left', 'pan_right', 'none'] = 'push_in'   # design/89 B2: a still or a graphic moves 5 % across its shot
     motion_reason: str = Field(default='', max_length=1000)   # why a still stays frozen (`none`)
     carries_text: bool = False   # design/112 K2, K4: the still shows words (a label, a title, a caption): push_in only, placed whole, never cropped or panned
-    scene_drawn: DrawnScene | None = None   # design/113 E1
+    scene_svg: SvgScene | None = None   # design/117 P2 (design/113 E1 was the primitive scene)
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
@@ -724,7 +627,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if shot.visual_type in GRAPHIC_TYPES and scenes is counted and (any(d.status != 'unknown' and d.value is not None for d in (shot.drawing_spec.dimensions if shot.drawing_spec else []))
                                                                                     or any(re.search(r'\d', c) for c in shot.claims)):   # design/113 E6: a warning until SK approves the sample (answer 6)
                         need(False, f'shot {shot.id} is a {shot.visual_type} with exact sizes or numbers: the drawn route is the default for technical diagrams, charts, maps and timelines '
-                                    '(visual_type drawn, a scene_drawn from the spec, rendered free and reviewed on the Takes step); an AI-painted graphic is for a look, never for a figure (design/113 E6, SK 27 Oct).')
+                                    '(visual_type drawn, an uploaded SVG scene named by scene_svg, rendered free and reviewed on the Takes step); an AI-painted graphic is for a look, never for a figure (design/113 E6, SK 27 Oct).')
                     if seconds is not None and shot.visual_type in GRAPHIC_TYPES + ('drawn',) and seconds < MIN_GRAPHIC_S:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
                     if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
@@ -790,8 +693,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                                  'for example a brick about 3 : 1.5 : 1, both leaves the same thickness; "illustrative" means no numbers printed, never free proportions'})
                             if any(d.status == 'unknown' for d in spec.dimensions):
                                 need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
-                    if shot.visual_type == 'drawn':   # design/113 E1, E5: after the spec's own checks, so a spec fault is named first
-                        drawn_needs(shot, seconds)
+                    if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
+                        svg_needs(shot, seconds)
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:
                             warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state' + NEXT_RELEASE})
