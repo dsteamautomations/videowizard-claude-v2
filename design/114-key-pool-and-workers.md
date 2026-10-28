@@ -55,3 +55,7 @@ The server spends the API quota for every run; the operators hold no key. Today 
 ## Not covered (known before the build)
 
 - Live quota behaviour of the providers (sampled on the week's runs, not benchmarked). OpenAI's per-organisation limits are not read from the API. ElevenLabs, Higgsfield and Apify stay on one key each. server/tests (Docker).
+
+## SK's answers (28 Oct 2026)
+
+1. Cooling: 60 s on a rate limit, 10 minutes on a quota or billing answer, 1 hour on a revoked key; constants in `keys.py`.
