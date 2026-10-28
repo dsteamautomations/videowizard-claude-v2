@@ -141,7 +141,7 @@ def read_timeline(text, fps):
     return cuts, int(round(Fraction(seq.get('duration').rstrip('s')) * fps)) if seq is not None else 0
 
 
-def cross_check(edit_dir, manifest):
+def cross_check(edit_dir, manifest, skip_roles=()):
     """design/107 Step D: every manifest file present with its size and fingerprint, the voiceover byte-identical, every cut pointing at a present file,
     the timeline's length and cut count equal to the approved film's."""
     edit_dir = Path(edit_dir)
@@ -150,7 +150,10 @@ def cross_check(edit_dir, manifest):
     tl = edit_dir / (manifest.get('timeline_file') or f"Timeline/{manifest.get('run')}.fcpxml")
     portable = tl.with_name(tl.name.replace('.fcpxml', '.portable.fcpxml'))
     src = portable if portable.exists() else tl   # review 27 Oct: once `download` wrote this computer's paths, the portable copy is what the manifest describes
+    skipped = {f['name'] for f in rows if f.get('role') in skip_roles}   # design/115 H2: the camera copies left out on purpose; the cuts link to the originals
     for f in rows:
+        if f['name'] in skipped:
+            continue
         p = src if edit_dir / f['name'] == tl else edit_dir / f['name']
         if not p.exists():
             problems.append(f"{f['name']}: missing")
@@ -160,7 +163,7 @@ def cross_check(edit_dir, manifest):
             problems.append(f"{f['name']}: {p.stat().st_size} bytes, the manifest says {f['bytes']}")
         elif f.get('sha256') and sha256_of(p) != f['sha256']:
             problems.append(f"{f['name']}: the fingerprint differs from the manifest's" + (' (the voiceover is not the approved one)' if f['name'].endswith('narration.mp3') else ''))
-    out = {'present': f'{present} of {len(rows)} files', 'cuts': 0, 'timeline_frames': 0, 'problems': problems}
+    out = {'present': f'{present} of {len(rows) - len(skipped)} files' + (f' ({len(skipped)} camera copies left out)' if skipped else ''), 'cuts': 0, 'timeline_frames': 0, 'problems': problems}
     if not src.exists():
         problems.append(f'{tl.name}: the timeline file is missing')
         out['ok'] = False
@@ -169,6 +172,8 @@ def cross_check(edit_dir, manifest):
     video = [c for c in cuts if c['lane'] == 1]
     out['cuts'], out['timeline_frames'] = len(video), frames
     for i, c in enumerate(video, 1):
+        if c['file'] in skipped:
+            continue
         if not (edit_dir / c['file']).exists():
             problems.append(f"cut {i}: {c['file']} is not in the folder")
     want = manifest.get('film_frames')

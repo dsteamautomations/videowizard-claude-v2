@@ -2095,14 +2095,19 @@ def cmd_delivery(a):
             _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
         manifest = _json_file(m, 'work/manifest.json')
         edit_dir = ws / 'edit'
-        download_bundle(m, manifest, into=edit_dir, roles=None)
-        rep = handoff.cross_check(edit_dir, manifest)
+        skip = () if a.camera else ('original',)   # design/115 H2: the camera copies are low resolution and the editor has the originals; `--camera` brings them
+        download_bundle(m, manifest, into=edit_dir, roles=None if a.camera else [r for r in {f['role'] for f in manifest['files']} if r != 'original'])
+        rep = handoff.cross_check(edit_dir, manifest, skip_roles=skip)
         if not rep['ok']:
             emit({'action': 'refused', 'check': rep, 'message': 'The download is incomplete or wrong: ' + '; '.join(rep['problems'][:6]) + '. Run `vw delivery download` again: only what is missing or wrong moves.'}, 2)
         handoff.write_timeline_for(edit_dir, manifest)
         how = handoff.free_route_text(m['code']) if found.get('edition') != 'studio' else \
-            'Resolve Studio found: `vw delivery open` imports the timeline into Resolve and reads it back (Resolve must be running with external scripting on).'
-        copies = " The camera files are copies made by an editor: get the originals' folder and run `vw delivery relink-check --originals \"<folder>\"` before the handover." if manifest.get('camera_copies') == 'copies' else ''   # design/107 §6
+            'Resolve Studio found: `vw delivery open --originals "<folder>"` links the camera cuts to the originals and imports the timeline into Resolve (Resolve must be running with external scripting on).'
+        if skip:
+            copies = " The camera copies were left out: the cuts name your originals (`vw delivery download --camera` brings the copies)."
+        else:
+            copies = ''
+        copies += " The camera files are copies made by an editor: get the originals' folder and run `vw delivery relink-check --originals \"<folder>\"` before the handover." if manifest.get('camera_copies') == 'copies' else ''   # design/107 §6
         emit({'resolve': found, 'check': rep, 'edit': str(edit_dir), 'open': how, 'camera_copies': manifest.get('camera_copies')}, 0, f"{words} {rep['present']} checked, {rep['cuts']} cuts, {rep['timeline_frames']} frames: the edit is in {edit_dir}.{copies} {how}")
     if a.what == 'open':   # design/107 Step F: Studio imports the timeline by scripting and reads it back; free Resolve gets the three steps
         found = handoff.find_resolve()
@@ -2113,8 +2118,20 @@ def cmd_delivery(a):
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import resolve_bridge
             manifest = _json_file(m, 'work/manifest.json')
+            relinked = None
+            if a.originals:   # design/115 H4: the relink check first; its corrected timeline is the one imported
+                import csv
+                rows = list(csv.DictReader((ws / 'edit' / 'Relink-list.csv').open(encoding='utf-8', newline='')))
+                try:
+                    rc = handoff.relink_check(ws / 'edit', m['code'], rows, a.originals)
+                except ValueError as exc:
+                    emit({'action': 'refused', 'message': f'The relink check could not read a timecode: {exc}. Fix the tag or leave it empty, then run again.'}, 2)
+                bad = [l for l in rc['lines'] if l.get('outcome') in ('missing', 'ask', 'by_hand')]
+                if bad:
+                    emit({'action': 'refused', 'relink': rc, 'message': 'The originals do not match every camera file: ' + ' '.join(l['line'] for l in bad[:4]) + ' Fix that first, or run `vw delivery open` without --originals and relink by hand.'}, 2)
+                relinked = rc.get('relinked')
             try:
-                report = resolve_bridge.studio_import(resolve_bridge.adapter(), ws / 'edit', manifest, m['code'])
+                report = resolve_bridge.studio_import(resolve_bridge.adapter(), ws / 'edit', manifest, m['code'], timeline=relinked)
             except (SystemExit, Exception) as exc:   # Resolve not running, scripting off, or an import failure: the free route still works
                 emit({'open': handoff.free_route_text(m['code']), 'studio_error': str(exc)}, 0, f'Resolve Studio could not import by scripting ({exc}). ' + handoff.free_route_text(m['code']))
             write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': 'Resolve Studio import by the plugin'})
@@ -2293,7 +2310,8 @@ def build_parser():
     s.add_argument('--accept-as-is', action='store_true'); s.add_argument('--frame-note', action='append'); s.set_defaults(fn=cmd_assembly)
     s = sub.add_parser('delivery'); s.add_argument('what', choices=['bundle', 'status', 'check', 'download', 'open', 'confirm', 'zip', 'relink-check', 'resolve', 'final'])   # design/107
     s.add_argument('--check', action='store_true'); s.add_argument('--run', dest='run_it', action='store_true'); s.add_argument('--inspect', action='store_true'); s.add_argument('--close', action='store_true')
-    s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.add_argument('--originals', help="relink-check: the folder that holds the camera originals (design/107)"); s.set_defaults(fn=cmd_delivery)
+    s.add_argument('--authorization'); s.add_argument('--note'); s.add_argument('--quote'); s.add_argument('--originals', help="relink-check, open: the folder that holds the camera originals (design/107, design/115)")
+    s.add_argument('--camera', action='store_true', help='download: bring the low-resolution camera copies too (left out by default, design/115)'); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     return p

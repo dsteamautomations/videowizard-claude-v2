@@ -33,7 +33,7 @@ def edit(tmp_path, bad=None, missing=None, cuts=CUTS, film_frames=400, n_cuts=2)
     shutil.rmtree(d, ignore_errors=True)   # each call is a fresh folder
     rows = []
     for name, body in (('Media/Camera/C1.MP4', b'camera' * 10), ('Media/AI/VS1.mp4', b'ai' * 10), ('Media/Voiceover/narration.mp3', b'voice' * 10), ('Approved-film.mp4', b'film' * 10)):
-        rows.append({'name': name, 'role': 'original', 'sha256': hashlib.sha256(body).hexdigest(), 'bytes': len(body)})
+        rows.append({'name': name, 'role': {'Camera': 'original', 'AI': 'ai', 'Voiceover': 'narration'}.get(name.split('/')[1] if '/' in name else '', 'film'), 'sha256': hashlib.sha256(body).hexdigest(), 'bytes': len(body)})
         if name != missing:
             (d / name).parent.mkdir(parents=True, exist_ok=True)
             (d / name).write_bytes(body[:-1] + b'!' if name == bad else body)
@@ -137,7 +137,7 @@ def cli(monkeypatch, tmp_path):
 
 
 def args(**kw):
-    base = {'what': 'check', 'check': False, 'run_it': False, 'inspect': False, 'close': False, 'authorization': None, 'note': None, 'quote': None}
+    base = {'what': 'check', 'check': False, 'run_it': False, 'inspect': False, 'close': False, 'authorization': None, 'note': None, 'quote': None, 'camera': False, 'originals': None}
     return argparse.Namespace(**{**base, **kw})
 
 

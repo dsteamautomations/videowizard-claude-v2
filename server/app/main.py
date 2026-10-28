@@ -1622,7 +1622,7 @@ def assembly_record(run_id: UUID, body: Quote, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/delivery/bundle', status_code=201)
 def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)
+    return _s2(conn, user, run_id, ('assembly', 'delivery'), body, lambda run, outputs: deliv.bundle(conn, storage(), user, run, outputs), 201)   # design/115 H1: the early package at the assembly step
 
 
 @app.post('/api/runs/{run_id}/delivery/resolve/reserve')

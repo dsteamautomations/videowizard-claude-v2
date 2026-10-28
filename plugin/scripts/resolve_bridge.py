@@ -214,12 +214,12 @@ def build(adapter, bundle_dir, manifest, run_code, out_dir):
             'drt_path': str(drt), 'project_export_path': str(project_export), 'check': adapter.check()}
 
 
-def studio_import(adapter, edit_dir, manifest, code):
+def studio_import(adapter, edit_dir, manifest, code, timeline=None):
     """design/107 Step F, Studio: import Timeline/VW-n.fcpxml, save, export .drp and .drt into Timeline/, read back and compare with the plan at 0 frames."""
     import handoff
     edit_dir = Path(edit_dir)
     adapter.project(code, manifest['timeline'])
-    adapter.import_timeline(edit_dir / 'Timeline' / f'{code}.fcpxml', code)
+    adapter.import_timeline(Path(timeline) if timeline else edit_dir / 'Timeline' / f'{code}.fcpxml', code)   # design/115 H4: the relinked timeline when the originals were checked
     drt = adapter.export_drt(edit_dir / 'Timeline' / f'{code}.drt')
     drp = adapter.export_project(edit_dir / 'Timeline' / f'{code}.drp')
     cuts = adapter.readback()

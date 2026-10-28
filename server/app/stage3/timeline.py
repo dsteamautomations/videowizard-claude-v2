@@ -32,7 +32,7 @@ def _path(src):
     return src[len(REL):] if src.startswith(REL) else src[len('file://'):] if src.startswith('file://') else src
 
 
-def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames):
+def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames, reference=True, captions=None):
     """design/107 §5. events: delivery.resolve_events rows (file, kind, source/record frames, source_fps, zoom, pan, tilt, rotation, colour group, marker, a2).
     One gap the length of the film is the primary story; every cut, the voiceover (lane -1), the nat sound (lane -2) and the switched-off reference track
     (lane 2) connect to it, so every offset is a film time."""
@@ -96,8 +96,9 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames)
         aid = asset(p.get('file') or 'Media/Voiceover/narration.mp3', 'audio', fps, p['source_out_frame'])
         ET.SubElement(gap, 'asset-clip', ref=aid, lane='-1', offset=_t(Fraction(p['record_in_frame']) / fps), name='Voiceover', start=_t(Fraction(p['source_in_frame']) / fps),
                       duration=_t(Fraction(p['source_out_frame'] - p['source_in_frame']) / fps), audioRole='dialogue.voiceover', enabled='1')
-    ref = asset('Approved-film.mp4', 'reference', fps, film_frames)
-    ET.SubElement(gap, 'asset-clip', ref=ref, lane='2', offset='0s', name=REFERENCE, start='0s', duration=_t(Fraction(film_frames) / fps), format=main, enabled='0')
+    if reference:   # design/115: the early package has no approved film to reference
+        ref = asset('Approved-film.mp4', 'reference', fps, film_frames)
+        ET.SubElement(gap, 'asset-clip', ref=ref, lane='2', offset='0s', name=REFERENCE, start='0s', duration=_t(Fraction(film_frames) / fps), format=main, enabled='0')
     for item in finishing or []:
         ET.SubElement(gap, 'marker', start=_t(Fraction(int(item.get('timeline_in_frame') or 0)) / fps), duration=_t(1 / fps), value=str(item.get('item') or '')[:200], note='finishing')
     for c in sfx_cues or []:
@@ -105,6 +106,12 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames)
         at = Fraction(e['record_in_frame']) / fps if e else Fraction(0)
         ET.SubElement(gap, 'marker', start=_t(at), duration=_t(1 / fps), value=f"SFX {c.get('sfx_type') or ''}".strip(),
                       note=(f"{c.get('description') or ''}" + (f" (clip time {c['start_tc']})" if c.get('start_tc') else '')).strip())
+    for i, c in enumerate(captions or [], 1):   # design/115 H3: the same cues as the .srt, on a caption track Resolve imports as subtitles
+        cap = ET.SubElement(gap, 'caption', lane='3', offset=_t(Fraction(c['start_frame']) / fps), name=f'Caption {i}', start='0s', duration=_t(Fraction(c['end_frame'] - c['start_frame']) / fps), role='iTT?captionFormat=ITT.en')
+        txt = ET.SubElement(cap, 'text', placement='bottom')
+        ET.SubElement(txt, 'text-style', ref='ts1').text = c['text']
+        if i == 1:
+            ET.SubElement(ET.SubElement(cap, 'text-style-def', id='ts1'), 'text-style', font='Noto Sans', fontSize='48', fontColor='1 1 1 1', alignment='center')
     ET.indent(root)
     return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE fcpxml>\n' + ET.tostring(root, encoding='unicode')
 

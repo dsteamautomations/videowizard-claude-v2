@@ -198,6 +198,8 @@ def visuals_info(store, run, outputs):
 
 def bundle(conn, store, user, run, outputs):
     session = session_of(store, run)
+    if not any(o['stage'] == 'assembly' and o['unit'] is None for o in outputs):   # design/115 H1: every shot placed, no assembly yet: the editor's early package
+        return bundle_early(conn, store, user, run, outputs, session)
     asm_o = S2._output(outputs, 'assembly')
     master_o = S2._output(outputs, 'master')
     voice_o = S2._output(outputs, 'voice')
@@ -272,6 +274,59 @@ def bundle(conn, store, user, run, outputs):
     session['resolve'] = None if (session.get('resolve') or {}).get('film_sha256') != film['sha256'] else session['resolve']
     save_session(store, run, session)
     return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the operator\'s computer (Windows or Mac): `vw pull <code>` then `vw delivery resolve --check`, then `--run --authorization "<operator words>"`'}
+
+
+def bundle_early(conn, store, user, run, outputs, session):
+    """design/115: the package once every gap is recorded and before the assembly: the narration, the camera cuts by name and time (the copies listed, not
+    required), the raw AI files, the timeline, the EDL, the relink list, the cut list and the captions. The proof copy and the final approval follow as before."""
+    from . import early as E
+    master_o, voice_o, media_o = S2._output(outputs, 'master'), S2._output(outputs, 'voice'), S2._output(outputs, 'media')
+    plan, _ = S2._file(store, master_o, f"master-v{master_o['summary']['version']}.json")
+    missing = E.gaps_missing(plan, outputs)
+    if missing:
+        raise Problem(409, 'NOT_ALLOWED', f"The package waits for every shot: {', '.join(missing)} {'has' if len(missing) == 1 else 'have'} no recorded visuals yet (`vw visuals record --gap G`).")
+    s2 = S2.session_of(store, run)
+    pk = S2._package(store, s2)
+    fps = pk['timeline']['fps']
+    clips = {c['id']: c for c in media_o['summary']['clips']}
+    events, ai_files = E.events_of(plan, pk, outputs, clips)
+    files = []
+    for f in voice_o['files']:
+        if f['name'] in ('narration.mp3', 'timing.json'):
+            files.append({'role': 'narration', 'name': layout('narration', f['name']), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
+    used = [e['clip_id'] for e in events if e.get('clip_id')]
+    for cid in dict.fromkeys(used):
+        c = clips[cid]
+        files.append({'role': 'original', 'name': layout('original', c['name']), 'key': f"{run['id']}/media/{c['name']}", 'sha256': c['sha256'], 'bytes': c['bytes']})
+    for f in ai_files:
+        files.append({'role': 'ai', 'name': layout('ai', f['name']), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
+    mf = next(x for x in master_o['files'] if x['name'] == f"master-v{master_o['summary']['version']}.json")
+    files.append({'role': 'plan', 'name': 'Plans/' + mf['name'], **{k: mf[k] for k in ('key', 'sha256', 'bytes')}})
+    pieces = [{'file': layout('narration', 'narration.mp3'), 'source_in_frame': p['source_start_frame'], 'source_out_frame': p['source_end_frame'], 'record_in_frame': p['timeline_start_frame']}
+              for p in ((pk.get('narration') or {}).get('pieces') or [{'source_start_frame': 0, 'source_end_frame': plan['duration_frames'], 'timeline_start_frame': 0}])]
+    cuts_per_clip = {cid: used.count(cid) for cid in set(used)}
+    nar = pk.get('narration') or {}
+    cues = E.cues(nar.get('sentences') or [], nar.get('words') or [], fps)
+    captions = E.srt(cues, fps)
+    generated = {f"{run['code']}.fcpxml": (TL.fcpxml(run['code'], pk['timeline'], events, pieces, [], [], plan['duration_frames'], reference=False, captions=cues).encode('utf-8'), 'application/xml'),
+                 f"{run['code']}.edl": (TL.edl(run['code'], pk['timeline'], events).encode('utf-8'), 'text/plain'),
+                 f"{run['code']}.srt": (captions.encode('utf-8'), 'text/plain'), 'Cut-list.csv': (E.cut_list_csv(events, fps).encode('utf-8'), 'text/csv'),
+                 'Relink-list.csv': (TL.relink_csv(media_o['summary']['clips'], set(used), cuts_per_clip).encode('utf-8'), 'text/csv'),
+                 'OPEN-EDIT.md': (E.open_edit_text(run['code']).encode('utf-8'), 'text/markdown')}
+    for name, (data, mime) in generated.items():
+        k = key(run, 'delivery/' + name)
+        store.put(k, data, mime)
+        files.append({'role': 'generated', 'name': layout('generated', name), 'key': k, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)})
+    manifest = {'contract': CONTRACT_BUNDLE, 'run': run['code'], 'client': run.get('client'), 'created_at': datetime.now(timezone.utc).isoformat(), 'early': True, 'film_sha256': None,
+                'master_digest': master_o['summary']['plan_digest'], 'timeline': pk['timeline'], 'files': files, 'resolve_events': events, 'narration_pieces': pieces,
+                'timeline_file': layout('generated', f"{run['code']}.fcpxml"), 'film_frames': plan['duration_frames'], 'cuts': len(events), 'camera_copies': media_o['summary'].get('copies')}
+    mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
+    for f in files + [{'name': 'manifest.json', **mk}]:
+        jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
+    session['bundle'] = {'manifest': mk, 'film_sha256': None, 'early': True, 'files': len(files), 'bytes': sum(f['bytes'] for f in files)}
+    save_session(store, run, session)
+    return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'early': True, 'cuts': len(events),
+            'next': "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download` (no camera copies by default), then `vw delivery open --originals \"<folder>\"` on Resolve Studio."}
 
 
 NAMES = {'youtube': 'YouTube', 'tiktok': 'TikTok', 'linkedin': 'LinkedIn', 'twitter': 'X'}
@@ -379,6 +434,8 @@ def layout(role, name, fills=None):
         return ('Media/AI/' if name in (fills or set()) else 'Media/Camera/Stabilised/') + name
     if role == 'narration':
         return 'Media/Voiceover/' + name
+    if role == 'ai':   # design/115: the raw AI files of the early package
+        return 'Media/AI/' + name
     if role == 'generated' and name.rsplit('.', 1)[-1] in ('fcpxml', 'edl', 'drp', 'drt'):
         return 'Timeline/' + name
     return name
