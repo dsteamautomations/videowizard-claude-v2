@@ -103,6 +103,7 @@ class NewRun(Write):
     client: str = Field(min_length=1, max_length=200)
     title: str = ''
     procedure_version: str | None = None
+    image_provider: Literal['openai', 'gemini']   # design/120: required; the run's image model, never changed afterwards
 
 
 class FileRef(Strict):
@@ -690,7 +691,7 @@ def me(user=User):
 @app.post('/api/runs', status_code=201)
 def create_run(body: NewRun, user=User, conn=DB):
     def create():
-        run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version))
+        run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version, body.image_provider))
         return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id']),            # earlier titles for this client (design/36 1.5)
                      'last_brief': core.last_brief(conn, run['client_id']),                    # what the client said last time (design/37 2.2)
                      'client_rules': core.client_rules(conn, run['client_id']),               # rules learned for the client (design/37 2.3)

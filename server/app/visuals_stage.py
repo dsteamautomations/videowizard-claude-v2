@@ -340,12 +340,22 @@ def prices():
     return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S), 'usd_inr': float(s.VISUALS_USD_INR)}
 
 
+IMAGE_JOB_PROVIDERS = ('openai', 'gemini-image')   # design/120: the two image job families
 IMAGE_USD_PER_M = {'input': 8.0, 'output': 30.0}   # design/82 U2: OpenAI's GPT Image 2.5 rates, every input token at the image rate (the text share is a fraction of a rupee)
 
 
+def provider_of(run):
+    """design/120: the run's image model family, chosen at creation; runs from before the choice are openai."""
+    return (run or {}).get('image_provider') or 'openai'
+
+
 def image_cost_inr(cost, pr):
-    """A finished image job's cost from its tokens; the flat image price when the job has none."""
+    """A finished image job's cost: Gemini flat per picture plus its inputs (design/120); OpenAI from its tokens; the flat image price when the job has none."""
     c = cost or {}
+    if c.get('provider') == 'gemini':
+        s = settings()
+        usd = (s.GEMINI_IMAGE_USD_4K if str(c.get('tier') or '').upper() == '4K' else s.GEMINI_IMAGE_USD) + int(c.get('inputs') or 0) * s.GEMINI_IMAGE_INPUT_USD
+        return usd * pr.get('usd_inr', 88.0)
     if not c.get('output_tokens'):
         return pr['image_inr']
     return ((c.get('input_tokens') or 0) * IMAGE_USD_PER_M['input'] + c['output_tokens'] * IMAGE_USD_PER_M['output']) / 1e6 * pr.get('usd_inr', 88.0)
@@ -353,13 +363,14 @@ def image_cost_inr(cost, pr):
 
 def visuals_spend(conn, run):
     """What this film's visuals have cost so far, at the configured prices: every image job and every take job that ran or is running."""
-    rows = conn.execute("select provider, status, request, cost from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'video')", (run['id'],)).fetchall()
+    rows = conn.execute("select provider, status, request, cost from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'gemini-image', 'video')", (run['id'],)).fetchall()   # design/120
     live = [r for r in rows if r['status'] not in ('failed', 'rejected', 'cancelled')]
     pr = prices()
-    images = sum(1 for r in live if r['provider'] == 'openai')
+    pics = [r for r in live if r['provider'] in IMAGE_JOB_PROVIDERS]
+    images = len(pics)
     ref = lambda r: (r.get('request') or {}).get('reference') or {}
-    fixes = sum(1 for r in live if r['provider'] == 'openai' and (ref(r).get('fix_of') or str(ref(r).get('name') or '').endswith('-fix')))   # design/96 X3; an old fix by its name
-    image_inr = sum(image_cost_inr(r.get('cost'), pr) for r in live if r['provider'] == 'openai')
+    fixes = sum(1 for r in pics if ref(r).get('fix_of') or str(ref(r).get('name') or '').endswith('-fix'))   # design/96 X3; an old fix by its name
+    image_inr = sum(image_cost_inr(r.get('cost'), pr) for r in pics)
     seconds = float(sum(float((r.get('request') or {}).get('duration_seconds') or 0) for r in live if r['provider'] == 'video'))
     return {'images': images, 'fixes': fixes, 'take_seconds': seconds, 'spent_inr': round(image_inr + seconds * pr['video_inr_per_s'], 2), 'prices': pr}
 
@@ -2067,7 +2078,8 @@ def generate_image(conn, store, user, run, outputs, body):
         need(style_ref, 'A component is made in the approved style: approve the style picture first (the Pictures step).')
         if style_ref['id'] not in (body.get('parents') or []):
             body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
-        body = {**body, 'prompt': with_composed(body['prompt'], COMPONENT_BLOCK.format(name=element.get('name') or body['element_id']))}
+        block = COMPONENT_BLOCK if provider_of(run) == 'openai' else COMPONENT_BLOCK_GREEN   # design/120: Gemini has no transparent output; the server keys the green out
+        body = {**body, 'prompt': with_composed(body['prompt'], block.format(name=element.get('name') or body['element_id']))}
     if body['kind'] == 'sheet' and body['element_id'] != STYLE:   # design/119 rule 2: the server's lines on a reference sheet
         body = {**body, 'prompt': with_composed(body['prompt'], sheet_block(element))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
@@ -2105,6 +2117,13 @@ def generate_image(conn, store, user, run, outputs, body):
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
+    if provider_of(run) == 'gemini':   # design/120: fourteen at most, counted by kind (Google's limits for the Pro image model)
+        ekind = {e['id']: e['kind'] for e in plan['elements']}
+        kinds = {'style': [p for p in parents if p and p.get('kind') == 'style'], 'character': [p for p in parents if p and p.get('kind') != 'style' and ekind.get(p.get('element_id')) == 'person']}
+        kinds['object'] = [p for p in parents if p and p not in kinds['style'] and p not in kinds['character']]
+        need(len(parents) <= GEMINI_MAX_INPUTS, f'{len(parents)} input pictures: Gemini takes at most {GEMINI_MAX_INPUTS}. Name fewer.')
+        for kind_, cap_ in GEMINI_KIND_CAPS.items():
+            need(len(kinds[kind_]) <= cap_, f"{len(kinds[kind_])} {kind_} pictures ({', '.join(p['id'][:8] for p in kinds[kind_])}): Gemini takes at most {cap_} {kind_} pictures in one prompt. Name fewer.")
     # design/111 F21's cap of four removed (SK, 28 Oct 2026): every applicable reference may go in, each with its job line; the model's MAX_INPUTS is the ceiling
     named_n = len(body.get('parents') or [])
     for k, p in enumerate(parents[named_n:], named_n + 1):   # F21: the server names the pictures it added itself (the start's own sheets)
@@ -2166,6 +2185,8 @@ def generate_image(conn, store, user, run, outputs, body):
     # picture was rule 2's new picture (several things change, or the framing), made whole; since design/112 S2 an end always has its region: the alternative is a start-only take
     if body['kind'] == 'keyframe':
         body = {**body, 'role': 'end' if is_end else 'start'}   # a copy: the caller's request is never changed
+    if region and provider_of(run) == 'gemini' and not body.get('fix_of'):   # design/120: no mask on Gemini; the region in words, the composite-back restores the outside as before
+        body = {**body, 'prompt': with_composed(body['prompt'], f"Change only what is inside the region left {region['left'] * 100:g} %, top {region['top'] * 100:g} %, width {region['width'] * 100:g} %, height {region['height'] * 100:g} % of Image 1; everything outside it exactly as Image 1.")}
     variants = int(body.get('variants') or 1)   # design/86 K4: two candidates for a start keyframe, the operator picks
     need(variants in (1, 2), 'variants is 1 or 2.')
     need(variants == 1 or (body['kind'] == 'keyframe' and not is_end), 'Two candidates are for a start keyframe only.')
@@ -2276,6 +2297,9 @@ WORLD_LINE = {'check': "the film's world", 'pass_when': 'the subject is in a rea
 STYLE = '_STYLE'   # design/89 C2: the film's style sheet, one picture every graphic is made from
 COMPONENT_BLOCK = ('Image 1 is the approved style of this film: take its palette, line and finish from it. One {name} alone, nothing else in the frame, '
                    'on a transparent background: no ground, no setting, no shadow outside its own edge, the whole thing inside the frame.')   # design/117 P1
+COMPONENT_BLOCK_GREEN = ('Image 1 is the approved style of this film: take its palette, line and finish from it. One {name} alone, nothing else in the frame, '
+                         'on a flat, even chroma green background (#00FF00) that touches every edge: no ground, no setting, no shadow outside its own edge, no green on the thing itself, the whole thing inside the frame.')   # design/120
+GEMINI_MAX_INPUTS, GEMINI_KIND_CAPS = 14, {'object': 6, 'character': 5, 'style': 3}   # design/120: Google's limits for the Pro image model, 28 Oct 2026
 COMPONENT_LINES = [{'check': 'one thing only', 'pass_when': 'one thing alone: no background, no ground, no setting, no second object, no shadow outside its edge', 'weight': 'must'},
                    {'check': 'clean edge', 'pass_when': 'the edge of the thing is clean and nothing of it is cut off by the frame', 'weight': 'must'}]
 
@@ -2529,16 +2553,23 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     ref_id = digest({'run': str(run['id']), 'request': request_id})[:32]
     frame = default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), {})   # design/71 P3: the size follows the brief's frame
     first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
-    size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
-    request = {'kind': 'image', 'op': op, 'model': body.get('model') or IMAGE_MODELS[op], 'prompt': body['prompt'], 'size': size, **({'background': 'transparent'} if body['kind'] == 'component' else {}),
+    provider = provider_of(run)   # design/120: the run's image model
+    if provider == 'gemini':
+        size = {'aspect': frame if frame in ('16:9', '9:16') else '16:9', 'tier': settings().GEMINI_IMAGE_SIZE}
+        model = settings().GEMINI_IMAGE_MODEL
+    else:
+        size = body.get('size') or (library.edit_size(first.get('width'), first.get('height'), frame) if first else library.default_size(frame))
+        model = body.get('model') or IMAGE_MODELS[op]
+    request = {'kind': 'image', 'op': op, 'provider': provider, 'model': model, 'prompt': body['prompt'], 'size': size,
+               **({'background': 'transparent'} if body['kind'] == 'component' and provider == 'openai' else {}), **({'chroma_key': True} if body['kind'] == 'component' and provider == 'gemini' else {}),
                'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents],
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
                              **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
                              **({'golden_candidate': True} if body.get('golden') else {})},   # design/96 X3; design/106 T1; design/111 F11
                **({'region': body['region']} if body.get('region') else {})}
-    row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'openai',%s,%s) returning id",
-                       (run['id'], ref_id, Jsonb(request), request_id)).fetchone()
-    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'model', 'prompt', 'size', 'quality', 'parents') + (('background',) if request.get('background') else ()) + (('region',) if request.get('region') else ())},
+    row = conn.execute("insert into vw2_jobs(run_id, stage, unit, request, request_id, provider) values (%s,'visuals',%s,%s,%s,%s) returning id",
+                       (run['id'], ref_id, Jsonb(request), request_id, 'openai' if provider == 'openai' else 'gemini-image')).fetchone()   # design/120: the job family by provider, last so the older readers of the params keep their places
+    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'provider', 'model', 'prompt', 'size', 'quality', 'parents') + (('background',) if request.get('background') else ()) + (('chroma_key',) if request.get('chroma_key') else ()) + (('region',) if request.get('region') else ())},
                                      **({'answer': answer} if answer is not None else {}), **({'pending_end': pending_end} if pending_end else {}),
                                      **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
@@ -3759,6 +3790,7 @@ def status(conn, store, run, outputs, repair=True):
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'sheet_due': sheet_due(session, plan) if plan else [],   # design/119 rule 2
+            'image_provider': provider_of(run),   # design/120
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19

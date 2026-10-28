@@ -547,8 +547,10 @@ def cmd_start(a):
         from extraction import SUFFIXES
         if not script.is_file() or script.suffix.lower() not in SUFFIXES:
             emit({'action': 'refused', 'message': f'--script must name an existing TXT, MD, Fountain, DOCX or PDF file; {a.script!r} is not one. The run was not created.'}, 2)
+    if getattr(a, 'images', None) not in ('openai', 'gemini'):   # design/120: the image model is chosen once, at the start, and never changes
+        emit({'action': 'refused', 'message': 'Ask the operator which image model this run uses: GPT Image (openai) or Gemini Nano Banana (gemini); it cannot change later. Then `vw start --client … --images openai|gemini`. No run was created.'}, 2)
     preflight(a.need_gb)
-    run = write('/api/runs', {'client': a.client, **({'procedure_version': a.version} if a.version else {})})
+    run = write('/api/runs', {'client': a.client, 'image_provider': a.images, **({'procedure_version': a.version} if a.version else {})})
     if workspace(run['code']).exists():
         emit({'action': 'refused', 'message': f"Folder runs/{run['code']} already exists on this machine."}, 2)
     write(f"/api/runs/{run['id']}/claim", {'machine': machine_id()})
@@ -564,7 +566,7 @@ def cmd_start(a):
                   'message': f"Run {run['code']} was created, but {script.name} could not be copied into in/ ({exc.__class__.__name__}). Ask the operator to copy it by hand, then run `vw stage intake prepare`."}, 2)
     nxt = call('GET', f"/api/runs/{run['id']}/next")
     emit({**run, 'workspace': str(workspace(run['code'])), 'script_file': copied, 'next': nxt}, 0,
-         f"Started {run['code']} for {run.get('client')} in {m['code']}/" + (f"; {copied} copied into in/" if copied else '') + f"; {directory_line(run.get('client_card'))}. " + next_line(nxt))
+         f"Started {run['code']} for {run.get('client')} in {m['code']}/; images: {run.get('image_provider') or a.images}" + (f"; {copied} copied into in/" if copied else '') + f"; {directory_line(run.get('client_card'))}. " + next_line(nxt))
 
 
 def directory_line(card):
@@ -2261,6 +2263,7 @@ def build_parser():
     sub.add_parser('whoami').set_defaults(fn=cmd_whoami)
     s = sub.add_parser('start')
     s.add_argument('--client', required=True); s.add_argument('--version'); s.add_argument('--script', help='the script file to copy into in/ (design/34 1.6)')
+    s.add_argument('--images', choices=['openai', 'gemini'], help='the image model of this run, asked of the operator, never changed later (design/120)')
     s.add_argument('--need-gb', type=float, default=5); s.add_argument('--keep-logs', action='store_true'); s.set_defaults(fn=cmd_start)
     s = sub.add_parser('next'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_next)
     s = sub.add_parser('output')

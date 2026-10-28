@@ -56,7 +56,7 @@ def test_start_script_refuses_hidden_and_system_places(harness, monkeypatch, cap
     hidden.write_text('x', encoding='utf-8')
     monkeypatch.setattr(vw, 'write', lambda *a, **k: pytest.fail('the run must not be created'))
     for path in (str(hidden), '/private/etc/hosts.md', str(Path.home() / 'Library' / 'Application Support' / 'x.txt')):
-        code, out, err = run(vw.cmd_start, argparse.Namespace(client='C', version=None, script=path, need_gb=0, keep_logs=False), capsys)
+        code, out, err = run(vw.cmd_start, argparse.Namespace(client='C', images='openai', version=None, script=path, need_gb=0, keep_logs=False), capsys)
         assert code == 2 and 'cannot read from' in out['message'], path
 
 
@@ -69,7 +69,7 @@ def test_start_script_copies_an_ordinary_file_and_logs_it(harness, monkeypatch, 
     monkeypatch.setattr(vw, 'machine_id', lambda: 'mac-1')
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'id': 'run-2', 'code': 'VW-10', 'client': 'C', 'procedure_version': '2'})
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'stage': 'intake', 'needs_acceptance': True})
-    code, out, err = run(vw.cmd_start, argparse.Namespace(client='C', version=None, script=str(script), need_gb=0, keep_logs=False), capsys)
+    code, out, err = run(vw.cmd_start, argparse.Namespace(client='C', images='openai', version=None, script=str(script), need_gb=0, keep_logs=False), capsys)
     assert code == 0 and out['script_file'] == 'script.md' and (tmp_path / 'runs' / 'VW-10' / 'in' / 'script.md').read_text(encoding='utf-8') == 'A script.'
     log = (tmp_path / 'runs' / 'VW-10' / 'work' / 'guard.log').read_text(encoding='utf-8')
     assert ' · vw start --script · allowed · ' in log and 'script.md' in log

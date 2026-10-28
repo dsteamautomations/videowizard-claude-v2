@@ -57,6 +57,81 @@ def _openai(path, **kw):
     return r   # every key answered a limit: the last answer, so the job requeues as before (design/82 U3)
 
 
+GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'   # design/120
+
+
+class _Answer:
+    """A response-shaped object for the common path: OpenAI's {data: [{b64_json}], usage} made from Gemini's answer, or an error with the model's words."""
+
+    def __init__(self, status_code, body, text=''):
+        self.status_code, self._body, self.text = status_code, body, text or json.dumps(body)
+        self.content = json.dumps(body).encode('utf-8')
+
+    def json(self):
+        return self._body
+
+
+def _gemini_image(req, parents):
+    """design/120: one picture from Gemini's image model through the key pool (the same cooling as _openai): the prompt and the pictures as parts, the
+    aspect and the tier in imageConfig; the first image part comes back as OpenAI's shape so the rest of process_image is shared."""
+    from . import keys
+    tries = keys.each('gemini', settings())
+    if not tries:
+        raise Problem(503, 'IMAGE_CONFIGURATION', 'Configure VW2_GEMINI_API_KEY on the server.')
+    size = req.get('size') if isinstance(req.get('size'), dict) else {}
+    parts = []
+    for k, (pid, png) in enumerate(parents, 1):
+        parts += [{'text': f'Image {k}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(png).decode('ascii')}}]
+    parts.append({'text': req['prompt']})
+    payload = {'contents': [{'role': 'user', 'parts': parts}],
+               'generationConfig': {'responseModalities': ['IMAGE'], 'imageConfig': {'aspectRatio': size.get('aspect') or '16:9', 'imageSize': str(size.get('tier') or settings().GEMINI_IMAGE_SIZE).upper()}}}
+    r = None
+    for idx, key in tries:
+        r = httpx.post(GEMINI_URL.format(model=req['model']), headers={'x-goog-api-key': key, 'Content-Type': 'application/json'}, json=payload, timeout=300)
+        reason = keys.reason_of(r.status_code)
+        if reason is None:
+            break
+        keys.cool('gemini', idx, reason)
+    else:
+        out = _Answer(r.status_code, {'error': {'type': 'provider', 'message': r.text[:300]}}, r.text)   # every key answered a limit: the last answer, so the job requeues (design/82 U3)
+        out.key_index = idx
+        return out
+    if r.status_code >= 400:
+        out = _Answer(r.status_code, {'error': {'type': 'provider', 'message': r.text[:300]}}, r.text)
+        out.key_index = idx
+        return out
+    body = r.json()
+    cands = body.get('candidates') or []
+    parts_out = ((cands[0].get('content') or {}).get('parts') or []) if cands else []
+    image = next((p['inlineData'] for p in parts_out if isinstance(p, dict) and p.get('inlineData')), None)
+    if not image:
+        words = ' '.join(str(p.get('text') or '') for p in parts_out if isinstance(p, dict)).strip() or (body.get('promptFeedback') or {}).get('blockReason') or 'no image in the answer'
+        out = _Answer(400, {'error': {'type': 'no_image', 'message': words}}, words)
+        out.key_index = idx
+        return out
+    usage = body.get('usageMetadata') or {}
+    out = _Answer(200, {'data': [{'b64_json': image['data']}], 'usage': {'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')}})
+    out.key_index = idx
+    return out
+
+
+def key_out_green(png):
+    """design/120: a component made on chroma green (#00FF00) keyed to alpha: green pixels (hue near 1/3, saturated, bright) go transparent."""
+    import numpy as np
+    from PIL import Image
+    from io import BytesIO
+    with Image.open(BytesIO(png)) as im:
+        rgb = im.convert('RGB')
+        hsv = np.asarray(rgb.convert('HSV')).astype(int)
+        h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+        green = (h > 60) & (h < 110) & (s > 90) & (v > 60)   # PIL's hue is 0..255; pure green is 85
+        alpha = np.where(green, 0, 255).astype('uint8')
+        out = Image.fromarray(np.dstack([np.asarray(rgb), alpha]), 'RGBA')
+        buf = BytesIO()
+        out.save(buf, format='PNG')
+        return buf.getvalue()
+
+
 def process_image(job):
     """Returns (status, result, error, cost, retry_in)."""
     req, jid = job['request'], str(job['id'])
@@ -66,7 +141,9 @@ def process_image(job):
     try:
         if not raw_path.exists():
             dispatched = True
-            if req['op'] == 'generate':
+            if req.get('provider') == 'gemini':   # design/120
+                r = _gemini_image(req, [(p['id'], store.get(p['key'])) for p in req.get('parents') or []])
+            elif req['op'] == 'generate':
                 r = _openai('/images/generations', json={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality'], 'output_format': 'png', 'n': 1,
                                                          **({'background': req['background']} if req.get('background') else {})})   # design/117 P1: a component's transparent background
             else:
@@ -84,6 +161,8 @@ def process_image(job):
                 return 'rejected', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code} on {attempt} attempts; no further retry.', None, None
             if r.status_code >= 400:
                 result, error = refusal(r)
+                if getattr(r, '_body', None) and (r._body.get('error') or {}).get('type') == 'no_image':   # design/120: Gemini answered in words, not a picture
+                    result, error = {**result, 'failure': 'no_image'}, f"The model returned no picture: {(r._body.get('error') or {}).get('message')}"
                 return 'failed', result, error, None, None
             durable(raw_path, r.content)
         body = json.loads(raw_path.read_text(encoding='utf-8'))
@@ -96,6 +175,8 @@ def process_image(job):
                 out = BytesIO()
                 im.convert('RGB').save(out, format='PNG')
                 png = out.getvalue()
+        if req.get('chroma_key'):   # design/120: a component made on chroma green
+            png = key_out_green(png)
         edit = None
         if req.get('region') and req.get('parents'):   # design/111 F11: the start copied back outside the region; how much the model changed there is kept
             png, edit = composite_back(store.get(req['parents'][0]['key']), png, req['region'])
@@ -105,7 +186,11 @@ def process_image(job):
         store.put(k, png, 'image/png')
         sha = hashlib.sha256(png).hexdigest()
         usage = body.get('usage') or {}
-        cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
+        if req.get('provider') == 'gemini':   # design/120: priced flat per picture plus its inputs
+            cost = {'provider': 'gemini', 'model': req['model'], 'tier': str((req.get('size') or {}).get('tier') if isinstance(req.get('size'), dict) else '') or settings().GEMINI_IMAGE_SIZE,
+                    'inputs': len(req.get('parents') or []), 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
+        else:
+            cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
         return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
                             **({'key_index': r.key_index} if getattr(r, 'key_index', None) is not None else {}),   # design/114: which key, never the key
                             **({'edit': edit} if edit else {})}, None, cost, None
@@ -461,8 +546,12 @@ def claim_take(conn):
 
 def tick():
     busy = False
-    with connect() as conn:
-        job = jobs.claim(conn, 'openai')
+    job = None
+    for family in ('openai', 'gemini-image'):   # design/120: both image families, one worker
+        with connect() as conn:
+            job = jobs.claim(conn, family)
+        if job:
+            break
     if job:
         outcome = process_image(job)
         with connect() as conn:

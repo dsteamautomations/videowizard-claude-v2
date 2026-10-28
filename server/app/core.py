@@ -151,13 +151,13 @@ def effective_rules(conn, run, outputs):
             'effective': brief_effective + [l['rule'] for l in learned]}
 
 
-def create_run(conn, user, title, client, version):
+def create_run(conn, user, title, client, version, image_provider='openai'):
     version = version or settings().DEFAULT_PROCEDURE_VERSION
     if stage_table(version) is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
     chosen = resolve_client(client)
-    return conn.execute('insert into vw2_runs(title, client, client_id, owner_id, owner_name, procedure_version) values (%s,%s,%s,%s,%s,%s) returning *',
-                        (title or '', chosen['client_name'], chosen['client_id'], user['id'], user['name'], version)).fetchone()
+    return conn.execute('insert into vw2_runs(title, client, client_id, owner_id, owner_name, procedure_version, image_provider) values (%s,%s,%s,%s,%s,%s,%s) returning *',   # design/120: chosen once, never changed
+                        (title or '', chosen['client_name'], chosen['client_id'], user['id'], user['name'], version, image_provider)).fetchone()
 
 
 def is_admin(user):

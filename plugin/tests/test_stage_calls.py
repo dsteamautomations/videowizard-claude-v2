@@ -134,7 +134,7 @@ def test_start_refuses_a_missing_script_before_creating_the_run(monkeypatch, tmp
     created = []
     monkeypatch.setattr(vw, 'write', lambda *a, **k: created.append(a))
     monkeypatch.setattr(vw, 'preflight', lambda need: None)
-    a = argparse.Namespace(client='VK', version=None, need_gb=0, keep_logs=False, script=str(tmp_path / 'missing.docx'))
+    a = argparse.Namespace(client='VK', images='openai', version=None, need_gb=0, keep_logs=False, script=str(tmp_path / 'missing.docx'))
     with pytest.raises(SystemExit) as exc:
         vw.cmd_start(a)
     out = json.loads(capsys.readouterr()[0])
@@ -153,7 +153,7 @@ def test_start_keeps_last_brief_and_client_rules_and_tolerates_their_absence(mon
                {'id': 'run-8', 'code': 'VW-8', 'client': 'VK', 'client_id': 'c-vk', 'procedure_version': '2'}]
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: answers.pop(0) if path == '/api/runs' else {})
     monkeypatch.setattr(vw, 'request', lambda method, path, wait=None, **kw: ({'stage': 'intake'}, 0))
-    a = argparse.Namespace(client='VK', version=None, need_gb=0, keep_logs=False, script=None)
+    a = argparse.Namespace(client='VK', images='openai', version=None, need_gb=0, keep_logs=False, script=None)
     for code, expect_brief, expect_rules in (('VW-7', True, 1), ('VW-8', False, 0)):
         with pytest.raises(SystemExit) as exc:
             vw.cmd_start(a)
