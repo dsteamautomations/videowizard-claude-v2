@@ -2080,6 +2080,12 @@ def generate_image(conn, store, user, run, outputs, body):
                 need(False, f"{p['id']} was approved with a failed must line ({', '.join(failed)}): the operator decides first; the question is on its card (`vw visuals answer --item {p['id']} …`).")
     found = guarded(lambda: locate(store, session, body['shot_id'])) if body.get('shot_id') else None   # design/91 N8: the shot this picture is for
     named = found[3] if found else None
+    if named is not None:   # design/119 rule 5: a reference goes in only when its thing is in the shot (the style, the start chain and a person in frame excepted)
+        allowed = set(named.get('element_ids') or []) | {body['element_id'], STYLE}
+        for p in parents:
+            if p and p.get('element_id') not in allowed and p.get('kind') not in ('keyframe', 'state'):
+                nm = next((e.get('name') for e in plan['elements'] if e['id'] == p.get('element_id')), p.get('element_id'))
+                need(False, f"{p['id']} is a picture of {p.get('element_id')} ({nm}), which is not in shot {named['id']}: add the element to the shot's element_ids or leave the picture out (design/119 rule 5).")
     if body['kind'] == 'keyframe':
         _keyframe_gates(session, plan, body, parents, named)   # design/77 L35, L38, L41
     answer = body.get('answer')
@@ -2153,6 +2159,17 @@ def generate_image(conn, store, user, run, outputs, body):
             need(False, str(exc))
         lines = lines + material_lines(m)
         body = {**body, 'prompt': with_composed(body['prompt'], material_sentence(m))}
+    if not body.get('fix_of'):   # design/119 rule 6: every known size as a number beside the thing (the material spec carries its own)
+        shown = [e for e in plan['elements'] if e['id'] in set((named or {}).get('element_ids') or []) | {body['element_id']} and not e.get('material_spec')]
+        sizes = '; '.join(s for s in (size_sentence(e) for e in shown) if s)
+        if sizes:
+            body = {**body, 'prompt': with_composed(body['prompt'], 'Sizes: ' + sizes + '.')}
+        own_words = [e.get('name', '') for e in plan['elements'] if e['id'] in set((named or {}).get('element_ids') or []) | {body['element_id']}]   # design/119 rule 3
+        for k, p in enumerate(parents, 1):
+            if p and p.get('element_id') not in (body['element_id'], None) and p.get('kind') not in ('keyframe', 'state', 'frame'):
+                extra = also_shows(p, own=own_words)
+                if extra:
+                    body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} also shows {', '.join(extra)}: show none of them.")}
     if body['kind'] == 'keyframe' and found and named.get('visual_type') == 'video':   # design/110 F4, F5, F6: the lines, and the block under the writer's prompt
         lines = lines + picture_rule_lines(plan, found[2], named, 'end' if is_end else 'start')
         if not body.get('fix_of'):
@@ -3805,3 +3822,31 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
     session['recorded_gaps'][gap_id] = str(out['id'])
     save_session(store, run, session)
     return {'gap_id': gap_id, 'output': str(out['id']), 'shots': len(shots)}
+
+
+def size_sentence(element):
+    """design/119 rule 6: the element's known sizes as one sentence beside its name; nothing for an unknown (design/106 D6)."""
+    parts = [f"{d.get('part', '')} {d.get('measure', '')} {d['value']:g} {d.get('unit') or ''}".strip() for d in element.get('size') or [] if d.get('value') is not None]
+    return f"{element.get('name') or element.get('id')}: {', '.join(parts)}" if parts else ''
+
+
+CAMERA_NOTE = re.compile(r'\b(focus|sharp|\d+\s?mm feel|natural colour|micro-contrast|sharpening|grain|bokeh|lens|hdr)\b', re.I)
+
+
+def also_shows(parent, own=()):
+    """design/119 rule 3: the things a reference's own stored prompt put in its Details sentence, less the shot's own things, less camera notes.
+    [] for a picture with no stored prompt (a frame, a supplied or web picture)."""
+    prompt = (parent.get('generation') or {}).get('prompt') or ''
+    m = re.search(r'Details:\s*(.+?)(?:\.\s+[A-Z][a-z]+:|\n|$)', prompt, re.S)
+    if not m:
+        return []
+    own_l = [w.lower() for w in own if w]
+    out = []
+    for phrase in re.split(r';|,|\band\b', m.group(1)):
+        ph = phrase.strip(' .')
+        if not ph or CAMERA_NOTE.search(ph) or len(ph.split()) > 10:
+            continue
+        if any(o and (o in ph.lower() or ph.lower() in o) for o in own_l):
+            continue
+        out.append(ph)
+    return out
