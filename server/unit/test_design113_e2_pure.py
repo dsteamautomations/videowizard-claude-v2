@@ -140,3 +140,14 @@ def test_the_worker_renders_stores_and_measures_the_file(tmp_path, monkeypatch):
     monkeypatch.setattr(VW, 'SPOOL', tmp_path / 'again')
     status, result, error, _, _ = VW.process_drawn({'id': 'j2', 'run_id': 'run-1', 'request': {'request_key': 'run-1/visuals/takes/none.json', 'preparation_id': 'p2'}})
     assert status == 'failed' and 'Render failed' in error
+
+
+def test_the_render_reads_the_frame_size_a_real_run_stores_as_a_list():
+    """Defect 33 (Revathi, 28 Oct): a run stores resolution as [1920, 1080] (the master's summary); the fixtures said '1920x1080'. Both read."""
+    store = drawn_store()
+    s = saved(store)
+    s['source']['resolution'] = [1920, 1080]
+    store.files['run-1/visuals/session.json'] = json.dumps(s).encode('utf-8')
+    out = VS.render_drawn(FakeConn([]), store, USER, RUN, [], {'shot_id': 'DR1'})
+    req = json.loads(store.files[saved(store)['preparations']['DR1']['key']])
+    assert (req['width'], req['height']) == (1920, 1080) and out['frames'] == 100

@@ -3249,7 +3249,8 @@ def render_drawn(conn, store, user, run, outputs, body):
     need(spec and (session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
          f"the drawing spec of {shot['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {shot['id']} --quote`, or on the page) before the drawing is rendered (design/113 E5).")
     fps = session['source']['fps']
-    W, H = (int(v) for v in str(session['source'].get('resolution') or '1920x1080').lower().split('x'))
+    res = session['source'].get('resolution') or [1920, 1080]   # defect 33: a run stores [1920, 1080] (the master's summary), the fixtures '1920x1080'; both read, as defect 26 did
+    W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
     words = ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words')
     cues = guarded(lambda: drawn.cue_seconds(shot['scene_drawn'], shot, words, fps))
     images = {}
