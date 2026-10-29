@@ -73,7 +73,7 @@ def test_g1_graphic_seconds_in_a_row_and_g2_a_visible_claim_on_a_graphic():
     run = [w for w in k if w['kind'] == 'graphics_run']
     assert run and '10.0 s' in run[0]['message'] and 'next release' not in run[0]['message']
     k = VC.validate_plan(doc_(pshot('DG1', 0, 175, 'diagram'), pshot('DG2', 175, 350, 'diagram'), pshot('VS1', 350, 1000, 'video')), GAPS, Fraction(25))[1]
-    assert 'refused from the next release' in [w for w in k if w['kind'] == 'graphics_run'][0]['message']
+    assert 'give the reason in the treatment' in [w for w in k if w['kind'] == 'graphics_run'][0]['message']   # design/124 A2
     k = kinds(doc_(pshot('DG1', 0, 125, 'diagram'), pshot('VS0', 125, 200, 'video'), pshot('DG2', 200, 325, 'diagram'), pshot('VS1', 325, 1000, 'video')))
     assert not any(w == 'graphics_run' for _, w in k)   # a camera shot between resets the run
     k = kinds(doc_({**pshot('DG1', 0, 100, 'diagram'), 'claim': 'visible'}, {**pshot('VS1', 100, 600, 'video'), 'claim': 'visible'}, pshot('VS9', 600, 1000, 'video')))

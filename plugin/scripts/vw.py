@@ -1547,7 +1547,7 @@ def cmd_visuals(a):
                          f"{len(queued)} queued; {body['element_id']} refused: {payload.get('message')}; fix it and run the file again")
                 queued.append(payload['reference_id'])
                 warned += [f"{body['element_id']}: {w}" for w in payload.get('warnings') or []]   # design/89 C, D
-            emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid OpenAI images queued; tell the operator, then `vw visuals status --wait 300`." +
+            emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid images queued with the film's picture AI; tell the operator, then `vw visuals status --wait 300`." +
                  (' Warnings: ' + '; '.join(warned) if warned else ''))
         body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
                 **_parents_and_crops(a.parents), **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),   # design/119 rule 1: id or id@left,top,width,height
@@ -1556,7 +1556,7 @@ def cmd_visuals(a):
                 **({'golden': True} if getattr(a, 'golden', False) else {}), **({'region': _region(a.region)} if getattr(a, 'region', None) else {}),
                 **({'end_region': _region(a.end_region)} if getattr(a, 'end_region', None) else {})}   # design/111 F11
         out = write(base + '/images', body)
-        emit(out, 0, f"Paid OpenAI image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
+        emit(out, 0, f"Paid image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
                      (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
     if a.what == 'approve':
         if a.file:   # design/77 L33b: several approvals in one call
@@ -1571,7 +1571,7 @@ def cmd_visuals(a):
             def bind_row(r):
                 body = {'shot_id': r['shot'], 'references': r['refs'], **({'subject_selectors': r['selectors']} if r.get('selectors') else {}), **({'quote': r['quote']} if r.get('quote') else {})}
                 return r['shot'], 'POST', base + '/bind', body
-            _batch(_rows(m, a.file, ('shot', 'refs')), bind_row, 'shot', lambda done: f"{len(done)} shots bound: {', '.join(done)}; now `vw visuals packet --shot S` for each, then compose the start and end images.")
+            _batch(_rows(m, a.file, ('shot', 'refs')), bind_row, 'shot', lambda done: f"{len(done)} shots bound: {', '.join(done)}; now `vw visuals packet --shot S` for each, then compose the start image (and the end image only where the shot must end exactly).")
         refs = {eid: text.split(',') for eid, text in _pairs(a.refs, '--refs', 'ELEMENT=REF1,REF2').items()}
         selectors = {}
         for item in a.selector or []:   # design/33 A3: an object inside an approved place picture, named in words
@@ -1580,7 +1580,7 @@ def cmd_visuals(a):
                 emit({'action': 'refused', 'message': f'--selector expects ELEMENT=REF:"what to look at", got {item!r}.'}, 2)
             selectors.setdefault(m.group(1), {})[m.group(2)] = m.group(3).strip().strip('"')
         out = write(base + '/bind', {'shot_id': a.shot, 'references': refs, **({'subject_selectors': selectors} if selectors else {}), **({'quote': a.quote} if a.quote else {})})
-        emit(out, 0, f"Bound {a.shot} ({', '.join(out.get('elements') or [])}); now `vw visuals packet --shot {a.shot}`, then compose the start and end images.")   # design/74 L31
+        emit(out, 0, f"Bound {a.shot} ({', '.join(out.get('elements') or [])}); now `vw visuals packet --shot {a.shot}`, then compose the start image (and the end image only where the shot must end exactly).")   # design/74 L31
     if a.what == 'packet':
         out, code = request('GET', f'{base}/shots/{a.shot}/packet')
         if code:

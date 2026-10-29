@@ -89,14 +89,14 @@ ANSWER = {'status': 'ready', 'prompt': 'Image 1 is the style sheet: take its sty
 
 
 def test_a_graphic_picture_carries_the_claims_and_relationships_as_must_lines_and_warns_without_style_spec_or_answer(monkeypatch):
-    """C1, C2, C4, D4, D5: warned in this release, refused from the next."""
+    """C1, C2, C4, D4, D5: warned (design/124 A2: no 'next release' promise)."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
     doc, sess = graphic_session()
     store = store_with(sess, doc)
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'diagram-E1', 'kind': 'isolated', 'subject': 'the wall section', 'prompt': ANSWER['prompt'], 'shot_id': 'DG1'}
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     w = ' | '.join(out['warnings'])
-    assert 'answer form' in w and 'style sheet' in w and 'drawing spec' in w and 'refused from the next' in w
+    assert 'answer form' in w and 'style sheet' in w and 'drawing spec' in w and 'next release' not in w
     row = saved(store)['references'][out['reference_id']]
     lines = {(l['check'], l['weight']) for l in row['server_checklist']}
     assert ('claim: saves bricks', 'must') in lines and ('relationship: the two leaves are the same thickness', 'must') in lines and ('relationship: the cavity is inside the wall', 'must') in lines
@@ -174,7 +174,7 @@ def test_a_take_without_its_answer_form_is_warned():
                    bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
     out = VS.prepare_take(store_with(sess, doc), USER, RUN, [], {'shot_id': 'VS1', 'motion_prompt': 'water poured', 'subject_reconciliation': {}, 'start_image': 'R1', 'end_image': 'R2',
                                                                  'continuity_notes': 'the wall stays'})
-    assert any('answer form' in w and 'refused from the next' in w for w in out['warnings'])
+    assert any('answer form' in w and 'next release' not in w for w in out['warnings'])
 
 
 def test_every_picture_without_its_answer_form_is_warned_and_a_drawing_is_checked_against_its_sizes_and_label(monkeypatch):
@@ -186,7 +186,7 @@ def test_every_picture_without_its_answer_form_is_warned_and_a_drawing_is_checke
     sess['accepted'] = accepted(doc)
     store = store_with(sess, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'k1', 'element_id': 'E2', 'name': 'kiln', 'kind': 'isolated', 'subject': 'a kiln', 'prompt': 'A brick kiln.'})
-    assert len(out['warnings']) == 1 and 'answer form' in out['warnings'][0] and 'refused from the next' in out['warnings'][0]
+    assert len(out['warnings']) == 1 and 'answer form' in out['warnings'][0] and 'next release' not in out['warnings'][0]
     assert [l['check'] for l in saved(store)['references'][out['reference_id']].get('server_checklist') or []] == ["the film's world"]   # design/91 N9: only the world line
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'k2', 'element_id': 'E1', 'name': 'wall', 'kind': 'isolated', 'subject': 'the wall', 'prompt': 'A wall section.', 'shot_id': 'DG1'})
     lines = {l['check']: l for l in saved(store)['references'][out['reference_id']]['server_checklist']}

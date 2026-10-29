@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, NEXT_RELEASE, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -591,7 +591,7 @@ def sequence(store, user, run, outputs, shot_id, reference_ids, quote):
             row = session['references'].get(rid)
             need(row and row.get('status') in ('candidate', 'approved') and row.get('sha256'), f'{rid} is not a candidate or approved reference of this run.')
             rows.append(row)
-        warnings.append(f'these states have no shot recorded; from the next release the order comes from the pictures made for {shot_id}')
+        warnings.append(f'these states have no shot recorded: the order given is used; make states with --shot {shot_id} so the order comes from its own pictures')
         for i, row in enumerate(rows[1:], 2):
             parents = [p.get('id') for p in (row.get('generation') or {}).get('parents') or []]
             if rows[i - 2]['id'] not in parents:
@@ -2324,10 +2324,6 @@ def generate_image(conn, store, user, run, outputs, body):
             body = {**body, 'prompt': with_composed(body['prompt'], rl)}
     if lw:
         warns.append(lw)
-    missing = [] if body.get('fix_of') else library.image_names_missing(body['prompt'], len(body.get('parents') or []))   # design/96 C1: the pictures it names, not those the server adds
-    if missing:
-        warns.append(f"the edit sends {len(body['parents'])} pictures but the prompt does not name Image {', '.join(map(str, missing))}: name each as Image 1 to Image N "
-                     'with what to take from it' + NEXT_RELEASE)
     warns += [f"made from {p['id']}, which was made for {p['shot_id']}; this picture is listed and checked under {body['shot_id']}"   # design/95 F7: on purpose, or a slip
               for p in parents if body.get('shot_id') and p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id') not in (None, body['shot_id'])]
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named)
@@ -2398,7 +2394,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     their opposite), its descriptive words (N8), what the step before left (N14) and its facts; a graphic carries what it depicts (N10)."""
     if body.get('fix_of'):   # a fix round carries its picture's form when it had one
         return [], []
-    warns = [] if answer is not None else ['no answer form with this picture: write it with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE]
+    warns = [] if answer is not None else ['no answer form with this picture: write it with the library\'s form (--answer), so its checklist is checked']
     facts = {f['id']: f for f in plan.get('visual_facts') or [] if f.get('status') != 'unknown'}   # an unknown fact is never a line: it is never drawn
     lines = [_fact_line(f) for f in facts.values() if f.get('about') == body['element_id']]
     graphic = named is not None and named['visual_type'] in GRAPHIC_TYPES
@@ -2445,11 +2441,11 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
         if view_line(sh):   # design/111 F19
             lines.append(view_line(sh))
     if body['kind'] != 'state' and not any(p.get('kind') == 'style' and p.get('status') == 'approved' for p in parents):   # a state is made from the previous state
-        warns.append(f'no approved style sheet among the parents: make it once (`vw visuals image --element {STYLE} --kind style`), approve it, and name it in --parents' + NEXT_RELEASE)
+        warns.append(f'no approved style sheet among the parents: make it once (`vw visuals image --element {STYLE} --kind style`), approve it, and name it in --parents')
     for sh in shots:
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {sh['id']} --quote`, or on the page)" + NEXT_RELEASE)
+            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {sh['id']} --quote`, or on the page)")
     return _dedupe(lines + label_lines), warns
 
 
@@ -3177,7 +3173,7 @@ def light_warning(scene, kind, prompt):
     """design/103 A1: a keyframe in a lit scene names the scene's light word for word; a warning in this release."""
     light = (scene or {}).get('light', '').strip().rstrip('.')
     if kind == 'keyframe' and light and light not in prompt:
-        return f"the prompt does not carry the scene's light sentence word for word ('{light}'): one light per scene, so the shots match" + NEXT_RELEASE
+        return f"the prompt does not carry the scene's light sentence word for word ('{light}'): one light per scene, so the shots match"
     return None
 
 
@@ -3226,7 +3222,7 @@ def prepare_take(store, user, run, outputs, body):
             library.check_answer(answer, body['motion_prompt'])
         except ValueError as exc:
             need(False, str(exc))
-    need(str(body.get('continuity_notes') or '').strip(), 'Continuity notes are required: what stays unchanged between the two frames, and for a person five traits from the sheet (`--continuity`).')   # design/84 V2
+    need(str(body.get('continuity_notes') or '').strip(), 'Continuity notes are required: what stays unchanged through the shot (and between the start and the end image when the shot has one), and for a person five traits from the sheet (`--continuity`).')   # design/84 V2
     base = packet(store, run, outputs, body['shot_id'], session)
     shot = base['preparation']['shot']
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))
@@ -3246,13 +3242,13 @@ def prepare_take(store, user, run, outputs, body):
         images[role] = {'reference_id': rid, 'sha256': row['sha256'], 'key': row['key'], 'mime_type': 'image/png', 'width': row.get('width'), 'height': row.get('height')}
     used = [sid for sid, rid in _start_images(store, session).items() if rid == body['start_image'] and sid != body['shot_id']] + \
            [sid for sid, a in session['assets'].items() if sid != body['shot_id'] and a.get('reference_id') == body['start_image']]
-    warns, form = [], form + ([] if answer is not None else ['no answer form with this take: write the motion prompt with the library\'s form (--answer), so its checklist is checked' + NEXT_RELEASE])   # design/89 C4
+    warns, form = [], form + ([] if answer is not None else ['no answer form with this take: write the motion prompt with the library\'s form (--answer), so its checklist is checked'])   # design/89 C4
     beats = {b['id']: b for s in planned.get('subjects') or [] for b in s.get('beats') or []}   # design/91 N1: when each change happens is its beat's frames
     changes = [{'what': c['what'], 'beat_id': c['beat_id'], 'at_s': [round((beats[c['beat_id']]['start_frame'] - planned['start_frame']) / float(fps), 2),
                                                                      round((beats[c['beat_id']]['end_frame'] - planned['start_frame']) / float(fps), 2)]}
                for c in planned.get('changes') or [] if c.get('beat_id') in beats]
     if not changes:
-        form.append('no change list on this shot: list what differs between the start and the end picture and the beat that causes each (changes), so the pair is checked' + NEXT_RELEASE)
+        form.append('no change list on this shot: list what differs between the start and the end picture and the beat that causes each (changes), so the pair is checked')
     _rule(session, not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
     s, e = images['start_image'], images.get('end_image')
     align = None
@@ -3550,7 +3546,7 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     if made and made != shot_id:   # R1.7 (L2): only into its own shot, or moved with the operator's words
         need(str(move or '').strip(), f"{reference_id} was made for {made}; make one for {shot_id} (`vw visuals image --shot {shot_id} …`), or move it with the operator's words (--move).")
     elif not made and row.get('kind') in ('keyframe', 'state'):
-        warns.append(f'{reference_id} has no shot recorded; from the next release a picture is placed only in the shot it was made for')
+        warns.append(f'{reference_id} has no shot recorded: make pictures with --shot so each is placed only in the shot it was made for')
     used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
     _rule(session, not used, f'H5: this picture is already in {used[0] if used else ""}. Two shots never show the same picture: compose another (a reimagined shot, return_of, for a return), '
                              f'or take it out there first: `vw visuals unplace --shot {used[0] if used else ""}`, or Remove on the page.', warns)   # design/94 R1.8

@@ -429,7 +429,6 @@ ROUTE_REASON = re.compile(r'\b(because|since|so that|needs? (?:the )?(?:motion|m
 STATE_MAX_S = 5                            # one state of a graphic, at most 5 s
 GRAPHIC_BUILD_S = 4                        # a graphic on screen longer than this is a build of states or a drawn animation
 FROZEN_SHARE = 0.10                        # design/89 B4 (SK): warn when frozen pictures pass 10 % of the film
-NEXT_RELEASE = ' (warned in this release; refused from the next)'
 PAUSE_GAP_S = 0.12                         # design/89 A3: a silence between words this long is a pause a cut may fall in
 CUT_TOLERANCE_S = 0.3                      # a cut further than this from a pause is warned
 WORD_TOLERANCE_S = 0.5                     # a picture that starts more than this after its words is warned
@@ -645,10 +644,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         limit = STILL_FROZEN_MAX_S if shot.motion == 'none' else STILL_MOVING_MAX_S
                         if seconds > limit + 0.04:
                             warnings.append({'shot_id': shot.id, 'kind': 'still_long', 'message': f"shot {shot.id} is a {'frozen ' if shot.motion == 'none' else ''}still of {seconds:.1f} s: at most {limit} s; "
-                                             'fill the stretch with several different stills or a moving shot (a clip stretch or a take)' + NEXT_RELEASE})
+                                             'fill the stretch with several different stills or a moving shot (a clip stretch or a take)'})
                     if seconds is not None and shot.visual_type == 'diagram' and seconds > GRAPHIC_BUILD_S + 0.04:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
-                                         '(an animation shot) or a drawn animation' + NEXT_RELEASE})
+                                         '(an animation shot) or a drawn animation'})
                     for fid in shot.fact_ids:   # design/91 N6
                         need(fid in facts, f'shot {shot.id} names the fact {fid}, which the plan does not have.')
                     rests_on = {fid: facts[fid] for fid in shot.fact_ids} | {f.id: f for f in plan.visual_facts if f.about and f.about in shot.element_ids}
@@ -662,7 +661,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and shot.narration.strip():   # design/91 N8, N17
                         if not shot.claims and not shot.claims_left_out and not shot.descriptors:
                             warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims and the descriptive words spoken over it (claims, '
-                                             'descriptors); the picture never shows their opposite' + NEXT_RELEASE})
+                                             'descriptors); the picture never shows their opposite'})
                         if shot.claims and not shot.evidence.strip():
                             warnings.append({'shot_id': shot.id, 'kind': 'evidence_missing', 'message': f'shot {shot.id}: say how its picture shows its claims (evidence): a test, a table, '
                                              'or the result in a scene, never an unrelated picture'})
@@ -672,11 +671,11 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if shot.visual_type in GRAPHIC_TYPES + ('drawn',):   # design/89 C1, D1, D3; design/113: a drawn shot too
                         if not shot.depicts.strip():   # design/91 N10
                             warnings.append({'shot_id': shot.id, 'kind': 'depicts_missing', 'message': f'shot {shot.id}: say what the graphic depicts (depicts), in the subject\'s own form, '
-                                             'or an alternative labelled as the contrast; the operator approves it with the treatment' + NEXT_RELEASE})
+                                             'or an alternative labelled as the contrast; the operator approves it with the treatment'})
                         graphic_seen = True
                         if shot.narration.strip() and not shot.claims and not shot.claims_left_out:
                             warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
-                                             'or name one left out on purpose with the reason (claims_left_out)' + NEXT_RELEASE})
+                                             'or name one left out on purpose with the reason (claims_left_out)'})
                         if shot.drawing_spec is None:
                             if shot.graphic_kind not in ('title', 'text') and not NO_SPEC_WORDS.search(shot.production_method):   # defect 35: the words the message asks for are read
                                 warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
@@ -697,7 +696,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         svg_needs(shot, seconds)
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:
-                            warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state' + NEXT_RELEASE})
+                            warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state'})
                     if scenes is counted:   # a return names a shot the film shows: the recommended choice, never the alternative
                         starts[shot.id] = shot.start_frame
                     returns.append(shot)
@@ -829,7 +828,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                              '(the motion carries the change); set end_state_exact true if the final state must be exact, then an end image is made (design/112 S1)'})
                         if not shot.changes:
                             warnings.append({'shot_id': shot.id, 'kind': 'changes_missing', 'message': f'shot {shot.id}: list what differs between its start and end picture and the beat that '
-                                             'causes each (changes); the pair is checked against it' + NEXT_RELEASE})
+                                             'causes each (changes); the pair is checked against it'})
                         acting = [s for s in shot.subjects if s.behaviour == 'acts']
                         if fps:
                             f, length = float(fps), (shot.end_frame - shot.start_frame) / float(fps)
@@ -894,7 +893,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             warnings.append({'gap_id': gap.gap_id, 'kind': 'all_graphics', 'message': f'gap {gap.gap_id} is {len(own)} shots, all graphics: mix in a frame from the footage or a scene unless each one earns its place'})
     if graphic_seen and plan.foundation.graphic_style is None:   # design/89 C2
         warnings.append({'kind': 'style_missing', 'message': 'the plan has graphics: give foundation.graphic_style (palette from the client card, line weight, labels, background, how the frame '
-                                                           'is filled); the operator approves it once as a style sheet picture and every graphic is bound to it' + NEXT_RELEASE})
+                                                           'is filled); the operator approves it once as a style sheet picture and every graphic is bound to it'})
     for shot in returns:   # design/89 H7: a return is reimagined, with what differs
         if shot.return_of:
             need(shot.return_of in starts and starts[shot.return_of] < shot.start_frame, f'shot {shot.id}: return_of names an earlier shot of this plan ({shot.return_of} is not one).')
@@ -1054,7 +1053,7 @@ def course_warnings(plan, fps):
 
 def _graphics_run(gap_id, ids, seconds):   # design/93 G1
     return {'gap_id': gap_id, 'kind': 'graphics_run', 'message': f"{seconds:.1f} s of graphics in a row in {gap_id} ({', '.join(ids)}): above 8 s, break it with a camera shot"
-                                                              + ('; above 12 s it will be refused from the next release unless the treatment gives a reason' if seconds > 12 else '')}
+                                                              + ('; above 12 s, give the reason in the treatment' if seconds > 12 else '')}
 
 
 def gap_digest(plan, gap):

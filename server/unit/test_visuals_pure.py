@@ -79,11 +79,11 @@ def test_graphic_warnings_short_static_back_to_back_and_all_graphics():
     assert 'DG1 is a graphic of 2.0 s' in short['message'] and 'at least 3 s' in short['message']
     pair = next(w for w in warnings if w.get('kind') == 'graphics_back_to_back')
     assert 'DG1 and DG2 are graphics back to back' in pair['message'] and "second shot's purpose" in pair['message']
-    # design/89 B1: a still of four seconds that moves passes; the 20 s one above is warned (refused from the next release)
+    # design/89 B1: a still of four seconds that moves passes; the 20 s one above is warned
     _, warnings = VC.validate_plan(plan([shot('IM1', 0, 100, 'image'), shot('VS1', 100, 600, 'video'), shot('VS2', 600, 1000, 'video')]), GAPS, Fraction(25))
     assert not [w for w in warnings if w.get('kind') == 'still_long']
     long = next(w for w in VC.validate_plan(doc, GAPS, Fraction(25))[1] if w.get('kind') == 'still_long' and w['shot_id'] == 'IM1')
-    assert 'IM1 is a still of 20.0 s' in long['message'] and 'at most 4 s' in long['message'] and 'refused from the next' in long['message']
+    assert 'IM1 is a still of 20.0 s' in long['message'] and 'at most 4 s' in long['message'] and 'next release' not in long['message']
     # a gap of more than one shot that is all graphics
     doc = plan([shot('DG1', 0, 500, 'diagram'), {**shot('AN1', 500, 1000, 'animation'), 'states': states(10, 10)}])
     _, warnings = VC.validate_plan(doc, GAPS, Fraction(25))

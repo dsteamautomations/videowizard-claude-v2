@@ -204,6 +204,28 @@ The assistant's instructions for the visuals stage (about 10,800 words), the pro
 - **A0 done (29 Oct 2026):** `design/124-a0-rule-list.csv` (2,353 rules) and its summary `design/124-a0-rule-list.md`.
 - **A1 done (29 Oct 2026), not deployed:** the instructions' change-history labels removed into a **new instruction version 3** (`server/procedures/v3.json`); version 2 is untouched, so films in progress keep their wording. Only the visuals stage differs between the two. 50 labelled brackets and 3 history notes ("SK, 28 Oct …", "the cap of four removed by SK …") removed; 11,302 words became 11,047; a script proved that no other word changed and no label is left; the ratio "3 : 1.5 : 1" and every number stay as they were. Server unit tests 705 passed. New films start on version 3 only when the default is switched (Phase C3). From now on, every instruction change of this tidy-up, and every procedure change of design/121 and design/124's Changes 1–9 when they are built, goes into version 3.
 - Labels still inside the server's own refusal texts, added lines and messages (about 360 rows of the rule list): handled with A4 (the other voices), since they live in the code.
+- **A2 proposed (29 Oct 2026), waiting for SK:** the out-of-date rules, checked against the code, in six groups (rule-list ids in brackets):
+
+| Group | What is out of date | Proposed |
+|---|---|---|
+| **1. A start and an end picture for every video** | Since the start-only change a video takes a start picture only, and an end only where the final moment must be exact; still written as pairs in the instructions (R0073, R0325, R0329, R0383), the prompt guide (R1403), a server line (R2151), a message (R2320) and a refusal that asks for notes about "the two frames" (R1061) | Correct the wording everywhere to "start picture; an end picture only where it must be exact" |
+| **2. Four ways to make a picture; "arrows that travel are not available"** | There are five ways (the drawn diagram), and a drawn diagram can move things along a path (R0031, R0043) | Correct (the same as Change 5) |
+| **3. "Refused from the next release"** | 18 warnings promise to become refusals and never did (R0452, R0789, R0790, R0794, R0797, R0798, R0804, R0850, R0864, R0880, R0910, R1018, R1022, R1023, R1056, R1066, R1067, R1098); one of them can never fire, because the same thing is already refused (R1015) | Remove the promise and keep them as warnings; remove R1015's warning. Whether any should become a refusal is decided per rule in Phase B, not all at once |
+| **4. The picture AI is chosen per film** | The prompt guide says "GPT Image for every picture, never Nano Banana" (R1150, R1554) and two messages say "paid OpenAI image" (R2315, R2317), though a film may use Nano Banana | Correct to "the film's picture AI (GPT Image or Nano Banana)" |
+| **5. Small leftovers** | A pointer to the wrong section (R0048); an old alias "answers for one release" kept for weeks (R2160); a warn-only path for sessions begun before 23 Oct (R0884) | Fix the pointer; remove the alias; keep the old-session path until no film from before 23 Oct is open |
+| **6. Facts in the prompt guide about video models** | Veo (not used), Kling 4.0 watch notes, the Higgsfield fixed lines listed differently from today's, a file named INDEX that VideoWizard replaced, a section that is not in the bundle (R1193, R1252, R1800, R1866, R1895, R1906, R1910) | Handle in A4 with the prompt guide (it is a separate snapshot; a corrected guide is a new snapshot, so films in progress keep theirs) |
+
+Not in A2: the ₹ spending limit (17 rows): still live; it goes with design/122. R0626 (the "cap of four" note): already removed in A1.
+
+- **A2 done for groups 1–5 (SK, 29 Oct 2026), not deployed:**
+  - Instruction version 3: five routes, with the drawn diagram named beside the other four and its moving parts; a start image per video, an end image only where the final state must be exact (three places); "warned and refused from the next" became "warned"; the section pointer corrected.
+  - Server: the "refused from the next release" promise removed from 15 warnings and reworded in 3 more (they stay warnings); the warning that could never fire removed (the same thing is refused earlier); the continuity refusal no longer speaks of "the two frames".
+  - Chat tool: "paid OpenAI image" became the film's picture AI (2 messages); "compose the start and end images" became "the start image (and the end image only where the shot must end exactly)" (2 messages).
+  - Tests: 7 assertions that expected the promise now expect it gone. Server unit 705 passed; plugin 320 passed, 3 known Windows-only failures.
+  - **Held back (with Phase C3):** the packet's start instruction (R2151, "a cut starts a new pair with its own two images"), its old alias (R2160) and the video instruction's "the two images". These texts are part of each shot's fingerprint: changing them now would mark prepared takes stale in every film in progress. They change with the switch to version 3 for new films.
+  - Group 4's prompt-guide rows (R1150, R1554) and group 1's (R1403) go with A4 (a new guide snapshot).
+
+Where the corrections land: groups 1, 2 and 5 in instruction version 3 (the wording) and in the server code (the lines and messages); group 3 in the server code; group 4 in the messages now and in the prompt guide with A4.
 
 ### Part B — The four phases reviewed so far (SK, 29 Oct 2026)
 

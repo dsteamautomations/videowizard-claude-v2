@@ -126,7 +126,7 @@ def test_a_shot_without_a_change_list_is_prepared_without_a_pair_check_and_warne
     Pair.calls = []
     monkeypatch.setattr(VS, '_gemini_transport', lambda: Pair)
     out = VS.prepare_take(take_session(None), USER, RUN, [], BODY)
-    assert not Pair.calls and any('change list' in w and 'refused from the next' in w for w in out['warnings'])
+    assert not Pair.calls and any('change list' in w and 'next release' not in w for w in out['warnings'])
 
 
 # ---------- N3 ----------
