@@ -561,7 +561,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                             'correction': ((session.get('spec_corrections') or {}).get(material_key(e['id'])) or {}).get('words')} if e.get('material_spec') else None),
                           'not_this': list(((session.get('not_this') or {}).get(e['id']) or {}).get('lines') or [])}   # design/111 F10, F12
                          for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
-            'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session),
+            'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session), 'stock_source': STOCK_SOURCE,
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0
             'golden': dict(session.get('golden') or {}),   # design/111 F11
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
@@ -1469,7 +1469,7 @@ def round_undo(store, user, run, outputs, quote):
     rd = session.get('round')
     need(rd and rd.get('pass') in (2, 'complete'), 'Nothing to undo: the round is at pass 1 or has not started.')
     searches = session.get('searches') or {}
-    own = [r['search_id'] for r in rd['elements'].values() if r.get('search_id')]
+    own = [sid for r in rd['elements'].values() for sid in _sids(r)]
     if rd['pass'] == 2:
         picked = [sid for sid in own if (searches.get(sid) or {}).get('picked')]
         need(not picked, f"Pass 1 cannot be undone: a pick is saved from {', '.join(picked)}; reject the pictures you do not want instead.")
@@ -1813,26 +1813,81 @@ def fetch_image(url):
     raise ValueError('too many redirects')
 
 
-def _search_into(session, user, run, plan, element_id, keywords, quote, results=None):
-    """The search on a loaded session (design/73 R3; the round of design/79 calls it for several elements before one save)."""
+def _search_into(session, user, run, plan, element_id, keywords, quote, results=None, source=''):
+    """The search on a loaded session (design/73 R3); `source` names the stock search's added word (design/121 change 5)."""
     need(any(e['id'] == element_id for e in plan['elements']), f'Unknown element {element_id}.')
     quote = said(quote, 'Searched', user)   # design/99 C4: the click is the operator's yes to the web search
     words = str(keywords or '').split()
     need(2 <= len(words) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')   # R6
     rows = results if results is not None else apify.search_images(' '.join(words), 10)
-    sid = digest({'run': str(run['id']), 'element': element_id, 'keywords': ' '.join(words), 'at': datetime.now(timezone.utc).isoformat()})[:12]
+    sid = digest({'run': str(run['id']), 'element': element_id, 'keywords': ' '.join(words), 'source': source, 'at': datetime.now(timezone.utc).isoformat()})[:12]
     session.setdefault('searches', {})[sid] = {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'quote': quote, 'by': user['id'],
-                                               'at': datetime.now(timezone.utc).isoformat(), 'results': rows, 'picked': []}
+                                               'at': datetime.now(timezone.utc).isoformat(), 'results': rows, 'picked': [], **({'source': source} if source else {})}
     return {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'results': rows}
 
 
-def search(store, user, run, outputs, element_id, keywords, quote):
-    """design/73 R3: one Google Images search for an element, on the operator's yes; the ten rows kept on the session for the page and the tool."""
+STOCK_SOURCE = 'depositphotos'   # design/121 change 5: the source box's default word (browser test 29 Oct: clean, focused, local); set after the real test with SK
+
+
+def prefetch_key(run, url):
+    return key(run, f"prefetch/{digest({'url': url})[:24]}.png")
+
+
+def search_rows(store, run, keywords, source=''):
+    """design/121 changes 5, 6: before the run's lock, the plain search and, with a source word, the stock search, at once; then every picture of both
+    downloaded (eight at a time) and stored, so Save is instant and a picture that will not download is marked on its row before it is ticked.
+    {'plain': rows or {'error'}, 'stock': ...}; nothing when the keywords are not two to six words (search() refuses them under the lock)."""
+    from concurrent.futures import ThreadPoolExecutor
+    words, src = ' '.join(str(keywords or '').split()), ' '.join(str(source or '').split())
+    if not 2 <= len(words.split()) <= 6:
+        return {}
+    queries = {'plain': words, **({'stock': f'{words} {src}'} if src else {})}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = {k: pool.submit(apify.search_images, q, 10) for k, q in queries.items()}
+    out = {}
+    for k, f in futures.items():
+        try:
+            out[k] = f.result()
+        except Exception as exc:   # this search's failure; the other may still have come back
+            out[k] = {'error': exc.message if isinstance(exc, Problem) else str(exc)}
+    found = [r for v in out.values() if isinstance(v, list) for r in v]
+    fetched = _download_picks({r['image_url']: r for r in found})
+    good = {u: f for u, f in fetched.items() if f[0] is not None}
+    with ThreadPoolExecutor(max_workers=8) as pool:   # ponytail: the stored copies are never deleted (about 20 pictures a search); a cleanup at the stage's record if storage grows
+        list(pool.map(lambda u: store.put(prefetch_key(run, u), good[u][0], 'image/png'), good))
+    for r in found:
+        data, _size, used = fetched[r['image_url']]
+        r['download'] = used if data is not None else 'failed: ' + '; '.join(used)
+    return out
+
+
+def search(store, user, run, outputs, element_id, keywords, quote, source='', found=None):
+    """design/73 R3: a Google Images search for an element, on the operator's yes; design/121: with a source word a stock search beside it, every picture
+    downloaded at once; in an open round the thing's row takes the new searches (pass 1 and pass 2 alike), so Done counts them."""
+    need(2 <= len(str(keywords or '').split()) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')
+    if found is None:
+        found = search_rows(store, run, keywords, source)
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
-    out = _search_into(session, user, run, plan, element_id, keywords, quote)
+    src = ' '.join(str(source or '').split())
+    rd = session.get('round') or {}
+    row = rd['elements'].get(element_id) if rd.get('pass') in (1, 2) else None
+    errors = {k: v['error'] for k, v in found.items() if isinstance(v, dict)}
+    if found and len(errors) == len(found):   # nothing came back: the row says so and still waits
+        if row is not None:
+            row['error'] = '; '.join(errors.values())
+            save_session(store, run, session)
+        need(False, 'The search failed: ' + '; '.join(errors.values()) + '. Search again, or choose the footage picture or Ignore this.')
+    plain = _search_into(session, user, run, plan, element_id, keywords, quote, results=found['plain']) if isinstance(found.get('plain'), list) else None
+    stock = _search_into(session, user, run, plan, element_id, keywords, quote, results=found['stock'], source=src) if isinstance(found.get('stock'), list) else None
+    sids = [x['search_id'] for x in (plain, stock) if x]
+    for sid in sids:   # the page shows the plain and the stock search side by side
+        session['searches'][sid]['pair'] = sids
+    if row is not None:
+        row.update(search_ids=sids, search_id=sids[0], keywords=' '.join(str(keywords).split()), source=src, verdict='search', error='; '.join(errors.values()) or None, ignored=False)
     save_session(store, run, session)
-    return out
+    first = plain or stock
+    return {**first, 'search_ids': sids, 'source': src, 'stock_results': (stock or {}).get('results') or [], **({'errors': errors} if errors else {})}
 
 
 def pick(store, user, run, outputs, search_id, picks, quote):
@@ -1866,6 +1921,19 @@ def _download_picks(rows):
     return {key: f.result() for key, f in futures.items()}
 
 
+def _fetch_picks(store, run, rows):
+    """design/121 change 6: a picture downloaded at its search is read from the store; the rest are downloaded now, as before."""
+    out, rest = {}, {}
+    for k, row in rows.items():
+        pk = prefetch_key(run, row['image_url'])
+        if row.get('download') in ('picture', 'thumbnail') and store.exists(pk):
+            data = store.get(pk)
+            out[k] = (data, image_bytes(data)[1], row['download'])
+        else:
+            rest[k] = row
+    return {**out, **_download_picks(rest)}
+
+
 def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched=None):
     s = (session.get('searches') or {}).get(search_id)
     need(s, f'Unknown search {search_id}.')
@@ -1881,7 +1949,7 @@ def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched
     made, failed = [], []
     element_kind = next(e['kind'] for e in plan['elements'] if e['id'] == s['element_id'])
     if fetched is None:
-        fetched = _download_picks({(search_id, row['n']): row for row, _ in chosen})
+        fetched = _fetch_picks(store, run, {(search_id, row['n']): row for row, _ in chosen})   # design/121 change 6
     for row, note in chosen:
         png, size, used = fetched[(search_id, row['n'])]
         if png is None:
@@ -1926,96 +1994,72 @@ def round_start(store, user, run, outputs, elements):
     return {'pass': 1, 'elements': len(rows)}
 
 
-def round_searches(store, run, outputs, verdicts):
-    """design/92 (L59): the round's searches, run before the run's lock (each may take two minutes); round_done saves them under the lock.
-    {element: rows, or {'error': message}}; nothing when no first pass is waiting (round_done then refuses as before)."""
-    session = session_of(store, run, outputs)
-    rd = session.get('round') or {}
-    if rd.get('pass') != 1:
-        return {}
-    wanted = {eid: ' '.join(str((verdicts.get(eid) or {}).get('keywords') or row['keywords']).split()) for eid, row in rd['elements'].items()
-              if (verdicts.get(eid) or {}).get('verdict') == 'search'}
-    from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {eid: pool.submit(apify.search_images, kw, 10) for eid, kw in wanted.items() if 2 <= len(kw.split()) <= 6}
-    out = {}
-    for eid, f in futures.items():
-        try:
-            out[eid] = f.result()
-        except Exception as exc:   # this row's failure, recorded at the save
-            out[eid] = {'error': exc.message if isinstance(exc, Problem) else str(exc)}
-    return out
+def _sids(row):
+    """design/121 change 5: a thing's searches in the round, the plain one and the stock one (an older row: its one search)."""
+    return list(row.get('search_ids') or ([row['search_id']] if row.get('search_id') else []))
 
 
-def round_done(store, user, run, outputs, verdicts, quote, found=None):
-    """Pass 1 answered: the chosen frames approved with the words, the searches run with the words as the yes; pass 2 for the searched elements."""
+def round_done(store, user, run, outputs, verdicts, quote):
+    """Pass 1 answered: the chosen frames approved with the words; design/121 change 6: every thing set to Google was searched with its own button
+    (Done runs no search and waits, naming them); Ignore this needs nothing. Pass 2 for the searched things."""
     session = session_of(store, run, outputs)
-    plan = guarded(lambda: current_plan(store, session))
     rd = session.get('round')
     need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
-    quote = said(quote, 'Pass 1 done', user)   # design/99 C6: the click approves the frames and says yes to the searches
+    quote = said(quote, 'Pass 1 done', user)   # design/99 C6: the click approves the frames
     verdicts = verdicts or {}
+    waiting = []
     for eid, row in rd['elements'].items():
         if not row['frames']:   # a round posted without naming the frames: the element's grabbed frames count (as round_start does now)
             row['frames'] = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
         v = verdicts.get(eid) or {}
-        need(v.get('verdict') in ('approve', 'search'), f'{eid}: a verdict is required, approve or search.')
+        need(v.get('verdict') in ('approve', 'search', 'ignore'), f'{eid}: a verdict is required: approve the footage picture, search, or ignore.')
         if v['verdict'] == 'approve':
-            need(row['frames'], f'{eid} has no frame to approve: search instead.')
+            need(row['frames'], f'{eid} has no frame to approve: search instead, or ignore it.')
+        if v['verdict'] == 'search' and not _sids(row):
+            waiting.append(eid)
+    need(not waiting, f"{len(waiting)} thing{'s' if len(waiting) > 1 else ''} not searched yet: {', '.join(waiting)}. Press Search on each, or choose the footage picture or Ignore this.")
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
     for eid, row in rd['elements'].items():
-        if verdicts[eid]['verdict'] == 'search':
-            row['keywords'] = str(verdicts[eid].get('keywords') or row['keywords']).strip()
-    if found is None:   # design/80 S5: the searches do not depend on each other; they run at once (the routes run them before the lock, design/92)
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            futures = {eid: pool.submit(apify.search_images, ' '.join(row['keywords'].split()), 10) for eid, row in rd['elements'].items() if verdicts[eid]['verdict'] == 'search' and 2 <= len(row['keywords'].split()) <= 6}
-    else:
-        futures = found
-    for eid, row in rd['elements'].items():
-        v = verdicts[eid]
-        row['verdict'] = v['verdict']
-        if v['verdict'] == 'approve':
+        v = verdicts[eid]['verdict']
+        row['verdict'], row['ignored'] = v, v == 'ignore'
+        if v == 'approve':
             for fid in row['frames']:
                 r = session['references'][fid]
                 if r['status'] == 'candidate':
                     r.update(status='approved', approval={**stamp, 'sha256': r['sha256']})
                     _feedback_image(session, run, user, r, 'pass', quote, '')
-            continue
-        try:
-            got = futures.get(eid)
-            got = got.result() if hasattr(got, 'result') else got
-            if isinstance(got, dict) and got.get('error'):
-                raise ValueError(got['error'])
-            row['search_id'] = _search_into(session, user, run, plan, eid, row['keywords'], quote, got)['search_id']
-            row['error'] = None
-        except (Problem, ValueError) as exc:   # a failed search is this row's, the rest go on
-            row['error'] = exc.message if isinstance(exc, Problem) else str(exc)
     rd['quote'] = quote
-    rd['pass'] = 2 if any(r['search_id'] for r in rd['elements'].values()) else 'complete'
+    searched = [eid for eid, r in rd['elements'].items() if r['verdict'] == 'search']
+    rd['pass'] = 2 if searched else 'complete'
     save_session(store, run, session)
-    return {'pass': rd['pass'], 'searched': [eid for eid, r in rd['elements'].items() if r['search_id']], 'errors': {eid: r['error'] for eid, r in rd['elements'].items() if r['error']}}
+    return {'pass': rd['pass'], 'searched': searched, 'errors': {eid: r['error'] for eid, r in rd['elements'].items() if r.get('error')}}
 
 
-def round_picks(store, user, run, outputs, picks, quote):
-    """Pass 2 answered: the ticked pictures per search become web references; the round is complete."""
+def round_picks(store, user, run, outputs, picks, quote, ignore=()):
+    """Pass 2 answered: the ticked pictures per search become web references; design/121 change 1: every searched thing has an answer first
+    (a tick, a pick saved before, or Ignore this), else nothing is saved and the waiting things are named."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     rd = session.get('round')
     need(rd and rd.get('pass') == 2, 'No reference round is waiting for its second pass.')
     quote = said(quote, 'Pass 2 done', user)   # design/99 C6
-    own = {r['search_id'] for r in rd['elements'].values() if r['search_id']}
-    made, failed = [], {}
-    for sid in (picks or {}):
+    picks, ignore = picks or {}, set(ignore or ())
+    searches = session.get('searches') or {}
+    own = {sid for r in rd['elements'].values() for sid in _sids(r)}
+    for sid in picks:
         need(sid in own, f'Search {sid} is not in this round.')
+    waiting = [eid for eid, r in rd['elements'].items() if r.get('verdict') == 'search' and eid not in ignore
+               and not any(picks.get(sid) or (searches.get(sid) or {}).get('picked') for sid in _sids(r))]
+    need(not waiting, f"{len(waiting)} thing{'s' if len(waiting) > 1 else ''} still need an answer: {', '.join(waiting)}. Tick a picture, search again with new words, or press Ignore this.")
+    made, failed = [], {}
     wanted = {}   # design/83 P1: every pick of every search downloaded at once, then recorded search by search in the ticked order
-    for sid, rows in (picks or {}).items():
-        results = {r['n']: r for r in (session.get('searches') or {}).get(sid, {}).get('results') or []}
+    for sid, rows in picks.items():
+        results = {r['n']: r for r in (searches.get(sid) or {}).get('results') or []}
         for p in rows or []:
             if (p or {}).get('n') in results:
                 wanted[(sid, p['n'])] = results[p['n']]
-    fetched = _download_picks(wanted)
-    for sid, rows in (picks or {}).items():
+    fetched = _fetch_picks(store, run, wanted)   # design/121 change 6
+    for sid, rows in picks.items():
         if not rows:
             continue
         try:
@@ -2025,9 +2069,12 @@ def round_picks(store, user, run, outputs, picks, quote):
                 failed[sid] = out['failed']
         except (Problem, ValueError) as exc:
             failed[sid] = exc.message if isinstance(exc, Problem) else str(exc)
+    for eid, r in rd['elements'].items():
+        if r.get('verdict') == 'search':
+            r['ignored'] = eid in ignore
     rd['pass'] = 'complete'
     save_session(store, run, session)
-    return {'complete': True, 'references': [r['id'] for r in made], 'failed': failed}
+    return {'complete': True, 'references': [r['id'] for r in made], 'failed': failed, 'ignored': sorted(ignore)}
 
 
 def _round_view(session):
@@ -2035,15 +2082,17 @@ def _round_view(session):
     if not rd:
         return None
     searches = session.get('searches') or {}
-    return {**rd, 'elements': {eid: {**r, 'picked': (searches.get(r['search_id']) or {}).get('picked') if r.get('search_id') else None} for eid, r in rd['elements'].items()}}
+    return {**rd, 'elements': {eid: {**r, 'search_ids': _sids(r), 'picked': [n for sid in _sids(r) for n in (searches.get(sid) or {}).get('picked') or []] if _sids(r) else None}
+                               for eid, r in rd['elements'].items()}}
 
 
 def nothing_fits(store, user, run, outputs, search_id, reason):
-    """design/73 R4b (6): none of the ten fits; the reason reaches the assistant as the next search's hint."""
+    """design/73 R4b (6): none of the ten fits; the reason joins the element's "not this" list (design/111 F12). design/121 change 1: the next search is
+    the operator's own (new words and Search again), or Ignore this."""
     session = session_of(store, run, outputs)
     s = (session.get('searches') or {}).get(search_id)
     need(s, f'Unknown search {search_id}.')
-    need(str(reason or '').strip(), 'Say in one line why nothing fits; it becomes the next search.')
+    need(str(reason or '').strip(), 'Say in one line why nothing fits; it goes on the "not this" list.')
     s['nothing_fits'] = {'reason': str(reason).strip(), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     save_session(store, run, session)
     return {'search_id': search_id, 'nothing_fits': s['nothing_fits']}
@@ -2210,6 +2259,18 @@ def generate_image(conn, store, user, run, outputs, body):
         lines = list(lines or []) + COMPONENT_LINES
     if body['kind'] == 'sheet' and body['element_id'] != STYLE:
         lines = list(lines or []) + sheet_lines(element)   # design/119 rule 2
+        if not body.get('fix_of'):   # design/121 change 4: the operator's note on each source, in the prompt and as a must line
+            for k, p in enumerate(parents, 1):
+                note = ((p or {}).get('source') or {}).get('note') or ''
+                if note.strip():
+                    body = {**body, 'prompt': with_composed(body['prompt'], f"The operator's note on Image {k}: {note.strip().rstrip('.')}.")}
+                    lines.append({'check': f'operator note on Image {k}', 'weight': 'must', 'pass_when': f"the picture follows the operator's note on Image {k}: {note.strip()}"})
+    if not body.get('fix_of'):   # design/121 change 5: a web picture may carry a stock site's watermark; never copied
+        webs = [k for k, p in enumerate(parents, 1) if p and p.get('kind') == 'web']
+        for k in webs:
+            body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} may carry a watermark or a stock site's lettering: ignore it, never copy it.")}
+        if webs:
+            lines = list(lines or []) + [WATERMARK]
     if body.get('end_prompt') and not body.get('end_region') and not body.get('fix_of'):   # design/112 S2: the end the server queues needs its region too
         warns.append('the end written with this start has no region: the server will refuse to make it (design/112 S2); give --end-region left,top,width,height with the start')
     if body['kind'] == 'keyframe' and not is_end and named is not None:
@@ -2300,6 +2361,7 @@ COMPONENT_BLOCK = ('Image 1 is the approved style of this film: take its palette
 COMPONENT_BLOCK_GREEN = ('Image 1 is the approved style of this film: take its palette, line and finish from it. One {name} alone, nothing else in the frame, '
                          'on a flat, even chroma green background (#00FF00) that touches every edge: no ground, no setting, no shadow outside its own edge, no green on the thing itself, the whole thing inside the frame.')   # design/120
 GEMINI_MAX_INPUTS, GEMINI_KIND_CAPS = 14, {'object': 6, 'character': 5, 'style': 3}   # design/120: Google's limits for the Pro image model, 28 Oct 2026
+WATERMARK = {'check': 'no watermark', 'weight': 'must', 'pass_when': "no watermark, stock site's name or lettering across the picture"}   # design/121 change 5
 COMPONENT_LINES = [{'check': 'one thing only', 'pass_when': 'one thing alone: no background, no ground, no setting, no second object, no shadow outside its edge', 'weight': 'must'},
                    {'check': 'clean edge', 'pass_when': 'the edge of the thing is clean and nothing of it is cut off by the frame', 'weight': 'must'}]
 
@@ -2440,15 +2502,18 @@ def spec_table(spec):
 
 
 def note_reference(store, user, run, outputs, ref_id, note):
-    """design/106 N4: a saved picture's note stays editable until its element's sheet is made; the sheet prompt reads the latest note."""
+    """design/106 N4: a saved picture's note stays editable; the sheet prompt reads the latest note. design/121 change 4: a note after the sheet marks
+    the sheet "sources changed", like a picture added after it, so a new sheet is made with the note."""
     session = session_of(store, run, outputs)
     row = session['references'].get(ref_id)
     need(row and row.get('kind') in ('web', 'frame', 'supplied', 'isolated') and row.get('status') != 'rejected', f'{ref_id} is not a saved picture of an element.')
-    sheet = next((r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == row.get('element_id') and r.get('status') != 'rejected'), None)
-    need(not sheet, f"{row.get('element_id')}'s sheet is already made ({(sheet or {}).get('id', '')[:8]}): reject the sheet to change the notes it was made from.")
     row.setdefault('source', {})['note'] = str(note or '').strip()[:500]
+    sheets = [r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == row.get('element_id') and r.get('status') != 'rejected']
+    for r in sheets:
+        r['sources_changed'] = True
     save_session(store, run, session)
-    return {'reference_id': ref_id, 'note': row['source']['note'], 'next': f"Note saved: {row.get('element_id')}'s sheet is made with it."}
+    return {'reference_id': ref_id, 'note': row['source']['note'],
+            'next': f"Note saved: {row.get('element_id')}'s " + ('sheet is marked "sources changed": the assistant makes a new one with it.' if sheets else 'sheet is made with it.')}
 
 
 def correct_spec(store, user, run, outputs, shot_id, words):

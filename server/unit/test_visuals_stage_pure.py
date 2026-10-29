@@ -1052,7 +1052,7 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
 
 
 def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
-    """design/79: every element at once; pass 1 approves frames and runs the searches; pass 2 takes the picks."""
+    """design/79: every element at once; pass 1 approves frames (design/121 change 6: each thing searched with its own button first); pass 2 takes the picks."""
     from io import BytesIO
     PIL = pytest.importorskip('PIL.Image')
     png = BytesIO()
@@ -1083,19 +1083,20 @@ def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
     rows = [{'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://img.example/1.jpg', 'page_url': 'https://site.example/p1', 'site': 'site.example', 'width': 800, 'height': 600, 'title': 'kiln'}]
     calls = []
     monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: calls.append(keywords) or rows)
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: png.getvalue())
     # design/99: a click needs no typed words; this step no longer refuses without them
     with pytest.raises(Problem, match='E2: a verdict is required'):
         g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}}, 'yes'))
     with pytest.raises(Problem, match='E2 has no frame to approve'):
         g(lambda: VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'approve'}}, 'yes'))
-    out = VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'search', 'keywords': 'clamp kiln Tamil Nadu'}}, 'Yes: the first frame, and search for the kiln.')
+    VS.search(store, USER, RUN, [], 'E2', 'clamp kiln Tamil Nadu', 'Yes, search for the kiln.')   # design/121 change 6: the thing's own Search button, before Done
+    out = VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'search'}}, 'Yes: the first frame.')
     s = saved(store)
     assert s['references']['F1']['status'] == 'approved' and s['references']['F1']['approval']['quote'].startswith('Yes') and calls == ['clamp kiln Tamil Nadu']
     rd = s['round']
     assert out['pass'] == 2 and rd['pass'] == 2 and rd['elements']['E1']['verdict'] == 'approve' and rd['elements']['E2']['verdict'] == 'search' and rd['elements']['E2']['search_id'] and rd['elements']['E2']['keywords'] == 'clamp kiln Tamil Nadu'
     sid = rd['elements']['E2']['search_id']
     assert s['searches'][sid]['quote'].startswith('Yes') and s['feedback'][-1]['id'] == 'F1'
-    monkeypatch.setattr(VS, 'fetch_image', lambda url: png.getvalue())
     with pytest.raises(Problem, match='not in this round'):
         g(lambda: VS.round_picks(store, USER, RUN, [], {'nope': [{'n': 1}]}, 'these'))
     out = VS.round_picks(store, USER, RUN, [], {sid: [{'n': 1, 'note': 'colour only'}]}, 'This one, colour only.')
@@ -1103,22 +1104,7 @@ def test_the_reference_round_runs_as_two_passes_on_one_page(monkeypatch):
     assert out['complete'] is True and s['round']['pass'] == 'complete' and s['searches'][sid]['picked'] == [1]
     web = [r for r in s['references'].values() if r.get('kind') == 'web']
     assert len(web) == 1 and web[0]['element_id'] == 'E2' and web[0]['source']['note'] == 'colour only'
-    # design/80 S5: three search rows run at once (a barrier that only three concurrent calls can pass)
     import threading
-    VS.round_start(store, USER, RUN, [], [{'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln'}])
-    sess3 = saved(store)
-    sess3['round']['elements'].update({'E3': {'frames': [], 'keywords': 'clay pit', 'verdict': None, 'search_id': None, 'error': None}, 'E4': {'frames': [], 'keywords': 'lime mortar', 'verdict': None, 'search_id': None, 'error': None}})
-    doc3 = {**doc, 'elements': doc['elements'] + [{**doc['elements'][0], 'id': 'E3', 'name': 'Pit'}, {**doc['elements'][0], 'id': 'E4', 'name': 'Mortar'}]}
-    store = store_with(sess3, doc3)
-    gate = threading.Barrier(3, timeout=3)
-    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: (gate.wait() and None) or rows)
-    out = VS.round_done(store, USER, RUN, [], {'E2': {'verdict': 'search'}, 'E3': {'verdict': 'search'}, 'E4': {'verdict': 'search'}}, 'yes')
-    assert out['pass'] == 2 and out['errors'] == {} and sorted(out['searched']) == ['E2', 'E3', 'E4']
-    # a search that fails is recorded on its row and the round goes on
-    VS.round_start(store, USER, RUN, [], [{'element_id': 'E2', 'frames': [], 'keywords': 'brick kiln'}])
-    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: (_ for _ in ()).throw(Problem(502, 'SEARCH', 'Apify answered HTTP 500 to the image search.')))
-    out = VS.round_done(store, USER, RUN, [], {'E2': {'verdict': 'search'}}, 'yes')
-    assert out['pass'] == 'complete' and saved(store)['round']['elements']['E2']['error'].startswith('Apify answered')
     # design/83 P1: the picks of every search in the round are downloaded at once (two searches, three picks, one barrier)
     import threading
     s2 = saved(store)

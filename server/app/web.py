@@ -365,10 +365,10 @@ def _visuals_act(code, vw2_session, body):
     action = body.get('action')
     quote = str(body.get('quote') or '')
     found = None
-    if action == 'round-done':   # design/92 (L59): the round's searches run before the run's lock
+    if action == 'search':   # design/92 (L59), design/121 change 6: the searches and their downloads run before the run's lock
         with db_connect() as conn:
             r0 = core.load_run(conn, user, _run_by_code(conn, user, code)['id'])
-            found = V.round_searches(storage(), r0, core.current_outputs(conn, r0['id']), dict(body.get('verdicts') or {}))
+        found = V.search_rows(storage(), r0, str(body.get('keywords') or ''), str(body.get('source') or ''))
     with db_connect() as conn:
         run = _run_at(conn, user, code, 'visuals')
         store = storage()
@@ -378,11 +378,11 @@ def _visuals_act(code, vw2_session, body):
             'select': lambda: V.select_choice(store, user, run, outputs, {body['gap_id']: body['choice_id']}),
             'accept': lambda: V.accept(store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
             'revise': lambda: V.revise_gap(store, user, run, outputs, body['gap_id'], str(body.get('notes') or ''), quote),   # design/76
-            'search': lambda: V.search(store, user, run, outputs, body['element_id'], str(body.get('keywords') or ''), quote),   # design/73
+            'search': lambda: V.search(store, user, run, outputs, body['element_id'], str(body.get('keywords') or ''), quote, str(body.get('source') or ''), found),   # design/73; design/121
             'pick': lambda: V.pick(store, user, run, outputs, body['search_id'], list(body.get('picks') or []), quote),
             'nothing-fits': lambda: V.nothing_fits(store, user, run, outputs, body['search_id'], str(body.get('reason') or '')),
-            'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, found=found),   # design/79; design/92
-            'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote),
+            'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote),   # design/79; design/121 change 6: no search at Done
+            'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote, list(body.get('ignore') or [])),   # design/121 change 1
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),

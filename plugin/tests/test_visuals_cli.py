@@ -452,7 +452,7 @@ def test_elements_search_pick_and_nothing_fits_post_what_the_server_expects(harn
     posted = []
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'search_id': 's1', 'element_id': 'E1', 'keywords': 'kadapari tool', 'results': [{'n': 1, 'site': 'a.in', 'width': 800, 'height': 600, 'title': 'k', 'page_url': 'https://a.in/p'}]})
     code, out, err = run(args(what='search', element='E1', keywords='kadapari tool', quote='Yes, search.'), capsys)
-    assert code == 0 and posted[-1][0].endswith('/visuals/search') and posted[-1][1] == {'element_id': 'E1', 'keywords': 'kadapari tool', 'quote': 'Yes, search.'} and '1. a.in 800x600' in err and 'visuals page' in err
+    assert code == 0 and posted[-1][0].endswith('/visuals/search') and posted[-1][1] == {'element_id': 'E1', 'keywords': 'kadapari tool', 'source': '', 'quote': 'Yes, search.'} and '1. a.in 800x600' in err and 'visuals page' in err
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'search_id': 's1', 'references': [{'id': 'r2'}, {'id': 'r1'}]})
     code, out, err = run(args(what='pick', search='s1', n='2,1', note=['2=avoid brand text'], quote='These two.'), capsys)
     assert code == 0 and posted[-1][1] == {'search_id': 's1', 'picks': [{'n': 2, 'note': 'avoid brand text'}, {'n': 1, 'note': ''}], 'quote': 'These two.'} and '2 web references' in err
@@ -485,6 +485,9 @@ def test_round_posts_the_elements_the_verdicts_and_the_picks_and_status_waits_fo
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: posted.append((path, body)) or {'complete': True, 'references': ['r1'], 'failed': {}})
     code, out, err = run(args(what='round', picks='out/round-picks.json', quote='These.'), capsys)
     assert code == 0 and posted[-1][0].endswith('/visuals/round/picks') and posted[-1][1]['picks'] == {'s1': [{'n': 2, 'note': 'colour only'}]} and 'one sheet per element' in err
+    (ws / 'out' / 'round-picks.json').write_text(json.dumps({'s1': [{'n': 2}], 'ignore': ['E3']}), encoding='utf-8')   # design/121 change 1: Ignore this from chat
+    code, out, err = run(args(what='round', picks='out/round-picks.json', quote='These; skip E3.'), capsys)
+    assert code == 0 and posted[-1][1]['picks'] == {'s1': [{'n': 2}]} and posted[-1][1]['ignore'] == ['E3']
     answers = [{'jobs': [], 'round': {'pass': 1}}, {'jobs': [], 'round': {'pass': 'complete'}}]
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: answers.pop(0) if answers else {'jobs': [], 'round': {'pass': 'complete'}})
     monkeypatch.setattr(vw.time, 'sleep', lambda s: None)

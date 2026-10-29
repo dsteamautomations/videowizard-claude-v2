@@ -338,6 +338,7 @@ class GapRevise(Write):   # design/76 (L32)
 class SearchBody(Write):   # design/73 R3
     element_id: str
     keywords: str = Field(min_length=1, max_length=120)
+    source: str = Field(default='', max_length=40)   # design/121 change 5: the stock search's word, outside the six
     quote: str = ''   # design/99 C4: the click is the yes
 
 
@@ -383,6 +384,7 @@ class RoundDone(Write):
 
 class RoundPicks(Write):
     picks: dict[str, list[dict[str, Any]]]
+    ignore: list[str] = []   # design/121 change 1: the searched things answered with Ignore this
     quote: str = ''   # design/99 C6
 
 
@@ -1350,7 +1352,8 @@ def visuals_elements(run_id: UUID, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/search')
 def visuals_search(run_id: UUID, body: SearchBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.search(storage(), user, run, outputs, body.element_id, body.keywords, body.quote))   # design/73 R3
+    found = visuals_stage.search_rows(storage(), core.load_run(conn, user, run_id), body.keywords, body.source)   # design/92, design/121 change 6: before the run's lock
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.search(storage(), user, run, outputs, body.element_id, body.keywords, body.quote, body.source, found))   # design/73 R3
 
 
 @app.post('/api/runs/{run_id}/visuals/pick', status_code=201)
@@ -1365,14 +1368,12 @@ def visuals_round(run_id: UUID, body: RoundStart, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round/done')
 def visuals_round_done(run_id: UUID, body: RoundDone, user=User, conn=DB):
-    run = core.load_run(conn, user, run_id)   # design/92 (L59): the searches run before the run's lock; the save takes it
-    found = visuals_stage.round_searches(storage(), run, core.current_outputs(conn, run['id']), body.verdicts)
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote, found=found))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote))   # design/121 change 6: no search at Done
 
 
 @app.post('/api/runs/{run_id}/visuals/round/picks')
 def visuals_round_picks(run_id: UUID, body: RoundPicks, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_picks(storage(), user, run, outputs, body.picks, body.quote))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_picks(storage(), user, run, outputs, body.picks, body.quote, body.ignore))
 
 
 @app.post('/api/runs/{run_id}/visuals/nothing-fits')

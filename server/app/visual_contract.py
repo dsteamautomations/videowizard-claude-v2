@@ -736,6 +736,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             need(end <= beat.start_frame < beat.end_frame <= shot.end_frame,
                                  'A subject cannot perform overlapping beats or actions outside its shot.')
                             need(beat.start == state, 'Beat starting state must continue this subject\'s preceding state.')
+                            need(beat.target in landmarks or beat.target in elements, f"shot {shot.id}: beat {beat.id}'s target is a landmark of the scene or an element of the plan "
+                                 f"('{beat.target}' is neither): name the thing the action heads for; describe it in path and result (design/121 change 3).")
+                            need(beat.target in landmarks or beat.target in shot.element_ids, f"shot {shot.id}: beat {beat.id} heads for {beat.target}, which is not in the shot: "
+                                 'add it to the shot\'s element_ids so it is in the start picture (design/121 change 3).')
                             states.extend([beat.start, beat.end])
                             state, end = beat.end, beat.end_frame
                         if subject.beats:

@@ -20,7 +20,7 @@ def subject(*beats, landmark='L1'):
     """One acting subject whose beats run one after another, each from the previous one's end state."""
     out = []
     for n, (a, b, min_s) in enumerate(beats):
-        out.append({'id': f'B{n + 1}', 'start_frame': a, 'end_frame': b, 'action': 'lays one brick', 'done': 'laid one brick', 'target': 'the top course', 'path': 'along the course',   # design/110 F1
+        out.append({'id': f'B{n + 1}', 'start_frame': a, 'end_frame': b, 'action': 'lays one brick', 'done': 'laid one brick', 'target': landmark, 'path': 'along the course',   # design/110 F1
                     'result': 'one more brick on the course', 'start': st(f'{n} laid', landmark), 'end': st(f'{n + 1} laid', landmark), **({'min_s': min_s} if min_s is not None else {})})
     return {'element_id': 'E1', 'role': 'primary', 'screen_position': 'centre', 'behaviour': 'acts', 'start': st('0 laid', landmark), 'end': st(f'{len(beats)} laid', landmark), 'beats': out}
 

@@ -1310,7 +1310,7 @@ _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
-    'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
@@ -1470,22 +1470,26 @@ def cmd_visuals(a):
             out = write(base + '/round/undo', {'quote': a.quote or ''})
             emit(out, 0, out.get('next') or f"The round is at pass {out.get('pass')} again.")
         if a.verdicts:
-            out = write(base + '/round/done', {'verdicts': _json_file(m, a.verdicts), 'quote': a.quote})
-            emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} search(es) ran" + (f"; failed: {', '.join(out['errors'])}" if out.get('errors') else '') + f"; the round is at pass {out.get('pass')}.")
+            out = write(base + '/round/done', {'verdicts': _json_file(m, a.verdicts), 'quote': a.quote})   # design/121 change 6: approve, search (searched first) or ignore per element; Done runs no search
+            emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} searched thing(s) go to pass 2; the round is at pass {out.get('pass')}.")
         if a.picks:
-            out = write(base + '/round/picks', {'picks': _json_file(m, a.picks), 'quote': a.quote})
+            pk = _json_file(m, a.picks)
+            ignore = pk.pop('ignore', []) if isinstance(pk, dict) else []   # design/121 change 1: {"<search id>": [{n, note}], "ignore": ["E2"]}
+            out = write(base + '/round/picks', {'picks': pk, 'ignore': ignore, 'quote': a.quote})
             emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks.")
         rows = _rows(m, a.file or 'out/reference-round.json', ('element_id', 'keywords'))
         out = write(base + '/round', {'elements': rows})
         emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements. Give the operator the page link ({visuals_page_url(m['code'])}): they answer every element there in two passes. "
-             "Wait with `vw visuals status --wait 900`; ask nothing per element.")
+             "While they do, write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps (design/121 change 2); "
+             "then wait with `vw visuals status --wait 900`; ask nothing per element.")
     if a.what == 'search':   # design/73 R3: Google Images for an element the footage lacks, on the operator's yes
         if not (a.quote or '').strip():
             emit({'action': 'refused', 'message': "The operator's yes to the web search is required: --quote \"<their words>\" (say what you will search and why first)."}, 2)
-        out = write(base + '/search', {'element_id': a.element, 'keywords': a.keywords or '', 'quote': a.quote})
-        rows = out.get('results') or []
-        listing = '; '.join(f"{r['n']}. {r.get('site') or '?'} {r.get('width')}x{r.get('height')} {r.get('title') or ''}".strip() for r in rows)
-        emit(out, 0, f"Search {out.get('search_id')} for {a.element} ({len(rows)} pictures): {listing}. The operator ticks pictures and adds notes on the visuals page ({visuals_page_url(m['code'])}), or tell me their picks: `vw visuals pick --search {out.get('search_id')} --n 2,5 --note 2=\"…\" --quote \"…\"`.")
+        out = write(base + '/search', {'element_id': a.element, 'keywords': a.keywords or '', 'source': getattr(a, 'source', None) or '', 'quote': a.quote})   # design/121 change 5: --source "<stock site>" adds a second search
+        sids = out.get('search_ids') or [out.get('search_id')]
+        listing = lambda rows: '; '.join(f"{r['n']}. {r.get('site') or '?'} {r.get('width')}x{r.get('height')} {r.get('title') or ''}" + (' (will not download)' if str(r.get('download') or '').startswith('failed') else '') for r in rows)
+        parts = [f"search {sids[0]} ({len(out.get('results') or [])} pictures): {listing(out.get('results') or [])}"] + ([f"stock search {sids[1]} ({len(out['stock_results'])} pictures): {listing(out['stock_results'])}"] if len(sids) > 1 else [])
+        emit(out, 0, f"For {a.element}: " + ' | '.join(parts) + f". The operator ticks pictures and adds notes on the visuals page ({visuals_page_url(m['code'])}), or tell me their picks: `vw visuals pick --search <search id> --n 2,5 --note 2=\"…\" --quote \"…\"`.")
     if a.what == 'pick':   # design/73 R4: the ticked pictures, in order, with notes
         ns = [int(x) for x in str(a.n or '').replace(' ', '').split(',') if x]
         if not ns:
@@ -1497,7 +1501,7 @@ def cmd_visuals(a):
         out = write(base + '/pick', {'search_id': a.search, 'picks': [{'n': n, 'note': notes.get(n, '')} for n in ns], 'quote': a.quote or ''})
         emit(out, 0, f"{len(out.get('references') or [])} web references saved and approved from search {a.search} (design/100: ticking and saving is the approval); show them (`fetch --ref`) and reject one only if the saved file is not the picture ticked, then generate the element's sheet from them.")
     if a.what == 'nothing-fits':   # design/73 R4b
-        emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted; the reason is the next search\'s hint.')
+        emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted on the element\'s "not this" list; the next search is the operator\'s (new words), or Ignore this (design/121 change 1).')
     if a.what == 'revise':   # design/76 (L32): a change request is a revision, never a yes
         out = write(base + '/revise', {'gap_id': a.gap, 'notes': a.notes or '', 'quote': a.quote})
         emit(out, 0, f"Gap {a.gap} is under revision: change its treatment entry and its plan, propose the next version, then ask for its acceptance afresh; generate nothing for it until then.")
@@ -2305,7 +2309,7 @@ def build_parser():
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost'):   # design/73, design/79; design/94 --move; design/106 --role; design/110
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost', '--source'):   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')

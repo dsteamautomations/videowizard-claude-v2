@@ -3,47 +3,50 @@
 {% block body %}
 <style>
 /* design/78: the visuals page on the voices page's frame (design/55): six steps on one line, one view at a time, the footer with the words and the step's action */
+/* review 29 Oct (design/121 change 7): larger text for reading; the page is wider and scrolls more */
+.v2{font-size:17px}
+main:has(> .v2){max-width:1400px}
 .v2 .top{position:sticky;top:0;background:var(--bg);z-index:5;padding:10px 0 8px;border-bottom:1px solid var(--line)}
-.v2 .steps{display:flex;gap:14px;font-size:16px;align-items:center;flex-wrap:wrap}
+.v2 .steps{display:flex;gap:14px;font-size:19px;align-items:center;flex-wrap:wrap}
 .v2 .steps a{color:var(--muted);text-decoration:none;cursor:pointer;padding:4px 2px}
 .v2 .steps a.on{color:var(--fg);font-weight:700;border-bottom:2px solid var(--fg)}
 .v2 .steps a.off{opacity:.45;cursor:default}
-.v2 .dir{font-size:13px;color:var(--muted);margin-top:6px}
+.v2 .dir{font-size:16px;color:var(--muted);margin-top:6px}
 .v2 .dir strong{color:var(--fg)}
-.v2 .meter{display:inline-flex;align-items:center;gap:8px;margin-left:12px;font-size:12.5px}
+.v2 .meter{display:inline-flex;align-items:center;gap:8px;margin-left:12px;font-size:15px}
 .v2 .meter .bar{display:inline-block;width:120px;height:8px;border-radius:999px;background:var(--z);overflow:hidden;vertical-align:middle;border:1px solid var(--line)}
 .v2 .meter .bar i{display:block;height:100%;background:var(--accent)}
 .v2 .meter .bar i.over{background:var(--err)}
 .v2 .tabs{display:flex;gap:6px;margin:14px 0 10px;flex-wrap:wrap}
-.v2 .tabs button{border:1px solid var(--line);background:var(--bg);padding:7px 16px;border-radius:999px;font-size:14px}
+.v2 .tabs button{border:1px solid var(--line);background:var(--bg);padding:7px 16px;border-radius:999px;font-size:17px}
 .v2 .tabs button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .v2 .search{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}
-.v2 .search input{flex:1;min-width:200px;padding:11px 14px;font-size:15px;border-radius:12px}
-.v2 .chip{border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:var(--bg);font-size:12.5px;cursor:pointer}
-.v2 table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.v2 th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--card);white-space:nowrap}
+.v2 .search input{flex:1;min-width:200px;padding:11px 14px;font-size:18px;border-radius:12px}
+.v2 .chip{border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:var(--bg);font-size:15px;cursor:pointer}
+.v2 table{width:100%;border-collapse:separate;border-spacing:0;font-size:17px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.v2 th{font-weight:500;color:var(--muted);font-size:15px;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--card);white-space:nowrap}
 .v2 td{padding:11px 12px;vertical-align:top;border-bottom:1px solid var(--line)}
 .v2 tbody tr:last-child td{border-bottom:0}
 .v2 tbody tr:nth-child(even) td{background:var(--z)}
 .v2 tbody tr:hover td{background:var(--hover)}
 .v2 tbody tr.sel td{background:var(--sel)}
 .v2 td.c{text-align:center;white-space:nowrap;width:56px}
-.v2 .nm{font-weight:600;font-size:15px}
-.v2 .ds{color:var(--muted);font-size:12.5px;margin-top:2px}
-.v2 .badge{display:inline-block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px;white-space:nowrap}
+.v2 .nm{font-weight:600;font-size:18px}
+.v2 .ds{color:var(--muted);font-size:15px;margin-top:2px}
+.v2 .badge{display:inline-block;font-size:14px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px;white-space:nowrap}
 .v2 .badge.ok{border-color:var(--ok);color:var(--ok)}
 .v2 .badge.dec{border-color:var(--accent);color:var(--fg)}
 .v2 .badge.err{border-color:var(--err);color:var(--err)}
-.v2 .ic{border:none;background:none;font-size:18px;cursor:pointer;padding:4px 8px;color:var(--fg);border-radius:8px}
+.v2 .ic{border:none;background:none;font-size:22px;cursor:pointer;padding:4px 8px;color:var(--fg);border-radius:8px}
 .v2 .ic:hover{background:var(--hover)}
-.v2 input[type=checkbox],.v2 input[type=radio]{min-width:0;width:16px;height:16px;margin:0;vertical-align:middle;accent-color:var(--accent)}
-.v2 .empty{color:var(--muted);padding:40px 12px;font-size:15px;text-align:center;border:1px dashed var(--line);border-radius:12px}
-.v2 .msg{min-height:1.2em;font-size:13px;margin:8px 0}
+.v2 input[type=checkbox],.v2 input[type=radio]{min-width:0;width:20px;height:20px;margin:0;vertical-align:middle;accent-color:var(--accent)}
+.v2 .empty{color:var(--muted);padding:40px 12px;font-size:18px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+.v2 .msg{min-height:1.2em;font-size:16px;margin:8px 0}
 .v2 .err{color:var(--err)}.v2 .ok{color:var(--ok)}
-.v2 h3{font-size:13px;color:var(--muted);font-weight:500;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
-.v2 .intended{font-size:13px;margin:4px 0 8px;padding-left:18px}
+.v2 h3{font-size:16px;color:var(--muted);font-weight:500;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+.v2 .intended{font-size:16px;margin:4px 0 8px;padding-left:18px}
 .v2 .intended li{margin:0}
-.v2 .two{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+.v2 .two{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
 @media (max-width:760px){.v2 .two{grid-template-columns:1fr}}
 .v2 .list{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
 .v2 .list a{display:block;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;color:var(--fg);text-decoration:none}
@@ -52,81 +55,81 @@
 .v2 .list a .ds{margin-top:1px}
 .v2 .card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px;background:var(--card)}
 .v2 .strip{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-.v2 .pic{width:160px;min-width:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--z);font-size:12px;position:relative}
-.v2 .pic img{display:block;width:100%;height:90px;object-fit:cover;background:#000;cursor:pointer}
+.v2 .pic{width:200px;min-width:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--z);font-size:15px;position:relative}
+.v2 .pic img{display:block;width:100%;height:112px;object-fit:cover;background:#000;cursor:pointer}
 .v2 .pic .cap{padding:4px 6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v2 .pic.on{border-color:var(--ok)}
 .v2 .pic.off{opacity:.55;border-style:dashed}
-.v2 .pic button{margin:0 6px 6px;padding:3px 9px;font-size:12px;border-radius:999px}
-.v2 .pic .tick{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--bg);border:1px solid var(--line);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.v2 .pic button{margin:0 6px 6px;padding:3px 9px;font-size:15px;border-radius:999px}
+.v2 .pic .tick{position:absolute;top:6px;left:6px;width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--line);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .v2 .pic .tick.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .v2 .chips{display:flex;gap:4px;flex-wrap:wrap;margin:0 6px 6px}
-.v2 .chips button{font-size:11px;padding:1px 7px;border-radius:999px;margin:0}
-.v2 .chk{margin:2px 6px 6px;padding-left:14px;font-size:11.5px;color:var(--muted);white-space:normal}
+.v2 .chips button{font-size:14px;padding:1px 7px;border-radius:999px;margin:0}
+.v2 .chk{margin:2px 6px 6px;padding-left:14px;font-size:15px;color:var(--muted);white-space:normal}
 .v2 .chk li{margin:0}
 .v2 .btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
-.v2 .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px}
+.v2 .btns button{padding:4px 10px;font-size:15px;border-radius:999px}
 .v2 .btns button.go{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .v2 .need-words{border-color:var(--err)!important;box-shadow:0 0 0 2px var(--err)}
 /* design/80: the split view: the grid left, the chosen picture and its controls in a sticky panel on the right; under 900px the panel sits under the grid */
 .v2 .split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
-.v2 .panel{position:sticky;top:96px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card);font-size:13px;max-height:calc(100vh - 210px);overflow:auto}   /* design/100 S3 */
+.v2 .panel{position:sticky;top:96px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--card);font-size:16px;max-height:calc(100vh - 210px);overflow:auto}   /* design/100 S3 */
 .v2 .panel img{display:block;width:100%;max-height:380px;object-fit:contain;background:#000;border-radius:8px}
-.v2 .panel .pnote{width:100%;min-height:64px;margin:8px 0 4px;font-size:13px;border-radius:8px;padding:6px 8px;resize:vertical}
+.v2 .panel .pnote{width:100%;min-height:64px;margin:8px 0 4px;font-size:16px;border-radius:8px;padding:6px 8px;resize:vertical}
 .v2 .panel .btns button.go{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .v2 .pic.sel{outline:2px solid var(--accent);outline-offset:1px}
-.v2 .fchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg);font-size:12.5px;cursor:pointer;color:var(--fg)}
+.v2 .fchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg);font-size:15px;cursor:pointer;color:var(--fg)}
 .v2 .fchip b{color:var(--muted);cursor:pointer;font-weight:400}
 .v2 .timed{margin-top:4px;line-height:1.5}.v2 .timed .tm{font-variant-numeric:tabular-nums;color:var(--fg)}
-.v2 .turn{font-size:13px;margin:8px 0 4px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
+.v2 .turn{font-size:16px;margin:8px 0 4px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
 .v2 .turn.you{border-color:var(--accent);color:var(--fg);font-weight:600}
 .v2 .turn.ok{border-color:var(--ok);color:var(--ok)}
 .v2 .turn.head{margin:14px 0 6px;background:var(--card)}
 .v2 .chk li.ok{color:var(--ok)}.v2 .chk li.err{color:var(--err)}
 @media (max-width:900px){.v2 .split{grid-template-columns:1fr}.v2 .panel{position:static}}
 .v2 .foot{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line);z-index:6}
-.v2 .foot .in{max-width:1100px;margin:0 auto;padding:8px 20px 10px}
+.v2 .foot .in{max-width:1400px;margin:0 auto;padding:8px 20px 10px}
 .v2 .foot .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-.v2 .foot .status{font-size:13px;min-height:1.3em;margin-bottom:6px;color:var(--muted)}
+.v2 .foot .status{font-size:16px;min-height:1.3em;margin-bottom:6px;color:var(--muted)}
 .v2 .foot .status.err{color:var(--err)}
 .v2 .foot .status.ok{color:var(--ok)}
 .v2 .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:v2spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes v2spin{to{transform:rotate(360deg)}}
-.v2 .player{display:flex;gap:12px;align-items:center;margin:0 0 8px;font-size:13px}
+.v2 .player{display:flex;gap:12px;align-items:center;margin:0 0 8px;font-size:16px}
 .v2 .player[hidden]{display:none}
 .v2 .player span{flex:0 0 220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--fg)}
 .v2 .player video{flex:1;width:100%;max-height:220px;background:#000;border-radius:8px}
-.v2 .tray{flex:1;font-size:13px;color:var(--muted);min-width:120px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.v2 .foot .go{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);padding:10px 18px;font-size:14px;border-radius:10px;white-space:nowrap}
+.v2 .tray{flex:1;font-size:16px;color:var(--muted);min-width:120px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.v2 .foot .go{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);padding:10px 18px;font-size:17px;border-radius:10px;white-space:nowrap}
 .v2 .foot .go:disabled{opacity:.45}
 .v2 .foot button{white-space:nowrap}
-.v2 .why{font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap}
-.v2 .words{flex:1;min-width:240px;padding:8px 10px;font-size:14px;border-radius:10px;min-height:38px;resize:vertical}
-.v2 .spacer{height:170px}
+.v2 .why{font-size:15px;color:var(--muted);margin-left:8px;white-space:nowrap}
+.v2 .words{flex:1;min-width:240px;padding:8px 10px;font-size:17px;border-radius:10px;min-height:38px;resize:vertical}
+.v2 .spacer{height:210px}
 /* design/97: the shared panel on every picture step, wider; the viewer; the check in one line; what waits */
 .v2 .split{grid-template-columns:minmax(0,1fr) minmax(360px,45%)}
 .v2 .panel img{max-height:50vh;cursor:zoom-in}
 .v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding-top:8px;z-index:2}   /* design/100 S3: Approve and Reject always in view */
-.v2 details.pdet{margin-top:6px}.v2 details.pdet summary{cursor:pointer;color:var(--muted);font-size:12.5px}   /* design/100 S4 */
+.v2 details.pdet{margin-top:6px}.v2 details.pdet summary{cursor:pointer;color:var(--muted);font-size:15px}   /* design/100 S4 */
 .v2 .panel .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
 .v2 .panel .pair img{max-height:40vh}
 .v2 .panel video{width:100%;max-height:50vh;background:#000;border-radius:8px}
 .v2 .panel .srcs{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .v2 .panel .srcs img{width:72px;height:44px;object-fit:cover}
-.v2 details.chkd summary{cursor:pointer;font-size:12px;margin:2px 6px}
+.v2 details.chkd summary{cursor:pointer;font-size:15px;margin:2px 6px}
 .v2 details.chkd summary.err{color:var(--err)}.v2 details.chkd summary.ok{color:var(--ok)}
 .v2 .badge.waitb{border-color:var(--accent);color:var(--fg)}
 .v2 .hl{outline:3px solid var(--accent);outline-offset:2px}
-.v2 .wlist{margin:6px 0;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:13px}
+.v2 .wlist{margin:6px 0;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:16px}
 .v2 .wlist a{display:block;padding:2px 0}
 #viewer{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.92);display:grid;grid-template-columns:minmax(0,1fr) 360px}
 #viewer[hidden]{display:none}
 #viewer .vw-stage{overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:pinch-zoom}
 #viewer .vw-stage img{max-width:100%;max-height:100%;transform-origin:center;user-select:none}
-#viewer .vw-side{background:var(--card);padding:12px;overflow:auto;color:var(--fg);font-size:13px}
+#viewer .vw-side{background:var(--card);padding:12px;overflow:auto;color:var(--fg);font-size:16px}
 @media (max-width:900px){ #viewer{grid-template-columns:1fr} #viewer .vw-side{max-height:45vh}}   /* a space after each brace: a brace then a hash opens a Jinja comment */
 .v2 .pclose{display:flex;justify-content:flex-end;margin:-6px -6px 2px}
-.v2 .pclose .ic{font-size:22px;line-height:1}
+.v2 .pclose .ic{font-size:24px;line-height:1}
 .v2 .rsn{margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:10px}
 @media (max-width:600px){.v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding:6px 0;z-index:2}}
 img.sheet{display:block;max-width:100%;margin-top:6px;border-radius:4px;border:1px solid #333}
@@ -164,6 +167,7 @@ const inr=n=>'₹'+Math.round(Number(n)||0).toLocaleString('en-IN');
 let confirmPicks=false;   // design/106 N3: Done asked once, then Finish
 let data=null, timer=null, inflight=false, step=null, selEl=null, selPic=null, gapFilter='', selGaps={}, view=null, wi=-1, hashDone=false, rejOpen=null, closed={};   // design/99: the reject reason open after a reject; panels the operator closed   // selPic: {sid,n} a search result, {ref} a reference (design/80)
 const picks={};   // search id -> [{n, note}] in the order ticked (design/73)
+const searching={}, ignoredEls={};   // design/121: the things whose search is running; the things answered Ignore this on pass 2
 function remember(k,v){try{localStorage.setItem('vz:'+code+':'+k,v);}catch(e){}}
 function recall(k){try{return localStorage.getItem('vz:'+code+':'+k);}catch(e){return null;}}
 function msg(t,err,busy){const f=$('fmsg');f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');f.className='status '+(err?'err':(busy?'':'ok'));}
@@ -176,6 +180,16 @@ async function act(body){
   finally{inflight=false;}
 }
 async function send(body,okText){msg('Recording…',false,true);try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}msg((j&&j.next)||okText||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}catch(err){msg(err.message,true);highlightNamed(err.message,document);return null;}}
+async function roundSearch(eid){   // design/121 change 6: a thing's own search; not through act(), so the operator goes on to the next thing while it runs
+  const kw=(($('kw-'+eid)||{}).value||'').trim(), src=(($('src-'+eid)||{}).value||'').trim();
+  if(kw.split(/\s+/).filter(Boolean).length<2||kw.split(/\s+/).length>6){needWords('kw-'+eid,'Two to six words to search for: the thing and its place or trade.');return;}
+  searching[eid]=true;renderStep();footer();msg('Searching for '+eid+'… you can go on to the next thing.',false,true);
+  try{const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',element_id:eid,keywords:kw,source:src})});let j=null;try{j=await r.json();}catch(e){j=null;}
+    if(!r.ok)throw new Error((j&&j.message)||('The server answered '+r.status+'.'));
+    if(j&&j.view)data=j.view;msg(eid+': '+((j.results||[]).length+(j.stock_results||[]).length)+' pictures found'+(j.errors?' (one search failed: '+Object.values(j.errors).join('; ')+')':'')+'.',!!j.errors);}
+  catch(err){msg(eid+': '+err.message,true);await load();}
+  finally{delete searching[eid];render();}
+}
 async function load(){
   let r;
   try{r=await fetch(base+'/data',{cache:'no-store'});}catch(e){msg('The server is not reachable; trying again in 15 s.',true);schedule(15000);return;}
@@ -236,7 +250,7 @@ window.addEventListener('hashchange',applyHash);
 function footageBlock(){   // design/88 F4: the footage is measured and told; the operator may correct it with their words
   const f=data.footage;if(!f||!f.line)return '';
   const opt=(name,vals)=>'<select id="ft-'+name+'"><option value="">'+name+': as measured</option>'+vals.map(v=>'<option value="'+v+'">'+v+'</option>').join('')+'</select>';
-  return '<div class="card"><span class="nm" style="font-size:14px">'+esc(f.line)+'</span> <button class="chip" id="ft-open">Correct this</button>'+
+  return '<div class="card"><span class="nm" style="font-size:17px">'+esc(f.line)+'</span> <button class="chip" id="ft-open">Correct this</button>'+
     '<div id="ft-form" hidden style="margin-top:8px"><div class="btns">'+opt('camera',['cinema','mirrorless','phone','drone','mixed'])+opt('support',['handheld','tripod','gimbal','mixed'])+opt('look',['natural','graded','log'])+'</div>'+
     '<textarea id="ftwords" class="words" style="width:100%;margin-top:6px" placeholder="your words: what the footage really is"></textarea><div class="btns"><button class="go" data-a="footage">Save the correction</button></div></div></div>';}
 function wireFootage(){const o=$('ft-open');if(!o)return;o.addEventListener('click',()=>{$('ft-form').hidden=!$('ft-form').hidden;});
@@ -323,7 +337,7 @@ function renderPlan(){
     const shots=g.shots.length?'<details><summary class="ds" style="cursor:pointer">'+g.shots.length+' shot'+(g.shots.length>1?'s':'')+'</summary>'+g.shots.map(s=>'<div class="ds" style="margin:4px 0 0 12px"><b>'+esc(s.shot_id)+'</b> · '+esc(ROUTE[s.route]||s.route)+' · '+secs(s.end_frame-s.start_frame)+' — '+esc(s.purpose)+(s.ambient?'<div>'+'Moves around it: '+esc(s.ambient)+'</div>':'')+'</div>').join('')+'</details>':'<span class="ds">'+(g.choices&&!g.choices.selected?'choose one of the two':'no shots yet')+'</span>';
     const can=!g.recorded&&g.shots.length;
     return '<tr class="'+(selGaps[g.gap_id]?'sel':'')+'"><td class="c">'+(can?'<input type="checkbox" data-sel="'+esc(g.gap_id)+'" '+(selGaps[g.gap_id]?'checked':'')+' aria-label="select '+esc(g.gap_id)+'">':'')+'</td><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+secs(g.end_frame-g.start_frame)+'</div><div class="ds">'+esc(g.requirement||'')+'</div>'+timed(g)+'</td><td>'+esc(e.picture||'')+'<div class="ds">'+esc((e.routes||[]).map(r=>ROUTE[r]||r).join(', '))+'</div>'+((g.split||[]).length?'<div class="ds">'+g.split.map(x=>esc(x.route)+' '+x.seconds.toFixed(1)+' s ('+x.shots+')').join(' · ')+'</div>':'')+choice+'</td><td>'+shots+'</td><td>'+state+words_+'</td></tr>';}).join('');
-  $('s-plan').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 4px">Tick the gaps, type your words at the foot, then Accept them, or Revise to send them back with what to change. A change request is never a yes.</p><table><thead><tr><th class="c"></th><th>Gap</th><th>Picture · route</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  $('s-plan').innerHTML='<p class="ds" style="font-size:17px;margin:14px 0 4px">Tick the gaps, type your words at the foot, then Accept them, or Revise to send them back with what to change. A change request is never a yes.</p><table><thead><tr><th class="c"></th><th>Gap</th><th>Picture · route</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
   $('s-plan').querySelectorAll('[data-sel]').forEach(c=>c.addEventListener('change',()=>{selGaps[c.dataset.sel]=c.checked;if(!c.checked)delete selGaps[c.dataset.sel];renderPlan();footer();}));
   $('s-plan').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
 }
@@ -411,6 +425,7 @@ function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; t
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0, kept=(s.picked||[]).includes(r.n);
   return '<div class="pic '+(isSel('sid',s.search_id,r.n)?'sel':'')+'" data-lb="'+esc(s.search_id)+':'+r.n+'"><span class="tick '+(p?'on':'')+'" data-tick="'+esc(s.search_id)+':'+r.n+'" title="tick to use; the first tick is Image 1">'+(p?idx:'')+'</span><img src="'+esc(r.thumbnail||r.image_url)+'" alt="" loading="lazy">'+
     (kept?'<span class="badge ok" style="margin:4px 6px 0">Saved ✓</span>':p?'<span class="badge dec" style="margin:4px 6px 0">ticked · not saved</span>':'')+   // design/99 C5
+    (String(r.download||'').startsWith('failed')?'<span class="badge err" style="margin:4px 6px 0" title="'+esc(r.download)+'">will not download</span>':'')+   // design/121 change 6
     '<div class="cap" title="'+esc(r.title||'')+'">'+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+'</div>'+
     (p?'<input class="gnote" data-gnote="'+esc(s.search_id)+':'+r.n+'" value="'+esc(p.note||'')+'" placeholder="note: keep … / avoid …" style="width:calc(100% - 12px);margin:0 6px 6px">':'')+'</div>';   // design/106 N1
 }
@@ -519,32 +534,51 @@ function wireGrid(root,rerender){
   root.querySelectorAll('input[data-gnote]').forEach(i=>{i.addEventListener('click',ev=>ev.stopPropagation());i.addEventListener('input',()=>{const [sid,n]=i.dataset.gnote.split(':');const q=pickOf(sid,Number(n));if(q)q.note=i.value;});});   // design/106 N1: typed in the grid, no re-render
   wirePanel();
 }
-function renderRound(rd){   // design/79: every element at once; pass 1 the frames and the keywords, pass 2 the searched elements' pictures
+function sidsOf(r){return (r&&(r.search_ids&&r.search_ids.length?r.search_ids:(r.search_id?[r.search_id]:[])))||[];}   // design/121 change 5: the plain and the stock search
+function searchOf(sid){return (data.searches||[]).find(x=>x.search_id===sid)||null;}
+function searchBar(eid,kw,src,cls){   // design/121 changes 5, 6: the words, the source word outside the six, and this thing's own Search button
+  const busy=!!searching[eid];
+  return '<div class="search"><input class="'+cls+'" data-el="'+esc(eid)+'" id="kw-'+esc(eid)+'" value="'+esc(kw)+'" placeholder="two to six words: the thing and its place or trade" style="flex:2">'+
+    '<input class="src" data-el="'+esc(eid)+'" id="src-'+esc(eid)+'" value="'+esc(src)+'" placeholder="stock site (optional)" title="a stock site name, added to a second search; clear it for the plain search only" style="flex:1;min-width:150px">'+
+    '<button data-a="round-search" data-el="'+esc(eid)+'" '+(busy?'disabled':'')+'>'+(busy?'<span class="spin"></span>Searching…':'Search')+'</button></div>';
+}
+function strips(sids){return sids.map(searchOf).filter(Boolean).map(s=>'<div class="ds" style="margin-top:6px"><b>'+(s.source?'Stock · '+esc(s.source):'Google')+'</b> · “'+esc(s.keywords)+'” · '+s.results.length+' pictures'+
+  (s.results.some(x=>String(x.download||'').startsWith('failed'))?' · <span class="err">a picture marked “will not download” cannot be used; tick another</span>':'')+'</div>'+(s.results.length?'<div class="strip">'+s.results.map(x=>resultCard(s,x)).join('')+'</div>':'<div class="ds">No picture came back for these words.</div>')).join('');}
+function roundWaiting(rd){   // design/121 changes 1, 6: what keeps Done locked, by name
+  const out=[];Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid], sids=sidsOf(r);
+    if(rd.pass===1){if(verdictOf(eid,r)==='search'&&!sids.length)out.push(eid);}
+    else if(r.verdict==='search'&&!ignoredEls[eid]&&!(r.picked&&r.picked.length)&&!sids.some(sid=>(picks[sid]||[]).length))out.push(eid);});
+  return out;}
+function verdictOf(eid,r){const v=document.querySelector('input[name="v-'+eid+'"]:checked');if(v)return v.value;if(r.verdict&&r.verdict!=='search')return r.verdict;
+  const fr=(r.frames&&r.frames.length)||(data.references||[]).some(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));return fr&&!sidsOf(r).length?'approve':'search';}
+function renderRound(rd){   // design/79: every element at once; pass 1 the frames and a search per thing (design/121), pass 2 the searched things' pictures
   const d=data, refs={};(d.references||[]).forEach(r=>refs[r.id]=r);
   const els=d.elements||[], byId={};els.forEach(e=>byId[e.id]=e);
   const ids=Object.keys(rd.elements);
+  const kws={}, srcs={};document.querySelectorAll('input.kw[data-el],input.kw2[data-el]').forEach(k=>kws[k.dataset.el]=k.value);document.querySelectorAll('input.src[data-el]').forEach(k=>srcs[k.dataset.el]=k.value);   // the words typed so far survive a re-render
+  const kwOf=(eid,r)=>eid in kws?kws[eid]:(r.keywords||''), srcOf=(eid,r)=>eid in srcs?srcs[eid]:(sidsOf(r).length?(r.source||''):(d.stock_source||''));
   let left;
   if(rd.pass===1){
-    const kws={};document.querySelectorAll('input.kw[data-el]').forEach(k=>kws[k.dataset.el]=k.value);   // the keywords typed so far survive a re-render
-    const vs={};document.querySelectorAll('input[type=radio]:checked').forEach(v=>vs[v.name]=v.value);
-    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};
+    const vs={};ids.forEach(eid=>vs[eid]=verdictOf(eid,rd.elements[eid]));
+    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, sids=sidsOf(r), v=vs[eid];
       let frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
       if(!frames.length)frames=(d.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));   // the element's frames count even when the row names none
-      const v=vs['v-'+eid]||(frames.length?'approve':'search');
-      return '<tr><td><span class="nm">'+esc(eid)+'</span><div class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</div></td><td>'+(frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'"><img src="'+esc(thumbOf(f.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(f.id)+'"><div class="cap">from your footage'+(f.status==='approved'?' · approved':'')+'</div></div>').join('')+'</div>':'<span class="ds">no frame in the footage</span>')+'</td>'+
-        '<td><input class="kw" data-el="'+esc(eid)+'" value="'+esc(eid in kws?kws[eid]:(r.keywords||''))+'" placeholder="two to six words" style="width:100%;min-width:180px"></td>'+
-        '<td>'+(frames.length?'<label style="display:block;margin-bottom:6px"><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v==='approve'?'checked':'')+'> Approve the frame</label>':'')+'<label style="display:block"><input type="radio" name="v-'+esc(eid)+'" value="search" '+(v==='search'?'checked':'')+'> Search with these keywords</label></td></tr>';}).join('');
-    left='<p class="ds" style="font-size:14px;margin:14px 0 8px"><b>Reference round, pass 1 of 2:</b> every element at once. For each row, keep the footage frame or send the keywords to Google Images; edit the keywords as you like. Click a frame to see it large on the right. One words box at the foot covers the whole pass and is your yes to the searches; then Done. Nothing is paid from a click.</p>'+
-      '<table><thead><tr><th>Element</th><th>From your footage</th><th>Keywords</th><th>Your verdict</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span>'+
+        '<div class="btns" style="margin:8px 0;gap:18px">'+(frames.length?'<label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v==='approve'?'checked':'')+'> Use the footage picture</label>':'')+
+        '<label><input type="radio" name="v-'+esc(eid)+'" value="search" '+(v==='search'?'checked':'')+'> Search Google</label><label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
+        (frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'"><img src="'+esc(thumbOf(f.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(f.id)+'"><div class="cap">from your footage'+(f.status==='approved'?' · approved':'')+'</div></div>').join('')+'</div>':'<div class="ds">no picture of it in the footage</div>')+
+        (v==='search'?searchBar(eid,kwOf(eid,r),srcOf(eid,r),'kw')+(r.error?'<div class="ds err">The search failed: '+esc(r.error)+'. Search again, or choose another answer.</div>':'')+(sids.length?strips(sids):'<div class="ds">Press Search: the pictures come back here while you go on to the next thing.</div>'):'')+'</div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, pass 1 of 2:</b> for each thing, use the picture from your footage, search Google, or ignore it. A search runs when you press its Search button, and you can go on to the next thing while it runs; tick pictures now or on pass 2. Done unlocks when every thing has its answer. Nothing is paid from a click.</p>'+rows;
   }else{
-    const parts=ids.filter(eid=>rd.elements[eid].search_id).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, s=(d.searches||[]).find(x=>x.search_id===r.search_id);
-      if(!s)return '';
-      return '<h3>'+esc(eid)+' <span class="ds" style="text-transform:none">'+esc(e.name)+' · “'+esc(s.keywords)+'”</span></h3>'+(s.results.length?'<div class="strip">'+s.results.map(x=>resultCard(s,x)).join('')+'</div>':'<div class="ds">No picture came back for these keywords.</div>');}).join('');
-    const errs=ids.filter(eid=>rd.elements[eid].error).map(eid=>'<div class="ds err">'+esc(eid)+': '+esc(rd.elements[eid].error)+'</div>').join('');
-    left='<p class="ds" style="font-size:14px;margin:14px 0 8px"><b>Reference round, pass 2 of 2:</b> the searched elements. Click a picture to see it large on the right; tick the ones to use, in order (the first tick is Image 1), and write a note for each in the panel. The ticked pictures line up at the foot; one words box there, then Done. An element with no tick gets no picture; say so in the words if it needs another search.</p>'+errs+parts;
+    const parts=ids.filter(eid=>rd.elements[eid].verdict==='search').map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, ign=!!ignoredEls[eid];
+      return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> '+(ign?'<span class="badge dec">ignored</span> ':'')+
+        '<button data-a="ignore" data-el="'+esc(eid)+'">'+(ign?'Undo Ignore':'Ignore this')+'</button>'+(ign?'':searchBar(eid,kwOf(eid,r),srcOf(eid,r),'kw2')+(r.error?'<div class="ds err">The last search failed: '+esc(r.error)+'.</div>':'')+strips(sidsOf(r)))+'</div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, pass 2 of 2:</b> for every searched thing, tick the pictures to use (the first tick is Image 1) with a note on each, or type new words and Search again, or press Ignore this. Click a picture to see it large on the right. Done unlocks when every thing has its answer.</p>'+parts;
   }
   $('s-references').innerHTML=split(left);
-  wireGrid($('s-references'),()=>renderRound(rd));
+  wireGrid($('s-references'),()=>{renderRound(rd);});
+  $('s-references').querySelectorAll('input[type=radio]').forEach(x=>x.addEventListener('change',()=>{renderRound(rd);footer();}));
+  $('s-references').querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
 }
 function renderReferences(){
   const d=data, can=stage()==='visuals'&&!!d.treatment&&!!d.plan_digest;
@@ -557,17 +591,18 @@ function renderReferences(){
   const e=els.find(x=>x.id===selEl), refs=(d.references||[]).filter(r=>r.element_id===e.id), hits=(d.element_matches||{})[e.id]||[], s=latestSearch(e.id);
   const kwNow=($('kw-'+e.id)||{}).value, okSheet=refs.find(r=>r.kind==='sheet'&&r.status==='approved'), pend=refs.find(r=>r.kind==='sheet'&&r.status==='candidate');
   if(pend&&!selPic&&!closed[e.id])selPic={ref:pend.id};   // design/97 R1: the sheet waiting for approval opens large, beside its sources
-  const list='<div class="list">'+els.map(x=>{const st=elState(x);return '<a data-el="'+esc(x.id)+'" class="'+(x.id===selEl?'on':'')+'"><span class="nm" style="font-size:14px">'+esc(x.id)+'</span><div class="ds">'+esc(x.name)+' · '+esc(x.kind)+'</div><div class="ds"><span class="badge '+st[0]+'">'+st[1]+'</span></div></a>';}).join('')+'</div>';
+  const list='<div class="list">'+els.map(x=>{const st=elState(x);return '<a data-el="'+esc(x.id)+'" class="'+(x.id===selEl?'on':'')+'"><span class="nm" style="font-size:17px">'+esc(x.id)+'</span><div class="ds">'+esc(x.name)+' · '+esc(x.kind)+'</div><div class="ds"><span class="badge '+st[0]+'">'+st[1]+'</span></div></a>';}).join('')+'</div>';
   let body='<div class="card"><span class="nm">'+esc(e.name)+'</span> <span class="ds">'+esc(e.id)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span><div class="ds" style="margin-top:4px">'+esc(e.requirements||'')+(e.size&&e.size.length?'<div>'+'Size: '+e.size.map(x=>esc(x.part)+' '+esc(x.measure)+' '+(x.value!=null?esc(x.value)+' '+esc(x.unit||''):'unknown')+' ('+esc(x.status)+')').join(' · ')+'</div>':'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div></div>'+materialBox(e)+(!e.material_spec&&e.not_this&&e.not_this.length?'<div class="ds">Not this: '+esc(e.not_this.join('; '))+'</div>':'')+qBox(e.id);
   let src='';
   src+='<h3>From your footage</h3><div class="ds">'+(hits.length?hits.slice(0,6).map(h=>esc(h.clip)+' at '+esc(h.seconds)+' s ('+esc(h.entity)+')').join(' · ')+' — the assistant grabs the frames':'not seen in the footage')+'</div>';
   const frames=refs.filter(r=>['frame','supplied','web','isolated'].includes(r.kind));
   if(frames.length){src+='<div class="strip">'+frames.map(r=>refCard({...r,name:(r.kind==='frame'?'from your footage':r.kind==='web'?'from the web':r.kind==='supplied'?'your file':'generated')+(r.note?' · '+r.note:'')},'',true)).join('')+'</div>';}
-  const searchBox='<h3>Google Images, for what the footage lacks</h3><div class="search"><input id="kw-'+esc(e.id)+'" placeholder="two to six words: the thing and its place or trade" value="'+esc(kwNow!=null?kwNow:(s?s.keywords:''))+'"><button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button></div>'+   // design/99 C4: the click is the yes; design/110 rule 0: always present, also after Done and after the sheet
+  const srcNow=($('src-'+e.id)||{}).value;
+  const searchBox='<h3>Google Images, for what the footage lacks</h3><div class="search"><input id="kw-'+esc(e.id)+'" placeholder="two to six words: the thing and its place or trade" value="'+esc(kwNow!=null?kwNow:(s?s.keywords:''))+'" style="flex:2"><input class="src" id="src-'+esc(e.id)+'" placeholder="stock site (optional)" title="a stock site name, added to a second search; clear it for the plain search only" value="'+esc(srcNow!=null?srcNow:(s?(s.source||''):(d.stock_source||'')))+'" style="flex:1;min-width:150px"><button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button></div>'+   // design/99 C4: the click is the yes; design/110 rule 0: always present, also after Done and after the sheet; design/121 change 5: the source box
     (can?'<div class="search"><input type="file" id="up-'+esc(e.id)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(e.id)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(e.id)+'">Add your own picture</button></div>':'');   // design/110: the operator\'s own picture, approved when saved
   let web='';
   if(s){web+='<div class="ds"><b>'+esc(s.results.length)+' pictures found for “'+esc(s.keywords)+'”</b>'+(s.picked&&s.picked.length?' · <span class="ok">'+s.picked.length+' saved ✓ (#'+esc(s.picked.join(', #'))+')</span>':'')+(s.nothing_fits?' · <span class="err">nothing fit: '+esc(s.nothing_fits.reason)+'</span>':'')+'. Click a picture to see it large on the right; tick the ones to use, in order (the first tick is Image 1); the note goes in the panel.</div>';
-    web+='<div class="strip">'+s.results.map(r=>resultCard(s,r)).join('')+'</div>';}
+    web+=strips(s.pair||[s.search_id]);}   // design/121 change 5: the plain and the stock search side by side
   const saved=!!(s&&((s.picked&&s.picked.length)||s.nothing_fits));   // design/106 R1: once picks are saved, the unpicked results and the search fold
   const webFold=searchBox+(saved?'<details><summary class="ds" style="cursor:pointer">show all ('+s.results.length+' search results)</summary>'+web+'</details>':web);
   const sheets=refs.filter(r=>r.kind==='sheet'), sheet=sheets.filter(r=>r.status!=='rejected').pop();   // design/106 R2: a sheet, waiting or approved, comes first
@@ -576,7 +611,7 @@ function renderReferences(){
       '<details><summary class="ds" style="cursor:pointer">all sources ('+frames.length+')</summary>'+src+'</details>'+
       searchBox+'<details><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results)</summary>'+web+'</details>';}
   else body+=src+webFold+'<h3>Reference sheet · '+esc(e.id)+'</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">No sheet yet: the assistant generates it from the pictures above once they are approved.</div>');
-  $('s-references').innerHTML=undo+'<p class="ds" style="font-size:14px;margin:14px 0 8px">Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Click any picture to see it large on the right, where Approve and Reject take your words. Nothing is paid from a click.</p>'+split('<div class="two">'+list+'<div>'+body+'</div></div>');
+  $('s-references').innerHTML=undo+'<p class="ds" style="font-size:17px;margin:14px 0 8px">Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Click any picture to see it large on the right, where Approve and Reject take your words. Nothing is paid from a click.</p>'+split('<div class="two">'+list+'<div>'+body+'</div></div>');
   const root=$('s-references');
   root.querySelectorAll('.list a').forEach(a=>a.addEventListener('click',()=>{selEl=a.dataset.el;selPic=null;renderReferences();footer();}));
   root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
@@ -683,7 +718,7 @@ function renderTakes(){
       const latest=['start','end'].flatMap(role=>{const of=live.filter(r=>picWord(r)===role+' image');const cands=of.filter(r=>r.status==='candidate');return cands.length>1?cands:of.slice(-1);}), older=pair.filter(r=>!latest.includes(r));   // review 27 Oct: two start candidates (design/86 K4) both in view
       const card=r=>refCard({...r,name:picWord(r)+' · '+r.name},'',true);
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The pictures: click a picture to see it large, approve or reject it.</div><div class="strip">'+latest.map(card).join('')+'</div>'+(older.length?'<details class="chkd"><summary class="ds">'+older.length+' earlier picture'+(older.length>1?'s':'')+'</summary><div class="strip">'+older.map(card).join('')+'</div></details>':'')+pairPlan(s);}
-      if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:14px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+reviewsOf(k)+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
+      if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:17px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+reviewsOf(k)+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
       h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });
@@ -700,7 +735,7 @@ function readyGaps(){return data.gaps.filter(g=>g.accepted&&!g.recorded&&g.shots
 function renderRecord(){
   const d=data, ready=readyGaps();
   const rows=d.gaps.map(g=>'<tr><td><span class="nm">'+esc(g.gap_id)+'</span><div class="ds">'+esc(g.requirement||'')+'</div></td><td class="ds">'+g.shots.map(s=>esc(s.shot_id)+' '+(s.asset?'✓':s.takes.some(k=>k.selected)?'✓':'·')).join(' ')+'</td><td>'+(g.recorded?'<span class="badge ok">recorded</span>':ready.includes(g)?'<span class="badge dec">ready to record</span>':g.accepted?'<span class="badge">in progress</span>':'<span class="badge">not accepted</span>')+'</td></tr>').join('');
-  $('s-record').innerHTML='<p class="ds" style="font-size:14px;margin:14px 0 4px">A gap is recorded when every shot has its picture, its sequence or a selected take. Your words at the foot, then Record.</p><table><thead><tr><th>Gap</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  $('s-record').innerHTML='<p class="ds" style="font-size:17px;margin:14px 0 4px">A gap is recorded when every shot has its picture, its sequence or a selected take. Your words at the foot, then Record.</p><table><thead><tr><th>Gap</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 // ---------- the footer: the words and the step's action ----------
 function footer(){
@@ -716,17 +751,19 @@ function footer(){
     act_.innerHTML='<button class="go" data-a="accept-selected" '+(n?'':'disabled')+'>Accept</button> <button data-a="revise-selected" '+(n?'':'disabled')+'>Revise</button>';
   }else if(step==='references'&&roundOpen()){   // design/79: one words box and Done for the whole pass
     const rd=roundOpen();
-    if(rd.pass===1){const n=Object.keys(rd.elements).length;tray.innerHTML='<span>Done approves the frames and runs the searches you chose.</span>';act_.innerHTML=confirmPicks?'<span>Done with '+n+' element'+(n>1?'s':'')+'?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-done">Finish</button>':'<button class="go" data-a="round-done">Done ('+n+' element'+(n>1?'s':'')+')</button>';}   // design/110 rule 0: Done asks first
-    else{const sids=Object.values(rd.elements).filter(r=>r.search_id).map(r=>r.search_id), n=sids.reduce((k,sid)=>k+((picks[sid]||[]).length),0), kept=($('words')||{}).value||'';
+    const wait=roundWaiting(rd), lock=wait.length?' disabled title="every thing needs its answer first"':'';   // design/121 changes 1, 6: Done stays locked, naming what waits
+    const waitLine=wait.length?'<span class="err"><b>'+wait.length+'</b> thing'+(wait.length>1?'s':'')+' '+(rd.pass===1?'not searched yet':wait.length>1?'still need an answer':'still needs an answer')+': '+esc(wait.join(', '))+'</span>':'';
+    if(rd.pass===1){const n=Object.keys(rd.elements).length;tray.innerHTML=waitLine||'<span>Done approves the footage pictures you chose; the searched things go to pass 2.</span>';act_.innerHTML=confirmPicks&&!wait.length?'<span>Done with '+n+' element'+(n>1?'s':'')+'?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-done">Finish</button>':'<button class="go" data-a="round-done"'+lock+'>Done ('+n+' element'+(n>1?'s':'')+')</button>';}   // design/110 rule 0: Done asks first
+    else{const sids=Object.values(rd.elements).flatMap(sidsOf), n=sids.reduce((k,sid)=>k+((picks[sid]||[]).length),0), kept=($('words')||{}).value||'';
       const notes=sids.reduce((k,sid)=>k+((picks[sid]||[]).filter(p=>String(p.note||'').trim()).length),0);   // design/106 N2, N3
-      tray.innerHTML=(n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'<span>Tick the pictures to use.</span>')+'<span class="ds">Picture notes go under each ticked picture.</span><textarea class="words" id="words" placeholder="words for the whole pass (optional)"></textarea>';
+      tray.innerHTML=waitLine+(n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'<span>Tick the pictures to use.</span>')+'<span class="ds">Picture notes go under each ticked picture.</span><textarea class="words" id="words" placeholder="words for the whole pass (optional)"></textarea>';
       $('words').value=kept;
-      act_.innerHTML=confirmPicks?'<span>'+n+' picture'+(n===1?'':'s')+' ticked, '+notes+' note'+(notes===1?'':'s')+': finish pass 2?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-picks">Finish</button>'
-        :'<button class="go" data-a="round-picks">Done</button> <button data-a="round-undo">Undo Done (back to pass 1)</button>';wireChips();}
+      act_.innerHTML=confirmPicks&&!wait.length?'<span>'+n+' picture'+(n===1?'':'s')+' ticked, '+notes+' note'+(notes===1?'':'s')+': finish pass 2?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-picks">Finish</button>'
+        :'<button class="go" data-a="round-picks"'+lock+'>Done</button> <button data-a="round-undo">Undo Done (back to pass 1)</button>';wireChips();}
   }else if(step==='references'){
-    const s=selEl?latestSearch(selEl):null, n=s?(picks[s.search_id]||[]).length:0;
-    tray.innerHTML='<span>'+esc(selEl||'')+':</span>'+(s&&n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips([s.search_id]):'');   // design/99 C5
-    act_.innerHTML=(s?(n?'<button class="go" data-a="pick" data-search="'+esc(s.search_id)+'">'+'Save '+n+' picture'+(n>1?'s':'')+'</button> <button data-a="clear-ticks" data-search="'+esc(s.search_id)+'">Clear</button> ':'')+'<button data-a="nothing-fits" data-search="'+esc(s.search_id)+'">Nothing fits</button>':'<span class="why">type keywords above and press Search</span>');wireChips();
+    const s=selEl?latestSearch(selEl):null, sids=s?(s.pair||[s.search_id]):[], n=sids.reduce((k,sid)=>k+(picks[sid]||[]).length,0);   // design/121 change 5: both searches
+    tray.innerHTML='<span>'+esc(selEl||'')+':</span>'+(s&&n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'');   // design/99 C5
+    act_.innerHTML=(s?(n?'<button class="go" data-a="pick" data-search="'+esc(sids.join(','))+'">'+'Save '+n+' picture'+(n>1?'s':'')+'</button> <button data-a="clear-ticks" data-search="'+esc(sids.join(','))+'">Clear</button> ':'')+'<button data-a="nothing-fits" data-search="'+esc(s.search_id)+'">Nothing fits</button>':'<span class="why">type keywords above and press Search</span>');wireChips();
   }else if(step==='pictures'||step==='takes'){   // design/97 P2: a picture's words go in the panel beside it
     tray.innerHTML='<span>Click a picture or a take: it opens beside the list with its buttons; × or Esc closes it.</span>';act_.innerHTML='';   // design/99 C1, C2
   }else{
@@ -760,15 +797,16 @@ async function click(b){
   if(a==='unplace'){await send({action:'unplace',shot_id:b.dataset.shot},'Picture taken out of the shot; it stays approved.');return;}   // design/94 L3
   if(a==='select-take'){await send({action:'select-take',job_id:b.dataset.job},'Take selected.');return;}
   if(a==='reject-take'){const j=await send({action:'reject-take',job_id:b.dataset.job},'Take rejected.');if(j){rejOpen=b.dataset.job;renderStep();}return;}
-  if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} await send({action:'search',element_id:b.dataset.el,keywords:kw},'Search done: tick the pictures to use, then Save.');return;}
-  if(a==='pick'){const sid=b.dataset.search, list=picks[sid]||[];if(!list.length){msg('Tick at least one picture first.',true);return;}const j=await send({action:'pick',search_id:sid,picks:list},list.length+' picture'+(list.length>1?'s':'')+' saved as references for '+(selEl||'the element')+'; the assistant makes the sheet from them.');if(j){delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
+  if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} await send({action:'search',element_id:b.dataset.el,keywords:kw,source:(($('src-'+b.dataset.el)||{}).value||'').trim()},'Search done: tick the pictures to use, then Save.');return;}   // design/121 change 5
+  if(a==='pick'){const sids=b.dataset.search.split(',').filter(sid=>(picks[sid]||[]).length);if(!sids.length){msg('Tick at least one picture first.',true);return;}   // design/121 change 5: each search's ticks saved in turn
+    for(const sid of sids){const list=picks[sid];const j=await send({action:'pick',search_id:sid,picks:list},list.length+' picture'+(list.length>1?'s':'')+' saved as references for '+(selEl||'the element')+'; the assistant makes the sheet from them.');if(!j)return;delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='answer'){await send({action:'answer',item:b.dataset.item,answer:b.dataset.answer},'Answer recorded.');return;}   // design/110 rule 0
   if(a==='round-undo'){await send({action:'round-undo',quote:q},'Done undone: the pass is open again.');return;}
   if(a==='supply'){const el=b.dataset.el, f=($('up-'+el)||{}).files, u=(($('url-'+el)||{}).value||'').trim();   // design/110: the operator's own picture
     if(f&&f.length){const fr=new FileReader();fr.onload=async()=>{await send({action:'supply',element_id:el,name:f[0].name,content_base64:String(fr.result).split(',')[1]},'Your picture is saved and approved for '+el+'.');};fr.readAsDataURL(f[0]);return;}
     if(!u){msg('Choose a file or paste an https link first.',true);return;}
     await send({action:'supply',element_id:el,url:u},'Your picture is saved and approved for '+el+'.');return;}
-  if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it becomes the next search.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted; the assistant searches again with your hint.');return;}
+  if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it goes on the "not this" list.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted for the "not this" list. Type new words and press Search again, or add your own picture.');return;}   // design/121 change 1
   if(a==='approve-spec'){await send({action:'approve-spec',shot_id:b.dataset.shot,quote:''},'Drawing spec approved.');return;}   // design/106 D4: no words for a click
   if(a==='save-note'){await send({action:'note',reference_id:b.dataset.ref,note:(($('ref-note')||{}).value||'').trim()},'Note saved.');return;}   // design/106 N4
   if(a==='approve-specs'){await send({action:'approve-specs',quote:''},'Drawing specs approved.');return;}   // design/106 D5
@@ -782,20 +820,22 @@ async function click(b){
     if(!v('camera')&&!v('support')&&!v('look')){msg('Choose what to correct first.',true);return;} if(!w){needWords('ftwords','Say in your words what the footage really is.');return;}
     await send({action:'footage',camera:v('camera'),support:v('support'),look:v('look'),quote:w},'Footage corrected: your words win for the rest of the run.');return;}
   if(a==='record'){if(!q){need();return;}await send({action:'record',gap_ids:readyGaps().map(g=>g.gap_id),quote:q},'Gaps recorded.');return;}
-  if(a==='clear-ticks'){delete picks[b.dataset.search];renderReferences();footer();return;}   // design/99 C5
+  if(a==='clear-ticks'){b.dataset.search.split(',').forEach(sid=>delete picks[sid]);renderReferences();footer();return;}   // design/99 C5
   if(a==='round-done'){const rd=roundOpen();if(!rd)return;   // design/99 C6: the click approves
     if(!confirmPicks){confirmPicks=true;footer();return;}   // design/110 rule 0: Done asks first
     confirmPicks=false;
-    const verdicts={};Object.keys(rd.elements).forEach(eid=>{const v=document.querySelector('input[name="v-'+eid+'"]:checked');const kw=document.querySelector('input.kw[data-el="'+eid+'"]');verdicts[eid]={verdict:v?v.value:'search',keywords:kw?kw.value.trim():''};});
-    const j=await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the frames are approved and the searches ran.');
-    if(j&&j.errors&&Object.keys(j.errors).length)msg('Some searches failed: '+Object.entries(j.errors).map(([e,w])=>e+' ('+w+')').join('; ')+'. The rest are on pass 2.',true);return;}
+    const verdicts={};Object.keys(rd.elements).forEach(eid=>{verdicts[eid]={verdict:verdictOf(eid,rd.elements[eid])};});   // design/121 change 6: Done runs no search
+    await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the footage pictures you chose are approved; the searched things are on pass 2.');return;}
+  if(a==='ignore'){const el=b.dataset.el;if(ignoredEls[el])delete ignoredEls[el];else ignoredEls[el]=true;renderStep();footer();return;}   // design/121 change 1: one click, no typing
+  if(a==='round-search'){roundSearch(b.dataset.el);return;}   // design/121 change 6: not through act(): several searches run at once
   if(a==='round-picks-back'){confirmPicks=false;footer();return;}   // design/106 N3
   if(a==='round-picks'){const rd=roundOpen();if(!rd)return;
     if(!confirmPicks){confirmPicks=true;footer();return;}   // design/106 N3: Done shows the summary first
     confirmPicks=false;
-    const pk={};Object.values(rd.elements).filter(r=>r.search_id).forEach(r=>{pk[r.search_id]=picks[r.search_id]||[];});
-    const j=await send({action:'round-picks',picks:pk,quote:q},'Pass 2 done: the picked pictures are kept; the assistant generates the sheets.');
-    if(j){Object.keys(pk).forEach(s=>delete picks[s]);if(j.failed&&Object.keys(j.failed).length)msg('Some pictures could not be downloaded: '+Object.keys(j.failed).join(', ')+'; the rest are kept.',true);}return;}
+    const pk={};Object.values(rd.elements).flatMap(sidsOf).forEach(sid=>{pk[sid]=picks[sid]||[];});
+    const ign=Object.keys(ignoredEls).filter(eid=>rd.elements[eid]);
+    const j=await send({action:'round-picks',picks:pk,ignore:ign,quote:q},'Pass 2 done: the picked pictures are kept; the assistant generates the sheets.');
+    if(j){Object.keys(pk).forEach(s=>delete picks[s]);ign.forEach(e=>delete ignoredEls[e]);if(j.failed&&Object.keys(j.failed).length)msg('Some pictures could not be downloaded: '+Object.keys(j.failed).join(', ')+'; the rest are kept.',true);}return;}
 }
 // ---------- render ----------
 function render(){

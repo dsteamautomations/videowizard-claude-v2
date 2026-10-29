@@ -104,7 +104,8 @@ def test_the_status_route_reads_without_the_lock_and_through_an_open_defect(monk
     assert calls == [False] and json.loads(out.body)['busy'] is True
 
 
-def test_the_rounds_searches_run_before_the_lock_and_the_save_uses_them(monkeypatch):
+def test_a_search_runs_before_the_lock_and_the_save_uses_it(monkeypatch):
+    """design/92 (L59), design/121 change 6: the search and its downloads run before the run's lock (search_rows); the save under the lock searches nothing."""
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     doc['elements'][0]['kind'] = 'object'
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1',
@@ -112,12 +113,13 @@ def test_the_rounds_searches_run_before_the_lock_and_the_save_uses_them(monkeypa
     store = store_with(sess, doc)
     rows = [{'n': 1, 'thumbnail': 'https://t/1.jpg', 'image_url': 'https://i/1.jpg', 'page_url': 'https://p/1', 'site': 's', 'width': 8, 'height': 6, 'title': 't'}]
     calls = []
-    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: calls.append(keywords) or rows)
-    found = VS.round_searches(store, RUN, [], {'E1': {'verdict': 'search'}})
-    assert found == {'E1': rows} and calls == ['village mason Tamil Nadu']
+    monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: calls.append(keywords) or [dict(r) for r in rows])
+    monkeypatch.setattr(VS, 'fetch_image', lambda url: (_ for _ in ()).throw(ValueError('HTTP 403')))
+    found = VS.search_rows(store, RUN, 'village mason Tamil Nadu', '')
+    assert calls == ['village mason Tamil Nadu'] and found['plain'][0]['download'].startswith('failed')
     monkeypatch.setattr(VS.apify, 'search_images', lambda *a, **k: pytest.fail('searched again inside the lock'))
-    out = VS.round_done(store, USER, RUN, [], {'E1': {'verdict': 'search'}}, 'Yes, search.', found=found)
-    assert out['pass'] == 2 and saved(store)['searches'][out['searched'] and saved(store)['round']['elements']['E1']['search_id']]['results'] == rows
+    out = VS.search(store, USER, RUN, [], 'E1', 'village mason Tamil Nadu', 'Yes, search.', found=found)
+    assert saved(store)['round']['elements']['E1']['search_id'] == out['search_id'] and saved(store)['searches'][out['search_id']]['results'][0]['image_url'] == 'https://i/1.jpg'
 
 
 def test_the_page_buttons_do_their_work_off_the_event_loop(monkeypatch):

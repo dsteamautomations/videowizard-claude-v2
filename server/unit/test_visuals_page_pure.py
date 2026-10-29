@@ -14,8 +14,8 @@ def test_the_page_is_six_steps_on_the_voices_frame():
 
 
 def test_the_reference_round_has_its_two_passes_and_one_done_button():
-    """design/79 Q2."""
-    for needle in ('pass 1 of 2', 'pass 2 of 2', 'data-a="round-done"', 'data-a="round-picks"', 'Approve the frame', 'Search with these keywords', 'input.kw', 'roundOpen()'):
+    """design/79 Q2; design/121: the three answers on pass 1."""
+    for needle in ('pass 1 of 2', 'pass 2 of 2', 'data-a="round-done"', 'data-a="round-picks"', 'Use the footage picture', 'Search Google', 'Ignore this', 'input.kw', 'roundOpen()'):
         assert needle in HTML, needle
     assert "'" + 'candidate' + "'" in HTML and 'style="margin:4px 6px 0"' in HTML   # the picture's own state badge
 

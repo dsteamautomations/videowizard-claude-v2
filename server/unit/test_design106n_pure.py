@@ -1,4 +1,4 @@
-"""design/106 N1-N4, R1-R3: a picture's note is easy to give and stays editable until its sheet is made; the References step puts the sheet first."""
+"""design/106 N1-N4, R1-R3: a picture's note is easy to give and stays editable (design/121 change 4: after the sheet too, marking it); the References step puts the sheet first."""
 import json
 from pathlib import Path
 
@@ -18,14 +18,15 @@ def web(rid, status='approved', note='keep the red oxide'):
 
 # ---------- N4: the note stays editable until the element's sheet is made ----------
 
-def test_a_saved_pictures_note_can_be_changed_until_its_sheet_exists():
+def test_a_saved_pictures_note_can_be_changed_and_after_the_sheet_marks_it():
     doc, sess = film(references=refs(web('W1')))
     store = store_with(sess, doc)
     out = VS.note_reference(store, USER, RUN, [], 'W1', 'keep the red oxide; avoid the shine')
     assert saved(store)['references']['W1']['source']['note'] == 'keep the red oxide; avoid the shine' and 'note saved' in out['next'].lower()
     doc, sess = film(references=refs(web('W1'), pic('S1', status='candidate', kind='sheet', parents=['W1'])))
-    with pytest.raises(Problem, match='sheet'):
-        g(lambda: VS.note_reference(store_with(sess, doc), USER, RUN, [], 'W1', 'too late'))
+    store = store_with(sess, doc)
+    VS.note_reference(store, USER, RUN, [], 'W1', 'after the sheet')   # design/121 change 4: saved, and the sheet is marked for a new one
+    assert saved(store)['references']['S1']['sources_changed'] is True
     doc, sess = film(references=refs(web('W1'), pic('S1', status='rejected', kind='sheet', parents=['W1'])))
     VS.note_reference(store_with(sess, doc), USER, RUN, [], 'W1', 'a rejected sheet does not block')   # the next sheet reads the new note
 
