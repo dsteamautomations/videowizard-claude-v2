@@ -112,7 +112,7 @@ def test_prepare_take_measures_the_pair_and_refuses_a_shifted_end():
     store.files['run-1/visuals/references/R2.png'] = png(shifted)
     with pytest.raises(Problem, match='not aligned with the start') as exc:
         g(lambda: VS.prepare_take(store, USER, RUN, [], body))
-    assert 'shift 2.' in exc.value.message and 'design/112 S3' in exc.value.message
+    assert 'shift 2.' in exc.value.message and 'design/' not in exc.value.message
     store.files['run-1/visuals/references/R2.png'] = png(start)
     VS.prepare_take(store, USER, RUN, [], body)
     assert saved(store)['preparations']['VS1']['alignment']['pass'] is True

@@ -113,12 +113,12 @@ def frame_ref(rid, clip, at):
 
 
 def test_a_frozen_frame_of_a_clip_that_plays_elsewhere_is_refused_even_with_approval():
-    """H3: c1 plays in the first cut."""
+    """c1 plays in the first cut."""
     doc, sess = clip_session(references={'F1': frame_ref('F1', 'c1', 3.0)})
     store = store_with(sess, doc)
     m, data = master([{'kind': 'event', 'sub_clip_id': 'c1:SUB_01', 'source_in_frame': 0, 'source_out_frame': 100, 'timeline_in_frame': 0, 'timeline_out_frame': 100}])
     store.files['run-1/master-v1.json'] = data
-    with pytest.raises(Problem, match='H3: clip c1 plays elsewhere'):
+    with pytest.raises(Problem, match='clip c1 plays elsewhere'):
         g(lambda: VS.still_from_reference(store, USER, RUN, [MEDIA, m], 'IM1', 'F1', 'yes', {'reason': 'r', 'considered': 'c'}, [0, 0, 0.7, 0.7]))
 
 
@@ -132,7 +132,7 @@ def test_a_reuse_needs_the_reason_the_reimagined_shot_and_words_60_s_apart_a_dif
         store.files['run-1/master-v1.json'] = data
         with pytest.raises(Problem) as exc:
             g(lambda: VS.fill_clip(store, USER, RUN, [MEDIA, m], 'VS1', 'c1', 10.0, 'yes'))
-        assert 'H2: clip c1 is already on screen' in exc.value.message and 'reimagined shot' in exc.value.message
+        assert 'clip c1 is already on screen' in exc.value.message and 'reimagined shot' in exc.value.message
         with pytest.raises(Problem, match=expect):
             g(lambda: VS.fill_clip(store, USER, RUN, [MEDIA, m], 'VS1', 'c1', 10.0, 'yes', {'reason': 'the only shot of the kiln', 'considered': 'a drone view: none exists'}, [0.1, 0.1, 0.7, 0.7]))
     # 60 s apart, a different stretch, a crop of 30 % within a safe 2×: passes, approved on the page through the same function
@@ -162,7 +162,7 @@ def test_two_shots_never_share_a_start_image_or_a_still():
     s = saved(store)
     s['preparations'] = {'VS0': {'preparation_id': 'p', 'key': 'x', 'start_image': 'R2', 'end_image': 'R9'}}
     store = store_with(s, doc)
-    with pytest.raises(Problem, match='H5: this picture is already in VS0'):
+    with pytest.raises(Problem, match='this picture is already in VS0'):
         g(lambda: VS.still_from_reference(store, USER, RUN, [], 'IM1', 'R2', 'yes'))
 
 
@@ -213,7 +213,7 @@ def test_a_visuals_session_begun_before_the_release_is_warned_not_refused():
     m, data = master([{'kind': 'event', 'sub_clip_id': 'c1:SUB_01', 'source_in_frame': 0, 'source_out_frame': 100, 'timeline_in_frame': 0, 'timeline_out_frame': 100}])
     store.files['run-1/master-v1.json'] = data
     out = VS.still_from_reference(store, USER, RUN, [MEDIA, m], 'IM1', 'F1', 'yes')
-    assert out['warnings'] and out['warnings'][0].startswith('H3: clip c1 plays elsewhere') and saved(store)['assets']['IM1']['repeat_warnings'] == out['warnings']
+    assert out['warnings'] and out['warnings'][0].startswith('clip c1 plays elsewhere') and saved(store)['assets']['IM1']['repeat_warnings'] == out['warnings']
 
 
 def test_a_new_visuals_session_refuses_the_repeat_rules(monkeypatch):

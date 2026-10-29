@@ -79,7 +79,7 @@ def test_approving_a_revised_start_queues_its_end_and_names_the_job():
     assert 'end image queued' in row['next'] and 'job-1' in row['next'] and 'take' not in row['next']
 
 
-def test_a_start_approved_without_an_end_prompt_never_names_the_take_as_next():
+def test_a_start_approved_without_an_end_prompt_on_a_start_only_shot_names_the_take_as_next():
     store = start_store()
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {'request_id': 'r12', 'element_id': 'E1', 'name': 'keyframe-start-VS1', 'kind': 'keyframe', 'shot_id': 'VS1',
                                                                 'subject': 'the labourer', 'prompt': 'Image 1 is the old start; the labourer at the stack.', 'parents': ['K1'], 'role': 'start'})
@@ -87,7 +87,7 @@ def test_a_start_approved_without_an_end_prompt_never_names_the_take_as_next():
         g(lambda: VS.approve_reference(approvable(store, out['reference_id']), USER, RUN, [], out['reference_id'], 'a' * 64, '', FakeConn([])))
     VS.answer(store, USER, RUN, [], 'VS1', out['reference_id'])
     row = VS.approve_reference(store, USER, RUN, [], out['reference_id'], 'a' * 64, '', FakeConn([]))
-    assert 'take' not in row['next'] and 'end image' in row['next']
+    assert row['next'] == 'Approved: the take for VS1 is the next step.'   # design/124 A4 item 4: VS1 is start-only (no end_state_exact)
 
 
 # ---------- T3: the server never places a take its words reject ----------

@@ -83,7 +83,7 @@ def test_h5_names_the_shot_suggests_a_return_and_how_to_take_it_out():
 
 
 def test_a_picture_naming_another_shot_than_its_parents_is_warned():
-    doc, sess = film(references=refs(pic('K1', 'DG1')))
+    doc, sess = film(references=refs(pic('K1', 'DG1', status='approved')))
     out = image(store_with(sess, doc), parents=['K1'], prompt='Image 1 is the start; the cavities now show.', shot_id='DG2')
     assert any('made from K1, which was made for DG1; this picture is listed and checked under DG2' in w for w in out['warnings'])
 

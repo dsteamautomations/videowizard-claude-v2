@@ -103,7 +103,7 @@ def test_a_second_approved_start_for_one_shot_asks_which_to_keep():
         g(lambda: VS.answer(store, USER, RUN, [], 'VS1', 'both'))
     VS.answer(store, USER, RUN, [], 'VS1', rid)
     s = saved(store)
-    assert s['references']['K1']['status'] == 'rejected' and 'rule 0' in s['references']['K1']['rejection']['notes'] and 'VS1' not in s['questions']
+    assert s['references']['K1']['status'] == 'rejected' and 'the operator kept' in s['references']['K1']['rejection']['notes'] and 'VS1' not in s['questions']
     row = VS.approve_reference(store, USER, RUN, [], rid, 'a' * 64, '', FakeConn([]))
     assert row['status'] == 'approved' and row.get('end_reference_id')
 

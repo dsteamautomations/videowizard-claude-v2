@@ -102,8 +102,8 @@ def test_the_server_composes_the_inventory_the_tool_sentence_and_the_headings():
     d = doc_with(rich())
     scene, sh = d['gaps'][0]['scenes'][0], d['gaps'][0]['scenes'][0]['shots'][0]
     inv = VS.inventory_line(d, scene, sh, 'start')
-    assert inv == 'Inventory, exactly: Red brick × 2 on the table; Pointing trowel × 1 in E1\'s hands. Nothing else of these kinds in frame; nothing rests on top of the stack.'
-    assert VS.inventory_line(d, scene, sh, 'end') == 'Inventory, exactly: Red brick × 4 on the table; E1 holds nothing. Nothing else of these kinds in frame; nothing rests on top of the stack.'
+    assert inv == 'Inventory, exactly: Red brick × 2 on the table; Pointing trowel × 1 in E1\'s hands. Nothing else of these kinds in frame.'   # design/124 A4 item 15: no stack named
+    assert VS.inventory_line(d, scene, sh, 'end') == 'Inventory, exactly: Red brick × 4 on the table; E1 holds nothing. Nothing else of these kinds in frame.'
     tools = VS.tool_lines(d, scene, sh, 'start')
     assert tools == ["The same Pointing trowel: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; E1 holds nothing else; no second one appears; it is fully inside the frame. "
                      'At the start it is in the hand above the table, 1 hand from it.']
@@ -117,7 +117,7 @@ def test_the_server_composes_the_inventory_the_tool_sentence_and_the_headings():
     turned['subjects'][0]['end']['facing'] = {**HEAD, 'edge': 'left'}
     assert VS.heading_lines(scene, turned, 'end')[0] == 'Heading of E1: it turns, as the change says; at the end its front is toward the table at the left edge; the left side faces the camera.'
     block = VS.composed_block(d, scene, sh, 'start')
-    assert block.startswith('E1: about to') and 'Heading of E1' in block and 'The same Pointing trowel' in block and block.rstrip().endswith('nothing rests on top of the stack.')
+    assert block.startswith('E1: about to') and 'Heading of E1' in block and 'The same Pointing trowel' in block and block.rstrip().endswith('Nothing else of these kinds in frame.')
     assert 'Because E1 has laid one brick' in VS.composed_block(d, scene, sh, 'end')
 
 

@@ -149,7 +149,7 @@ def prepare(conn, store, user, run, outputs):
     save_session(store, run, session)
     pk = save_json(store, key(run, 'package.json'), package)
     return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'footage': (footage_view(session, outputs) or {}).get('line'),
-            'next': 'write out/visual-plan.json then `vw visuals check`'}
+            'next': 'settle the treatment with the operator and record it (`vw visuals treatment`), then write the plan (out/visual-plan.json, `vw visuals check`)'}   # design/124 A4 item 1
 
 
 def gap_timing(store, run, gaps, fps):
@@ -384,7 +384,7 @@ def check_cap(conn, run, session, estimate_inr, what):
     spent, cap = visuals_spend(conn, run)['spent_inr'], cap_of(session)
     if spent + float(estimate_inr) > cap + 1e-9:
         raise Problem(409, 'VISUALS_CAP', f"₹{spent:,.0f} spent of ₹{cap:,.0f} on this film's visuals; {what} needs about ₹{float(estimate_inr):,.0f}. "
-                                          "Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word (design/74 L26).",
+                                          "Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word.",
                       spent_inr=spent, cap_inr=cap, estimate_inr=float(estimate_inr))
 
 
@@ -737,7 +737,7 @@ def spec_view(shot):
     if spec.get('view'):
         return spec['view'], (spec.get('view_reason') or '').strip()
     words = ' '.join(str(shot.get(k) or '') for k in ('depicts', 'purpose', 'title')).lower()
-    return ('cutaway', 'a section is cut through the wall') if 'section' in words else ('', '')
+    return ('cutaway', 'a section is shown cut through') if 'section' in words else ('', '')
 
 
 def view_line(shot):
@@ -1084,7 +1084,7 @@ def not_this(store, user, run, outputs, element_id):
             near.append(s_['nothing_fits']['reason'])
     spec = material_sentence(element) if element.get('material_spec') else f"{element['name']}: {element.get('requirements') or ''}"
     text = (f"The thing: {spec}\nList the common variants of this thing that a picture model draws instead of it, each as one short 'no …' line naming the difference "
-            "(the bond, the shape, the surface, the colour, the size, the fittings), eight lines at most, no explanations." +
+            "(the bond, the shape, the surface, the colour, the size, the fittings), twelve lines at most, no explanations." +
             ('\nThe operator rejected these web results or wrote why nothing fit; turn each difference into a line too: ' + '; '.join(near[:20]) if near else ''))
     need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
@@ -1173,8 +1173,11 @@ def sheet_due(session, plan):
         if not sources or any(r.get('kind') == 'sheet' and r.get('status') in ('approved', 'candidate', 'generating') for r in refs):
             continue
         views = ', '.join(e.get('required_views') or []) or 'the views the plan needs'
-        who = 'the person' if e.get('kind') == 'person' else 'the thing'
-        out.append({'element_id': e['id'], 'next': f"write the reference sheet of {e['id']} now: `vw visuals image --element {e['id']} --kind sheet --parents {','.join(sources)} …` ({views}; {who} alone on plain ground)"})
+        if e.get('kind') == 'person':   # design/124 decision 5: a person's sheet is made from words; no footage or web picture of a person goes to the picture AI
+            out.append({'element_id': e['id'], 'next': f"write the reference sheet of {e['id']} now from the person's description (build, age, posture, garments and how they are worn, hair; "
+                                                        f"look at {','.join(sources)} and describe them), with no picture parents: `vw visuals image --element {e['id']} --kind sheet …` ({views}; the person alone on plain ground)"})
+            continue
+        out.append({'element_id': e['id'], 'next': f"write the reference sheet of {e['id']} now: `vw visuals image --element {e['id']} --kind sheet --parents {','.join(sources)} …` ({views}; the thing alone on plain ground)"})
     return out
 
 
@@ -1204,7 +1207,8 @@ def check_region(region):
     except (TypeError, ValueError):
         need(False, 'A region is four numbers between 0 and 1.')
     need(0 <= l < 1 and 0 <= t < 1 and 0 < w <= 1 and 0 < h <= 1 and l + w <= 1 + 1e-9 and t + h <= 1 + 1e-9, 'The region lies inside the frame: left + width and top + height are at most 1.')
-    need(w * h <= REGION_MAX + 1e-9, f'The region covers {w * h * 100:.0f} % of the frame: an edit changes one region of a third at most; a bigger change is a new picture made with the golden picture as a reference (design/111 F11).')
+    need(w * h <= REGION_MAX + 1e-9, f'The region covers {w * h * 100:.0f} % of the frame: an edit changes one region of a third at most; for an end image, make the shot start-only (end_state_exact false) and let the motion carry the change; '
+                                       'for another picture, make a new one with the golden picture as Image 1.')   # design/124 A4 item 13
     return {'left': l, 'top': t, 'width': w, 'height': h}
 
 
@@ -1279,7 +1283,10 @@ def inventory_line(plan, scene, shot, when):
             holders.append(f"{s['element_id']} holds nothing")
     if not items and not holders:
         return ''
-    return 'Inventory, exactly: ' + '; '.join(items + holders) + '. Nothing else of these kinds in frame; nothing rests on top of the stack.'
+    places = [place_words(scene_marks, o.get('place')) for s in shot.get('subjects') or [] for w in ('start', 'end') for o in (s.get(w) or {}).get('objects') or []]
+    stacks = [p for p in places if 'stack' in p.lower()]   # design/124 A4 item 15: only where a stack is named and nothing is put on it
+    stack = '; nothing rests on top of the stack' if stacks and not any(re.match(r'(on|onto|on top of)\b', p, re.I) for p in stacks) else ''
+    return 'Inventory, exactly: ' + '; '.join(items + holders) + '. Nothing else of these kinds in frame' + stack + '.'
 
 
 def _prop_end_words(marks, p):
@@ -1451,7 +1458,7 @@ def answer(store, user, run, outputs, item, words):
         for rid in q['choices']:
             r = session['references'].get(rid)
             if rid != words and r and r.get('status') != 'rejected':
-                r.update(status='rejected', rejection={'notes': f'rule 0: the operator kept {words} for {item}', 'quote': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
+                r.update(status='rejected', rejection={'notes': f'the operator kept {words} for {item}', 'quote': words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     if q.get('fork') == 'parent' and words == q['choices'][0]:
         session['references'][item]['parent_ok'] = True
     if q.get('fork') == 'not_yet' and words == q['choices'][1]:   # F3: approved anyway, on the operator's word; the flaw is theirs to carry as a parent too
@@ -1533,7 +1540,7 @@ def waiting(session, plan, code, take_rows):
         elif sh and route_of(sh) == 'still':
             add(sh['start_frame'], f"Still · {sh['id']}{title(sh)}", 'pictures', sh['id'], r['id'])
         elif sh and route_of(sh) == 'video':
-            add(sh['start_frame'], f"Start and end · {sh['id']}{title(sh)}", 'takes', sh['id'], r['id'])
+            add(sh['start_frame'], f"{'Start and end' if sh.get('end_state_exact') else 'Start image'} · {sh['id']}{title(sh)}", 'takes', sh['id'], r['id'])   # design/124 A4 item 23
     for sid, sh in shots.items():
         if route_of(sh) == 'graphic_sequence':
             try:
@@ -2115,12 +2122,12 @@ def generate_image(conn, store, user, run, outputs, body):
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
         cited = footage_cited(element, plan.get('visual_facts'))
         need(not cited or frames_ok, f"{element['id']}'s fact or size cites the footage ({cited[:80]}): approve a footage frame of {element['id']} (`vw visuals frame --element {element['id']} ...`) "
-                                     f"before any picture of it, and mark it identity exact in the plan (design/119 rule 7).")
+                                     f"before any picture of it, and mark it identity exact in the plan.")
         unknown = [d for d in element.get('size') or [] if d.get('value') is None]   # design/119 rule 8: measure before the first picture
         if frames_ok and unknown and body['kind'] != 'sheet':
             d = unknown[0]
             need(False, f"{element['id']} has a size still unknown ({d.get('part')} {d.get('measure')}) and an approved footage frame {frames_ok[0]['id']}: measure it first "
-                        f"(`vw visuals measure --refs {frames_ok[0]['id']} --question ...`), then put the value in the plan with status measured, before its first picture (design/119 rule 8).")
+                        f"(`vw visuals measure --refs {frames_ok[0]['id']} --question ...`), then put the value in the plan with status measured, before its first picture.")
     if body['kind'] == 'component':   # design/117 P1: a thing alone, in the approved style, on a transparent background; the style picture is Image 1
         need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
         style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
@@ -2139,7 +2146,13 @@ def generate_image(conn, store, user, run, outputs, body):
         check_crop(region)
     for p in parents:   # design/71 P6 (the server check, design/74 L7): a retry starts from an approved picture, never from a rejected one
         if p and p.get('status') == 'rejected':
-            need(False, f"{p['id']} was rejected: make the next {'state from the last approved state' if body['kind'] == 'state' else 'end image from the approved start, not from the candidate chain'}.")
+            need(False, f"{p['id']} was rejected: it is never a parent; " + ('make the next state from the last approved state.' if body['kind'] == 'state' else
+                                                                              'start from an approved picture (an end image from its approved start).'))   # design/124 A4 item 12
+    people = {e['id']: e.get('name') or e['id'] for e in plan['elements'] if e.get('kind') == 'person'}
+    for p in parents:   # design/124 decision 5: a footage frame or web picture of a person is never sent to the picture AI; the operator's own picture is
+        if p and p.get('kind') in ('frame', 'web') and p.get('element_id') in people:
+            need(False, f"{p['id']} is a {'footage frame' if p['kind'] == 'frame' else 'web picture'} of {people[p['element_id']]} ({p['element_id']}), a person: a picture of a person from the footage "
+                        f"or the web is never sent to the picture AI. Leave it out; the person's sheet is written from the person's description (build, age, posture, garments, hair).")
     gold = golden_of(session, body['element_id'])
     if body.get('golden'):   # design/111 F11: the golden picture, written on the server's cue after the sheet (and the spec) are approved
         need(body['kind'] == 'isolated' and element['kind'] not in ('person', 'graphic', 'style'), 'A golden picture is a picture of an object, a place, an animal, a material or a process (kind isolated); a person\'s golden picture is its identity sheet.')
@@ -2152,10 +2165,14 @@ def generate_image(conn, store, user, run, outputs, body):
     if body['kind'] == 'state':   # design/65: a state is made from the previous state, which is approved only when the whole sequence is
         need(len(parents) == 1, 'A state is generated from the previous state: give one parent.')
         need(parents[0] and parents[0]['status'] in ('approved', 'candidate'), 'The parent must be a candidate or approved reference of this run.')
-    else:   # design/66 C3: an end keyframe is made from the start keyframe before either is approved, so the pair is approved together
-        need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate')) for p in parents),
-             'Parents must be approved references of this run (an end keyframe may be made from a candidate start keyframe).')
-    library.check_prompt(body['prompt'])   # design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
+    else:   # design/124 decision 9: an end is made only from an approved start (the server makes it from end_prompt once the start is approved); a fix starts from its candidate
+        for p in parents:
+            if p and body['kind'] == 'keyframe' and p.get('kind') == 'keyframe' and p.get('status') == 'candidate' and p['id'] != body.get('fix_of'):
+                need(False, f"{p['id']} is a start image still waiting for approval: an end image is made only from an approved start. Write the end with the start "
+                            "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start.")
+        need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate' and p['id'] == body.get('fix_of')))
+                 for p in parents), 'Parents must be approved references of this run.')
+    library.check_prompt(body['prompt'], fix=bool(body.get('fix_of')))   # design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
         starts = [p for p in parents if p['kind'] == 'keyframe']
         need(not starts or re.search(r'\bimage 1\b', body['prompt'], re.I),
@@ -2180,7 +2197,7 @@ def generate_image(conn, store, user, run, outputs, body):
             body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} is the approved {p.get('kind') or 'reference'} of {p.get('element_id')}: take identity from it, nothing else.")}
     if parents and not body.get('fix_of'):   # F21: one job line per picture
         missing_ = library.image_names_missing(body['prompt'], len(parents))
-        need(not missing_, f"the prompt does not say what Image {', '.join(map(str, missing_))} is for: one job line per picture ('Image k is …: take …') (design/111 F21).")
+        need(not missing_, f"the prompt does not say what Image {', '.join(map(str, missing_))} is for: one job line per picture ('Image k is …: take …').")
     if not body.get('shot_id') and body['kind'] in ('keyframe', 'state'):   # design/94 R1.1: a state, an end image or a fix takes its parent's shot
         body['shot_id'] = next((p['shot_id'] for p in parents if p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id')), None)
         need(body['shot_id'] or body.get('fix_of'), f"Name the shot this {body['kind']} is for (--shot): a picture is listed, checked and placed only in its own shot.")
@@ -2200,7 +2217,7 @@ def generate_image(conn, store, user, run, outputs, body):
         for p in parents:
             if p and p.get('element_id') not in allowed and p.get('kind') not in ('keyframe', 'state'):
                 nm = next((e.get('name') for e in plan['elements'] if e['id'] == p.get('element_id')), p.get('element_id'))
-                need(False, f"{p['id']} is a picture of {p.get('element_id')} ({nm}), which is not in shot {named['id']}: add the element to the shot's element_ids or leave the picture out (design/119 rule 5).")
+                need(False, f"{p['id']} is a picture of {p.get('element_id')} ({nm}), which is not in shot {named['id']}: add the element to the shot's element_ids or leave the picture out.")
     if body['kind'] == 'keyframe':
         _keyframe_gates(session, plan, body, parents, named)   # design/77 L35, L38, L41
     answer = body.get('answer')
@@ -2252,7 +2269,7 @@ def generate_image(conn, store, user, run, outputs, body):
         pending_end = {'prompt': body['end_prompt'], 'answer': body.get('end_answer'), **({'region': check_region(body['end_region'])} if body.get('end_region') else {})}   # design/111 F11
     if body['kind'] == 'keyframe' and is_end and not region and not body.get('fix_of'):   # design/112 S2
         whats = '; '.join(c.get('what', '') for c in (named or {}).get('changes') or []) or 'the change'
-        need(False, f'An end image is an edit inside one region of its start (design/112 S2): give --region left,top,width,height (fractions of the frame, a third at most) covering where {whats} happens; '
+        need(False, f'An end image is an edit inside one region of its start: give --region left,top,width,height (fractions of the frame, a third at most) covering where {whats} happens; '
                     'the server masks it and copies the start back outside it, so nothing else moves. Several places, or the framing itself: make the shot start-only (end_state_exact false) and let the motion carry the change.')
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'component':
@@ -2272,7 +2289,7 @@ def generate_image(conn, store, user, run, outputs, body):
         if webs:
             lines = list(lines or []) + [WATERMARK]
     if body.get('end_prompt') and not body.get('end_region') and not body.get('fix_of'):   # design/112 S2: the end the server queues needs its region too
-        warns.append('the end written with this start has no region: the server will refuse to make it (design/112 S2); give --end-region left,top,width,height with the start')
+        warns.append('the end written with this start has no region: the server will refuse to make it; give --end-region left,top,width,height with the start')
     if body['kind'] == 'keyframe' and not is_end and named is not None:
         lines = lines + not_yet_lines(named)   # design/110 F3: a start shows the action not yet done (a fix of a start too)
     if answer is not None and library.exact_entries(answer):   # design/111 F13: every picture with exact text, not only a graphic
@@ -2326,7 +2343,7 @@ def generate_image(conn, store, user, run, outputs, body):
         warns.append(lw)
     warns += [f"made from {p['id']}, which was made for {p['shot_id']}; this picture is listed and checked under {body['shot_id']}"   # design/95 F7: on purpose, or a slip
               for p in parents if body.get('shot_id') and p and p.get('kind') in ('keyframe', 'state') and p.get('shot_id') not in (None, body['shot_id'])]
-    if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named)
+    if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
     check_cap(conn, run, session, prices()['image_inr'] * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
@@ -2445,7 +2462,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     for sh in shots:
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {sh['id']} --quote`, or on the page)")
+            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve the specs as one table (`vw visuals spec`, or on the page)")   # design/124 A4 item 19
     return _dedupe(lines + label_lines), warns
 
 
@@ -2678,7 +2695,7 @@ def _keyframe_gates(session, plan, body, parents, named=None):
         read = [sh['id'] for gap, sh in video if (session['bindings'].get(sh['id']) or {}).get('packet_read_at') and session['bindings'][sh['id']].get('gap_digest') == gap_digest(plan, gap)]
         first = video[0][1]['id']
         need(read, f"Bind the shot and read its packet before composing its start image (`vw visuals bind --shot {first} …`, then `vw visuals packet --shot {first}`): "
-                   "the packet carries the pair instructions and the library's job form.")
+                   "the packet carries the start instructions and the library's job form.")
     if end:   # L38
         m = camera_move(body['prompt'])
         if m:
@@ -2818,9 +2835,22 @@ def _shot_is_video(store, session, shot_id):
 def _approved_next(store, session, row):
     """design/97 A4: what follows an approval that places nothing."""
     word = _picture_word(store, session, row)
-    return {'end image': f"Approved: the take for {made_for(session, row)} is the next step.", 'start image': 'Approved: the end image is made from it next.',
-            'state': 'Approved: the sequence is approved as a whole once every state is in.', 'style sheet': 'Approved: every graphic is made from it.',
-            'reference sheet': f"Approved: the shots of {row.get('element_id')} are made from it."}.get(word, 'Approved.')
+    sid = made_for(session, row)
+    if word == 'start image':   # design/124 A4 item 4: an end comes next only where the shot's end must be exact
+        try:
+            exact = bool(locate(store, session, sid)[3].get('end_state_exact'))
+        except Exception:
+            exact = False
+        return (f"Approved: this shot's end must be exact: its end image is made from this start next (`vw visuals image --kind keyframe --role end --parents {row['id']} --region …`)."
+                if exact else f"Approved: the take for {sid} is the next step.")
+    if word == 'reference sheet':   # design/124 A4 item 11: a thing's golden picture comes next; a person's sheet is its golden picture
+        try:
+            person = {e['id']: e.get('kind') for e in current_plan(store, session)['elements']}.get(row.get('element_id')) == 'person'
+        except (ValueError, Problem, KeyError, StopIteration):
+            person = False
+        return f"Approved: the shots of {row.get('element_id')} are made from it." if person else f"Approved: the golden picture of {row.get('element_id')} is made from it next."
+    return {'end image': f"Approved: the take for {sid} is the next step.",
+            'state': 'Approved: the sequence is approved as a whole once every state is in.', 'style sheet': "Approved: every graphic's first picture is made from it."}.get(word, 'Approved.')
 
 
 def reject_reference(store, user, run, outputs, ref_id, notes, quote):
@@ -2837,7 +2867,7 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
         except (ValueError, Problem):
             pass
         save_session(store, run, session)
-        return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}
+        return {**row, 'next': _rejected_next(store, session, row)}
     need(row and row['status'] in ('candidate', 'approved'), f"Reference {ref_id} is not a candidate or approved picture (it is {(row or {}).get('status') or 'unknown'}); only those can be rejected.")
     quote = said(words, 'Rejected', user)   # design/99 C3: the reason is optional
     row.update(status='rejected', rejection={'notes': reason, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
@@ -2847,7 +2877,16 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
     except (ValueError, Problem):
         pass
     save_session(store, run, session)
-    return {**row, 'next': f'Rejected: the assistant makes a new {_picture_word(store, session, row)} with your note.'}   # design/97 A4
+    return {**row, 'next': _rejected_next(store, session, row)}   # design/97 A4
+
+
+def _rejected_next(store, session, row):
+    """design/124 A4 item 12: what follows a rejection, by kind: a web pick or a frame waits for the operator's words; a generated picture is made again."""
+    if row.get('kind') in ('web', 'frame', 'supplied'):
+        return "Rejected: the next search or frame comes from the operator's words, or Ignore this; nothing is searched or made without them."
+    word = _picture_word(store, session, row)
+    return f'Rejected: the assistant makes a new {word} with your note' + {'end image': ', from the approved start, never from this one.',
+                                                                          'state': ', from the last approved state, never from this one.'}.get(word, '.')
 
 
 # ---------- design/74 L7: the feedback record, in the library's shape (record-template.videowizard.yaml) ----------
@@ -3114,6 +3153,7 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
 # ---------- takes ----------
 
 def select_generator(store, user, run, outputs, shot_id, provider, model):
+    """design/124 A4 decision 5: Omni only; choosing it sets a shot back from a retired choice."""
     session = session_of(store, run, outputs)
     guarded(lambda: video_generators.GeneratorChoice(shot_id=shot_id, provider=provider, model=model))
     session['generator_choices'][shot_id] = {'provider': provider, 'model': model, 'plan_digest': session['current']}
@@ -3162,7 +3202,7 @@ def bind_advice(plan, session, shot):
     for e in plan['elements']:
         if e['id'] not in (shot.get('element_ids') or []) or not frames(e['id']):
             continue
-        if (e['kind'] == 'material' or (e['kind'] == 'object' and e.get('identity') == 'exact')) and shot.get('size', '') in ('', 'MS', 'MCU', 'CU', 'ECU'):   # D1
+        if (e['kind'] == 'material' or (e['kind'] == 'object' and e.get('identity') == 'exact')) and shot.get('size', '') in ('', 'MS', 'MCU', 'CU', 'ECU') and not golden_of(session, e['id']):   # D1; design/124 A4 item 17: the golden picture carries it
             out.append({'element_id': e['id'], 'use': 'texture', 'reference_ids': frames(e['id']), 'line': 'the texture reference: take only its surface: its colour, wear and joints'})
         if e['kind'] == 'place':   # D2
             out.append({'element_id': e['id'], 'use': 'look', 'reference_ids': frames(e['id']), 'line': 'the look reference: take only its light and colour'})
@@ -3190,9 +3230,9 @@ def shot_guidance(shot, neighbours):
               'Thirds by default, the centre only on purpose; use leading lines and give a moving subject room ahead. To show a task, a first-person frame '
               'with the hands in front is an option.']   # B10, B13
     support = {(s or {}).get('support') for s in neighbours.values()} - {None, 'unknown'}
-    if shot.get('visual_type') == 'video' and support:   # B4: the camera matches the clips beside the gap
-        lines.append('The clips beside this gap are handheld: ask for slight handheld micro-movement in the take.' if 'handheld' in support
-                     else 'The clips beside this gap are steady: keep the camera steady in the take.')
+    if shot.get('visual_type') == 'video' and support:   # B4; design/124 A4 decision 2: steady takes, never handheld movement asked for
+        lines.append(('The clips beside this gap are handheld, but the take stays steady: ' if 'handheld' in support else 'The clips beside this gap are steady: ')
+                     + "the take is locked off on a tripod unless the shot's camera_move names its one move.")
     return lines
 
 
@@ -3212,8 +3252,8 @@ def prepare_take(store, user, run, outputs, body):
         except ValueError:
             save_session(store, run, session)
             raise
-    need(body.get('end_image') or not planned.get('end_state_exact'), "This shot's final state must be exact (end_state_exact): generate the end from the start (`vw visuals image --kind keyframe --parents <start>`), "
-                                                                      'approve both, then `--start R --end R2`.')   # design/66 C2, narrowed by design/112 S1: start alone by default
+    need(body.get('end_image') or not planned.get('end_state_exact'), "This shot's final state must be exact (end_state_exact): write its end with the start (`end_prompt`, `end_region`); "
+                                                                      'the server makes the end once the start is approved; then `--start R --end R2`.')   # design/124 decision 9   # design/66 C2, narrowed by design/112 S1: start alone by default
     need(body['start_image'] != body.get('end_image'), 'The start and end images are distinct pictures: the end is the start one small action further on.')
     library.check_prompt(body['motion_prompt'])   # design/71 F2 (a ValueError: the API wraps this call in guarded())
     answer = body.get('answer')
@@ -3227,11 +3267,15 @@ def prepare_take(store, user, run, outputs, body):
     shot = base['preparation']['shot']
     need(set(body['subject_reconciliation']) == {s['element_id'] for s in shot['subjects']}, 'Reconcile every subject of the shot, exactly those: ' + ', '.join(s['element_id'] for s in shot['subjects']))
     selected = base['preparation']['provider']
-    cap = next(c for c in video_generators.CATALOG if c['provider'] == selected['provider'] and c['model'] == selected['model'])
+    cap = next((c for c in video_generators.CATALOG if c['provider'] == selected['provider'] and c['model'] == selected['model']), None)
+    if cap is None:   # design/124 A4 decision 5: a shot that chose Kling or Seedance keeps its takes, but no new take is prepared on them
+        was = (video_generators.known(selected['provider'], selected['model']) or {}).get('label', selected['model']).split(' ·')[0]
+        need(False, f"shot {body['shot_id']} chose {was}, which is no longer offered. {video_generators.OMNI_ONLY} Set the shot back to Omni "
+                    f"(`vw visuals generator --shot {body['shot_id']} --provider google --model {video_generators.OMNI}`), then prepare the take again.")
     fps = Fraction(session['source']['fps'])
     exact = Fraction(shot['end_frame'] - shot['start_frame']) / fps
     need(exact <= cap['max_seconds'], f"shot {shot['id']} is {float(exact):.1f} s, longer than {cap['label'].split(' ·')[0]}'s maximum {cap['max_seconds']} s: "
-                                      "split the shot or choose another generator (`vw visuals generator`)")   # design/45 10.7: refuse, never clamp
+                                      "split the shot where an action begins or ends")   # design/45 10.7: refuse, never clamp; design/124 A4 decision 5
     duration = body.get('duration_seconds') or max(cap['min_seconds'], -(-exact.numerator // exact.denominator))  # ceil, at least the generator's minimum
     need(cap['min_seconds'] <= duration <= cap['max_seconds'], f"Duration {duration}s is outside {cap['label']} ({cap['min_seconds']}–{cap['max_seconds']}s).")
     images, form = {}, []
@@ -3248,8 +3292,8 @@ def prepare_take(store, user, run, outputs, body):
                                                                      round((beats[c['beat_id']]['end_frame'] - planned['start_frame']) / float(fps), 2)]}
                for c in planned.get('changes') or [] if c.get('beat_id') in beats]
     if not changes:
-        form.append('no change list on this shot: list what differs between the start and the end picture and the beat that causes each (changes), so the pair is checked')
-    _rule(session, not used, f"H5: {body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
+        form.append('no change list on this shot: list what the action changes and the beat that causes each (changes), so the take (and the pair, where there is one) is checked')
+    _rule(session, not used, f"{body['start_image']} is already the start of {used[0] if used else ''}; two shots never share a start image (an end image may start the next segment of one shot).", warns)
     s, e = images['start_image'], images.get('end_image')
     align = None
     if e:   # design/112 S3: the pair's alignment, measured in code before anything else reads it
@@ -3258,7 +3302,7 @@ def prepare_take(store, user, run, outputs, body):
         except Exception as exc:
             form.append(f'the pair alignment was not measured ({exc.__class__.__name__}): compare the framing of the two pictures yourself')
         if align:
-            need(align['pass'], f"The end image is not aligned with the start: {align['seen']} (design/112 S3): make the end again as an edit of the start inside a region (`--region`), "
+            need(align['pass'], f"The end image is not aligned with the start: {align['seen']}: make the end again as an edit of the start inside a region (`--region`), "
                                 'or set the shot start-only (end_state_exact false).')
     if e and all((s['width'], s['height'], e['width'], e['height'])):   # design/71 P3: the pair shares its aspect ratio (a 1920x1080 frame and a 1536x864 edit both pass)
         a, b = s['width'] / s['height'], e['width'] / e['height']
@@ -3268,7 +3312,7 @@ def prepare_take(store, user, run, outputs, body):
               'base_preparation_digest': base['preparation_digest'], 'motion_prompt': body['motion_prompt'], 'subject_reconciliation': body['subject_reconciliation'],
               'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration), 'camera_move': shot.get('camera_move') or '',   # design/112 S4
               'aspect_ratio': default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), body),   # design/53 L7
-              'resolution': body.get('resolution') or ('720p' if selected['model'] != video_generators.CATALOG[1]['model'] else None),
+              'resolution': body.get('resolution') or '720p',   # design/124 A4 decision 5: Omni only
               **images, 'provider': selected['provider'], 'model': selected['model'],
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},
               'generated_audio_policy': 'retain original output; never replace narration automatically', **({'answer': answer} if answer is not None else {}),
@@ -3422,11 +3466,11 @@ def render_drawn(conn, store, user, run, outputs, body):
     _no_question(session, shot['id'])   # design/110 rule 0
     sv = shot.get('scene_svg') or {}
     row = (session.get('scenes') or {}).get(sv.get('sha256') or '')
-    need(row, f"the plan's scene_svg of {shot['id']} names no uploaded scene: upload it (`vw visuals scene --shot {shot['id']} --file scene.svg`) and put its sha256 in the plan (design/117 P2).")
+    need(row, f"the plan's scene_svg of {shot['id']} names no uploaded scene: upload it (`vw visuals scene --shot {shot['id']} --file scene.svg`) and put its sha256 in the plan.")
     spec = shot.get('drawing_spec')
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: approve it as a table (`vw visuals spec --shot {shot['id']} --quote`, or on the page) before the drawing is rendered (design/113 E5).")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: approve the specs as one table (`vw visuals spec`, or on the page) before the drawing is rendered.")
     fps = session['source']['fps']
     res = session['source'].get('resolution') or [1920, 1080]   # defect 33: a run stores [1920, 1080] (the master's summary), the fixtures '1920x1080'; both read, as defect 26 did
     W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
@@ -3477,7 +3521,7 @@ def set_scene(store, user, run, outputs, shot_id, name, content):
         need(False, 'The scene is not UTF-8 text.')
     fonts = ('Noto Sans',) + ((Path(session['font']['name']).stem,) if session.get('font') else ())
     problems = svg_scene.check(text, fonts=fonts, refs=session['references'])
-    need(not problems, 'The scene breaks the rules (design/117 P2): ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    need(not problems, 'The scene breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
     sha = hashlib.sha256(content).hexdigest()
     k = f"{run['id']}/visuals/scenes/{sha}.svg"
     store.put(k, content, 'image/svg+xml')
@@ -3548,7 +3592,7 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     elif not made and row.get('kind') in ('keyframe', 'state'):
         warns.append(f'{reference_id} has no shot recorded: make pictures with --shot so each is placed only in the shot it was made for')
     used = [sid for sid, a in session['assets'].items() if sid != shot_id and a.get('reference_id') == reference_id] + [sid for sid, rid in _start_images(store, session).items() if rid == reference_id and sid != shot_id]
-    _rule(session, not used, f'H5: this picture is already in {used[0] if used else ""}. Two shots never show the same picture: compose another (a reimagined shot, return_of, for a return), '
+    _rule(session, not used, f'this picture is already in {used[0] if used else ""}. Two shots never show the same picture: compose another (a reimagined shot, return_of, for a return), '
                              f'or take it out there first: `vw visuals unplace --shot {used[0] if used else ""}`, or Remove on the page.', warns)   # design/94 R1.8
     if made and made != shot_id:
         row.update(shot_id=shot_id, moved={'from': made, 'to': shot_id, 'quote': move, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
@@ -3625,13 +3669,13 @@ def ledger(store, session, outputs):
 def _crop_check(crop, safe):
     """H4: a crop inside the frame, of the frame's shape, enlarging at least REUSE_MIN_ZOOM and no more than the clip's safe enlargement."""
     if not (isinstance(crop, (list, tuple)) and len(crop) == 4):
-        return None, 'H4: give the crop that makes the framing clearly different (--crop x,y,w,h, fractions of the frame).'
+        return None, 'give the crop that makes the framing clearly different (--crop x,y,w,h, fractions of the frame).'
     x, y, w, h = (float(v) for v in crop)
     if not (0 <= x and 0 <= y and 0 < w <= 1 and 0 < h <= 1 and x + w <= 1.0001 and y + h <= 1.0001 and abs(w - h) <= 0.01):
-        return None, 'H4: the crop lies inside the frame and keeps its shape (w equal to h).'
+        return None, 'the crop lies inside the frame and keeps its shape (w equal to h).'
     zoom = 1 / max(w, h)
     if not REUSE_MIN_ZOOM - 1e-6 <= zoom <= safe + 1e-6:
-        return None, f"H4: the crop enlarges {zoom:.2f}×; it must be between {REUSE_MIN_ZOOM:.2f}× and the clip's safe {safe:.2f}×."
+        return None, f"the crop enlarges {zoom:.2f}×; it must be between {REUSE_MIN_ZOOM:.2f}× and the clip's safe {safe:.2f}×."
     return [x, y, w, h], ''
 
 
@@ -3647,20 +3691,20 @@ def _reuse_gate(store, run, session, outputs, shot, clip_id, src_in, src_out, mo
         return None, warns
     names = ', '.join(f"{e['shot_id']} ({e['where']})" for e in others)
     if not moving:
-        _rule(session, not any(e['moving'] for e in others), f'H3: clip {clip_id} plays elsewhere ({names}); a frozen frame of it is never shown: use another clip, or a moving stretch with an approved reuse.', warns)
+        _rule(session, not any(e['moving'] for e in others), f'clip {clip_id} plays elsewhere ({names}); a frozen frame of it is never shown: use another clip, or a moving stretch with an approved reuse.', warns)
     else:
-        _rule(session, all(e['moving'] for e in others), f'H3: clip {clip_id} is shown as a frozen frame in {names}; a clip is either moving or a frame in the film, never both.', warns)
+        _rule(session, all(e['moving'] for e in others), f'clip {clip_id} is shown as a frozen frame in {names}; a clip is either moving or a frame in the film, never both.', warns)
     r = reuse or {}
     why = bool(str(r.get('reason') or '').strip() and str(r.get('considered') or '').strip())
-    _rule(session, why, f'H2: clip {clip_id} is already on screen in {names}: showing it again is a reuse. Prefer a reimagined shot (the same subject from another angle, distance or moment, '
+    _rule(session, why, f'clip {clip_id} is already on screen in {names}: showing it again is a reuse. Prefer a reimagined shot (the same subject from another angle, distance or moment, '
                         "return_of). A plain reuse needs the reason, the reimagined shot you considered and why it adds nothing (--reuse, --considered, or the page's reuse fields), then the operator's approval.", warns)
     for e in others:
         apart = max(film_in - e['film_out_s'], e['film_in_s'] - film_out)
-        _rule(session, apart >= REUSE_APART_S, f"H4: {shot['id']} is {apart:.0f} s from {e['shot_id']}; an approved reuse is at least {REUSE_APART_S} s apart.", warns)
+        _rule(session, apart >= REUSE_APART_S, f"{shot['id']} is {apart:.0f} s from {e['shot_id']}; an approved reuse is at least {REUSE_APART_S} s apart.", warns)
         _rule(session, src_out <= e['src_in_s'] or src_in >= e['src_out_s'] if (moving or e['moving']) else abs(src_in - e['src_in_s']) >= 1.0,
-              f"H4: a different stretch of clip {clip_id} from the one in {e['shot_id']}, with no overlap in the clip's own time.", warns)
+              f"a different stretch of clip {clip_id} from the one in {e['shot_id']}, with no overlap in the clip's own time.", warns)
     safe = float((session.get('clip_safe_zoom') or {}).get(clip_id) or 1.0)
-    _rule(session, safe >= REUSE_MIN_ZOOM - 1e-6, f'H4: clip {clip_id} can be enlarged only {safe:.2f}× before it goes soft; a clearly different framing needs {REUSE_MIN_ZOOM:.2f}×. '
+    _rule(session, safe >= REUSE_MIN_ZOOM - 1e-6, f'clip {clip_id} can be enlarged only {safe:.2f}× before it goes soft; a clearly different framing needs {REUSE_MIN_ZOOM:.2f}×. '
                                                  'Use a reimagined shot instead (return_of): a soft picture is never the fix for a repeat.', warns)
     box, problem = _crop_check(crop, safe)
     _rule(session, box is not None, problem, warns)

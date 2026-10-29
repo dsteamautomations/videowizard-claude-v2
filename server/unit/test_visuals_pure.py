@@ -214,11 +214,14 @@ def test_a_return_names_a_shot_the_film_shows():
     VC.validate_plan(doc, gaps2, Fraction(25))
 
 
-def test_a_video_shot_longer_than_the_default_generator_is_warned():
+def test_a_video_shot_longer_than_omni_makes_is_refused(monkeypatch):
+    """design/124 A4 decision 5 (was: warned, with a longer generator offered)."""
+    from app import video_generators
+    monkeypatch.setattr(VC, '_default_generator', lambda: video_generators.CATALOG[0])   # this module's fixtures lift the limit (conftest); this test runs the real one
     doc = plan([shot('VS1', 0, 590, 'video'), shot('VS2', 590, 1000, 'video')])   # 23.6 s and 16.4 s
-    result, warnings = VC.validate_plan(doc, GAPS, Fraction(25))
-    length = [w for w in warnings if w.get('kind') == 'length']
-    assert [w['shot_id'] for w in length] == ['VS1', 'VS2'] and '23.6 s' in length[0]['message'] and 'at most 10 s' in length[0]['message'] and 'Seedance' in length[0]['message']
+    with pytest.raises(ValueError, match='shot VS1 is 23.6 s; every take is Gemini Omni, 3–10 s: split it') as exc:
+        VC.validate_plan(doc, GAPS, Fraction(25))
+    assert 'Seedance' not in str(exc.value) and 'generator' not in str(exc.value)
     _, warnings = VC.validate_plan(plan([shot('VS1', 0, 250, 'video'), shot('IM1', 250, 1000, 'image')]), GAPS, Fraction(25))
     assert not [w for w in warnings if w.get('kind') == 'length']
 

@@ -26,7 +26,7 @@ def font_file(brand=None):
     """The font to draw with: the brand font when the run carries one, else the repo's Noto Sans. Missing or unreadable: a named failure."""
     p = Path(brand) if brand else (FONTS / 'NotoSans-Variable.ttf')
     if not p.exists():
-        raise ValueError(f'font {p.name} is not there ({"the brand font of this run" if brand else "under server/fonts"}); nothing is substituted (design/113 E4)')
+        raise ValueError(f'font {p.name} is not there ({"the brand font of this run" if brand else "under server/fonts"}); nothing is substituted')
     try:
         ImageFont.truetype(str(p), 12)
     except OSError as exc:

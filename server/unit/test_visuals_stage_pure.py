@@ -293,7 +293,7 @@ def test_prepare_take_needs_a_start_and_a_distinct_end_image_and_freezes_both():
     sess_exact = {**sess, 'accepted': accepted(doc_exact), 'bindings': {'VS1': {**sess['bindings']['VS1'], 'gap_digest': gap_digest(doc_exact, doc_exact['gaps'][1])}}}
     with pytest.raises(Problem, match='final state must be exact') as exc:
         g(lambda: VS.prepare_take(store_with(sess_exact, doc_exact), USER, RUN, [], body))
-    assert '--kind keyframe --parents <start>' in exc.value.message and '--start R --end R2' in exc.value.message
+    assert 'end_prompt' in exc.value.message and '--start R --end R2' in exc.value.message   # design/124 decision 9
     with pytest.raises(Problem, match='distinct'):
         g(lambda: VS.prepare_take(store_with(sess, doc), USER, RUN, [], {**body, 'end_image': 'R1'}))
     with pytest.raises(Problem, match='end_image must be an approved reference'):
@@ -305,14 +305,18 @@ def test_prepare_take_needs_a_start_and_a_distinct_end_image_and_freezes_both():
     assert record['start_image']['reference_id'] == 'R1' and record['end_image']['reference_id'] == 'R2' and '<LAST_FRAME>@Image2' in record['effective_prompt'] and 'one continuous shot' in record['effective_prompt'] and 'Continuity: the wall and the yard light stay' in record['effective_prompt']
 
 
-def test_a_keyframe_may_be_generated_from_a_candidate_keyframe(monkeypatch):
-    """design/66 C3: the end keyframe is made from the start keyframe before either is approved, so the pair is approved together."""
+def test_an_end_keyframe_is_never_made_from_a_candidate_start(monkeypatch):
+    """design/124 decision 9 (was design/66 C3, an end from a candidate start, the pair approved together): the end waits for the start's approval."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
                    references={'K1': ref('K1'), 'S1': {**ref('S1'), 'kind': 'sheet'}, 'A1': ref('A1', 'approved')})
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the same yard, the bucket now empty', 'parents': ['K1']}
-    store = store_with(sess, doc)
+    with pytest.raises(Problem, match='K1 is a start image still waiting for approval') as exc:
+        g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
+    assert 'end_prompt' in exc.value.message
+    approved = {**sess, 'references': {**sess['references'], 'K1': ref('K1', 'approved')}}
+    store = store_with(approved, doc)
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], body)
     assert out['op'] == 'edit' and saved(store)['references'][out['reference_id']]['generation']['parents'] == [{'id': 'K1', 'key': 'run-1/visuals/references/K1.png', 'sha256': 'sha-K1'}]
     with pytest.raises(Problem, match='Parents must be approved'):   # a candidate sheet is not a start keyframe
@@ -583,7 +587,7 @@ def test_an_end_keyframe_carries_the_start_keyframes_own_references(monkeypatch)
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     sheets = {'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'S2': {**ref('S2', 'approved'), 'kind': 'sheet'}}
-    start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': 'S1', 'key': sheets['S1']['key'], 'sha256': 'sha-S1'}, {'id': 'S2', 'key': sheets['S2']['key'], 'sha256': 'sha-S2'}]}}
+    start = {**ref('K1', 'approved'), 'generation': {'op': 'edit', 'parents': [{'id': 'S1', 'key': sheets['S1']['key'], 'sha256': 'sha-S1'}, {'id': 'S2', 'key': sheets['S2']['key'], 'sha256': 'sha-S2'}]}}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references={**sheets, 'K1': start})
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty', 'parents': ['K1']}
     store = store_with(sess, doc)
@@ -655,7 +659,7 @@ def test_an_end_keyframe_must_name_image_1_and_the_packet_says_so(monkeypatch):
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     gap = doc['gaps'][1]
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc),
-                   references={'K1': ref('K1'), 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
+                   references={'K1': ref('K1', 'approved'), 'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}, 'packet_read_at': 't'}})
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'The bucket now empty, the mason one step left.', 'parents': ['K1']}
     with pytest.raises(Problem, match='names "Image 1"'):
         g(lambda: VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], body))
@@ -671,7 +675,7 @@ def test_more_than_16_inputs_after_inheritance_are_refused_with_the_count(monkey
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     sheets = {f'S{i}': {**ref(f'S{i}', 'approved'), 'kind': 'sheet'} for i in range(16)}
-    start = {**ref('K1'), 'generation': {'op': 'edit', 'parents': [{'id': s, 'key': sheets[s]['key'], 'sha256': 'x'} for s in sheets]}}
+    start = {**ref('K1', 'approved'), 'generation': {'op': 'edit', 'parents': [{'id': s, 'key': sheets[s]['key'], 'sha256': 'x'} for s in sheets]}}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references={**sheets, 'K1': start})
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket now empty.', 'parents': ['K1']}
     with pytest.raises(Problem, match='17 input pictures'):   # design/71 P2's ceiling fires first; design/111 F21's four below it
@@ -684,7 +688,7 @@ def test_more_than_16_inputs_after_inheritance_are_refused_with_the_count(monkey
 def test_the_image_size_follows_the_frame_and_an_edit_takes_its_parents_size(monkeypatch):
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
-    refs = {'K1': {**ref('K1'), 'width': 1088, 'height': 1936}, 'F1': {**ref('F1', 'approved'), 'kind': 'frame', 'width': 1920, 'height': 1080}, 'S1': {**ref('S1', 'approved'), 'kind': 'sheet', 'width': 1536, 'height': 864}}
+    refs = {'K1': {**ref('K1', 'approved'), 'width': 1088, 'height': 1936}, 'F1': {**ref('F1', 'approved'), 'kind': 'frame', 'width': 1920, 'height': 1080}, 'S1': {**ref('S1', 'approved'), 'kind': 'sheet', 'width': 1536, 'height': 864}}
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': []}], current='d1', accepted=accepted(doc), references=refs)
     brief = [{'stage': 'brief', 'unit': None, 'summary': {'production': {'format': {'frame': '9:16'}}}}]
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'n', 'kind': 'keyframe', 'shot_id': 'IM1', 'subject': 'the wall', 'prompt': 'Image 1 is the reference: take its look. A wall'}
@@ -750,7 +754,7 @@ def test_a_rejected_picture_cannot_be_approved_bound_held_or_used_as_a_parent(mo
     with pytest.raises(Problem, match='not an approved reference'):
         g(lambda: VS.still_from_reference(store, USER, RUN, [], 'IM1', 'K1', 'yes'))
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the wall', 'prompt': 'Image 1 is the start; the bucket empty.', 'parents': ['K1']}
-    with pytest.raises(Problem, match='from the approved start, not from the candidate chain'):   # design/71 P6, the server check
+    with pytest.raises(Problem, match='was rejected: it is never a parent'):   # design/71 P6, the server check; design/124 A4 item 12
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], body))
     VS.reject_reference(store, USER, RUN, [], 'S2', 'the label drifted', 'No.')
     with pytest.raises(Problem, match='last approved state'):
@@ -888,7 +892,7 @@ def test_an_end_keyframe_that_moves_the_camera_is_refused_and_the_packet_says_so
     """design/77 L38 (VW-6 BEAT_01: "the camera has drifted slightly forward" against "keep exactly as in Image 1")."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
-    sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'K1': ref('K1')})
+    sess = video_session(doc, references={'S1': {**ref('S1', 'approved'), 'kind': 'sheet'}, 'K1': ref('K1', 'approved')})
     sess['bindings']['VS1']['packet_read_at'] = 't'
     body = {'request_id': 'r1', 'element_id': 'E1', 'name': 'end', 'kind': 'keyframe', 'region': {'left': 0.1, 'top': 0.2, 'width': 0.5, 'height': 0.5}, 'shot_id': 'VS1', 'subject': 'the wall', 'parents': ['K1'],
             'prompt': 'Image 1 is the start. The helper five metres on. The camera has drifted slightly forward, so the stack is larger.'}

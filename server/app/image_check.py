@@ -19,7 +19,8 @@ from PIL import Image, ImageFilter, ImageStat
 from .config import settings
 
 CHECK_MODEL = 'gemini-3.8-flash'
-FIXED = [{'check': 'readable text', 'pass_when': 'no readable text anywhere in the frame unless the prompt asked for exact text', 'weight': 'must'},
+FIXED = [{'check': 'readable text', 'pass_when': 'no readable text anywhere in the frame except the words the prompt or this checklist asks for (exact text, '   # design/124 A4 item 2
+                                                   "the labels of a sheet's views, a drawing spec's label, a style picture's sample labels)", 'weight': 'must'},
          {'check': 'a real face', 'pass_when': 'no face that matches a person in the footage frames sent as references', 'weight': 'must'},
          {'check': 'nothing extra', 'pass_when': 'nothing in the frame that the prompt did not ask for (a second person, a vehicle, a sign, a logo)', 'weight': 'should'}]
 SCENE_FIXED = [   # design/91 N7: for scene pictures, not graphics; should lines, so they never start a fix round alone
@@ -135,7 +136,7 @@ def take_drift(video_path, snapshot, frames=None):
     return {'check': 'camera drift', 'weight': 'must' if locked else 'should', 'pass': ok if locked else None,
             'pass_when': 'the frame holds still across the take: no drift, zoom or slide of the whole picture',
             'seen': f'drift up to {shift * 100:.1f} % of the frame, zoom up to {zoom * 100:.1f} %, over {len(frames)} frames'
-                    + ('' if locked else ' (a camera move is planned, or the take is from before design/112: reported, not judged)'),
+                    + ('' if locked else ' (a camera move is planned, or the take was prepared before the camera was judged: reported, not judged)'),
             'at_s': None, 'drift_pct': round(shift * 100, 2), 'zoom_pct': round(zoom * 100, 2)}
 
 
@@ -275,7 +276,7 @@ def drawn_fix(svg, sheet, failed, rules, transport_factory):
 def lines_of(ref):
     """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
     own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]
-    return own + FIXED + ([] if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') == 'component' else SCENE_FIXED)   # design/117 P1: a cut-out has no scene
+    return own + FIXED + ([] if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') in ('component', 'sheet') else SCENE_FIXED)   # design/117 P1: a cut-out has no scene; design/124 A4 item 14: nor a sheet
 
 
 def build(candidate_png, parents, lines, prompt):
@@ -308,7 +309,9 @@ def code_checks(ref, result, parents):
     got = f"{result.get('width')}x{result.get('height')}" if result.get('width') and result.get('height') else None
     out.append({'check': 'size', 'pass_when': f'the picture is {want}', 'weight': 'must', 'pass': (got == want) if want and got else None, 'seen': got or ''})
     if parents:
-        out.append({'check': 'parent', 'pass_when': 'made from its approved parent', 'weight': 'must', 'pass': all(p.get('status') in ('approved', 'candidate') for p in parents), 'seen': ', '.join(p.get('id', '')[:8] for p in parents)})
+        ok = lambda p: p.get('status') == 'approved' or p.get('id') == ref.get('fix_of') or (ref.get('kind') == 'state' and p.get('status') == 'candidate')   # design/124 decision 9: never a candidate start
+        out.append({'check': 'parent', 'pass_when': 'made from approved parents (a fix from the picture it fixes, a state from the previous state)', 'weight': 'must',
+                    'pass': all(ok(p) for p in parents), 'seen': ', '.join(p.get('id', '')[:8] for p in parents)})
     return out
 
 
@@ -474,4 +477,5 @@ def fix_body(ref, failed):
             'prompt': prompt, 'parents': [ref['id']], 'fix_of': ref['id'], 'shot_id': ref.get('shot_id'),   # design/94 R1.1: listed under its original's shot
             **({'role': ref['role']} if ref.get('role') else {}),   # review 27 Oct: a fix of a start is a start, with the same end to make
             **({'end_prompt': ref['pending_end']['prompt'], 'end_answer': ref['pending_end'].get('answer')} if ref.get('pending_end') else {}),
+            **({'end_region': ref['pending_end']['region']} if (ref.get('pending_end') or {}).get('region') else {}),   # design/124 decision 9: the end the server makes keeps its region
             'answer': {**(ref.get('answer') or {}), 'prompt': prompt, 'base_image_id': ref['id'], 'single_change': failed['pass_when']} if ref.get('answer') else None}

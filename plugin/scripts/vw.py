@@ -1435,7 +1435,7 @@ def cmd_visuals(a):
              + (" — over the cap: narrow the plan and tell the operator the spend; the cap is a setting the builder changes on SK's word." if over else '.'))   # design/74 L26
     if a.what == 'reject':   # design/74 L7: a wrong picture, with the operator's words; the next one starts from the approved picture
         out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote or ''})   # design/99 C3: the reason is optional
-        emit(out, 0, (out.get('next') or f'Reference {a.ref} rejected.') + ' The next end image is made from the approved start (a state from the last approved state), never from this one.')   # design/97 A4
+        emit(out, 0, out.get('next') or f'Reference {a.ref} rejected.')   # design/97 A4; design/124 A4 item 12: the server says the next step by kind
     if a.what == 'feedback':   # design/74 L7: the records in the library's shape
         out = call('GET', base + '/feedback')
         folder = ws / 'work' / 'visuals'
@@ -1453,7 +1453,7 @@ def cmd_visuals(a):
         lines = []
         for e in out.get('elements') or []:
             hits = (out.get('matches') or {}).get(e['id']) or []
-            lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else 'not seen in the footage: the operator picks a picture (`vw visuals search`) or the sheet is generated from words'))
+            lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else "not seen in the footage: the operator's own picture (`supply`), Google on their yes (`search`), or the sheet from words"))
         emit({'file': 'work/visuals/elements.json', 'elements': len(out.get('elements') or [])}, 0, 'Elements against the footage (work/visuals/elements.json): ' + '; '.join(lines))
     if a.what == 'ask':   # design/110 rule 0: the question is a server state on the item
         choices = [c.strip() for c in str(a.choices or '').split('|') if c.strip()]
@@ -1476,11 +1476,11 @@ def cmd_visuals(a):
             pk = _json_file(m, a.picks)
             ignore = pk.pop('ignore', []) if isinstance(pk, dict) else []   # design/121 change 1: {"<search id>": [{n, note}], "ignore": ["E2"]}
             out = write(base + '/round/picks', {'picks': pk, 'ignore': ignore, 'quote': a.quote})
-            emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks.")
+            emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks (a person's from words, no picture parents).")   # design/124 decision 5
         rows = _rows(m, a.file or 'out/reference-round.json', ('element_id', 'keywords'))
         out = write(base + '/round', {'elements': rows})
         emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements. Give the operator the page link ({visuals_page_url(m['code'])}): they answer every element there in two passes. "
-             "While they do, write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps (design/121 change 2); "
+             "While they do, write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps; "
              "then wait with `vw visuals status --wait 900`; ask nothing per element.")
     if a.what == 'search':   # design/73 R3: Google Images for an element the footage lacks, on the operator's yes
         if not (a.quote or '').strip():
@@ -1499,9 +1499,9 @@ def cmd_visuals(a):
             k, _, v = str(item).partition('=')
             notes[int(k.strip())] = v.strip().strip('"')
         out = write(base + '/pick', {'search_id': a.search, 'picks': [{'n': n, 'note': notes.get(n, '')} for n in ns], 'quote': a.quote or ''})
-        emit(out, 0, f"{len(out.get('references') or [])} web references saved and approved from search {a.search} (design/100: ticking and saving is the approval); show them (`fetch --ref`) and reject one only if the saved file is not the picture ticked, then generate the element's sheet from them.")
+        emit(out, 0, f"{len(out.get('references') or [])} web references saved and approved from search {a.search} (ticking and saving is the approval); show them (`fetch --ref`) and reject one only if the saved file is not the picture ticked, then generate the element's sheet from them (a person's from words, no picture parents).")
     if a.what == 'nothing-fits':   # design/73 R4b
-        emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted on the element\'s "not this" list; the next search is the operator\'s (new words), or Ignore this (design/121 change 1).')
+        emit(write(base + '/nothing-fits', {'search_id': a.search, 'reason': a.reason or ''}), 0, 'Noted on the element\'s "not this" list; the next search is the operator\'s (new words), or Ignore this.')
     if a.what == 'revise':   # design/76 (L32): a change request is a revision, never a yes
         out = write(base + '/revise', {'gap_id': a.gap, 'notes': a.notes or '', 'quote': a.quote})
         emit(out, 0, f"Gap {a.gap} is under revision: change its treatment entry and its plan, propose the next version, then ask for its acceptance afresh; generate nothing for it until then.")
@@ -1595,7 +1595,7 @@ def cmd_visuals(a):
         if not a.start:   # design/66 D1, narrowed by design/112 S1: the start image always; the end only for a shot whose final state must be exact (the server refuses without it then)
             emit({'action': 'refused', 'message': 'A take starts from an approved start image: `prepare-take --start R` (and `--end R2` when the shot has end_state_exact).'}, 2)
         if not (a.continuity or '').strip():   # design/84 V2
-            emit({'action': 'refused', 'message': 'Give the continuity line: `--continuity "what stays unchanged between the two frames; for a person five traits from the sheet"`.'}, 2)
+            emit({'action': 'refused', 'message': 'Give the continuity line: `--continuity "what stays unchanged through the shot (and between the start and the end image when the shot has one); for a person five traits from the sheet"`.'}, 2)
         subjects = _pairs(a.subject, '--subject', 'ELEMENT="what this subject does in the shot"')
         body = {'shot_id': a.shot, 'start_image': a.start, **({'end_image': a.end} if a.end else {}), 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
                 **({'duration_seconds': int(a.seconds)} if a.seconds else {}), **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5
@@ -1667,7 +1667,7 @@ def cmd_visuals(a):
         rd = st.get('round') or {}
         round_line = f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': read the verdicts and make the sheets') if rd else ''
         if open_:
-            images, takes = sum(1 for j in open_ if j.get('provider') == 'openai'), sum(1 for j in open_ if j.get('provider') == 'video')
+            images, takes = sum(1 for j in open_ if j.get('provider') in ('openai', 'gemini-image')), sum(1 for j in open_ if j.get('provider') == 'video')   # design/124 A4 item 20: both picture AIs
             line = ', '.join(x for x in (f'{images} image{"s" if images != 1 else ""}' if images else '', f'{takes} take{"s" if takes != 1 else ""}' if takes else '') if x) + f' open; {ready} ready' + \
                    ('; run again with --wait' if a.wait else '')
         else:

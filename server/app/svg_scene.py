@@ -179,10 +179,10 @@ def check(text, aspect=(16, 9), fonts=('Noto Sans',), refs=None):
             except ValueError:
                 px = None
             if px is None or px < TEXT_MIN_SHARE * vb[3]:
-                out.append(f"text '{_text_of(el)[:40]}' is {size or 'without'} font-size: at least {TEXT_MIN_SHARE * 100:g} % of the frame height ({TEXT_MIN_SHARE * vb[3]:g}) (design/91 N13)")
+                out.append(f"text '{_text_of(el)[:40]}' is {size or 'without'} font-size: at least {TEXT_MIN_SHARE * 100:g} % of the frame height ({TEXT_MIN_SHARE * vb[3]:g})")
             words = len(_text_of(el).split())
             if words > TEXT_MAX_WORDS:
-                out.append(f"text '{_text_of(el)[:40]}…' has {words} words: at most eight words on screen at once (design/116)")
+                out.append(f"text '{_text_of(el)[:40]}…' has {words} words: at most eight words on screen at once")
     for el, _ in _walk(root):   # second pass: internal links resolve
         href = _href(el)
         if href and href.startswith('#') and href[1:] not in ids:
@@ -218,7 +218,7 @@ def spec_problems(root, spec):
             part = str(d.get('part') or '').lower()
             for _, t in texts_of(root):
                 if part and part in t.lower() and re.search(r'\d', t):
-                    out.append(f"text '{t}' gives a figure for the {_dim_key(d)}, which is unknown: no figure (design/106 D6)")
+                    out.append(f"text '{t}' gives a figure for the {_dim_key(d)}, which is unknown: no figure")
             continue
         figure = f"{d['value']:g} {d.get('unit') or ''}".strip().lower()
         if figure not in text and f"{d['value']:g}{d.get('unit') or ''}".lower() not in text:

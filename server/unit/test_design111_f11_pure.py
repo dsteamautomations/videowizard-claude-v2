@@ -154,7 +154,7 @@ def test_an_ends_region_is_a_third_at_most_and_may_be_written_with_the_start():
     put(store, s)
     body = {'request_id': 'q-e', 'element_id': 'E1', 'name': 'keyframe-end-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer', 'prompt': 'Image 1 is the start; the labourer at the edge.',
             'parents': [rid], 'role': 'end'}
-    with pytest.raises(Problem, match='design/112 S2'):   # no region: refused since design/112 S2 (a start-only take is the alternative)
+    with pytest.raises(Problem, match='An end image is an edit inside one region'):   # no region: refused since design/112 S2 (a start-only take is the alternative)
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'request_id': 'q-whole'}))
     with pytest.raises(Problem, match='covers 50 % of the frame'):
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'region': {'left': 0, 'top': 0, 'width': 1, 'height': 0.5}}))

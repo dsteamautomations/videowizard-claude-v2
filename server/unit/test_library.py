@@ -37,7 +37,7 @@ def test_every_step_names_files_that_exist_and_the_pack_carries_their_text():
         assert step['files'] and all(f['text'].strip() for f in step['files']), name
     assert pack['steps']['take']['task'] == 'clip-from-frame' and pack['steps']['end']['task'] == 'first-last-frame' and pack['steps']['state']['task'] == 'graphic-states'
     assert pack['steps']['frame']['task'] is None   # no prompt is written for a frame grab
-    assert 'library/video/models/kling/FACT-SHEET.md' in {f['path'] for f in pack['steps']['take']['files']}
+    assert 'library/video/models/gemini-omni-1-1/FACT-SHEET.md' in {f['path'] for f in pack['steps']['take']['files']}
     assert pack['map'].startswith('# VideoWizard map') and pack['field_sources'].startswith('# Where each job-form field') and pack['compliance']['path'] == L.COMPLIANCE
 
 
@@ -117,12 +117,18 @@ def test_check_prompt_refuses_a_logo_a_model_name_a_pixel_size_and_a_resolution(
         L.check_prompt('Render in 720p, the yard.')
 
 
-def test_an_edit_names_one_change_two_at_most():
-    """design/86 K5."""
-    assert L.check_prompt('Mode: edit. Image 1 is the start.\nChange only: the helper has walked five metres on. He is now smaller with distance.\nKeep exactly as in Image 1: the lane, the houses.') is None
+def test_an_edit_names_one_change():
+    """design/86 K5; design/124 A4 (SK): one change per edit, a second is refused."""
+    assert L.check_prompt('Mode: edit. Image 1 is the start.\nChange only: the helper has walked five metres on, smaller with distance.\nKeep exactly as in Image 1: the lane, the houses.') is None
+    with pytest.raises(ValueError, match='names 2 changes under "Change only": one change per edit;'):
+        L.check_prompt('Mode: edit. Image 1 is the start.\nChange only: the helper has walked five metres on. He is now smaller with distance.\nKeep exactly as in Image 1: the lane, the houses.')
+    with pytest.raises(ValueError, match='names 2 changes'):
+        L.check_prompt('Mode: edit.\nChange only: the bucket is empty; the trowel lies on the wall.\nKeep exactly as in Image 1: the lane.')
     with pytest.raises(ValueError, match='names 4 changes'):
         L.check_prompt('Mode: edit.\nChange only: the helper is redrawn at true scale. He stands two metres past the stack. He faces the house. He walks toward its entrance.\nKeep exactly as in Image 1: the lane.')
     assert L.check_prompt('Shot: a wall. Beat: built. Constraints: no people.') is None   # a fresh picture has no change section
+    # a fix round's one change is the failed check line the server writes, which may run to two clauses
+    assert L.check_prompt('Mode: edit.\nChange only: the picture still shows the start state; this line FAILS when the result is in it.\nKeep exactly as in Image 1: the lane.', fix=True) is None
 
 
 def test_default_size_follows_the_frame_and_an_edit_takes_its_parents_size_only_when_both_sides_divide_by_16():
@@ -130,3 +136,87 @@ def test_default_size_follows_the_frame_and_an_edit_takes_its_parents_size_only_
     assert L.edit_size(1536, 864, '16:9') == '1536x864' and L.edit_size(1088, 1936, '16:9') == '1088x1936'
     assert L.edit_size(1920, 1080, '16:9') == '1536x864'   # a footage frame: 1080 is not a multiple of 16
     assert L.edit_size(None, None, '9:16') == '1088x1936'
+
+
+# ---------- design/124 A4: the corrected guide is a new snapshot; Gemini Omni only; no change-history label in a message ----------
+
+OLD = VERSION
+DROPPED = ('library/video/models/kling/FACT-SHEET.md', 'library/video/models/seedance/FACT-SHEET.md', 'library/video/models/higgsfield/NOTES.md')
+
+
+def _fingerprint(files):
+    h = hashlib.sha256()
+    for f in sorted(files, key=lambda f: f['path']):
+        h.update(f['path'].encode('utf-8') + b'\0' + f['sha256'].encode('ascii') + b'\n')
+    return h.hexdigest()
+
+
+def test_the_new_snapshot_is_the_latest_and_every_snapshot_matches_its_manifest_and_its_name():
+    new = L.latest()
+    assert new != OLD and new.startswith('vwlib-2026-10-29-') and OLD in L.versions()
+    for v in L.versions():
+        m = L.manifest(v)
+        assert L.verify(v) == [] and m['version'] == v
+        assert m['fingerprint_sha256'] == _fingerprint(m['files']) and v.endswith(m['fingerprint_sha256'][:12])
+        for f in m['files']:
+            assert (L.ROOT / v / f['path']).stat().st_size == f['bytes'], f['path']
+    assert L.manifest(OLD)['fingerprint_sha256'].startswith('4f88379be109')   # the old snapshot stays as it was
+    assert 'design/124 A4' in L.manifest(new)['note']
+
+
+def test_the_new_snapshot_drops_kling_seedance_and_higgsfield_and_nothing_points_at_them():
+    new = L.latest()
+    paths = {f['path'] for f in L.manifest(new)['files']}
+    assert not paths & set(DROPPED) and not any((L.ROOT / new / p).exists() for p in DROPPED)
+    assert all((L.ROOT / OLD / p).is_file() for p in DROPPED)   # films on the old snapshot keep theirs
+    assert L.MODEL_SHEETS == {'gemini-omni-1.1-flash': ('library/video/models/gemini-omni-1-1/FACT-SHEET.md',)} and not set(L.ALL_SHEETS) & set(DROPPED)
+    for name, s in L.STEPS.items():
+        assert not set(s['files']) & set(DROPPED), name
+    pack = L.steps(new)   # every file a step names exists in the new snapshot
+    for name, step in pack['steps'].items():
+        assert step['files'] and all(f['text'].strip() for f in step['files']), name
+    assert L.step_files('take', {'provider': 'higgsfield', 'model': 'kling-video/v3.0/std/image-to-video'}) == [p for p in L.STEPS['take']['files'] if p not in L.ALL_SHEETS]
+    for p in paths:
+        if p.endswith('.md') or p.endswith('.yaml'):
+            t = L.text(new, p)
+            assert 'models/kling' not in t and 'models/seedance' not in t and 'higgsfield/' not in t, p
+
+
+def test_the_new_map_and_field_sources_say_what_the_server_does():
+    new = L.latest()
+    vwmap, fields = L.text(new, 'VW-MAP.md'), L.text(new, 'FIELD-SOURCES.md')
+    form = L.text(new, 'library/forms/answer-form.videowizard.md')
+    for t in (vwmap, fields, form):
+        assert '₹' not in t and 'spend cap' not in t and '0.21.3' not in t
+    assert 'Higgsfield' not in vwmap
+    assert 'library/forms/answer-form.videowizard.md' in vwmap and '`library/forms/answer-form.md`' not in vwmap
+    assert 'Nano Banana' in vwmap and 'Nano Banana' in fields and 'GPT Image 2.5 for every image' not in vwmap
+    assert '--quality' in vwmap and 'In a single unbroken scene, one continuous shot, no scene cuts, no jump cuts. No dialogue. No music. No captions or overlay text.' in vwmap
+    assert 'end_prompt' in vwmap and 'from words' in vwmap and 'one change per edit' in vwmap.lower()
+    row = fields.split('`mandatory_text`')[1].split('\n')[0]
+    assert '`none`' in row and 'does not come from the client card' in row
+    assert 'for {video model}' not in L.text(new, 'library/playbooks/video-frame.md')
+    L.check_prompt('Asset: keyframe, shot 2 of 5, at 16:9. Target aspect ratio: 16:9. Mode: multi-reference.')
+
+
+def test_messages_the_assistant_reads_carry_no_change_history_label():
+    def msg(fn, *a):
+        with pytest.raises(ValueError) as e:
+            fn(*a)
+        return str(e.value)
+    texts = [msg(L.check_prompt, 'The mason stands in the centre.'), msg(L.check_prompt, 'They sit as before.'),
+             msg(L.check_prompt, 'Mode: edit.\nChange only: a wall. b door.\nKeep: c.'), msg(L.check_material_prompt, 'short bricks in a row'),
+             msg(L.check_quoted, 'A sign reads "Mortar bed" above.', []),
+             msg(L.check_exact_places, {'exact_text': [{'text': 'air'}]}, set()),
+             msg(L.check_exact_places, {'exact_text': [{'text': 'air', 'place': {'landmark_id': 'L9'}, 'size_pct': 3}]}, set()),
+             msg(L.check_exact_places, {'exact_text': [{'text': 'air', 'place': {'region': 'top'}}]}, set())]
+    for t in texts:
+        assert 'design/' not in t, t
+
+
+def test_the_job_form_names_the_films_own_picture_ai():
+    """design/124 A4 item 7: a Nano Banana film's form names the Gemini image model, not GPT Image."""
+    from app.config import settings
+    form = L.job_form('start', run={**RUN, 'image_provider': 'gemini'}, plan=PLAN, gap=GAP, scene=SCENE, shot=SHOT, refs=REFS, generator=None, brief=BRIEF, card=CARD, rules=[], fps=25)
+    assert form['model'] == settings().GEMINI_IMAGE_MODEL
+    assert L.job_form('start', run=RUN, plan=PLAN, gap=GAP, scene=SCENE, shot=SHOT, refs=REFS, generator=None, brief=BRIEF, card=CARD, rules=[], fps=25)['model'].startswith('gpt-image')

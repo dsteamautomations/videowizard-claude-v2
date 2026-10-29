@@ -50,9 +50,9 @@ def test_a_close_up_gets_no_layers_line_and_a_graphic_gets_nothing():
 
 def test_the_camera_follows_the_clips_beside_the_gap():
     hand = ' '.join(VS.shot_guidance(shot_(), {'before': side('handheld'), 'after': side('tripod')}))
-    assert 'slight handheld micro-movement' in hand
+    assert 'micro-movement' not in hand and 'locked off on a tripod' in hand   # design/124 A4 decision 2: steady takes
     steady = ' '.join(VS.shot_guidance(shot_(), {'before': side('tripod'), 'after': None}))
-    assert 'keep the camera steady' in steady and 'handheld' not in steady
+    assert 'locked off on a tripod' in steady and 'handheld' not in steady   # design/124 A4 decision 2
     assert not any('camera steady' in l or 'micro-movement' in l for l in VS.shot_guidance(shot_(), {'before': side('unknown'), 'after': {'clip_id': 'x'}}))
     assert not any('micro-movement' in l for l in VS.shot_guidance(shot_(visual_type='image'), {'before': side('handheld')}))   # a still does not move
 

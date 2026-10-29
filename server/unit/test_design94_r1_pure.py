@@ -54,7 +54,7 @@ def image(store, **body):
 # ---------- R1.1 (S3): every picture records its shot ----------
 
 def test_a_keyframe_names_its_shot_and_a_state_or_an_end_image_takes_its_parents():
-    doc, sess = film(references=refs(pic('S1', 'AN1'), pic('K1', 'DG1'), pic('OLD', kind='state')))
+    doc, sess = film(references=refs(pic('S1', 'AN1'), pic('K1', 'DG1', status='approved'), pic('OLD', kind='state')))
     store = store_with(sess, doc)
     with pytest.raises(Problem, match='--shot'):
         g(lambda: image(store))

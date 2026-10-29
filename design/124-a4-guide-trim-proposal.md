@@ -1,0 +1,27 @@
+# Trimming the prompt-writing guide: a proposal (design/124 A4)
+
+Status: proposed, not applied. Written 29 Oct 2026 with the new guide snapshot `server/library/vwlib-2026-10-29-3d60877d3d23/`. Nothing below has been changed; each line needs SK's yes.
+
+Why: the server sends every file a step names, whole, every time (`library.steps`, `library.step_files`); the "open when" conditions in VW-MAP are not applied. Each irrelevant page is reading the assistant must do and advice it may follow against the server. A trim is a new snapshot again (films in progress keep theirs).
+
+Two ways to trim, per file: **(a) stop sending it** (take the path out of `library.STEPS` or `ALWAYS`; the file can stay in the bundle), or **(b) cut it inside the snapshot** to the relevant sections (the file becomes "snapshot, cut for VideoWizard" in the manifest). (a) is a one-line code change; (b) keeps the useful part.
+
+| File | Sent at | Relevant share | Keep | Cut | Proposed |
+| --- | --- | --- | --- | --- | --- |
+| `playbooks/web-app.md` | still-diagram (as the playbook) | about 15 % | the process-explainer task note and its prompt lines | heroes, icon sets, device mockups, app-store panels, email headers, wireframes; the model and quality rows (overridden in VW-MAP) | (b): cut to the process-explainer note; or move that note into `video/diagram-in-states.md` and stop sending web-app (a) |
+| `prompts/05-information.md` | still-diagram | about 20 % | the structure of P025 and P030 (staged explainer, process slide) | classroom cards, tasting wheel, walking map; P027's chart (a refused route: figures take the drawn route) | (b): keep P025 and P030 only |
+| `agency/deterministic-checks.md` | always (every step) | about 30 % (sections 1-2) | section 1 (the vague-word table), section 2 (the presence checks) | sections 3-8: ad-agency task types, signage manufacturability, compiled prompt order; the "crisp edges" replacement that RULEBOOK 9 bans | (b): sections 1-2 only (VW-MAP already says "section 1"); drop "crisp" from the replacements |
+| `video/consistent-character-frames.md` | reference, start | about 15 % | Section 1's variable table (the checklist for describing a person in words, decision 5) and Rule 3 (hairstyle) | the nine-frame fashion series, three style presets, crop table, batch rule, 3:4 frame, the "reference image is mandatory" principle (against decision 5), the `[Reference image: …]` header | (b): Section 1 table and Rule 3 only |
+| `video/craft/animatic-keyframes.md` | still-scene, start | about 30 % | the keyframe card (sections 1-2) and the image-prompt order | the race-spot project's constraints (cold combative palette, faces absent, 70 % unlit), the 18-26 panel staircase, the worked race example, the hand-offs to `seedance.md` / `kling.md` / `veo.md` | (b): the card and the prompt order only |
+| `video/still-to-motion-pipeline.md` | take | about 25 % | the style formulas and the motion formula | script, TTS, captions, loudness and assembly (VideoWizard does these elsewhere); the Veo / Nano Banana tool table | (b), or (a) except for a faceless explainer (needs a condition in `step_files`) |
+| `00-method/craft.md` | still-diagram, state | about 35 % | sections 1, 2, 5 (diagram grammar, without the data-visualisation schema), 12, 13 | section 0 (gallery routing, not in the bundle), section 3 (JSON render flags, "8K", "hyper-realistic"), UI specs, poster hierarchy, section 10 (named studio styles, against RULEBOOK 9) | (b) |
+| `video/models/gemini-omni-1-1/FACT-SHEET.md` | take | about 50 % | Part B camera, motion and continuity habits | Part A (calls, prices, polling, edit and extend: the server's), B12 audio, B13 drafts (overridden in VW-MAP) | (b): Part B without B12-B13 |
+| `models/gpt-image/FACT-SHEET.md` | every picture step | about 55 % (none on a Nano Banana film) | Part B | Part A (API settings, prices, waits: the server's); B9's quality advice (overridden: always high) | (b); separately, SK decides whether a Nano Banana Pro sheet is sent on Gemini films instead |
+| `playbooks/video-frame.md` | picture steps | about 55 % | keyframe, continuity kit, the prompt template, the checklist | storyboard, keyframe-set, cover frame, section 6 handoff notes, the model row | (b) |
+| `playbooks/video-clip.md` | take | about 55 % | the motion brief (section 4) minus the camera, audio, single-scene and length lines; the Omni template's subject and environment lines; checklist | clip-from-text, clip-edit, clip-extend, UGC, dialogue, the Seedance template and draft/final row | (b) |
+| `video/craft/camera-lighting-vocabulary.md` | take | about 50 % | framing, movement (locked off and single moves), light words | section 7 named director palettes (RULEBOOK 9), section 8 sound and Veo syntax, section 11 transitions | (b) |
+| `agency/compliance-checklist.md` | every film (the plugin writes it) | about 40 %, and only for five industries | sector lines C01-C08 | second signer, consent ids (C09, met by decision 5), C03/C18 mandatory text (not used), delivery sign-off | write it only for the five industries VW-MAP names (a plugin change); (b) for the rest |
+
+Effect, roughly: the always-sent set drops by about two thirds of `deterministic-checks.md`; each picture step loses about half of what it reads today.
+
+Not covered: the shares are by section length, not by measured tokens; no prompt was run against a trimmed bundle, so whether the assistant writes better prompts with less to read is not tested.

@@ -44,6 +44,14 @@ def test_a_fix_on_request_names_its_line_and_cost_and_is_labelled():
     assert view[out['reference_id']]['fix_for'] == 'label: Rat-trap bond'   # X2: the page labels it
 
 
+def test_a_fix_whose_failed_line_runs_to_two_clauses_is_not_refused_as_two_changes():
+    """design/124 A4: one change per edit; a fix's one change is the failed line, which may hold a ';' or two sentences."""
+    row = {**checked('K1'), 'server_checklist': [{'check': FAILED['check'], 'pass_when': 'the label reads exactly; nothing else is lettered. The leader line ends on the wall', 'weight': 'must'}]}
+    doc, sess = film(references=refs(row))
+    out = VS.request_fix(FakeConn([]), store_with(sess, doc), USER, RUN, [], 'K1')
+    assert out['of'] == 'K1'
+
+
 @pytest.mark.parametrize('row, message', [
     (pic('K1', 'DG1', check={'lines': [], 'must_failed': []}), 'nothing to fix: no must line failed'),
     (checked('K1', fix_of='K0'), 'a fix is not fixed again'),

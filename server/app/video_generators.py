@@ -9,9 +9,11 @@ from .errors import Problem
 
 OMNI = 'gemini-omni-1.1-flash'
 DEFAULT = {'provider': 'google', 'model': OMNI}
-CATALOG = [
+CATALOG = [   # design/124 A4 decision 5: Gemini Omni only; every take 3-10 s, a longer passage is split
     {**DEFAULT, 'label': 'Gemini Omni · Direct Google', 'min_seconds': 3, 'max_seconds': 10,
      'duration_control': 'prompt_requested', 'end_image': True},
+]
+RETIRED = [   # no longer offered; kept so a shot that chose one in a film in progress is still read (its prepared and finished takes)
     {'provider': 'higgsfield', 'model': 'kling-video/v3.0/std/image-to-video',
      'label': 'Kling 3.0 Standard · Higgsfield', 'min_seconds': 3, 'max_seconds': 15,
      'duration_control': 'integer_seconds', 'end_image': True},
@@ -19,6 +21,14 @@ CATALOG = [
      'label': 'Seedance 2.5 · Higgsfield', 'min_seconds': 4, 'max_seconds': 30,
      'duration_control': 'integer_seconds', 'end_image': True},
 ]
+
+
+OMNI_ONLY = 'Gemini Omni only: every take is Gemini Omni, 3–10 s; split the shot. No other video generator is offered.'
+
+
+def known(provider, model):
+    """The catalogue entry of a choice, a retired one included (for reading a film in progress)."""
+    return next((c for c in CATALOG + RETIRED if c['provider'] == provider and c['model'] == model), None)
 
 
 class GeneratorChoice(BaseModel):
@@ -30,7 +40,7 @@ class GeneratorChoice(BaseModel):
     @model_validator(mode='after')
     def supported(self):
         if not any(c['provider'] == self.provider and c['model'] == self.model for c in CATALOG):
-            raise ValueError('Choose a supported provider/model pair from the video generator catalog.')
+            raise ValueError(OMNI_ONLY)
         return self
 
 

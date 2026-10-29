@@ -36,7 +36,7 @@ def test_a_drawing_names_its_view_with_a_reason_and_a_section_defaults_to_cutawa
     d = base({**SPEC, 'view': '', 'view_reason': ''})
     check(d)
     sh = d['gaps'][0]['scenes'][0]['shots'][0]
-    assert VS.spec_view(sh) == ('cutaway', 'a section is cut through the wall')
+    assert VS.spec_view(sh) == ('cutaway', 'a section is shown cut through')   # design/124 A4 item 26
     with pytest.raises(ValueError, match='give view \\(cutaway, plan, side or elevation\\) and view_reason'):
         check(base({**SPEC, 'view': '', 'view_reason': ''}, depicts='the brick'))
     with pytest.raises(ValueError, match='view_reason'):

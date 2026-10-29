@@ -32,7 +32,7 @@ def test_an_end_without_a_region_is_refused_naming_the_change_and_a_start_withou
     put(store, s)
     body = {'request_id': 'q-e', 'element_id': 'E1', 'name': 'keyframe-end-VS1', 'kind': 'keyframe', 'shot_id': 'VS1', 'subject': 'the labourer', 'prompt': 'Image 1 is the start; the labourer at the edge.',
             'parents': [rid], 'role': 'end'}
-    with pytest.raises(Problem, match='An end image is an edit inside one region of its start \\(design/112 S2\\)') as exc:
+    with pytest.raises(Problem, match='An end image is an edit inside one region of its start: give --region') as exc:
         g(lambda: VS.generate_image(FakeConn([]), store, USER, RUN, [], body))
     assert '--region' in exc.value.message and 'start-only' in exc.value.message
     out = VS.generate_image(FakeConn([]), store, USER, RUN, [], {**body, 'region': REGION})

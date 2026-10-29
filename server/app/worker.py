@@ -197,7 +197,7 @@ def recover_voice(job, provider=None):
     snap, jid = job['request'], str(job['id'])
     if snap.get('timing_mode') == 'generation':
         raise Problem(409, 'TIMING_RECOVERY', 'Narration needs its original timed response; history audio has no alignment. Narrate again: pieces already '
-                                              'journaled on this server are reused without a second charge (design/40).')
+                                              'journaled on this server are reused without a second charge.')
     start = job['created_at'].timestamp() - 5
     end = job['updated_at'].timestamp() + 600
     found, cursor, seen = [], None, set()
