@@ -335,10 +335,10 @@ def test_the_packet_carries_the_start_end_and_motion_instructions():
                    references={'R1': ref('R1', 'approved')}, bindings={'VS1': {'gap_digest': gap_digest(doc, gap), 'references': {'E1': [{'id': 'R1', 'sha256': 'sha-R1'}]}}})
     prep = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']
     start, end, motion = prep['start_image_instruction'], prep['end_image_instruction'], prep['video_instruction']
-    assert prep['image_instruction'] == start   # the old name still answers for one release
-    assert 'Write the start prompt and the end prompt together before generating either' in start and 'room in the frame for the move' in start and 'what the motion heads for already in frame' in start
-    assert 'from the approved start image as its parent' in end and "the server sends the start's own references with it" in end
-    assert 'its position against its landmark and its side of the frame, its facing' in end and 'Change nothing else' in end and 'result of its last beat' in end
+    assert 'image_instruction' not in prep   # design/124 C3: the old alias is gone
+    assert 'only where the shot has end_state_exact, write the end' in start   # design/124 C3, decision 9 and 'room in the frame for the move' in start and 'what the motion heads for already in frame' in start
+    assert 'the server makes the end image from the approved start' in end and "the start's own references go with it" in end   # design/124 C3, decision 9
+    assert 'its position against its landmark and its side of the frame, its facing' in end and 'Change only what lies inside the region' in end and 'result of its last beat' in end
     assert motion.startswith('Read the actual accepted starting image')
     lib = prep['library']   # design/68 L3
     assert lib['version'] == VS.library.latest() and [s['step'] for s in lib['steps']] == ['start', 'end', 'take'] and lib['steps'][2]['task'] == 'clip-from-frame'
@@ -668,7 +668,7 @@ def test_an_end_keyframe_must_name_image_1_and_the_packet_says_so(monkeypatch):
     out = VS.generate_image(FakeConn([]), store_with(sess, doc), USER, RUN, [], {**body, 'request_id': 'r2', 'parents': []})   # a start keyframe has no parent: no numbering needed
     assert out['op'] == 'generate'
     end = VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['end_image_instruction']
-    assert 'Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, nothing else.' in end
+    assert 'Image 1 is the start image; images 2 onward are its own references, sent by the server: take identity from them, nothing else.' in end   # design/124 C3
 
 
 def test_more_than_16_inputs_after_inheritance_are_refused_with_the_count(monkeypatch):

@@ -3223,7 +3223,7 @@ def exact_patterns(plan, shot, refs):
         if e['id'] in (shot.get('element_ids') or []) and e.get('kind') == 'object' and e.get('identity') == 'exact':
             carriers = [r['reference_id'] for r in refs if r['element_id'] == e['id'] and r.get('kind') in ('frame', 'isolated', 'supplied', 'web')]
             out.append({'element_id': e['id'], 'name': e.get('name'), 'requirements': e.get('requirements'), 'pattern_references': carriers,
-                        'rule': 'name the geometry in nouns; the pattern is demanded on the checklist at medium and close shots only' + ('' if carriers else '; no close reference is bound yet: bind a footage frame or an isolated picture of it first')})
+                        'rule': 'name the geometry in nouns; the pattern is demanded on the checklist at medium and close shots only' + ('' if carriers else '; no close reference is bound yet: bind its golden picture (before one exists, a footage frame)')})
     return out
 
 
@@ -3246,16 +3246,18 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
                          'note': (row.get('source') or {}).get('note') or '',   # design/73 R4a: the operator's note on a picked picture becomes a keep or avoid line
                          **({'subject_selector': b['subject_selector']} if 'subject_selector' in b else {})})
     generator = session['generator_choices'].get(shot_id) or video_generators.DEFAULT
-    start_instruction = ('Write the start prompt and the end prompt together before generating either. Compose the start for the whole segment: every visible subject, '
+    start_instruction = ('Write the start prompt; only where the shot has end_state_exact, write the end\'s request with it (end_prompt, end_answer, end_region: one region, a third of the frame at most). '
+                         'Compose the start for the whole segment: every visible subject, '
                          'including secondary/background subjects, in its start state in the named scene layout, what the motion heads for already in frame, room in the frame '
                          'for the move, nothing the end state needs cut off or hidden, nothing placed where the end would have to remove it. Keep landmark-relative locations; '
-                         'the camera only changes their screen projection. A boundary picture is shared only within one continuous shot, same place and framing: the end image '
-                         'of one segment is the start of the next there; a cut starts a new pair with its own two images. Name one human-scale anchor against a named landmark '
+                         'the camera only changes their screen projection. Where a segment has an end image, it is the start image of the next only within one continuous shot, '
+                         'same place and framing; a cut starts afresh with its own start image. Name one human-scale anchor against a named landmark '
                          '(a person beside a doorway, a hand on a course) so the scale is fixed; the landmarks are listed under scene.landmarks.')   # design/67 B; design/74 L24; design/77 L39
-    end_instruction = ('Make the end image from the approved start image as its parent; the server sends the start\'s own references with it. Show every subject in its end state '
+    end_instruction = ('Only for a shot with end_state_exact: the server makes the end image from the approved start (from the request written with the start); '
+                       'the start\'s own references go with it. The request shows every subject in its end state '
                        'as the plan gives it: its position against its landmark and its side of the frame, its facing, its pose, what it holds, how far the work has gone; for an '
-                       'acting subject the result of its last beat. Name the positions in words. Change nothing else: the same framing, camera, light, people and props. Keep in '
-                       'frame whatever the motion heads for. Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, '
+                       'acting subject the result of its last beat. Name the positions in words. Change only what lies inside the region: the same framing, camera, light, people and props. Keep in '
+                       'frame whatever the motion heads for. Image 1 is the start image; images 2 onward are its own references, sent by the server: take identity from them, '
                        'nothing else. The camera does not move between the two images: the same framing, lens and position. The end shows the action\'s visible result, a '
                        'different pose or state from the start, never the same frozen pose. Carry each line of end_targets word for word: it is where every subject ends.')   # design/67 C; design/71 P1; design/77 L38; design/86 K6
     prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': {k: v for k, v in shot.items() if k != 'warning_answers'}, 'references': refs,   # design/124 Change 7
@@ -3263,10 +3265,10 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'context': packet_context(session, plan, gap, shot),   # design/86 K7: the gap's words, the treatment's picture, the intended visuals, the neighbours, earlier rejections
               'exact_patterns': exact_patterns(plan, shot, refs),   # design/86 K8: client patterns and the reference that carries each
               'sequence_rules': plan.get('sequence_rules', []), 'elements': [e for e in plan['elements'] if e['id'] in shot['element_ids']],
-              'start_image_instruction': start_instruction, 'image_instruction': start_instruction,   # the old name answers for one release (design/67 A)
+              'start_image_instruction': start_instruction,   # design/124 C3: the old alias image_instruction is gone
               'end_image_instruction': end_instruction,
               'video_instruction': 'Read the actual accepted starting image before writing movement. For EACH subject, follow the ordered beats, targets, paths, contacts, object responses and final progress. Keep non-acting subjects where they are. '
-                                   'The take is one unbroken shot: write the motion so nothing enters the frame that the start or the end does not show. Write the continuity line (`--continuity`): what stays unchanged between the two frames, and for a person five traits from the sheet.',   # design/84 V3
+                                   'The take is one unbroken shot: write the motion so nothing enters the frame that the start (or the end, where the shot has one) does not show. Write the continuity line (`--continuity`): what stays unchanged through the shot (and between the start and the end image where there is one), and for a person five traits from the sheet.',   # design/84 V3
               'checks': ['Treatment and narrated meaning', 'All visible subjects accounted for', 'World-relative layout and scale', 'Secondary action progression', 'Reference identity', 'Boundary continuity', 'Exact placement duration'],
               'footage_character': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/77 L42; design/88: measured, the correction winning
               'provider': {k: generator[k] for k in ('provider', 'model')}}
