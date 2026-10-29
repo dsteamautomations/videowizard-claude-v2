@@ -51,3 +51,5 @@ if [ -d "$OPERATOR" ]; then (cd "$OPERATOR" && "$CLAUDE" plugin list); fi
 echo
 echo "Plugin updated from main @ $(git rev-parse --short main)."
 echo "The operator must restart Claude Code in \"$OPERATOR\" to pick it up."
+echo "CHECK the Claude desktop app: Settings > plugins > 'From marketplaces you added' > Vw must be OFF there (29 Oct 2026: the app"
+echo "switched the reinstalled plugin on for every desktop session, and its guard blocked every builder session). The operator folder keeps it on."
