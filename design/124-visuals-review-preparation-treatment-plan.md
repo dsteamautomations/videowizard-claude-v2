@@ -199,6 +199,12 @@ The assistant's instructions for the visuals stage (about 10,800 words), the pro
 | **A3. Copies that disagree** | Every topic written in both lists where the two copies say different things (found so far: four or five ways to make a picture; the start-and-end picture count; the order of picture sources) | The AI has to guess which is right | decide each one |
 | **A4. The other voices** | Make the server's and the chat tool's "what next" messages, the prompt-writing guide and the server's added lines say the same as the instructions; remove the rule about "which one wins when they disagree" once nothing disagrees | They contradict the instructions (Change 1 was one) | confirm the list |
 
+### Progress
+
+- **A0 done (29 Oct 2026):** `design/124-a0-rule-list.csv` (2,353 rules) and its summary `design/124-a0-rule-list.md`.
+- **A1 done (29 Oct 2026), not deployed:** the instructions' change-history labels removed into a **new instruction version 3** (`server/procedures/v3.json`); version 2 is untouched, so films in progress keep their wording. Only the visuals stage differs between the two. 50 labelled brackets and 3 history notes ("SK, 28 Oct …", "the cap of four removed by SK …") removed; 11,302 words became 11,047; a script proved that no other word changed and no label is left; the ratio "3 : 1.5 : 1" and every number stay as they were. Server unit tests 705 passed. New films start on version 3 only when the default is switched (Phase C3). From now on, every instruction change of this tidy-up, and every procedure change of design/121 and design/124's Changes 1–9 when they are built, goes into version 3.
+- Labels still inside the server's own refusal texts, added lines and messages (about 360 rows of the rule list): handled with A4 (the other voices), since they live in the code.
+
 ### Part B — The four phases reviewed so far (SK, 29 Oct 2026)
 
 Preparation, treatment, the detailed plan (reviewed next) and the picture search. For each of the four:
