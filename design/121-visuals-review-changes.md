@@ -233,3 +233,20 @@ As built, beside the plan above:
 - **Stored downloads are never deleted** (about 20 pictures a search, in the run's storage); a cleanup when the stage is recorded, if storage grows.
 - **Plans already approved** keep their free-word action targets; the new rule applies when a plan is checked or proposed again (VW-7's next revision will need its targets as landmarks or elements).
 - The page's concurrent searches were checked against a faked server; two real searches at once on the VM are not yet seen.
+
+### Local tests after the build (29 Oct 2026, SK's PC)
+
+**The real search test (Change 5's "to do first").** Eight real searches through the project's own search service and downloader, all at once: "red clay brick kiln worker India" and "mason plastering wall trowel", each plain and with "depositphotos", "unsplash", "pexels". All eight came back in 52 s together (a search 8-34 s, its ten downloads 8-30 s). Every picture downloaded, some only as Google's small preview.
+
+| Source word | What came back | Watermarks | Picture size |
+|---|---|---|---|
+| none | kiln: news photos of Indian kilns; trowel: shop photos of the tool alone | none seen | mostly Google's previews (400-740 px) |
+| depositphotos | trowel: nine of ten from Depositphotos, clean and sharp; kiln: mixed with Getty, Alamy, Dreamstime, Shutterstock, iStock | **yes**: Getty, Alamy, Dreamstime, Shutterstock print their names; a large Depositphotos picture (1600 px) carries its watermark and ID bar | Depositphotos 600 px |
+| unsplash | trowel: all Unsplash, but only as previews; kiln: mixed | **faint repeated "Unsplash+" lettering** across the trowel pictures | previews only (about 650 px) |
+| pexels | kiln: all ten from Pexels, clean, Indian scenes; trowel: mixed with Dreamstime, Shutterstock, Vecteezy | **none on Pexels pictures**; the others' yes | Pexels full size (up to 5000 px) or preview |
+
+Reading: **pexels** gave the cleanest, largest, unwatermarked pictures for people at work; depositphotos gave sharp but small pictures and pulls in watermarked sites; unsplash brings faint watermarks. The plain search stays useful for objects (shop pictures of the tool alone). The default word is SK's choice.
+
+**The watermark line on real pictures.** Three reference sheets made with the server's own GPT Image call from watermarked stock pictures: a Getty kiln picture (with and without the line) and a watermarked Depositphotos trowel picture (with the line). None of the three shows any watermark or lettering beyond the view labels: the sheet's "alone on plain ground" already drops the background where watermarks sit. The line costs nothing and stays as a guard for other picture kinds; the check's "no watermark" line is the safety net.
+
+**Server tests with Docker** (`tests/test_visuals.py`, `tests/test_web.py`, dummy keys so nothing paid could be called): 6 passed, 7 failed, and the same 7 fail on the code before this change. The cause is older: since design/120 a run needs `--images openai|gemini`, and these tests' run helper does not pass it. Not caused by design/121; a fix to the test helper is a separate small job.
