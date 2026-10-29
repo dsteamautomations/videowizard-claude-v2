@@ -1826,7 +1826,7 @@ def _search_into(session, user, run, plan, element_id, keywords, quote, results=
     return {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'results': rows}
 
 
-STOCK_SOURCE = 'depositphotos'   # design/121 change 5: the source box's default word (browser test 29 Oct: clean, focused, local); set after the real test with SK
+STOCK_SOURCE = 'pexels'   # design/121 change 5: the source box's default word; SK chose it after the real test (29 Oct): no watermarks, full size, local scenes
 
 
 def prefetch_key(run, url):

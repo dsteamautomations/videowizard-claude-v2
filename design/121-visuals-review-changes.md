@@ -224,7 +224,7 @@ The page was checked in a browser on a local copy with VW-7's data and a faked s
 As built, beside the plan above:
 - Pass 1 also offers **Ignore this** (not only pass 2), so a thing with no footage picture whose search keeps failing never blocks the round.
 - Ticks may be made on pass 1 already, under each search's pictures; they are sent with pass 2's Done.
-- The stock word's default is `depositphotos` (one constant, `STOCK_SOURCE`), from the browser test; the real test through the search service is still to do (below).
+- The stock word's default is `pexels` (one constant, `STOCK_SOURCE`): first `depositphotos` from the browser test, changed to `pexels` by SK after the real test below.
 
 ### Not covered
 - **The real test through Apify** (Change 5's "to do first"): which stock sites download at full size, which carry watermarks, the price per search. The default word may change after it. Needs the server's search key; a few searches cost a few cents.
@@ -245,7 +245,7 @@ As built, beside the plan above:
 | unsplash | trowel: all Unsplash, but only as previews; kiln: mixed | **faint repeated "Unsplash+" lettering** across the trowel pictures | previews only (about 650 px) |
 | pexels | kiln: all ten from Pexels, clean, Indian scenes; trowel: mixed with Dreamstime, Shutterstock, Vecteezy | **none on Pexels pictures**; the others' yes | Pexels full size (up to 5000 px) or preview |
 
-Reading: **pexels** gave the cleanest, largest, unwatermarked pictures for people at work; depositphotos gave sharp but small pictures and pulls in watermarked sites; unsplash brings faint watermarks. The plain search stays useful for objects (shop pictures of the tool alone). The default word is SK's choice.
+Reading: **pexels** gave the cleanest, largest, unwatermarked pictures for people at work; depositphotos gave sharp but small pictures and pulls in watermarked sites; unsplash brings faint watermarks. The plain search stays useful for objects (shop pictures of the tool alone). **SK chose `pexels` as the default (29 Oct 2026).**
 
 **The watermark line on real pictures.** Three reference sheets made with the server's own GPT Image call from watermarked stock pictures: a Getty kiln picture (with and without the line) and a watermarked Depositphotos trowel picture (with the line). None of the three shows any watermark or lettering beyond the view labels: the sheet's "alone on plain ground" already drops the background where watermarks sit. The line costs nothing and stays as a guard for other picture kinds; the check's "no watermark" line is the safety net.
 
