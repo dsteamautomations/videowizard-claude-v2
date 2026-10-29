@@ -23,13 +23,12 @@ def check(d):
 
 def test_illustrative_is_earned_only_after_all_four_sources_were_tried():
     unknown = {**SPEC['dimensions'][1], 'tried': 'not in the client brochure; no footage frame shows the cavity'}
-    with pytest.raises(ValueError, match='a size is unknown: the drawing is illustrative only when illustrative is true'):
-        check(base({**SPEC, 'illustrative': False, 'dimensions': [SPEC['dimensions'][0], unknown]}))
-    with pytest.raises(ValueError, match="cavity width: 'illustrative' is earned only after all four sources were tried; tried does not name: a standard or a maker figure, an approved picture"):
-        check(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0], unknown]}))
-    check(base(SPEC))   # the shared fixture names all four
-    with pytest.raises(ValueError, match='nothing is unknown: drop illustrative'):
-        check(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0]], 'label': ''}))
+    said = lambda d: ' | '.join(w['message'] for w in check(d)[1] if w['kind'] == 'spec_unresearched')   # design/124 C2: warned in the plan, refused at spec approval
+    assert 'a size is unknown: the drawing is illustrative only when illustrative is true' in said(base({**SPEC, 'illustrative': False, 'dimensions': [SPEC['dimensions'][0], unknown]}))
+    assert "cavity width: 'illustrative' is earned only after all four sources were tried; tried does not name: a standard or a maker figure, an approved picture" in said(
+        base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0], unknown]}))
+    assert said(base(SPEC)) == ''   # the shared fixture names all four
+    assert 'nothing is unknown: drop illustrative' in said(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0]], 'label': ''}))
 
 
 def test_a_drawing_names_its_view_with_a_reason_and_a_section_defaults_to_cutaway():

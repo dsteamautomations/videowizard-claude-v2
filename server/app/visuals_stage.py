@@ -144,7 +144,8 @@ def prepare(conn, store, user, run, outputs):
                'script_digest': script['summary'].get('content_digest') if script else None,
                'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
-               'generator_catalog': video_generators.catalog()}
+               'generator_catalog': video_generators.catalog(),
+               **({'parts': procedure['parts']} if procedure.get('parts') else {})}   # design/124 C1: the instructions per step (version 3 on); version 2 has none
     session['intended_visuals'] = package['intended_visuals']   # design/86 K7: the packet reads them from the session
     save_session(store, run, session)
     pk = save_json(store, key(run, 'package.json'), package)
@@ -2596,6 +2597,12 @@ def _dedupe(lines):
     return [l for l in lines if not (l['check'] in seen or seen.add(l['check']))]
 
 
+def researched(label, spec, material=False):
+    """design/124 C2: a spec is approved only when its research is done: every unknown size tried in all four sources, illustrative earned (warned in the plan)."""
+    from .visual_contract import DrawingSpec, MaterialSpec, spec_research_needs
+    guarded(lambda: spec_research_needs(label, (MaterialSpec if material else DrawingSpec).model_validate(spec)))
+
+
 def approve_spec(store, user, run, outputs, shot_id, quote):
     """design/89 D4: the operator approves a drawing spec once, as a table of parts, sizes and sources; a change to the spec needs a new approval.
     design/106 D4: no words needed; the operator never types sizes, and a correction goes to the assistant instead."""
@@ -2606,6 +2613,7 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
         need(element and element.get('material_spec'), f'{shot_id[len("element:"):]} has no material spec.')
         spec = element['material_spec']
         need(not correction_pending(session, shot_id, spec), f'The correction of {element["id"]}\'s material spec waits for the assistant to revise it; approve the revised one.')
+        researched(f'material spec of {element["id"]}', spec, material=True)
         if not (session.get('not_this') or {}).get(element['id']):   # design/111 F12: the list is the spec's second half, built with it
             try:
                 not_this(store, user, run, outputs, element['id'])
@@ -2620,6 +2628,7 @@ def approve_spec(store, user, run, outputs, shot_id, quote):
     spec = shot.get('drawing_spec')
     need(spec, f'Shot {shot_id} has no drawing spec.')
     need(not correction_pending(session, shot_id, spec), f'The correction of {shot_id} waits for the assistant to revise the spec; approve the revised one.')   # review 27 Oct
+    researched(f'shot {shot_id}', spec)
     session.setdefault('spec_approvals', {})[shot_id] = {'digest': spec_digest(spec), 'quote': said(quote, 'Approved', user), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     (session.get('spec_corrections') or {}).pop(shot_id, None)
     save_session(store, run, session)
@@ -2684,6 +2693,7 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, sh['id'], spec):   # review 27 Oct: the assistant's turn, not approved over
             waiting_.append(sh['id'])
         elif spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
+            researched(f"shot {sh['id']}", spec)   # design/124 C2: refused before anything is saved
             session.setdefault('spec_approvals', {})[sh['id']] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(sh['id'], None)
             approved.append({'shot_id': sh['id'], 'table': spec_table(spec)})
@@ -2693,6 +2703,7 @@ def approve_specs(store, user, run, outputs, quote=''):
         if spec and correction_pending(session, k, spec):
             waiting_.append(k)
         elif spec and not material_approved(session, e):
+            researched(f"material spec of {e['id']}", spec, material=True)
             session.setdefault('spec_approvals', {})[k] = {'digest': spec_digest(spec), 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
             (session.get('spec_corrections') or {}).pop(k, None)
             approved.append({'shot_id': k, 'element_id': e['id'], 'table': spec_table(spec)})
@@ -3591,6 +3602,8 @@ def render_drawn(conn, store, user, run, outputs, body):
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_svg).")
     _no_question(session, shot['id'])   # design/110 rule 0
     sv = shot.get('scene_svg') or {}
+    need(sv, f"{shot['id']} has no scene yet (scene_svg): after the picture search, draw it with the approved pictures, upload it (`vw visuals scene --shot {shot['id']} --file scene.svg`), "
+             "put its sha256 and actions in the plan, then draw.")   # design/124 C2: named at plan time, finished here
     row = (session.get('scenes') or {}).get(sv.get('sha256') or '')
     need(row, f"the plan's scene_svg of {shot['id']} names no uploaded scene: upload it (`vw visuals scene --shot {shot['id']} --file scene.svg`) and put its sha256 in the plan.")
     spec = shot.get('drawing_spec')

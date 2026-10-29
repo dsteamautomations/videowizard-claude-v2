@@ -98,8 +98,7 @@ def test_the_plan_takes_scene_svg_on_a_drawn_shot_and_scene_drawn_is_gone():
     out, warnings = check(drawn())
     assert out['gaps'][0]['scenes'][0]['shots'][0]['scene_svg']['sha256'] == 'a' * 64 and VC.routes(out)['drawn'] == 1
     assert 'scene_drawn' not in VC.Shot.model_fields and not hasattr(VC, 'DrawnShape') and not hasattr(VC, 'drawn_labels')
-    with pytest.raises(ValueError, match='DR1 is drawn: give scene_svg'):
-        check(drawn(scene_svg=None))
+    check(drawn(scene_svg=None))   # design/124 C2: named at plan time, the scene after the picture search; `draw` refuses without it
     with pytest.raises(ValueError, match='sha256'):
         check(drawn(scene_svg={'sha256': 'short', 'actions': []}))
     with pytest.raises(ValueError, match='scene_drawn'):   # extra forbid: the old field is named back

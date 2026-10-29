@@ -286,6 +286,24 @@ def test_prepare_writes_the_files_and_prints_the_page_link(harness, monkeypatch,
     assert any(f['file'] == 'work/visuals/prompt.md' for f in out['files'])
 
 
+def test_prepare_writes_one_file_per_part_and_names_them(harness, monkeypatch, capsys):
+    """design/124 C1: prompt.md is the common part; each part goes to part-<name>.md behind the sentinel; the message names them."""
+    ws, _ = harness
+    monkeypatch.setattr(vw, 'server_url', lambda: 'https://x.example')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'package': {'key': 'k'}, 'gaps': ['G1'], 'next': 'treatment'})
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'version': 'vwlib-x', 'always': [], 'steps': {}, 'compliance': None, 'map': '', 'field_sources': ''})
+    parts = [{'name': 'treatment', 'title': 'Treatment', 'text': '2. TREATMENT\nwrite it'}, {'name': 'plan', 'title': 'The detailed plan', 'text': '3. THE DETAILED PLAN\nx'}]
+    fake_client(monkeypatch, {'source': {'gaps': {}}, 'prompt': 'common', 'parts': parts, 'plan_schema': {}, 'world_evidence': [], 'intended_visuals': [], 'generator_catalog': []})
+    code, out, err = run(args(what='prepare'), capsys)
+    folder = ws / 'work' / 'visuals'
+    assert code == 0 and (folder / 'prompt.md').read_text(encoding='utf-8') == 'common\n'
+    t = (folder / 'part-treatment.md').read_text(encoding='utf-8')
+    assert t.startswith(vw.SENTINEL_LINE) and t.endswith('2. TREATMENT\nwrite it\n') and (folder / 'part-plan.md').exists()
+    assert 'parts' not in json.loads((folder / 'rest.json').read_text(encoding='utf-8'))
+    assert {'work/visuals/part-treatment.md', 'work/visuals/part-plan.md'} <= {f['file'] for f in out['files']}
+    assert 'part-treatment.md' in err and 'part-plan.md' in err and 'prompt.md once' in err
+
+
 def test_treatment_sequence_cap_and_budget_post_what_the_server_expects(harness, monkeypatch, capsys):
     ws, _ = harness
     posted = []

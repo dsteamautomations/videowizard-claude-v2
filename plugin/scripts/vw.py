@@ -186,6 +186,9 @@ def visuals_reading_files(ws, data):
         files.append({'file': f'work/visuals/{name}', 'rows': n, 'for': purpose})
     prompt = str(data.get('prompt') or '')
     put('prompt.md', '\n'.join(textwrap.fill(l, 160) if len(l) > 160 else l for l in prompt.split('\n')) + '\n', 'read first')
+    for part in data.get('parts') or []:   # design/124 C1: one file per step, behind the sentinel like prompt.md
+        text = f"{SENTINEL_LINE}\nPart {part['name']}: {part['title']}\n\n{part['text'].rstrip()}\n"
+        put(f"part-{part['name']}.md", '\n'.join(textwrap.fill(l, 160) if len(l) > 160 else l for l in text.split('\n')), 'read when you reach that step: ' + part['title'])
     source = dict(data.get('source') or {})
     gaps = source.pop('gaps', None) or {}
     put('gaps.json', sorted(({'gap_id': gid, **g} for gid, g in gaps.items()), key=lambda g: g.get('start_frame', 0)), 'treatment')
@@ -195,7 +198,7 @@ def visuals_reading_files(ws, data):
         files.append({'file': f'work/visuals/{name}', 'rows': n, 'for': 'scenes and references'})
     put('schema.json', data.get('plan_schema') or {}, 'the plan')
     put('generators.json', data.get('generator_catalog') or [], 'video shots')
-    rest = {k: v for k, v in data.items() if k not in ('prompt', 'source', 'intended_visuals', 'brief', 'world_evidence', 'plan_schema', 'generator_catalog')}
+    rest = {k: v for k, v in data.items() if k not in ('prompt', 'parts', 'source', 'intended_visuals', 'brief', 'world_evidence', 'plan_schema', 'generator_catalog')}
     put('rest.json', {**rest, 'source': source}, 'reference')
     return files
 
@@ -1454,6 +1457,9 @@ def cmd_visuals(a):
         url = visuals_page_url(m['code'])
         told = (f"Tell the operator in one line, never ask: {out['footage']}; they correct it on the visuals page or say so (`vw visuals footage --camera … --support … --look … --quote`). "
                 if out.get('footage') else '')   # design/88 F4
+        parts = [f['file'].rsplit('/', 1)[1] for f in files if f['file'].startswith('work/visuals/part-')]   # design/124 C1
+        if parts:
+            told = f"The instructions are split by step: read prompt.md once, then part-<step>.md when you reach that step ({', '.join(parts)}). " + told
         emit({**out, 'files': files, 'visuals_page_url': url, 'not_shareable': NOT_SHAREABLE}, 0,
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, gaps.json and intended-visuals.json first. "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "

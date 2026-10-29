@@ -35,8 +35,8 @@ def checked(sp):
 def test_an_unknown_size_without_the_sources_tried_is_refused():
     untried = copy.deepcopy(SPEC)
     untried['dimensions'][1].pop('tried', None)
-    with pytest.raises(ValueError, match='record the sources tried'):
-        checked(untried)
+    _, warns = checked(untried)   # design/124 C2: warned in the plan, refused at spec approval (test_design124_c2_pure)
+    assert any(w['kind'] == 'spec_unresearched' and 'record the sources tried' in w['message'] for w in warns)
     out, warns = checked(spec())
     assert out['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec']['dimensions'][1]['tried'] == TRIED
 

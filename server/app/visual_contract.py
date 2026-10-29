@@ -223,9 +223,10 @@ def svg_needs(shot, seconds):
     """design/117 P2: a drawn shot names its uploaded scene and keys every action inside the shot; the spec is required when the shot carries figures
     (a claim with a number), and its sizes are checked against the scene's text at render, when the file is read."""
     label = f'shot {shot.id}'
-    need(shot.scene_svg is not None, f'{label}: {shot.id} is drawn: give scene_svg (the uploaded SVG\'s sha256 and the actions).')
     figures = any(FIGURE.search(c) for c in shot.claims)
     need(shot.drawing_spec is not None or not figures, f'{label}: {shot.id} is drawn: it carries figures, so it needs a drawing_spec (the sourced sizes) approved on the References step.')
+    if shot.scene_svg is None:   # design/124 C2: named at plan time; the scene comes after the picture search, and `draw` refuses without it
+        return
     words = ' '.join(_tokens(shot.narration))
     for n, a in enumerate(shot.scene_svg.actions, 1):
         need((a.at_s is not None) != bool(a.word.strip()), f'{label}: action {n}: give at_s or word, one of the two.')
@@ -369,10 +370,11 @@ class Plan(Model):
     visual_facts: list[VisualFact] = Field(default_factory=list, max_length=100)   # design/91 N6
 
 
-def _dimension_needs(label, dims):
-    """design/106 D3, D6: an unknown size names what was tried and carries no number; a known one names its source."""
+def _dimension_needs(label, dims, research=True):
+    """design/106 D3, D6: an unknown size names what was tried and carries no number; a known one names its source.
+    research=False (design/124 C2): a spec's tried sources are checked at spec approval (spec_research_needs), after the picture search."""
     for d in dims:
-        need(d.status != 'unknown' or d.tried.strip(), f'{label}: {d.part} {d.measure} is unknown: record the sources tried and why each failed (tried): '
+        need(not research or d.status != 'unknown' or d.tried.strip(), f'{label}: {d.part} {d.measure} is unknown: record the sources tried and why each failed (tried): '
              'the client material, `measure` on footage frames, a standard or a maker figure, an approved picture.')
         need(d.status != 'unknown' or d.value is None, f'{label}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
         need(d.status == 'unknown' or d.source.strip(), f'{label}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
@@ -392,6 +394,21 @@ def _illustrative_needs(label, spec):
             need(not missing, f"{label}: {d.part} {d.measure}: 'illustrative' is earned only after all four sources were tried; tried does not name: {', '.join(missing)}.")
     else:
         need(not spec.illustrative, f'{label}: nothing is unknown: drop illustrative.')
+
+
+def spec_research_needs(label, spec):
+    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size tried in all four sources, illustrative earned."""
+    _dimension_needs(label, spec.dimensions)
+    _illustrative_needs(label, spec)
+
+
+def _research_warning(label, spec, **where):
+    """design/124 C2: in the plan a spec's sizes may still wait for their research (after the picture search): warned, refused at spec approval."""
+    try:
+        spec_research_needs(label, spec)
+    except ValueError as e:
+        return [{**where, 'kind': 'spec_unresearched', 'message': f'{e} (refused when the spec is approved; the research comes after the picture search)'}]
+    return []
 
 
 NO_SPEC_WORDS = re.compile(r'\b(label|title|caption|chart|timeline|calendar|icon|icons)\b', re.I)   # defect 35: a graphic that is no drawing of a real object
@@ -421,6 +438,10 @@ def technique_words(text):
             if re.fullmatch(pat, w) and name not in found:
                 found.append(name)
     return found
+
+
+def _differs(a, b):   # design/124 C2: the state fields two states disagree on
+    return ', '.join(k for k in type(a).model_fields if getattr(a, k) != getattr(b, k))
 
 
 def need(value, message):
@@ -544,6 +565,7 @@ def timing_warnings(gap_id, shots, timing, fps):
 def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True):
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
     plan = Plan.model_validate(document)
+    spec_warnings = []   # design/124 C2
     elements = unique(plan.elements, 'id', 'element')
     for e in plan.elements:   # review 27 Oct: an element's sizes (design/103 A5) are checked like a drawing spec's
         _dimension_needs(f'element {e.id}', e.size)
@@ -551,8 +573,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         if e.kind == 'material' or e.repeating:   # design/111 F10: one measured spec per repeating material
             need(e.material_spec is not None, f'element {e.id} is a repeating material: give its material_spec (unit sizes with sources, laid, joint, pattern, proportions), made like a drawing spec, never typed by the operator.')
             need(not e.size, f'element {e.id}: its sizes live in its material_spec, not in size.')
-            _dimension_needs(f'material spec of {e.id}', e.material_spec.dimensions)
-            _illustrative_needs(f'material spec of {e.id}', e.material_spec)   # design/111 F19
+            _dimension_needs(f'material spec of {e.id}', e.material_spec.dimensions, research=False)
+            spec_warnings += _research_warning(f'material spec of {e.id}', e.material_spec, element_id=e.id)   # design/111 F19; design/124 C2: refused at approval
             need(e.material_spec.dimensions, f'material spec of {e.id}: give the unit sizes (length, width, height) with their sources.')
             need(e.material_spec.proportions, f'material spec of {e.id}: give the proportions that matter.')
     unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
@@ -564,7 +586,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     unique(plan.gaps, 'gap_id', 'gap')
     unique(plan.foundation.world + plan.foundation.exclusions + plan.foundation.specifications + plan.foundation.production_constraints + plan.foundation.editing_constraints + plan.sequence_rules, 'id', 'rule')
     scene_ids, shot_ids, beat_ids = set(), set(), set()
-    warnings = []
+    warnings = spec_warnings
     placed = []   # (gap_id, shot_id, visual_type, start, end) in film order, for the pacing warnings (design/65 B4)
     frozen, starts, returns = 0.0, {}, []   # design/89 B4, H7
     said = []   # design/91 N11: the counted shots, for the repeated messages
@@ -705,12 +727,13 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                                  'its sources, and so does a chart or a timeline that carries figures; a title or a label alone needs none: say so in production_method'})   # design/124 A4 item 16
                         else:
                             spec = shot.drawing_spec
-                            _dimension_needs(f'shot {shot.id}', spec.dimensions)
-                            _illustrative_needs(f'shot {shot.id}', spec)   # design/111 F19
+                            _dimension_needs(f'shot {shot.id}', spec.dimensions, research=False)
+                            warnings += _research_warning(f'shot {shot.id}', spec, shot_id=shot.id)   # design/111 F19; design/124 C2: refused at approval
                             section = 'section' in (shot.depicts + ' ' + shot.purpose + ' ' + shot.title).lower()   # F19: a wall section defaults to cutaway
                             need(spec.view or section, f'shot {shot.id}: give view (cutaway, plan, side or elevation) and view_reason: which view shows what the drawing is for.')
                             need(not spec.view or spec.view_reason.strip(), f'shot {shot.id}: view {spec.view}: give view_reason.')
-                            if not spec.proportions:   # design/106 D2
+                            real_object = shot.graphic_kind == 'diagram' and any(ekind.get(e) in ('object', 'material') for e in shot.element_ids)   # design/124 C2: not a chart, map or day strip
+                            if not spec.proportions and real_object:   # design/106 D2
                                 warnings.append({'shot_id': shot.id, 'kind': 'spec_proportions_missing', 'message': f'shot {shot.id}: give the proportions that matter (proportions), '
                                                  'for example a brick about 3 : 1.5 : 1, both leaves the same thickness; "illustrative" means no numbers printed, never free proportions'})
                             if any(d.status == 'unknown' for d in spec.dimensions):
@@ -757,7 +780,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             beat_ids.add(beat.id)
                             need(end <= beat.start_frame < beat.end_frame <= shot.end_frame,
                                  'A subject cannot perform overlapping beats or actions outside its shot.')
-                            need(beat.start == state, 'Beat starting state must continue this subject\'s preceding state.')
+                            need(beat.start == state, "Beat starting state must continue this subject's preceding state: "
+                                 f"shot {shot.id}, subject {subject.element_id}, beat {beat.id} differs in {_differs(state, beat.start)} "
+                                 "(the first beat starts exactly in the subject's start state, a later one in the previous beat's end).")
                             need(beat.target in landmarks or beat.target in elements, f"shot {shot.id}: beat {beat.id}'s target is a landmark of the scene or an element of the plan "
                                  f"('{beat.target}' is neither): name the thing the action heads for; describe it in path and result.")
                             need(beat.target in landmarks or beat.target in shot.element_ids, f"shot {shot.id}: beat {beat.id} heads for {beat.target}, which is not in the shot: "
@@ -765,7 +790,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             states.extend([beat.start, beat.end])
                             state, end = beat.end, beat.end_frame
                         if subject.beats:
-                            need(state == subject.end, 'Final beat must leave the subject in the shot\'s ending state.')
+                            need(state == subject.end, "Final beat must leave the subject in the shot's ending state: "
+                                 f"shot {shot.id}, subject {subject.element_id}, beat {subject.beats[-1].id} differs in {_differs(subject.end, state)} "
+                                 "(the last beat ends exactly in the subject's end state).")
                         for state in states:
                             need(state.position.landmark_id in landmarks, 'Subject positions must refer to a named scene landmark.')
                             need(set(state.holding) <= elements, 'Held objects must have element identities.')
@@ -866,8 +893,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         if any(not b.min_s for s in acting for b in s.beats):
                             warnings.append({'shot_id': shot.id, 'kind': 'min_s_missing', 'message': f'shot {shot.id}: give every beat its min_s, the realistic time its action takes, so the shot '
                                              'holds only what fits its seconds'})
-                    if not shot.subjects:
-                        need(shot.information_progression.strip(), 'Describe the composition or information progression for a shot without acting subjects.')
+                    if not shot.subjects and shot.visual_type != 'footage':   # design/124 C2: footage is filmed, not composed
+                        need(shot.information_progression.strip(), f'shot {shot.id}: describe the composition or information progression for a shot without acting subjects.')
             last = scenes[-1].shots[-1].id if scenes and scenes[-1].shots else None   # design/91 N16
             for sh in (s for sc in scenes for s in sc.shots):
                 need(not sh.transition_out or sh.id == last, f'shot {sh.id}: transition_out is for the last shot of a gap; set the next shot\'s transition_in instead.')
@@ -969,7 +996,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     return result, warnings
 
 
-SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers'), ('size',)   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale
+SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers', 'scene_svg', 'drawing_spec'), ('size', 'material_spec')   # design/124 C2 fix 6: specs are researched after the picture search and approved in their own table, so they never need the gap accepted again   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale
 
 
 def _drop(d, keys):
@@ -1042,7 +1069,7 @@ def course_warnings(plan, fps):
         scenes = next((c.scenes for c in gap.choices if c.id == gap.recommended_choice), []) if gap.choices else gap.scenes
         run_s, run_ids = 0.0, []
         for scene in scenes:
-            if any(s.visual_type not in GRAPHIC_TYPES + ('footage',) for s in scene.shots) and not scene.light.strip():   # A1; design/124-b item 1: footage has its own light
+            if any(s.visual_type not in GRAPHIC_TYPES + ('drawn', 'footage') for s in scene.shots) and not scene.light.strip():   # A1; design/124-b item 1: footage has its own light; C2: a drawing none
                 out.append({'scene_id': scene.id, 'kind': 'light_missing', 'message': f'scene {scene.id}: describe its light once (light): the sources against the landmarks, '
                                                                                       'the main one, hard or soft, colour, strength'})
             seen, sizes = {}, []   # A3: the widest size each element was seen at so far in the scene; the sizes in order
@@ -1113,7 +1140,7 @@ WARNING_PLAIN = {
 }
 WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missing', 'carries_over_missing', 'changes_missing', 'claims_missing', 'depicts_missing',
                      'element_size_missing', 'end_state', 'evidence_missing', 'facts_missing', 'footage_identity', 'frozen_share', 'light_missing', 'min_s_missing',
-                     'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'state_changed', 'style_missing')
+                     'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'spec_unresearched', 'state_changed', 'style_missing')
 
 
 def answer_warnings(plan, warnings):
