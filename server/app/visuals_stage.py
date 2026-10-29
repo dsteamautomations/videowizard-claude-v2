@@ -143,6 +143,7 @@ def prepare(conn, store, user, run, outputs):
                'footage_character': footage_view(session, outputs),   # design/88: measured per clip; the operator's correction wins; the texture comes from this
                'script_digest': script['summary'].get('content_digest') if script else None,
                'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
+               'script_claims': script_claims(script),   # design/125 S3: the figures the narration rests on, checked or not
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog(),
                **({'parts': procedure['parts']} if procedure.get('parts') else {})}   # design/124 C1: the instructions per step (version 3 on); version 2 has none
@@ -214,6 +215,11 @@ def first_cut_events(store, outputs):
         return []
     keys = ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_in_frame', 'timeline_out_frame')
     return [{k: ev[k] for k in keys} for ev in events if ev.get('kind') == 'event' and all(k in ev for k in keys)]
+
+
+def script_claims(script):
+    """design/125 S3: the figures or claims the narration rests on, as the script stage recorded them ({text, checked, source}); [] when none."""
+    return list(((script or {}).get('summary') or {}).get('claims') or [])
 
 
 def gap_neighbours(store, outputs):

@@ -181,6 +181,8 @@ def media_prepare(ws, procedure, prior):
 def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, footage=None, copies=None):
     if copies not in ('originals', 'copies'):   # design/107 §6: asked once, recorded
         raise Refused('Ask the operator once: are these the camera originals or copies made by an editor? Then `--copies originals` or `--copies copies`.')
+    if camera_audio not in ('allowed', 'excluded'):   # design/125 M1: asked once, recorded, like the copies answer
+        raise Refused('Ask the operator once: may the camera sound be used in the film? Then `--camera-audio allowed` or `--camera-audio excluded` with `--note "<their words>"`.')
     try:
         clips = json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):

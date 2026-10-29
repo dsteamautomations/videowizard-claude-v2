@@ -140,8 +140,8 @@ def test_record_stores_the_sound_answer_and_reports_progress(ws):
     assert s['camera_audio'] == 'allowed' and s['camera_audio_note'] == 'site noise only' and len(s['clips']) == 2
     assert sorted(calls) == ['a.mp4', 'b.mp4'] and sorted(progress) == [(1, 2, 'a.mp4'), (2, 2, 'b.mp4')] or sorted(progress) == [(1, 2, 'b.mp4'), (2, 2, 'a.mp4')]
     assert [k for k, _, _ in sorted(progress)] == [1, 2]
-    res = media_record(ws, PROC, prior, fake_upload([]), copies='originals')
-    assert res['summary']['camera_audio'] is None and res['summary']['camera_audio_note'] == ''
+    with pytest.raises(Refused, match='camera sound'):   # design/125 M1: the answer is required
+        media_record(ws, PROC, prior, fake_upload([]), copies='originals')
 
 
 def test_record_refuses_a_clip_changed_since_prepare(ws):
@@ -152,15 +152,15 @@ def test_record_refuses_a_clip_changed_since_prepare(ws):
     time.sleep(0.02)
     (ws / 'in' / 'b.mp4').write_bytes(data[:-1] + bytes([data[-1] ^ 1]))   # same size, different bytes, new mtime
     with pytest.raises(Refused) as exc:
-        media_record(ws, PROC, prior, fake_upload([]), copies='originals')
+        media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals')
     assert 'changed since prepare' in str(exc.value) and 'b.mp4' in str(exc.value) and 'a.mp4' not in str(exc.value)
     media_prepare(ws, PROC, prior)
     os.utime(ws / 'in' / 'a.mp4')   # touched: same bytes, new mtime; prepare again is seconds
     with pytest.raises(Refused) as exc:
-        media_record(ws, PROC, prior, fake_upload([]), copies='originals')
+        media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals')
     assert 'a.mp4' in str(exc.value)
     media_prepare(ws, PROC, prior)
-    assert media_record(ws, PROC, prior, fake_upload([]), copies='originals')['summary']['clips']
+    assert media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals')['summary']['clips']
 
 
 def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, capsys):

@@ -440,7 +440,7 @@ def process(job):
                     if exc.code in ('incomplete_response', 'empty_response', 'model_json', 'blocked_response'):
                         return 'failed', {'failure': exc.code}, str(exc), None, None
                     if exc.code == 'provider_stream_error':
-                        return 'failed', {'failure': exc.code, 'provider_error': meta.get('provider_error')}, 'Provider reported an error in its stream; no retry was made.', None, None
+                        return 'failed', {'failure': exc.code, 'provider_error': meta.get('provider_error')}, 'Provider reported an error in its stream.', None, None
                     return 'submission_unknown', {'failure': exc.code, 'phase': 'generate'}, f'Outcome unknown after dispatch ({exc.code}). Recover from the receipt or resolve.', None, None
         renew(jid, 'review')
         saved = read_json(paths['response.json'])
@@ -497,10 +497,24 @@ def finalize(conn, user_id, job, status, result, error, cost, retry_in):
         if not existing:
             core.output(conn, user, run, {'stage': 'analysis', 'unit': clip['id'], 'files': files,
                                           'summary': {**result['summary'], 'cost': cost, 'job_id': str(job['id'])}})
-    elif status == 'rejected' and (result or {}).get('http_status') in (429, 503) and ((result or {}).get('category') not in ('spending_or_billing_limit', 'quota_limit') or _pool_size() > 1)             and not job['request'].get('capacity_retry_of') and not job['request'].get('retry_of'):
-        # one automatic capacity retry (v1 rule): same frozen request, fresh row
+    elif passing_failure(status, result) and not job['request'].get('retry_of') and int(job['request'].get('auto_retries') or 0) < AUTO_RETRIES:
+        # design/125 A4: a passing failure is retried by itself up to three times (same frozen request, fresh row, the next key); an operator's retry gets none
+        request = {k: v for k, v in job['request'].items() if k not in ('retry_of', 'retry_note', 'auto_retry_of', 'capacity_retry_of')}
         conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id, attempt) values (%s,'analysis',%s,%s,%s, gen_random_uuid(), 1)''',
-                     (job['run_id'], job['unit'], PROVIDER, Jsonb({**job['request'], 'capacity_retry_of': str(job['id'])})))
+                     (job['run_id'], job['unit'], PROVIDER, Jsonb({**request, 'auto_retries': int(job['request'].get('auto_retries') or 0) + 1, 'auto_retry_of': str(job['id'])})))
+
+
+AUTO_RETRIES = 3
+PASSING = ('provider_stream_error', 'incomplete_response', 'empty_response')
+
+
+def passing_failure(status, result):
+    """design/125 A4: a failure the same request may not meet again: an error in the provider's stream, an answer cut off or empty, a busy service
+    (429 or 503; a spending or quota limit only when another key can take it). A refused, blocked, malformed or unknown outcome is not one."""
+    result = result or {}
+    if status == 'failed':
+        return result.get('failure') in PASSING
+    return status == 'rejected' and result.get('http_status') in (429, 503) and (result.get('category') not in ('spending_or_billing_limit', 'quota_limit') or _pool_size() > 1)
 
 
 def _pool_size():

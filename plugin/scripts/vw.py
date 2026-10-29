@@ -193,12 +193,13 @@ def visuals_reading_files(ws, data):
     gaps = source.pop('gaps', None) or {}
     put('gaps.json', sorted(({'gap_id': gid, **g} for gid, g in gaps.items()), key=lambda g: g.get('start_frame', 0)), 'treatment')
     put('intended-visuals.json', data.get('intended_visuals') or [], 'treatment')
+    put('claims.json', data.get('script_claims') or [], 'the plan: the figures the narration rests on')   # design/125 S3
     put('brief.json', data.get('brief') or {}, 'treatment')
     for name, n in rows_files(folder, 'world', data.get('world_evidence') or [], cap=25):
         files.append({'file': f'work/visuals/{name}', 'rows': n, 'for': 'scenes and references'})
     put('schema.json', data.get('plan_schema') or {}, 'the plan')
     put('generators.json', data.get('generator_catalog') or [], 'video shots')
-    rest = {k: v for k, v in data.items() if k not in ('prompt', 'parts', 'source', 'intended_visuals', 'brief', 'world_evidence', 'plan_schema', 'generator_catalog')}
+    rest = {k: v for k, v in data.items() if k not in ('prompt', 'parts', 'source', 'intended_visuals', 'script_claims', 'brief', 'world_evidence', 'plan_schema', 'generator_catalog')}
     put('rest.json', {**rest, 'source': source}, 'reference')
     return files
 
@@ -2347,7 +2348,7 @@ def build_parser():
     sub.add_parser('whoami').set_defaults(fn=cmd_whoami)
     s = sub.add_parser('start')
     s.add_argument('--client', required=True); s.add_argument('--version'); s.add_argument('--script', help='the script file to copy into in/ (design/34 1.6)')
-    s.add_argument('--images', choices=['openai', 'gemini'], help='the image model of this run, asked of the operator, never changed later (design/120)')
+    s.add_argument('--images', choices=['openai', 'gemini'], help='the image model of this run, asked of the operator, never changed later')
     s.add_argument('--need-gb', type=float, default=5); s.add_argument('--keep-logs', action='store_true'); s.set_defaults(fn=cmd_start)
     s = sub.add_parser('next'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_next)
     s = sub.add_parser('output')

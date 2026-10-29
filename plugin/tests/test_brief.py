@@ -54,12 +54,13 @@ def test_steps_carry_chapters_production_block_and_the_web_rule():
 
 
 def test_languages_are_required_on_every_film():
-    for prod in ({}, {'field_speech_languages': ['ta']}, {'narration_language': 'en'}, {'field_speech_languages': [], 'narration_language': 'en'}):
+    for prod in ({}, {'field_speech_languages': ['ta']}, {'narration_language': 'en'}):
         with pytest.raises(Refused) as exc:
             production_inputs(prod)
         assert 'every film' in str(exc.value)
     with pytest.raises(Refused):
         production_inputs({'field_speech_languages': 'ta', 'narration_language': 'en'})
+    assert production_inputs({'field_speech_languages': [], 'narration_language': 'en'})['field_speech_languages'] == []   # design/125 B1: nobody speaks
     out = production_inputs({'field_speech_languages': ['ta', 'en'], 'narration_language': 'en'})
     assert out['field_speech_languages'] == ['ta', 'en'] and out['narration_language'] == 'en'
     assert 'field_speech_languages' not in out['defaults_applied'] and 'narration_language' not in out['defaults_applied']

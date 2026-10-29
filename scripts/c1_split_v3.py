@@ -50,7 +50,7 @@ if __name__ == '__main__':
     old, prompt, parts, steps = build()
     d = json.loads(V3.read_text(encoding='utf-8'))
     for s_old, s_new in zip(old['stages'], d['stages']):   # every other stage as it was
-        assert s_old == s_new or s_new['name'] == 'visuals', s_new['name']
+        assert s_old == s_new or s_new['name'] in ('visuals', 'intake', 'brief', 'script', 'voice', 'media', 'analysis'), s_new['name']   # design/125 changed these in version 3
     if '--check' in sys.argv:
         st = next(s for s in d['stages'] if s['name'] == 'visuals')
         sys.path.insert(0, str(ROOT / 'scripts'))
@@ -64,6 +64,8 @@ if __name__ == '__main__':
                     part['text'] = part['text'].replace(a, b)
         from c2_fixes_v3 import apply   # design/124 C2: the trial's wording fixes, applied after the part references
         prompt = apply(prompt, parts)
+        from d125_wording_v3 import apply_visuals   # design/125 I1, S3: two sentences in the parts
+        apply_visuals(parts)
         assert (st['prompt'], st['parts'], st['steps']) == (prompt, parts, steps), 'v3.json does not hold the split (with the part references)'
         print('ok: v3.json holds the split (common + parts == the Phase B text, asserted in build) with the part references')
     else:

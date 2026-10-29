@@ -363,7 +363,7 @@ def format_inputs(given):
 def production_inputs(given):
     """Blueprint v3.2 project inputs (design/12 §A.1). Defaults apply only to keys the operator did not supply; nothing is invented per client."""
     out = {}
-    missing = [k for k in ASKED_EVERY_FILM if not given.get(k)]
+    missing = [k for k in ASKED_EVERY_FILM if given.get(k) in (None, '')]   # design/125 B1: an empty list of footage languages is an answer (nobody speaks)
     if missing:
         raise Refused('out/brief.json: production.field_speech_languages (languages spoken in the footage) and production.narration_language are asked of the operator on every film; '
                       'record their answers (missing: ' + ', '.join(missing) + ').')
@@ -491,6 +491,10 @@ def script_record(ws, procedure, prior):
         diff = first_difference(rebuilt, expected) or ('', '')
         raise Refused('out/script.json: spoken_text is not the cleaned script plus the accepted changes. First difference, expected: '
                       f'{diff[0]!r}; submitted: {diff[1]!r}. List every edit as a change with an exact before.')
+    claims = data.get('claims') or []   # design/125 S3: the figures the message rests on, handed to the visuals stage
+    if not isinstance(claims, list) or not all(isinstance(c, dict) and isinstance(c.get('text'), str) and c['text'].strip() and isinstance(c.get('checked'), bool)
+                                               and isinstance(c.get('source', ''), str) and not set(c) - {'text', 'checked', 'source'} for c in claims):
+        raise Refused('out/script.json: claims is a list of {text, checked: true or false, source when checked}, or empty.')
     accepted = sum(1 for c in changes if c.get('decision') in ('accepted', 'reworded'))
     passages = paragraphs(text)
     if not passages:
@@ -502,7 +506,7 @@ def script_record(ws, procedure, prior):
                **({'length_warning': f'The script has {len(text):,} characters; it will be narrated in about {-(-len(text) // V4_REQUEST_LIMIT)} requests and joined '
                                      '(Eleven v4 takes at most 10,000 per request).'} if len(text) > V4_REQUEST_LIMIT else {}),
                'source_intake': intake['summary']['source_digest'], 'source_brief': brief['summary']['content_digest'],
-               'assessment': data.get('assessment', ''), 'changes': accepted, 'changes_proposed': len(changes), 'changes_accepted': accepted,
+               'assessment': data.get('assessment', ''), 'claims': claims, 'changes': accepted, 'changes_proposed': len(changes), 'changes_accepted': accepted,
                'changes_rejected': sum(1 for c in changes if c.get('decision') == 'rejected'), **stamps(ws, 'script')}   # design/38 3.2
     return {'files': ['out/script.json'], 'summary': summary, 'retain': True, 'upload': True}
 

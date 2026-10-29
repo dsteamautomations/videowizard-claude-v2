@@ -262,7 +262,7 @@ def test_visuals_package_is_written_one_file_per_section(harness, monkeypatch):
     (ws / 'work' / 'visuals' / 'world-9.json').write_text('stale', encoding='utf-8')
     files = vw.download_visuals_package({'code': 'VW-9', 'run_id': 'run-1'}, 'k')
     names = sorted(p.name for p in (ws / 'work' / 'visuals').iterdir())
-    assert names == ['brief.json', 'gaps.json', 'generators.json', 'intended-visuals.json', 'prompt.md', 'rest.json', 'schema.json', 'world-1.json', 'world-2.json']
+    assert names == ['brief.json', 'claims.json', 'gaps.json', 'generators.json', 'intended-visuals.json', 'prompt.md', 'rest.json', 'schema.json', 'world-1.json', 'world-2.json']
     assert (ws / 'work' / 'visuals' / 'prompt.md').read_text(encoding='utf-8').startswith('ppp')
     gaps = json.loads((ws / 'work' / 'visuals' / 'gaps.json').read_text(encoding='utf-8'))
     assert gaps == [{'gap_id': 'G1', 'start_frame': 0, 'end_frame': 100, 'requirement': 'r'}]

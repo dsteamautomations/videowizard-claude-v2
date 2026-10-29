@@ -97,9 +97,11 @@ def apply(text, items, register, tweaks=None):
     if rows and register and register.strip():
         first = min(rows.values(), key=lambda r: r['start'])
         inserts.setdefault(first['start'], []).append(register.strip())
+    in_force = register.strip() if register and register.strip() else None
     for key, tag in sorted(tags.items(), key=lambda kv: rows[kv[0]]['start'] if kv[0] in rows else -1):
-        if key in rows:
+        if key in rows and tag != in_force:   # design/125 V1: a tag that repeats the one in force is not sent
             inserts.setdefault(rows[key]['start'], []).append(tag)
+            in_force = tag
     out, spans, cursor, shift = [], [], 0, 0
     for pos in sorted(inserts):
         out.append(text[cursor:pos])
