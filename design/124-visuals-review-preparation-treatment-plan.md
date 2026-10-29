@@ -256,7 +256,7 @@ Where the corrections land: groups 1, 2 and 5 in instruction version 3 (the word
   - **Guide:** a new snapshot `server/library/vwlib-2026-10-29-3d60877d3d23/` (25 files; the old one untouched, so films in progress keep theirs); VW-MAP rewritten with SK's overrides; FIELD-SOURCES as the server fills it; Kling, Seedance and Higgsfield files dropped; one change per edit refused in the prompt check (a fix round's single failed line exempt); on a Nano Banana film the job form names the Gemini model. Trim proposal (not applied): `design/124-a4-guide-trim-proposal.md`.
   - **Tests:** server unit 731 passed; plugin 326 passed, 3 known Windows-only failures. Test-only workaround: 27 older test modules build plans with 12–30 s video shots; `server/unit/conftest.py` lifts Omni's 10 s limit for those modules only (every other module, and the new tests, run the real limit). Rewriting those fixtures is left for Phase B.
   - **Effect on films in progress after deploy:** an accepted plan is not re-checked, but a NEW take on a shot longer than 10 s, or on a shot that chose Kling/Seedance, is refused: such a shot must be split or set back to Omni (VW-7's long shots, if any, need a revision).
-  - **Open question for SK:** decision 5 covers the picture AI; may a footage frame showing a person still be a video take's start image (that goes to the video AI)? Unchanged for now.
+  - **Answered by SK (29 Oct 2026): yes.** Decision 5 is about the picture AI only; a footage frame showing a person may still be a video take's start image (it goes to the video AI). Nothing to change.
 
 ### Part B — The four phases reviewed so far (SK, 29 Oct 2026)
 
