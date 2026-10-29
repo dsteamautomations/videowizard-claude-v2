@@ -316,6 +316,9 @@ class MeasureBody(Write):   # design/89 D2: sizes read off approved footage fram
 class TreatmentBody(Write):   # design/65 B6: a document without words is the draft the page shows; words without a document record the draft
     document: dict[str, Any] | None = None
     quote: str = ''
+    accept: list[str] = []      # design/124 Change 6: lines of the draft (direction, G1, ...) accepted
+    send_back: list[str] = []   # lines sent back with notes
+    notes: str = ''
 
 
 class SequenceBody(Write):    # design/65 B2'
@@ -1330,7 +1333,7 @@ def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/treatment')
 def visuals_treatment(run_id: UUID, body: TreatmentBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.treatment(storage(), user, run, outputs, body.document, body.quote))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.treatment(storage(), user, run, outputs, body.document, body.quote, accept=body.accept, send_back=body.send_back, notes=body.notes))
 
 
 @app.post('/api/runs/{run_id}/visuals/sequence')

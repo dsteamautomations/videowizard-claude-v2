@@ -1301,14 +1301,14 @@ def cmd_planning(a):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
 _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
-    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote'},
+    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
@@ -1377,6 +1377,68 @@ def _region(value):
         emit({'action': 'refused', 'message': '--region is four numbers between 0 and 1.'}, 2)
 
 
+def _read_json(ws, rel, what):
+    try:
+        return json.loads((ws / rel).read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        emit({'action': 'refused', 'message': f'{what} {rel} is missing or not valid JSON ({exc.__class__.__name__}).'}, 2)
+
+
+def _swap_ids(value, ids):
+    """Every string equal to a dropped duplicate's id becomes the kept thing's id."""
+    if isinstance(value, dict):
+        return {k: _swap_ids(v, ids) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_swap_ids(v, ids) for v in value]
+    return ids.get(value, value) if isinstance(value, str) else value
+
+
+def plan_join(ws, base_rel, gaps_rel):
+    """design/124 Change 9: out/plan-base.json (the shared parts; its gaps the film's gap ids in order) and one file per helper in the gaps folder
+    (a gap, or {"gaps": [...]}, each with its "new_elements") joined into out/visual-plan.json: the gaps in film order, the new things merged once by name.
+    Returns (payload, code, line) for emit."""
+    if not base_rel or not gaps_rel:
+        return {'action': 'refused', 'message': 'Give both: --base out/plan-base.json --gaps out/plan-gaps/'}, 2, None
+    base = _read_json(ws, base_rel, 'The base')
+    order = [g if isinstance(g, str) else g.get('gap_id') for g in base.get('gaps') or []]
+    folder = ws / gaps_rel
+    if not order or not folder.is_dir():
+        return {'action': 'refused', 'message': f"The base lists no gaps, or {gaps_rel} is not a folder."}, 2, None
+    elements = list(base.get('elements') or [])
+    by_name = {str(e.get('name') or '').strip().lower(): e['id'] for e in elements}
+    found = {}
+    for path in sorted(folder.glob('*.json')):
+        part = _read_json(ws, path.relative_to(ws).as_posix(), 'The gap file')
+        gaps = part['gaps'] if isinstance(part.get('gaps'), list) else [part]
+        swap = {}
+        for e in list(part.get('new_elements') or []) + [e for g in gaps for e in g.get('new_elements') or []]:
+            name = str(e.get('name') or '').strip().lower()
+            if name in by_name:
+                if by_name[name] != e['id']:
+                    swap[e['id']] = by_name[name]
+                continue
+            if any(x['id'] == e['id'] for x in elements):
+                return {'action': 'refused', 'message': f"{path.name}: new thing {e['id']} ({e.get('name')}) has the id of another thing; give it its own id."}, 2, None
+            elements.append(e)
+            by_name[name] = e['id']
+        for g in gaps:
+            gid = g.get('gap_id')
+            if gid not in order:
+                return {'action': 'refused', 'message': f"{path.name}: gap {gid} is not in the base's gap list ({', '.join(order)})."}, 2, None
+            if gid in found:
+                return {'action': 'refused', 'message': f"gap {gid} is written twice ({found[gid][0]} and {path.name}); keep one."}, 2, None
+            found[gid] = (path.name, _swap_ids({k: v for k, v in g.items() if k != 'new_elements'}, swap))
+    missing = [gid for gid in order if gid not in found]
+    if missing:
+        return {'action': 'refused', 'message': f"No helper wrote gap {', '.join(missing)}; write it before the join."}, 2, None
+    olds = {g['gap_id']: g for g in base.get('gaps') or [] if isinstance(g, dict)}
+    plan = {**base, 'elements': elements, 'gaps': [{**olds.get(gid, {}), **found[gid][1]} for gid in order]}
+    (ws / 'out').mkdir(exist_ok=True)
+    (ws / 'out' / 'visual-plan.json').write_text(json.dumps(plan, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+    return ({'file': 'out/visual-plan.json', 'gaps': order, 'elements': len(elements)}, 0,
+            f"Joined {len(order)} gaps into out/visual-plan.json ({len(elements)} things). Now `vw visuals check --file out/visual-plan.json`.")
+
+
 def cmd_visuals(a):
     refused = visuals_flags_refused(a)   # design/106 T3
     if refused:
@@ -1414,8 +1476,20 @@ def cmd_visuals(a):
             if b.get('planned_inr') is not None:
                 line += f", about ₹{b['planned_inr']:,.0f} against cap ₹{b.get('cap_inr', 0):,.0f}" + (' (over the cap)' if b['planned_inr'] > (b.get('cap_inr') or 0) else '')
         if out.get('warnings'):
-            line += f"; {len(out['warnings'])} warning(s): answer each in the shot's purpose and show them to the operator"
+            open_ = sum(1 for w in out['warnings'] if not w.get('answered'))
+            line += f"; {len(out['warnings'])} warning(s), {open_} unanswered: answer each in its shot's warning_answers (kind and answer), never in the purpose"
         emit(out, 0 if out.get('status') != 'rejected' else 2, line)
+    if a.what == 'treatment' and (getattr(a, 'accept', None) or getattr(a, 'send_back', None)):   # design/124 Change 6: the operator's verdict per line
+        acc = [x.strip() for x in (getattr(a, 'accept', None) or '').split(',') if x.strip()]
+        back = [x.strip() for x in (getattr(a, 'send_back', None) or '').split(',') if x.strip()]
+        if acc and not a.quote:
+            emit({'action': 'refused', 'message': "Accepting lines needs the operator's own words: --quote \"…\"."}, 2)
+        if back and not a.notes:
+            emit({'action': 'refused', 'message': 'Sending a line back needs what to change: --notes "…".'}, 2)
+        out = write(base + '/treatment', {'accept': acc, 'send_back': back, 'notes': a.notes or '', 'quote': a.quote or ''})
+        emit(out, 0, out.get('next') or '')
+    if a.what == 'plan-join':   # design/124 Change 9: the helpers' gaps joined into one plan, nothing sent
+        emit(*plan_join(ws, getattr(a, 'base', None), (a.gaps or [None])[0]))
     if a.what == 'treatment':   # design/65 B6: the treatment as a record
         out = write(base + '/treatment', {'document': _json_file(m, a.file), 'quote': a.quote or ''})
         t = out.get('totals') or {}
@@ -2309,7 +2383,7 @@ def build_parser():
     s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost', '--source'):   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base'):   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')

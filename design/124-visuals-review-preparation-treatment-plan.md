@@ -280,6 +280,27 @@ The later phases (reference sheet and golden picture, shot pictures, videos, rev
 | **C3. A new version** | The tidy instructions go in as a new instruction version: films in progress keep the old one; going back is easy |
 | **C4. The revised review prompt** | SK's review prompt (the one that opened this review: what happens, why, connections, what went wrong, better, too many rules, prompts that create prompts, API keys, parallel work, the flowchart), revised so that for each later phase it also brings up, unasked: change-history labels; topics written twice and copies that disagree; out-of-date rules; the other voices (server and chat-tool messages, the prompt-writing guide, the server's added lines) that disagree with the instructions; rules that misfire for one of the agreed film types; rules the server already checks that can be one line; and the phase's place in the split. SK reuses it for each later phase |
 
+### Phase B progress
+
+- **Work item 7, the film-type check (29 Oct 2026), for the four reviewed phases:** `design/124-b-film-types.md`. 21 rules misfire for at least one film type (the server refuses 8, refuses and warns 2, warns 8; 1 in the treatment estimate; 2 text only) and 5 are dead weight. Worst: a footage clip has no shot type of its own, so it is judged as an AI still or video; a busy scene makes every background worker a full record; a living subject must move a body-length even when it rightly holds still; every place must look occupied, even a clean show home; ordinary words read as craft techniques or size words ("points at", "the drill", "fewer"). For SK: the 16 with a clear fix and the 4 dead-weight items with a clear fix (one approval), then 5 decisions one at a time (items 2, 7, 12, 15 and the person-search row).
+  - **SK's five decisions (29 Oct 2026):**
+    - **(a) Busy scenes (item 2):** up to 3 background people are named workers (elements with beats); more than 3 are a crowd: the scene's ambient line plus one `groups` entry, not named elements.
+    - **(b) Graphics (item 7):** the 8-second limit stays (a run of graphics over 8 s is broken with a camera shot); the instructions' "six to ten seconds for a diagram that builds" is brought in line with it.
+    - **(c) A real person speaking to camera (item 12):** where a real person is required speaking on camera, it is the real person, never an AI lookalike: their other angles come from their own footage only; no AI picture of an identified speaker.
+    - **(d) Long AI-only passages (item 15):** kept: AI video is broken up (Gemini Omni makes at most 10 s); the run rule stays as it is, also in a film with no footage.
+    - **(e) Google search for people (dead-weight row):** kept: a web search for a person or character not in the footage is a reference for the person's description (decision 5: the web picture itself is never sent to the picture AI).
+  - **SK approved the 16 clear misfire fixes and the 4 dead-weight fixes (29 Oct 2026, "Yes, approve").** Built with Phase B: the text side in version 3, the server side in the checks.
+
+- **Phase B built (29 Oct 2026; not deployed):**
+  - **Code:** Changes 3 (Direction), 6 (accept or send back per gap, page and chat), 7 (`warning_answers`, the facts line), 8 (plain warnings: 20 kinds shown, 21 technical), 9 (`vw visuals plan-join`); the server side of the 16 + 4 film-type fixes and decisions (a) and (c): `visual_type: footage`, `staged_clean`, `speaker: true`, `continues_footage: true`, crowds as one varied group (more than 3 named background people refused), a gaze at `camera`, small-life holds, `fixed` at close sizes, the treatment's `shots[].seconds`; two server messages now point to `warning_answers`. Item 18 is text-only; item 7's "one build counts as one graphic" not built (the 8 s limit stays). Server unit 769 passed; plugin 329 passed, 3 known Windows-only failures; the page script checks clean.
+  - **Wording (version 3):** the four phases rewritten as one section each (common part; 1 Preparation, 2 Treatment, 3 The detailed plan, 4 The picture search; later phases word for word except three sentences that contradicted decisions); steps cut to 8 pointers. Pass 1 merged the copies and added the changes; pass 2 made every server-checked rule one line: the four phases 6,217 → 4,349 words; the whole visuals text 11,152 → 9,836 words. Trace: `design/124-b-wording-trace.md`; scripts `scripts/b_wording_v3.py`, `b_wording_v3_pass2.py`, `b_wording_v3_fixes.py`.
+  - **Independent check** (a helper that did not write the text): `design/124-b-independent-check.md`. It found 11 small losses, 2 meaning changes, 1 changed condition, 1 addition and 2 contradictions; all corrected (P1-P10, P12), P11 kept (it states an existing check, `size_repeat`). After the corrections, no number of the old text is missing.
+  - **Left for later:** the test-only workaround in `server/unit/conftest.py` (27 older test modules plan video shots over 10 s); the field details that now live only in the plan form and the refusal messages (heading, props, gaze parts, view values) — Part B item 3, to confirm in the trial run (C2).
+
+### After Phase C (SK, 29 Oct 2026)
+
+design/122 (films with no footage, and no spending limit for any film) and design/123 (English, Hindi and Tamil narrations) are built after Phase C, on the tidy, split instructions (version 3), each as its own release. Phases B and C only take them into account (the film-type check includes a film with no footage).
+
 ---
 
 ## Work item 7 — Check every rule against the kinds of film we make (agreed, SK 29 Oct 2026; not started)
@@ -288,7 +309,7 @@ The later phases (reference sheet and golden picture, shot pictures, videos, rev
 Change 4 was found by chance, while reading the treatment section: a rule written for one situation that fires in all of them. The visuals stage has many more rules: about 10,800 words of written instructions (several hundred rules), about 86 automatic checks that refuse a plan and 38 that warn, and the prompt-writing guide. Others are likely to misfire the same way (rules that assume real footage, rules written for a documentary, rules for long gaps that misfire on a 3-second gap).
 
 ### How
-1. **Agree the film types with SK first**, so every rule is tested against the same situations. Proposed list (SK to confirm or change):
+1. **The film types (confirmed by SK, 29 Oct 2026):**
    - a film that opens on real footage / a film that opens on a gap;
    - a human story (people at work) / a technical record (diagrams, sizes, numbers);
    - a film with no footage at all (design/122);

@@ -193,7 +193,9 @@ def test_a_graphic_says_what_it_depicts():
 
 def test_the_next_step_says_what_it_carries_over():
     """N14 in the plan."""
-    im = {**pshot('IM1', 0, 100, 'image'), 'narration': 'Then the bricks are laid on the plinth.', 'claims_left_out': [{'claim': 'x', 'reason': 'y'}]}
+    from test_design91_b1_pure import subject
+    im = {**pshot('IM1', 0, 100, 'image'), 'narration': 'Then the bricks are laid on the plinth.', 'claims_left_out': [{'claim': 'x', 'reason': 'y'}],
+          'subjects': [subject((0, 100, None))]}   # design/124-b item 20: a next step of a process, where a subject acts
     assert ('IM1', 'carries_over_missing') in kinds(plan([im] + rest()))
     assert ('IM1', 'carries_over_missing') not in kinds(plan([{**im, 'carries_over': ['the plinth under the first course']}] + rest()))
 

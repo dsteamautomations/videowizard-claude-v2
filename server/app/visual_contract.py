@@ -48,6 +48,8 @@ class Element(Model):
     material_spec: 'MaterialSpec | None' = None   # design/111 F10
     description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (build, age, skin, hair, posture, garment types and how worn), in every prompt
     signs_of_use: list['SignOfUse'] = Field(default_factory=list, max_length=30)   # design/111 F18: a place's traces of use, two written per shot
+    staged_clean: str = Field(default='', max_length=1000)   # design/124-b item 4: why this place is shown clean and unused (a handover, a showroom); then no signs of use
+    speaker: bool = False   # design/124-b decision (c): a real person speaking to camera in the footage; never an AI picture, every shot of them is footage
 
 
 class Position(Model):
@@ -183,7 +185,7 @@ class SignOfUse(Model):   # design/111 F18: a trace of work or living at one of 
 class Group(Model):   # design/111 F17: several of a kind in frame, all alike for a reason or no two alike with a trait each
     kind: str = Field(min_length=1, max_length=80)   # an element id, or the frame's own word (workers, people, cows)
     count: int = Field(ge=2)
-    mode: Literal['same', 'different']
+    mode: Literal['same', 'different', 'varied']   # design/124-b decision (a): varied, a crowd, a few traits used in turn
     reason: str = Field(default='', max_length=500)   # same: why they are alike
     items: list[str] = Field(default_factory=list, max_length=30)   # different: one trait each
 
@@ -234,6 +236,11 @@ def svg_needs(shot, seconds):
         need(a.kind != 'move' or len(a.path) >= 2, f'{label}: action {n}: move needs a path of two points or more.')
 
 
+class WarningAnswer(Model):   # design/124 Change 7: the answer to one warning of the check, kept out of the purpose and out of every picture request
+    kind: str = Field(min_length=1, max_length=80)
+    answer: str = Field(min_length=1, max_length=1000)
+
+
 class ClaimOut(Model):   # design/89 C1: a claim spoken over a graphic and left out on purpose
     claim: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=1, max_length=1000)
@@ -244,7 +251,7 @@ class Shot(Model):
     id: str = Field(min_length=1, max_length=80, pattern=r'^[A-Za-z0-9_-]+$')
     start_frame: int = Field(ge=0)
     end_frame: int = Field(gt=0)
-    visual_type: Literal['image', 'video', 'diagram', 'animation', 'drawn']   # design/113: drawn, a graphic the server renders from a declarative scene
+    visual_type: Literal['image', 'video', 'diagram', 'animation', 'drawn', 'footage']   # design/113: drawn, a graphic the server renders from a declarative scene; design/124-b item 1: footage, a clip stretch or a footage frame
     graphic_kind: Literal['diagram', 'chart', 'map', 'title', 'text'] = 'diagram'   # design/96 J2: what a graphic is checked for; leader lines only on a diagram
     narration: str = Field(max_length=12000)
     purpose: str = Field(min_length=1, max_length=4000)
@@ -291,6 +298,7 @@ class Shot(Model):
     size_reason: str = Field(default='', max_length=500)   # a stated reveal or repeat
     camera_reason: str = Field(default='', max_length=1000)   # design/103 A4: what the viewer should feel or read, and why this camera gives it
     claim: Literal['', 'visible', 'invisible'] = ''   # design/103 G2: a claim a camera could film, or one it cannot
+    warning_answers: list[WarningAnswer] = Field(default_factory=list, max_length=60)   # design/124 Change 7
 
 
 class Landmark(Model):
@@ -313,6 +321,7 @@ class Scene(Model):
     air: str = Field(default='', max_length=500)   # design/103 A2: what hangs in the air, lit by that light, or 'clean'
     outfit: dict[str, str] = Field(default_factory=dict)   # design/111 F16: person element id -> the garment colours of this scene
     time_jump: str = Field(default='', max_length=500)   # design/111 F16: the script's words when the colours change from the scene before
+    continues_footage: bool = False   # design/124-b item 11: the scene continues the place of the footage beside the gap, which is its wider view
 
 
 class SourceCandidate(Model):
@@ -393,14 +402,21 @@ TECHNIQUE_VERBS = {'pointing': r'point(s|ed|ing)?', 'plastering': r'plaster(s|ed
                    'welding': r'weld(s|ed|ing)?', 'soldering': r'solder(s|ed|ing)?', 'grouting': r'grout(s|ed|ing)?', 'painting': r'paint(s|ed|ing)?', 'sanding': r'sand(s|ed|ing)',
                    'polishing': r'polish(es|ed|ing)?', 'chiselling': r'chisel(s|led|ling)?', 'sawing': r'saw(s|ed|ing)', 'drilling': r'drill(s|ed|ing)?', 'stitching': r'stitch(es|ed|ing)?',
                    'weaving': r'weav(e|es|ing)|wove|woven', 'kneading': r'knead(s|ed|ing)?', 'moulding': r'mould(s|ed|ing)?', 'thatching': r'thatch(es|ed|ing)?', 'tying': r'tie(s|d)?|tying'}   # design/111 F14
-SIZE_WORDS = re.compile(r'\b(small|smaller|smallest|large|larger|largest|big|bigger|biggest|less|fewer|thin|thinner|thick|thicker|short|shorter|light|lighter|tall|taller|heavy|heavier|tiny|huge|mini|compact|narrow|narrower|wide|wider)\b', re.I)   # design/111 F15
+NOUN_BEFORE = {'the', 'a', 'an', 'his', 'her', 'their', 'its', 'in'}
+SIZE_WORDS = re.compile(r'\b(small|smaller|smallest|large|larger|largest|big|bigger|biggest|thin|thinner|thick|thicker|shorter|tall|taller|heavy|heavier|tiny|huge|mini|compact|narrow|narrower|wide|wider)\b', re.I)   # design/111 F15; design/124-b item 6: light, lighter, less, fewer, short dropped
+SMALL_LIFE = re.compile(r'\b(breath\w*|chew\w*|blink\w*|nod\w*|head|hands?|fingers?|tail|ears?|shifts?|sways?)\b', re.I)   # design/124-b item 3
+GAZE_CAMERA = 'camera'   # design/124-b item 17
+NEGATED = re.compile(r'(?:\bno|\bwithout|\bempty of|\bbefore the)\s+(?:\w+\s+)?$', re.I)   # design/124-b item 9
+CROWD = 3   # design/124-b decision (a): up to three background people are named; more are a crowd
 
 
 def technique_words(text):
     """design/111 F14: the techniques a beat's words name, in order of appearance, each once."""
     found = []
-    for m in re.finditer(r'[A-Za-z]+', str(text or '')):
-        w = m.group(0).lower()
+    words = [m.group(0).lower() for m in re.finditer(r'[A-Za-z]+', str(text or ''))]
+    for i, w in enumerate(words):
+        if i and words[i - 1] in NOUN_BEFORE or (w.startswith('point') and words[i + 1:i + 2] in (['at'], ['to'])):   # design/124-b item 5: a noun (the drill, his tie) or a gesture (points at)
+            continue
         for name, pat in TECHNIQUE_VERBS.items():
             if re.fullmatch(pat, w) and name not in found:
                 found.append(name)
@@ -418,7 +434,6 @@ def unique(rows, key, label):
     return set(values)
 
 
-MAX_GENERATED_SHOT_S = 30   # design/21 E7: today's AI video tools make at most 30 s per shot; longer blanks are several shots
 GRAPHIC_TYPES = ('diagram', 'animation')   # design/65: a diagram is a still, an animation a graphic sequence of stills; both are graphics for the pacing rules
 STILL_TYPES = ('image', 'diagram')         # filled by one approved picture (`vw visuals still`)
 MIN_STATE_S = 3                            # a state is read, not glanced
@@ -441,14 +456,14 @@ def _default_generator():
 
 
 def route_of(shot):
-    return 'video' if shot['visual_type'] == 'video' else 'graphic_sequence' if shot['visual_type'] == 'animation' else 'drawn' if shot['visual_type'] == 'drawn' else 'still'   # design/113
+    return 'footage' if shot['visual_type'] == 'footage' else 'video' if shot['visual_type'] == 'video' else 'graphic_sequence' if shot['visual_type'] == 'animation' else 'drawn' if shot['visual_type'] == 'drawn' else 'still'   # design/113
 
 
 def routes(plan, fps=25):
     """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
     graphics, and the images the plan will need: a start image per video shot and an end only where the shot's final state must be exact (design/112 S1),
     a start-only shot after an exact end starting on that end; one picture per still, one per state of a sequence."""
-    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'drawn': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0, 'drawn': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0,
+    out = {'video': 0, 'still': 0, 'graphic_sequence': 0, 'drawn': 0, 'footage': 0, 'seconds': {'video': 0.0, 'still': 0.0, 'graphic_sequence': 0.0, 'drawn': 0.0, 'footage': 0.0}, 'graphic_seconds': 0.0, 'images_estimated': 0,
            'still_moving': 0, 'still_frozen': 0}   # design/112 K3
     for gap in plan.get('gaps', []):
         scenes = gap.get('scenes') or []
@@ -471,7 +486,7 @@ def routes(plan, fps=25):
                     prev_exact = False
                     if kind == 'still':   # design/112 K3
                         out['still_frozen' if (shot.get('motion') or 'push_in') == 'none' else 'still_moving'] += 1
-                    if kind == 'drawn':   # design/113: rendered, no picture
+                    if kind in ('drawn', 'footage'):   # design/113: rendered, no picture; design/124-b item 1: footage, none made
                         out['images_estimated'] -= 1
                     out['images_estimated'] += len(shot.get('states') or []) or 1 if kind == 'graphic_sequence' else 1
     return out
@@ -526,11 +541,13 @@ def timing_warnings(gap_id, shots, timing, fps):
     return out
 
 
-def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE):
+def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True):
+    """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
     plan = Plan.model_validate(document)
     elements = unique(plan.elements, 'id', 'element')
     for e in plan.elements:   # review 27 Oct: an element's sizes (design/103 A5) are checked like a drawing spec's
         _dimension_needs(f'element {e.id}', e.size)
+        need(not e.speaker or e.kind == 'person', f'element {e.id}: speaker marks a real person speaking to camera; {e.id} is a {e.kind}.')   # design/124-b decision (c)
         if e.kind == 'material' or e.repeating:   # design/111 F10: one measured spec per repeating material
             need(e.material_spec is not None, f'element {e.id} is a repeating material: give its material_spec (unit sizes with sources, laid, joint, pattern, proportions), made like a drawing spec, never typed by the operator.')
             need(not e.size, f'element {e.id}: its sizes live in its material_spec, not in size.')
@@ -540,6 +557,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             need(e.material_spec.proportions, f'material spec of {e.id}: give the proportions that matter.')
     unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
     facts, ekind = {f.id: f for f in plan.visual_facts}, {e.id: e.kind for e in plan.elements}
+    speakers = {e.id for e in plan.elements if e.speaker}
     for f in plan.visual_facts:
         need(f.status == 'unknown' or f.source.strip(), f'fact {f.id} is {f.status}: give its source (the client, the footage with clip and time, a standard).')
         need(not f.about or f.about in elements, f'fact {f.id} is about {f.about}, which is not an element of the plan.')
@@ -583,11 +601,15 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     need(ekind.get(pid) == 'person', f'scene {scene.id}: outfit names {pid}, which is not a person element.')
                 for pid in {eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'place'}:   # design/111 F18
                     place_marks.setdefault(pid, set()).update(landmarks)
-                if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES + ('drawn',) for s in scene.shots):   # design/91 N4: life in the frame
+                background = sorted({sub.element_id for s in scene.shots for sub in s.subjects if sub.role == 'background' and ekind.get(sub.element_id) == 'person'})
+                need(len(background) <= CROWD, f"scene {scene.id} names {len(background)} background people ({', '.join(background)}): up to {CROWD} are named workers with beats; "
+                                               "more are a crowd: the scene's ambient line plus one groups entry (count, mode varied, a few traits used in turn), not named elements.")   # design/124-b decision (a)
+                if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES + ('drawn', 'footage') for s in scene.shots):   # design/91 N4: life in the frame; design/124-b item 1: footage has its own
                     if not scene.activity_level:
                         warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
                                          'from the narration and the brief'})
-                    elif scene.activity_level != 'quiet' and not any(sub.role in ('secondary', 'background') for s in scene.shots for sub in s.subjects):
+                    elif (scene.activity_level != 'quiet' and not any(sub.role in ('secondary', 'background') for s in scene.shots for sub in s.subjects)
+                          and not (scene.ambient.strip() and any(s.groups for s in scene.shots))):   # design/124-b decision (a): a crowd is the ambient line plus a group
                         warnings.append({'scene_id': scene.id, 'kind': 'life_missing', 'message': f'scene {scene.id} is {scene.activity_level} but shows one subject and no background '
                                          'activity: add who else is there and what they do (secondary or background subjects with beats) and the working equipment'})
                 if scenes is counted and any(s.visual_type == 'video' for s in scene.shots) and not scene.ambient.strip():   # design/101 M2
@@ -600,10 +622,10 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     need(shot.start_frame == cursor and shot.end_frame > cursor,
                          'Shots must cover their gap in order, without overlaps or missing frames.')
                     cursor = shot.end_frame
-                    if fps and shot.visual_type == 'video':   # design/65: an animation is stills now; only a video take has the generator's cap
-                        need((shot.end_frame - shot.start_frame) <= MAX_GENERATED_SHOT_S * float(fps),
-                             f'A generated shot is at most {MAX_GENERATED_SHOT_S} s; split a longer stretch into several shots.')
                     seconds = (shot.end_frame - shot.start_frame) / float(fps) if fps else None
+                    for sp in sorted(speakers & set(shot.element_ids)):   # design/124-b decision (c)
+                        need(shot.visual_type == 'footage', f'shot {shot.id}: {sp} is a real person speaking to camera: never an AI picture or take of them; '
+                                                            'their other angles come from their own footage: plan the shot as footage (visual_type footage).')
                     placed.append((gap.gap_id, shot.id, shot.visual_type, shot.start_frame, shot.end_frame))
                     if scenes is counted:
                         said.append(shot)
@@ -637,20 +659,21 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             and shot.visual_type == 'video' and not any(s.behaviour == 'acts' and s.beats for s in shot.subjects)):   # a graphic build is never under 4 s (a state holds 3 s)
                         what = 'AI video'
                         warnings.append({'shot_id': shot.id, 'kind': 'short_route', 'message': f'shot {shot.id} is {seconds:.1f} s of {what} with no visible action: under {STILL_MOVING_MAX_S} s the default is a moving still '
-                                         f"(a footage frame or an AI still with a push or a pan); say in purpose why this shot needs {what} ('because …'), or make it a still"})
+                                         f"(a footage frame or an AI still with a push or a pan); say why this shot needs {what} in its warning_answers (kind short_route), or make it a still"})
                     if seconds is not None and shot.visual_type == 'image':   # design/89 B1 (SK): 4 s moving, 3 s frozen
                         limit = STILL_FROZEN_MAX_S if shot.motion == 'none' else STILL_MOVING_MAX_S
                         if seconds > limit + 0.04:
                             warnings.append({'shot_id': shot.id, 'kind': 'still_long', 'message': f"shot {shot.id} is a {'frozen ' if shot.motion == 'none' else ''}still of {seconds:.1f} s: at most {limit} s; "
                                              'fill the stretch with several different stills or a moving shot (a clip stretch or a take)'})
-                    if seconds is not None and shot.visual_type == 'diagram' and seconds > GRAPHIC_BUILD_S + 0.04:
+                    if seconds is not None and shot.visual_type == 'diagram' and shot.graphic_kind not in ('title', 'text') and seconds > GRAPHIC_BUILD_S + 0.04:   # design/124-b item 7
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
                                          '(an animation shot) or a drawn animation'})
                     for fid in shot.fact_ids:   # design/91 N6
                         need(fid in facts, f'shot {shot.id} names the fact {fid}, which the plan does not have.')
                     rests_on = {fid: facts[fid] for fid in shot.fact_ids} | {f.id: f for f in plan.visual_facts if f.about and f.about in shot.element_ids}
-                    if 'close' in shot.framing.lower():
-                        for f in rests_on.values():
+                    if shot.size in CLOSE_SIZES or re.search(r'\bclose[- ]?up\b', shot.framing, re.I):   # design/124-b item 8: a close shot, on its subject's facts
+                        subj_ = {s.element_id for s in shot.subjects} or set(shot.element_ids[:1])
+                        for f in [facts[fid] for fid in shot.fact_ids] + [f for f in plan.visual_facts if f.about in subj_]:
                             need(f.status != 'unknown', f'shot {shot.id} is close on what fact {f.id} describes, and that fact is unknown: it is never invented; '
                                                        'frame the shot wider, or ask the operator.')
                     if any(ekind.get(e) in ('material', 'process') for e in shot.element_ids) and not rests_on:
@@ -663,7 +686,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         if shot.claims and not shot.evidence.strip():
                             warnings.append({'shot_id': shot.id, 'kind': 'evidence_missing', 'message': f'shot {shot.id}: say how its picture shows its claims (evidence): a test, a table, '
                                              'or the result in a scene, never an unrelated picture'})
-                    if (re.match(r'\s*(then|next|after (that|this)|once)\b', shot.narration, re.I) or re.search(r'\bon top of\b', shot.narration, re.I)) and not shot.carries_over:
+                    process = any(s.behaviour == 'acts' for sh_ in [shot] + gap_shots[-1:] for s in sh_.subjects)   # design/124-b item 20: a process has acting subjects
+                    if process and (re.match(r'\s*(then|next|after (that|this)|once)\b', shot.narration, re.I) or re.search(r'\bon top of\b', shot.narration, re.I)) and not shot.carries_over:
                         warnings.append({'shot_id': shot.id, 'kind': 'carries_over_missing', 'message': f'shot {shot.id} is the next step of a process: name what the step before left that '
                                          'must still be visible (carries_over)'})   # design/91 N14
                     if shot.visual_type in GRAPHIC_TYPES + ('drawn',):   # design/89 C1, D1, D3; design/113: a drawn shot too
@@ -675,7 +699,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
                                              'or name one left out on purpose with the reason (claims_left_out)'})
                         if shot.drawing_spec is None:
-                            if shot.graphic_kind not in ('title', 'text') and not NO_SPEC_WORDS.search(shot.production_method):   # defect 35: the words the message asks for are read
+                            real = any(ekind.get(e) in ('object', 'material') for e in shot.element_ids) or any(FIGURE.search(c) for c in shot.claims)   # design/124-b item 19: an idea graphic draws no real object
+                            if real and shot.graphic_kind not in ('title', 'text') and not NO_SPEC_WORDS.search(shot.production_method):   # defect 35: the words the message asks for are read
                                 warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
                                                  'its sources, and so does a chart or a timeline that carries figures; a title or a label alone needs none: say so in production_method'})   # design/124 A4 item 16
                         else:
@@ -710,13 +735,14 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         states = [subject.start, subject.end]
                         previous = last_states.get(subject.element_id)
                         if previous and previous != subject.start.model_dump() and not subject.continuity_note.strip():
-                            warnings.append({'shot_id': shot.id, 'element_id': subject.element_id,
+                            warnings.append({'shot_id': shot.id, 'element_id': subject.element_id, 'kind': 'state_changed',
                                              'message': 'Subject state changed between shots; explain the movement, elapsed time or intended discontinuity.'})
                         living = shot.visual_type == 'video' and ekind.get(subject.element_id) in ('person', 'animal')
                         if subject.behaviour == 'holds':
                             need(not subject.beats and subject.hold_reason.strip(), 'A held subject needs its reason, not invented beats.')
+                            small_life = SMALL_LIFE.search(subject.hold_reason) and not ('stand' in subject.start.pose.lower() and scene.activity_level in ('normal', 'busy'))   # design/124-b item 3
                             if living:   # design/110 F6: a living thing that is not the actor still gets its own small change
-                                need(subject.start.position != subject.end.position, f'shot {shot.id}: {subject.element_id} is a living thing that stands still from start to end; give it a small move '
+                                need(small_life or subject.start.position != subject.end.position, f'shot {shot.id}: {subject.element_id} is a living thing that stands still from start to end; give it a small move '
                                      '(its end position a body-length or so from its start, against a landmark).')
                                 need(subject.start.pose == subject.end.pose and subject.start.holding == subject.end.holding and subject.start.progress == subject.end.progress,
                                      'A held subject cannot change what it holds or its progress.')
@@ -768,20 +794,23 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         if shot.visual_type == 'video' and ekind.get(subject.element_id) == 'person' and shot.face_in_frame:   # design/111 F7: the eyes have a state too
                             for state in states:
                                 need(state.gaze is not None, f'shot {shot.id}: {subject.element_id} is a person with the face in frame: give gaze (target, head_turn, mouth) on every state, or set face_in_frame false for a back view or hands in close.')
-                                need(state.gaze.target in landmarks or state.gaze.target in elements, f'shot {shot.id}: {subject.element_id}\'s gaze target is a landmark of the scene or a named element ({state.gaze.target} is neither).')
+                                need(state.gaze.target in landmarks or state.gaze.target in elements or state.gaze.target == GAZE_CAMERA, f'shot {shot.id}: {subject.element_id}\'s gaze target is a landmark of the scene or a named element, or the camera ({state.gaze.target} is none of them).')   # design/124-b item 17
                         if shot.visual_type == 'video':   # design/110 F1: the past tense comes from the plan, never from the server
                             for beat in subject.beats:
                                 need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second").')
                         last_states[subject.element_id] = subject.end.model_dump()
                     if shot.visual_type == 'video':   # design/111 F17: several of a kind are a group, same or different
                         several = {o.element_id for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for o in stt.objects if o.count > 1}
-                        several |= {w.lower() for w in GROUP_WORDS.findall(shot.framing + ' ' + shot.appearance)}
+                        text_ = shot.framing + ' ' + shot.appearance
+                        several |= {m.group(0).lower() for m in GROUP_WORDS.finditer(text_) if not NEGATED.search(text_[:m.start()])}   # design/124-b item 9: "no workers yet" asks for none
                         have_ = {g.kind.lower() for g in shot.groups}
                         for k_ in sorted(several):
                             need(k_.lower() in have_, f'shot {shot.id} shows several {k_} (more than one in frame): give groups an entry for it, mode same with the reason or different with one trait each.')
                         for g in shot.groups:
                             if g.mode == 'same':
                                 need(g.reason.strip(), f'shot {shot.id}: the {g.kind} are all alike: give the reason (one batch, one uniform).')
+                            elif g.mode == 'varied':   # design/124-b decision (a): a crowd, a few traits used in turn, never one per head
+                                need(len([i for i in g.items if i.strip()]) >= 2, f'shot {shot.id}: the {g.kind} are a varied crowd: give a few traits (two or more) in items, used in turn.')
                             else:
                                 need(len([i for i in g.items if i.strip()]) >= g.count, f'shot {shot.id}: the {g.kind} are {g.count} and different: give one trait each in items.')
                     if shot.visual_type == 'video':   # design/111 F14: every technique the beats name is an element, so it gets its reference like a person or a tool
@@ -790,7 +819,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             for b in s.beats:
                                 for tech in technique_words(b.action + ' ' + b.done):
                                     need(tech in names_, f"shot {shot.id}: the technique '{tech}' (beat {b.id}: {b.action}) is not an element: add it (kind technique, id {tech.upper()}) so it joins the reference round and gets its own picture.")
-                    if SIZE_WORDS.search(' '.join(shot.claims + shot.descriptors)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message
+                    if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and SIZE_WORDS.search(' '.join(shot.claims + shot.descriptors)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message; design/124-b item 6: a graphic shows size by its figures
                         subj = shot.subjects[0].element_id if shot.subjects else shot.element_ids[0]
                         el = next((e for e in plan.elements if e.id == subj), None)
                         sized_ = bool(el) and any(d.value is not None for d in (el.size or []) + list((el.material_spec.dimensions if el.material_spec else [])))
@@ -799,7 +828,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         need(shot.compare_to in shot.element_ids and shot.compare_to != subj, f'shot {shot.id}: compare_to names an element in frame other than the subject ({shot.compare_to} is not).')
                     if shot.visual_type == 'video' and shot.subjects:   # design/111 F8: three fixed things of the place, from the landmarks, never an element (a shot with an action: it gets an end or a take)
                         wanted = min(3, len(landmarks))
-                        need(len(shot.fixed) == wanted and len(set(shot.fixed)) == wanted, f'shot {shot.id}: names three fixed things of the background in fixed (landmark ids; all of them when the scene has fewer than three).')
+                        close_ = shot.size in CLOSE_SIZES   # design/124-b item 16: at MCU or closer, only the landmarks in frame, down to none
+                        need(len(set(shot.fixed)) == len(shot.fixed) and (len(shot.fixed) <= wanted if close_ else len(shot.fixed) == wanted),
+                             f'shot {shot.id}: names three fixed things of the background in fixed (landmark ids; all of them when the scene has fewer than three; at MCU or closer, only those in frame).')
                         for lid in shot.fixed:
                             need(lid in landmarks, f'shot {shot.id}: {lid} is not a landmark of the scene (fixed names landmarks only).')
                             need(lid not in elements, f'shot {shot.id}: {lid} is an element, a thing that can be carried: it belongs to objects, not to fixed.')
@@ -820,10 +851,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         own = {b.id: b for s in shot.subjects for b in s.beats}
                         for ch in shot.changes:
                             need(ch.beat_id in own, f"shot {shot.id}: the change '{ch.what}' names {ch.beat_id}, which is not a beat of this shot.")
-                        if shot.changes and not shot.end_state_exact:   # design/112 S1: start-only by default; a planned visible result is a choice made on purpose
-                            warnings.append({'shot_id': shot.id, 'kind': 'end_state', 'message': f'shot {shot.id} has a change list and no exact end: its take is made from the start image alone '
-                                             '(the motion carries the change); set end_state_exact true if the final state must be exact, then an end image is made'})
-                        if not shot.changes:
+                        if not shot.changes and any(s.behaviour == 'acts' for s in shot.subjects):   # design/124-b item 10: an ambient-only shot changes nothing; no end_state warning on the default
                             warnings.append({'shot_id': shot.id, 'kind': 'changes_missing', 'message': f'shot {shot.id}: list what the action changes and the beat that '
                                              'causes each (changes); the take, and the pair where there is one, is checked against it'})   # design/124 A4 item 23
                         acting = [s for s in shot.subjects if s.behaviour == 'acts']
@@ -863,9 +891,9 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     placed.sort(key=lambda p: p[3])
     for prev, cur in zip(placed, placed[1:]):
         if prev[2] in GRAPHIC_TYPES and cur[2] in GRAPHIC_TYPES and (prev[0] == cur[0] or prev[4] == cur[3]):
-            warnings.append({'shot_id': cur[1], 'kind': 'graphics_back_to_back', 'message': f"shots {prev[1]} and {cur[1]} are graphics back to back: the second shot's purpose must say why it stays a graphic"})
+            warnings.append({'shot_id': cur[1], 'kind': 'graphics_back_to_back', 'message': f"shots {prev[1]} and {cur[1]} are graphics back to back: say why the second stays a graphic in its warning_answers (kind graphics_back_to_back)"})
     for e in plan.elements:   # design/111 F18: a place the film shows carries its signs of use, each at a landmark of a scene that shows it
-        if e.id in place_marks:
+        if e.id in place_marks and not e.staged_clean.strip():   # design/124-b item 4: a place staged clean, with its reason, carries none
             need(len(e.signs_of_use) >= 2, f'{e.id} is a place the film shows: give signs_of_use, two or more traces of work or living, each at one of its landmarks.')
             for s in e.signs_of_use:
                 need(s.landmark_id in place_marks[e.id], f'{e.id}: {s.landmark_id} is not a landmark of a scene that shows {e.id} (signs_of_use).')
@@ -883,11 +911,11 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             seconds = (r[-1][4] - r[0][3]) / float(fps or 25)
             if seconds > AI_RUN_S:
                 warnings.append({'gap_id': gap.gap_id, 'shot_id': r[0][1], 'kind': 'ai_run', 'message': f"gap {gap.gap_id}: shots {', '.join(p[1] for p in r)} are {seconds:.1f} s of AI video back to back, over {AI_RUN_S} s: "
-                                 'break the run with a frame from the footage, a still or a graphic, and cut the AI shots to three to five seconds each; a run that long reads as synthetic'})
+                                 f"break the run with {'a frame from the footage, ' if footage else ''}a still or a graphic, and cut the AI shots to three to five seconds each; a run that long reads as synthetic"})   # design/124-b item 13
     for gap in plan.gaps:
         own = [p for p in placed if p[0] == gap.gap_id]
         if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):
-            warnings.append({'gap_id': gap.gap_id, 'kind': 'all_graphics', 'message': f'gap {gap.gap_id} is {len(own)} shots, all graphics: mix in a frame from the footage or a scene unless each one earns its place'})
+            warnings.append({'gap_id': gap.gap_id, 'kind': 'all_graphics', 'message': f"gap {gap.gap_id} is {len(own)} shots, all graphics: mix in {'a frame from the footage or ' if footage else ''}a scene unless each one earns its place"})   # design/124-b item 13
     if graphic_seen and plan.foundation.graphic_style is None:   # design/89 C2
         warnings.append({'kind': 'style_missing', 'message': 'the plan has graphics: give foundation.graphic_style (palette from the client card, line weight, labels, background, how the frame '
                                                            'is filled); the operator approves it once as a style sheet picture and every graphic\'s first picture is made from it'})   # design/124 A4 item 24
@@ -901,12 +929,15 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                                           'build the graphics, or say why this film needs them still'})
     warnings.extend(course_warnings(plan, fps))   # design/103
     result = plan.model_dump()
+    answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
         if key not in document: result.pop(key)
     for key in ('specifications', 'production_constraints', 'editing_constraints', 'graphic_style', 'studio_background'):
         if key not in document['foundation']: result['foundation'].pop(key)
     for element, original_element in zip(result['elements'], document.get('elements', [])):
         if 'size' not in original_element: element.pop('size')   # design/103: absent stays absent
+        for key in ('staged_clean', 'speaker'):   # design/124-b: absent stays absent
+            if key not in original_element: element.pop(key)
         for d, od in zip(element.get('size') or [], original_element.get('size') or []):
             if 'tried' not in od: d.pop('tried', None)
     # New presentation fields must not change legacy approval digests when absent.
@@ -919,12 +950,12 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         for scene, original_scene in scene_pairs:
             if 'title' not in original_scene: scene.pop('title')
             if 'activity_level' not in original_scene: scene.pop('activity_level')
-            for key in ('ambient', 'light', 'air'):   # design/101, 103: absent stays absent
+            for key in ('ambient', 'light', 'air', 'continues_footage'):   # design/101, 103, 124-b: absent stays absent
                 if key not in original_scene: scene.pop(key)
             for shot, original_shot in zip(scene['shots'], original_scene['shots']):
                 for key in ('title', 'appearance', 'production_method', 'review_notes', 'states', 'motion', 'motion_reason', 'return_of', 'differs_by',
                             'claims', 'claims_left_out', 'drawing_spec', 'changes', 'fact_ids', 'descriptors', 'evidence', 'depicts', 'carries_over', 'message', 'adds',
-                            'transition_in', 'transition_out', 'transition_reason', 'size', 'size_reason', 'camera_reason', 'claim'):   # design/89, 91, 103: absent stays absent
+                            'transition_in', 'transition_out', 'transition_reason', 'size', 'size_reason', 'camera_reason', 'claim', 'warning_answers'):   # design/89, 91, 103, 124: absent stays absent
                     if key not in original_shot: shot.pop(key)
                 if shot.get('drawing_spec') and original_shot.get('drawing_spec'):   # design/106: absent stays absent
                     if 'proportions' not in original_shot['drawing_spec']: shot['drawing_spec'].pop('proportions', None)
@@ -938,7 +969,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     return result, warnings
 
 
-SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim'), ('size',)   # design/101, 103
+SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers'), ('size',)   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale
 
 
 def _drop(d, keys):
@@ -977,7 +1008,7 @@ CLOSE_SIZES, OPEN_SIZES = ('MCU', 'CU', 'ECU'), ('EWS', 'WS', 'MWS')
 SIZE_ORDER = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
 
 
-FOOTAGE_CITED = re.compile(r'\b(footage|frame)\b', re.I)   # design/119 rule 7
+FOOTAGE_CITED = re.compile(r'\b(footage|clips?)\b', re.I)   # design/119 rule 7; design/124-b item 21: a door frame is no footage
 PASSER_BY = re.compile(r'passer|passing by|walk(?:s|ing)? by|in the background|background person', re.I)   # design/119 rule 9
 
 
@@ -996,11 +1027,12 @@ def footage_cited(element, facts):
 def course_warnings(plan, fps):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
+    acting = {s.element_id for g in plan.gaps for sc in list(g.scenes) + [x for c in g.choices for x in c.scenes] for sh in sc.shots for s in sh.subjects if s.beats}
     for e in plan.elements:   # A5
         if e.kind not in ('person', 'graphic') and e.identity != 'exact' and footage_cited(e, plan.visual_facts):   # design/119 rule 7
             out.append({'element_id': e.id, 'kind': 'footage_identity', 'message': f'element {e.id}: its fact or size cites the footage ({footage_cited(e, plan.visual_facts)[:80]}): a thing the footage shows is '
                                                                                    'identity exact with an approved footage frame as its identity; set identity exact and approve a frame of it before any picture'})
-        if e.kind == 'person' and PASSER_BY.search(f'{e.requirements} {e.description}'):   # design/119 rule 9
+        if e.kind == 'person' and e.id not in acting and PASSER_BY.search(f'{e.requirements} {e.description}'):   # design/119 rule 9; design/124-b decision (a): a worker with beats is named on purpose
             out.append({'element_id': e.id, 'kind': 'passer_by', 'message': f'element {e.id} reads as a passer-by: a background person who only passes is never a named element with a sheet; '
                                                                             "describe them in each scene's own words, different every time"})
         if e.kind in ('person', 'object', 'animal') and not e.size and not e.material_spec:   # defect 35: a material's sizes live in its material_spec (design/111 F10), never in a size list
@@ -1010,10 +1042,12 @@ def course_warnings(plan, fps):
         scenes = next((c.scenes for c in gap.choices if c.id == gap.recommended_choice), []) if gap.choices else gap.scenes
         run_s, run_ids = 0.0, []
         for scene in scenes:
-            if any(s.visual_type not in GRAPHIC_TYPES for s in scene.shots) and not scene.light.strip():   # A1
+            if any(s.visual_type not in GRAPHIC_TYPES + ('footage',) for s in scene.shots) and not scene.light.strip():   # A1; design/124-b item 1: footage has its own light
                 out.append({'scene_id': scene.id, 'kind': 'light_missing', 'message': f'scene {scene.id}: describe its light once (light): the sources against the landmarks, '
                                                                                       'the main one, hard or soft, colour, strength'})
             seen, sizes = {}, []   # A3: the widest size each element was seen at so far in the scene; the sizes in order
+            if scene.continues_footage:   # design/124-b item 11: the footage beside the gap showed the place and its subjects wider
+                seen, sizes = {e: 0 for sh in scene.shots for e in sh.element_ids}, ['footage']
             for shot in scene.shots:
                 if shot.visual_type in GRAPHIC_TYPES:
                     run_s += (shot.end_frame - shot.start_frame) / float(fps) if fps else 0
@@ -1025,7 +1059,7 @@ def course_warnings(plan, fps):
                 if run_s > 8:   # G1: a camera shot ends a run of graphics
                     out.append(_graphics_run(gap.gap_id, run_ids, run_s))
                 run_s, run_ids = 0.0, []
-                if not shot.camera_reason.strip():   # A4
+                if not shot.camera_reason.strip() and shot.visual_type != 'footage':   # A4; design/124-b item 1: the footage's camera is given
                     out.append({'shot_id': shot.id, 'kind': 'camera_reason_missing',
                                 'message': f'shot {shot.id}: say what the viewer should feel or read, and why this angle, size and move give it (camera_reason)'})
                 if not shot.size:   # review 27 Oct: an unsized shot breaks the run and is the opener if it comes first; it is never skipped over
@@ -1051,6 +1085,57 @@ def course_warnings(plan, fps):
 def _graphics_run(gap_id, ids, seconds):   # design/93 G1
     return {'gap_id': gap_id, 'kind': 'graphics_run', 'message': f"{seconds:.1f} s of graphics in a row in {gap_id} ({', '.join(ids)}): above 8 s, break it with a camera shot"
                                                               + ('; above 12 s, give the reason in the treatment' if seconds > 12 else '')}
+
+
+# design/124 Change 8: the warnings that change what the operator will see, each in one plain sentence shown with its gap on the plan step;
+# the technical ones stay between the assistant and the server.
+WARNING_PLAIN = {
+    'cut_off_pause': 'This cut falls in the middle of a sentence, not in a pause.',
+    'words_off_picture': 'This picture is not on screen when its words are spoken.',
+    'state_off_words': 'A part of this graphic appears before or after the words it shows.',
+    'life_missing': 'This busy scene shows one person and nothing else going on around them.',
+    'build_short': 'This graphic has more points to show than steps to show them in.',
+    'graphic_short': 'This graphic is on screen too briefly to be read.',
+    'still_long': 'This still picture stays on screen longer than a still should.',
+    'graphic_unbuilt': 'This graphic stays on screen a long time without building up.',
+    'state_long': 'One step of this graphic stays on screen too long.',
+    'look_only': 'The only change in this video is a look or an expression, which AI video often gets wrong.',
+    'message_repeated': 'This shot says again what an earlier shot already said.',
+    'graphics_back_to_back': 'Two graphics follow each other with no camera picture between them.',
+    'ai_run': 'Several AI videos run back to back here for a long stretch.',
+    'all_graphics': 'Every shot of this gap is a graphic, with nothing from the footage or a scene.',
+    'graphics_run': 'Graphics run for more than 8 seconds here without a camera picture.',
+    'claim_visible_graphic': 'This graphic shows something a camera could film.',
+    'size_open': 'This scene opens close in, before the place has been seen.',
+    'size_repeat': 'Three shots in a row are framed at the same size.',
+    'size_close_first': 'This close-up comes before the subject has been seen wider.',
+    'look_alike': 'This picture looks like another one in the film.',
+}
+WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missing', 'carries_over_missing', 'changes_missing', 'claims_missing', 'depicts_missing',
+                     'element_size_missing', 'end_state', 'evidence_missing', 'facts_missing', 'footage_identity', 'frozen_share', 'light_missing', 'min_s_missing',
+                     'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'state_changed', 'style_missing')
+
+
+def answer_warnings(plan, warnings):
+    """design/124 Change 7: a warning counts as answered when its shot (else its scene, its gap, else any shot of the plan) has a warning_answers entry of its kind."""
+    where = {}
+    for gap in plan['gaps']:
+        for scene in all_scenes(gap):
+            for shot in scene['shots']:
+                answers = {}
+                for a in shot.get('warning_answers') or []:
+                    need(a['kind'] in WARNING_PLAIN or a['kind'] in WARNING_TECHNICAL, f"shot {shot['id']}: warning_answers names {a['kind']!r}, which is no kind of warning.")
+                    answers[a['kind']] = a['answer']
+                where[('shot', shot['id'])] = answers
+                for k in (('scene', scene['id']), ('gap', gap['gap_id']), ('plan',)):
+                    where[k] = {**answers, **where.get(k, {})}
+    for w in warnings:
+        at = ('shot', w['shot_id']) if w.get('shot_id') else ('scene', w['scene_id']) if w.get('scene_id') else ('gap', w['gap_id']) if w.get('gap_id') else ('plan',)
+        answer = (where.get(at) or {}).get(w.get('kind'))
+        w['answered'] = answer is not None
+        if answer is not None:
+            w['answer'] = answer
+    return warnings
 
 
 def gap_digest(plan, gap):

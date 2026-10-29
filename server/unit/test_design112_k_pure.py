@@ -27,7 +27,7 @@ def test_a_short_video_or_build_without_action_is_warned_unless_the_purpose_says
     d = plan([{**pshot('V1', 0, 75, 'video'), 'subjects': []}, pshot('IM1', 75, 1000, 'image')])   # 3 s of AI video, no acting beat
     assert ('V1', 'short_route') in kinds(d)
     w = next(w for w in check(d)[1] if w.get('kind') == 'short_route')
-    assert 'moving still' in w['message'] and 'purpose' in w['message']
+    assert 'moving still' in w['message'] and 'warning_answers' in w['message']   # design/124 Change 7
     d['gaps'][0]['scenes'][0]['shots'][0]['purpose'] = 'the water must be seen running, because a still cannot show the flow'
     assert ('V1', 'short_route') not in kinds(d)
     # a graphic build is never under 4 s (a state holds 3 s at least), so K1 is about AI video

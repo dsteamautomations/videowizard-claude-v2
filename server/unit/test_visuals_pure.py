@@ -36,7 +36,7 @@ def test_routes_count_video_stills_and_graphic_sequences_with_no_file_warning():
     assert not [w for w in warnings if w.get('kind') == 'route']
     r = VC.routes(result)
     assert r['video'] == 1 and r['still'] == 2 and r['graphic_sequence'] == 1
-    assert r['seconds'] == {'video': 4.0, 'still': 24.0, 'graphic_sequence': 12.0, 'drawn': 0.0} and r['graphic_seconds'] == 16.0   # diagram 4 s + sequence 12 s; design/113 adds the drawn route
+    assert r['seconds'] == {'video': 4.0, 'still': 24.0, 'graphic_sequence': 12.0, 'drawn': 0.0, 'footage': 0.0} and r['graphic_seconds'] == 16.0   # diagram 4 s + sequence 12 s; design/113 adds the drawn route
     assert r['images_estimated'] == 1 + 3 + 1 + 1   # a start image (design/112 S1: no end unless exact), three states, a diagram, a picture
 
 
@@ -78,7 +78,7 @@ def test_graphic_warnings_short_static_back_to_back_and_all_graphics():
     short = next(w for w in warnings if w.get('kind') == 'graphic_short')
     assert 'DG1 is a graphic of 2.0 s' in short['message'] and 'at least 3 s' in short['message']
     pair = next(w for w in warnings if w.get('kind') == 'graphics_back_to_back')
-    assert 'DG1 and DG2 are graphics back to back' in pair['message'] and "second shot's purpose" in pair['message']
+    assert 'DG1 and DG2 are graphics back to back' in pair['message'] and 'warning_answers' in pair['message']   # design/124 Change 7
     # design/89 B1: a still of four seconds that moves passes; the 20 s one above is warned
     _, warnings = VC.validate_plan(plan([shot('IM1', 0, 100, 'image'), shot('VS1', 100, 600, 'video'), shot('VS2', 600, 1000, 'video')]), GAPS, Fraction(25))
     assert not [w for w in warnings if w.get('kind') == 'still_long']
@@ -226,9 +226,7 @@ def test_a_video_shot_longer_than_omni_makes_is_refused(monkeypatch):
     assert not [w for w in warnings if w.get('kind') == 'length']
 
 
-def test_a_generated_shot_over_thirty_seconds_is_still_refused():
-    with pytest.raises(ValueError, match='at most 30 s'):
-        VC.validate_plan(plan([shot('VS1', 0, 1000, 'video')]), GAPS, Fraction(25))   # 40 s
+def test_forty_seconds_of_graphic_states_is_fine():   # design/124-b: the 30 s cap on a video shot is gone; Omni's 10 s refuses first
     result, _ = VC.validate_plan(plan([{**shot('AN1', 0, 1000, 'animation'), 'states': states(10, 10, 10, 10)}]), GAPS, Fraction(25))   # 40 s of stills is fine
     assert len(result['gaps'][0]['scenes'][0]['shots'][0]['states']) == 4
 

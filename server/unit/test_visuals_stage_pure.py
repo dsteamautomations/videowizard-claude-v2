@@ -95,7 +95,7 @@ def saved(store):
     return json.loads(store.files['run-1/visuals/session.json'])
 
 
-TREATMENT = {'gaps': [{'gap_id': 'G1', 'intended': ['Cutaway section revealing hollow cavities inside the wall.'], 'picture': 'the wall section builds: bricks on edge, then the cavities, then the air gap labelled',
+TREATMENT = {'direction': 'technical record with scenes of work', 'gaps': [{'gap_id': 'G1', 'intended': ['Cutaway section revealing hollow cavities inside the wall.'], 'picture': 'the wall section builds: bricks on edge, then the cavities, then the air gap labelled',
                        'routes': ['graphic_sequence'], 'seconds': 20, 'images': 3},
                       {'gap_id': 'G2', 'intended': [], 'picture': 'water poured over a finished wall in the yard', 'routes': ['video'], 'seconds': 10, 'images': 1, 'departure': ''}]}
 
@@ -117,23 +117,23 @@ def test_the_treatment_totals_the_frozen_seconds_and_shows_the_share_of_the_film
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 4.0, 'video_inr_per_s': 8.9})
     store = store_with(session())
     first_cut = {'stage': 'first_cut', 'unit': None, 'summary': {'duration_frames': 2500}}   # a 100 s film
-    doc = {'gaps': [{**TREATMENT['gaps'][0], 'frozen_seconds': 12}, TREATMENT['gaps'][1]]}
+    doc = {**TREATMENT, 'gaps': [{**TREATMENT['gaps'][0], 'frozen_seconds': 12}, TREATMENT['gaps'][1]]}
     out = VS.treatment(store, USER, RUN, [first_cut], doc, 'yes')
     assert out['totals']['frozen_seconds'] == 12 and out['totals']['frozen_share'] == 0.12 and out['totals']['frozen_limit'] == 0.1
     with pytest.raises(Problem, match='frozen_seconds'):
-        g(lambda: VS.treatment(store, USER, RUN, [], {'gaps': [{**TREATMENT['gaps'][0], 'frozen_seconds': 99}, TREATMENT['gaps'][1]]}, 'yes'))
+        g(lambda: VS.treatment(store, USER, RUN, [], {**TREATMENT, 'gaps': [{**TREATMENT['gaps'][0], 'frozen_seconds': 99}, TREATMENT['gaps'][1]]}, 'yes'))
 
 
 def test_treatment_refuses_a_missing_gap_an_unknown_route_or_no_words():
     store = store_with(session())
     with pytest.raises(Problem, match='covers every gap'):
-        g(lambda: VS.treatment(store, USER, RUN, [], {'gaps': TREATMENT['gaps'][:1]}, 'yes'))
-    bad = {'gaps': [{**TREATMENT['gaps'][0], 'routes': ['hand_made']}, TREATMENT['gaps'][1]]}
+        g(lambda: VS.treatment(store, USER, RUN, [], {**TREATMENT, 'gaps': TREATMENT['gaps'][:1]}, 'yes'))
+    bad = {**TREATMENT, 'gaps': [{**TREATMENT['gaps'][0], 'routes': ['hand_made']}, TREATMENT['gaps'][1]]}
     with pytest.raises(Problem, match='route'):
         g(lambda: VS.treatment(store, USER, RUN, [], bad, 'yes'))
     assert VS.treatment(store, USER, RUN, [], TREATMENT, '  ')['draft'] is True   # no words: the draft the page shows, not a record
     with pytest.raises(Problem, match='unknown gap'):
-        g(lambda: VS.treatment(store, USER, RUN, [], {'gaps': TREATMENT['gaps'] + [{**TREATMENT['gaps'][0], 'gap_id': 'G9'}]}, 'yes'))
+        g(lambda: VS.treatment(store, USER, RUN, [], {**TREATMENT, 'gaps': TREATMENT['gaps'] + [{**TREATMENT['gaps'][0], 'gap_id': 'G9'}]}, 'yes'))
 
 
 def test_propose_is_refused_without_a_treatment_and_when_a_route_departs_from_it(monkeypatch):
@@ -150,7 +150,7 @@ def test_propose_is_refused_without_a_treatment_and_when_a_route_departs_from_it
     with pytest.raises(Problem, match="gap G1: the plan uses \\['still'\\] but the treatment says \\['graphic_sequence'\\]"):
         g(lambda: VS.propose(FakeConn(), store, USER, RUN, [], departed))
     # footage in the treatment allows a still in the plan (a frame shown as a still)
-    VS.treatment(store, USER, RUN, [], {'gaps': [{**TREATMENT['gaps'][0], 'routes': ['footage']}, TREATMENT['gaps'][1]]}, 'yes again')
+    VS.treatment(store, USER, RUN, [], {**TREATMENT, 'gaps': [{**TREATMENT['gaps'][0], 'routes': ['footage']}, TREATMENT['gaps'][1]]}, 'yes again')
     assert VS.propose(FakeConn(), store, USER, RUN, [], departed)['version'] == 2
 
 
@@ -807,11 +807,11 @@ def test_treatment_takes_routes_from_the_shots_when_one_is_named_and_refuses_an_
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     one = {**TREATMENT['gaps'][1], 'routes': ['video'], 'shots': [{'id': 'S1', 'route': 'video', 'seconds': 6}, {'id': 'S2', 'route': 'still', 'seconds': 4}]}
     store = store_with(session())
-    out = VS.treatment(store, USER, RUN, [], {'gaps': [TREATMENT['gaps'][0], one]}, 'yes')
+    out = VS.treatment(store, USER, RUN, [], {**TREATMENT, 'gaps': [TREATMENT['gaps'][0], one]}, 'yes')
     assert out['recorded'] and saved(store)['treatment']['gaps'][1]['routes'] == ['video', 'still']
     several = {**one, 'routes': ['video', 'graphic_sequence']}   # names two, a shot uses a third
     with pytest.raises(Problem, match="gap G2: shot S2 uses the route 'still', which the entry does not name"):
-        g(lambda: VS.treatment(store_with(session()), USER, RUN, [], {'gaps': [TREATMENT['gaps'][0], several]}, 'yes'))
+        g(lambda: VS.treatment(store_with(session()), USER, RUN, [], {**TREATMENT, 'gaps': [TREATMENT['gaps'][0], several]}, 'yes'))
 
 
 def test_the_cap_message_tells_the_operator_the_spend_and_names_the_builder(monkeypatch):
@@ -942,7 +942,7 @@ def test_a_revision_drops_the_acceptance_keeps_the_words_and_clears_when_the_gap
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
     store = store_with(session(library_version='vwlib-x'))
     store.files['run-1/visuals/package.json'] = json.dumps({'intended_visuals': []}).encode('utf-8')
-    VS.treatment(store, USER, RUN, [], {'gaps': [{**TREATMENT['gaps'][0], 'routes': ['still']}, TREATMENT['gaps'][1]]}, 'yes')
+    VS.treatment(store, USER, RUN, [], {**TREATMENT, 'gaps': [{**TREATMENT['gaps'][0], 'routes': ['still']}, TREATMENT['gaps'][1]]}, 'yes')
     VS.propose(FakeConn(), store, USER, RUN, [], doc)   # version 1, validated as the real flow stores it
     VS.accept(store, USER, RUN, [], ['G1', 'G2'], 'yes both')
     with pytest.raises(Problem, match='operator'):

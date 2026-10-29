@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, STILL_TYPES, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -280,14 +280,14 @@ def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
-        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE)   # design/89 B4
+        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)))   # design/89 B4; design/124-b item 13
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
     r = routes(plan, _fps(session) or 25)
     pr = prices()
     planned = round(r['images_estimated'] * pr['image_inr'] + r['seconds']['video'] * pr['video_inr_per_s'], 2)   # design/65 B7: the cost against the cap, before anything is paid
     alike = look_alike_placed(store, session)   # design/89 H6: the pictures already placed that look alike
-    warnings += [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike]
+    warnings += answer_warnings(plan, [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike])   # design/124 Change 7
     split = {}
     for gap in plan['gaps']:   # design/97 G3: a gap with choices is split by its recommended choice
         try:
@@ -301,8 +301,11 @@ def check(store, run, outputs, document):
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
-    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE))
+    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs))))
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
+    direction = ' '.join(str(session['treatment'].get('direction') or '').split())   # design/124 Change 3: a treatment recorded before it has none
+    need(not direction or ' '.join(plan['foundation']['treatment'].split()).startswith(direction),
+         "foundation.treatment starts from the treatment's Direction, word for word: " + direction)
     for gap in plan['gaps']:   # a route that departs from the recorded treatment needs a new treatment, with the reason
         said = set()
         for e in session['treatment']['gaps']:
@@ -403,14 +406,22 @@ def budget(conn, store, run, outputs):
 
 # ---------- design/65 B6: the treatment as a record ----------
 
-def treatment(store, user, run, outputs, document, quote):
+def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes=''):
     """One entry per gap: the team's intended visuals cited or departed from, the picture in a line, the routes, the seconds, the images.
     Without the operator's words the document is kept as the draft the visuals page shows; with them it is recorded (the page records the
-    draft with the words given there). `propose` is refused without a record and when a route departs from it."""
+    draft with the words given there). `propose` is refused without a record and when a route departs from it.
+    design/124 Change 3: a sent document starts with its Direction (a few lines). Change 6: accept or send_back names lines of the draft
+    (direction, G1, ...); the draft is recorded when every line is accepted."""
     session = session_of(store, run, outputs)
+    if accept or send_back:
+        return _treatment_lines(store, user, run, session, list(accept or []), list(send_back or []), notes, quote)
     if document is None:
         document = session.get('treatment_draft')
         need(document, 'No treatment draft on this run: send one first (`vw visuals treatment --file out/visual-treatment.json`).')
+    else:
+        direction = str((document or {}).get('direction') or '').strip()
+        need(direction, 'Write the Direction first (direction, a few lines): what the audience should understand or feel, the point of view, the approach and why.')   # design/124 Change 3
+        need(len(direction) <= 2000, 'The Direction is a few lines (at most 2000 characters).')
     entries = (document or {}).get('gaps')
     need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
     gaps = session['source']['gaps']
@@ -429,7 +440,6 @@ def treatment(store, user, run, outputs, document, quote):
                 routes_.append(r)
         e['routes'] = routes_
         need(str(e.get('picture') or '').strip(), f"gap {e['gap_id']}: say the picture in one line.")
-        need(e.get('activity_level', '') in ('', 'quiet', 'normal', 'busy'), f"gap {e['gap_id']}: activity_level is quiet, normal or busy.")   # design/91 N4
         need(isinstance(e.get('depicts', []), list) and all(isinstance(x, str) and x.strip() for x in e.get('depicts', [])),
              f"gap {e['gap_id']}: depicts is a list of lines, one per graphic, each saying what it shows.")   # design/91 N10
         need(isinstance(e.get('seconds'), (int, float)) and e['seconds'] > 0, f"gap {e['gap_id']}: seconds must be a number above zero.")
@@ -441,9 +451,14 @@ def treatment(store, user, run, outputs, document, quote):
         totals['images'] += e['images']
         first = routes_[0]
         totals['routes'][first] = totals['routes'].get(first, 0) + 1
-        totals['seconds'][first] = round(totals['seconds'].get(first, 0.0) + float(e['seconds']), 2)
-        if 'video' in routes_:
-            video_seconds += float(e['seconds'])
+        parts = [(sh.get('route') or first, sh.get('seconds')) for sh in e.get('shots') or [] if isinstance(sh, dict)]   # design/124-b item 14: a mixed gap's seconds per route
+        if parts and all(isinstance(x, (int, float)) and x > 0 for _, x in parts):
+            video_seconds += sum(float(x) for r, x in parts if r == 'video')
+        else:   # no seconds per shot: today's sum, the first route, all of it as video when video is named
+            parts = [(first, e['seconds'])]
+            video_seconds += float(e['seconds']) if 'video' in routes_ else 0.0
+        for r, x in parts:
+            totals['seconds'][r] = round(totals['seconds'].get(r, 0.0) + float(x), 2)
     missing = sorted(set(gaps) - seen)
     need(not missing, 'The treatment covers every gap; missing: ' + ', '.join(missing) + '.')
     film = film_frames(outputs)   # design/89 B4: the expected frozen share, shown before approval
@@ -452,15 +467,78 @@ def treatment(store, user, run, outputs, document, quote):
         totals['frozen_limit'] = float(session.get('frozen_limit') or FROZEN_SHARE)
     pr = prices()
     estimate = round(totals['images'] * pr['image_inr'] + video_seconds * pr['video_inr_per_s'], 2)
-    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries)}
+    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
+              **({'direction': str(document['direction']).strip()} if str((document or {}).get('direction') or '').strip() else {})}   # design/124 Change 3
     if not str(quote or '').strip():   # the draft the page shows for approval
+        record['lines'] = _carry_lines(session, record)   # design/124 Change 6
         session['treatment_draft'] = record
+        if all(v['state'] == 'accepted' for v in record['lines'].values()):   # every line accepted already, word for word
+            return _record_lines(store, run, session)
         save_session(store, run, session)
-        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest']}
+        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
     session['treatment'] = {**record, 'quote': quote}
     session.pop('treatment_draft', None)
     save_session(store, run, session)
     return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest']}
+
+
+# ---------- design/124 Change 6: a state per line of the treatment ----------
+
+def _line_digests(record):
+    """The Direction and each gap entry, each a line the operator accepts or sends back on its own."""
+    out = {'direction': digest(' '.join(record['direction'].split()))} if record.get('direction') else {}
+    out.update({e['gap_id']: digest(e) for e in record.get('gaps') or []})
+    return out
+
+
+def _line_states(lines):
+    return {k: v['state'] for k, v in lines.items()}
+
+
+def _carry_lines(session, record):
+    """A revised draft keeps the verdict on every line whose text did not change; a changed line goes back to 'to_accept', marked changed.
+    The line before is the last draft's, else the recorded treatment's (every line of it accepted with its words)."""
+    old = (session.get('treatment_draft') or {}).get('lines')
+    if old is None and session.get('treatment'):
+        old = {k: {'digest': d, 'state': 'accepted', 'quote': session['treatment'].get('quote')} for k, d in _line_digests(session['treatment']).items()}
+    old, lines = old or {}, {}
+    for k, d in _line_digests(record).items():
+        o = old.get(k)
+        lines[k] = dict(o) if o and o['digest'] == d else {'digest': d, 'state': 'to_accept', **({'changed': True} if o else {})}
+    return lines
+
+
+def _record_lines(store, run, session):
+    draft = session.pop('treatment_draft')
+    quotes = list(dict.fromkeys(v['quote'] for v in draft['lines'].values() if v.get('quote')))
+    session['treatment'] = {**draft, 'quote': ' / '.join(quotes)}
+    save_session(store, run, session)
+    return {'recorded': True, 'totals': draft['totals'], 'estimate_inr': draft['estimate_inr'], 'cap_inr': cap_of(session), 'digest': draft['digest'], 'lines': _line_states(draft['lines']),
+            'next': 'Treatment recorded: every line accepted. The assistant writes the plan to it.'}
+
+
+def _treatment_lines(store, user, run, session, accept, send_back, notes, quote):
+    draft = session.get('treatment_draft')
+    need(draft, 'No treatment draft on this run: send one first (`vw visuals treatment --file out/visual-treatment.json`).')
+    lines = draft.get('lines') or {k: {'digest': d, 'state': 'to_accept'} for k, d in _line_digests(draft).items()}   # a draft from before Change 6
+    accept, send_back = [str(x).strip() for x in accept], [str(x).strip() for x in send_back]
+    unknown = [x for x in accept + send_back if x not in lines]
+    need(not unknown, f"Not a line of the treatment draft: {', '.join(unknown)}; its lines are {', '.join(lines)}.")
+    need(not set(accept) & set(send_back), 'A line is accepted or sent back, not both.')
+    need(not send_back or str(notes or '').strip(), 'Say what to change in the line sent back (notes).')
+    at = datetime.now(timezone.utc).isoformat()
+    for k in accept:
+        lines[k] = {'digest': lines[k]['digest'], 'state': 'accepted', 'quote': said(quote, 'accepted', user), 'by': user['id'], 'at': at}
+    for k in send_back:
+        lines[k] = {'digest': lines[k]['digest'], 'state': 'sent_back', 'note': str(notes).strip(), 'quote': said(quote, 'sent back', user), 'by': user['id'], 'at': at}
+    draft['lines'] = lines
+    if all(v['state'] == 'accepted' for v in lines.values()):
+        return _record_lines(store, run, session)
+    save_session(store, run, session)
+    waiting = [k for k, v in lines.items() if v['state'] != 'accepted']
+    back = [k for k, v in lines.items() if v['state'] == 'sent_back']
+    return {'draft': True, 'lines': _line_states(lines),
+            'next': f"Still to accept: {', '.join(waiting)}." + (f" Sent back: {', '.join(back)}: the assistant revises only those lines and sends the draft again." if back else '')}
 
 
 # ---------- design/65 §8: what the visuals page shows ----------
@@ -509,10 +587,11 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                  'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key')) if res.get('sheet_key') else None})   # design/91 N3; design/117 P4
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
-        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, **_accepted_words(session, gid)}
+        entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, 'warnings': [], **_accepted_words(session, gid)}
         if plan:
             gap = next((x for x in plan['gaps'] if x['gap_id'] == gid), None)
             if gap:
+                entry['warnings'] = plain_warnings(session, gap)   # design/124 Change 8
                 if gap.get('choices'):
                     entry['choices'] = {'options': [{'id': c['id'], 'title': c['title'], 'why': c['why']} for c in gap['choices']], 'recommended': gap.get('recommended_choice'),
                                         'selected': (session['choice_selections'].get(gid) or {}).get('choice_id')}
@@ -527,6 +606,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                     asset = session['assets'].get(sh['id'])
                     binding = session['bindings'].get(sh['id']) or {}
                     entry['shots'].append({'shot_id': sh['id'], 'title': sh.get('title') or '', 'visual_type': sh['visual_type'], 'route': route_of(sh), 'purpose': sh.get('purpose', ''),
+                                           'facts_line': facts_line(plan, sh), 'warning_answers': sh.get('warning_answers') or [],   # design/124 Change 7
                                            **({'ambient': ambient.get(sh['id'])} if sh['visual_type'] == 'video' and ambient.get(sh['id']) else {}),   # design/101 M6
                                            **{k: sh[k] for k in ('size', 'camera_reason') if sh.get(k)}, **lit.get(sh['id'], {}),   # design/103
                                            'start_frame': sh['start_frame'], 'end_frame': sh['end_frame'], 'states': sh.get('states') or [], 'element_ids': sh.get('element_ids') or [],
@@ -567,6 +647,35 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
             'waiting': waiting(session, plan, code, take_rows),   # design/97 W1, W3
             'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
+
+
+SIZE_NAMES = {'EWS': 'Extreme wide', 'WS': 'Wide', 'MWS': 'Medium wide', 'MS': 'Medium', 'MCU': 'Medium close-up', 'CU': 'Close-up', 'ECU': 'Extreme close-up'}
+
+
+def facts_line(plan, shot):
+    """design/124 Change 7: one line per shot from the plan's checked facts: its size, the words it sits under, what each subject does last and
+    how it ends, and the counts that change. Written by the server, never by the assistant."""
+    names = {e['id']: e['name'] for e in plan.get('elements') or []}
+    words = str(shot.get('narration') or '').split()
+    parts = ([SIZE_NAMES[shot['size']]] if shot.get('size') in SIZE_NAMES else []) + (["under '" + ' '.join(words[:12]) + ('…' if len(words) > 12 else '') + "'"] if words else [])
+    for s in shot.get('subjects') or []:
+        name = names.get(s['element_id'], s['element_id'])
+        if s.get('beats'):
+            last = s['beats'][-1]
+            parts += [f"{name}: {last.get('done') or last['action']}", f"ends {last['result']}"]
+        a, z = ({o['element_id']: o['count'] for o in (s.get(k) or {}).get('objects') or []} for k in ('start', 'end'))
+        parts += [f'{names.get(e, e)} {a.get(e, 0)} → {z.get(e, 0)}' for e in dict.fromkeys([*a, *z]) if a.get(e, 0) != z.get(e, 0)]
+    return ' · '.join(parts)
+
+
+def plain_warnings(session, gap):
+    """design/124 Change 8: the current plan's warnings on this gap that the operator sees, in plain words, with the assistant's answer."""
+    version = next((v for v in reversed(session['versions']) if v.get('plan_digest') == session.get('current')), None)
+    scenes = all_scenes(gap)
+    shots, scene_ids = {sh['id'] for sc in scenes for sh in sc['shots']}, {sc['id'] for sc in scenes}
+    return [{'kind': w['kind'], **({'shot_id': w['shot_id']} if w.get('shot_id') else {}), 'plain': WARNING_PLAIN[w['kind']], **({'answer': w['answer']} if w.get('answer') else {})}
+            for w in (version or {}).get('warnings') or [] if w.get('kind') in WARNING_PLAIN
+            and (w.get('shot_id') in shots or w.get('scene_id') in scene_ids or (w.get('gap_id') == gap['gap_id'] and not w.get('shot_id')))]
 
 
 # ---------- design/65 B2': the graphic sequence ----------
@@ -644,11 +753,11 @@ def split_of(shots, fps):
     """design/97 G3: a gap's seconds and shots per route."""
     out = {}
     for sh in shots:
-        k = 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else 'drawn' if sh['visual_type'] == 'drawn' else ('still (frozen)' if (sh.get('motion') or 'push_in') == 'none' else 'still (moving)')   # design/112 K3; design/113
+        k = 'footage' if sh['visual_type'] == 'footage' else 'graphics' if sh['visual_type'] in GRAPHIC_TYPES else 'AI video' if sh['visual_type'] == 'video' else 'drawn' if sh['visual_type'] == 'drawn' else ('still (frozen)' if (sh.get('motion') or 'push_in') == 'none' else 'still (moving)')   # design/112 K3; design/113
         row = out.setdefault(k, {'route': k, 'seconds': 0.0, 'shots': 0})
         row['seconds'] = round(row['seconds'] + (sh['end_frame'] - sh['start_frame']) / float(fps), 1)
         row['shots'] += 1
-    return [out[k] for k in ('graphics', 'drawn', 'AI video', 'still (moving)', 'still (frozen)') if k in out]
+    return [out[k] for k in ('footage', 'graphics', 'drawn', 'AI video', 'still (moving)', 'still (frozen)') if k in out]
 
 
 def _still_text(shot, ref):
@@ -777,6 +886,16 @@ def _place_in(plan, element_id, shot):
     return any(kinds.get(i) == 'place' for i in [element_id] + list(shot.get('element_ids') or []))
 
 
+def place_line(plan, element_id, shot):
+    # design/124-b item 4: the place's must line: occupied or in use, or clean and unused where every place in frame is staged clean with its reason
+    places = [e for e in plan.get('elements') or [] if e['kind'] == 'place' and e['id'] in [element_id] + list(shot.get('element_ids') or [])]
+    if not places:
+        return None
+    if all(str(e.get('staged_clean') or '').strip() for e in places):
+        return {'check': 'clean', 'weight': 'must', 'pass_when': 'clean and unused, as planned (' + '; '.join(e['staged_clean'].strip().rstrip('.') for e in places) + '): no traces of work or living'}
+    return OCCUPIED
+
+
 def signs_lines(session, plan, scene, shot, element_id):
     """Two signs of use per shot, from the places in frame, taken in turn (the next shot gets the next pair); a shot keeps the pair it was given."""
     elements = {e['id']: e for e in plan.get('elements') or []}
@@ -830,7 +949,9 @@ def group_lines(plan, shot):
     out = []
     for g in shot.get('groups') or []:
         head = f"Every {names[g['kind']]}" if g['kind'] in names else f"{g['count']} {g['kind']}"
-        out.append(head + (f": all alike ({g.get('reason', '').strip().rstrip('.')})." if g['mode'] == 'same' else ': no two alike: ' + '; '.join(i.strip().rstrip('.') for i in g.get('items') or []) + '.'))
+        traits = '; '.join(i.strip().rstrip('.') for i in g.get('items') or [])
+        out.append(head + (f": all alike ({g.get('reason', '').strip().rstrip('.')})." if g['mode'] == 'same' else f', varied, the traits in turn: {traits}.' if g['mode'] == 'varied'   # design/124-b decision (a)
+                           else f': no two alike: {traits}.'))
     return out
 
 
@@ -841,8 +962,10 @@ def group_rule_lines(plan, shot):
     for g, line in zip(shot.get('groups') or [], group_lines(plan, shot)):
         name = names.get(g['kind'], g['kind'])
         if g['kind'] not in names:
-            out.append({'check': f'group count: {name}', 'weight': 'must', 'pass_when': f"exactly {g['count']} {name} are in frame, no more, no fewer"})
+            out.append({'check': f'group count: {name}', 'weight': 'must', 'pass_when': f"about {g['count']} {name} are in frame, a crowd" if g['mode'] == 'varied'
+                        else f"exactly {g['count']} {name} are in frame, no more, no fewer"})   # design/124-b decision (a): a crowd is counted roughly
         out.append({'check': f'group alike: {name}', 'weight': 'must', 'pass_when': (f'the {name} are all alike in shape, size, colour and wear' if g['mode'] == 'same'
+                                                                                     else f'the {name} differ; these traits appear among them: ' + '; '.join(g.get('items') or []) if g['mode'] == 'varied'
                                                                                      else f'no two alike among the {name}; each shows its own trait: ' + '; '.join(g.get('items') or []))})
     return out
 
@@ -2117,6 +2240,7 @@ def generate_image(conn, store, user, run, outputs, body):
     element = {'id': STYLE, 'kind': 'style'} if body['element_id'] == STYLE else next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
+    need(not element.get('speaker'), f"{element['id']} is a real person speaking to camera: never an AI picture of them; their other angles come from their own footage.")   # design/124-b decision (c)
     if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE:
         from .visual_contract import footage_cited
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
@@ -2333,8 +2457,9 @@ def generate_image(conn, store, user, run, outputs, body):
             lines.append({'check': 'signs of use', 'weight': 'must', 'pass_when': sg[0][len('Signs of use: '):].rstrip('.') + ': both visible at their places'})
             if not body.get('fix_of'):
                 body = {**body, 'prompt': with_composed(body['prompt'], sg[0])}
-        if _place_in(plan, body['element_id'], found[3]):
-            lines.append(OCCUPIED)
+        pl = place_line(plan, body['element_id'], found[3])   # design/124-b item 4
+        if pl:
+            lines.append(pl)
     if element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated') and not body.get('fix_of'):   # design/111 F18: the real light, once per run, in every prompt
         rl = real_light_line(store, session)
         if rl:
@@ -3122,7 +3247,7 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
                        'frame whatever the motion heads for. Image 1 is the start image; images 2 onward are its identity sheets, sent by the server: take identity from them, '
                        'nothing else. The camera does not move between the two images: the same framing, lens and position. The end shows the action\'s visible result, a '
                        'different pose or state from the start, never the same frozen pose. Carry each line of end_targets word for word: it is where every subject ends.')   # design/67 C; design/71 P1; design/77 L38; design/86 K6
-    prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': shot, 'references': refs,
+    prompt = {'foundation': plan['foundation'], 'scene': {k: v for k, v in scene.items() if k != 'shots'}, 'shot': {k: v for k, v in shot.items() if k != 'warning_answers'}, 'references': refs,   # design/124 Change 7
               'end_targets': end_targets(scene, shot),   # design/86 K6: the end state of each subject as one sentence the end prompt carries word for word
               'context': packet_context(session, plan, gap, shot),   # design/86 K7: the gap's words, the treatment's picture, the intended visuals, the neighbours, earlier rejections
               'exact_patterns': exact_patterns(plan, shot, refs),   # design/86 K8: client patterns and the reference that carries each
@@ -3171,9 +3296,10 @@ def default_aspect(brief_summary, body):
 def _route_gate(shot, wanted):
     """design/65 B2', B3: a video shot takes a take, a still shot a still, an animation shot a graphic sequence."""
     vt = shot['visual_type']
-    if vt == wanted or (wanted == 'still' and vt in STILL_TYPES):
+    if vt == wanted or (wanted == 'still' and vt in STILL_TYPES + ('footage',)):   # design/124-b item 1: a footage shot takes a footage frame (or a clip stretch)
         return
-    takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)'}.get(vt, 'a still (`vw visuals still`)')
+    takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)',
+             'footage': 'a clip stretch (`vw visuals clip`) or a footage frame (`vw visuals still`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
 
@@ -3583,6 +3709,7 @@ def _place_still(store, user, run, outputs, session, shot_id, reference_id, quot
     _no_question(session, shot_id, reference_id)   # design/110 rule 0
     row = session['references'].get(reference_id)
     need(row and row['status'] == 'approved', f'Reference {reference_id} is not an approved reference of this run.')
+    need(shot['visual_type'] != 'footage' or row.get('kind') == 'frame', f'shot {shot_id} is a footage shot: it shows a footage frame or a clip stretch, never a made picture.')   # design/124-b item 1
     quote = said(quote, 'Placed', user)   # design/99 C2
     need(row.get('kind') != 'web', 'a web picture is a guide only; it cannot appear in the film.')   # design/94 R1.5 (U2)
     warns = []
@@ -3739,7 +3866,7 @@ def fill_clip(store, user, run, outputs, shot_id, clip_id, in_s, quote, reuse=No
     """design/89 B3: a moving stretch of an original clip fills a still or a video shot, from its in point for exactly the shot's length."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
-    need(shot['visual_type'] in ('image', 'video'), f"shot {shot_id} is a {shot['visual_type']}: a clip stretch fills a still or a video shot, never a graphic.")
+    need(shot['visual_type'] in ('image', 'video', 'footage'), f"shot {shot_id} is a {shot['visual_type']}: a clip stretch fills a footage, still or video shot, never a graphic.")   # design/124-b item 1
     clip = media_clips(outputs).get(clip_id)
     need(clip, f'Unknown clip {clip_id}.')
     need((quote or '').strip(), 'The operator reply is required.')

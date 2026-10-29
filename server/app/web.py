@@ -374,7 +374,7 @@ def _visuals_act(code, vw2_session, body):
         store = storage()
         outputs = core.current_outputs(conn, run['id'])
         calls = {
-            'treatment': lambda: V.treatment(store, user, run, outputs, None, quote),
+            'treatment': lambda: V.treatment(store, user, run, outputs, None, quote, accept=list(body.get('accept') or []), send_back=list(body.get('send_back') or []), notes=str(body.get('notes') or '')),   # design/124 Change 6
             'select': lambda: V.select_choice(store, user, run, outputs, {body['gap_id']: body['choice_id']}),
             'accept': lambda: V.accept(store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
             'revise': lambda: V.revise_gap(store, user, run, outputs, body['gap_id'], str(body.get('notes') or ''), quote),   # design/76
