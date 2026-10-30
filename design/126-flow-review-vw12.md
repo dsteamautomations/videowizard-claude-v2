@@ -1,0 +1,1059 @@
+# 126 — Review of the whole flow on VW-12, stage by stage (started 30 Oct 2026)
+
+SK and the assistant review every stage of VideoWizard on the fresh film **VW-12** ("Rat-Trap Bond Masonry - Documentary Explainer v7", client VK Nardep, Uma's laptop, picture AI Gemini / Nano Banana, instruction version 3), one sub-step at a time, with SK's review prompt (vw2-notes/124-c4-review-prompt.md) applied to every stage. VW-13 (Revathi's PC, GPT Image) is used only to compare. Everything decided in design/125 is not raised again. **Nothing here is built until SK says so.**
+
+## The flowchart (continues design/125's; grows as we go)
+
+```
+[Script document from the client]
+      ▼
+0. Start   ── picture AI asked first (I1) ──► the run (VW-12: gemini, VW-13: openai) ✓ seen
+      │    (reviewed on VW-12: ST1 no silent GPT Image; ST2 "as in v1" removed)
+      ▼
+1. Intake  ── kept narration ─────────────► Brief, Script, Voice   (reviewed: 78/78 removals right; IN1 prompt trimmed)
+      │    ── removed duration lines ──────► Brief (the document's own timings)
+      │    ── removed picture notes ───────► Visuals: treatment ("the team's intended picture" per scene)
+      │    ── chosen title ────────────────► the run's name
+      ▼
+2. Brief   ── purpose, message, ending ────► Script stage (does the narration fit?)
+      │    ── tone ────────────────────────► Voice (how the narration is spoken)
+      │    ── chapters ────────────────────► Analysis (each clip tagged) and Options (one chapter per scene, P7)
+      │    ── footage languages (may be none, B1) ► Analysis (what speech to listen for)
+      │    ── speaker on camera ───────────► Analysis and Options (the crop rule, P4–P6)
+      │    ── frame shape, where it plays ─► the finished film
+      │    ── client rules, directory ─────► every later stage
+      ▼
+3. Script  ── final spoken words ──────────► Voice
+      │    ── paragraphs as beats ─────────► Options, Master, Visuals
+      │    ── figures the message rests on (claims, S3) ► Visuals (claims.json)
+      ▼
+4. Voice   ── delivery tags (no repeat, V1) ► the narration
+      │    ── final narration, word timings ► Options, Master, Visuals
+      ▼
+5. Media   ── clips; camera sound required (M1); originals or copies ► Analysis, Assembly
+      ▼
+6. Analysis ── per clip: pieces, grades, beats, people, chapter ► Options
+      │     (15 at once, A1; plain mode ≤ 15 s, A2; up to 3 automatic retries, A4)
+      ▼
+7. Options ── scenes ► coverage (direct / related / chapter, P8) ► first cut ► tool's check (act-on first, P11)
+      │     ► second look per scene by helpers (O4–O6) ► review film (AI-only scenes as one blank, P13)
+      ▼
+8. Master  ── slide answers ► master film ► gaps to Visuals
+      ▼
+9. Visuals (design/121, 124; its own flowchart in design/visuals-flowchart.md)
+```
+
+VW-12's position is kept in the table below. ⚠ marks where something went wrong on VW-12.
+
+## Where VW-12 is (read in the database, 30 Oct 2026, 11:07 IST)
+
+| Step | Done? | When (IST) | Operator's recorded words |
+|---|---|---|---|
+| 0 Start (picture AI: gemini) | done | 10:59:20 | – |
+| 1 Intake | approved | prepared 10:59:54, recorded 11:03:00 | "Rat-Trap Bond Masonry - Documentary Explainer v7 / Approved the cleaned script" |
+| 2 Brief | approved | prepared 11:04:10, recorded 11:06:49 | "Same, approve" |
+| 3 Script onwards | not started | – | – |
+
+No paid job, no defect. VW-13 at the same time: intake approved 11:04:20 (title 2), brief not yet recorded.
+
+## Stage 0–1 — Start and Intake
+
+### The map of the stage (waiting for SK's yes)
+
+Words and checks are the version 3 instructions and the chat tool's refusals (I read both: `server/procedures/v3.json`, intake; `plugin/scripts/stages_text.py`). "Rules" is my own count of separate instructions.
+
+| # | Sub-step | Rules | Words | Tool refusals | VW-12 |
+|---|---|---|---|---|---|
+| 0.1 | The picture AI asked before the film starts (I1) | 1 | 34 (command text) | 0 | gemini recorded |
+| 0.2 | `vw start`: client, script copied in | 3 | about 140 (command text) | client must match one Active client | 10:59:20 |
+| 1.1 | Prepare: the text taken out of the document, numbered, the titles already used shown | 3 | 64 | 4 (no document, wrong file named, two documents, unreadable) | 10:59:54 |
+| 1.1.1 | A scanned page: ask for a readable copy | 1 | 22 | 0 | not needed |
+| 1.2 | The proposal: which lines are not the script, up to three titles | about 14 | 716 (prompt) + 41 | 7 (file missing or not an object; removals not a list; bad shape; not a line number; a blank line; unknown kind) | 78 removed, 35 kept, 3 titles |
+| 1.3 | Preview and show the operator; one question (title, approve or corrections) | 6 | 110 | 1 (prepare first) | – |
+| 1.4 | Record with the chosen title | 3 | 32 | 6 (prepare first; source changed; no titles; no `--title`; title length; nothing left) | title 1, 11:03:00 |
+
+Total for the stage: about 31 rules, 985 words, 18 refusals. Nothing paid.
+
+### Assumed without checking
+- That the picture AI was asked in chat before the run (the database shows gemini; the chat is on Uma's laptop).
+- The rule counts are my own reading.
+
+### 0.1 — The picture AI asked before the film starts (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** the run was created at 10:59:20 with picture AI `gemini`; prepare ran 34 seconds later. VW-13: `openai`. Nothing paid.
+
+**Findings (I read the code: `plugin/scripts/vw.py` start, `server/app/main.py` and `core.py` run creation, `visuals_stage.provider_of`)**
+- Works as agreed (I1): the chat tool refuses to start a film without the answer ("Ask the operator which image model…; no run was created"), and the server refuses a run without it too. The question now sits in the start instructions, where the assistant reads it before starting.
+- Nothing written twice that disagrees; no label in the text the AI reads (the help text's "(design/120)" went with I2). Not paid; no keys; nothing to run in parallel; no helper; not part of a shot's fingerprint.
+- **Block (point 13), deliberate:** the choice can never change on a film (SK, 28 Oct, design/120: two groups compare the two picture AIs on the same script). A wrong answer means a fresh film. Recommend **keep**: it is asked first, so a wrong answer costs only the few minutes of intake and brief.
+- ⚠ **Older way (point 15): two silent fallbacks to GPT Image** kept only for films started before the choice existed (28 Oct): the server's run-creation function defaults to `openai` (never reached: the request must name one), and the visuals stage reads a film with no picture AI as `openai` ("runs from before the choice are openai"). Every such film is closed (VW-3 to VW-11); both open films carry their choice.
+
+**Assumed without checking:** that the operator was asked in chat (the chat is on Uma's laptop; the database shows the answer).
+
+**Proposed (waiting for SK)**
+- **ST1 — The two fallbacks to GPT Image removed:** a film without a picture AI is refused by name ("this film has no picture AI; it is chosen at `vw start --images`"), never silently given GPT Image. Hurts: no film today (rare, and only by mistake). Work: two lines and one test. Breaks: closed films' visuals pages could no longer be opened for pictures (closed, never delivered). Undo: the two lines. Operator: nothing. Cost and time: none. Success: a run row with no picture AI is refused by name in the visuals stage; VW-12 and VW-13 unchanged. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| keep the fixed choice (recommended); ST1 agreed (SK, 30 Oct 2026: "Yes, approve ST1") | – | – |
+
+**For the builder (ST1):** `server/app/core.py` `create_run`: no default for `image_provider`; `server/app/visuals_stage.py` `provider_of`: refuse (`Problem`) when the run has none, naming `vw start --images`. Test: a run dict without `image_provider` is refused by name; `openai` and `gemini` pass through.
+
+### 0.2 — Starting the film: client and script (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** started 10:59:20 for VK Nardep (an Active client of the directory, as required); the script document was in the film's folder when prepare ran 34 seconds later (stored as `original.txt`, 7,271 bytes). Whether it came with `--script` or was pasted in chat is not recorded. Nothing paid.
+
+**Findings (I read `plugin/scripts/vw.py` start, `server/app/core.py` run creation and client matching, `plugin/commands/vw.md` "Starting a run")**
+- Works: 9 refusals, each with what to do (a file the tool may not read; not a TXT, MD, Fountain, DOCX or PDF; no picture AI; too little disk space; the folder already exists; a retired or unknown instruction version; no single Active client matches; the copy failed). A partial client name that fits exactly one client is accepted and said back to the operator with the client's directory card.
+- ⚠ **Change-history label in the text the assistant reads (point 16):** the command text opens "Starting a run" with "(as in v1: …)", "v1" being the first system, which the assistant has never seen.
+- Owner: both fresh films are recorded as SK's, although Uma and Revathi ran them (they sign in with SK's account). Nothing in this stage depends on it; noted only.
+- Not paid; no keys; nothing to run in parallel; no helper; not too much to read (one paragraph); one decision; no block; not part of a shot's fingerprint. Film types: a film with no script document cannot start (design/122 covers films without footage, not without a script): out of scope.
+
+**Assumed without checking:** how the script reached the folder; that the operator saw the directory card line.
+
+**Proposed (waiting for SK)**
+- **ST2 — "(as in v1: …)" removed** from the start paragraph: "Starting a run (as in v1: the script is the first input, the client is mandatory, the title is chosen later)." becomes "Starting a run: the script is the first input, the client is mandatory, the title is chosen later." Words: 23 → 20. Hurts: nothing today (a meaningless word to read past). Work: one replacement, checked by eye. Breaks: nothing. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| ST2 agreed (SK, 30 Oct 2026: "Yes, approve ST2") | – | – |
+
+**For the builder (ST2):** `plugin/commands/vw.md` line 13, the replacement above; checked by eye.
+
+### 1.1 — Prepare (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** prepare ran at 10:59:54 on one document, with no extraction warning and no scanned page; the tool printed the intake prompt, the counts and the titles already used for VK Nardep (the earlier films' titles, up to "… v6"), and wrote the numbered document to a file the assistant reads in parts. Free, a few seconds.
+
+**Findings (I read `plugin/scripts/stages_text.py` `intake_prepare` and the v3 intake steps)**
+- Works: the 4 refusals say what to do (no document; a wrong file named; two documents, never picked silently; an unreadable file). The document is never pasted into the prompt; the assistant reads it in parts.
+- What the assistant reads here: the prompt (716 words), the five steps (269 words) and the document (113 numbered lines, about 7,300 characters): small (point 11).
+- The prompt's history label ("ported verbatim 14 Oct 2026") is stored beside the prompt but not printed to the assistant (I read what prepare returns).
+- Nothing paid; no keys; nothing parallel; no decision; no block; no helper; no older way; nothing written twice; not part of a shot's fingerprint. **Nothing to change.**
+
+### 1.1.1 — A scanned page: ask for a readable copy (reviewed 30 Oct 2026)
+Not reached on VW-12 (a text document, no scanned page). Nothing to discuss.
+
+| Decided | Parked | Open |
+|---|---|---|
+| 1.1 and 1.1.1: no change | – | – |
+
+### 1.2 — The proposal: which lines are not the script, and three titles (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read the stored document and the assistant's proposal on the server):** the document has 127 lines. The assistant (Claude, in the operator's chat) proposed 78 removals: the document title (as "other"), the suggested duration, and for each of the 9 scenes its heading, its duration, the "Visuals" and "Narration" labels and the picture bullets (4 to 8 per scene). **Every removal is right and no spoken line was removed** (I compared line by line: the 35 kept lines are exactly the narration; blank lines kept). Titles: "… Documentary Explainer v7" (recommended; the client already has a v6), "… Benefits, Materials and Construction", "… Building Smarter, Building Sustainably v2". The notes field is filled (I3 works). Prepare to record: about 3 minutes, including the operator's reading. Nothing paid. VW-13 (the same document) chose the third title.
+
+**Findings (I read the v3 intake prompt and step 2)**
+- Decisions in one go (point 12): 78 removals and 3 titles, but one repeating pattern per scene, and the operator reads the cleaned script before approving: no second pass needed.
+- Prompts that write prompts (point 7): none here.
+- ⚠ **Leftovers from the first system (point 18), as in the brief and script (B2, S1):** the prompt was written for a separate AI that returned an answer (ported 14 Oct); today the assistant writes a file and talks to the operator. "Return only JSON, no prose around it:" is out of date (step 2 already says write it to out/intake.json).
+- **Said twice (point 17):** "never rewrite a line" is said three times in the prompt ("YOU NEVER REWRITE A LINE…", "You return line NUMBERS… you do not tidy anything", and "Preserve spoken words exactly so the chosen script has an honest, inspectable relationship to its original source") and once more in step 2; "That is the situation this tool has always been in and it survives it easily." repeats the sentence before it (a wrongly kept line costs nothing).
+- No label printed; nothing paid; no keys; nothing parallel; no block; no helper; no older way; not part of a shot's fingerprint. Film types: a clean script (nothing to remove) is allowed ("an empty list … is the right answer"); speaker names stay under "when in doubt, keep it" (design/125, not proposed).
+
+**Assumed without checking:** that the operator saw the removals grouped by kind before approving (the chat is on Uma's laptop).
+
+**Proposed (waiting for SK)**
+- **IN1 — The intake prompt trimmed of its leftovers:** remove "That is the situation this tool has always been in and it survives it easily." and "Preserve spoken words exactly so the chosen script has an honest, inspectable relationship to its original source."; "Return only JSON, no prose around it:" becomes "Write this to out/intake.json:". Words: 716 → 681. No rule lost (never rewrite, the high bar for removing, the answer shape all stay). Hurts: nothing today (VW-12's proposal was right); it is a tidy-up. Work: three replacements with the trace and a test. Breaks: nothing; films already past the intake are untouched. Undo: the old text. Operator: nothing. Success: on the next film the proposal is as clean as VW-12's. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| IN1 agreed (SK, 30 Oct 2026: "Yes, approve IN1") | – | – |
+
+**For the builder (IN1):** `server/procedures/v3.json` `intake.prompt`: the three replacements above, with a trace; test: none of the two sentences in v3's intake prompt, "out/intake.json" in it, the high-bar and never-rewrite sentences still there.
+
+### 1.3 — Preview and the one question to the operator (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** the cleaned script is 35 spoken lines, under the step's 40-line limit, so the whole of it is shown in chat. The operator's recorded answer has two parts, "Rat-Trap Bond Masonry - Documentary Explainer v7" and "Approved the cleaned script" (the title and the approval in one reply, as the step asks). About 3 minutes from prepare to the answer. Free.
+
+**Findings (I read `intake_preview` and its message, and step 3)**
+- Works: the preview is the exact script the record will keep (the same removal code), and the message after it says "ask the operator to read it before approving", matching the step.
+- Considered, not proposed: showing the operator all 78 removed lines is long, but it is the only place a spoken line wrongly marked as a picture note would be seen; keeping it is the safer choice.
+- Nothing paid; no keys; nothing parallel; one question; no block; no helper; no older way; no label; nothing written twice; not part of a shot's fingerprint. **Nothing to change.**
+
+**Assumed without checking:** what the chat showed (it is on Uma's laptop); the recorded answer suggests the question tool with two answers.
+
+| Decided | Parked | Open |
+|---|---|---|
+| 1.3: no change | – | – |
+
+### 1.4 — Record with the chosen title (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** recorded at 11:03:00 with the operator's words; the run's name became "Rat-Trap Bond Masonry - Documentary Explainer v7" (from the suggestions). Kept for later stages: the cleaned script (35 lines), the original document, the 10 timing lines (for the brief) and the team's intended pictures for all 9 scenes, each with its heading and the first words of its narration (for the visuals stage). Free.
+
+**Findings (I read `intake_record` and the server's record)**
+- Works: the 6 refusals say what to do (prepare first; the document changed since prepare; no titles; no chosen title; title too long; nothing left). The server sets the run's name from the chosen title.
+- Noted, not proposed: VW-12 and VW-13 (the same client, prepared within a minute) could not see each other's titles, and VW-12's third suggestion is exactly the title VW-13 chose. Two films with one name is possible only when two films of one client start together (a test setup); not worth a check.
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; nothing written twice; not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 1.4: no change | – | – |
+
+### Stage 0–1 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| ST1 (no silent GPT Image), ST2 ("as in v1" removed), IN1 (intake prompt trimmed, 716 → 681 words); the fixed picture AI kept | – | – |
+
+---
+
+## Stage 2 — Brief
+
+### Where VW-12 is
+Prepared 11:04:10, recorded 11:06:49 IST with "Same, approve" (2 min 39 s). Free. (The script and voice stages have started since; reviewed after this one.)
+
+### The map of the stage (waiting for SK's yes)
+
+Words: the v3 brief prompt (1,060) by section, and the steps (462). Refusals: the chat tool's record (I read `brief_record` and `production_inputs`). "Rules" is my count.
+
+| # | Sub-step | Rules | Words | Tool refusals | VW-12 |
+|---|---|---|---|---|---|
+| 2.1 | Prepare: the script, the client's last brief, the rules remembered for the client, the directory card, the document's timing lines | 3 | 32 + 151 (the prompt's opening) | 0 | 11:04:10 |
+| 2.2 | The five decisions (purpose, audience, message, tone, ending), each with a reason | about 18 | 195 + 99 | 2 (file; the five must be filled) | five written |
+| 2.3 | Questions: only those that change a decision; constraints only as supplied | about 12 | 141 + 68 | 3 (questions and answers' shape; an id; a required question unanswered) | 1 question |
+| 2.4 | The chapters: what the footage will show, in film order | 6 | 197 (production values, shared with 2.5) + part of step 1 | 2 (generic names; identifiers like "Chapter 3") | 15 chapters |
+| 2.5 | Production values asked on every film in one message (rules, footage languages, narration language, speaker on camera, where it plays and the frame shape, length only if given); last brief's answers as the recommendation | about 10 | step 1 (230) + 50 | 10 (format 4; languages 3; length, speaker, lists 3) | "Same, approve" |
+| 2.6 | The directory's words against the operator's and the script's | 5 | 105 | 2 (list shape; each difference's fields) | 1 difference (audience, by the script) |
+| 2.7 | Presentation in a fixed order and one question: approve or changes | 6 | 120 + 54 | 0 | – |
+| 2.8 | Record on an explicit yes | 2 | 18 | (the refusals above run here) | 11:06:49 |
+| 2.9 | The web rule: say why before any search, only on a yes | 4 | 62 | 0 | no search recorded |
+
+Total: about 66 rules, 1,522 words, 19 refusals. Nothing paid.
+
+### 2.1 — Prepare (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database and the code):** prepare ran at 11:04:10. The assistant was given the cleaned script, the title and client, the document's 10 timing lines ("Suggested Duration: 5–6 Minutes" and one per scene) as a hint, the client's directory card, no remembered client rules (none exist for any client yet), and the client's latest brief: **VW-10's** (29 Oct 18:26), chosen when the film was started. Its answers became the recommendation: website and YouTube, 16:9, not muted, Tamil in the footage, English narration, speaker not shown, no brand rules; VW-12 recorded exactly these. Free, a few seconds.
+
+**Findings (I read `brief_prepare`, `core.last_brief`, the v3 brief step 0 and the prompt's opening)**
+- Works: the latest brief is taken from any film of the client, open or closed, so dropping VW-10 did not lose the client's answers (VW-10's "YouTube, website only" carried over; VW-11's had Facebook).
+- What the assistant reads here: the prompt (1,060 words), the steps (462), the script (about 4,800 characters), the card and the last brief: moderate, no overload (point 11).
+- The opening's "current Brief, previous questions, exact human answers" reads like the first system's redraft loop, but it still holds when the operator asks for changes (the file keeps the questions and answers): not proposed.
+- Nothing paid; no keys; nothing parallel; no decision; no block; no helper; no older way; no label; not part of a shot's fingerprint. **Nothing to change.**
+
+**Assumed without checking:** that the chat showed the operator which film the recommendation came from (the step says "which values are last time's answers"; the chat is on Uma's laptop).
+
+| Decided | Parked | Open |
+|---|---|---|
+| 2.1: no change | – | – |
+
+### 2.2 — The five decisions (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read the stored brief on the server):** the assistant wrote the five decisions, each with a reason tied to the script:
+- **Purpose:** viewers understand what rat-trap bond is, why it saves bricks, mortar and money while staying strong and cooler, and what good practice it needs (bricks, laying on edge, clean cavities, junctions and sills, curing). Reason: the script's first half persuades, the second explains how.
+- **Audience:** "Recommendation: people in India who build or decide on homes and small buildings (homeowners, self-builders, masons, site engineers, rural housing workers), who know ordinary brickwork but are new to rat-trap bond." Reason: crushing strengths, guide strings, seven days of curing.
+- **Message:** the cavities are the point: fewer bricks and less mortar, cooler and cheaper, as strong as ordinary bonds, if the bricks are good and the work careful. Reason: "these cavities are not empty spaces wasted".
+- **Tone:** calm, clear documentary; practical, quietly confident, respectful of the mason's craft; figures plainly, no hype.
+- **Ending:** awareness, as the script has it; no call to action added.
+All five are specific and grounded; nothing invented. The operator approved them with the production answer ("Same, approve"; the one-reply approval was noted on VW-11 in design/125).
+
+**Findings (I read the prompt's five-decision and reasons sections, 294 words, and every brief stored so far)**
+- ⚠ **A rule that spoils the record (point 6):** "Where not supplied, label it a recommendation" makes the assistant write the word into the audience itself. After the operator approves, the stored audience still begins "Recommendation: …" on **8 of the 11 films** (VW-3, 4, 5, 6, 8, 10, 12, 13). That field is read later by the script and voice steps, the options step and the prompt guide, where it reads as not yet decided. The chat already shows it as a recommendation, and a difference from the directory is recorded with who decided it.
+- **Out of date (point 18):** "Do not rewrite intake to force this stage to pass." is from the first system, where a stage had to pass a gate; the assistant cannot change a recorded intake.
+- Too many rules (point 6, otherwise): about 18 rules on five fields, most of them "avoid empty words" rules; the output was good, so no other trim proposed.
+- Decisions at once (point 12): five, each reasoned: fine. Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **BR1 — "Recommendation" said in the reason, not written into the audience; the gate leftover removed:** "Where not supplied, label it a recommendation." becomes "Where not supplied, its reason says so." (7 words → 7); "Do not rewrite intake to force this stage to pass." removed. Prompt 1,060 → 1,050 words. Hurts: most films (8 of 11), mildly (a misleading word read by later steps). Work: two replacements with the trace and a test. Breaks: nothing; films already past the brief keep their stored wording. Undo: the old text. Operator: nothing (the chat still says it is a recommendation). Success: the next film's stored audience has no "Recommendation:" and its reason says it came from the script. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| BR1 agreed (SK, 30 Oct 2026: "Yes, approve BR1") | – | – |
+
+**For the builder (BR1):** `server/procedures/v3.json` `brief.prompt`: the two replacements above, with a trace; test: neither old sentence in v3's brief prompt, "its reason says so" in it.
+
+### 2.3 — Questions and constraints (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (stored brief):** one question, marked required: the production values, with last time's answers (VW-10) as the recommendation, the document's own "5 to 6 minutes" as a hint, and a request to confirm the brand and safety rules. Answered "Same, approve". No question about the five decisions (none needed); constraints empty (none supplied). Free.
+
+**Findings (I read the prompt's questions and constraints sections, 209 words, and the tool's question checks)**
+- Works: zero creative questions is allowed and happened; the tool refuses a required question with no answer, and the answer is stored in the operator's words.
+- **Said twice or more (point 17):** four sentences of this section repeat what is said elsewhere: the question's fields ("a stable id, question, why it matters, an optional recommendation and a boolean required flag": also in step 1 and the answer shape); "Never prefill an answer because it seems obvious" (step 1: "Never fill `answers` yourself"; and "A recommended answer is never a human answer" just before it); "Do not re-ask questions already answered" (the redraft sentence: "ask again only if their meaning … actually changed"); "Do not turn every missing fact into a required answer" ("Only consequential unresolved questions may be required").
+- Small tension, harmless: "only consequential questions may be required", yet the production question is required on every film (step 1 asks it every time); the operator answers it either way.
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **BR2 — The four repeated sentences removed** from the questions section (each keeps its other copy, named above). Prompt 1,050 → 1,007 words. Hurts: nothing today; less to read past. Work: four removals with the trace (each removed sentence listed beside the copy that stays) and a test. Breaks: nothing; films past the brief untouched. Undo: the old text. Operator: nothing. Success: the next film's questions are as on VW-12 (production asked, answers in the operator's words, no creative question unless needed). **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| BR2 agreed (SK, 30 Oct 2026: "Yes, approve BR2") | – | – |
+
+**For the builder (BR2):** `server/procedures/v3.json` `brief.prompt`: the four removals, with a trace listing each beside the copy that stays; test: none of the four in v3's brief prompt, each kept copy still present.
+
+### 2.4 — The chapters (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (stored brief):** 15 chapters, in film order, named plainly: Housing construction today; Conventional flat brickwork; Bricks on edge and the hollow cavities; Exposed-brick walls and cool interiors; Brick kilns and brick transport; Brick quality and strength testing; Preparing the plinth and mortar; Setting guide strings; Laying bricks on edge; Keeping the cavities clean; Checking line, level and plumb; Junctions, corners and sill course; Pointing the joints; Curing the walls; Completed rat-trap bond homes. Made fresh from this script, not copied (VW-10 had 14, VW-13 has 14, VW-11 had 9, from the same script). Free.
+
+**Findings (I read the prompt's production section, step 1, the tool's chapter checks, and the options step that uses the chapters)**
+- Works: plain names of what the camera will see, in film order; none is an argument of the script; the tool refuses generic names and numbered labels ("Chapter 3").
+- **What it connects to (seen on the flowchart):** each clip is tagged with one chapter at the analysis, and at the options step **a scene covers one chapter: a paragraph covering two is split where the second begins** (P7, design/125). VW-12's 15 chapters fall on 9 paragraphs, so its options step may cut about 15 scenes; script paragraph 6 alone covers five chapters (plinth and mortar, guide strings, laying, clean cavities, line and level) in 6 sentences, so some scenes may be one sentence of 5 to 8 seconds. Each scene gets a slide, an answer and a second-look helper (O6). Not a fault yet: to watch at options (parked).
+- Chapters made before the footage is seen: "Brick kilns and brick transport" may have no clip; that only means AI pictures later (P8 keeps the clip study's own matches too). No change.
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; nothing written twice; not part of a shot's fingerprint. Film types: an empty list for a film with no steps is allowed. **Nothing to change here.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 2.4: no change | 15 chapters on 9 paragraphs with P7: watch the scene count and the shortest scene at options 7.2 | – |
+
+### 2.5 — Production values asked on every film (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (stored brief):** asked in one message, with VW-10's answers as the recommendation: Tamil spoken in the footage; English narration; speaker not shown; length from the narration (the document's "5 to 6 minutes" given as a hint; the narration is about 4,800 characters, about 5 minutes); 16:9, website and YouTube, watched with sound; no brand or safety rules. Answer "Same, approve"; recorded exactly so. Free.
+
+**Findings (I read step 1, the prompt's production paragraph and the tool's `production_inputs` and `format_inputs`)**
+- Works: one list, in the steps (B3 of design/125); the prompt points to it. The tool requires both language answers on every film (an empty footage list now allowed, B1; not needed here), refuses wrong shapes, and fills 16:9 with no destinations when the operator says nothing, as the step says.
+- What it connects to: footage languages → the clip study (what speech to listen for); speaker not shown → the crop rule at analysis and options (P4–P6); frame shape → the finished film; brand and safety rules → every later stage (none here, though the clip study flags missing helmets: the client said none, so the flags stay information).
+- Nothing paid; no keys; nothing parallel; one question; no block; no helper; no older way; no label; nothing written twice; not part of a shot's fingerprint. **Nothing to change.**
+
+**Assumed without checking:** that the operator read the full list before "Same, approve" (the chat is on Uma's laptop; the stored question shows every value).
+
+| Decided | Parked | Open |
+|---|---|---|
+| 2.5: no change | – | – |
+
+### 2.6 — The directory against the operator and the script (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (stored brief):** one difference recorded: the audience. The directory says "youth, volunteers, rural communities, spiritual seekers, and donors interested in national development"; the brief chose "homeowners and self-builders, masons, site engineers and rural housing and development workers in India", decided by the script (crushing strengths, guide strings, curing are written for builders). No operator words (the operator did not speak to it). Free.
+
+**Findings (I read the prompt's directory paragraph, 105 words, and the tool's two checks)**
+- Works: the order is the agreed one (the operator's words first, the script second, the directory only where neither has spoken, as a recommendation); the difference is said once and recorded with who decided it. The same difference appears on every film of this client (VW-10 to VW-13), as expected: the directory describes the organisation, the script a film for builders.
+- Nothing paid; no keys; nothing parallel; one decision; no block (the warning never stops the brief); no helper; no older way; no label; nothing written twice; not part of a shot's fingerprint. **Nothing to change.**
+
+**Assumed without checking:** that the chat said "This differs from the directory…" to the operator (Uma's laptop).
+
+| Decided | Parked | Open |
+|---|---|---|
+| 2.6: no change | – | – |
+
+### 2.7 — Presentation and the one question (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** prepare 11:04:10 to the recorded answer 11:06:49 (2 min 39 s). One reply, "Same, approve", answered the production question and approved the brief (noted on VW-11, design/125; not raised again). What the chat showed is on Uma's laptop. Free.
+
+**Findings (I read step 2, 120 words, and the prompt's closing paragraph, 54 words)**
+- Works: the step fixes the order (five decisions with reasons, chapters numbered, the production block, open questions) and ends on one question.
+- **Said twice, in the first system's words (points 17 and 18):** the prompt's closing paragraph repeats step 1 and step 2: "Return a proposal containing purpose, audience, message, tone, ending, constraints, reasons keyed by the five field names, questions and production. Do not include answers or approval." (step 1 lists the same fields and says "Never fill `answers` yourself"; "Return a proposal" is the wording of the separate AI of 14 Oct) and "Ask for one grouped acceptance or corrections." (step 2: "Ask one question: approve, or changes?"). Its middle sentence ("The file is the proposal; present its meaning and open questions in readable chat, not JSON the operator has to copy.") is said only here and stays.
+- Nothing paid; no keys; nothing parallel; one question; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **BR3 — The closing paragraph cut to its one sentence said nowhere else:** "The file is the proposal; present its meaning and open questions in readable chat, not JSON the operator has to copy." Prompt 1,007 → 973 words. No rule lost (each removed sentence has its copy in step 1 or 2). Work: one replacement with the trace and a test. Breaks: nothing; films past the brief untouched. Undo: the old paragraph. Operator: nothing. Success: the next brief is presented as VW-12's, with one question. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| BR3 agreed (SK, 30 Oct 2026: "Yes, approve BR3") | – | – |
+
+**For the builder (BR3):** `server/procedures/v3.json` `brief.prompt`: the closing paragraph replaced by its one kept sentence, with a trace; test: "Return a proposal" and "grouped acceptance" not in v3's brief prompt, the kept sentence present.
+
+### 2.8 — Record (reviewed 30 Oct 2026)
+Recorded at 11:06:49 with "Same, approve"; the tool's 19 refusals ran here and none fired. Nothing to discuss.
+
+### 2.9 — The web rule (reviewed 30 Oct 2026)
+Not reached at the brief on VW-12 (no search proposed there). Nothing to discuss; the same rule is used at the script stage, where VW-12 did search (3.4).
+
+### Stage 2 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| BR1 ("Recommendation" in the reason, not the audience; gate leftover removed), BR2 (four repeated sentences removed), BR3 (closing paragraph cut); brief prompt 1,060 → 973 words | 15 chapters with P7: at options 7.2 | – |
+
+---
+
+## Stage 3 — Script
+
+### Where VW-12 is (read in the database, 30 Oct, about 11:56 IST)
+| Step | When (IST) | Operator's recorded words |
+|---|---|---|
+| 3 Script | prepared 11:08:24, recorded 11:13:52 | "Yes, approve" |
+| 4 Voice | recorded 11:33:29 | "Made final on the voices page by SK" |
+| 5 Media | recorded 11:39:51 | "1. List is complete and correct / 2. Camera sound can be used for analysis only but not for the film / 3. Camera originals but compressed" |
+| 6 Analysis | running: 44 clip studies finished between 11:43 and 11:55 | – |
+
+### The map of the stage (waiting for SK's yes)
+
+Words: the v3 script prompt (642) by paragraph and the steps (300). Refusals: the chat tool's record (I read `script_record`). "Rules" is my count.
+
+| # | Sub-step | Rules | Words | Tool refusals | VW-12 |
+|---|---|---|---|---|---|
+| 3.1 | Prepare: the cleaned script, the approved brief, the directory's action, contact and name patterns | 4 | 46 + 115 | 0 | 11:08:24 |
+| 3.2 | Checking the narration against the brief; wording changes only when useful | about 16 | 193 + part of step 1 | 0 | no change proposed |
+| 3.3 | Facts and claims: nothing invented; the figures the message rests on listed as claims (S3) | about 10 | 117 + one sentence of step 1 | 1 (claims' shape) | 6 claims, 3 checked |
+| 3.4 | A web check of a claim, only on the operator's yes | 3 | about 55 (step 2) | 0 | 3 claims searched; one disagreed (strength), wording kept |
+| 3.5 | Presenting the changes and one question | 5 | 81 + about 30 | 0 | "Yes, approve" |
+| 3.6 | The operator's decision on each change; record; paragraphs numbered as beats | about 10 | 136 + 88 | 9 | 11:13:52, 9 beats |
+
+Total: about 48 rules, 942 words, 10 refusals. Nothing paid (the web search is the assistant's own).
+
+### 3.1 — Prepare (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** prepare ran at 11:08:24, 1½ minutes after the brief. The assistant was given the cleaned script (4,783 characters, 9 paragraphs), the title and client, the brief's five decisions, constraints (none) and answers, English narration, no brand rules, the 15 chapters, and from the directory only the client's contact details (no action instructions or name patterns exist for this client). The ending is awareness only, so the contact details were rightly not used. Free, a few seconds.
+
+**Findings (I read `script_prepare`, `directory_for_script`, step 0 and the prompt's first three paragraphs)**
+- Works: the directory gives the script step only what it may use (action instructions, contact details for an ending that asks for an action, how the name is written); the rest of the card stays out.
+- ⚠ **Out of date (point 18):** the prompt's first paragraph says the input includes "any previously accepted prepared script, exact supplied wording and notes, prior proposals and the operator's decisions". Prepare prints none of these (I read what it returns: title, client, script, brief, answers, narration language, rules, chapters, directory); it is the first system's redraft input. Step 0 lists what is really printed.
+- What the assistant reads: 642 + 300 words of instructions and a 4,800-character script: small (point 11). Nothing paid; no keys; nothing parallel; no decision; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **SC1 — The input list says what prepare gives:** "…exact title and client, any previously accepted prepared script, exact supplied wording and notes, prior proposals and the operator's decisions. Read all current inputs." becomes "…exact title and client, and the directory facts the prepare prints. Read all current inputs." Prompt 642 → 634 words. No rule lost (wording the operator supplies in chat is still covered by the third paragraph's "explicitly supplied prepared wording"). Hurts: nothing today; one less thing to look for that is not there. Work: one replacement with the trace and a test. Breaks: nothing; films past the script untouched. Undo: the old text. Operator: nothing. Success: the next script assessment, as VW-12's, names only real inputs. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| SC1 agreed (SK, 30 Oct 2026: "Yes, approve SC1") | – | – |
+
+**For the builder (SC1):** `server/procedures/v3.json` `script.prompt`, first paragraph: the replacement above, with a trace; test: "prior proposals" not in v3's script prompt.
+
+### 3.2 — Checking the narration against the brief (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** no change proposed. The assessment: the narration already fits the brief (what rat-trap bond is, why the cavities matter, the good practice it needs, a calm factual voice, an awareness ending, no call to action). Prepare to record 5½ minutes, including the web check (3.4). Free.
+
+**Findings (I read the prompt's paragraphs on starting wording, the brief check and what to defer, 193 words, and every script recorded so far)**
+- Works as intended: "no finding is a valid result" and the assistant did not invent changes. Across the 10 films recorded, **one change was ever proposed (VW-6), and none accepted**: the client's script is the script; the real value of this stage now is the claims (3.3, 3.4).
+- ⚠ **The first system's wording (point 18):** the paragraph on what to defer still speaks of gates: "Defer Treatment, shots, media study, visual achievability, AI makeability, material coverage and filmability. Missing footage is not a defect in narration. Do not gate this stage on visual plans, casting, location, voice selection or provider settings. No voice generation, paid call or automatic progression into Voice is authorized by accepting a script." (52 words); its meaning fits in two sentences.
+- Decisions at once (point 12): one check of 9 paragraphs against five decisions: fine. Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **SC2 — The "defer" paragraph said in plain words:** it becomes "Pictures and footage come later: missing footage is not a defect in narration. Accepting a script starts no voice or paid call." (52 → 22 words; prompt 634 → 604). No rule lost: nothing visual is judged here; accepting starts nothing paid. Hurts: nothing today. Work: one replacement with the trace and a test. Breaks: nothing; films past the script untouched. Undo: the old paragraph. Operator: nothing. Success: the next script check, as VW-12's, judges only the words. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| SC2 agreed (SK, 30 Oct 2026: "Yes, approve SC2") | – | – |
+
+**For the builder (SC2):** `server/procedures/v3.json` `script.prompt`, the "Defer…" paragraph replaced as above, with a trace; test: "filmability" and "gate" not in v3's script prompt, the two new sentences present.
+
+### 3.3 — Facts and claims (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** the first film to record claims (S3 of design/125 at work; VW-13 recorded 5). Six claims:
+| Claim | Checked? |
+|---|---|
+| Nearly 25 % fewer bricks | yes: about 25 % (Canada Masonry Design Centre study), the draft Indian standard says about 16–20 %; wording kept |
+| Brick strength 20 / 35 / 75 kg/cm² for one, two, three storeys | no |
+| Up to three storeys can be built safely | yes: the draft Indian standard says load-bearing walls up to three storeys have been built |
+| Strength comparable to conventional bonds | yes: **measured lower** than English bond (about 16–50 % lower); wording kept by the operator |
+| Used in thousands of buildings across India | no |
+| Walls cured at least seven days | no |
+
+**Findings (I read step 1's claims sentence, the prompt's facts paragraph, 117 words, the tool's claims check, and how the visuals stage reads them)**
+- Works: nothing invented; each figure the message rests on is listed with its state and source; the visuals stage reads them as claims.json ("a picture or graphic shows the same figure, and a checked one is not searched again").
+- Connection (flowchart): the one figure a graphic will draw (the 20 / 35 / 75 table; the team's intended picture for scene 5 is "a graphic showing strength requirements") is one of the three not checked. Nothing is lost: an unchecked figure is researched at the visuals stage.
+- Noted: "checked" means "looked up", not "confirmed": the strength claim is checked and contradicted, and its source says so in words the visuals stage reads; keeping the wording was the operator's decision. No change.
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; nothing written twice; not part of a shot's fingerprint (the builder confirmed for S3). **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 3.3: no change | the 20 / 35 / 75 graphic: watch at visuals that it is researched before it is drawn | – |
+
+### 3.4 — A web check of a claim, on the operator's yes (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** three claims were looked up (fewer bricks, three storeys, comparable strength); each source reads "Web search 2026-10-30 (**search results only**)": the assistant read the search results' short extracts, not the pages. One finding went against the script (strength measured lower); the operator kept the wording. All within the 5½ minutes of the stage. Free. VW-13 looked up none.
+
+**Findings (I read step 2, the claims sources, and what reads the assessment)**
+- Works: the search happened inside the rule (the stored sources say what was searched and found; the operator decided).
+- ⚠ **A check from search extracts only (point 5):** a claim looked up this way is stored as checked, and the visuals stage then does not search it again ("a checked one is not searched again"), so a figure drawn later may rest on a two-line extract. Step 2 says "show what you found", not where it was read.
+- Noted, no change: the assessment still says "the figures … have not been checked", written before the search; nothing reads the assessment after the record (I searched the code), and the claims carry the true state.
+- Nothing paid (the assistant's own search); no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Assumed without checking:** that the operator was asked before the search (the step requires it; the chat is on Uma's laptop).
+
+**Proposed (waiting for SK)**
+- **SC3 — A check reads the source page:** in step 2, "Search only after the operator says yes; show what you found;" becomes "Search only after the operator says yes; show what the source page says;", and "I want to check X in the script, because" becomes "I want to check X, because". Step 2: 84 → 83 words. Hurts: films whose claims are checked (VW-12 so far), and through them the visuals' graphics. Work: one replacement with the trace and a test. Breaks: nothing; films past the script keep their claims. Undo: the old words. Operator: nothing (a page may take a few seconds longer). Success: the next checked claim's source names a page, not "search results only". **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| SC3 agreed (SK, 30 Oct 2026: "Yes, approve SC3") | – | – |
+
+**For the builder (SC3):** `server/procedures/v3.json` `script.steps[2]`: the two replacements above, with a trace; test: "the source page" in v3's script step 2, "show what you found" not.
+
+### 3.5 — Presenting and the one question (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** with no change proposed, the assistant presented the assessment and the claims (with the three checked ones' findings); the operator answered "Yes, approve" (recorded 11:13:52). What the chat showed is on Uma's laptop. Free.
+
+**Findings (I read step 2 and the prompt's presenting paragraph, 81 words)**
+- Works: one question, approve or changes.
+- **Said twice (point 17):** the presenting paragraph repeats step 3 and the tool: "After the operator decides, each change carries decision: accepted, rejected, or reworded with operator_wording; rejected changes stay in the file and are not applied." (step 3 says the same, and to build the text from the accepted changes only) and "Unaccepted edits must not leak into the final text." (the tool rebuilds the text and refuses any other, and the prompt already says "The tool checks that only the accepted changes are applied").
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **SC4 — The two repeated sentences removed** from the presenting paragraph (each kept in step 3 or the tool's line). Prompt 604 → 570 words. Work: two removals with the trace and a test. Breaks: nothing; films past the script untouched. Undo: the old text. Operator: nothing. Success: the next film's changes, when there are any, carry their decisions as today (the tool refuses otherwise). **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| SC4 agreed (SK, 30 Oct 2026: "Yes, approve SC4") | – | – |
+
+**For the builder (SC4):** `server/procedures/v3.json` `script.prompt`, presenting paragraph: the two removals, with a trace; test: neither sentence in v3's script prompt; step 3's decision sentence and the "tool checks" line still present.
+
+### 3.6 — The decisions, the record and the beats (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** recorded at 11:13:52 with "Yes, approve": no change, so the recorded text is the cleaned script exactly (its fingerprint equals the intake's); 4,783 characters split into **9 beats** (BEAT_01 … BEAT_09, one per paragraph), which the voice is bound to; the 6 claims kept. None of the 9 refusals fired. Free.
+
+**Findings (I read step 3, the prompt's answer-format paragraph, 92 words, its last two paragraphs, and the tool's change check)**
+- Works: the tool rebuilds the text from the accepted changes and refuses any other (9 refusals, each saying what to quote or add).
+- ⚠ **A contradiction inside one paragraph (point 17):** "insertions or deletions can use an empty before or after" and, three sentences later, "anchor an insertion on a short before excerpt rather than an empty one". The tool accepts both (an empty-before insertion only when its words occur once; otherwise it asks for an anchor), so the anchor is the safe one to say.
+- **Said twice and leftovers (points 17, 18):** "Return the complete proposed spoken_text, optional notes, a concise assessment and changes containing before, after and reason." (step 1); "Every edit must be a listed change with an exact before that occurs once" (step 1, word for word); "Make the full proposal consistent with the listed changes." (the tool refuses otherwise); "there is no fixed-row constraint" (the first system's rows).
+- Not paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint (the beats are, later, through the voice; nothing here changes them).
+
+**Proposed (waiting for SK)**
+- **SC5 — The answer-format paragraph said once, without the contradiction:** it becomes "Use exact before excerpts from the current working wording and show the proposed wording; a deletion has an empty after; anchor an insertion on a short before excerpt. Keep unchanged text exact. Changes can cross physical lines." (92 → 37 words; prompt 570 → 515). No rule lost (each removed sentence is in step 1 or enforced by the tool; empty-before insertions still pass the tool when unambiguous). Work: one replacement with the trace and a test. Breaks: nothing; films past the script untouched. Undo: the old paragraph. Operator: nothing. Success: the next film with a change records it on the first try. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| SC5 agreed (SK, 30 Oct 2026: "Yes, approve SC5") | – | – |
+
+**For the builder (SC5):** `server/procedures/v3.json` `script.prompt`, the answer-format paragraph replaced as above, with a trace; test: "fixed-row" and "can use an empty before" not in v3's script prompt; step 1's "Every edit must be a listed change…" still present.
+
+### Stage 3 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| SC1 (input list as given), SC2 ("defer" paragraph in plain words), SC3 (a check reads the source page), SC4 (two repeats removed), SC5 (answer format said once, no contradiction); script prompt 642 → 515 words | the 20 / 35 / 75 graphic: at visuals | – |
+
+---
+
+## Stage 4 — Voice
+
+### What happened on VW-12 (read in the database)
+| Sub-step | When (IST) | What |
+|---|---|---|
+| Direction recorded | before 11:22 | register "[measured, quietly confident]", tags at the turns, the test passage on the brick-saving figures |
+| Two tryouts, same passage, two voices | 11:22:25 → 11:22:45 (20 s, at the same time) | 264 characters billed each |
+| One full narration, Reyaansh on Eleven v4 (stability 0.5, similarity 0.75) | 11:25:09 → 11:26:09 (1 min) | 294.4 s, 9 beats, 4,783 characters sent, 2,197 billed |
+| Made final on the voices page | 11:33:29 | "Made final on the voices page by SK" |
+V1 at work: the narration sent opens with one register tag, not two (11 tags in all).
+
+### The map of the stage (waiting for SK's yes)
+
+Words: the v3 voice prompt (550), the direction prompt (688) and the steps (607). Refusals: the server's voice and direction checks and the chat tool's record (I read `server/app/voices.py`, `voice_direction.py`, `plugin/scripts/stages_av.py`). "Rules" is my count.
+
+| # | Sub-step | Rules | Words | Refusals | VW-12 |
+|---|---|---|---|---|---|
+| 4.1 | Prepare: the script, the brief, the client's last voice, the favourites, the voices page link | 3 | 42 + 53 | 2 (an accepted script first; script in storage) | – |
+| 4.2 | The direction: the register, a tag only where the delivery changes, up to three test passages of 50–100 words | about 20 | 143 + 688 | 6 (register and tags; passages; the chosen passage; tweaks) | register + 10 tags; one passage |
+| 4.3 | Recommending and finding voices: last voice, favourites, the account and the library; never guessing from the client's name | about 10 | 120 + 202 | 4 (a voice not on the account; library saves and restores) | Reyaansh (VW-11's voice) and one other |
+| 4.4 | Tryouts on the page: one to six voices on the chosen passage, at the same time | 6 | 73 | 4 (step; at least one voice; at most six; a voice twice) + 1 (direction first) | 2 tryouts, 20 s |
+| 4.5 | Paid steps said, not asked; jobs waited for, never resubmitted; models and settings | 8 | 57 + 129 | 0 | Eleven v4, 0.5 / 0.75 |
+| 4.6 | The chat way instead of the page (one question a message) | 7 | 178 | 0 | not used |
+| 4.7 | The full narration, listened to, made final; word timings per beat | 8 | 67 + 93 | 6 (script changed; no timing for a beat; not found; not ready; record checks) | 294.4 s, final on the page |
+
+Total: about 62 rules, 1,845 words, 23 refusals. Paid: ElevenLabs, 2,725 characters billed in all (2 × 264 + 2,197).
+
+### 4.1 — Prepare (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** prepare gave the assistant the accepted script (4,783 characters, 9 passages), the brief's five decisions, English narration and Tamil in the footage, the client's last voice (Reyaansh, from VW-11's brief client), the favourites, the voices page link, the voice prompt and the direction prompt. Free, a few seconds. (The prepare time is not stored for the voice.)
+
+**Findings (I read `voice_prepare`, step 0 and the prompt's opening)**
+- Works: the last voice is proposed first, then the favourites; the page link is given.
+- ⚠ **The "what next" message gives the wrong order (point 19, the other voices):** prepare's message says "Agree a voice with the operator (one question per message, the voices page or the catalog), then the direction, then narrate and record." Step 1 says the opposite: "First, before any voice is discussed, the direction and the test passage", and the server refuses a tryout before the direction ("Ask the assistant for the direction and the test passage first"). On VW-12 the assistant followed the steps (direction first), so nothing broke. Same kind of slip as P1 of design/125.
+- What the assistant reads: the voice prompt (550), the direction prompt (688), the steps (607) and the script: moderate, no overload. The prompt's history label ("VW-VOICE v4 … design/52") is stored, not printed.
+- Nothing paid; no keys; nothing parallel; no decision; no block; no helper; no older way; not part of a shot's fingerprint.
+
+**Assumed without checking:** that VW-11's voice was the last voice offered (the record of the offer is in the chat on Uma's laptop; VW-12 used the same voice).
+
+**Proposed (waiting for SK)**
+- **VO1 — The message gives the steps' order:** "First the direction and test passage, then a voice (the voices page, or one question per message), then narrate and record." (23 → 17 words.) Hurts: every film, mildly (the assistant must notice the steps disagree). Work: one line and a test. Breaks: nothing. Undo: the old line. Operator: nothing. Success: on the next film, prepare's message names the direction first. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| VO1 declined (SK, 30 Oct 2026: "Leave it"): the message keeps its order | – | – |
+
+### 4.2 — The direction (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read the stored direction on the server):** recorded at 11:16 IST with "Best fit, passage 1". The kind of film: a documentary explainer. Two lists: **best fit**, register "[measured, quietly confident]" and 10 tags on 45 sentences, only at the turns (the answer to the opening problem [confident]; "these cavities are not empty" [with quiet emphasis]; the first figure and the strength table [with weight on the figures]; the instructions [clear, unhurried]; the close [thoughtful], [quietly proud]); **experimental**, "[warm, conversational]", a builder's-tip reading. Three test passages of 65–73 words (the figures; the turn on the cavities; the close); passage 1 chosen (72 words: 25 %, comparable strength, three storeys). Free.
+
+**Prompts that write prompts (point 7):** the tags are the request the voice service reads. Real example, the tryout text: "[measured, quietly confident] [with weight on the figures] The technique can reduce brick consumption by nearly twenty-five percent…" (the register, then the passage's own first tag). Clear, within the vocabulary, no pause or reaction tag. What it sounded like is only known to the operator's ears.
+
+**Findings (I read step 1, 143 words, the direction prompt, 688 words, and the server's direction checks)**
+- Works: few tags, at the turns; the server checks the tags and passages (6 refusals).
+- **First system's wording (point 18):** "Return only JSON:" (step 1 already says write out/direction.json), as IN1 at the intake.
+- **Said twice (point 17):** the prompt's "WHAT YOU SAY TO THE OPERATOR" repeats step 1's presentation ("Present the kind of film in one line, the register of each list, then each list as rows: the sentence's first four or five words, the tag, the reason in a short phrase. Then the one line on the experimental idea. Ask: best fit, experimental, changes, or none."), and its question leaves out the test passage, which step 1 asks in the same question. Its last two sentences ("None" is valid; never claim to have heard anything) are said only here and stay.
+- Decisions at once (point 12): 45 sentences, two lists, three passages: one pass, and the operator hears the result; no second pass needed. Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint (the direction's digest binds the narration, not a shot).
+
+**Proposed (waiting for SK)**
+- **VO2 — The direction prompt said once:** "Return only JSON:" becomes "Write out/direction.json:"; the repeated presentation sentences removed, keeping "'None' is a valid answer: the voice reads the script as it is. Never claim to have heard anything; only the operator's listening establishes what a voice does with a tag." Direction prompt 688 → about 640 words. No rule lost (step 1 holds the presentation and the one question with the passage). Work: two replacements with the trace and a test. Breaks: nothing; the recorded direction and its digest unchanged. Undo: the old text. Operator: nothing. Success: the next direction is presented as VW-12's, with one question naming the list and the passage. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| VO2 declined (SK, 30 Oct 2026: "Leave it") | – | – |
+
+### 4.3 — Recommending and finding voices (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** two voices were tried: **Reyaansh – Deep, Gripping Suspense Voice** (the client's last voice, from VW-11) and **Arijit M – Engaging Reels Creator**, both from the account, on the voices page. Reyaansh was chosen. Free (the tryouts are 4.4).
+
+**Findings (I read step 2, the prompt's RECOMMEND and FIND paragraphs, 202 words, and the server's voice checks)**
+- Works: the last voice came first; the page was used (the default), so the chat way's catalogue reading did not happen; the choice was the operator's by ear, as the rules require (never from the client's name, never claimed as heard by the assistant).
+- Noted, no change: the chosen voice's own label says "suspense", the brief's tone says "calm, measured"; the operator heard both and chose; the direction's register sets the delivery. The ear decides, as agreed.
+- Nothing paid; no keys; nothing parallel; one decision (the operator's); no block; no helper; no older way; no label; nothing written twice that disagrees; not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 4.3: no change | – | – |
+
+### 4.4 — Tryouts on the page (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** two tryouts (Arijit M, Reyaansh) queued at 11:22:25 and both ready at 11:22:45: **20 seconds, at the same time**; the same text for both (the chosen passage with its tags, 601 characters sent), Eleven v4 at 0.5 / 0.75; ElevenLabs billed 264 characters each (its own count). No failure.
+
+**Findings (I read the server's tryout checks and the job rows)**
+- Parallel work (point 9): yes, the two tryouts ran side by side. Keys (point 8): one ElevenLabs key; enough for one film's tryouts (and the two fresh films ran their voices at different times). The server refuses a tryout before the direction, with no voice, with more than six voices, or the same voice twice.
+- Cost and time (point 10): 528 characters billed, 20 seconds.
+- Nothing else to raise: no block, no helper, no older way, no label, not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 4.4: no change | – | – |
+
+### 4.5 — Paid steps said, not asked; jobs; models and settings (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** three paid jobs (two tryouts, one narration), all on Eleven v4 at the default 0.5 / 0.75, all ready on the first try; none resubmitted, none recovered, none failed. Whether each submission was announced with its model, settings and characters is in the chat on Uma's laptop.
+
+**Findings (I read step 4, 57 words, and the prompt's MODELS AND SETTINGS and JOBS paragraphs, 129 words)**
+- Works: the defaults were used; jobs were waited for, not replaced.
+- Small repeat, not proposed (the same meaning, no disagreement): "Wait with `vw voice jobs --wait 180`" and "recovered, never resubmitted" are in both step 4 and the JOBS paragraph.
+- Keys, parallel work, cost and time: covered at 4.4 and 4.7. No block, no helper, no older way (Eleven v3 and Multilingual v2 are still offered models, not older ways), no label, not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 4.5: no change | – | – |
+
+### 4.6 — The chat way (reviewed 30 Oct 2026)
+Not reached on VW-12 (the voices page was used). Nothing to discuss.
+
+### 4.7 — The full narration and making it final (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** one narration, Reyaansh on Eleven v4 (0.5 / 0.75), queued 11:25:09, ready 11:26:09 (**1 minute**): the whole script in one piece, 4,783 characters sent with 11 tags (one register tag at the top: V1 works), 2,197 characters billed (ElevenLabs' count). Result: **294.4 s**, word timings for all 9 beats (BEAT_05 the longest, 52.6 s; BEAT_08 the shortest, 16.9 s), each beat given a 0.8 s breathing pause. Made final on the voices page at 11:33:29 (7 minutes after it was ready, for a 5-minute narration): "Made final on the voices page by SK".
+
+**Findings (I read step 5, the prompt's NARRATE paragraph, 160 words, the server's narration checks and the tool's beat timing)**
+- Works: one piece, timed per word; the record refuses a narration made for another script version and a beat with no timed words. VW-11's narration of the same script was 301 s; VW-12's is 294.4 s (a different direction; the doubled tag gone).
+- Noted, not proposed: the page records its own fixed words, "by SK", because the operators sign in with SK's account; the operator here was Uma (as at 0.2).
+- Keys and parallel work: one job, one key: nothing to split. Cost: 2,197 characters billed (with the tryouts, 2,725 for the stage). No block (at most three narrations a film, not reached), no helper, no older way, no label, nothing written twice that disagrees. Fingerprint: the narration's timings feed every later timing; nothing here changes them. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 4.6 not reached; 4.7: no change | – | – |
+
+### Stage 4 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| no change in the voice stage; VO1 and VO2 declined (SK) | – | – |
+
+---
+
+## Stage 5 — Media
+
+### What happened on VW-12 (read in the database)
+Prepared 11:36:07, recorded 11:39:48 (about 3½ minutes). 46 clips, 802.7 s (13 min 23 s): the same footage as VW-11. Camera sound **excluded** (M1: answered and required); copies: **editor's copies**; the operator's words: "1. List is complete and correct / 2. Camera sound can be used for analysis only but not for the film / 3. Camera originals but compressed". Nothing paid.
+
+### The map of the stage (waiting for SK's yes)
+
+Words: the v3 media prompt (91) and steps (286). Refusals: the chat tool's prepare and record (I read `stages_av.py`). "Rules" is my count.
+
+| # | Sub-step | Rules | Words | Tool refusals | VW-12 |
+|---|---|---|---|---|---|
+| 5.1 | Prepare: one line per clip; identical files once; variable frame rates converted; rotation read | 6 | 90 + 45 | 1 | 46 clips listed, 11:36 |
+| 5.2 | The list confirmed with the operator; nothing described | 3 | about 20 + 46 | 0 | "List is complete and correct" |
+| 5.3 | The camera-sound question, required (M1) | 2 | about 25 | 1 (no answer) | excluded |
+| 5.4 | Originals or editor's copies; the copies note | 3 | about 60 | 1 (no answer) | copies |
+| 5.5 | Record: upload three at a time with receipts and retries, resume, clips become the analysis units | 5 | 90 | 2 (a clip changed since prepare; upload failure) | recorded 11:39:48 |
+
+Total: about 19 rules, 377 words, 5 refusals. Nothing paid.
+
+### 5.1 — Prepare (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** 46 clips listed, 919 MB, 3.8 s to 95 s each (28 of them 15 s or less, which the analysis now studies in the plain mode, A2); 45 at 50 frames a second and 1 at 25; every clip with a timecode; none converted, none rotated; no identical files. Free, seconds.
+
+**Findings (I read `media_prepare`, `footage_guess`, `copies_note`, step 0 and the prompt)**
+- Works: the listing, the 200 MB limit, three clips probed at a time, the copies note (one clip's frame rate differs from the rest, so the note is printed).
+- ⚠ **An older way still speaking (points 15 and 19):** prepare still prints a guess at the footage ("looks professional …" or "looks like phone footage …") ending "**the operator confirms the camera, the support and the look at record**". That was the way of 22 Oct (design/77 L42: the footage described at the media step); since design/88 the footage is measured at the visuals stage, and the same prepare's message and step 1 say "**Do not ask what the footage is**". The guess contradicts both. It is also wrong for VW-12: the clips are compressed copies (h264, about 6 Mbit/s) of camera originals, so the rule's bit-rate test reads "looks like phone footage".
+- ⚠ **The same older way at record:** `vw stage media record` still accepts `--camera`, `--support`, `--look` and `--footage-note` ("accepted for one release", design/88, 25 Oct) and stores them in the media record, where nothing reads them since the visuals fallback was removed (old-ways item 6): an answer given there is silently lost. The record's empty `footage_character` field is old-ways item 13 ("next release that touches media").
+- Nothing paid; no keys; nothing parallel beyond the three-at-a-time probe; no block; no helper; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **ME1 — The media step's footage guess and footage flags retired:** prepare no longer prints the guess; `media record` refuses `--camera`, `--support`, `--look` and `--footage-note` with one line ("the footage is measured at the visuals stage; correct it there with `vw visuals footage`"); the record's empty `footage_character` field goes (old-ways item 13, due now: this touches media). Hurts: every film (a contradicting line the assistant must ignore; a misleading "phone footage" guess). Work: the chat tool's media prepare and record, and their tests (the test of the guess removed). Breaks: nothing stored is read; films past the media step untouched. Undo: the old code. Operator: nothing. Success: on the next film, prepare prints no footage line, and `media record --camera …` is refused by name. **Older way:** retired by refusal in this release (design/77 L42's footage at media).
+
+| Decided | Parked | Open |
+|---|---|---|
+| ME1 agreed (SK, 30 Oct 2026: "Yes, approve ME1") | – | – |
+
+**For the builder (ME1):** `plugin/scripts/stages_av.py`: `footage_guess` and its call removed from `media_prepare`; `media_record` drops `footage` and the `footage_character` field; `plugin/scripts/vw.py`: `stage media record` refuses `--camera`, `--support`, `--look`, `--footage-note` with the one line above (the `--camera` of `vw delivery` is a different flag and stays); `plugin/tests/test_media.py`: the guess test replaced by "no footage line" and "the flags refused by name". design/35 old-ways items 6 and 13 marked done.
+
+### 5.2 — The list confirmed (reviewed 30 Oct 2026)
+"1. List is complete and correct" (recorded in the operator's words); nothing described. Nothing to discuss.
+
+### 5.3 — The camera-sound question (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** asked and answered: "Camera sound can be used for analysis only but not for the film", recorded as **excluded** with those words (M1 at work: the record would have refused without it). Free.
+
+**Findings (I read step 1, the prompt's sentence and the tool's refusal)**
+- Works, and the meaning carries through: "excluded" keeps the camera sound out of the film, while the clip study still listens to it (for speech in Tamil and for safety), which is what the operator asked.
+- Noted, no change: the stored note joins this answer and the copies answer in one line ("…; Camera originals but compressed"); harmless, both answers are stored on their own too.
+- Nothing paid; no keys; nothing parallel; one question; no block; no helper; no older way; no label; not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 5.2, 5.3: no change | – | – |
+
+### 5.4 — Originals or editor's copies (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** "3. Camera originals but compressed", recorded as **copies**. The copies note was due (one clip at 25 frames a second among 45 at 50); every clip keeps a timecode, and the names keep the camera's clip number with a suffix (for example C0032_02881492.mp4). Free.
+
+**Findings (I read step 1, the tool's refusal and `copies_note`)**
+- Works: the answer is required (refused without it) and leads to the hand-off designed in design/107 (the film is relinked to the originals at the very end); the same answer as VW-11.
+- Nothing paid; no keys; nothing parallel; one question; no block; no helper; no older way; no label; not part of a shot's fingerprint. **Nothing to change.**
+
+**Assumed without checking:** that the operator was told the one-line copies note (the chat is on Uma's laptop).
+
+| Decided | Parked | Open |
+|---|---|---|
+| 5.4: no change | – | – |
+
+### 5.5 — Record: the upload (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** prepare 11:36:07 to record 11:39:48: the 46 clips (919 MB) uploaded with a receipt each, three at a time, inside about 3½ minutes including the operator's answers (VW-11: about 10 minutes for the same footage: the operator's internet is the limit, as noted in design/125). No interruption, no clip refused. The 46 clips became the analysis units; the first clip study was queued at 11:42:06. Free.
+
+**Findings (I read step 2, `media_record` and `upload_file`)**
+- Works: receipts per file, resume by running record again (finished files skipped), a clip changed since prepare refused.
+- Parallel work (point 9): three uploads at once; at VW-12's speed no change needed.
+- Nothing paid; no keys; no block; no helper; no older way (ME1 covers the footage flags); no label; not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 5.5: no change | – | – |
+
+### Stage 5 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| ME1 (the footage guess and flags at media retired by refusal; old-ways items 6 and 13 closed) | – | – |
+
+---
+
+## Stage 6 — Analysis (the clip study)
+
+### What happened on VW-12 (read in the database)
+- **Finished:** all 46 clips retained, first queued 11:42:06, last done 11:55:38: **13½ minutes** (VW-11: 34 minutes with 8 at once; A1 at work). No failure, **no automatic retry needed** (A4 not tested by this run).
+- **A2 at work (short clips in the plain mode):** the 28 clips of 15 s or less took **75 s** each on average (VW-11: 4 min 40 s) with **no "look again" tokens** (VW-11: about 290,000 each); the 18 longer clips, studied in the agentic mode, took 349 s each on average with about 587,000 "look again" tokens each.
+- Model Gemini 3.8 Flash, high thinking, high resolution. The brief recorded no safety rules, so the safety-gear flags were waived from the start (the policy says so).
+
+### The map of the stage (waiting for SK's yes)
+
+Words: the v3 analysis steps (328; the request sent to Gemini is the server's, unchanged since design/125 and not proposed for change there). Refusals: the server's analysis jobs (I read `server/app/analysis_jobs.py`, 19). "Rules" is my count.
+
+| # | Sub-step | Rules | Words | Server refusals | VW-12 |
+|---|---|---|---|---|---|
+| 6.1 | Before starting: one message (listen to the clips' sound? any clip to leave out?), the camera-sound answer said back; start | 5 | 90 | 5 | started 11:42 |
+| 6.2 | The clip study: one paid Gemini request per clip, 15 at once; plain mode for 15 s or less, agentic above | 4 | (in 6.1) | 4 | 46 studied, 13½ min |
+| 6.3 | Waiting: the status line, never reading the evidence files | 3 | 37 | 0 | – |
+| 6.4 | Failures: up to three automatic retries; then the operator's retry, recover or leave out | 6 | 86 | 7 | none |
+| 6.5 | Eligibility and crops computed by the server; a free re-check (`policy`) and waived safety flags | 5 | 95 | 3 | safety flags waived |
+| 6.6 | Moving on: nothing to approve; the next step is options | 2 | 20 | 0 | – |
+
+Total: about 25 rules, 328 words, 19 refusals. Paid: 46 Gemini requests (the money figure is read at 6.2).
+
+### 6.1 — Before starting (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** media recorded 11:39:48; the first clip study queued 11:42:06 (2 min 18 s later). The study was started with the model listening to the clips' sound and no clip left out; camera sound excluded, taken from the media answer. Free.
+
+**Findings (I read step 0, 90 words, and the server's start checks)**
+- Works: the camera-sound answer is taken from the media step, not asked again; the start refuses without it, with every clip excluded, or with jobs still open.
+- ⚠ **A question the operator answered two minutes earlier (point 5):** step 0 asks, in one message, "should the model listen to the clips' audio (default yes), and is there any clip to leave out (default none)?". At the media step the operator had just said "List is complete and correct" and "Camera sound can be used **for analysis** only". Both answers were already given; the question costs a round trip on every film (most of VW-12's 2 minutes before the start, by the times).
+- Nothing paid yet; no keys; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Assumed without checking:** that the question was asked on VW-12 and that the 2 minutes went to it (the chat is on Uma's laptop).
+
+**Proposed (waiting for SK)**
+- **AN1 — Start without asking again:** step 0 becomes "Run `vw analysis start [--understand-audio no] [--exclude <clip name> …]` without asking: the clip list was confirmed at media, and the model listens to the clips' sound unless the operator said there that it must not be used even for analysis. One paid Gemini 3.8 Flash request per clip (agentic for a clip over 15 seconds, plain for a shorter one); tell the operator, do not ask. The server computes eligibility and crops." (90 → 64 words.) The flags stay for an operator who asks. Hurts: every film (one question, about 2 minutes). Work: one step's wording, the trace and a test. Breaks: nothing; a running or finished analysis is untouched. Undo: the old step. Operator: one question fewer; to leave a clip out they say so at the media list. Success: on the next film the clip study starts within seconds of the media record, with no question. **Older way:** retired in this release (the second question).
+
+| Decided | Parked | Open |
+|---|---|---|
+| AN1 agreed (SK, 30 Oct 2026: "Yes, approve AN1") | – | – |
+
+**For the builder (AN1):** `server/procedures/v3.json` `analysis.steps[0]` replaced as above, with a trace; test: v3's analysis step 0 has no question and keeps `--understand-audio no` and `--exclude`.
+
+### 6.2 — The clip study (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database):** 46 Gemini 3.8 Flash requests, 13½ minutes in all, none failed. 28 clips of 15 s or less in the plain mode (75 s each, no "look again" tokens); 18 longer clips agentic (349 s each, about 587,000 "look again" tokens each).
+
+**The comparison A2 skipped, made free from two real runs (SK chose no paid test on 29 Oct; VW-11 studied the same 46 clips, all agentic):**
+| Clips | Usable pieces VW-11 | Usable pieces VW-12 | Grade A 11 → 12 | Grade B 11 → 12 |
+|---|---|---|---|---|
+| 28 short (VW-12 plain, VW-11 agentic) | 49 | 43 (−12 %) | 35 → 36 | 15 → 9 |
+| 18 long (agentic both times) | 66 | 65 (−2 %, the run-to-run difference) | 45 → 43 | 23 → 20 |
+The plain mode found the same grade-A pieces on short clips and about six fewer grade-B ones, for about a quarter of the time and none of the "look again" cost.
+
+**Cost (point 10):** about 11.0 million input tokens and 0.96 million output and thinking tokens for the film; the 18 long clips are about 98 % of the input (their "look again" tokens). The money: no Gemini 3.8 Flash price is set in the server's code (I searched), so I cannot give rupees from the records.
+
+**Findings:** keys (point 8): 5 Gemini keys used in turn, 15 at once (A1): no change. Prompts that write prompts: none (the request is fixed in the server). The request sent to Gemini is unchanged (design/125: changing it voids every stored log). No block, no helper, no older way, no label, not part of a shot's fingerprint. **Nothing to change; A2 confirmed by the comparison.**
+
+**Assumed without checking:** that the grade-B pieces the plain mode missed were not ones the cut needed (VW-11's cut is closed; VW-12's options will show).
+
+| Decided | Parked | Open |
+|---|---|---|
+| 6.2: no change | the six fewer short-clip B pieces: watch at options whether a scene lacks footage VW-11 had | – |
+
+### 6.3 — Waiting (reviewed 30 Oct 2026)
+The status line and "never read the evidence files"; what was reported is in the chat on Uma's laptop. Nothing to discuss.
+
+### 6.4 — Failures and automatic retries (reviewed 30 Oct 2026)
+Not reached on VW-12 (no clip failed, so A4's automatic retries were not used). Nothing to discuss; A4 stays untested on a real film.
+
+### 6.5 — Eligibility and crops (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the database and in C0128's stored evidence):** 112 pieces: **108 usable as they are**, 3 usable only for their sound, 1 refused (VW-11: 115, 5, 1 of 121). Safety-gear flags waived from the start (no safety rules in the brief). The crop rule of design/125 (P4–P6), live for the first time, on the five pieces it was meant to rescue:
+| Piece | VW-11 | VW-12 |
+|---|---|---|
+| C0109 (two silent workers) | out | **usable (2 pieces)**: P4, a silent worker is not a speaker |
+| C0093 (one silent worker) | out | **usable (3 pieces)**: P4 |
+| C0120 (worker at the right edge, chatter) | out | **3 usable**, 1 sound only |
+| C0124 (worker at the right edge, chatter) | out | **usable (2 pieces)** |
+| C0128 (a mason explaining in Tamil) | out | **still out** (sound only) |
+
+**Why C0128 is still out (I re-ran the rule by hand on its stored boxes):** this time the clip study drew the work to keep across **96 % of the frame's width** (VW-11's study drew it narrower). A crop from the top must start below the mason's head (34 % down) and keep the frame's shape, so it is 66 % wide and cuts 15 % off each side of the work, more than the 10 % P6 allows, at a zoom of about 1.5 (the limit is 1.35). The rule worked as built; the footage does not allow the crop.
+
+**Findings (I read `server/app/clip_log/solver.py` and step 4)**
+- Works: four of the five pieces are back; nothing usable shows a speaking face.
+- Noted, not proposed: when both crops fail, the stored reason names only the side crop ("Speaker horizontally overlaps…"), not why the top crop failed; nobody acts on that text.
+- Free (the server computes it; a re-check is free). No keys; no block (the speaker rule follows the brief: "speaker not shown"); no helper; no older way (old-ways item 11 covers films analysed before P4–P6); no label; not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 6.3, 6.4 not reached / nothing; 6.5: no change | – | – |
+
+### 6.6 — Moving on (reviewed 30 Oct 2026)
+Nothing to approve; the run moved to options when every clip was retained. Nothing to discuss.
+
+### Stage 6 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| AN1 (start without asking again); A1, A2, P4–P6 confirmed on real data; A4 untested (no failure) | six fewer short-clip grade-B pieces: watch at options | – |
+
+---
+
+## Stage 7 — Options (the first cut and its review film)
+
+**Live code changed during this review:** design/127 (the review page and film by scene and shot) was deployed on 30 Oct by another session (server 0.77.0, plugin 0.64.0, main 5c5cfdf with its page hotfix). VW-12 cut its options before and after that deploy; this stage is read on the live code.
+
+### What happened on VW-12 (read in the database)
+| Step | When (IST) | What |
+|---|---|---|
+| Scenes approved | before 12:27 | 9 scenes (not about 15, as feared at 2.4), 1 pause; "Yes, approve" |
+| First cut, version 1, rendered | 12:27:11 → 12:29:43 | (before design/127) |
+| First cut, version 2, rendered | 15:08:53 → 15:11:41 | after design/127's deploy; review film 377.4 s |
+| Options approved | 15:45 | "first answer #1.3 KEEP" (slide 1.3: scene 1, shot 3, in design/127's numbering) |
+| Master rendered | 16:03 → 16:05 | (stage 8) |
+
+**The cut (version 2):** 9 options, 25 real shots, 20 AI shots, 8 alternatives. Of the narration's about 296 s: **81 s direct footage + 37 s B-roll = 118 s real (40 %)**, **179 s for AI (60 %)** (VW-11: 35 % real, 65 % AI, with scenes 3 and 4 wholly AI). Scene 3 now has 7 s of real footage; scene 4 has 5.5 s of B-roll; no scene is AI-only.
+
+### The map of the stage (waiting for SK's yes)
+
+Words: the live v3 options prompt (1,271) and steps (521). Refusals and warnings: the tool's check (counted again at 7.5). "Rules" is my count, done at each sub-step.
+
+| # | Sub-step | Words | VW-12 |
+|---|---|---|---|
+| 7.1 | Prepare: the package for reading, grouped by scene (P3) | 90 | before 12:27 |
+| 7.2 | Scenes and pauses, one chapter per scene (P7) | 162 | 9 scenes, 1 pause |
+| 7.3 | The coverage report: direct, related, same chapter (P8) | 40 | – |
+| 7.4 | Writing the first cut in two rounds (exact matches, then fill), rules 1–11 (P9: an idea vs a visible thing) | 155 + 1,271 | 25 real, 20 AI shots |
+| 7.4.1 | Doubtful boundaries: free frames or a paid closer look | (in 7.4) | no paid look |
+| 7.5 | The tool's check: act-on warnings first (P11) | (in 7.4) | to read |
+| 7.6 | The second look, one helper per scene (O4–O6) | (in 7.4) | to read: whether helpers ran |
+| 7.7 | The review film and page (design/127: by scene and shot), the first answer approves | 74 | two versions; approved 15:45 |
+
+Total: 1,792 words of instructions. Free except a paid closer look (none used).
+
+### 7.1 — Prepare: the package for reading (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** prepare wrote the reading files from the stored package (9 scenes, 45 sentences, 46 clip cards, 112 pieces). Free, seconds. I rebuilt VW-12's reading files on this PC from its stored package with the live chat tool's own code (tested, not estimated):
+
+| Part | Size | About (4 characters a token) |
+|---|---|---|
+| Pieces, by scene (12 files) | 211 KB | 53,000 tokens |
+| Word timings (2 files; read only for pauses) | 68 KB | 17,000 tokens |
+| Coverage, narration, scenes, prompt, shapes, the rest | 49 KB | 12,000 tokens |
+| **Total** | **328 KB** | **about 82,000 tokens** (65,000 without the word files) |
+
+**Findings (I read `options_reading_files`, `pieces_by_scene` and step 0)**
+- Works: one file per scene with its sentences and the pieces that fit, direct first (P3); a piece's full row on demand.
+- ⚠ **Too much to read again (point 11):** P3 measured about 47,000 tokens on VW-11's package; VW-12's is about 65,000 without the word files. The cause is P8 (the clip study's matches kept): a piece is now listed under every scene it fits, so the 112 pieces fill **343 rows** (150 direct, **177 related**, 15 same chapter). The related rows alone are 103 KB (about 26,000 tokens): more than the direct ones, for pieces the cut uses least.
+- Nothing paid; no keys; nothing parallel; no decision; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **OP1 — A related piece in one short line:** in each scene's file, the direct and same-chapter pieces keep their row; a related piece is listed in one line (its id, clip, grade, length and what is seen, once per clip); its full row is printed on demand (`vw options show --sub`, as today). Expected on VW-12: pieces 211 KB → about 130 KB; the reading about 65,000 → 45,000 tokens (without the word files). Hurts: every film with many clips (the reading before any choice). Work: the reading files only (the stored package and the server's check unchanged) and a test. Breaks: nothing stored; films in progress get it at their next prepare. Undo: the old rows. Operator: nothing. Success: on VW-12's package, every piece its cut used is in the files, the related ones in one line each, and the reading measures under 50,000 tokens. **Older way:** retired in this release (the full related rows; the stored package keeps every detail).
+
+| Decided | Parked | Open |
+|---|---|---|
+| OP1 agreed (SK, 30 Oct 2026: "Yes, approve OP1") | – | – |
+
+**For the builder (OP1):** `plugin/scripts/vw.py` `pieces_by_scene`: a piece whose fit is `related` is written as one short row (`sub_clip_id`, `clip_name`, `grade`, `duration_s`, `fit`, and `seen` once per clip); direct and chapter rows unchanged. Test on a package copy: related rows carry only those keys; every direct row unchanged; VW-12's pieces files under 140 KB.
+
+### 7.2 — Scenes and pauses (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read the stored package):** 9 scenes, one per paragraph, each naming **one** chapter (The housing need: Housing construction today; What rat-trap bond is: Bricks on edge and the hollow cavities; Why it is different: Exposed-brick walls and cool interiors; Environmental benefits: Brick kilns and brick transport; Quality bricks: Brick quality and strength testing; The construction process: Laying bricks on edge; Structural details: Junctions, corners and sill course; Pointing and curing: Pointing the joints; Conclusion: Completed rat-trap bond homes). One pause: 2 s after word 608, "sets the conclusion apart from the technical steps". Approved "Yes, approve". Free.
+
+**Findings (I read step 1, the scene check, and the pieces' chapters in the package)**
+- ⚠ **P7 (one chapter per scene) was met in name only (point 6: a rule the AI cannot follow cleanly):** P7 says "a paragraph covering two [chapters] is split where the second begins", and the tool warns only when a scene **lists** two chapters. Paragraph 6 covers five chapters (plinth and mortar, guide strings, laying, clean cavities, line and level); the assistant listed one, "Laying bricks on edge", and split nothing, so the warning stayed silent. Six chapters are named by no scene; three of them carry footage: **Checking line, level and plumb (19 pieces), Preparing the plinth and mortar (7), Keeping the cavities clean (4)**. Those 30 pieces reached scene 6 only through the clip study's own matches (P8), which is why scene 6 still got the most footage (33 s).
+- What P7 was for (one slide and one answer per step) is now given by design/127: the review page answers shot by shot. Keeping nine scenes was the better outcome (fewer slides, no one-sentence scenes).
+- The pause: 2 s of silence (camera sound is excluded), approved by the operator. Fine.
+- Nothing paid; no keys; nothing parallel; no helper; no label; not part of a shot's fingerprint (scenes set later timings; this changes new films only).
+
+**Proposed (waiting for SK)**
+- **OP2 — A scene lists every chapter its paragraph covers; no forced split:** step 1's "a scene covers one chapter: a paragraph covering two is split where the second begins" becomes "list every chapter the paragraph covers; split a paragraph only when the operator asks", and the tool's two-chapter warning goes. Effect: a piece's "same chapter" fit counts for every step of the paragraph (on VW-12, the 30 pieces above). Hurts: process films whose paragraphs hold several steps (common). Work: one sentence of step 1, one warning removed, a test. Breaks: nothing; new films. Undo: the old sentence and warning. Operator: nothing (the shot-by-shot page gives the per-step answer). Cost and time: none. Success: on the next process film, its process scene lists all its chapters and the report's same-chapter count includes those pieces. **Older way:** P7 (design/125, 30 Oct) retired in this release, replaced by design/127's per-shot answers.
+
+| Decided | Parked | Open |
+|---|---|---|
+| OP2 agreed (SK, 30 Oct 2026: "Yes, approve OP2") | – | – |
+
+**For the builder (OP2):** `server/procedures/v3.json` `options.steps[1]`: the sentence replaced as above (trace); the scene check's two-chapter warning removed (`stage2`), its test replaced by "a scene listing three chapters passes without a warning". design/35: P7 listed as retired by OP2.
+
+### 7.3 — The coverage report (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the stored package):**
+| Scene | Direct | Related | Same chapter | Alert |
+|---|---|---|---|---|
+| 1 The need for better building | 1 | 24 | 2 | – |
+| 2 What rat-trap bond is | 37 | 37 | 0 | – |
+| 3 Why it is different | **17** | 36 | 1 | – (VW-11: zero coverage) |
+| 4 Environmental benefits | **1** | 0 | 0 | – (VW-11: zero coverage) |
+| 5 Quality bricks | 4 | 4 | 0 | – |
+| 6 The construction process | 66 | 16 | 0 | – |
+| 7 Structural details | 12 | 32 | 0 | – |
+| 8 Pointing and curing | 1 | 7 | 0 | – |
+| 9 Conclusion | 7 | 18 | 11 | – |
+
+**Findings (I read the coverage in the package and step 2)**
+- **P8 works:** no scene shows zero coverage; "direct" now means the clip study matched the piece to that paragraph, not merely the same chapter; scenes 3 and 4 have footage to choose from, and both got some in the cut (7 s and 5.5 s).
+- Not recorded on the server (shown in chat); 40 words; nothing paid; no keys; no block; no helper; no older way; no label; not part of a shot's fingerprint. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 7.3: no change | – | – |
+
+### 7.4 — Writing the first cut (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read the stored cut, version 2, proposed 15:08 IST):** 9 scenes cut, none AI-only. **25 real shots** (16 direct matches, 9 B-roll), median 4.2 s; **20 blanks** for AI (3.4 to 18.6 s); 8 alternatives offered on shots; 3 notes for the operator; every self-check point passed.
+- **P9 works:** scene 3's "the exposed brick pattern is visually attractive" is shown by real footage (C0134, an unplastered exposed-brick finish); the scene's claims (thermal barrier, 25 %, strength, three storeys) are blanks for graphics.
+- **O7 used:** one clip (C0104) appears twice in scene 6, on parts that do not overlap and at different shot sizes.
+- **Blanks with footage nearby (checked, not a fault):** "plinth swept and wetted" (4.2 s) and "guide strings stretched" (3.5 s) are blanks; I read the 30 pieces of those chapters: none shows a plinth being cleaned or wetted (they sweep brick courses) and none shows guide strings, so the exact-match rule is right.
+
+**Prompts that write prompts (point 7):** each blank's "what it must show" becomes the visuals stage's gap description. Real examples: "Graphic: brick strength matched to building height; a single-storey house with 20 kg/cm² minimum crushing strength…", then "Graphic continues: two storeys 35 kg/cm², three storeys 75 kg/cm²"; "Water curing: a worker sprays and wets a finished rat-trap bond wall, the brickwork darkening with water". Clear, one picture each, the narration's own figures. One to note: scene 3's "studies show performance comparable to conventional bonds" carries a claim the web check found generous (3.3); keeping the wording was the operator's choice, and the graphic will say what the voice says.
+
+**Findings**
+- Decisions at once (point 12): about 70 in one pass (9 scenes, 25 shots, 20 blanks, 8 alternatives): the second look (O4–O6) is for this; whether it ran is 7.6.
+- Too much to read: OP1. Nothing paid (no closer look); no keys; no block; no helper here; no older way; no label; not part of a shot's fingerprint. **Nothing to change.**
+
+**Assumed without checking:** that the 8 alternatives and 3 notes reached the page as questions (7.7 reads the page).
+
+### 7.4.1 — Doubtful boundaries (reviewed 30 Oct 2026)
+No paid closer look on VW-12 (the cut's inspection cost is empty); whether free frames were looked at is in the chat. Nothing to discuss.
+
+| Decided | Parked | Open |
+|---|---|---|
+| 7.4, 7.4.1: no change | – | – |
+
+### 7.5 — The tool's check (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read the stored cut's warnings):** 47 warnings, no refusal left. For information (P11 counts them in one line): R1 16 (a cut not at a natural cut point), R10 12 (colour group changes), R4 4 (energy drops): 32. To act on: **N17 10**, E2 4 (an AI blank over 12 s), R5 1 (a wide shot held under 4 s): 15. P12 at work (no "refused from the next release" promise).
+
+**The 10 N17 warnings, read one by one:** each says "step … is shown by a clip of the stage X; the scene narrates Y: the right step? **(the operator decides)**". The tool has already refused any such shot without a reason (the assistant gave one for each), so this warning comes after the reason. Then:
+- **Nothing takes it to the operator:** the cut carries 3 questions for the operator (a soft focus, rough bricks, mortar over the cavity), none of them from N17; the review page does not show the check's warnings. "The operator decides" is never true.
+- **Most are false alarms from the one-chapter scenes (7.2):** scene 6's "attention is given to maintaining alignment, level" shown by a clip of "Checking line, level and plumb", and "care is taken to prevent mortar from falling into the cavities" shown by "Keeping the cavities clean", are the right steps; they fire only because scene 6 named one chapter. OP2 removes these. Others are idea sentences shown by finished homes (scenes 2, 3, 4), which P9 allows.
+
+**Findings (I read `stage2/validator.py`'s N17 check and the step's act-on list)**
+- ⚠ **A warning that asks for a decision nobody is asked (point 19, the other voices):** N17's chapter warning ends "(the operator decides)" and is listed with the warnings to act on, after the tool has already required the reason it wants.
+- E2: the four long blanks are graphics that build ("Graphic continues…") or a summary graphic; the visuals stage breaks AI video over 12 s anyway. No change.
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **OP3 — N17's chapter warning counted for information:** once the shot has its reason (already required), the "shown by a clip of another stage" warning is counted with R1, R10, R4 and R8 in the one information line, and its "(the operator decides)" goes. N17's claim warning ("a claim shown by footage") stays to act on. On VW-12: act-on 15 → 5 (with OP2 the count line also shrinks). Hurts: every process film (warnings to read past). Work: the warning's text and its group (one server file) and a test. Breaks: nothing stored. Undo: the old group. Operator: nothing. Success: on VW-12's cut, the act-on list is the 4 E2, the 1 R5 and no N17 chapter warning. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| OP3 agreed (SK, 30 Oct 2026: "Yes, approve OP3") | – | – |
+
+**For the builder (OP3):** `server/app/stage2/validator.py`: the "shown by a clip of the stage …" N17 flag gets its own kind counted in `for_information`, without "(the operator decides)"; the claim N17 flag stays act-on. Test on VW-12's cut: `act_on` holds 4 E2 and 1 R5 only. The options step's act-on list (v3 steps[3]) says "N17 (claims)" (trace).
+
+### 7.6 — The second look, one helper per scene (started 30 Oct 2026)
+
+**What the server shows (read in storage):** the timeline: package 11:57; scenes 12:00 and 12:01 (two versions); first cut version 1 proposed **12:27** (26 minutes after the scenes; VW-11's one pass took 5); version 2 proposed 15:08 after design/127's deploy, with 8 of 9 scenes cut differently. **Neither stored cut records whether a second look ran:** the helpers' files (`out/second-look/<scene>.json`) stay on the operator's laptop and `join-second-look` leaves no mark in the cut. The 26 minutes fit a second look, but that is a guess.
+
+**SK, 30 Oct 2026: "Skip, go to 7.7".** Not verified whether the second look ran on VW-12.
+
+| Decided | Parked | Open |
+|---|---|---|
+| 7.6 skipped by SK | the second look leaves no mark on the server (its run and fixes cannot be read after the fact) | whether the helpers ran on VW-12 |
+
+### 7.7 — The review film and page (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in storage and in the run's session):** version 2's review film rendered 15:08:53 → 15:11:41 (2.8 min, free): **377.4 s** for 296 s of narration, built from 95 items (17 slates: 9 scenes and 8 alternatives; 20 AI cards under the narration; 33 footage pieces with their label strip). The operator answered on the page from 15:45:46 to 16:02:03 (**16 minutes, 28 answers**): 25 shots (20 Keep, 5 Reject: 1.2, 6.1, 6.7, 8.1, 9.4, none with a note) and 3 alternatives taken; the first answer (#1.3 Keep) approved the options, and the run moved to master by itself (design/127 and P14 at work).
+
+**Prompts that write prompts (point 7):** each AI card shows the words and "For AI: …" (the blank's description), so the operator reads the request the visuals stage will get.
+
+**Findings (I read `stage2/slides.py` and the render list)**
+- Works: scene numbers and shot numbers (1.3, 6.7), alternatives opening only when their shot is rejected, AI-only shots needing no answer.
+- ⚠ **Words run together on the cards:** the card text is cleaned to plain letters by dropping every character outside basic English (`ascii_text`), so a dash disappears with no space: VW-12's first card reads "a major **challengehow** to build", from "challenge—how". The same happens to any dash (—, –) and to curly quotes and apostrophes (’ is dropped: "it’s" → "its"). The script has dashes in scenes 1 and 2.
+- Nothing paid; no keys; rendering is one job; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **OP4 — Dashes and curly quotes kept readable on the cards:** before the cleaning, a dash becomes " - " and curly quotes become straight ones. Hurts: every film whose narration has dashes or apostrophes (most). Work: one line in `ascii_text` and a test. Breaks: nothing stored; a film's next render shows it. Undo: the old line. Operator: nothing. Success: VW-12's first card reads "challenge - how". **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| OP4 agreed (SK, 30 Oct 2026: "Yes, approve OP4") | – | – |
+
+**For the builder (OP4):** `server/app/stage2/slides.py` `ascii_text`: before the NFKD cleaning, "—" and "–" become " - ", "’" and "‘" become "'", "“" and "”" become '"'. Test: "challenge—how" gives "challenge - how"; "it’s" gives "it's".
+
+### Stage 7 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| OP1 (related pieces in one line), OP2 (a scene lists every chapter; P7 retired), OP3 (N17's chapter warning for information), OP4 (dashes and quotes on the cards); P8, P9, P13, P14, O7, design/127 seen working | the second look leaves no mark on the server | whether the second look ran on VW-12 (7.6, skipped by SK) |
+
+---
+
+## Stage 8 — The master
+
+### What happened on VW-12 (read in the database and storage)
+| Step | When (IST) | What |
+|---|---|---|
+| Answers on the review page | 15:45:46 → 16:02:03 (16 min) | 28 answers: 20 shots kept, 5 rejected (1.2, 6.1, 6.7, 8.1, 9.4; no reasons), 3 alternatives taken; no trim |
+| Master built and rendered | 16:03:08 → 16:05:20 (2.2 min) | 296.28 s, loudness −16.4 LUFS, peak −2.6 dB |
+| Master and first cut approved | 16:19:26 (14 min after the film was ready) | "Watched and listened to the master, approved" |
+| Gaps handed to visuals | 16:19 | **12 gaps**, 3.5 to 45.6 s; neighbouring blanks joined (scene 5: one 45.6 s gap); 2 rejected shots without an alternative became gaps ("in place of rejected Scene 6 · Shot 1: …", "… Scene 8 · Shot 1: …") |
+| Visuals started | 16:20 | (stage 9) |
+
+### The map of the stage (agreed: SK, "Yes, start at 8.1")
+
+Words: the live v3 master steps (478; the first-cut step 13). Refusals: the stage's checks (I read `stage2/stage.py`).
+
+| # | Sub-step | Words | VW-12 |
+|---|---|---|---|
+| 8.1 | Answering the shots (page by default; chat with the question tool, four a message): Keep, Reject, Trim; alternatives after a Reject; the first answer approves the options | 289 | 28 answers in 16 min, on the page |
+| 8.1.1 | A trim turned into frames | (in 8.1) | none |
+| 8.2 | Building the master: a rejected shot takes its kept alternative or becomes a blank; neighbouring blanks join; blanks under 3 s, trims that change a scene's length and a clip used twice refused | 163 (with 8.3–8.5) | built |
+| 8.3 | Rendering, waiting, fetching | (in 8.2) | 2.2 min |
+| 8.4 | Approval: watched and listened, master and first cut recorded together | (in 8.2) | 16:19 |
+| 8.5 | A client rule from a rejection note (on the operator's yes) | (in 8.2) | no note, no rule |
+| 8.6 | The gaps handed to the visuals stage | 26 | 12 gaps |
+
+Total: 491 words. Nothing paid.
+
+### 8.1 — Answering the shots (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the run's session):** on the review page (design/127 live since 14:30; its page fault, the page stuck at "Loading", fixed at 15:21, before the operator began). 28 answers in 16 minutes (15:45:46 → 16:02:03), about 35 s each, in film order: 20 shots kept; 5 rejected, none with a reason (1.2, 6.7 and 9.4 then took their alternative; 6.1 and 8.1 had none to take); no trim. The first answer approved the options.
+
+**Findings (I read step 0, 289 words, and the session's answers)**
+- Works: one answer per shot, alternatives offered only after a Reject, scene headers and AI shots needing nothing, the first answer approving.
+- Noted for 8.6: the reason for a Reject is optional and none was given, so the two rejected shots without an alternative reach the visuals stage described only by their words (see 8.6).
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint. **Nothing to change.**
+
+### 8.1.1 — A trim turned into frames
+Not reached on VW-12 (no trim). Nothing to discuss.
+
+| Decided | Parked | Open |
+|---|---|---|
+| 8.1, 8.1.1: no change | – | – |
+
+## Blocks found (point 13), across all stages
+| # | Where | Decision or refusal | Recommendation | SK |
+|---|---|---|---|---|
+| 1 | 0.1 | The picture AI never changes on a film (SK, 28 Oct, design/120) | keep | – |
+
+## Older ways found (point 15), across all stages
+| # | Where | Older way | Newer way | Recommendation | SK |
+|---|---|---|---|---|---|
+| 1 | 0.1 | A film with no picture AI silently gets GPT Image (server default; visuals stage) | the picture AI chosen at the start (28 Oct) | retire by refusal (ST1) | agreed |
+| 2 | 5.1 | The footage guessed and confirmed at the media step (design/77 L42, 22 Oct): prepare's guess line, `media record --camera/--support/--look/--footage-note`, the empty `footage_character` field | the footage measured at visuals (design/88, 25 Oct) | retire by refusal (ME1) | agreed |
+| 3 | 7.2 | One chapter per scene (P7, design/125, 30 Oct) | a scene lists every chapter; per-step answers by shot (design/127) | retire (OP2) | agreed |
+
+## Parking list
+| # | From | Item | Where it goes |
+|---|---|---|---|
+| 1 | 2.4 | VW-12 has 15 chapters on 9 paragraphs; with P7 (one chapter per scene) the options step may cut about 15 scenes, some of one sentence (5–8 s), each with a slide, an answer and a helper | options 7.2 on VW-12: count the scenes and the shortest | **seen: 9 scenes**; looked at in 7.2 |
+| 2 | 3.3 | The brick-strength table (20 / 35 / 75 kg/cm²), which a graphic will draw, was not checked at the script | visuals: check it is researched before the graphic is made |
+| 3 | 6.2 | The plain mode found six fewer grade-B pieces on short clips | options: not checked scene by scene; scenes 3 and 4 gained footage over VW-11 |
+| 4 | 7.6 | The second look leaves no mark on the server: whether it ran and what it fixed cannot be read afterwards | a later build, if SK wants it |
