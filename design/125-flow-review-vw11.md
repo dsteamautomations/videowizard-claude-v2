@@ -679,3 +679,4 @@ Server unit 872 passed, 4 skipped (browser tests); chat tool 349 passed, 3 known
 - The shared test environment on this PC was found broken (files deleted from the temporary folder); the tests ran on the system Python 3.12 and a fresh environment.
 
 - **Deployed 30 Oct 2026** (design/35 row 114): server 0.76.0, plugin 0.63.0, main @ 0dc9f47; live version 3 checked (the AI-only scene rule, the second look, the first-cut step). The operator restarts Claude Code; Vw off in the desktop app's list.
+- **VW-10 and VW-11 closed (SK, 30 Oct 2026: "Yes, close both"; 10:46 IST),** in the database as before (never delivered; no job queued or running). No film is open. The team starts a fresh run on version 3 with every change of design/125. VW-11's old slide behaviour and its declared gaps are now due on design/35's old-ways list (next release).
