@@ -677,3 +677,5 @@ Server unit 872 passed, 4 skipped (browser tests); chat tool 349 passed, 3 known
 - A real render of a blue card, a browser look at the page, a real run of the helpers, and whether the desktop app honours the helpers' and the folder's model and thinking settings (to test on one operator laptop).
 - The second look's still frames show a piece's own edges, not a trimmed shot's edges (the free frame grab takes the piece's in and out).
 - The shared test environment on this PC was found broken (files deleted from the temporary folder); the tests ran on the system Python 3.12 and a fresh environment.
+
+- **Deployed 30 Oct 2026** (design/35 row 114): server 0.76.0, plugin 0.63.0, main @ 0dc9f47; live version 3 checked (the AI-only scene rule, the second look, the first-cut step). The operator restarts Claude Code; Vw off in the desktop app's list.
