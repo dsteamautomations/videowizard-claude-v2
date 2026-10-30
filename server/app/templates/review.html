@@ -190,7 +190,7 @@ async function submit(slide){
 }
 async function send(body){
   msg('Recording #'+body.slide+'…',false,true);
-  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action)+' recorded ('+j.decided+' of '+j.of+').'));
+  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action)+' recorded ('+j.decided+' of '+j.of+').');
     if(j.view){data=j.view;draw();}else{await load();}
     if(waitingFor===body.slide){resume();}
     return j;}

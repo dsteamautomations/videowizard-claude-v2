@@ -356,3 +356,15 @@ def test_the_instructions_and_the_chat_path_speak_of_shots():
         assert 'KEEP_WITH_EDIT' not in t and 'SECONDARY' not in t and 'alternatives' in t, path
     main = (APP / 'main.py').read_text(encoding='utf-8')
     assert "Literal['KEEP', 'REJECT', 'KEEP_WITH_EDIT', 'DROP']" not in main
+
+
+def test_the_page_script_parses():
+    """design/127 hotfix: a stray bracket left the live page at "Loading..." (SyntaxError); the script is parsed by Node when it is installed."""
+    import re, shutil, subprocess
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node is not installed here')
+    html = (APP / 'templates' / 'review.html').read_text(encoding='utf-8')
+    script = re.search(r'<script>\s*(\(function\(\)\{.*?\}\)\(\);)\s*</script>', html, re.S).group(1)
+    out = subprocess.run([node, '-e', 'new Function(require("fs").readFileSync(0, "utf8"))'], input=script, capture_output=True, text=True, encoding='utf-8')
+    assert out.returncode == 0, out.stderr
