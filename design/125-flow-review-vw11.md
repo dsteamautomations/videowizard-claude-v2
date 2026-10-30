@@ -640,3 +640,40 @@ SK's rule: every change states its older way (retired, or kept until a date with
 - Not checked in this audit: the visuals stage's code beyond what design/124 recorded (it was not part of stages 1 to 7).
 
 - **VW-3 to VW-9 closed (SK, 30 Oct 2026: "Yes, close them"; 09:27 IST).** The server's own close refuses a film that was never delivered, so they were closed in the database (status closed, closed time set), after checking none had a job queued or running; reopening is setting the status back. Their render caches on the server were not cleared (disk space only). Open films now: VW-10 and VW-11, both on version 3. Instruction version 2 and the three older ways tied to it are now **due** on design/35's list.
+
+---
+
+## The stage 7 build (30 Oct 2026, on SK's word "Yes, build now"; commit, no deploy until SK approves)
+
+Built by three builders working on separate files, then checked and joined: (A) the options and master server and the review page; (B) the crop rule and the older ways due; (C) the chat tool, the helpers and the wording. Server 0.76.0, plugin 0.63.0.
+
+### What was built
+- **Review page and options (A):** O1 (a scene whose footage is all questions takes only a trim; its parts decide it), O2/O3 (scene numbers; "N-2", "second choice"), O7 (a later, non-overlapping part of a clip in the same scene is not a reuse; side by side at the same size refused), O8 (a hint on every slide; a second choice's scene card on deep blue, a blue mark on its rows; "Keep with edit" is now "Trim a shot"), P1, P7 (warning), P8 (the clip study's matches kept: on VW-11 scene 3 shows 19 direct and 43 related), P11 (`act_on` and `for_information`; on VW-11: 3 to act on, "38 for information: R1 17, R10 13, R4 5, R8 3"), P12, P13 simpler (a declared gap refused; an AI-only scene is one blank with its slide, card and Keep/Reject), P14.
+- **Crop rule (B):** P4, P5, P6: on VW-11's footage C0109 and C0093 become usable as they are, C0128 with a top crop (zoom 1.22), C0120 (1.28) and C0124 (1.20) with a side crop.
+- **Chat tool and wording (C):** P3 (the reading, grouped by scene: VW-11's 394 KB → 189 KB, about 98,600 → 47,100 tokens), O4–O6 (`vw options second-look`, the `vw-scene-review` helper on Opus at high thinking, `vw options join-second-look`), O9 (the `vw-plan-gaps` helper), the operator guard lets only these two helpers run, the wording of P2, P7, P9, P10, P13, P14, O1–O3, O4–O6, O7, O9 and the first-cut step (script `scripts/d125_stage7_wording_v3.py`, trace `design/125-stage7-wording-trace.md`; options 1,619 → 1,617 words, master 454 → 453, first cut 53 → 13), O0 in both operator setup guides (`"model": "claude-opus-5-5"`, `"effortLevel": "high"`, never set `CLAUDE_CODE_EFFORT_LEVEL`).
+- **Older ways retired by refusal (A, B, C, and the lead):** instruction versions 1 and 2 for new or adopted films; the planning stage, its endpoints, `vw planning` and `v1.json`; the version-1 evidence contract; the separate options approval; the separate first-cut record; deciding by option number; cuts without stored slides; the footage answer from media; Kling, Seedance and the Higgsfield branches; the older guide snapshot; the visuals stage reading a planning output; unused evidence modules; the old video-service key setting. Every refusal names the new way (messages in design/35's list).
+
+### Choices the builders made inside SK's decisions (for SK to confirm)
+- **O1:** a scene decided by its parts only when it has no second choice (with two versions both answer-free, the operator could not pick one).
+- **O7:** two parts of one clip side by side at the same size is **refused** (read from "never side by side").
+- **O8:** only the second choice's own scene card is blue; its question and blank cards stay black.
+- **P6:** 10 % per edge of the must-keep area (C0128 loses 7.3 % on each side, 14.6 % of the width in all).
+
+### The independent check (a helper that did not write the wording)
+Every change in version 3 is in the trace, and version 2 is unchanged. It found six problems, all fixed (`scripts/d125_stage7_fixes_v3.py`, appended to the trace):
+1. a contradiction: the E2 rule (split a long blank with footage) against an AI-only scene: E2 now says an AI-only scene is included and gives the way out ("or say in intent why it must stay whole"); the prompt's second list of flags removed (the steps hold the one list);
+2. the master step's scene-decided-by-its-parts wording now matches the code: it needs no answer, takes a trim if wanted, and only without a second choice; an AI-only scene keeps Keep/Reject;
+3. rule 3 keeps "by default" and the B-roll gate ("only when clearly relevant, relatable to the words, and nothing in it wrong");
+4. "keep one of the two" restored for a second choice;
+5. the act-on flags listed with "each says what to do" (their messages carry the explanation);
+6. the per-scene file limit said ("a large scene continuing in pieces-<scene>-2.json").
+Also in the command text: the paragraph's "versions 2 and 3" heading, the reuse wording (another scene), and two sentences said twice. **Word counts:** options 1,619 → 1,607, master 454 → 448, first cut 53 → 13; the command text's options paragraph 437 → 428. Left as noted: options keep their internal numbers 1..N beside the slides' scene numbers (`vw options show --option n`).
+
+### Tests
+Server unit 872 passed, 4 skipped (browser tests); chat tool 349 passed, 3 known Windows-only failures; `c1_split_v3.py --check` ok; every chat-tool file compiles. New: `test_design125_stage7_a_pure.py` (28), `_b_pure.py` (14), `_c_pure.py`, plugin `test_design125_stage7.py` (13); older tests adapted to the retired ways.
+
+### Not covered
+- The Docker tests (`server/tests`): Docker was not running; `test_stage2.py` and `test_visuals.py` still use declared gaps and the planning stage (on design/35's list, item 15).
+- A real render of a blue card, a browser look at the page, a real run of the helpers, and whether the desktop app honours the helpers' and the folder's model and thinking settings (to test on one operator laptop).
+- The second look's still frames show a piece's own edges, not a trimmed shot's edges (the free frame grab takes the piece's in and out).
+- The shared test environment on this PC was found broken (files deleted from the temporary folder); the tests ran on the system Python 3.12 and a fresh environment.

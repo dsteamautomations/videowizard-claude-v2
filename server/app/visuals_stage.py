@@ -1,5 +1,5 @@
 """Visuals stage: direction (chat model), reference library (frame / supplied / web / generated via OpenAI GPT Image 2.5),
-bindings, video takes (Google Omni / Higgsfield) and local assets, one stage output per gap.
+bindings, video takes (Google Omni) and local assets, one stage output per gap.
 
 Session state is one JSON object in storage ({run}/visuals/session.json); images, takes and plans are files.
 Unit of the ledger = gap (from the planning certificate, or the approved first cut when the Mac slice exists);
@@ -91,11 +91,11 @@ def _fps(session):
 
 
 def gaps_source(store, outputs):
-    """Gaps come from the approved first cut when present (Mac slice), else from the planning certificate."""
+    """Gaps come from the approved first cut when present, else from the master (design/125: the planning stage of version 1 is retired)."""
     first_cut = next((o for o in outputs if o['stage'] == 'first_cut' and o['unit'] is None), None)
-    planning = next((o for o in outputs if o['stage'] in ('planning', 'master') and o['unit'] is None), None)
+    planning = next((o for o in outputs if o['stage'] == 'master' and o['unit'] is None), None)
     if not planning:
-        raise Problem(409, 'NOT_ALLOWED', 'Visuals needs a finalized plan (planning or master) first.')
+        raise Problem(409, 'NOT_ALLOWED', 'Visuals needs an approved master first.')
     base = first_cut['summary'] if first_cut and first_cut['summary'].get('gaps') is not None else planning['summary']
     gaps = {g['shot_id']: {'start_frame': g['start_frame'], 'end_frame': g['end_frame'], 'passage_ids': g.get('passage_ids', []), 'requirement': g.get('reason', '')} for g in base['gaps']}
     return {'from': 'first_cut' if base is not planning['summary'] else 'planning', 'fps': str(base.get('fps') or planning['summary']['fps']),
@@ -122,16 +122,11 @@ def prepare(conn, store, user, run, outputs):
                     logs[o['unit']] = log   # design/88: movement and contrast per clip
                     world.append({'clip': o['unit'], 'entities': log.get('entities'), 'unavailable_or_uncertain': log.get('unavailable_or_uncertain'),
                                   'landmarks': sorted({l for s in log.get('sub_clips') or [] for l in (s.get('continuity_and_story') or {}).get('world_landmarks_and_props', [])})})
-                else:
-                    ev = doc['evidence']
-                    world.append({'clip': o['unit'], 'world_markers': ev.get('world_markers'), 'evidence_limits': ev.get('evidence_limits')})
+                else:   # design/125: the version-1 evidence contract is retired
+                    raise Problem(409, 'RETIRED', f"Clip {o['unit']}: the version-1 evidence contract is retired; analysis uses the clip log (clip-log-v1).")
     media = next((o for o in outputs if o['stage'] == 'media' and o['unit'] is None), None)   # design/88: measured, not asked
     session['footage_measured'] = FM.measure(((media or {}).get('summary') or {}).get('clips') or [], logs)
     session['clip_safe_zoom'] = {cid: float(log.get('max_safe_zoom_limit') or 1.0) for cid, log in logs.items()}   # design/89 H4: how far a reuse may be cropped
-    if 'footage_correction' not in session:   # F6: the answer recorded at the media step before design/88 stands as the correction
-        old = footage_character(outputs)
-        if old:
-            session['footage_correction'] = {**{k: old.get(k) for k in ('camera', 'support', 'look', 'quote')}, 'from': 'the media step'}
     session['footage'] = FM.apply_correction(session['footage_measured'], session.get('footage_correction'))
     session['gap_neighbours'] = gap_neighbours(store, outputs)   # F3: the clip before and after each gap
     session['first_cut_events'] = first_cut_events(store, outputs)   # design/89 H1, finding 9: read once here, not on every placement
@@ -243,11 +238,10 @@ def gap_neighbours(store, outputs):
 
 
 def footage_view(session, outputs=()):
-    """design/88 F4: the line the operator is told, the summary and the per-clip map; a session prepared before design/88 shows the recorded answer."""
+    """design/88 F4: the line the operator is told, the summary and the per-clip map (design/125: the answer recorded at media is retired)."""
     f = session.get('footage')
     if not f:
-        old = footage_character(outputs) if outputs else None
-        return {'line': None, 'summary': old, 'per_clip': {}} if old else None
+        return None
     return {'line': FM.line(f['summary']), 'summary': f['summary'], 'per_clip': f['per_clip'], 'measured': (session.get('footage_measured') or {}).get('summary')}
 
 
@@ -265,12 +259,6 @@ def correct_footage(store, user, run, outputs, values, quote):
     session['footage'] = FM.apply_correction(session.get('footage_measured') or {'per_clip': {}, 'summary': {}}, session['footage_correction'])
     save_session(store, run, session)
     return footage_view(session)
-
-
-def footage_character(outputs):
-    """design/77 L42: the operator's confirmed footage character from the media record (camera, support, look, their words), or None for a run recorded before it."""
-    media = next((o for o in outputs if o['stage'] == 'media' and o['unit'] is None), None)
-    return ((media or {}).get('summary') or {}).get('footage_character') if media else None
 
 
 def library_version_of(session):

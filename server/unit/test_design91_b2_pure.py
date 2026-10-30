@@ -93,12 +93,12 @@ def test_every_step_is_shown_by_an_event_or_left_as_a_blank():
     assert any('N17' in x and 'why' in x for x in check(d)['refusals'])
 
 
-def test_an_option_without_a_step_map_is_flagged_this_release():
+def test_an_option_without_a_step_map_is_flagged():
     d = doc()
     for o in d['options']:
         o.pop('steps')
     r = check(d)
-    assert not n17(r['refusals']) and any('N17' in x and 'refused from the next' in x for x in r['flags'])
+    assert not n17(r['refusals']) and any('N17 no step map' in x for x in r['flags'])   # design/125 P12: no promise of a refusal
 
 
 def test_footage_of_another_process_stage_and_a_claim_shown_by_footage_are_flagged():

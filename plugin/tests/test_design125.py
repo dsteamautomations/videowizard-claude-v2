@@ -16,7 +16,7 @@ COMMAND = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
 
 def test_i1_i4_m1_the_operator_command_text():
     assert 'ask the operator which picture AI this film uses' in COMMAND and '--images openai|gemini' in COMMAND
-    assert 'procedure version 2, the current default' not in COMMAND and 'version 3, the current default' in COMMAND
+    assert 'procedure version 2, the current default' not in COMMAND and 'procedure versions 2 and 3' not in COMMAND   # I4, then version 2 retired (design/125 stage 7)
     media = next(line for line in COMMAND.split('\n') if line.startswith('**Media**'))
     assert '--camera-audio allowed|excluded' in media and 'camera sound' in media
 

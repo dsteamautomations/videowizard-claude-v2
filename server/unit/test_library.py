@@ -8,7 +8,7 @@ import pytest
 from app import library as L
 from app.errors import Problem
 
-VERSION = 'vwlib-2026-10-21-4f88379be109'
+VERSION = 'vwlib-2026-10-29-3d60877d3d23'   # design/35 Old ways 8: the only snapshot installed; the 21 Oct one is removed
 RUN = {'id': 'run-1', 'code': 'VW-9', 'client_id': 'NARDEP'}
 PLAN = {'foundation': {'treatment': 'documentary', 'appearance': 'overcast yard light', 'exclusions': [{'id': 'X1', 'statement': 'no logos', 'scope': 'all', 'source': 'brief'}],
                        'editing_constraints': [{'id': 'C1', 'statement': 'no gift boxes', 'scope': 'all', 'source': 'operator'}]},
@@ -140,7 +140,6 @@ def test_default_size_follows_the_frame_and_an_edit_takes_its_parents_size_only_
 
 # ---------- design/124 A4: the corrected guide is a new snapshot; Gemini Omni only; no change-history label in a message ----------
 
-OLD = VERSION
 DROPPED = ('library/video/models/kling/FACT-SHEET.md', 'library/video/models/seedance/FACT-SHEET.md', 'library/video/models/higgsfield/NOTES.md')
 
 
@@ -151,16 +150,15 @@ def _fingerprint(files):
     return h.hexdigest()
 
 
-def test_the_new_snapshot_is_the_latest_and_every_snapshot_matches_its_manifest_and_its_name():
+def test_the_new_snapshot_is_the_only_one_and_matches_its_manifest_and_its_name():
     new = L.latest()
-    assert new != OLD and new.startswith('vwlib-2026-10-29-') and OLD in L.versions()
+    assert L.versions() == [VERSION] == [new]   # design/35 Old ways 8: older snapshots removed
     for v in L.versions():
         m = L.manifest(v)
         assert L.verify(v) == [] and m['version'] == v
         assert m['fingerprint_sha256'] == _fingerprint(m['files']) and v.endswith(m['fingerprint_sha256'][:12])
         for f in m['files']:
             assert (L.ROOT / v / f['path']).stat().st_size == f['bytes'], f['path']
-    assert L.manifest(OLD)['fingerprint_sha256'].startswith('4f88379be109')   # the old snapshot stays as it was
     assert 'design/124 A4' in L.manifest(new)['note']
 
 
@@ -168,7 +166,6 @@ def test_the_new_snapshot_drops_kling_seedance_and_higgsfield_and_nothing_points
     new = L.latest()
     paths = {f['path'] for f in L.manifest(new)['files']}
     assert not paths & set(DROPPED) and not any((L.ROOT / new / p).exists() for p in DROPPED)
-    assert all((L.ROOT / OLD / p).is_file() for p in DROPPED)   # films on the old snapshot keep theirs
     assert L.MODEL_SHEETS == {'gemini-omni-1.1-flash': ('library/video/models/gemini-omni-1-1/FACT-SHEET.md',)} and not set(L.ALL_SHEETS) & set(DROPPED)
     for name, s in L.STEPS.items():
         assert not set(s['files']) & set(DROPPED), name

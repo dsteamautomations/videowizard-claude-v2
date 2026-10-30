@@ -8,8 +8,32 @@ SHOT_SIZES = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
 STABILIZE_ZOOM = 1.08
 
 
-def compute_davinci_crop(exclude_box, preserve_box, source_w, source_h, timeline_w, timeline_h, max_safe_zoom, rotation_deg=0.0, stabilize=False):
-    # verbatim port of the blueprint solver
+TRIM = 0.10   # design/125 P6: each edge of the must-keep box may lose up to 10 % of its width (left, right) or height (top, bottom)
+
+
+def _clipped(x_min, y_min, w, h, preserve_box):
+    px, py, pw, ph = preserve_box
+    tx, ty = TRIM * pw + 1e-6, TRIM * ph + 1e-6
+    return x_min - px > tx or (px + pw) - (x_min + w) > tx or y_min - py > ty or (py + ph) - (y_min + h) > ty
+
+
+def compute_davinci_crop(exclude_box, preserve_box, source_w, source_h, timeline_w, timeline_h, max_safe_zoom, rotation_deg=0.0, stabilize=False, head_box=None):
+    """The blueprint's side crop (ported verbatim, with P6's trim); when it fails and the head box is given, design/125 P5: a crop
+    from the top (window starts below the head) or the bottom (window ends above it), same aspect and zoom limit. The feasible
+    one with the least zoom wins; when none is, the side crop's answer stands."""
+    arf = (timeline_w / timeline_h) / (source_w / source_h)
+    side = _crop(_side_window(exclude_box, preserve_box, arf), preserve_box, timeline_w, timeline_h, max_safe_zoom, rotation_deg, stabilize, arf)
+    if side['feasible'] or not head_box:
+        return side
+    hx, hy, hw, hh = head_box
+    top = round(hy + hh + 0.02, 2)
+    ok = [s for s in (_crop(_vertical_window(top, round(1.0 - top, 2), preserve_box, arf), preserve_box, timeline_w, timeline_h, max_safe_zoom, rotation_deg, stabilize, arf),
+                      _crop(_vertical_window(0.0, round(hy - 0.02, 2), preserve_box, arf), preserve_box, timeline_w, timeline_h, max_safe_zoom, rotation_deg, stabilize, arf))
+          if s['feasible']]
+    return min(ok, key=lambda s: s['total_cumulative_zoom']) if ok else side
+
+
+def _side_window(exclude_box, preserve_box, arf):
     ex, ey, ew, eh = exclude_box
     px, py, pw, ph = preserve_box
     if ex + ew <= px:
@@ -17,12 +41,27 @@ def compute_davinci_crop(exclude_box, preserve_box, source_w, source_h, timeline
     elif px + pw <= ex:
         x_min = 0.0; max_w = round(ex - 0.02, 2)
     else:
-        return {'feasible': False, 'reason': 'Speaker horizontally overlaps must_preserve_action_box'}
-    arf = (timeline_w / timeline_h) / (source_w / source_h)
+        return 'Speaker horizontally overlaps must_preserve_action_box'
     w = max_w; h = round(w / arf, 2)
     p_cy = py + ph / 2.0
-    y_min = round(max(0.0, min(1.0 - h, p_cy - h / 2.0)), 2)
-    if not (x_min <= px and (px + pw) <= (x_min + w) and y_min <= py and (py + ph) <= (y_min + h)):
+    return x_min, round(max(0.0, min(1.0 - h, p_cy - h / 2.0)), 2), w, h
+
+
+def _vertical_window(y_min, h, preserve_box, arf):
+    if h <= 0 or y_min >= 1.0:
+        return 'Speaker head leaves no room above or below must_preserve_action_box'
+    w = round(h * arf, 2)
+    if w > 1.0:
+        w = 1.0; h = round(w / arf, 2)
+    px, py, pw, ph = preserve_box
+    return round(max(0.0, min(1.0 - w, px + pw / 2.0 - w / 2.0)), 2), y_min, w, h
+
+
+def _crop(window, preserve_box, timeline_w, timeline_h, max_safe_zoom, rotation_deg, stabilize, arf):
+    if isinstance(window, str):
+        return {'feasible': False, 'reason': window}
+    x_min, y_min, w, h = window
+    if _clipped(x_min, y_min, w, h, preserve_box):
         return {'feasible': False, 'reason': 'Action box clipped by aspect-locked crop window'}
     fit = max(arf, 1.0 / arf)
     crop_zoom = round((1.0 / w) * fit, 2)
@@ -92,9 +131,9 @@ def eligibility(sub, policy, max_zoom, src_w, src_h, timeline_w, timeline_h):
         notes.append('client-safe after operator waiver of: ' + ', '.join(gone))
     if sub['usability_grade'] == 'REJECT' or not safe:
         return 'REJECT_ALL', None, notes
-    talking = bool(p.get('mouth_visible') or p.get('looking_at_lens'))
+    talking = bool(p.get('looking_at_lens') or (p.get('mouth_visible') and p.get('speech_translation_block')))   # design/125 P4
     if not talking:
-        return 'ELIGIBLE_AS_IS', None, notes            # silent worker / hidden lips rule
+        return 'ELIGIBLE_AS_IS', None, notes            # silent worker (no speech heard) / hidden lips rule
     if policy.get('show_speaker_video'):
         return 'ELIGIBLE_A_ROLL_SPEAKER', None, notes
     m = p.get('speaker_crop_module')
@@ -107,7 +146,7 @@ def eligibility(sub, policy, max_zoom, src_w, src_h, timeline_w, timeline_h):
         notes.append('head box not inside body box, or body wider than 0.6 of the frame: NEEDS_BOUNDARY_CHECK')
     try:
         sol = compute_davinci_crop(boxes[1], boxes[2], src_w, src_h, timeline_w, timeline_h, max_zoom,
-                                   float(qc.get('horizon_rotation_deg') or 0.0), bool(qc.get('stabilization_needed')))
+                                   float(qc.get('horizon_rotation_deg') or 0.0), bool(qc.get('stabilization_needed')), head_box=boxes[0])
     except (TypeError, ValueError, ZeroDivisionError) as exc:
         return 'REJECT_VIDEO_KEEP_AUDIO_CONTEXT', {'feasible': False, 'reason': f'solver error: {exc.__class__.__name__}'}, notes + ['solver error']
     if sol['feasible'] and m.get('sharp_in_crop_zone', True):

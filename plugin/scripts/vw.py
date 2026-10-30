@@ -90,10 +90,7 @@ def readable_json(path, data):
 READING_DROP = {'entities'}                        # design/43 7.4: never read by the assistant, kept in the stored package
 READING_DROP_ROW = {'sfx_cues', 'editorial_ideas'}   # per sub-clip row: used at master build and assembly, not here
 READING_ROWS = (('sub_clips',), ('narration', 'words'), ('narration', 'sentences'))   # tables written one row per line
-OPTIONS_ROWS_PER_FILE = 25        # design/61 L17: at most 25 sub-clip rows a file (about 40 KB, some 17k tokens on VW-6's rows)
-OPTIONS_FILE_BYTES = 44_000       # and no table file over this: the reader refuses about 25k tokens; VW-6 measured 0.43 tokens a character
-OPTIONS_DROP_ROW = READING_DROP_ROW | {'ui_path', 'crop_rect', 'position', 'zoom', 'source_width', 'source_height', 'source_fps', 'horizon_rotation_deg',
-                                       'stabilization_needed', 'log_sub_clip_id', 'fit_source', 'risk_flags_waived'}   # the master build's and the UI's, never a placement decision
+OPTIONS_FILE_BYTES = 44_000       # design/61 L17: no table file over this: the reader refuses about 25k tokens; VW-6 measured 0.43 tokens a character
 
 
 def rows_file(path, rows):
@@ -146,7 +143,7 @@ def options_reading_files(ws, data):
         files.append({'file': f'work/options/{name}', 'rows': n, 'for': purpose})
     prompt = str(data.get('prompt') or '')
     put('prompt.md', '\n'.join(textwrap.fill(l, 160) if len(l) > 160 else l for l in prompt.split('\n')) + '\n', 'read first')
-    put('beats.json', data.get('beats') or [], 'scenes')
+    put('beats.json', [{k: v for k, v in b.items() if k not in ('text', 'steps')} for b in data.get('beats') or []], 'scenes')   # design/125 P3: the sentences are in the pieces files
     narration = dict(data.get('narration') or {})
     words = narration.pop('words', None) or []
     reading_copy(folder / 'narration.json', narration, drop=(), drop_row=(), rows=(('sentences',),))
@@ -155,14 +152,86 @@ def options_reading_files(ws, data):
         files.append({'file': f'work/options/{name}', 'rows': n, 'for': 'placements (pauses and word timing)'})
     put('shapes.json', data.get('shapes') or {}, 'scenes and placements')
     put('coverage.json', data.get('coverage') or [], 'placements')
-    for name, n in rows_files(folder, 'cards', data.get('cards') or []):
-        files.append({'file': f'work/options/{name}', 'rows': n, 'for': 'placements'})
-    subs = [{k: v for k, v in r.items() if k not in OPTIONS_DROP_ROW} if isinstance(r, dict) else r for r in data.get('sub_clips') or []]
-    for name, n in rows_files(folder, 'sub-clips', subs, cap=OPTIONS_ROWS_PER_FILE):
-        files.append({'file': f'work/options/{name}', 'rows': n, 'for': 'placements'})
+    scenes, other = pieces_by_scene(data)   # design/125 P3: the details a choice needs, by scene; full rows and cards on demand (`vw options show --sub`)
+    for s in scenes:
+        files += scene_files(folder, f"pieces-{s['beat_id']}", {k: s[k] for k in ('beat_id', 'title', 'process_stages', 'sentences')}, s['pieces'], 'placements')
+    files += scene_files(folder, 'pieces-other', None, other, 'placements: pieces that fit no scene')
     rest = {k: v for k, v in data.items() if k not in ('prompt', 'beats', 'narration', 'shapes', 'coverage', 'cards', 'sub_clips') and k not in READING_DROP}
     put('rest.json', rest, 'reference')
     return files
+
+
+PIECE_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'native_shot_size', 'effective_shot_size',
+                'action_peak', 'outcome_state', 'pairing_constraints', 'risk_flags', 'eligibility', 'min_hold_s')   # design/125 P3: what a choice needs
+FIT_ORDER = ('direct', 'related', 'chapter')
+
+
+def fit_of(row, beat):
+    """design/125 P3, P8: how a piece fits a scene: the row's fit_kinds ({beat_id: direct, chapter or related}, after the scenes are approved),
+    else its primary (direct) or secondary (related) fits. None when it does not fit."""
+    if isinstance(row.get('fit_kinds'), dict):
+        return row['fit_kinds'].get(beat['beat_id'])
+    return 'direct' if beat['beat_id'] in (row.get('primary_fits') or []) else 'related' if beat['beat_id'] in (row.get('secondary_fits') or []) else None
+
+
+def pieces_by_scene(data):
+    """design/125 P3: each scene with its sentences and the pieces that fit it (direct, related, chapter; package order inside a kind), every piece
+    cut to PIECE_FIELDS without the empty ones, what is seen (its clip card's overview) on the first piece of a clip only; the pieces that fit no scene, once."""
+    seen = {}
+    for c in data.get('cards') or []:
+        line = next((str(l) for l in c.get('lines') or [] if re.match(r'^\d*\s*OVERVIEW:', str(l))), '')   # some cards number their lines ('1 OVERVIEW: …')
+        seen[c.get('clip_id')] = line.split('OVERVIEW:', 1)[1].strip() if line else ''
+    rows = [r for r in data.get('sub_clips') or [] if isinstance(r, dict)]
+
+    def light(r, fit):
+        p = {k: seen.get(r.get('clip_id'), '') if k == 'seen' else fit if k == 'fit' else r.get(k) for k in PIECE_FIELDS}
+        return {k: v for k, v in p.items() if v not in (None, '', [], {})}
+
+    def once(pieces):   # ponytail: a clip's overview once per file; the later pieces of that clip read it above
+        named = set()
+        for p in pieces:
+            if p.get('clip_name') in named:
+                p.pop('seen', None)
+            named.add(p.get('clip_name'))
+        return pieces
+    scenes, placed = [], set()
+    for b in data.get('beats') or []:
+        fits = [(fit_of(r, b), r) for r in rows]
+        fits = [(f, r) for f, r in fits if f]
+        fits.sort(key=lambda x: FIT_ORDER.index(x[0]) if x[0] in FIT_ORDER else len(FIT_ORDER))
+        placed.update(r['sub_clip_id'] for _, r in fits)
+        scenes.append({'beat_id': b['beat_id'], 'title': b.get('title'), 'process_stages': b.get('process_stages') or [], 'target_beat_frames': b.get('target_beat_frames'),
+                       'sentences': [{k: s.get(k) for k in ('step_id', 'text', 'start_frame', 'end_frame')} for s in b.get('steps') or []],
+                       'pieces': once([light(r, f) for f, r in fits])})
+    return scenes, once([light(r, None) for r in rows if r['sub_clip_id'] not in placed])
+
+
+def scene_files(folder, stem, head, pieces, purpose):
+    """A scene's pieces as stem.json (the head, its sentences and the first pieces) and, past OPTIONS_FILE_BYTES, stem-2.json and on; one row a line."""
+    parts, current, size = [], [], len(json.dumps(head, ensure_ascii=False)) if head else 0
+    for p in pieces:
+        line = len(json.dumps(p, ensure_ascii=False)) + 2
+        if current and size + line > OPTIONS_FILE_BYTES:
+            parts.append(current)
+            current, size = [], 0
+        current.append(p)
+        size += line
+    parts.append(current)
+    out = []
+    for i, part in enumerate(parts, 1):
+        name = f'{stem}.json' if i == 1 else f'{stem}-{i}.json'
+        rows = ',\n'.join('  ' + json.dumps(p, ensure_ascii=False, default=str) for p in part)
+        if head is None:
+            text = '[\n' + rows + '\n]\n'
+        else:
+            top = head if i == 1 else {'beat_id': head['beat_id'], 'note': f'continues {stem}.json'}
+            body = [f' {json.dumps(k)}: {json.dumps(v, ensure_ascii=False, default=str)},' for k, v in top.items() if k != 'sentences']
+            if 'sentences' in top:
+                body.append(' "sentences": [\n' + ',\n'.join('  ' + json.dumps(s, ensure_ascii=False) for s in top['sentences']) + '\n ],')
+            text = '{\n' + '\n'.join(body) + '\n "pieces": [\n' + rows + '\n ]\n}\n'
+        (folder / name).write_text(text, encoding='utf-8')
+        out.append({'file': f'work/options/{name}', 'rows': len(part), 'for': purpose})
+    return out
 
 
 def visuals_reading_files(ws, data):
@@ -1249,59 +1318,14 @@ def _download(m, key, rel, expect=None):
     return str(dest)
 
 
-def cmd_planning(a):
-    m = active()
-    run = m['run_id']
-    base = f'/api/runs/{run}/planning'
-    if a.what == 'prepare':
-        missing = [q for q, ok in (('Output fps? (--fps 24|25|30)', a.fps), ('Output resolution? (--resolution 1920x1080)', a.resolution),
-                                   ('May original camera sound be heard in the film? (--source-audio none|ambient|speech|both)', a.source_audio),
-                                   ('May people be seen speaking on screen? (--visible-speaking allow|avoid)', a.visible_speaking)) if not ok]
-        if missing:
-            emit({'action': 'ask_operator', 'questions': missing}, 2)
-        w, h = (int(x) for x in a.resolution.lower().split('x'))
-        out = write(base + '/prepare', {'fps': int(a.fps), 'resolution': [w, h], 'source_audio_in_output': a.source_audio, 'visible_speaking': a.visible_speaking, 'film_type': a.film_type or ''})
-        path = _download(m, out['package']['key'], 'work/planning-package.json')
-        emit({**out, 'package_path': path, 'not_shareable': NOT_SHAREABLE}, 0, 'Planning package ready in work/planning-package.json. Next: group scenes (out/scenes.json) then `vw planning scenes`.')
-    if a.what == 'package':
-        st = call('GET', base)
-        if st.get('state') != 'prepared':
-            emit({'action': 'refused', 'message': 'Run `vw planning prepare` first.'}, 2)
-        full = call('GET', f'/api/runs/{run}')
-        emit({'package_path': _download(m, f"{run}/planning/package.json", 'work/planning-package.json'), 'status': st}, 0, 'Package downloaded.')
-    if a.what == 'scenes':
-        out = write(base + '/scenes', {'scenes': _json_file(m, a.file), 'quote': a.quote or ''})
-        _download(m, out['package']['key'], 'work/planning-package.json')
-        emit(out, 0, f"Scenes saved; passages {out['passages']}. Package refreshed. Next: author out/plan.json and `vw planning check`.")
-    if a.what in ('check', 'draft', 'revise'):
-        body = {'plan': _json_file(m, a.file)}
-        if a.what != 'check':
-            body['quote'] = a.quote
-        out = write(base + '/' + a.what, body)
-        emit(out, 0 if out.get('status') in (None, 'draft_technically_valid') else 2, f"{a.what}: {out.get('status', 'ok')}")
-    if a.what == 'status':
-        emit(call('GET', base))
-    if a.what == 'answer':
-        emit(write(base + '/answer', {'question_id': a.question, 'answer': a.answer, 'quote': a.quote}))
-    if a.what == 'mechanical':
-        emit(write(base + '/answer', {'question_id': a.question, 'check': json.loads(a.check)}))
-    if a.what == 'frames':
-        emit(write(base + '/frames', {'question_id': a.question, 'source_id': a.source, 'times': [float(t) for t in a.times.split(',')]}))
-    if a.what == 'inspect':
-        emit(write(base + '/inspect', {'question_ids': a.question_ids or ([a.question] if a.question else [])}), 0, 'Paid Gemini inspection queued; tell the operator. Poll `vw planning status`.')
-    if a.what == 'review-input':
-        out = call('GET', base + '/review-input')
-        (workspace(m['code']) / 'work' / 'inspector-answers.json').write_text(json.dumps(out, indent=1, ensure_ascii=False), encoding='utf-8')
-        emit(out, 0, 'Inspector answers in work/inspector-answers.json; write out/answer-review.json with a scope and reason per field.')
-    if a.what == 'review':
-        emit(write(base + '/review', _json_file(m, a.file)))
-    if a.what == 'ledger':
-        out = write(base + '/ledger', {})
-        _download(m, out['ledger']['key'], 'work/ledger.json')
-        emit(out, 0, f"Ledger prepared (digest {out['ledger_digest'][:12]}…) in work/ledger.json. Revise the plan, then `vw planning revise`.")
-    if a.what == 'finalize':
-        out = write(base + '/finalize', {'assessment': _json_file(m, a.file), 'quote': a.quote})
-        emit(out, 0, 'Planning finalized; certificate recorded. Run `vw next`.')
+RETIRED = {   # design/35 old ways: a retired way is refused locally with one line naming the new way
+    'planning': '`vw planning` is retired with instruction version 1: films use `vw options` and `vw master`.',
+    'options record': 'The separate options approval is retired: answering the first slide approves the options.',   # the server's words (design/125 P14)
+    'first-cut record': 'The separate first-cut record is retired: the first cut is recorded with the master (`vw master record`).'}
+
+
+def retired(what):
+    emit({'action': 'refused', 'message': RETIRED[what]}, 2)
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
@@ -1907,7 +1931,135 @@ def _s2_fetch(m, kind, out_name):
     emit(out, 0, f'{kind} film at {path}; let the operator watch it.')
 
 
+def options_package(m):
+    """The stored options package, every detail (design/125 P3: full rows and cards on demand); never written for reading."""
+    with api() as c:
+        r = c.get(f"/api/runs/{m['run_id']}/files/{m['run_id']}/stage2/package.json", follow_redirects=True)
+    if r.status_code != 200:
+        emit({'action': 'tell_builder', 'message': f'Download of the options package failed: HTTP {r.status_code}.'}, 2)
+    return json.loads(r.content)
+
+
+def event_frames(ev, rows, fps):
+    """An event's length on the timeline: a blank's timeline_frames; a real shot's source frames at the timeline's rate (as the server counts).
+    KeyError for a piece the package does not hold."""
+    from fractions import Fraction
+    if ev.get('blank'):
+        return int(ev.get('timeline_frames') or 0)
+    row = rows[ev.get('sub_clip_id')]
+    return int(round((int(ev['source_out_frame']) - int(ev['source_in_frame'])) * Fraction(str(fps)) / Fraction(str(row['source_fps']))))
+
+
+def second_look(m):
+    """design/125 O4, O5: one file per scene for its helper (its sentences, its options with each event's place on the timeline, the pieces that fit it)
+    and a few free stills at both edges of every chosen piece, decisions included. A grab that fails is noted in the scene's file, never fatal."""
+    ws = workspace(m['code'])
+    doc = load_json(ws / 'out' / 'options.json')
+    if not isinstance(doc, dict) or not doc.get('options'):
+        emit({'action': 'refused', 'message': 'Write out/options.json and pass `vw options check` before the second look.'}, 2)
+    pk = options_package(m)
+    rows, fps = {r['sub_clip_id']: r for r in pk.get('sub_clips') or []}, pk['timeline']['fps']
+    scenes, _ = pieces_by_scene(pk)
+    folder = ws / 'work' / 'options' / 'scenes'
+    if folder.exists():
+        shutil.rmtree(folder)
+    folder.mkdir(parents=True)
+    starts = {b['beat_id']: b.get('timeline_start_frame') or 0 for b in pk.get('beats') or []}
+    grabbed, files = {}, []
+    for s in scenes:
+        options = []
+        for o in doc['options']:
+            if o.get('beat_id') != s['beat_id']:
+                continue
+            at, events = starts[s['beat_id']], []
+            for ev in o.get('events') or []:
+                try:
+                    n = event_frames(ev, rows, fps)
+                except (KeyError, ValueError, TypeError):
+                    n = None   # the check names it
+                events.append({'at_frame': at, 'frames': n, **ev})
+                at += n or 0
+            options.append({**{k: o.get(k) for k in ('option_number', 'rank', 'steps', 'carries_over', 'moves_place')}, 'events': events})
+        stills = {}
+        for sub in dict.fromkeys(e['sub_clip_id'] for o in options for e in o['events'] if e.get('sub_clip_id')):
+            if sub not in grabbed:   # the free grab of `vw options frames`: stills around each edge; the first, the middle and the last are kept
+                grabbed[sub] = {'in': [], 'out': []}
+                for edge in ('in', 'out'):
+                    payload, code = request('POST', f"/api/runs/{m['run_id']}/options/frames", json={'request_id': str(uuid.uuid4()), 'sub_clip_id': sub, 'edge': edge})
+                    if code:
+                        grabbed[sub]['note'] = f"{edge}: {payload.get('message') or payload.get('action') or code}"
+                        continue
+                    shots = payload.get('frames') or []
+                    keep = [shots[i] for i in sorted({0, len(shots) // 2, len(shots) - 1})] if shots else []
+                    grabbed[sub][edge] = [_download(m, f['key'], f"work/frames/{sub.replace(':', '-')}-{edge}/{f['frame_id']}.png") for f in keep]
+            stills[sub] = grabbed[sub]
+        body = {**{k: s[k] for k in ('beat_id', 'title', 'process_stages', 'target_beat_frames', 'sentences')}, 'fps': fps, 'options': options,
+                'candidates': s['pieces'], 'frames': stills}
+        (folder / f"{s['beat_id']}.json").write_text(json.dumps(body, indent=1, ensure_ascii=False, default=str) + '\n', encoding='utf-8')
+        files.append({'file': f"work/options/scenes/{s['beat_id']}.json", 'options': len(options), 'candidates': len(s['pieces']),
+                      'stills': sum(len(v['in']) + len(v['out']) for v in stills.values())})
+    emit({'files': files}, 0, f"{len(files)} scene files in work/options/scenes/. Start one `vw-scene-review` helper per scene, all at once, each given only its file; "
+         "each writes out/second-look/<scene>.json. Then `vw options join-second-look` and `vw options check` again.")
+
+
+def join_second_look(m):
+    """design/125 O6: each out/second-look/<scene>.json replaces the events (and the steps, when given) of its scene's options in out/options.json.
+    All or nothing: a fix naming another scene's option, an unknown piece, or events that do not sum to the scene's frames refuses the join by name."""
+    ws = workspace(m['code'])
+    folder = ws / 'out' / 'second-look'
+    fixes = sorted(folder.glob('*.json')) if folder.exists() else []
+    if not fixes:
+        emit({'action': 'refused', 'message': 'No fixes in out/second-look/: run the `vw-scene-review` helpers first (`vw options second-look`).'}, 2)
+    doc = load_json(ws / 'out' / 'options.json')
+    if not isinstance(doc, dict) or not doc.get('options'):
+        emit({'action': 'refused', 'message': 'out/options.json is missing or empty.'}, 2)
+    pk = options_package(m)
+    rows, fps = {r['sub_clip_id']: r for r in pk.get('sub_clips') or []}, pk['timeline']['fps']
+    beats = {b['beat_id']: b for b in pk.get('beats') or []}
+    by_number = {o.get('option_number'): o for o in doc['options']}
+    problems, changed, unchanged, plan = [], [], {}, []
+    for path in fixes:
+        beat, name = path.stem, f'out/second-look/{path.name}'
+        fix = load_json(path)
+        if not isinstance(fix, dict) or beat not in beats:
+            problems.append(f'{name}: not a fix for a scene of this film (a JSON object named after its scene, e.g. BEAT_03.json)')
+            continue
+        if not fix.get('options'):
+            unchanged[beat] = str(fix.get('why') or '')
+            continue
+        for f in fix['options']:
+            o = by_number.get(f.get('option_number'))
+            if o is None or o.get('beat_id') != beat:
+                problems.append(f"{name}: option #{f.get('option_number')} is not an option of {beat}")
+                continue
+            try:
+                total = sum(event_frames(ev, rows, fps) for ev in f.get('events') or [])
+            except KeyError as e:
+                problems.append(f"{name}: option #{o['option_number']} names {e.args[0]}, which is not a piece of this film")
+                continue
+            except (ValueError, TypeError):
+                problems.append(f"{name}: option #{o['option_number']} has an event without whole source frames")
+                continue
+            if total != beats[beat]['target_beat_frames']:
+                problems.append(f"{name}: option #{o['option_number']}'s events sum to {total} frames; {beat} is {beats[beat]['target_beat_frames']} frames")
+                continue
+            plan.append((o, f))
+        changed.append(beat)
+    if problems:
+        emit({'action': 'refused', 'message': 'Second look not joined; fix these files and join again: ' + '; '.join(problems)}, 2)
+    for o, f in plan:
+        o['events'] = f['events']
+        if f.get('steps'):
+            o['steps'] = f['steps']
+    save_json(ws / 'out' / 'options.json', doc)
+    missing = [b for b in beats if b not in changed and b not in unchanged]
+    emit({'changed': changed, 'unchanged': unchanged, 'no_fix_file': missing}, 0,
+         f"Joined: {len(changed)} scene(s) changed, {len(unchanged)} unchanged" + (f", no fix file for {', '.join(missing)}" if missing else '') + '. Run `vw options check` again.')
+
+
 def cmd_options(a):
+    if a.what == 'record':
+        retired('options record')
     m = active()
     run = m['run_id']
     base = f'/api/runs/{run}/options'
@@ -1915,7 +2067,7 @@ def cmd_options(a):
         out = write(base + '/prepare', {})
         files = download_options_package(m, out['package']['key'])   # design/61: one file per section
         emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0, f"Package for reading in work/options/ ({len(files)} files, listed in `files` with row counts): {out['beats']} beats, "
-             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the sub-clips, cards and words files come after. Show the coverage report first.")
+             f"{out['eligible_sub_clips']} eligible sub-clips. Read prompt.md, then beats.json, narration.json and shapes.json for the scenes; the pieces files (by scene) and the words files come after. Show the coverage report first.")
     if a.what == 'coverage':
         emit(call('GET', base + '/coverage'))
     if a.what == 'scenes':
@@ -1925,7 +2077,8 @@ def cmd_options(a):
              f"Package refreshed in work/options/ ({len(files)} files); show the coverage report next.")
     if a.what in ('check', 'propose'):
         out = write(base + '/' + a.what, {'document': _json_file(m, a.file)})
-        emit(out, 2 if out.get('status') == 'rejected' else 0, f"{a.what}: {out.get('status') or 'version ' + str(out.get('version'))}")
+        emit(out, 2 if out.get('status') == 'rejected' else 0, f"{a.what}: {out.get('status') or 'version ' + str(out.get('version'))}"   # design/125 P11: act_on in full, for_information as one line
+             + (f"; act on {len(out['act_on'])} flag(s) (`act_on`)" if out.get('act_on') else '') + (f"; {out['for_information']}" if out.get('for_information') else ''))
     if a.what == 'frames':
         out = write(base + '/frames', {'sub_clip_id': a.sub, 'edge': a.edge or 'in'})
         paths = [_download(m, f['key'], f"work/frames/{a.sub.replace(':', '-')}-{a.edge or 'in'}/{f['frame_id']}.png") for f in out['frames']]
@@ -1937,15 +2090,23 @@ def cmd_options(a):
     if a.what == 'status':   # design/43 7.2: wait inside the tool for the film and say about how long is left
         st, line = wait_for_film(run, a.film or 'review', a.wait or 0)
         emit(st, 0, line)
+    if a.what == 'show' and a.sub:   # design/125 P3: a piece's full row and its clip's card, from the stored package
+        pk = options_package(m)
+        row = next((r for r in pk.get('sub_clips') or [] if r.get('sub_clip_id') == a.sub), None)
+        if row is None:
+            emit({'action': 'refused', 'message': f'No piece {a.sub} in the options package.'}, 2)
+        emit({'row': row, 'card': next((c for c in pk.get('cards') or [] if c.get('clip_id') == row.get('clip_id')), None)}, 0, f'{a.sub}: the full row and its clip card.')
     if a.what == 'show':
         emit(call('GET', f'{base}/{a.option}'))
+    if a.what == 'second-look':
+        second_look(m)
+    if a.what == 'join-second-look':
+        join_second_look(m)
     if a.what == 'log':
         out = call('GET', f'{base}/log/{a.unit}')
         emit({**out, 'path': _download(m, out['key'], f'work/logs/{a.unit}.evidence.json')}, 0, 'Full log downloaded; read it for this candidate only.')
     if a.what == 'fetch':
         _s2_fetch(m, 'review', 'out/review.mp4')
-    if a.what == 'record':
-        emit(write(base + '/record', {'quote': a.quote}), 0, 'Options recorded; next the operator decides per option (`vw master decide`).')
 
 
 FILM_COMMAND = {'review': 'options', 'master': 'master', 'assembly': 'assembly'}
@@ -1976,7 +2137,7 @@ def wait_for_film(run, film, wait_s, path=None):
 
 
 def slide_label(value):
-    """design/44 8.1: '2', '3' for a scene's option and its backup, '2A', '2B' inside; '#2b' and a number are accepted."""
+    """design/44 8.1, design/125 O2-O3: a scene's number ('2'), its second choice ('2-2'), the parts inside ('2A', '2-2A'); '#2b' and a number are accepted."""
     return str(value).strip().lstrip('#').strip().upper()
 
 
@@ -2033,8 +2194,7 @@ def cmd_master(a):
 
 
 def cmd_first_cut(a):
-    m = active()
-    emit(write(f"/api/runs/{m['run_id']}/first-cut/record", {'quote': a.quote}), 0, 'First cut recorded.')
+    retired('first-cut record')
 
 
 def frame_note(text):
@@ -2385,9 +2545,7 @@ def build_parser():
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='optional since design/42: the media stage\'s answer is used when absent'); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
     s.add_argument('--wait', type=float, default=0, help='status: seconds to wait inside the tool, polling every 15 s (design/42 6.1)')
     s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.add_argument('--waive', action='append'); s.set_defaults(fn=cmd_analysis)
-    s = sub.add_parser('planning'); s.add_argument('what', choices=['prepare', 'package', 'scenes', 'check', 'draft', 'answer', 'mechanical', 'frames', 'inspect', 'review-input', 'review', 'ledger', 'revise', 'finalize', 'status'])
-    s.add_argument('--fps'); s.add_argument('--resolution'); s.add_argument('--source-audio', choices=['none', 'ambient', 'speech', 'both']); s.add_argument('--visible-speaking', choices=['allow', 'avoid']); s.add_argument('--film-type')
-    s.add_argument('--file'); s.add_argument('--quote'); s.add_argument('--question'); s.add_argument('--question-ids', nargs='*'); s.add_argument('--answer'); s.add_argument('--check'); s.add_argument('--source'); s.add_argument('--times'); s.set_defaults(fn=cmd_planning)
+    s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base'):   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
@@ -2398,7 +2556,7 @@ def build_parser():
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
-    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
+    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film'):
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the film (status)')

@@ -241,7 +241,7 @@ def test_a15_phase1_model_and_settings(home, database, fake, gemini):
 
 def test_a16_identity_changes_with_model_only():
     from app import analysis, core
-    proc = dict(core._stage(core.stage_table('1'), 'analysis'))
+    proc = dict(core._stage(core.stage_table('3'), 'analysis'))   # design/35 Old ways 2: version 1 is gone
     clip = {'id': 'c1', 'name': 'c.mp4', 'sha256': 'a' * 64, 'bytes': 1, 'duration_s': 2.0, 'has_audio': True}
     script = {'spoken_text': 'A.\n', 'content_digest': 'd', 'passages': {'P001': 'A.'}}
     a = analysis.build_request({'id': 'r'}, proc, {}, script, clip, {'camera_audio': 'allowed'})
@@ -253,9 +253,7 @@ def test_e20_version2_runs_go_to_options_not_planning(home, database, fake, gemi
     run_until_analysis(home, database, fake, n_clips=1)
     vw(home, *START)
     drain()
-    assert vw(home, 'next')[1]['stage'] == 'options'   # procedure version 2: options/master replace planning (design/15)
-    rc, out, _ = vw(home, 'planning', 'prepare', '--fps', '25', '--resolution', '64x64', '--source-audio', 'none', '--visible-speaking', 'avoid')
-    assert rc == 2 and out['code'] == 'NOT_ALLOWED'
+    assert vw(home, 'next')[1]['stage'] == 'options'   # options/master; the planning stage is retired (design/125)
     rc, out, _ = vw(home, 'analysis', 'show', '--unit', vw(home, 'analysis', 'status')[1]['units'][0]['unit'])
     assert rc == 0 and len(out['summary']['summary_card']) == 10
 
@@ -278,7 +276,7 @@ def test_e18_policy_change_resolves_without_paid_call(home, database, fake, gemi
 
 def test_a10_long_clip_uses_agentic(home, database, fake, gemini, monkeypatch):
     from app import db
-    doc = db.stage_table('1')
+    doc = db.stage_table('3')
     for st in doc:
         if st['name'] == 'analysis':
             monkeypatch.setitem(st['settings'], 'agentic_over_seconds', 1.5)

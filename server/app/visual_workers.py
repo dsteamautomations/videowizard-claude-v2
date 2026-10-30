@@ -1,4 +1,4 @@
-"""Worker branches for the visuals stage: OpenAI image generation/edits and video takes (Google Omni / Higgsfield).
+"""Worker branches for the visuals stage: OpenAI image generation/edits and video takes (Google Omni).
 
 Rules kept from v1: write the intent before the one paid submit; never replay a dispatched submit; poll with backoff
 and one row update per state change; retain the exact provider output; ffprobe evidence with the 1 ms timing check."""

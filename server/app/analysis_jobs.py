@@ -21,7 +21,6 @@ from .db import connect
 from .errors import Problem
 from .storage import storage
 from .video_evidence.transport import GeminiTransport, GeminiTransportError, classify_failure
-from .video_evidence.world import provider_schema
 
 PROVIDER = 'gemini'
 SPOOL = Path(os.environ.get('VW2_SPOOL') or Path(__file__).resolve().parents[1] / '.spool')
@@ -155,8 +154,6 @@ def repolicy(conn, user, run, outputs, policy):
     retained = [o for o in outputs if o['stage'] == 'analysis' and o['unit'] and not o['summary'].get('excluded')]
     if not retained:
         raise Problem(409, 'NOT_ALLOWED', 'Nothing analysed yet; start analysis instead.')
-    if any(o['summary'].get('contract_version') != 'clip-log-v1' for o in retained):
-        raise Problem(409, 'NOT_ALLOWED', 'Policy re-solve applies to clip-log-v1 runs only.')
     store = storage()
     procedure = core._stage(core.stage_table(run['procedure_version']), 'analysis')
     jobs_ = []
@@ -416,7 +413,7 @@ def process(job):
                 uploaded = transport.upload(attachment, request['mime'], sha, existing_receipt=_receipt(read_json(paths['upload.json']), k_idx))
                 durable(paths['upload.json'], json.dumps({**uploaded, 'key_index': k_idx}).encode('utf-8'))
                 mode = request['identity']['settings']['processing_mode']
-                wire_schema = request['wire_schema'] if request.get('contract_version') == 'clip-log-v1' else provider_schema(request['schema'], mode)
+                wire_schema = request['wire_schema']
                 parts = [{'fileData': {'fileUri': uploaded['uri'], 'mimeType': uploaded['mimeType']}}, {'text': request['prompt']}]
                 if mode == 'AGENTIC':
                     parts[0]['mediaProcessing'] = 'AGENTIC'
@@ -457,12 +454,8 @@ def process(job):
         result = {'response_key': base + '.response.json', 'response_sha256': hashlib.sha256(raw_bytes).hexdigest(), 'response_bytes': len(raw_bytes),
                   'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': analysis.summary_of(reviewed, clip)}
         if reviewed['status'] == 'retained':
-            if reviewed.get('contract_version') == 'clip-log-v1':
-                from .clip_log import gate
-                ev = json.dumps(gate.evidence_document(reviewed, request, clip), ensure_ascii=False).encode('utf-8')
-            else:
-                ev = json.dumps({'evidence': reviewed['evidence'], 'gaps': reviewed['gaps'], 'descriptive_name': (reviewed['result'] or {}).get('descriptive_name'),
-                                 'identity': request['identity'], 'clip': clip}, ensure_ascii=False).encode('utf-8')
+            from .clip_log import gate
+            ev = json.dumps(gate.evidence_document(reviewed, request, clip), ensure_ascii=False).encode('utf-8')
             store.put(base + '.evidence.json', ev, 'application/json')
             if store.get(base + '.evidence.json') != ev:
                 raise Problem(502, 'STORAGE', 'Evidence read-back failed.')

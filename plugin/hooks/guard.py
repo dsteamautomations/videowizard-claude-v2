@@ -1,7 +1,7 @@
 """PreToolUse guard: an allow-list (design/36 1.11–1.12, design/37 2.4). The operator assistant may run only vw.py, may read
 and write only inside the active run folder, may ask the operator questions, keep its task list and use the web tools (the
 warning-and-yes rule before a search is an instruction in vw.md: the guard cannot tell who asked). Everything else, connectors,
-the browser pane and subagents included, is blocked. The stage procedure text (sentinel VW-PROCEDURE) never reaches a file or
+the browser pane and subagents other than the plugin's two helpers included, is blocked. The stage procedure text (sentinel VW-PROCEDURE) never reaches a file or
 a command. Every blocked call is one line in work/guard.log of the active run. Exit 2 blocks the call and sends the reason."""
 import json
 import os
@@ -22,6 +22,7 @@ WEB_BLOCKED = ("Blocked: a web search needs the operator's yes. Say to them: 'I 
                "because Y. The result may affect Z.' On their yes run vw web --about \"X\" --ok \"<their words>\", then search.")
 RECORDS = ('guard.log', 'manifest.json', '.active')   # design/48 O.4: the tool's own records, read-only for the assistant
 VW_SKILLS = ('vw:vw', 'vw')
+VW_HELPERS = ('vw:vw-scene-review', 'vw-scene-review', 'vw:vw-plan-gaps', 'vw-plan-gaps')   # design/125 O6, O9: the plugin's own helpers; their calls pass this guard too
 NOT_HERE = ("Blocked: {tool} is not available to the operator assistant. It uses only the vw tool, files inside the active run folder, "
             "questions to the operator, and the web after the warning and the operator's yes.")
 
@@ -121,6 +122,8 @@ def decide(tool, inp, cwd, vw):
             return f'Blocked: files may only be read or written inside {allowed}.'
         return None
     if tool in ALWAYS:
+        return None
+    if tool in ('Agent', 'Task') and str(inp.get('subagent_type') or '') in VW_HELPERS:
         return None
     if tool == 'Skill':
         name = str(inp.get('skill') or '')

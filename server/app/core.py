@@ -151,8 +151,17 @@ def effective_rules(conn, run, outputs):
             'effective': brief_effective + [l['rule'] for l in learned]}
 
 
+RETIRED_VERSIONS = {'1': 'procedure version 1 is retired; new films use version 3', '2': 'procedure version 2 is retired; new films use version 3'}   # design/35 Old ways 1, 2
+
+
+def refuse_retired(version):
+    if str(version) in RETIRED_VERSIONS:
+        raise Problem(409, 'VERSION_RETIRED', RETIRED_VERSIONS[str(version)])
+
+
 def create_run(conn, user, title, client, version, image_provider='openai'):
     version = version or settings().DEFAULT_PROCEDURE_VERSION
+    refuse_retired(version)
     if stage_table(version) is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
     chosen = resolve_client(client)
@@ -400,6 +409,7 @@ def close(conn, user, run):
 
 
 def adopt(conn, user, run, version):
+    refuse_retired(version)
     if stage_table(version) is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
     return conn.execute('update vw2_runs set procedure_version=%s where id=%s returning *', (version, run['id'])).fetchone()

@@ -282,7 +282,7 @@ def test_e30_bad_or_expired_session(client, database):
 def test_run_code_and_default_version(client, alice):
     r = client.post('/api/runs', json={'request_id': rid(), 'client': 'C'}, headers=alice)
     assert r.status_code == 201
-    assert r.json()['code'].startswith('VW-') and r.json()['procedure_version'] == '2'   # default since the clip-log-v1 contract (design/14)
+    assert r.json()['code'].startswith('VW-') and r.json()['procedure_version'] == '3'   # the default since design/124 C3; versions 1 and 2 are retired (design/125)
 
 
 def test_next_lists_paid_provider_for_per_unit_stage(client, alice):

@@ -120,7 +120,7 @@ def test_a_version_whose_package_changed_is_refused():
     assert exc.value.status == 409 and 'version 3' in exc.value.message and 'propose' in exc.value.message
 
 
-# ---------- design/44 8.1: slide labels (numbers for options and backups, letters inside) ----------
+# ---------- design/44 8.1, design/125 O2/O3: slide labels (scene numbers, a second choice N-2, letters inside) ----------
 
 def small_package():
     return {'beats': [{'beat_id': 'BEAT_01', 'title': 'Laying the first course', 'timeline_start_frame': 0, 'timeline_end_frame': 250, 'target_beat_frames': 250},
@@ -139,13 +139,13 @@ def small_doc():
             'gaps': []}
 
 
-def test_slides_take_running_numbers_and_letters_inside_an_option():
+def test_slides_take_scene_numbers_and_letters_inside_an_option():
     from app.stage2 import slides as SL
     sl = SL.slides(small_doc(), small_package(), 25)
-    assert [(s['no'], s['type']) for s in sl] == [('1', 'option'), ('1A', 'blank'), ('1B', 'decision'), ('2', 'backup'), ('3', 'option')]
-    assert sl[3]['backup_for'] == '1' and sl[3]['lines'][0].startswith('#2 | Scene 1: Laying the first course | BACKUP for #1 |')
+    assert [(s['no'], s['type']) for s in sl] == [('1', 'option'), ('1A', 'blank'), ('1B', 'decision'), ('1-2', 'backup'), ('2', 'option')]
+    assert sl[3]['backup_for'] == '1' and sl[3]['lines'][0].startswith('#1-2 | Scene 1: Laying the first course | second choice |')
     assert sl[1]['lines'][0].startswith('#1A | BLANK | Scene 1') and sl[2]['lines'][0] == '#1B | DECISION | Scene 1: Laying the first course'
-    assert sl[4]['lines'][0].startswith('#3 | Scene 2: Curing |') and all(s['number'] == int(s['no'][0]) for s in sl)
+    assert sl[4]['lines'][0].startswith('#2 | Scene 2: Curing |') and all(s['number'] == int(s['no'][0]) for s in sl)
     assert SL.letter(1) == 'A' and SL.letter(26) == 'Z' and SL.letter(27) == 'AA'
 
 
@@ -154,7 +154,7 @@ def test_review_items_carry_the_labels():
     doc, pk = small_doc(), small_package()
     items = SL.review_items(doc, pk, SL.slides(doc, pk, 25), lambda evs: [{'kind': 'event', 'frames': e['timeline_frames']} for e in evs], 25)
     labels = [it.get('label') for it in items if it['kind'] == 'event']
-    assert labels == ['#1', '#1B DECISION', '#2', '#3']
+    assert labels == ['#1', '#1B DECISION', '#1-2', '#2']
 
 
 def test_slate_head_accepts_a_letter(tmp_path):

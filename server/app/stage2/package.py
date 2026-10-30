@@ -90,6 +90,30 @@ def sub_clip_row(clip, log, sub, timeline_fps):
             'editorial_ideas': sub.get('editorial_ideas') or []}
 
 
+def scene_fits(rows, windows, paragraphs):
+    """design/125 P8: after the scenes are approved, a row fits a scene directly when the clip study put it in primary for a paragraph whose words
+    fall inside that scene, related when in secondary, and by chapter when its process_stage is the scene's chapter. paragraphs: the script beat id
+    (the clip study's beat) → (first frame, last frame) of its words on the timeline. primary_fits = direct ∪ chapter (what consumers read),
+    secondary_fits = related; fit_kinds names the kind per scene; the clip study's own lists stay in model_fits."""
+    over = {p: [w['beat_id'] for w in windows if w['timeline_start_frame'] < z and a < w['timeline_end_frame']] for p, (a, z) in paragraphs.items()}
+    for r in rows:
+        r['model_fits'] = {'primary': r['primary_fits'], 'secondary': r['secondary_fits']}
+        direct = {b for p in r['primary_fits'] for b in over.get(p, [])}
+        related = {b for p in r['secondary_fits'] for b in over.get(p, [])}
+        chapter = {w['beat_id'] for w in windows if r.get('process_stage') and r['process_stage'] in w['process_stages']}
+        kinds = {}
+        for w in windows:
+            b = w['beat_id']
+            kind = 'direct' if b in direct else 'chapter' if b in chapter else 'related' if b in related else None
+            if kind:
+                kinds[b] = kind
+        r['primary_fits'] = [b for b, k in kinds.items() if k != 'related']
+        r['secondary_fits'] = [b for b, k in kinds.items() if k == 'related']
+        r['fit_kinds'] = kinds
+        r['fit_source'] = 'clip study by paragraph, and scene chapter'
+    return rows
+
+
 def coverage(beats, rows, policy):
     """Blueprint §3 step 1.3 + design/17: counts per beat by primary/secondary fit and grade, uncoverable beats, low-confidence primaries, alerts."""
     report = []
@@ -101,13 +125,19 @@ def coverage(beats, rows, policy):
         entry = {'beat_id': b['beat_id'], 'target_beat_frames': b['target_beat_frames'],
                  'primary': {g: sum(1 for r in prim if r['grade'] == g) for g in ('A', 'B', 'C')}, 'secondary': {g: sum(1 for r in sec if r['grade'] == g) for g in ('A', 'B', 'C')},
                  'candidates': [r['sub_clip_id'] for r in prim] + [r['sub_clip_id'] for r in sec if r not in prim],
-                 'low_confidence': [r['sub_clip_id'] for r in prim if r['confidence'] < 0.6], 'alerts': []}
+                 'low_confidence': [r['sub_clip_id'] for r in prim if r['confidence'] < 0.6], 'alerts': [],
+                 'kinds': {k: sum(1 for r in rows if r['eligibility'].startswith('ELIGIBLE') and _kind(r, b['beat_id']) == k) for k in ('direct', 'related', 'chapter')}}   # design/125 P8
         if not prim and not sec:
             entry['alerts'].append('ZERO COVERAGE: no eligible sub-clip fits this beat' + (' (Mode 1: stay on A-roll is possible)' if policy.get('show_speaker_video') else '; same-stage detail shot or a visuals gap'))
         if holds and min(holds) > window_s:
             entry['alerts'].append(f'UNCOVERABLE: every candidate needs at least {min(holds)} s but the beat is {window_s:.2f} s')
         report.append(entry)
     return report
+
+
+def _kind(r, bid):
+    """How a row fits a scene: its fit_kinds after the scenes are approved; before, the clip study's own primary (direct) or secondary (related)."""
+    return (r.get('fit_kinds') or {}).get(bid) or ('direct' if bid in r['primary_fits'] else 'related' if bid in r['secondary_fits'] else None)
 
 
 def with_steps(beats, sentences):
@@ -137,5 +167,4 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
                                                                                          'claim': False}],   # design/91 N17: every step of the scene once
                                                                               'carries_over': ['what the step before left, which must still be visible'],   # design/91 N14
                                                                               'moves_place': 'only when the narration moves to another place mid-process'}],
-                                   'gaps': [{'beat_id': 'BEAT_02', 'reason': 'zero coverage'}],
                                    'qc_self': {f'Q{i}': {'pass': True, 'evidence': ''} for i in range(1, 9)}}}}

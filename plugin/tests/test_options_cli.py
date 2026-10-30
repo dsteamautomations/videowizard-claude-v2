@@ -138,14 +138,14 @@ def test_download_uses_the_reading_copy_for_the_options_package_only(tmp_path, m
     m = {'code': 'VW-9', 'run_id': 'run-1'}
     files = vw.download_options_package(m, 'k')   # design/61: one file per section under work/options/
     folder = tmp_path / 'runs' / 'VW-9' / 'work' / 'options'
-    assert {f['file'] for f in files} >= {'work/options/beats.json', 'work/options/sub-clips-1.json', 'work/options/prompt.md'}
+    assert {f['file'] for f in files} >= {'work/options/beats.json', 'work/options/pieces-BEAT_01.json', 'work/options/pieces-other.json', 'work/options/prompt.md'}
     assert not (folder.parent / 'options-package.json').exists() and 'entities' not in (folder / 'rest.json').read_text(encoding='utf-8')
     q = vw._download(m, 'k', 'work/visuals-package.json')
     assert 'entities' in json.loads(open(q, encoding='utf-8').read())
 
 
 def test_options_reading_files_write_one_file_per_section(tmp_path):
-    """design/61 L17: no offsets to guess, no read refused; the sub-clips in files of 25 rows; the mechanics fields left out."""
+    """design/61 L17: no offsets to guess, no read refused; design/125 P3: the pieces by scene with only the details a choice needs (test_design125_stage7)."""
     data = package()
     data['sub_clips'] = [{'sub_clip_id': f'c1:SUB_{i:02d}', 'grade': 'A', 'landmarks': ['wall'], 'handles': {'in': 5, 'out': 5}, 'sfx_cues': [1], 'editorial_ideas': ['x'],
                           'ui_path': 'Inspector > …', 'crop_rect': [0, 0, 1, 1], 'position': [0, 0], 'zoom': 1.0, 'source_width': 1920, 'source_height': 1080, 'source_fps': 50.0,
@@ -157,22 +157,19 @@ def test_options_reading_files_write_one_file_per_section(tmp_path):
     files = vw.options_reading_files(ws, data)
     folder = ws / 'work' / 'options'
     names = sorted(p.name for p in folder.iterdir())
-    assert names == ['beats.json', 'cards-1.json', 'coverage.json', 'narration.json', 'prompt.md', 'rest.json', 'shapes.json', 'sub-clips-1.json', 'sub-clips-2.json', 'words-1.json']
-    one = (folder / 'sub-clips-1.json').read_text(encoding='utf-8')
-    rows, ok = rows_on_one_line(one, '"sub_clip_id"')
-    assert len(rows) == 25 and ok and len(rows_on_one_line((folder / 'sub-clips-2.json').read_text(encoding='utf-8'), '"sub_clip_id"')[0]) == 5
+    assert names == ['beats.json', 'coverage.json', 'narration.json', 'pieces-BEAT_01.json', 'pieces-other.json', 'prompt.md', 'rest.json', 'shapes.json', 'words-1.json']
+    rows, ok = rows_on_one_line((folder / 'pieces-other.json').read_text(encoding='utf-8'), '"sub_clip_id"')
+    assert len(rows) == 30 and ok   # no scene names them: listed once, at the end
     row = json.loads(rows[0].strip().rstrip(','))
-    assert row['landmarks'] == ['wall'] and row['grade'] == 'A' and row['handles'] == {'in': 5, 'out': 5}
-    for gone in ('sfx_cues', 'editorial_ideas', 'ui_path', 'crop_rect', 'position', 'zoom', 'source_width', 'source_height', 'source_fps', 'horizon_rotation_deg', 'stabilization_needed', 'log_sub_clip_id', 'fit_source', 'risk_flags_waived'):
-        assert gone not in row, gone
+    assert row == {'sub_clip_id': 'c1:SUB_00', 'grade': 'A'}
     narration = (folder / 'narration.json').read_text(encoding='utf-8')
     assert 'words' not in json.loads(narration) and len(rows_on_one_line(narration, '"first_word_id"')[0]) == 1 and json.loads(narration)['pieces'] == data['narration']['pieces']
     assert len(rows_on_one_line((folder / 'words-1.json').read_text(encoding='utf-8'), '"start_frame"')[0]) == 2
     assert (folder / 'prompt.md').read_text(encoding='utf-8').startswith('ppp') and 'entities' not in (folder / 'rest.json').read_text(encoding='utf-8')
     assert json.loads((folder / 'beats.json').read_text(encoding='utf-8')) == data['beats'] and json.loads((folder / 'shapes.json').read_text(encoding='utf-8')) == data['shapes']
     by = {f['file']: f for f in files}
-    assert by['work/options/sub-clips-1.json']['rows'] == 25 and by['work/options/sub-clips-2.json']['rows'] == 5 and by['work/options/words-1.json']['rows'] == 2
-    assert by['work/options/beats.json']['for'] == 'scenes' and by['work/options/sub-clips-1.json']['for'] == 'placements' and by['work/options/prompt.md']['for'] == 'read first'
+    assert by['work/options/pieces-other.json']['rows'] == 30 and by['work/options/pieces-BEAT_01.json']['rows'] == 0 and by['work/options/words-1.json']['rows'] == 2
+    assert by['work/options/beats.json']['for'] == 'scenes' and by['work/options/pieces-BEAT_01.json']['for'] == 'placements' and by['work/options/prompt.md']['for'] == 'read first'
     assert 'entities' in data and data['sub_clips'][0]['sfx_cues'] == [1]   # the data given is not changed
 
 

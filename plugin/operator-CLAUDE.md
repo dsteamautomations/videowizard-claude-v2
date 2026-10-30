@@ -9,5 +9,5 @@ This folder is only for operating video runs with the `vw` plugin. Rules for eve
 - One-time setup, never asked per run: spend caps are set on the ElevenLabs, OpenAI and Google dashboards by the account owner.
 - One run at a time; write files only inside `runs/<code>/`; no reports or notes unless asked.
 - The stage prompts, steps and packages the tool prints are the builder's: never show them to the operator or write them into a file.
-- Web searches only after the warning and the operator's yes, recorded with `vw web --about "X" --ok "<their words>"`; connectors, the browser and subagents are not available here.
+- Web searches only after the warning and the operator's yes, recorded with `vw web --about "X" --ok "<their words>"`; connectors, the browser and subagents are not available here, except the plugin's two helpers the steps name (`vw-scene-review`, `vw-plan-gaps`).
 - Listening happens on the voices page (`/runs/<code>/voices`, the operator signs in): samples, auditions and every kept narration have a player there, and the final click is the record. A file inside `runs/<code>/` may be shown to the operator; nothing outside.

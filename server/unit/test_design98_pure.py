@@ -70,12 +70,11 @@ def test_no_answer_before_the_review_film_and_a_bad_answer_approves_nothing(reco
     assert recorded == [] and saved(store)['accepted'] is None
 
 
-def test_an_explicit_approval_still_works_and_then_answers_do_not_record_again(recorded):
+def test_an_explicit_approval_is_refused_and_records_nothing(recorded):
     store = at_options()
-    S.record_options(FakeConn({}), store, USER, RUN, 'Yes, these options.')
-    assert recorded[0]['accepted_quote'] == 'Yes, these options.' and 'approved_by' not in recorded[0]['summary']
-    S.decide(FakeConn({}), store, USER, RUN, '1', 'KEEP', '', None)
-    assert len(recorded) == 1
+    with pytest.raises(Problem, match='answering the first slide approves the options'):   # design/125: the older way, retired by refusal
+        S.record_options(FakeConn({}), store, USER, RUN, 'Yes, these options.')
+    assert recorded == [] and saved(store)['accepted'] is None
 
 
 # ---------- B: a reject without a reason ----------

@@ -130,8 +130,10 @@ def test_the_prepare_take_refusal_for_an_exact_end_names_end_prompt():
 def test_the_catalogue_offers_omni_only_and_another_generator_is_refused():
     assert [(o['provider'], o['model'], o['max_seconds']) for o in VG.catalog()['options']] == [('google', VG.OMNI, 10)]
     store, _ = take_store()
-    with pytest.raises(Problem, match='every take is Gemini Omni, 3–10 s; split the shot'):
+    with pytest.raises(Problem, match='^Kling and Seedance are retired; every video take is Gemini Omni$'):   # design/35 Old ways 7
         g(lambda: VS.select_generator(store, USER, RUN, [], 'VS1', 'higgsfield', KLING))
+    with pytest.raises(Problem, match='every take is Gemini Omni, 3–10 s; split the shot'):
+        g(lambda: VS.select_generator(store, USER, RUN, [], 'VS1', 'google', 'veo-3'))
     assert VS.select_generator(store, USER, RUN, [], 'VS1', 'google', VG.OMNI)['model'] == VG.OMNI
 
 

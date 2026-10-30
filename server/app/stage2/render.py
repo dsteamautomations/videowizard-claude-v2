@@ -52,10 +52,14 @@ def _font(size):
         return ImageFont.load_default()
 
 
-def slate_png(lines, width, height, path):
-    """A black slide. A first line that starts "#NN | ..." shows the number large on its own line (16 Oct: SK missed the small one)."""
+BACKGROUNDS = {'black': (0, 0, 0), 'blue': (10, 32, 96)}   # design/125 O8: a second choice's card is deep blue (red reads as an error)
+
+
+def slate_png(lines, width, height, path, background='black'):
+    """A black slide (deep blue for a second choice, design/125 O8). A first line that starts "#NN | ..." shows the number large on its own line
+    (16 Oct: SK missed the small one)."""
     from PIL import Image, ImageDraw
-    img = Image.new('RGB', (width, height), (0, 0, 0))
+    img = Image.new('RGB', (width, height), BACKGROUNDS.get(background, BACKGROUNDS['black']))
     draw = ImageDraw.Draw(img)
     size = max(12, height // 22)
     rows = [''.join(c if ord(c) < 127 else '?' for c in line) for line in lines]
@@ -94,7 +98,7 @@ def draw_width(text, font):
 
 
 WATCHED_SIZE = {'review': (1280, 720), 'master': (1280, 720)}   # design/43 7.1, design/44 8.3: films watched once and never delivered are made at the size the operator watches
-SLATE_HEAD = re.compile(r'^(#\d+[A-Z]*)\s*\|\s*(.*)$')             # "#2 | ..." or "#2B | ...": the label shows large on its own line
+SLATE_HEAD = re.compile(r'^(#\d+(?:-\d+)?[A-Z]*)\s*\|\s*(.*)$')             # "#2 | ..." or "#2B | ...": the label shows large on its own line
 
 
 DELIVERED = ('master', 'assembly')       # films with the whole narration under them; the assembly film is the delivered one
@@ -172,12 +176,12 @@ class Renderer:
         preset, crf = ('veryfast', '23') if self.fast else ('medium', '18')
         return ['-c:v', 'libx264', '-profile:v', 'high', '-preset', preset, '-crf', crf, '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(self.fps), '-an']
 
-    def slate(self, lines, frames=SLATE_FRAMES):
-        key = digest({'slate': lines, 'tl': self.tl, 'frames': frames})
+    def slate(self, lines, frames=SLATE_FRAMES, background='black'):
+        key = digest({'slate': lines, 'tl': self.tl, 'frames': frames, **({'background': background} if background != 'black' else {})})
         out = self.cache / f'slate-{key[:16]}.mp4'
         if not out.exists():
             png = self.cache / f'slate-{key[:16]}.png'
-            slate_png(lines, self.W, self.H, png)
+            slate_png(lines, self.W, self.H, png, background)
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
         return out
 
@@ -435,7 +439,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             carry = None
         if item['kind'] == 'slate':
             n = int(item.get('frames') or SLATE_FRAMES)
-            parts.append(r.slate(item['lines'], n))
+            parts.append(r.slate(item['lines'], n, item.get('background') or 'black'))
             silence_before += Fraction(n) / r.fps
             cursor += Fraction(n) / r.fps
         elif item['kind'] == 'card':   # design/21: a blank inside an option, captioned; the narration window already covers it

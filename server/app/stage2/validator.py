@@ -43,7 +43,8 @@ def validate_options(doc, package, policy):
     beats = {b['beat_id']: b for b in package['beats']}
     tl_fps = package['timeline']['fps']
     opts = doc.get('options') or []
-    gaps = {g['beat_id'] for g in doc.get('gaps') or []}
+    if doc.get('gaps'):   # design/125 P13: the declared gap is retired
+        refusals.append("declare a gap is retired; write it as one blank of the scene's length")
     numbers = [o.get('option_number') for o in opts]
     if numbers != list(range(1, len(opts) + 1)):
         refusals.append('G12: option numbers must run 1..N in order')
@@ -51,8 +52,8 @@ def validate_options(doc, package, policy):
     for o in opts:
         by_beat.setdefault(o.get('beat_id'), []).append(o)
     for bid in beats:
-        if bid not in by_beat and bid not in gaps:
-            refusals.append(f'{bid}: no option and not declared as a gap')
+        if bid not in by_beat:
+            refusals.append(f"{bid}: no option; a scene with no footage is an option made of one blank of the scene's length")
     for bid, group in by_beat.items():
         if bid not in beats:
             refusals.append(f'unknown beat {bid}')
@@ -69,7 +70,7 @@ def validate_options(doc, package, policy):
                 refusals.append(f'G13: {bid} SECONDARY must differ from PRIMARY in sub-clips or shot sizes')
     words = {w['id']: w for w in (package.get('narration') or {}).get('words') or []}
     silences = (package.get('narration') or {}).get('silences') or []
-    uses = {}    # clip_id -> [(option_number, beat_id, event_index, has_reuse_decision)] in film order (design/21 rule 7)
+    uses = {}    # clip_id -> [(option_number, beat_id, event_index, has_reuse_decision, source in, source out)] in film order (design/21 rule 7)
     for o in opts:
         n, bid, events = o.get('option_number'), o.get('beat_id'), o.get('events') or []
         beat = beats.get(bid)
@@ -123,7 +124,7 @@ def validate_options(doc, package, policy):
                 refusals.append(f'{tag}: B-roll goes behind a decision slide (decision kind b_roll)')
             if row.get('grade') == 'C' and not d:
                 refusals.append(f'{tag}: E3 the log grades this sub-clip C (poor quality): put it behind a decision slide (kind poor_quality) or leave a blank')
-            uses.setdefault(row['clip_id'], []).append((n, bid, i, bool(d and d.get('kind') == 'reuse')))
+            uses.setdefault(row['clip_id'], []).append((n, bid, i, bool(d and d.get('kind') == 'reuse'), ev.get('source_in_frame'), ev.get('source_out_frame')))
             if not row['eligibility'].startswith('ELIGIBLE') or not row['client_safe'] or row['risk_flags']:
                 refusals.append(f'{tag}: G10/Q8 sub-clip is not eligible or not client-safe ({row["eligibility"]}, risk flags {row["risk_flags"]})')
             if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
@@ -171,6 +172,8 @@ def validate_options(doc, package, policy):
                 if ps in SHOT_SIZES and cs in SHOT_SIZES and ps == cs:
                     sizes.append(cs)
                     flags.append(f'{tag}: G5 adjacent shots of the same size ({cs})')
+                    if prev['clip_id'] == row['clip_id']:   # design/125 O7: two parts of one clip side by side at one size is a jump cut
+                        refusals.append(f'{tag}: G5 two parts of clip {row["clip_id"]} side by side at the same size ({cs}): put another shot between them or change the size')
                     if len(sizes) >= 2:
                         refusals.append(f'{tag}: G5 three shots of the same size in a row')
                 else:
@@ -206,7 +209,7 @@ def validate_options(doc, package, policy):
         smap = o.get('steps')
         if smap is None:
             if own_steps:
-                flags.append(f'OPTION #{n}: N17 no step map: name the event that shows each step of the scene ({", ".join(own_steps)}) (warned in this release; refused from the next)')
+                flags.append(f'OPTION #{n}: N17 no step map: name the event that shows each step of the scene ({", ".join(own_steps)})')
         else:
             seen = []
             for s in smap if isinstance(smap, list) else []:
@@ -244,10 +247,11 @@ def validate_options(doc, package, policy):
         for i, ev in enumerate(events):
             ev.pop('_lm', None)
     # design/21 rule 7: a clip appears once in the film. Its first and backup options for one scene may share it (only one is kept);
-    # any other second use, including another part of the same clip, must be a decision of kind reuse.
+    # design/125 O7: a later part of the same clip in the same cut, not overlapping the earlier one, is not a reuse (G5 still flags two of one size
+    # side by side). Any other second use, including a part of the same clip in another scene, must be a decision of kind reuse.
     for cid, us in uses.items():
-        for j, (n, bid, i, is_reuse) in enumerate(us):
-            earlier = [u for u in us[:j] if not (u[1] == bid and u[0] != n)]
+        for j, (n, bid, i, is_reuse, a, _z) in enumerate(us):
+            earlier = [u for u in us[:j] if not (u[1] == bid and u[0] != n) and not (u[0] == n and isinstance(a, int) and isinstance(u[5], int) and u[5] <= a)]
             if earlier and not is_reuse:
                 refusals.append(f'OPTION #{n} shot {i + 1}: Q4 clip {cid} is already used (option #{earlier[0][0]}); a second use, even of another part, needs a decision of kind reuse or another clip')
     # design/91 N14: consecutive scenes narrating the same process stage stay in one place unless the option names the move
@@ -292,8 +296,20 @@ def group_flags(flags):
     return sorted(groups.values(), key=lambda g: (-g['count'], g['rule']))
 
 
+INFO_KINDS = ('R1', 'R4', 'R8', 'R10')   # design/125 P11: information only when shots are cut to the meaning across clips
+
+
+def answer_flags(flags):
+    """design/125 P11: the check's answer to the assistant: the flags to act on in full, the information-only kinds as one line of counts."""
+    info = [g for g in group_flags(flags) if g['rule'] in INFO_KINDS]
+    total = sum(g['count'] for g in info)
+    return {'act_on': [f for f in flags if (RULE_RE.search(f) or [None, 'other'])[1] not in INFO_KINDS],
+            'for_information': f"{total} for information: " + ', '.join(f"{g['rule']} {g['count']}" for g in info) if info else ''}
+
+
 def validate_master(master, package):
-    """Q4 zero duplicate sub-clips; Q5 runtime equals the sum of beats with no gaps or 1-frame cuts; events ripple from zero."""
+    """Q4 zero duplicate sub-clips (design/125 O7: a later, non-overlapping part of one sub-clip in the same scene is not one); Q5 runtime equals the
+    sum of beats with no gaps or 1-frame cuts; events ripple from zero."""
     refusals, flags = [], []
     seen = {}
     cursor = 0
@@ -301,9 +317,10 @@ def validate_master(master, package):
         if ev.get('kind') == 'gap':
             cursor += ev['timeline_frames']
             continue
-        if ev['sub_clip_id'] in seen and not ev.get('reuse_approved'):
-            refusals.append(f"Q4: {ev['sub_clip_id']} appears twice in the master (options #{seen[ev['sub_clip_id']]} and #{ev['approved_from_option']})")
-        seen[ev['sub_clip_id']] = ev['approved_from_option']
+        prev = seen.get(ev['sub_clip_id'])
+        if prev and not ev.get('reuse_approved') and not (prev[1] and prev[1] == ev.get('beat_id') and isinstance(prev[2], int) and prev[2] <= (ev.get('source_in_frame') or 0)):
+            refusals.append(f"Q4: {ev['sub_clip_id']} appears twice in the master (options #{prev[0]} and #{ev['approved_from_option']})")
+        seen[ev['sub_clip_id']] = (ev['approved_from_option'], ev.get('beat_id'), ev.get('source_out_frame'))
         if ev['timeline_frames'] <= 1:
             refusals.append(f"Q5: 1-frame cut in option #{ev['approved_from_option']}")
         if ev['timeline_in_frame'] != cursor:

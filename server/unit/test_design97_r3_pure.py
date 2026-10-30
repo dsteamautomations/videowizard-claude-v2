@@ -96,4 +96,5 @@ def test_the_page_carries_each_release_3_piece(needle):
 
 
 def test_the_review_page_explains_its_buttons():
-    assert 'Keep: use it. Reject: not this one (a reason is optional). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.' in REVIEW   # design/98 R1
+    assert ('Keep: use it. Reject: not this one (a reason is optional). Trim a shot: use it with a shot trimmed. A blue mark is a second choice: keep only one cut '
+            'of a scene. Drop: leave the decision out.') in REVIEW   # design/98 R1; design/125 O1, O8

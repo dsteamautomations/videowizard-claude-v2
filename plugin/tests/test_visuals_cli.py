@@ -569,7 +569,7 @@ def test_steps_and_command_text_carry_the_long_blank_the_ai_run_and_the_continui
     """design/84 V3, design/85 G1-G3."""
     vis, opt, doc = json.dumps(STAGES['visuals']), json.dumps(STAGES['options']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'ai_run' in vis and '3–5 s' in STAGES['visuals']['prompt'] and 'E2' in opt and 'blank over 12 s' in opt
-    assert '--continuity' in doc and 'ai_run' in doc and 'E2, a blank over 12 s' in doc
+    assert '--continuity' in doc and 'ai_run' in doc and 'the steps name the flags to act on' in doc   # design/125 P10: the E2 rule lives in the steps
     assert 'end_answer' in vis and '--variants 2' in vis and 'One change, two at most' in vis and 'close reference' in vis and 'checks every picture' in vis   # design/86 K1, K4, K5, K8
     assert '--end-answer' in doc and '--variants 2' in doc and 'one change per edit' in doc
 

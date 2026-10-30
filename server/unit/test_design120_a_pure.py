@@ -42,5 +42,5 @@ def test_create_run_writes_the_provider(monkeypatch):
                     return {'id': 'r', 'code': 'VW-1', 'image_provider': params[-1]}
             return R()
     import app.core as core
-    row = core.create_run(Conn(), {'id': 'u', 'name': 'SK'}, 'title', 'Cobuild', None, 'gemini')
+    row = core.create_run(Conn(), {'id': 'u', 'name': 'SK'}, 'title', 'Cobuild', '3', 'gemini')   # explicit: a local .env may still default to the retired version 2
     assert 'image_provider' in seen['sql'] and seen['params'][-1] == 'gemini' and row['image_provider'] == 'gemini'

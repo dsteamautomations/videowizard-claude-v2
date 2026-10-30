@@ -256,15 +256,12 @@ def test_a_page_load_reads_the_session_once_writes_nothing_and_skips_the_version
     assert store.gets == ['run-1/stage2/session.json']   # the cues of a rendered version are kept in memory
 
 
-def test_a_version_without_stored_slides_still_loads_its_document():
+def test_a_version_without_stored_slides_is_refused():
+    """design/125: cuts proposed without stored slides (before design/21) are retired; no open film has one."""
     sess = session()
     del sess['versions'][0]['slides']
-    sess['package'] = {'key': 'p', 'digest': 'pk1', 'narration_key': 'n'}
-    store = CountingStore(files(sess, with_plan=False))
-    store.files['run-1/stage2/options-v1.json'] = json.dumps({'document': {'options': []}, 'package_digest': 'pk1'}).encode('utf-8')
-    store.files['p'] = json.dumps({'beats': [], 'sub_clips': [], 'cards': []}).encode('utf-8')
-    view = S.review_view(FakeConn({}), store, RUN)
-    assert view['slides'] == [] and 'run-1/stage2/options-v1.json' in store.gets
+    with pytest.raises(Problem, match='no stored slides'):
+        S.review_view(FakeConn({}), CountingStore(files(sess, with_plan=False)), RUN)
 
 
 def test_the_page_draws_from_the_act_reply_without_a_second_request():

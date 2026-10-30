@@ -27,6 +27,9 @@
 .rv th.a,.rv td.a{width:190px}
 .rv .badge{display:inline-block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px}
 .rv .badge.dec{border-color:var(--accent);color:var(--fg)}
+.rv .badge.second{border-color:#2a5bd7;color:#2a5bd7}
+.rv tbody tr.second td:first-child{box-shadow:inset 4px 0 0 #2a5bd7}
+.rv .hint{font-style:italic}
 .rv .sc{font-weight:600}
 .rv .ds{color:var(--muted);font-size:12.5px;margin-top:3px}
 .rv .btns{display:flex;gap:6px;flex-wrap:wrap}
@@ -76,8 +79,10 @@ const code=document.getElementById('app').dataset.code, base='/runs/'+code+'/rev
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let data=null, timer=null, open=null, inflight=false, filmKey=null, current=null;
-// KEEP, REJECT and KEEP_WITH_EDIT for scene and backup slides; KEEP and DROP for decision slides; nothing for a blank (the server refuses anything else)
-const CHOICES={option:[['KEEP','Keep'],['REJECT','Reject'],['KEEP_WITH_EDIT','Keep with edit']],backup:[['KEEP','Keep'],['REJECT','Reject'],['KEEP_WITH_EDIT','Keep with edit']],decision:[['KEEP','Keep'],['DROP','Drop']],blank:[]};
+// KEEP, REJECT and KEEP_WITH_EDIT (Trim a shot) for scene and second-choice slides; KEEP and DROP for decision slides; nothing for a blank (the server refuses anything else)
+// design/125 O1: a scene decided by its parts (s.parts_decide) takes only a trim
+const CHOICES={option:[['KEEP','Keep'],['REJECT','Reject'],['KEEP_WITH_EDIT','Trim a shot']],backup:[['KEEP','Keep'],['REJECT','Reject'],['KEEP_WITH_EDIT','Trim a shot']],decision:[['KEEP','Keep'],['DROP','Drop']],blank:[]};
+const TRIM_ONLY=[['KEEP_WITH_EDIT','Trim a shot']];
 function msg(t,err,busy){const f=$('fmsg');f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');f.className='status '+(err?'err':(busy?'':'ok'));}
 async function act(body){
   if(inflight){throw new Error('Still recording the last answer; try again in a moment.');}
@@ -136,35 +141,36 @@ function draw(){
   const can=decidable();
   $('slides').innerHTML=d.slides.map(s=>{
     const cue=d.cues&&d.cues[s.slide]!=null;
-    const badge=s.type==='backup'?'<span class="badge">backup for #'+esc(s.backup_for)+'</span>':s.type==='decision'?'<span class="badge dec">decision</span>':s.type==='blank'?'<span class="badge">blank</span>':'';
+    const badge=s.type==='backup'?(s.scheme?'<span class="badge second">second choice</span>':'<span class="badge">backup for #'+esc(s.backup_for)+'</span>'):s.type==='decision'?'<span class="badge dec">decision</span>':s.type==='blank'?'<span class="badge">blank</span>':'';
     const lines=(s.lines||[]).slice(1).map(l=>String(l).trim());
     // the slide's lines come wrapped for the film card: joined back into running text; a decision's question is shown once, with its last line (keep or drop: the clip)
     const rest=s.type==='decision'?[s.question||'',lines.length&&/^keep or drop/i.test(lines[lines.length-1])?lines[lines.length-1]:''].filter(Boolean).join(' '):lines.join(' ');
-    const info='<div>'+badge+'<span class="sc">'+esc(s.scene||'')+'</span>'+(rest?'<div class="ds">'+esc(rest)+'</div>':'')+'<div class="ds">'+fmt(s.seconds)+(cue?' · at '+fmt(d.cues[s.slide]):'')+'</div></div>';
+    const info='<div>'+badge+'<span class="sc">'+esc(s.scene||'')+'</span>'+(s.hint?'<div class="ds hint">'+esc(s.hint)+'</div>':'')+(rest?'<div class="ds">'+esc(rest)+'</div>':'')+'<div class="ds">'+fmt(s.seconds)+(cue?' · at '+fmt(d.cues[s.slide]):'')+'</div></div>';
     let ans='';
     if(s.type==='blank'){ans='<span class="ds">no decision: a blank for AI video or animation</span>';}
-    else if(!s.needs_answer&&s.why){ans='<span class="ds">no answer needed: '+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action.replace(/_/g,' '))+' (ignored)</div>':'');}
+    else if(!s.needs_answer&&s.why&&!s.parts_decide){ans='<span class="ds">no answer needed: '+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action.replace(/_/g,' '))+' (ignored)</div>':'');}
     else{
       const a=s.answer;
-      const btns=CHOICES[s.type]||[];
+      const btns=s.parts_decide?TRIM_ONLY:(CHOICES[s.type]||[]);
       if(can){ans='<div class="btns">'+btns.map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(a&&a.action===v?'on':'')+'">'+l+'</button>').join('')+'</div>';}
       if(a){ans+='<div class="ans"><b>'+esc(a.action.replace(/_/g,' '))+'</b>'+(a.note?' · '+esc(a.note):'')+(a.edit?' · '+esc(a.edit):'')+(a.at?' · '+esc(String(a.at).slice(0,16).replace('T',' ')):'')+'</div>';}
       if(s.conflict){ans+='<div class="ans err">'+esc(s.conflict)+'</div>';}
+      else if(s.parts_decide&&!a){ans+='<div class="ds">no answer needed: '+esc(s.why||'')+'</div>';}
       else if(!can){ans+='<span class="ds">'+(d.accepted?(d.master_built?'no answer':'waiting'):'after the film')+'</span>';}
       if(open&&open.slide===s.slide){ans+=form(open);}
     }
-    return '<tr data-slide="'+esc(s.slide)+'" class="'+(cue?'cue':'')+(current===s.slide?' cur':'')+(!s.needs_answer&&s.why?' off':'')+'"><td class="n">'+esc(s.slide)+'</td><td>'+info+'</td><td class="a">'+ans+'</td></tr>';
+    return '<tr data-slide="'+esc(s.slide)+'" class="'+(cue?'cue':'')+(current===s.slide?' cur':'')+(!s.needs_answer&&s.why&&!s.parts_decide?' off':'')+(s.type==='backup'?' second':'')+'"><td class="n">'+esc(s.slide)+'</td><td>'+info+'</td><td class="a">'+ans+'</td></tr>';
   }).join('');
   $('slides').querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();choose(b.dataset.slide,b.dataset.act);}));
   $('slides').querySelectorAll('tr.cue').forEach(tr=>tr.addEventListener('click',e=>{if(e.target.closest('button,input,label'))return;seek(tr.dataset.slide);}));
   if(open){const f=$('f-'+open.slide);if(f){f.querySelector('button.go').addEventListener('click',()=>submit(open.slide));f.querySelector('button.no').addEventListener('click',()=>{open=null;draw();});const first=f.querySelector('input');if(first)first.focus();}}
   // the foot
   if(!d.accepted&&stage()==='options'){   // design/98 D1: no approval box; the first answer approves
-    $('action').innerHTML='<span>Watch the film and answer each slide with its buttons. Your first answer approves these options. Keep: use it. Reject: not this one (a reason is optional). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.</span>';
+    $('action').innerHTML='<span>Watch the film and answer each slide with its buttons. Your first answer approves these options. Keep: use it. Reject: not this one (a reason is optional). Trim a shot: use it with a shot trimmed. A blue mark is a second choice: keep only one cut of a scene. Drop: leave the decision out.</span>';
   }else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){
     $('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';
   }else if(d.accepted&&stage()==='master'){
-    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Keep: use it. Reject: not this one (a reason is optional). Keep with edit: use it with a shot or trim change. Drop: leave the decision out.</span>';   // design/97 O4; design/98
+    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Keep: use it. Reject: not this one (a reason is optional). Trim a shot: use it with a shot trimmed. A blue mark is a second choice: keep only one cut of a scene. Drop: leave the decision out.</span>';   // design/97 O4; design/98
   }else{
     $('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';
   }

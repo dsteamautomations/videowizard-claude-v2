@@ -148,6 +148,12 @@ def validate_scenes(words, scenes, process_stages=()):
         previous = i
 
 
+def chapter_warnings(scenes):
+    """design/125 P7: one chapter per scene; a scene that lists two is warned, not refused."""
+    return [f"Scene {n} lists two chapters ({'; '.join(s['process_stages'])}): split it where the second chapter begins (one chapter per scene)"
+            for n, s in enumerate(scenes, 1) if len(s.get('process_stages') or []) > 1]
+
+
 def beats(words, scenes, narration_plan, to_timeline, fps, ids=None):
     """Scene i runs from its boundary to the next one. A boundary that carries a pause sits after the silence, so the silence belongs
     to the scene that just ended (the picture runs on while the narration rests)."""

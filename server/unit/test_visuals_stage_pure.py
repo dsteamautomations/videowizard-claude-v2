@@ -504,12 +504,12 @@ def test_prepare_measures_the_footage_tells_it_and_the_neighbours_reach_the_pack
     view = VS.correct_footage(store, USER, RUN, outputs, {'camera': 'cinema', 'support': 'handheld'}, 'professional camera, handheld, natural')
     assert view['line'] == 'Your footage: cinema camera, handheld, natural look (your correction)' and view['measured']['camera'] == 'mixed'
     assert VS.packet(store, RUN, outputs, 'VS1')['preparation_digest'] == before and VS.status(FakeConn([]), store, RUN, outputs)['footage']['line'] == view['line']
-    # F6: an answer recorded at the media step before design/88 stands as the correction at the next prepare
+    # F6 retired (design/35 Old ways 6): an answer recorded at the media step before design/88 is no longer copied into the correction
     old = {**media, 'summary': {**media['summary'], 'footage_character': {'camera': 'mirrorless', 'support': 'handheld', 'look': 'natural', 'quote': 'Sony, handheld'}}}
     s2 = saved(store); s2.pop('footage_correction')
     store2 = store_with(s2, doc); store2.files.update({k: v for k, v in store.files.items() if k not in store2.files})
-    out = VS.prepare(FakeConn([]), store2, USER, {**RUN, 'procedure_version': '2'}, [old] + outputs[1:])
-    assert out['footage'] == 'Your footage: mirrorless camera, handheld, natural look (your correction)' and saved(store2)['footage_correction']['from'] == 'the media step'
+    out = VS.prepare(FakeConn([]), store2, USER, {**RUN, 'procedure_version': '3'}, [old] + outputs[1:])
+    assert 'your correction' not in out['footage'] and 'footage_correction' not in saved(store2)
 
 
 def test_each_gap_carries_its_narration_timed_and_the_packet_its_sentences():
@@ -925,14 +925,13 @@ def test_a_keyframe_for_a_shot_with_a_client_material_needs_a_footage_frame_as_a
     assert out['op'] == 'edit'
 
 
-def test_the_packet_carries_the_recorded_footage_character_or_none():
-    """design/77 L42."""
+def test_the_packet_never_reads_the_footage_character_answered_at_media():
+    """design/77 L42, retired by design/125 (design/35 Old ways 6): a session with no measured footage carries none, whatever media recorded."""
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video', subjects=[])])
     sess = video_session(doc)
     media = {'stage': 'media', 'unit': None, 'summary': {'clips': [], 'footage_character': {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'cinema camera'}}}
-    assert VS.packet(store_with(sess, doc), RUN, [media], 'VS1')['preparation']['footage_character'] == {'line': None, 'summary': media['summary']['footage_character']}   # a session from before design/88
-    assert VS.packet(store_with(sess, doc), RUN, [], 'VS1')['preparation']['footage_character'] == {'line': None, 'summary': None}
-    assert VS.footage_character([{'stage': 'media', 'unit': None, 'summary': {'clips': []}}]) is None
+    assert VS.packet(store_with(sess, doc), RUN, [media], 'VS1')['preparation']['footage_character'] == {'line': None, 'summary': None}
+    assert not hasattr(VS, 'footage_character')
 
 
 # ---------- design/76: Accept and Revise ----------

@@ -146,16 +146,14 @@ def prepare(conn, store, user, run, outputs):
         entities.extend({'clip_id': clip['id'], **e} for e in log.get('entities') or [])
     if not rows:
         raise Problem(409, 'NOT_ALLOWED', 'No analysed clips; run analysis first.')
-    if approved:   # scene fits come from the approved scene → process stage mapping (the logs only know the script's own beats)
-        by_stage = {}
-        for b in windows:
-            for st in b['process_stages']:
-                by_stage.setdefault(st, []).append(b['beat_id'])
-        for r in rows:
-            r['model_fits'] = {'primary': r['primary_fits'], 'secondary': r['secondary_fits']}
-            r['primary_fits'] = list(by_stage.get(r.get('process_stage') or '', []))
-            r['secondary_fits'] = []
-            r['fit_source'] = 'scene process stage'
+    if approved:   # design/125 P8: the logs know the script's paragraphs; each is mapped to the approved scenes its words fall in, beside the chapter
+        at = {w['id']: w for w in narration['words']}
+        paragraphs = {}
+        for b in beats:
+            own = [w['id'] for w in words if w.get('passage_id') == b.get('passage_id')]
+            if own:
+                paragraphs[b['beat_id']] = (at[own[0]]['start_frame'], at[own[-1]]['end_frame'])
+        P.scene_fits(rows, windows, paragraphs)
     rules = core.effective_rules(conn, run, outputs)['learned']   # design/37 2.7
     pk = P.build(run, production, windows, cards, rows, landmarks, entities, rules, TIMELINE, policy or {}, procedure.get('prompt') or '', narration)
     saved = save_json(store, key(run, 'package.json'), pk)
@@ -166,8 +164,13 @@ def prepare(conn, store, user, run, outputs):
     eligible = sum(1 for r in rows if r['eligibility'].startswith('ELIGIBLE'))
     return {'package': saved, 'beats': len(windows), 'clips': len(cards), 'sub_clips': len(rows), 'eligible_sub_clips': eligible, 'coverage': pk['coverage'],
             'learned_rules': len(rules), 'scenes_approved': bool(approved), 'pauses': len(plan['cuts']), 'sentences': len(narration['sentences']),
-            'next': ('present the coverage report, then author out/options.json and `vw options check`' if approved or len(windows) > 1 else
-                     'the script is one paragraph: propose scenes and pauses (out/scenes.json, `vw options scenes`) before options')}
+            'next': prepare_next(bool(approved))}
+
+
+def prepare_next(approved):
+    """design/125 P1: the scenes come first, always."""
+    return ('present the coverage report, then author out/options.json and `vw options check`' if approved else
+            'propose the scenes and pauses first (out/scenes.json, `vw options scenes`); then the coverage report and the options')
 
 
 def set_scenes(conn, store, user, run, outputs, document, quote):
@@ -203,7 +206,8 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     return {**out, 'scenes': [{k: b[k] for k in ('beat_id', 'title', 'target_beat_frames', 'process_stages')} | {'seconds': round(b['target_beat_frames'] / TIMELINE['fps'], 2),
                                                                                                                   'pauses': [{'after_word_id': p['after_word_id'], 'inserted_s': round(p['inserted_frames'] / TIMELINE['fps'], 2)} for p in b['pauses']]}
                                 for b in bs],
-            'film_seconds': round(plan['total_frames'] / TIMELINE['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / TIMELINE['fps'], 2)}
+            'film_seconds': round(plan['total_frames'] / TIMELINE['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / TIMELINE['fps'], 2),
+            'warnings': NR.chapter_warnings(document['scenes'])}   # design/125 P7
 
 
 def coverage(store, run):
@@ -223,7 +227,7 @@ def check(store, run, doc):
     work = deepcopy(doc)
     result = V.validate_options(work, pk, session['package']['policy'])
     out = {'status': 'rejected' if result['refusals'] else 'valid', 'refusals': result['refusals'],
-           'flags_by_rule': V.group_flags(result['flags']), 'flags_total': len(result['flags'])}   # design/43 7.6
+           **V.answer_flags(result['flags']), 'flags_total': len(result['flags'])}   # design/125 P11
     if not result['refusals']:
         out['scenes'] = SL.scene_summary(work, pk, TIMELINE['fps'])
     return out
@@ -261,12 +265,13 @@ def propose(conn, store, user, run, doc):
     conn.execute("delete from vw2_attempts where run_id=%s and stage='options' and unit=%s", (run['id'], core.UNIT_NONE))
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
-            'flags_by_rule': V.group_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
+            **V.answer_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
             'slides': [{k: s.get(k) for k in ('no', 'type', 'scene', 'backup_for', 'kind', 'question')} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
             **({'advice': round_advice(version)} if round_advice(version) else {}),
-            'next': '`vw options render`, let the operator watch, then `vw options record --quote`'}
+            'next': PROPOSE_NEXT}
 
 
+PROPOSE_NEXT = '`vw options render`; the operator watches and answers the slides on the page; the first answer approves the options'   # design/125 P14
 ROUNDS_BEFORE_BLANKS = 3
 
 
@@ -279,7 +284,10 @@ def round_advice(version):
 
 
 def _slides(store, session, doc, entry):
-    return entry.get('slides') or SL.slides(doc, _package(store, session), TIMELINE['fps'])   # versions proposed before design/21 carry none
+    """The version's stored slides. A version proposed before design/21 carries none: retired (design/125), refused."""
+    if 'slides' not in entry:
+        raise Problem(409, 'NOT_ALLOWED', f"Version {entry['version']} has no stored slides (proposed before design/21): `vw options check` and `propose` again.")
+    return entry['slides']
 
 
 def current(store, session):
@@ -457,7 +465,10 @@ def _ready_film(session, kind, plan_digest):
 
 
 def record_options(conn, store, user, run, quote, approved_by=None):
-    """The options output; approved_by (design/98 D2, D6): {'how': 'first_answer', 'slide': …} when the first slide answer approved it."""
+    """The options output, recorded by the first slide answer (design/98 D2, D6): approved_by {'how': 'first_answer', 'slide': …}. The explicit
+    approval beside it is retired (design/125 P14), refused."""
+    if not approved_by:
+        raise Problem(409, 'NOT_ALLOWED', 'The separate options approval is retired: answering the first slide approves the options.')
     session = session_of(store, run)
     doc, entry = current(store, session)
     _same_package(store, session, entry)
@@ -506,10 +517,12 @@ def _action(decisions, slide):
 
 
 def needs_answer(slide, heads, decisions):
-    """design/63 rule 2: a blank never needs an answer; a decision inside a REJECTed cut needs none (the build skips that cut).
-    Returns (needs, why)."""
+    """design/63 rule 2: a blank never needs an answer; a decision inside a REJECTed cut needs none (the build skips that cut). design/125 O1: a
+    scene whose footage is all decisions (parts_decide, scheme 2 only) is decided by them. Returns (needs, why)."""
     if slide['type'] == 'blank':
         return False, None
+    if slide.get('parts_decide'):
+        return False, 'decided by its parts: ' + ', '.join(slide.get('parts') or [])
     if slide['type'] == 'decision':
         head = heads.get(slide.get('option_number'))
         if head and _action(decisions, head) == 'REJECT':
@@ -541,6 +554,7 @@ def _slide_rows(sl, decisions):
         d = decisions.get(lab)
         needs, why = needs_answer(s, heads, decisions)
         rows.append({'slide': lab, 'type': s['type'], 'scene': s.get('scene') or scene_of.get(s.get('option_number')), 'backup_for': s.get('backup_for'), 'kind': s.get('kind'), 'question': s.get('question'),
+                     **{k: s[k] for k in ('scheme', 'hint', 'parts_decide', 'parts', 'ai_only') if k in s},   # design/125 O1, O8
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': needs, 'why': why, 'conflict': conflict_of(s, sl, decisions),
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows
@@ -601,7 +615,7 @@ def _cues_for(store, run, entry):
 def review_view(conn, store, run):
     """design/62: what the review page shows. The current version's slides with their answers and lines, the review film of that version
     when it is rendered (with the cue of every slide), the render state otherwise, and whether the options are recorded.
-    A read: one storage read for the session (plus the version document only when the version carries no slides), no write; the render
+    A read: one storage read for the session, no write; the render
     state is refreshed from the jobs table in memory (design/63 addendum: the page reloads after every click)."""
     try:
         session = session_of(store, run)
@@ -610,7 +624,7 @@ def review_view(conn, store, run):
     if not session.get('current'):
         return {'state': 'no_version'}
     entry = next(v for v in session['versions'] if v['digest'] == session['current'])
-    sl = entry.get('slides') or _slides(store, session, current(store, session)[0], entry)
+    sl = _slides(store, session, None, entry)
     _refresh(conn, store, run, session)
     rows = _slide_rows(sl, session.get('decisions') or {})
     r = session['renders'].get('review') or {}
@@ -642,6 +656,8 @@ def decide(conn, store, user, run, slide_no, action, note, edit):
         fail(f'Slide #{lab} is a decision: answer KEEP or DROP.')
     if s['type'] != 'decision' and action not in ('KEEP', 'REJECT', 'KEEP_WITH_EDIT'):
         fail('action must be KEEP, REJECT or KEEP_WITH_EDIT')
+    if s.get('parts_decide') and action != 'KEEP_WITH_EDIT':   # design/125 O1
+        fail(f"#{' and #'.join(s.get('parts') or [])} decide scene {s['number']}: answer them KEEP or DROP; slide #{lab} takes only a trim (KEEP_WITH_EDIT).")
     if action == 'KEEP_WITH_EDIT' and not edit:
         fail('KEEP_WITH_EDIT needs --edit "shot:N,in:±frames,out:±frames" (source frames; a frame is 1/25 s on the timeline).')
     approved_now = not session.get('accepted')
@@ -726,8 +742,9 @@ def build_master(conn, store, user, run):
     fps = TIMELINE['fps']
     kept = {}
     for o in deepcopy(doc['options']):
-        d = decisions[str(head[o['option_number']]['no'])]
-        if d['action'] == 'REJECT':
+        h = head[o['option_number']]
+        d = decisions.get(str(h['no'])) or {'action': 'KEEP'}   # design/125 O1: a scene decided by its parts needs no answer of its own
+        if d['action'] == 'REJECT' or (h.get('parts_decide') and all(decisions.get(p, {}).get('action') == 'DROP' for p in h.get('parts') or [])):
             continue
         if d['action'] == 'KEEP_WITH_EDIT':
             o = _apply_edit(o, d['edit'], rows, TIMELINE['fps'])
@@ -759,7 +776,7 @@ def build_master(conn, store, user, run):
     used = {}
     for bid, o in list(kept.items()):
         for ev in o['events']:
-            if not ev.get('blank') and not ev.get('reuse_approved'):
+            if not ev.get('blank') and not ev.get('reuse_approved') and bid not in used.get(ev['sub_clip_id'], []):   # design/125 O7: one scene, one use
                 used.setdefault(ev['sub_clip_id'], []).append(bid)
     swaps = []
     for sid, bids in used.items():
@@ -879,12 +896,5 @@ def record_master(conn, store, user, run, quote):
 
 
 def record_first_cut(conn, store, user, run, outputs, quote):
-    """The approved master film becomes the first cut: hash-bound; the quote must say the operator watched and listened (design/17 A50)."""
-    master_o = _output(outputs, 'master')
-    q = (quote or '').lower()
-    if 'watch' not in q or 'listen' not in q:
-        fail(FIRST_CUT_WORDS)
-    film = next((f for f in master_o['files'] if f['name'] == 'master.mp4'), None)
-    s = master_o['summary']
-    out = _first_cut_output(conn, user, run, master_o['id'], film, s, quote)
-    return {'output': str(out['id']), 'gaps': [g['shot_id'] for g in s['gaps']], 'next': 'visuals for each gap' if s['gaps'] else 'assembly'}
+    """Retired (design/44 8.4, design/125): the separate first-cut record is refused; `record_master` records both."""
+    raise Problem(409, 'NOT_ALLOWED', 'The separate first-cut record is retired: the first cut is recorded with the master (`vw master record`).')
