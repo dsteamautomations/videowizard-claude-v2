@@ -229,6 +229,13 @@ def declared_units(outputs, stage_name):
     return units
 
 
+def paid_line(run, paid):
+    """Defect 34: the visuals step's paid line names the run's own picture AI (design/120: chosen at creation, openai before the choice)."""
+    if paid and 'openai-images' in paid and (run.get('image_provider') or 'openai') == 'gemini':
+        return paid.replace('openai-images', 'gemini-images')
+    return paid
+
+
 def compute_next(run, stages, outputs, attempts):
     base = {'run_id': str(run['id']), 'code': run['code'], 'version': run['procedure_version'], 'active_machine': run['active_machine']}
     if run['status'] == 'closed':
@@ -244,7 +251,7 @@ def compute_next(run, stages, outputs, attempts):
             continue
         rows = [attempts.get((st['name'], u or UNIT_NONE)) for u in open_units]
         blocked = any(r and r['blocked'] for r in rows)
-        info = {**base, 'stage': st['name'], 'needs_acceptance': st['needs_acceptance'], 'paid': st['paid'], 'cap': st['cap'],
+        info = {**base, 'stage': st['name'], 'needs_acceptance': st['needs_acceptance'], 'paid': paid_line(run, st['paid']), 'cap': st['cap'],
                 'attempts': max((r['count'] for r in rows if r), default=0),
                 'actor': 'operator_decision' if blocked else 'operator',
                 'allowed': (['decide'] if blocked else ['output']) + ['view', 'revise', 'defect', 'adopt']}
