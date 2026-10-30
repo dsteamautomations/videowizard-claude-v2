@@ -256,4 +256,5 @@ Built together: I1–I4, B1–B3, S1–S3, V1–V3, M1–M2, A2–A4. **A1 is no
 - Python 3.9 for the chat tool: compiled under 3.12 only.
 - A2 without a comparison (SK's choice): watch the first film's short-clip logs.
 - A4 in the worst case pays four times for one clip.
-- Not deployed. On deploy: SK sets `VW2_WORKERS=18` (A1) in the VM's `server/.env`; the restart waits for running jobs; the plugin deploy needs the operator's Claude Code restart and the Vw switch turned off in the desktop app's list afterwards. Films already on version 3 (VW-10, VW-11) read the new wording from their next step.
+- **Deployed 30 Oct 2026** on SK's word (design/35 row 113): server 0.75.0, plugin 0.62.0; version 3 on the live server carries the new wording (checked: agentic over 15 s, the automatic-retry step, no brief label). A1 still to do: the VM's `VW2_WORKERS` reads 8.
+- Before the deploy it read: On deploy: SK sets `VW2_WORKERS=18` (A1) in the VM's `server/.env`; the restart waits for running jobs; the plugin deploy needs the operator's Claude Code restart and the Vw switch turned off in the desktop app's list afterwards. Films already on version 3 (VW-10, VW-11) read the new wording from their next step.
