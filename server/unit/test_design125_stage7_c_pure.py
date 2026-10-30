@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 V2 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v2.json').read_text(encoding='utf-8'))['stages']}
 V3 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages']}
-BEFORE = {'options': 1619, 'master': 454, 'first_cut': 53, 'analysis': 328, 'visuals': 10227}   # words read by the assistant, measured before this change
+BEFORE = {'options': 1792, 'master': 478, 'first_cut': 53, 'analysis': 328, 'visuals': 10227}   # words read by the assistant; design/127 added round 2 (B-roll), alternatives and the shot answers (SK)
 
 
 def texts(stage):
@@ -44,7 +44,7 @@ def test_p7_a_scene_covers_one_chapter():
 
 def test_p9_rule_3_an_abstract_idea_has_nothing_to_show_and_is_no_longer():
     r3 = rule(3)
-    assert 'blanks by default' in r3 and 'camera can see is matched like any other' in r3 and 'B-roll only when clearly relevant' in r3   # the independent check: the gate and 'by default' kept
+    assert 'have no exact match: a blank, or round 2 B-roll only where the words make no specific claim' in r3 and 'camera can see is matched like any other' in r3   # design/127: B-roll moved to round 2
     old = V2['options']['prompt']
     old3 = old[old.index('\n3. ') + 1:old.index('\n4. ')]
     assert len(r3.split()) <= len(old3.split())
@@ -57,16 +57,8 @@ def test_p13_an_ai_only_scene_is_one_blank_and_a_declared_gap_is_refused():
 
 def test_o7_a_later_part_of_the_same_clip_in_the_same_scene():
     r4 = rule(4)
-    assert 'same scene' in r4 and 'not overlapping' in r4 and 'side by side at the same shot size' in r4 and 'decision of kind reuse' in r4
+    assert 'same scene' in r4 and 'not overlapping' in r4 and 'side by side at the same shot size' in r4 and 'note of kind reuse' in r4
     assert 'including another part of the same clip' not in r4
-
-
-def test_o1_o3_scene_numbers_second_choices_and_trim_only_rows():
-    master = V3['master']['steps'][0]
-    assert 'next number' not in master and 'between 2 and 3' not in master
-    assert '2-2, keep one of the two' in master and 'needs no answer: its parts decide it, a trim (KEEP_WITH_EDIT) if wanted' in master
-    p = V3['options']['prompt']
-    assert 'running numbers' not in p and "scene's number" in p and 'second choice' in p and '#2-2A' in p
 
 
 def test_o4_o6_the_second_look_between_check_and_propose():

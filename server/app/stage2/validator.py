@@ -4,7 +4,7 @@ import re
 from fractions import Fraction
 
 from .package import SHOT_SIZES, GRID
-from .slides import DECISION_KINDS
+from .slides import NOTE_KINDS
 
 ROLL_SPEAKER = 'ELIGIBLE_A_ROLL_SPEAKER'
 MIN_BLANK_S = 3      # design/21: a blank (AI video or animation) is at least 3 s
@@ -37,6 +37,43 @@ def _eye_ok(a, b):
     return abs(ia // 3 - ib // 3) <= 1 and abs(ia % 3 - ib % 3) <= 1   # adjacent cells count as a match
 
 
+def _piece(tag, ev, row, policy, refusals):
+    """The checks every footage piece passes, a shot or an alternative: eligible, client-safe, speaker policy, match and evidence, inside its
+    window (G1), its action peak (G2), its hold (G3). Returns False when its frames are unusable (the caller stops there)."""
+    if not row['eligibility'].startswith('ELIGIBLE') or not row['client_safe'] or row['risk_flags']:
+        refusals.append(f'{tag}: G10/Q8 sub-clip is not eligible or not client-safe ({row["eligibility"]}, risk flags {row["risk_flags"]})')
+    if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
+        refusals.append(f'{tag}: Q1 speaker on screen while show_speaker_video is false')
+    if ev.get('match') not in ('direct', 'b_roll') or not str(ev.get('evidence') or '').strip():
+        refusals.append(f'{tag}: match (direct or b_roll) and evidence (the log fields that show it matches the words) are required')
+    a, z = ev.get('source_in_frame'), ev.get('source_out_frame')
+    if not (isinstance(a, int) and isinstance(z, int) and row['in_frame'] <= a < z <= row['out_frame']):
+        refusals.append(f"{tag}: G1 source frames {a}-{z} must lie inside the usable window {row['in_frame']}-{row['out_frame']}")
+        return False
+    peak = row.get('action_peak')
+    if peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
+        refusals.append(f"{tag}: G2 must_include_action_peak {peak['in_frame']}-{peak['out_frame']} dropped")
+    if (z - a) / Fraction(row['source_fps']) < row['min_hold_s'] and not ev.get('hold_last_frame'):
+        refusals.append(f"{tag}: G3 shorter than min_comprehension_hold_s {row['min_hold_s']}")
+    return True
+
+
+def _note(tag, ev, refusals):
+    """design/127: a doubtful shot carries a note {kind, question}, shown with it; the operator's answer is the shot's own."""
+    if 'decision' in ev:
+        refusals.append(f'{tag}: decision is retired: a doubtful shot carries a note {{kind, question}}; B-roll is a shot with match b_roll and needs no question')
+    d = ev.get('note')
+    if d is None:
+        return None
+    if isinstance(d, dict) and d.get('kind') == 'b_roll':
+        refusals.append(f'{tag}: B-roll is a shot with match b_roll; it needs no question')
+        return None
+    if not isinstance(d, dict) or d.get('kind') not in NOTE_KINDS or not str(d.get('question') or '').strip():
+        refusals.append(f'{tag}: a note needs kind ({", ".join(NOTE_KINDS)}) and the question for the operator')
+        return None
+    return d
+
+
 def validate_options(doc, package, policy):
     refusals, flags = [], []
     rows = {r['sub_clip_id']: r for r in package['sub_clips']}
@@ -58,19 +95,13 @@ def validate_options(doc, package, policy):
         if bid not in beats:
             refusals.append(f'unknown beat {bid}')
             continue
-        ranks = [o.get('rank') for o in group]
-        if ranks[0] != 'PRIMARY' or ranks.count('PRIMARY') != 1 or len(group) > 2 or (len(group) == 2 and ranks[1] != 'SECONDARY'):
-            refusals.append(f'G12: {bid} needs one PRIMARY first and at most one SECONDARY')
-        if len(group) == 2:
-            a = [(e.get('sub_clip_id'), e.get('source_in_frame'), e.get('source_out_frame')) for e in group[0].get('events', []) if not e.get('blank')]
-            b = [(e.get('sub_clip_id'), e.get('source_in_frame'), e.get('source_out_frame')) for e in group[1].get('events', []) if not e.get('blank')]
-            sizes_a = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[0].get('events', []) if e.get('sub_clip_id') in rows]
-            sizes_b = [rows[e['sub_clip_id']]['effective_shot_size'] for e in group[1].get('events', []) if e.get('sub_clip_id') in rows]
-            if {x[0] for x in a} == {x[0] for x in b} and sizes_a == sizes_b:
-                refusals.append(f'G13: {bid} SECONDARY must differ from PRIMARY in sub-clips or shot sizes')
+        if len(group) > 1 or any(o.get('rank') not in (None, 'PRIMARY') for o in group):   # design/127
+            refusals.append(f'{bid}: a second cut of a scene is retired; give an alternative for a shot (`alternatives` on the shot: another clip, the same length)')
     words = {w['id']: w for w in (package.get('narration') or {}).get('words') or []}
     silences = (package.get('narration') or {}).get('silences') or []
-    uses = {}    # clip_id -> [(option_number, beat_id, event_index, has_reuse_decision, source in, source out)] in film order (design/21 rule 7)
+    uses = {}    # clip_id -> [(option_number, beat_id, event_index, has_reuse_note, source in, source out)] in film order (design/21 rule 7)
+    alts = []    # design/127: (option_number, event_index, alternative number, clip_id)
+    direct, b_rolls = {}, []   # design/127: B-roll comes after the exact matches
     for o in opts:
         n, bid, events = o.get('option_number'), o.get('beat_id'), o.get('events') or []
         beat = beats.get(bid)
@@ -94,6 +125,8 @@ def validate_options(doc, package, policy):
                     continue
                 if not str(ev.get('intent') or '').strip():
                     refusals.append(f'{tag}: intent is required (what the AI video or animation must show)')
+                if ev.get('alternatives'):
+                    refusals.append(f'{tag}: an AI shot has no clip to replace: alternatives go on a footage shot')
                 if k < MIN_BLANK_S * tl_fps:
                     if str(ev.get('short_reason') or '').strip():
                         flags.append(f'{tag}: E1 blank of {k / tl_fps:.1f} s is under {MIN_BLANK_S} s; the operator decides ({ev["short_reason"]})')
@@ -113,35 +146,22 @@ def validate_options(doc, package, policy):
             if not row:
                 refusals.append(f'{tag}: unknown sub-clip')
                 continue
-            # design/21: every real shot states how it matches the words; anything uncertain goes behind a decision slide
-            d = ev.get('decision')
-            if d is not None and (not isinstance(d, dict) or d.get('kind') not in DECISION_KINDS or not str(d.get('question') or '').strip()):
-                refusals.append(f'{tag}: decision needs kind ({", ".join(DECISION_KINDS)}) and the question for the operator')
-                d = None
-            if ev.get('match') not in ('direct', 'b_roll') or not str(ev.get('evidence') or '').strip():
-                refusals.append(f'{tag}: match (direct or b_roll) and evidence (the log fields that show it matches the words) are required')
-            if ev.get('match') == 'b_roll' and not d:
-                refusals.append(f'{tag}: B-roll goes behind a decision slide (decision kind b_roll)')
-            if row.get('grade') == 'C' and not d:
-                refusals.append(f'{tag}: E3 the log grades this sub-clip C (poor quality): put it behind a decision slide (kind poor_quality) or leave a blank')
+            # design/21: every real shot states how it matches the words; design/127: a doubtful one carries a note, B-roll needs none
+            d = _note(tag, ev, refusals)
+            if row.get('grade') == 'C' and not (d and d.get('kind') == 'poor_quality'):
+                refusals.append(f'{tag}: E3 the log grades this sub-clip C (poor quality): give it a note (kind poor_quality) or leave a blank')
             uses.setdefault(row['clip_id'], []).append((n, bid, i, bool(d and d.get('kind') == 'reuse'), ev.get('source_in_frame'), ev.get('source_out_frame')))
-            if not row['eligibility'].startswith('ELIGIBLE') or not row['client_safe'] or row['risk_flags']:
-                refusals.append(f'{tag}: G10/Q8 sub-clip is not eligible or not client-safe ({row["eligibility"]}, risk flags {row["risk_flags"]})')
-            if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
-                refusals.append(f'{tag}: Q1 speaker on screen while show_speaker_video is false')
-            a, z = ev.get('source_in_frame'), ev.get('source_out_frame')
-            if not (isinstance(a, int) and isinstance(z, int) and row['in_frame'] <= a < z <= row['out_frame']):
-                refusals.append(f"{tag}: G1 source frames {a}-{z} must lie inside the usable window {row['in_frame']}-{row['out_frame']}")
+            if ev.get('match') == 'b_roll':
+                b_rolls.append((n, i, row['clip_id']))
+            else:
+                direct.setdefault(row['clip_id'], n)
+            if not _piece(tag, ev, row, policy, refusals):
                 continue
-            peak = row.get('action_peak')
-            if peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
-                refusals.append(f"{tag}: G2 must_include_action_peak {peak['in_frame']}-{peak['out_frame']} dropped")
+            a, z = ev['source_in_frame'], ev['source_out_frame']
             src_fps = Fraction(row['source_fps'])
             hold_s = row['min_hold_s'] + (1.0 if row['effective_shot_size'] in ('WS', 'EWS') else 0.0) - (0.5 if row['effective_shot_size'] in ('CU', 'ECU') else 0.0)
             hold_s = max(hold_s, row['min_hold_s'])
-            if (z - a) / src_fps < row['min_hold_s'] and not ev.get('hold_last_frame'):
-                refusals.append(f"{tag}: G3 shorter than min_comprehension_hold_s {row['min_hold_s']}")
-            elif (z - a) / src_fps < hold_s:
+            if row['min_hold_s'] <= (z - a) / src_fps < hold_s:
                 flags.append(f"{tag}: R5 hold under {hold_s:.1f} s for a {row['effective_shot_size']}")
             if ev.get('hold_last_frame') and not row['still_eligible']:
                 refusals.append(f'{tag}: G16 hold_last_frame only on still_frame_dynamic_zoom_eligible sub-clips')
@@ -164,6 +184,15 @@ def validate_options(doc, package, policy):
             n_tl, ratio = _tl_frames(ev, row, tl_fps)
             ev['_timeline_frames'] = n_tl
             ev['_fps_ratio'] = str(ratio)
+            for m, alt in enumerate(ev.get('alternatives') or [], 1):   # design/127: another clip for the same words, the same length
+                atag = f'{tag} alternative {m}'
+                arow = rows.get(alt.get('sub_clip_id')) if isinstance(alt, dict) else None
+                if not arow:
+                    refusals.append(f'{atag}: unknown sub-clip')
+                    continue
+                alts.append((n, i, m, arow['clip_id']))
+                if _piece(atag, alt, arow, policy, refusals) and _tl_frames(alt, arow, tl_fps)[0] != n_tl:
+                    refusals.append(f"{atag}: an alternative fills its shot's time exactly: {n_tl} frames (it has {_tl_frames(alt, arow, tl_fps)[0]})")
             if n_tl > LONG_REAL_S * tl_fps and not str(ev.get('hold_reason') or '').strip():
                 flags.append(f'{tag}: rule 11 real shot of {n_tl / tl_fps:.1f} s: cut it to the part that carries the meaning, or give hold_reason')
             total += n_tl
@@ -253,7 +282,15 @@ def validate_options(doc, package, policy):
         for j, (n, bid, i, is_reuse, a, _z) in enumerate(us):
             earlier = [u for u in us[:j] if not (u[1] == bid and u[0] != n) and not (u[0] == n and isinstance(a, int) and isinstance(u[5], int) and u[5] <= a)]
             if earlier and not is_reuse:
-                refusals.append(f'OPTION #{n} shot {i + 1}: Q4 clip {cid} is already used (option #{earlier[0][0]}); a second use, even of another part, needs a decision of kind reuse or another clip')
+                refusals.append(f'OPTION #{n} shot {i + 1}: Q4 clip {cid} is already used (option #{earlier[0][0]}); a second use, even of another part, needs a note of kind reuse or another clip')
+    seen_alt = set()
+    for n, i, m, cid in alts:   # design/127: an alternative's clip is used nowhere else in the cut
+        if cid in uses or cid in seen_alt:
+            refusals.append(f'OPTION #{n} shot {i + 1}: alternative {m} uses clip {cid}, which is already in the cut: give a clip used nowhere else')
+        seen_alt.add(cid)
+    for n, i, cid in b_rolls:   # design/127: B-roll is placed after the exact matches, from the clips they left unused
+        if cid in direct:
+            refusals.append(f'OPTION #{n} shot {i + 1}: B-roll comes after the exact matches: clip {cid} is a direct match in option #{direct[cid]}; take B-roll from a clip no exact match uses')
     # design/91 N14: consecutive scenes narrating the same process stage stay in one place unless the option names the move
     order = [b for b in package['beats'] if by_beat.get(b['beat_id'])]
     for a, b in zip(order, order[1:]):

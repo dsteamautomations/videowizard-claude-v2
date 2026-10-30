@@ -433,7 +433,7 @@ class DecideBody(Write):
         if isinstance(v, dict) and 'option_number' in v:
             raise Problem(422, 'RETIRED', OPTION_NUMBER_RETIRED)
         return v
-    action: Literal['KEEP', 'REJECT', 'KEEP_WITH_EDIT', 'DROP']
+    action: str   # design/127: KEEP, REJECT or TRIM; the retired KEEP_WITH_EDIT and DROP are refused by name in stage2.decide
     note: str = ''
     edit: str | None = None
 

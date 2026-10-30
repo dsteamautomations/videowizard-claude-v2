@@ -13,32 +13,29 @@
 .rv .nofilm{color:var(--muted);padding:40px 12px;font-size:15px;text-align:center;border:1px dashed var(--line);border-radius:12px}
 .rv .nofilm[hidden]{display:none}
 .rv .now{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.3em}
-.rv table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.rv th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--card);white-space:nowrap}
-.rv td{padding:10px 12px;vertical-align:top;border-bottom:1px solid var(--line)}
-.rv tbody tr:last-child td{border-bottom:0}
-.rv tbody tr:nth-child(even) td{background:var(--z)}
-.rv tbody tr.cue{cursor:pointer}
-.rv tbody tr.cue:hover td{background:var(--hover)}
-.rv tbody tr.cur td{background:var(--sel)}
-.rv tbody tr.off td{opacity:.55}
-.rv .ans.err{color:var(--err)}
-.rv th.n,.rv td.n{width:44px;font-weight:700;white-space:nowrap}
-.rv th.a,.rv td.a{width:190px}
-.rv .badge{display:inline-block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);margin-right:6px;vertical-align:1px}
-.rv .badge.dec{border-color:var(--accent);color:var(--fg)}
-.rv .badge.second{border-color:#2a5bd7;color:#2a5bd7}
-.rv tbody tr.second td:first-child{box-shadow:inset 4px 0 0 #2a5bd7}
-.rv .hint{font-style:italic}
-.rv .sc{font-weight:600}
+.rv .pause{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--muted)}
+.rv .pause input{width:auto;min-width:0;margin:0}
+.rv .wait{margin-top:8px;padding:10px 12px;border:2px solid var(--accent);border-radius:10px;font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rv .wait[hidden]{display:none}
+.rv .scene{border-radius:12px;padding:8px 10px 10px;margin-bottom:12px;border-left:6px solid var(--sc)}
+.rv .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;cursor:pointer}
+.rv .head b{font-size:15px}
+.rv .head span{font-size:12.5px;color:var(--muted)}
+.rv .row{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:7px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;cursor:pointer}
+.rv .row.cur{outline:2px solid #2a5bd7}
+.rv .row.alt{border:1.5px dashed var(--muted);margin-left:18px}
+.rv .row.off{opacity:.6}
+.rv .t{font-weight:600}
 .rv .ds{color:var(--muted);font-size:12.5px;margin-top:3px}
-.rv .btns{display:flex;gap:6px;flex-wrap:wrap}
+.rv .words{font-size:13px;margin-top:3px}
+.rv .q{font-size:12.5px;margin-top:3px}
+.rv .broll{display:inline-block;background:#8b0000;color:#fff;font-weight:700;font-size:2.3em;line-height:1.1;padding:1px 10px;border-radius:8px;margin:2px 8px 4px 0;vertical-align:middle}
+.rv .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .rv .btns button{padding:4px 10px;font-size:12.5px;border-radius:999px}
 .rv .btns button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
-.rv .btns button:disabled{opacity:.5;cursor:default}
-.rv .ans{font-size:12px;color:var(--muted);margin-top:5px}
+.rv .ans{font-size:12px;color:var(--muted);margin-top:5px;text-align:right}
 .rv .ans b{color:var(--ok)}
-.rv .form{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rv .form{grid-column:1/-1;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .rv .form input{min-width:0;padding:6px 9px;font-size:13px;border-radius:8px}
 .rv .form input.w{width:200px}.rv .form input.f{width:64px}
 .rv .form label{font-size:12px;color:var(--muted)}
@@ -47,10 +44,7 @@
 .rv .foot .in{max-width:1100px;margin:0 auto;padding:8px 20px 10px}
 .rv .foot .status{font-size:13px;min-height:1.3em;margin-bottom:6px;color:var(--muted)}
 .rv .foot .status.err{color:var(--err)}.rv .foot .status.ok{color:var(--ok)}
-.rv .foot .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.rv .foot textarea{flex:1;min-width:240px;min-height:38px;padding:8px 10px;font-size:14px;border-radius:10px;resize:vertical}
-.rv .foot .go{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);padding:10px 18px;font-size:14px;border-radius:10px;white-space:nowrap}
-.rv .foot .go:disabled{opacity:.45}
+.rv .foot .row2{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
 .rv .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);border-top-color:transparent;border-radius:50%;animation:rvspin .8s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes rvspin{to{transform:rotate(360deg)}}
 .rv .spacer{height:120px}
@@ -65,24 +59,26 @@
       <video id="film" controls preload="metadata" playsinline hidden></video>
       <div class="nofilm" id="nofilm">Loading…</div>
       <div class="now" id="now"></div>
+      <label class="pause"><input type="checkbox" id="pauseon"> Pause for answers (the film stops after each shot that still needs your answer)</label>
+      <div class="wait" id="wait" hidden><span id="waittext"></span><button id="goon">Continue</button></div>
     </div>
-    <div class="right">
-      <table><thead><tr><th class="n">#</th><th>Slide</th><th class="a">Answer</th></tr></thead><tbody id="slides"></tbody></table>
-    </div>
+    <div class="right" id="slides"></div>
   </div>
   <div class="spacer"></div>
-  <div class="foot"><div class="in"><div class="status" id="fmsg"></div><div class="row" id="action"></div></div></div>
+  <div class="foot"><div class="in"><div class="status" id="fmsg"></div><div class="row2" id="action"></div></div></div>
 </div>
 <script>
 (function(){
 const code=document.getElementById('app').dataset.code, base='/runs/'+code+'/review';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let data=null, timer=null, open=null, inflight=false, filmKey=null, current=null;
-// KEEP, REJECT and KEEP_WITH_EDIT (Trim a shot) for scene and second-choice slides; KEEP and DROP for decision slides; nothing for a blank (the server refuses anything else)
-// design/125 O1: a scene decided by its parts (s.parts_decide) takes only a trim
-const CHOICES={option:[['KEEP','Keep'],['REJECT','Reject'],['KEEP_WITH_EDIT','Trim a shot']],backup:[['KEEP','Keep'],['REJECT','Reject'],['KEEP_WITH_EDIT','Trim a shot']],decision:[['KEEP','Keep'],['DROP','Drop']],blank:[]};
-const TRIM_ONLY=[['KEEP_WITH_EDIT','Trim a shot']];
+let data=null, timer=null, open=null, inflight=false, filmKey=null, current=null, waitingFor=null;
+const passed=new Set();   // shots the viewer chose to play past without answering, this viewing
+// design/127: a footage shot KEEP / REJECT / TRIM; the AI shot of an all-AI scene Keep AI (KEEP) / Find footage (REJECT); an alternative KEEP / REJECT once its shot is rejected
+const CHOICES={shot:[['KEEP','Keep'],['REJECT','Reject'],['TRIM','Trim']],alternative:[['KEEP','Keep'],['REJECT','Reject']],ai:[['KEEP','Keep AI'],['REJECT','Find footage']]};
+let pauseOn=true; try{pauseOn=localStorage.getItem('vw-review-pause')!=='off';}catch(e){}
+$('pauseon').checked=pauseOn;
+$('pauseon').addEventListener('change',()=>{pauseOn=$('pauseon').checked;try{localStorage.setItem('vw-review-pause',pauseOn?'on':'off');}catch(e){}if(!pauseOn)resume();});
 function msg(t,err,busy){const f=$('fmsg');f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');f.className='status '+(err?'err':(busy?'':'ok'));}
 async function act(body){
   if(inflight){throw new Error('Still recording the last answer; try again in a moment.');}
@@ -106,24 +102,43 @@ function schedule(){clearTimeout(timer);timer=setTimeout(load,15000);}
 function fmt(s){s=Math.max(0,Math.round(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
 function stage(){return data&&data.run?data.run.stage:null;}
 function decidable(){return !data.master_built&&((stage()==='master'&&data.accepted)||(stage()==='options'&&!!data.film));}   // design/98 D1: the first answer approves the options
+function cue(slide){const c=data&&data.cues?data.cues[slide]:null;return Array.isArray(c)?c:null;}
+function row(s,can){
+  const c=cue(s.slide);
+  const off=!s.needs_answer&&s.why;
+  let info='<div><div class="t">'+(s.b_roll?'<span class="broll">B-roll</span>':'')+esc(s.title)+(s.type==='ai'?' · made with AI':'')+'</div>';
+  if(s.clip){info+='<div class="ds">'+esc(s.clip)+'</div>';}
+  if(s.words){info+='<div class="words">“'+esc(s.words)+'”</div>';}
+  if(s.type==='alternative'){info+='<div class="ds">the same words as '+esc(s.of)+'</div>';}
+  if(s.type==='ai'&&s.intent){info+='<div class="ds">For AI: '+esc(s.intent)+'</div>';}
+  if(s.note&&s.note.question){info+='<div class="q">Question: '+esc(s.note.question)+'</div>';}
+  info+='<div class="ds">'+esc(s.hint||'')+' · '+fmt(s.seconds)+(c?' · at '+fmt(c[0]):'')+'</div></div>';
+  let ans='';
+  if(!s.answerable){ans='<span class="ds">nothing to answer</span>';}
+  else if(off){ans='<span class="ds">'+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action)+' (not used)</div>':'');}
+  else{
+    const a=s.answer;
+    if(can){ans='<div class="btns">'+(CHOICES[s.type]||[]).map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(a&&a.action===v?'on':'')+'">'+l+'</button>').join('')+'</div>';}
+    if(a){ans+='<div class="ans"><b>'+esc(s.type==='ai'?(a.action==='KEEP'?'Keep AI':'Find footage'):a.action)+'</b>'+(a.note?' · '+esc(a.note):'')+(a.edit?' · '+esc(a.edit):'')+'</div>';}
+    if(!can){ans+='<span class="ds">'+(data.accepted?(data.master_built?'no answer':'waiting'):'after the film')+'</span>';}
+  }
+  return '<div data-slide="'+esc(s.slide)+'" class="row'+(s.type==='alternative'?' alt':'')+(off?' off':'')+(current===s.slide?' cur':'')+'">'+info+'<div>'+ans+'</div>'+(open&&open.slide===s.slide?form(open):'')+'</div>';
+}
 function draw(){
   const d=data; const film=$('film'), no=$('nofilm');
   if(d.state!=='prepared'){
-    $('line').textContent=d.state==='not_prepared'?'The options stage has not started yet.':'No options proposed yet; the assistant proposes them in chat.';
+    $('line').textContent=d.state==='not_prepared'?'The options stage has not started yet.':d.state==='old_form'?d.message:'No options proposed yet; the assistant proposes them in chat.';
     film.hidden=true;no.hidden=false;no.textContent=$('line').textContent;$('slides').innerHTML='';$('action').innerHTML='';return;
   }
-  // the top line
   let line='Version <strong>'+esc(d.version)+'</strong>';
-  if(!d.accepted&&stage()==='options'){line+=d.film?' · <strong>answer each slide; your first answer approves these options</strong>':' · the review film is not ready yet';}
+  if(!d.accepted&&stage()==='options'){line+=d.film?' · <strong>answer each shot; your first answer approves these options</strong>':' · the review film is not ready yet';}
   else if(!d.accepted){line+=' · this version is not the recorded one; the assistant proposes or records in chat';}
   else if(d.master_built){line+=' · answers closed: the master film is built';}
   else if(d.of&&d.answered>=d.of){line+=' · <strong>all '+d.of+' answered</strong>. The assistant builds the master film from here (vw master build).';}
   else{line+=' · <strong>'+d.answered+' of '+d.of+'</strong> answered · waiting: '+(d.waiting.length?esc(d.waiting.join(', ')):'none');}
   if(d.accepted&&d.approved_by&&d.approved_by.slide){line+=' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')';}   // design/98 D6
-  if(d.both_kept&&d.both_kept.length){line+=' · <span class="err">both cuts kept: '+esc(d.both_kept.map(b=>b.scene+' (#'+b.slides.join(', #')+')').join('; '))+'</span>';}
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open on this run; nothing can be recorded until it is fixed</span>';}
   $('line').innerHTML=line;
-  // the film
   clearTimeout(timer);
   if(d.film){
     no.hidden=true;film.hidden=false;
@@ -137,70 +152,67 @@ function draw(){
     else if(r.status==='queued'||r.status==='running'){no.innerHTML='<span class="spin"></span>The review film is rendering ('+esc(r.status)+'); this page checks again every 15 s.';schedule();}
     else{no.textContent='The render '+esc(r.status||'failed')+(r.error?': '+r.error:'')+'. The assistant renders again.';}
   }
-  // the slides
-  const can=decidable();
-  $('slides').innerHTML=d.slides.map(s=>{
-    const cue=d.cues&&d.cues[s.slide]!=null;
-    const badge=s.type==='backup'?(s.scheme?'<span class="badge second">second choice</span>':'<span class="badge">backup for #'+esc(s.backup_for)+'</span>'):s.type==='decision'?'<span class="badge dec">decision</span>':s.type==='blank'?'<span class="badge">blank</span>':'';
-    const lines=(s.lines||[]).slice(1).map(l=>String(l).trim());
-    // the slide's lines come wrapped for the film card: joined back into running text; a decision's question is shown once, with its last line (keep or drop: the clip)
-    const rest=s.type==='decision'?[s.question||'',lines.length&&/^keep or drop/i.test(lines[lines.length-1])?lines[lines.length-1]:''].filter(Boolean).join(' '):lines.join(' ');
-    const info='<div>'+badge+'<span class="sc">'+esc(s.scene||'')+'</span>'+(s.hint?'<div class="ds hint">'+esc(s.hint)+'</div>':'')+(rest?'<div class="ds">'+esc(rest)+'</div>':'')+'<div class="ds">'+fmt(s.seconds)+(cue?' · at '+fmt(d.cues[s.slide]):'')+'</div></div>';
-    let ans='';
-    if(s.type==='blank'){ans='<span class="ds">no decision: a blank for AI video or animation</span>';}
-    else if(!s.needs_answer&&s.why&&!s.parts_decide){ans='<span class="ds">no answer needed: '+esc(s.why)+'</span>'+(s.answer?'<div class="ans">'+esc(s.answer.action.replace(/_/g,' '))+' (ignored)</div>':'');}
-    else{
-      const a=s.answer;
-      const btns=s.parts_decide?TRIM_ONLY:(CHOICES[s.type]||[]);
-      if(can){ans='<div class="btns">'+btns.map(([v,l])=>'<button data-slide="'+esc(s.slide)+'" data-act="'+v+'" class="'+(a&&a.action===v?'on':'')+'">'+l+'</button>').join('')+'</div>';}
-      if(a){ans+='<div class="ans"><b>'+esc(a.action.replace(/_/g,' '))+'</b>'+(a.note?' · '+esc(a.note):'')+(a.edit?' · '+esc(a.edit):'')+(a.at?' · '+esc(String(a.at).slice(0,16).replace('T',' ')):'')+'</div>';}
-      if(s.conflict){ans+='<div class="ans err">'+esc(s.conflict)+'</div>';}
-      else if(s.parts_decide&&!a){ans+='<div class="ds">no answer needed: '+esc(s.why||'')+'</div>';}
-      else if(!can){ans+='<span class="ds">'+(d.accepted?(d.master_built?'no answer':'waiting'):'after the film')+'</span>';}
-      if(open&&open.slide===s.slide){ans+=form(open);}
-    }
-    return '<tr data-slide="'+esc(s.slide)+'" class="'+(cue?'cue':'')+(current===s.slide?' cur':'')+(!s.needs_answer&&s.why&&!s.parts_decide?' off':'')+(s.type==='backup'?' second':'')+'"><td class="n">'+esc(s.slide)+'</td><td>'+info+'</td><td class="a">'+ans+'</td></tr>';
-  }).join('');
-  $('slides').querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();choose(b.dataset.slide,b.dataset.act);}));
-  $('slides').querySelectorAll('tr.cue').forEach(tr=>tr.addEventListener('click',e=>{if(e.target.closest('button,input,label'))return;seek(tr.dataset.slide);}));
-  if(open){const f=$('f-'+open.slide);if(f){f.querySelector('button.go').addEventListener('click',()=>submit(open.slide));f.querySelector('button.no').addEventListener('click',()=>{open=null;draw();});const first=f.querySelector('input');if(first)first.focus();}}
-  // the foot
-  if(!d.accepted&&stage()==='options'){   // design/98 D1: no approval box; the first answer approves
-    $('action').innerHTML='<span>Watch the film and answer each slide with its buttons. Your first answer approves these options. Keep: use it. Reject: not this one (a reason is optional). Trim a shot: use it with a shot trimmed. A blue mark is a second choice: keep only one cut of a scene. Drop: leave the decision out.</span>';
-  }else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){
-    $('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';
-  }else if(d.accepted&&stage()==='master'){
-    $('action').innerHTML='<span>Click a slide to see it in the film; answer with its buttons. Keep: use it. Reject: not this one (a reason is optional). Trim a shot: use it with a shot trimmed. A blue mark is a second choice: keep only one cut of a scene. Drop: leave the decision out.</span>';   // design/97 O4; design/98
-  }else{
-    $('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';
+  // one coloured block per scene, its shots and alternatives under it
+  const can=decidable(); let html='', inScene=false;
+  for(const s of d.slides){
+    if(s.type==='scene'){
+      if(inScene){html+='</div>';}
+      inScene=true;
+      html+='<div class="scene" style="--sc:'+esc(s.colour)+';background:'+esc(s.colour)+'1f"><div class="head" data-slide="'+esc(s.slide)+'"><b>'+esc(s.lines[0])+' · '+esc(s.lines[1]||'')+'</b><span>'+esc(s.lines[2]||'')+' - '+esc(s.lines[3]||'')+'</span></div>';
+    }else{html+=row(s,can);}
   }
+  if(inScene){html+='</div>';}
+  $('slides').innerHTML=html;
+  $('slides').querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();choose(b.dataset.slide,b.dataset.act);}));
+  $('slides').querySelectorAll('[data-slide]').forEach(el=>{if(el.tagName==='BUTTON')return;el.addEventListener('click',e=>{if(e.target.closest('button,input,label'))return;seek(el.dataset.slide);});});
+  if(open){const f=$('f-'+open.slide);if(f){f.querySelector('button.go').addEventListener('click',()=>submit(open.slide));f.querySelector('button.no').addEventListener('click',()=>{open=null;draw();});const first=f.querySelector('input');if(first)first.focus();}}
+  const help='Watch the film and answer each shot. Keep: use it. Reject: not this one; an AI stretch takes its place (a reason is optional). Trim: use it with its start or end moved. '
+    +'B-roll is marked in dark red: it is fine to reject. An alternative (dashed) is another clip for the same words: it opens when you reject its shot. Keep AI / Find footage: for a scene made only with AI.';
+  if(!d.accepted&&stage()==='options'){$('action').innerHTML='<span>'+esc(help)+' Your first answer approves these options.</span>';}   // design/98 D1
+  else if(d.accepted&&stage()==='master'&&d.of&&d.answered>=d.of){$('action').innerHTML='<span>All '+d.of+' answered. Tell the assistant to build the master film (vw master build); an answer can still be changed here until then.</span>';}
+  else if(d.accepted&&stage()==='master'){$('action').innerHTML='<span>Click a row to see it in the film. '+esc(help)+'</span>';}
+  else{$('action').innerHTML='<span>'+esc(d.run&&d.run.stage?('The run is at '+d.run.stage+'.'):'')+'</span>';}
 }
 function form(o){
   if(o.action==='REJECT'){return '<div class="form" id="f-'+esc(o.slide)+'"><input class="w" placeholder="Why? (optional)"><button class="go">Save</button><button class="no">Close</button></div>';}   // design/98 R1
-  return '<div class="form" id="f-'+esc(o.slide)+'"><label>shot</label><input class="f" type="number" min="1" value="1"><label>in ±frames</label><input class="f" type="number" value="0"><label>out ±frames</label><input class="f" type="number" value="0"><button class="go">Record edit</button><button class="no">Cancel</button><span class="ds">Source frames; a frame is 1/25 s on the timeline.</span></div>';
+  return '<div class="form" id="f-'+esc(o.slide)+'"><label>start ±frames</label><input class="f" type="number" value="0"><label>end ±frames</label><input class="f" type="number" value="0"><button class="go">Record trim</button><button class="no">Cancel</button><span class="ds">Source frames; a frame is 1/25 s. The scene must keep its length: trim one shot and lengthen another.</span></div>';
 }
 async function choose(slide,action){
   if(action==='REJECT'){open=null;const j=await send({action:'decide',slide,decision:'REJECT'});if(j){open={slide,action};draw();}return;}   // design/98 R1: recorded at once; a reason may follow
-  if(action==='KEEP_WITH_EDIT'){open={slide,action};draw();return;}
+  if(action==='TRIM'){open={slide,action};draw();return;}
   open=null;await send({action:'decide',slide,decision:action});
 }
 async function submit(slide){
   const f=$('f-'+slide); if(!f||!open)return;
   if(open.action==='REJECT'){const why=f.querySelector('input').value.trim();if(!why){open=null;draw();return;}await send({action:'decide',slide,decision:'REJECT',note:why});return;}
   const v=[...f.querySelectorAll('input')].map(i=>parseInt(i.value||'0',10)||0);
-  await send({action:'decide',slide,decision:'KEEP_WITH_EDIT',edit:'shot:'+Math.max(1,v[0])+',in:'+v[1]+',out:'+v[2]});
+  await send({action:'decide',slide,decision:'TRIM',edit:'in:'+v[0]+',out:'+v[1]});
 }
 async function send(body){
   msg('Recording #'+body.slide+'…',false,true);
-  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action).replace(/_/g,' ')+' recorded ('+j.decided+' of '+j.of+').'+(j.conflict?' '+j.conflict:''),!!j.conflict);if(j.view){data=j.view;draw();}else{await load();}return j;}
-  catch(err){msg(err.message,true);return null;}
+  try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action)+' recorded ('+j.decided+' of '+j.of+').'));
+    if(j.view){data=j.view;draw();}else{await load();}
+    if(waitingFor===body.slide){resume();}
+    return j;}
+  catch(err){msg(err.message,true);return null;}   // the film stays paused; nothing is recorded twice (one request at a time)
 }
-function seek(slide){const t=data&&data.cues?data.cues[slide]:null;if(t==null||!filmKey)return;const f=$('film');f.currentTime=t;f.play().catch(()=>{});}
+function seek(slide){const c=cue(slide);if(!c||!filmKey)return;const f=$('film');f.currentTime=c[0];passed.delete(slide);f.play().catch(()=>{});}
+function resume(){waitingFor=null;$('wait').hidden=true;const f=$('film');if(f.paused&&filmKey){f.play().catch(()=>{});}}
+$('goon').addEventListener('click',()=>{if(waitingFor){passed.add(waitingFor);}resume();});
 $('film').addEventListener('timeupdate',()=>{
-  if(!data||!data.cues)return;const t=$('film').currentTime;let best=null,bt=-1;
-  for(const [k,v] of Object.entries(data.cues)){if(v<=t+0.05&&v>bt){bt=v;best=k;}}
-  if(best!==current){current=best;$('slides').querySelectorAll('tr').forEach(tr=>tr.classList.toggle('cur',tr.dataset.slide===current));
-    const s=data.slides.find(x=>x.slide===current);$('now').textContent=s?('Now: #'+s.slide+' '+(s.scene||'')):'';}
+  if(!data||!data.cues)return;const f=$('film'), t=f.currentTime;let best=null,bt=-1;
+  for(const s of data.slides){const c=cue(s.slide);if(!c)continue;
+    if(s.type==='alternative'&&!s.needs_answer&&s.why&&/is kept/.test(s.why)&&t>=c[0]&&t<c[1]-0.1){f.currentTime=c[1];return;}   // design/127: a switched-off alternative is skipped
+    if(s.type!=='scene'&&c[0]<=t+0.05&&c[0]>bt){bt=c[0];best=s.slide;}}
+  if(best!==current){current=best;$('slides').querySelectorAll('.row').forEach(el=>el.classList.toggle('cur',el.dataset.slide===current));
+    const s=data.slides.find(x=>x.slide===current);$('now').textContent=s?('Now: '+s.title+(s.b_roll?' · B-roll':'')):'';}
+  if(!pauseOn||waitingFor||f.paused)return;
+  for(const s of data.slides){   // design/127: stop at the end of a shot that still needs an answer
+    const c=cue(s.slide);
+    if(!c||!s.needs_answer||s.answer||passed.has(s.slide)||s.type==='scene')continue;
+    if(t>=c[1]-0.15&&t<c[1]+0.5){f.pause();waitingFor=s.slide;$('waittext').textContent='Answer to continue: '+s.title+'.';$('wait').hidden=false;
+      const el=$('slides').querySelector('.row[data-slide="'+CSS.escape(s.slide)+'"]');if(el)el.scrollIntoView({block:'nearest'});break;}
+  }
 });
 load();
 })();

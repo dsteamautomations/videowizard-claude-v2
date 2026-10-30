@@ -266,7 +266,7 @@ def propose(conn, store, user, run, doc):
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
             **V.answer_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
-            'slides': [{k: s.get(k) for k in ('no', 'type', 'scene', 'backup_for', 'kind', 'question')} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
+            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of') if s.get(k) is not None} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
             **({'advice': round_advice(version)} if round_advice(version) else {}),
             'next': PROPOSE_NEXT}
 
@@ -284,9 +284,11 @@ def round_advice(version):
 
 
 def _slides(store, session, doc, entry):
-    """The version's stored slides. A version proposed before design/21 carries none: retired (design/125), refused."""
+    """The version's stored rows. A version proposed before design/21 carries none, one before design/127 is in the old form: both refused."""
     if 'slides' not in entry:
         raise Problem(409, 'NOT_ALLOWED', f"Version {entry['version']} has no stored slides (proposed before design/21): `vw options check` and `propose` again.")
+    if any(s.get('scheme') != 3 for s in entry['slides']):   # design/127: scenes and shots; a cut in the old form (letters, second choices) is proposed again
+        raise Problem(409, 'NOT_ALLOWED', f"Version {entry['version']} was proposed in the old form: the assistant proposes it again (`vw options propose`).")
     return entry['slides']
 
 
@@ -484,8 +486,9 @@ def record_options(conn, store, user, run, quote, approved_by=None):
                                         'summary': {'version': entry['version'], 'options_digest': entry['digest'], 'options': entry['options'], 'gaps': entry['gaps'], 'flags': len(entry['flags']),
                                                     'scenes': ({'version': session['scenes']['version'], 'digest': session['scenes']['digest'], 'quote': session['scenes']['quote'],
                                                                 'pauses': len(session['scenes']['document']['pauses'])} if session.get('scenes') else None),
-                                                    'slides': len(entry.get('slides') or []), 'decision_slides': sum(1 for s in entry.get('slides') or [] if s['type'] == 'decision'),
-                                                    'blank_slides': sum(1 for s in entry.get('slides') or [] if s['type'] == 'blank'), 'scene_summary': entry.get('scenes'),
+                                                    'slides': len(entry.get('slides') or []), 'shots': sum(1 for s in entry.get('slides') or [] if s['type'] == 'shot'),
+                                                    'ai_shots': sum(1 for s in entry.get('slides') or [] if s['type'] == 'ai'),
+                                                    'alternatives': sum(1 for s in entry.get('slides') or [] if s['type'] == 'alternative'), 'scene_summary': entry.get('scenes'),
                                                     'review_film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s')}, 'inspection_cost': inspection_cost,
                                                     **({'approved_by': approved_by} if approved_by else {})}})
     session['accepted'] = {'version': entry['version'], 'digest': entry['digest'], 'quote': quote, 'output': str(out['id']),
@@ -493,22 +496,19 @@ def record_options(conn, store, user, run, quote, approved_by=None):
     session['recorded']['options'] = str(out['id'])
     save_session(store, run, session)
     return {'output': str(out['id']), 'version': entry['version'],
-            'next': 'the operator answers every numbered slide: `vw master decide --slide N --action KEEP|REJECT|KEEP_WITH_EDIT` for scene slides, KEEP|DROP for decision slides'}
+            'next': 'the operator answers every shot on the review page (or `vw master decide --slide 1.2 --action KEEP|REJECT|TRIM`)'}
 
 
 # ---------- master ----------
 
 def slide_label(value):
-    """design/44 8.1: slides are named 2, 3 (options and backups) and 2A, 2B (inside an option); '#2b' and an integer are accepted."""
+    """design/127: a scene is 2, its shots 2.1, 2.2, an alternative of shot 2.2 is 2.2A1; '#2.2a1' is accepted."""
     return str(value).strip().lstrip('#').strip().upper()
 
 
-KEPT = ('KEEP', 'KEEP_WITH_EDIT')
-
-
-def _heads(sl):
-    """The scene and backup slides by option number: the cut each inner slide belongs to."""
-    return {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}
+ANSWERED = ('shot', 'alternative')   # design/127: the rows answered KEEP / REJECT (/ TRIM); the one AI shot of an all-AI scene too
+RETIRED_ACTIONS = {'KEEP_WITH_EDIT': 'KEEP_WITH_EDIT is retired: use TRIM on the shot (--edit "in:±frames,out:±frames").',
+                   'DROP': 'DROP is retired: answer the shot KEEP, REJECT or TRIM.'}
 
 
 def _action(decisions, slide):
@@ -516,89 +516,86 @@ def _action(decisions, slide):
     return d.get('action') if d else None
 
 
-def needs_answer(slide, heads, decisions):
-    """design/63 rule 2: a blank never needs an answer; a decision inside a REJECTed cut needs none (the build skips that cut). design/125 O1: a
-    scene whose footage is all decisions (parts_decide, scheme 2 only) is decided by them. Returns (needs, why)."""
-    if slide['type'] == 'blank':
+def _answerable(s):
+    return s['type'] in ANSWERED or (s['type'] == 'ai' and bool(s.get('ai_only')))
+
+
+def _of(slide, sl):
+    return next((x for x in sl if x['no'] == slide.get('of')), None)
+
+
+def needs_answer(slide, sl, decisions):
+    """design/127: a footage shot needs its answer; an AI shot inside a scene and a scene header never do; the one AI shot of an all-AI scene does;
+    an alternative only once its shot is rejected. Returns (needs, why)."""
+    if not _answerable(slide):
         return False, None
-    if slide.get('parts_decide'):
-        return False, 'decided by its parts: ' + ', '.join(slide.get('parts') or [])
-    if slide['type'] == 'decision':
-        head = heads.get(slide.get('option_number'))
-        if head and _action(decisions, head) == 'REJECT':
-            return False, f"inside rejected #{head['no']}"
+    if slide['type'] == 'alternative':
+        shot, act = _of(slide, sl), _action(decisions, _of(slide, sl))
+        if act is None:
+            return False, f"answer {shot['title']} first"
+        if act != 'REJECT':
+            return False, f"Shot {shot['no'].split('.')[1]} is kept: its alternatives are off"
+        other = next((x for x in sl if x['type'] == 'alternative' and x.get('of') == slide['of'] and x['no'] != slide['no'] and _action(decisions, x) == 'KEEP'), None)
+        if other:
+            return False, f"{other['title']} is kept: the other alternatives are off"
     return True, None
 
 
-def conflict_of(slide, sl, decisions):
-    """design/63 rule 1: a kept cut whose other cut of the same scene is also kept."""
-    if slide['type'] not in ('option', 'backup') or _action(decisions, slide) not in KEPT:
-        return None
-    other = next((s for s in sl if s['type'] in ('option', 'backup') and s['beat_id'] == slide['beat_id'] and s['no'] != slide['no'] and _action(decisions, s) in KEPT), None)
-    return f"#{other['no']} is also kept: reject it or this one" if other else None
 
 
 def missing_answers(sl, decisions):
-    """The slides the build still needs an answer for (design/63: not the ones inside a rejected cut)."""
-    heads = _heads(sl)
-    return [str(s['no']) for s in sl if needs_answer(s, heads, decisions)[0] and str(s['no']) not in decisions]
+    return [str(s['no']) for s in sl if needs_answer(s, sl, decisions)[0] and str(s['no']) not in decisions]
 
 
 def _slide_rows(sl, decisions):
-    """One row per slide with the answer so far; the slide's own lines travel too (design/62: the chat asks each slide with them, the page shows them)."""
+    """One row per scene, shot and alternative, with the answer so far (the page and the chat path show the same)."""
     rows = []
-    heads = _heads(sl)
-    scene_of = {n: h.get('scene') for n, h in heads.items()}   # the inner slides (decision, blank) belong to that scene
     for s in sl:
         lab = str(s['no'])
         d = decisions.get(lab)
-        needs, why = needs_answer(s, heads, decisions)
-        rows.append({'slide': lab, 'type': s['type'], 'scene': s.get('scene') or scene_of.get(s.get('option_number')), 'backup_for': s.get('backup_for'), 'kind': s.get('kind'), 'question': s.get('question'),
-                     **{k: s[k] for k in ('scheme', 'hint', 'parts_decide', 'parts', 'ai_only') if k in s},   # design/125 O1, O8
-                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'needs_answer': needs, 'why': why, 'conflict': conflict_of(s, sl, decisions),
+        needs, why = needs_answer(s, sl, decisions)
+        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'note', 'of', 'ai_only', 'intent')},
+                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows
 
 
 def _progress(rows):
-    seen, both = set(), []
-    for r in rows:
-        if r.get('conflict') and r['scene'] not in seen:
-            seen.add(r['scene'])
-            both.append({'scene': r['scene'], 'slides': [x['slide'] for x in rows if x.get('conflict') and x['scene'] == r['scene']]})
     return {'answered': sum(1 for r in rows if r['needs_answer'] and r['answer']), 'of': sum(1 for r in rows if r['needs_answer']),
-            'waiting': [r['slide'] for r in rows if r['needs_answer'] and not r['answer']], 'both_kept': both}
+            'waiting': [r['slide'] for r in rows if r['needs_answer'] and not r['answer']]}
 
 
 def slides_view(store, run):
-    """Every slide of the current version with the answer so far, and the labels still waiting (design/44 8.1)."""
+    """Every row of the current version with the answer so far, and the labels still waiting (design/44 8.1)."""
     session = session_of(store, run)
     doc, entry = current(store, session)
     rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {})
     return {'version': entry['version'], 'slides': rows, **_progress(rows)}
 
 
-SLIDE_LABEL = re.compile(r'^#(\S+) \|')
-
-
 def slide_cues(plan, fps):
-    """design/62: when each slide's card starts in the review film, in seconds, from the saved render plan. Slates and blank cards carry
-    their label in their first line ('#2B | …'); narration items take no screen time; a slate without a frame count is the standard slate."""
+    """design/127: when each row starts and ends in the review film, in seconds, from the saved render plan: every item names its row (`slide`);
+    a scene runs to the end of its last piece. Narration items take no screen time; a slate without a frame count is the standard slate."""
     cues, at = {}, 0
+    scene = None
     for it in plan.get('items') or []:
         kind = it.get('kind')
         if kind == 'narration':
             continue
         frames = int(it.get('frames') or SLATE_FRAMES) if kind == 'slate' else int(it.get('frames') or it.get('timeline_frames') or 0)
-        lines = it.get('lines') or []
-        m = SLIDE_LABEL.match(str(lines[0])) if lines and kind in ('slate', 'card') else None
-        if m and m.group(1) not in cues:
-            cues[m.group(1)] = round(at / fps, 2)
+        lab = it.get('slide')
+        if lab:
+            if '.' not in lab:
+                scene = lab
+            start = cues.get(lab, [round(at / fps, 2)])[0]
+            cues[lab] = [start, round((at + frames) / fps, 2)]
+            if scene and lab != scene and lab.split('.')[0] == scene:
+                cues[scene][1] = round((at + frames) / fps, 2)
         at += frames
     return cues
 
 
-_CUES = {}   # (plan key, version digest) → the slide cues: a rendered version's plan never changes
+_CUES = {}   # (plan key, version digest) → the row cues: a rendered version's plan never changes
 
 
 def _cues_for(store, run, entry):
@@ -613,10 +610,9 @@ def _cues_for(store, run, entry):
 
 
 def review_view(conn, store, run):
-    """design/62: what the review page shows. The current version's slides with their answers and lines, the review film of that version
-    when it is rendered (with the cue of every slide), the render state otherwise, and whether the options are recorded.
-    A read: one storage read for the session, no write; the render
-    state is refreshed from the jobs table in memory (design/63 addendum: the page reloads after every click)."""
+    """design/62: what the review page shows. The current version's rows with their answers and lines, the review film of that version
+    when it is rendered (with every row's start and end), the render state otherwise, and whether the options are recorded.
+    A read: one storage read for the session, no write; the render state is refreshed from the jobs table in memory."""
     try:
         session = session_of(store, run)
     except Problem:
@@ -624,7 +620,10 @@ def review_view(conn, store, run):
     if not session.get('current'):
         return {'state': 'no_version'}
     entry = next(v for v in session['versions'] if v['digest'] == session['current'])
-    sl = _slides(store, session, None, entry)
+    try:
+        sl = _slides(store, session, None, entry)
+    except Problem as e:   # design/127: a cut proposed in the old form is proposed again
+        return {'state': 'old_form', 'message': e.message}
     _refresh(conn, store, run, session)
     rows = _slide_rows(sl, session.get('decisions') or {})
     r = session['renders'].get('review') or {}
@@ -639,45 +638,55 @@ def review_view(conn, store, run):
             'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'approved_by': accepted.get('approved_by'), 'master_built': bool(session.get('master'))}
 
 
+def _refuse_answer(s, sl, decisions, lab, action, edit):
+    """design/127: the answer each row takes, refused by name otherwise."""
+    if action in RETIRED_ACTIONS:
+        fail(RETIRED_ACTIONS[action])
+    if action not in ('KEEP', 'REJECT', 'TRIM'):
+        fail('action must be KEEP, REJECT or TRIM')
+    if s['type'] == 'scene':
+        shots = [x['no'] for x in sl if x['number'] == s['number'] and x['type'] == 'shot']
+        fail(f"Scene {s['number']} is a header: decide its shots: {', '.join(shots)}." if shots else
+             f"Scene {s['number']} is a header: answer its shot {s['number']}.1 (Keep AI: KEEP, Find footage: REJECT).")
+    if s['type'] == 'ai' and not s.get('ai_only'):
+        fail(f"{s['title']} is made with AI inside the scene: it needs no answer.")
+    if s['type'] == 'ai' and action == 'TRIM':
+        fail(f"{s['title']} is made with AI: Keep AI (KEEP) or Find footage (REJECT).")
+    if action == 'TRIM' and s['type'] != 'shot':
+        fail(f"TRIM is for a footage shot; {s['title']} takes KEEP or REJECT.")
+    if action == 'TRIM' and not edit:
+        fail('TRIM needs --edit "in:±frames,out:±frames" (source frames; a frame is 1/25 s on the timeline).')
+    if s['type'] == 'alternative':
+        needs, why = needs_answer(s, sl, decisions)
+        if not needs:
+            fail(why + ': its alternatives open when it is rejected.' if why.startswith('answer') else why + '.')
+
+
 def decide(conn, store, user, run, slide_no, action, note, edit):
-    """design/21: the operator answers by slide. Scene and backup slides: KEEP, REJECT, KEEP_WITH_EDIT. Decision slides: KEEP or DROP.
-    design/98: the first answer approves the options (the options output recorded in the same call, once the review film is rendered); a
-    REJECT needs no reason."""
+    """design/127: the operator answers by row: a footage shot KEEP, REJECT or TRIM; the AI shot of an all-AI scene KEEP (Keep AI) or REJECT
+    (Find footage); an alternative KEEP or REJECT once its shot is rejected. design/98: the first answer approves the options (the options output
+    recorded in the same call, once the review film is rendered); a REJECT needs no reason."""
     session = session_of(store, run)
     doc, entry = current(store, session)
     sl = _slides(store, session, doc, entry)
     lab = slide_label(slide_no)
+    action = str(action or '').strip().upper()
     s = next((x for x in sl if str(x['no']).upper() == lab), None)
     if not s:
-        fail(f"No slide #{lab}; the review film has: " + ', '.join(f"#{x['no']}" for x in sl) + '.')
-    if s['type'] == 'blank':
-        fail(f'Slide #{lab} is a blank for AI video or animation; it needs no decision.')
-    if s['type'] == 'decision' and action not in ('KEEP', 'DROP'):
-        fail(f'Slide #{lab} is a decision: answer KEEP or DROP.')
-    if s['type'] != 'decision' and action not in ('KEEP', 'REJECT', 'KEEP_WITH_EDIT'):
-        fail('action must be KEEP, REJECT or KEEP_WITH_EDIT')
-    if s.get('parts_decide') and action != 'KEEP_WITH_EDIT':   # design/125 O1
-        fail(f"#{' and #'.join(s.get('parts') or [])} decide scene {s['number']}: answer them KEEP or DROP; slide #{lab} takes only a trim (KEEP_WITH_EDIT).")
-    if action == 'KEEP_WITH_EDIT' and not edit:
-        fail('KEEP_WITH_EDIT needs --edit "shot:N,in:±frames,out:±frames" (source frames; a frame is 1/25 s on the timeline).')
+        fail(f"No slide #{lab}: the labels are now " + ', '.join(f"{x['no']} ({x['title']})" for x in sl if _answerable(x)) + '.')
+    _refuse_answer(s, sl, session['decisions'], lab, action, edit)
     approved_now = not session.get('accepted')
     if approved_now:   # design/98 D2: the first answer approves these options, with what was answered
         record_options(conn, store, user, run, f'Approved by answering the review slides: first answer #{lab} {action}' + (f' — {note.strip()}' if str(note or '').strip() else ''),
                        {'how': 'first_answer', 'slide': lab})
         session = session_of(store, run)
-    stamp = {'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
-    if s['type'] == 'decision':
-        session['decisions'][lab] = {'action': action, 'type': 'decision', **stamp}
-        session['master'] = None
-        save_session(store, run, session)
-        return {'slide': lab, 'type': 'decision', 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank'),
-                **({'options_approved': True} if approved_now else {})}
-    session['decisions'][lab] = {'action': action, 'type': s['type'], 'option_number': s['option_number'], 'edit': edit, **stamp}
+    session['decisions'][lab] = {'action': action, 'type': s['type'], **({'edit': edit} if action == 'TRIM' else {}),
+                                 'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session['master'] = None
     save_session(store, run, session)
-    conflict = conflict_of(s, sl, session['decisions'])   # design/63 rule 1: said the moment the second Keep lands
-    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': len(session['decisions']), 'of': sum(1 for x in sl if x['type'] != 'blank'),
-            **({'conflict': conflict} if conflict else {}), **({'options_approved': True} if approved_now else {})}
+    progress = _progress(_slide_rows(sl, session['decisions']))
+    return {'slide': lab, 'type': s['type'], 'action': action, 'decided': progress['answered'], 'of': progress['of'],
+            **({'options_approved': True} if approved_now else {})}
 
 
 def add_rule(store, user, run, text, quote=''):
@@ -693,7 +702,7 @@ def add_rule(store, user, run, text, quote=''):
 
 
 def _parse_edit(edit):
-    out = {'shot': 1, 'in': 0, 'out': 0}
+    out = {'in': 0, 'out': 0}
     for part in str(edit).split(','):
         k, _, v = part.strip().partition(':')
         if k in out:
@@ -701,30 +710,26 @@ def _parse_edit(edit):
     return out
 
 
-def _apply_edit(option, edit, rows, tl_fps):
+def _trim(ev, edit, row, tl_fps, title):
+    """design/127: TRIM on one footage shot: its in and out moved by source frames, inside its usable window, its action peak and its hold."""
     e = _parse_edit(edit)
-    idx = e['shot'] - 1
-    if not 0 <= idx < len(option['events']):
-        fail(f"edit names shot {e['shot']} but option #{option['option_number']} has {len(option['events'])}")
-    ev = option['events'][idx]
-    if ev.get('blank'):
-        fail(f"edit names shot {e['shot']}, which is a blank; count only the real shots and blanks in the option's order")
-    row = rows[ev['sub_clip_id']]
     a, z = ev['source_in_frame'] + e['in'], ev['source_out_frame'] + e['out']
     if not (row['in_frame'] <= a < z <= row['out_frame']):
-        fail(f"edit leaves shot {e['shot']} outside its usable window {row['in_frame']}-{row['out_frame']}")
+        fail(f"the trim leaves {title} outside its usable window {row['in_frame']}-{row['out_frame']}")
     peak = row.get('action_peak')
     if peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
-        fail(f"edit drops the action peak {peak['in_frame']}-{peak['out_frame']} of shot {e['shot']}")
+        fail(f"the trim drops the action peak {peak['in_frame']}-{peak['out_frame']} of {title}")
     if (z - a) / Fraction(row['source_fps']) < row['min_hold_s']:
-        fail(f"edit makes shot {e['shot']} shorter than its hold {row['min_hold_s']} s")
+        fail(f"the trim makes {title} shorter than its hold {row['min_hold_s']} s")
     ev['source_in_frame'], ev['source_out_frame'] = a, z
     ev['timeline_frames'] = int(round((z - a) * Fraction(str(tl_fps)) / Fraction(row['source_fps'])))
     ev['edited'] = edit
-    return option
+    return ev
 
 
 def build_master(conn, store, user, run):
+    """design/127: per shot: KEEP the shot, TRIM it, or REJECT it for its kept alternative, else an AI stretch with its words; adjacent AI
+    stretches merge; an all-AI scene answered Find footage goes back to the assistant."""
     session = session_of(store, run)
     if not session.get('accepted'):
         raise Problem(409, 'NOT_ALLOWED', 'Record the options stage first.')
@@ -734,61 +739,54 @@ def build_master(conn, store, user, run):
     beats = pk['beats']
     decisions = session['decisions']
     sl = _slides(store, session, doc, entry)
-    missing = [f'#{lab}' for lab in missing_answers(sl, decisions)]   # design/63: slides inside a rejected cut need none
+    missing = [f'#{lab}' for lab in missing_answers(sl, decisions)]
     if missing:
-        fail(f"Every numbered slide needs an answer; missing: {', '.join(missing)}")
-    head = {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}
-    inner = {(s['option_number'], s['event_index']): s for s in sl if s['type'] == 'decision'}
+        fail(f"Every shot needs an answer; missing: {', '.join(missing)}")
+    row_of = {(s['option_number'], s['type'], s.get('event_index'), s.get('alt_index')): s for s in sl}
     fps = TIMELINE['fps']
     kept = {}
     for o in deepcopy(doc['options']):
-        h = head[o['option_number']]
-        d = decisions.get(str(h['no'])) or {'action': 'KEEP'}   # design/125 O1: a scene decided by its parts needs no answer of its own
-        if d['action'] == 'REJECT' or (h.get('parts_decide') and all(decisions.get(p, {}).get('action') == 'DROP' for p in h.get('parts') or [])):
-            continue
-        if d['action'] == 'KEEP_WITH_EDIT':
-            o = _apply_edit(o, d['edit'], rows, TIMELINE['fps'])
-            total = sum(ev['timeline_frames'] for ev in o['events'])
-            target = next(b['target_beat_frames'] for b in beats if b['beat_id'] == o['beat_id'])
-            if total != target:
-                fail(f"option #{o['option_number']} after the edit is {total} frames; the beat needs {target}. Trim one shot and extend another in the same option.")
-        if o['beat_id'] in kept:
-            fail(f"{o['beat_id']}: both options kept (#{head[kept[o['beat_id']]['option_number']]['no']} and #{head[o['option_number']]['no']}); keep one.")
-        # design/21: a dropped placement becomes a blank; a kept reuse may repeat its clip; adjacent blanks merge
+        n_scene = row_of[(o['option_number'], 'scene', None, None)]['number']
+        events = []
         for i, ev in enumerate(o['events']):
-            ds = inner.get((o['option_number'], i))
-            if ds and decisions[str(ds['no'])]['action'] == 'DROP':
-                o['events'][i] = {'blank': True, 'timeline_frames': ev['timeline_frames'], 'intent': f"in place of dropped #{ds['no']}: {ds['question']}", 'dropped_from': ds['no']}
-            elif ds and ds.get('kind') == 'reuse':
+            if ev.get('blank'):
+                s = row_of[(o['option_number'], 'ai', i, None)]
+                if s.get('ai_only') and _action(decisions, s) == 'REJECT':
+                    fail(f"Scene {n_scene}: the operator asked to find footage (Find footage on {s['no']}): propose the scene again with footage "
+                         "(`vw options propose`), or the operator answers Keep AI.")
+                events.append(ev)
+                continue
+            s = row_of[(o['option_number'], 'shot', i, None)]
+            act = _action(decisions, s)
+            if act == 'TRIM':
+                ev = _trim(ev, decisions[s['no']]['edit'], rows[ev['sub_clip_id']], fps, s['title'])
+            if act == 'REJECT':
+                alt = next((row_of[(o['option_number'], 'alternative', i, m)] for m in range(len(ev.get('alternatives') or []))
+                            if _action(decisions, row_of[(o['option_number'], 'alternative', i, m)]) == 'KEEP'), None)
+                if alt:
+                    ev = {**ev['alternatives'][alt['alt_index']], 'timeline_frames': ev['timeline_frames'], 'from_alternative': alt['no']}
+                else:
+                    ev = {'blank': True, 'timeline_frames': ev['timeline_frames'], 'intent': f"in place of rejected {s['title']}: {s.get('words') or ''}".strip(),
+                          'rejected': s['no'], 'title': s['title']}
+            elif (ev.get('note') or {}).get('kind') == 'reuse':
                 ev['reuse_approved'] = True
+            events.append(ev)
+        total = sum(ev['timeline_frames'] for ev in events)
+        target = next(b['target_beat_frames'] for b in beats if b['beat_id'] == o['beat_id'])
+        if total != target:
+            fail(f"Scene {n_scene} after the trim is {total} frames; it needs {target}. Trim one shot and extend another in the same scene.")
         merged = []
-        for ev in o['events']:
+        for ev in events:
             if ev.get('blank') and merged and merged[-1].get('blank'):
-                merged[-1] = {**merged[-1], 'timeline_frames': merged[-1]['timeline_frames'] + ev['timeline_frames'], 'intent': f"{merged[-1]['intent']}; {ev['intent']}"}
+                merged[-1] = {**merged[-1], 'timeline_frames': merged[-1]['timeline_frames'] + ev['timeline_frames'], 'intent': f"{merged[-1]['intent']}; {ev['intent']}",
+                              'rejected': merged[-1].get('rejected') or ev.get('rejected'), 'title': merged[-1].get('title') or ev.get('title')}
             else:
                 merged.append(ev)
         for ev in merged:
-            if ev.get('blank') and ev.get('dropped_from') and ev['timeline_frames'] < V.MIN_BLANK_S * fps:
-                fail(f"Dropping #{ev['dropped_from']} leaves a blank of {ev['timeline_frames'] / fps:.1f} s, under {V.MIN_BLANK_S} s: keep it, or keep the scene with an edit that lengthens a neighbouring shot.")
+            if ev.get('blank') and ev.get('rejected') and ev['timeline_frames'] < V.MIN_BLANK_S * fps:
+                fail(f"Rejecting {ev['title']} leaves {ev['timeline_frames'] / fps:.1f} s of AI between two shots: keep it, trim a neighbour, or reject a neighbour too.")
         o['events'] = merged
         kept[o['beat_id']] = o
-    # collision audit: a sub-clip in two kept options → swap in the beat's other option if it is clean, else refuse
-    used = {}
-    for bid, o in list(kept.items()):
-        for ev in o['events']:
-            if not ev.get('blank') and not ev.get('reuse_approved') and bid not in used.get(ev['sub_clip_id'], []):   # design/125 O7: one scene, one use
-                used.setdefault(ev['sub_clip_id'], []).append(bid)
-    swaps = []
-    for sid, bids in used.items():
-        if len(bids) > 1:
-            for bid in bids[1:]:
-                alt = next((x for x in doc['options'] if x['beat_id'] == bid and x['option_number'] != kept[bid]['option_number']), None)
-                alt_sids = {e.get('sub_clip_id') for e in (alt or {}).get('events', []) if not e.get('blank')}
-                if alt and not (alt_sids & set(used)):
-                    swaps.append({'beat_id': bid, 'from': head[kept[bid]['option_number']]['no'], 'to': head[alt['option_number']]['no'], 'because': sid})
-                    kept[bid] = deepcopy(alt)
-                else:
-                    fail(f"collision: {sid} is in kept options for {bids}; no unused alternative for {bid}. Reject one of them.")
     words = (pk.get('narration') or {}).get('words') or []
 
     def spoken(a, z):
@@ -801,14 +799,13 @@ def build_master(conn, store, user, run):
         if not o:
             n = b['target_beat_frames']
             events.append({'kind': 'gap', 'beat_id': b['beat_id'], 'gap_id': b['beat_id'], 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n})
-            why = 'no kept option' if any(x['beat_id'] == b['beat_id'] for x in doc['options']) else next((g.get('reason') for g in doc.get('gaps') or [] if g['beat_id'] == b['beat_id']), 'zero coverage')
-            gaps.append({'shot_id': b['beat_id'], 'start_frame': cursor, 'end_frame': cursor + n, 'passage_ids': passages, 'reason': f"{why} | narration: {spoken(cursor, cursor + n)}"})
+            gaps.append({'shot_id': b['beat_id'], 'start_frame': cursor, 'end_frame': cursor + n, 'passage_ids': passages, 'reason': f"no option | narration: {spoken(cursor, cursor + n)}"})
             cursor += n
             continue
         k = 0
         for ev in o['events']:
             n = ev['timeline_frames']
-            if ev.get('blank'):   # design/21: a blank inside a scene is its own gap for the visuals stage
+            if ev.get('blank'):   # design/21: a stretch of AI inside a scene is its own gap for the visuals stage
                 k += 1
                 gid = f"{b['beat_id']}-B{k}"
                 events.append({'kind': 'gap', 'beat_id': b['beat_id'], 'gap_id': gid, 'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'timeline_frames': n})
@@ -817,10 +814,11 @@ def build_master(conn, store, user, run):
                 continue
             events.append({'kind': 'event', 'beat_id': b['beat_id'], 'approved_from_option': o['option_number'], **{k2: ev[k2] for k2 in ('sub_clip_id', 'source_in_frame', 'source_out_frame', 'timeline_frames')},
                            'crop': ev.get('crop', 'full'), 'hold_last_frame': bool(ev.get('hold_last_frame')), 'a2_intervals': ev.get('a2_intervals') or [], 'marker': ev.get('marker'),
-                           'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'edited': ev.get('edited'), 'reuse_approved': bool(ev.get('reuse_approved'))})
+                           'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'edited': ev.get('edited'), 'reuse_approved': bool(ev.get('reuse_approved')),
+                           **({'from_alternative': ev['from_alternative']} if ev.get('from_alternative') else {})})
             cursor += n
     plan = {'contract': CONTRACT_MASTER, 'run_id': str(run['id']), 'options_version': entry['version'], 'options_digest': entry['digest'], 'timeline': TIMELINE, 'events': events,
-            'gaps': gaps, 'duration_frames': cursor, 'swaps': swaps, 'decisions': decisions, 'extra_rules': session['extra_rules'],
+            'gaps': gaps, 'duration_frames': cursor, 'decisions': decisions, 'extra_rules': session['extra_rules'],
             'sfx_cues': [{'sub_clip_id': r['sub_clip_id'], **c} for r in pk['sub_clips'] if any(e.get('sub_clip_id') == r['sub_clip_id'] for e in events) for c in r['sfx_cues']],
             'finishing_preview': _finishing(pk, events)}
     result = V.validate_master(plan, pk)
@@ -831,7 +829,7 @@ def build_master(conn, store, user, run):
     session['master'] = {'version': version, 'digest': digest(plan), 'file': saved, 'plan': plan, 'gaps': [g['shot_id'] for g in gaps], 'events': len([e for e in events if e['kind'] == 'event']), 'flags': result['flags']}
     session['renders'].pop('master', None)
     save_session(store, run, session)
-    return {'version': version, 'events': session['master']['events'], 'gaps': session['master']['gaps'], 'swaps': swaps, 'flags': result['flags'], 'duration_frames': cursor,
+    return {'version': version, 'events': session['master']['events'], 'gaps': session['master']['gaps'], 'flags': result['flags'], 'duration_frames': cursor,
             'next': '`vw master render`, fetch, let the operator watch, then `vw master record --quote`'}
 
 
@@ -884,7 +882,7 @@ def record_master(conn, store, user, run, quote):
         conn.execute("insert into vw2_client_rules(client_id, rule, source_run) values (%s,%s,%s)", (run.get('client_id') or '', r['rule'], run['code']))
         added += 1
     summary = {'version': m['version'], 'plan_digest': m['digest'], 'fps': str(TIMELINE['fps']), 'resolution': [TIMELINE['width'], TIMELINE['height']], 'duration_frames': plan['duration_frames'],
-               'gaps': plan['gaps'], 'units': {'visuals': [g['shot_id'] for g in plan['gaps']]}, 'events': m['events'], 'swaps': plan['swaps'], 'learned_rules_added': added,
+               'gaps': plan['gaps'], 'units': {'visuals': [g['shot_id'] for g in plan['gaps']]}, 'events': m['events'], 'learned_rules_added': added,
                'film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s'), 'mix': (film.get('record') or {}).get('mix')}}
     out = core.output(conn, user, run, {'stage': 'master', 'files': files, 'accepted_quote': quote, 'summary': summary})
     first = _first_cut_output(conn, user, run, out['id'], files[1], summary, quote)

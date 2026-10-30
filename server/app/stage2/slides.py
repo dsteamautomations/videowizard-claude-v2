@@ -1,16 +1,16 @@
-"""design/21: the review film's numbered slides and its item sequence.
+"""design/21, design/127: the review film's rows and its item sequence, by scene and shot (scheme 3).
 
-Labels (design/125 O2, O3; scheme 2): a slide's number is its scene's number (Scene 5 is #5); a second version of a scene is "#5-2",
-"second choice"; the blanks and decision slides inside a cut take its number and a letter in event order (#5A, #5-2A). Slides stored
-before design/125 (no scheme) keep their running numbers and "BACKUP for #N". Slide types: option (a scene's first cut), backup (its
-second choice), decision (a placement that needs the operator's keep/drop: B-roll, reuse, check by eye, poor quality, an unsure join),
-blank (a stretch left for AI video or animation). An AI-only scene (P13) is an option made of one blank: its own slide, no inner blank.
-Option, backup and decision slides are silent; a blank is a captioned card under the continuing narration."""
+A scene is a header (no answer): "Scene 1", its title, its total time, its shots. Every event of the scene's cut is a shot, numbered in play order
+(1.1, 1.2): a footage shot (direct or B-roll) is answered KEEP, REJECT or TRIM; an AI shot inside a scene needs nothing; the one AI shot of an
+all-AI scene is answered Keep AI (KEEP) or Find footage (REJECT). An alternative belongs to a footage shot (1.2A1: the same words, the same
+length) and opens only when its shot is rejected. A doubtful shot carries a note {kind, question}, shown with it. In the film, a card comes
+only before a scene and before an alternative; footage carries a strip with its label and the words spoken; an AI shot is a card with its words."""
 import textwrap
 import unicodedata
 
-DECISION_KINDS = ('b_roll', 'reuse', 'check_by_eye', 'poor_quality', 'join', 'other')
-WRAP = 58   # characters per line at the slide font size
+NOTE_KINDS = ('reuse', 'check_by_eye', 'poor_quality', 'join', 'other')
+WRAP = 58   # characters per line at the card font size
+COLOURS = ('#1D9E75', '#7F77DD', '#D85A30', '#378ADD', '#BA7517', '#D4537E', '#639922', '#5F5E5A')   # one per scene, in turn
 
 
 def ascii_text(text):
@@ -25,131 +25,130 @@ def _frames(ev):
     return ev.get('timeline_frames', ev.get('_timeline_frames', 0))
 
 
-def letter(n):
-    """1 → A, 26 → Z, 27 → AA."""
-    out = ''
-    while n > 0:
-        n, r = divmod(n - 1, 26)
-        out = chr(65 + r) + out
-    return out
-
-
 def clip_name(row, cards):
     card = cards.get(row['clip_id']) or {}
     return ascii_text((card.get('descriptive_name') or row['clip_name']).replace('_', ' '))
 
 
+def scene_colour(n):
+    return COLOURS[(n - 1) % len(COLOURS)]
+
+
+def spoken(words, a, z):
+    """The narration words whose start falls inside [a, z) timeline frames."""
+    return ' '.join(str(w['text']) for w in words if a <= w['start_frame'] < z)
+
+
+def said_lines(said, most=6):
+    """The words on a card: wrapped, at most six lines (a long AI scene's words would run off the card), the last cut with "..."."""
+    lines = wrap(f'"{said}"') if said else []
+    return lines if len(lines) <= most else lines[:most - 1] + [lines[most - 1][:WRAP - 3] + '...']
+
+
+def _seconds(frames, fps):
+    return f'{frames / fps:.1f} s'
+
+
 def slides(doc, pk, fps):
-    """design/125 O1–O3, O8: every slide carries scheme 2 and a hint; a scene slide counts its sure shots (footage without a decision); when
-    every footage piece is a decision and the scene has no second choice, its parts decide it (parts_decide)."""
     beats = {b['beat_id']: (i + 1, b) for i, b in enumerate(pk['beats'])}
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     cards = {c['clip_id']: c for c in pk.get('cards') or []}
-    versions = {}
-    for o in doc['options']:
-        versions[o['beat_id']] = versions.get(o['beat_id'], 0) + 1
-    out, first, seen = [], {}, {}
+    words = (pk.get('narration') or {}).get('words') or []
+    out = []
     for o in doc['options']:
         n, b = beats[o['beat_id']]
-        label = ascii_text(f"Scene {n}: {b.get('title') or b['beat_id']}")
+        title = ascii_text(b.get('title') or b['beat_id'])
         events = o.get('events') or []
         frames = sum(_frames(ev) for ev in events)
-        shots = sum(1 for ev in events if not ev.get('blank'))
-        sure = sum(1 for ev in events if not ev.get('blank') and not ev.get('decision'))
-        seen[o['beat_id']] = seen.get(o['beat_id'], 0) + 1
-        no = str(n) if seen[o['beat_id']] == 1 else f"{n}-{seen[o['beat_id']]}"
-        backup_for = first.get(o['beat_id'])
-        ai_only = not shots
-        parts_decide = bool(shots) and not sure and versions[o['beat_id']] == 1
-        head = (f"#{no} | {label} | " + ('second choice | ' if backup_for else '') + ('made with AI | ' if ai_only else '') + f"{frames / fps:.1f} s"
-                + ('' if ai_only else f" | {shots} shot{'s' if shots != 1 else ''}"))
-        clips = [f"blank {_frames(ev) / fps:.1f} s" if ev.get('blank') else f"{clip_name(rows[ev['sub_clip_id']], cards)} ({_frames(ev) / fps:.1f} s)"
-                 for ev in events if ev.get('blank') or ev.get('sub_clip_id') in rows]
-        body = ['For AI video or animation'] + wrap(' '.join(str(ev.get('intent') or '') for ev in events)) if ai_only else wrap('Clips: ' + ' + '.join(clips))
-        if backup_for:
-            hint = f"another way to cut scene {n}; keep only one of {backup_for} and {no}"
-        elif ai_only:
-            hint = 'the whole scene made with AI; Keep leaves it to AI, Reject sends it back to look for footage'
-        elif parts_decide:
-            hint = 'decided by its parts below; here only a trim (Trim a shot)'
-        else:
-            hint = 'the whole scene as cut; Keep uses it, Reject makes this scene with AI, Trim a shot changes one shot'
-        top = {'no': no, 'number': n, 'scheme': 2, 'type': 'backup' if backup_for else 'option', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'scene': label,
-               'frames': frames, 'shots': shots, 'sure_shots': sure, 'backup_for': backup_for, 'hint': hint, 'background': 'blue' if backup_for else 'black',
-               **({'ai_only': True} if ai_only else {}), **({'parts_decide': True} if parts_decide else {}), 'lines': [head] + body}
-        out.append(top)
-        first.setdefault(o['beat_id'], no)
-        if ai_only:
-            continue
-        inner, labels = 0, []
-        for i, ev in enumerate(events):
+        ai = sum(1 for ev in events if ev.get('blank'))
+        footage = len(events) - ai
+        ai_only = not footage
+        base = {'number': n, 'scheme': 3, 'beat_id': o['beat_id'], 'option_number': o['option_number'], 'colour': scene_colour(n), 'scene': f'Scene {n}: {title}'}
+        out.append({**base, 'no': str(n), 'type': 'scene', 'title': f'Scene {n}', 'frames': frames, 'shots': footage, 'ai_shots': ai,
+                    'hint': 'the scene; its shots below are answered one by one',
+                    'lines': [f'Scene {n}', title, f'Total time: {_seconds(frames, fps)}',
+                              f'Shots: {len(events)} ' + ('(made with AI)' if ai_only else f'({ai} made with AI, {footage} footage)' if ai else '(footage)')]})
+        at = b['timeline_start_frame']
+        for i, ev in enumerate(events, 1):
+            k = _frames(ev)
+            said = ascii_text(spoken(words, at, at + k))
+            label, name = f'{n}.{i}', f'Scene {n} · Shot {i}'
+            common = {**base, 'event_index': i - 1, 'frames': k, 'at_frame': at, 'words': said}
+            at += k
             if ev.get('blank'):
-                inner += 1
-                lab = f'{no}{letter(inner)}'
-                out.append({'no': lab, 'number': n, 'scheme': 2, 'type': 'blank', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'event_index': i, 'frames': _frames(ev),
-                            'intent': ev.get('intent', ''), 'hint': 'made with AI later; nothing to answer',
-                            'lines': [f"#{lab} | BLANK | {label} | {_frames(ev) / fps:.1f} s", 'For AI video or animation'] + wrap(ev.get('intent', ''))})
-            elif ev.get('decision'):
-                inner += 1
-                lab = f'{no}{letter(inner)}'
-                labels.append(lab)
-                d = ev['decision']
-                name = clip_name(rows[ev['sub_clip_id']], cards) if ev.get('sub_clip_id') in rows else ev.get('sub_clip_id', '')
-                out.append({'no': lab, 'number': n, 'scheme': 2, 'type': 'decision', 'option_number': o['option_number'], 'beat_id': o['beat_id'], 'event_index': i, 'frames': _frames(ev),
-                            'kind': d.get('kind'), 'question': d.get('question', ''), 'hint': 'one doubtful piece; Keep uses it, Drop leaves an AI stretch in its place',
-                            'lines': [f"#{lab} | DECISION | {label}"] + wrap(d.get('question', '')) + [ascii_text(f"Keep or drop: {name} ({_frames(ev) / fps:.1f} s)")]})
-        if parts_decide:
-            top['parts'] = labels   # O1: the decisions that decide this scene, named in its refusal
+                out.append({**common, 'no': label, 'type': 'ai', 'title': name, 'intent': ev.get('intent', ''),
+                            **({'ai_only': True, 'hint': 'the whole scene made with AI; Keep AI leaves it to AI, Find footage sends it back to look for footage'}
+                               if ai_only else {'hint': 'made with AI later; nothing to answer'}),
+                            'lines': [f'{name} · made with AI', f'Time: {_seconds(k, fps)}'] + said_lines(said)
+                            + wrap('For AI: ' + str(ev.get('intent', '')))})
+                continue
+            row = rows.get(ev.get('sub_clip_id')) or {'clip_id': '', 'clip_name': ev.get('sub_clip_id', '')}
+            b_roll = ev.get('match') == 'b_roll'
+            what = clip_name(row, cards)
+            out.append({**common, 'no': label, 'type': 'shot', 'title': name, 'clip': what, 'b_roll': b_roll,
+                        'note': ev.get('note') if isinstance(ev.get('note'), dict) else None,
+                        'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it',
+                        'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said)})
+            for m, alt in enumerate(ev.get('alternatives') or [], 1):
+                arow = rows.get(alt.get('sub_clip_id')) or {'clip_id': '', 'clip_name': alt.get('sub_clip_id', '')}
+                aname = f'{name} · Alternative {m}'
+                out.append({**common, 'no': f'{label}A{m}', 'type': 'alternative', 'title': aname, 'of': label, 'alt_index': m - 1, 'clip': clip_name(arow, cards),
+                            'b_roll': alt.get('match') == 'b_roll', 'hint': f'another clip for Shot {i}; open when Shot {i} is rejected; keep at most one',
+                            'lines': [aname, clip_name(arow, cards), f'Time: {_seconds(k, fps)}', f'Words: the same as Shot {i}']})
     return out
 
 
 def review_items(doc, pk, sl, event_items, fps):
-    """The review film: each option's slide, then its narration and pictures; a decision slide splits the narration so the
-    words stay with their pictures; a blank is a card the narration runs under (an AI-only scene's one blank shows its scene slide's lines).
-    design/125 O8: a second choice's slide card carries its blue background."""
+    """The review film: each scene's card, then its narration and pictures. Footage carries its strip (label, words, B-roll, colour); an AI
+    shot is a card under the continuing narration; after a shot with alternatives, each alternative has its card and the shot's narration again.
+    Every item names its row (`slide`) for the page's cues."""
     beats = {b['beat_id']: b for b in pk['beats']}
-    head = {s['option_number']: s for s in sl if s['type'] in ('option', 'backup')}
-    inner = {(s['option_number'], s['event_index']): s for s in sl if s['type'] in ('blank', 'decision')}
+    by_key = {(s['option_number'], s['type'], s.get('event_index'), s.get('alt_index')): s for s in sl}
     items = []
+
+    def strip(s):
+        return {'label': s['title'], 'words': s.get('words', ''), 'b_roll': bool(s.get('b_roll')), 'colour': s['colour']}
+
     for o in doc['options']:
-        b = beats[o['beat_id']]
-        top = head[o['option_number']]
-        items.append({'kind': 'slate', 'lines': top['lines'], **({'background': top['background']} if top.get('background', 'black') != 'black' else {})})
-        seg_start = cursor = b['timeline_start_frame']
+        head = by_key[(o['option_number'], 'scene', None, None)]
+        items.append({'kind': 'slate', 'lines': head['lines'], 'colour': head['colour'], 'slide': head['no']})
+        seg_start = cursor = beats[o['beat_id']]['timeline_start_frame']
         pending = []
         for i, ev in enumerate(o['events']):
-            s = inner.get((o['option_number'], i))
-            if s and s['type'] == 'decision':
-                if cursor > seg_start:
-                    items += [{'kind': 'narration', 'start_s': seg_start / fps, 'end_s': cursor / fps}] + pending
-                pending, seg_start = [], cursor
-                items.append({'kind': 'slate', 'lines': s['lines']})
+            n = _frames(ev)
+            cursor += n
             if ev.get('blank'):
-                pending.append({'kind': 'card', 'frames': _frames(ev), 'lines': s['lines'] if s else top['lines']})
-            else:
-                label = f"#{s['no']} DECISION" if s and s['type'] == 'decision' else f"#{head[o['option_number']]['no']}"
-                pending += [{**it, 'label': label} for it in event_items([ev])]
-            cursor += _frames(ev)
-        items += [{'kind': 'narration', 'start_s': seg_start / fps, 'end_s': cursor / fps}] + pending
+                s = by_key[(o['option_number'], 'ai', i, None)]
+                pending.append({'kind': 'card', 'frames': n, 'lines': s['lines'], 'colour': s['colour'], 'slide': s['no']})
+                continue
+            s = by_key[(o['option_number'], 'shot', i, None)]
+            pending += [{**it, 'strip': strip(s), 'slide': s['no']} for it in event_items([ev])]
+            if ev.get('alternatives'):   # the shot's words, then each alternative with its card and the same words again
+                items += [{'kind': 'narration', 'start_s': seg_start / fps, 'end_s': cursor / fps}] + pending
+                pending, seg_start = [], cursor
+                for m, alt in enumerate(ev['alternatives']):
+                    a = by_key[(o['option_number'], 'alternative', i, m)]
+                    items += [{'kind': 'slate', 'lines': a['lines'], 'colour': a['colour'], 'slide': a['no']},
+                              {'kind': 'narration', 'start_s': (cursor - n) / fps, 'end_s': cursor / fps}]
+                    items += [{**it, 'strip': strip(a), 'slide': a['no']} for it in event_items([{**alt, 'timeline_frames': n}])]
+        if cursor > seg_start:
+            items += [{'kind': 'narration', 'start_s': seg_start / fps, 'end_s': cursor / fps}] + pending
     return items
 
 
 def scene_summary(doc, pk, fps):
-    """Per scene: seconds of real footage, seconds of blanks, decisions waiting (first option of each scene)."""
+    """Per scene: seconds of real footage, of B-roll and of AI, and the shots carrying a note (the scene's cut)."""
     out = []
-    by_beat = {}
-    for o in doc['options']:
-        by_beat.setdefault(o['beat_id'], o)
+    by_beat = {o['beat_id']: o for o in doc['options']}
     for i, b in enumerate(pk['beats'], 1):
         o = by_beat.get(b['beat_id'])
-        total = b['target_beat_frames']
         if not o:
-            out.append({'scene': i, 'beat_id': b['beat_id'], 'title': b.get('title'), 'real_s': 0.0, 'blank_s': round(total / fps, 2), 'decisions': 0,
-                        'note': 'no option'})
+            out.append({'scene': i, 'beat_id': b['beat_id'], 'title': b.get('title'), 'real_s': 0.0, 'b_roll_s': 0.0, 'blank_s': round(b['target_beat_frames'] / fps, 2),
+                        'notes': 0, 'note': 'no option'})
             continue
-        real = sum(_frames(ev) for ev in o['events'] if not ev.get('blank') and not ev.get('decision'))
-        dec = [ev for ev in o['events'] if ev.get('decision')]
-        out.append({'scene': i, 'beat_id': b['beat_id'], 'title': b.get('title'), 'real_s': round(real / fps, 2),
-                    'blank_s': round(sum(_frames(ev) for ev in o['events'] if ev.get('blank')) / fps, 2),
-                    'decision_s': round(sum(_frames(ev) for ev in dec) / fps, 2), 'decisions': len(dec)})
+        evs = o['events']
+        secs = lambda pick: round(sum(_frames(ev) for ev in evs if pick(ev)) / fps, 2)
+        out.append({'scene': i, 'beat_id': b['beat_id'], 'title': b.get('title'), 'real_s': secs(lambda e: not e.get('blank') and e.get('match') != 'b_roll'),
+                    'b_roll_s': secs(lambda e: e.get('match') == 'b_roll'), 'blank_s': secs(lambda e: e.get('blank')),
+                    'notes': sum(1 for ev in evs if ev.get('note')), 'alternatives': sum(len(ev.get('alternatives') or []) for ev in evs)})
     return out

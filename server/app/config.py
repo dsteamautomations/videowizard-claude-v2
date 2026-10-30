@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.76.0'
+    SERVER_VERSION: str = '0.77.0'
     GEMINI_IMAGE_MODEL: str = 'gemini-3-pro-image'   # design/120: Nano Banana Pro as Google's docs name it; SK's exact id goes in server/.env (VW2_GEMINI_IMAGE_MODEL)
     GEMINI_IMAGE_SIZE: str = '2K'                     # design/120: 1K, 2K or 4K (uppercase K)
     GEMINI_IMAGE_USD: float = 0.134                   # design/120: Google's price per 1K/2K picture, 28 Oct 2026

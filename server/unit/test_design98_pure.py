@@ -41,32 +41,32 @@ def saved(store):
 
 def test_the_first_answer_records_the_options_and_the_answer_in_one_call(recorded):
     store = at_options()
-    out = S.decide(FakeConn({}), store, USER, RUN, '1', 'KEEP', '', None)
+    out = S.decide(FakeConn({}), store, USER, RUN, '1.1', 'KEEP', '', None)
     s = saved(store)
-    assert out['action'] == 'KEEP' and s['decisions']['1']['action'] == 'KEEP'
+    assert out['action'] == 'KEEP' and s['decisions']['1.1']['action'] == 'KEEP'
     assert len(recorded) == 1 and recorded[0]['stage'] == 'options'
-    assert recorded[0]['accepted_quote'] == 'Approved by answering the review slides: first answer #1 KEEP'
-    assert recorded[0]['summary']['approved_by'] == {'how': 'first_answer', 'slide': '1'}
-    assert s['accepted']['digest'] == 'd1' and s['accepted']['approved_by']['slide'] == '1'
-    S.decide(FakeConn({}), store, USER, RUN, '2', 'REJECT', 'too dark', None)
+    assert recorded[0]['accepted_quote'] == 'Approved by answering the review slides: first answer #1.1 KEEP'
+    assert recorded[0]['summary']['approved_by'] == {'how': 'first_answer', 'slide': '1.1'}
+    assert s['accepted']['digest'] == 'd1' and s['accepted']['approved_by']['slide'] == '1.1'
+    S.decide(FakeConn({}), store, USER, RUN, '2.1', 'REJECT', 'too dark', None)
     assert len(recorded) == 1   # a second answer does not record the options again
 
 
 def test_the_first_answers_note_goes_into_the_approval(recorded):
     store = at_options()
-    S.decide(FakeConn({}), store, USER, RUN, '2', 'REJECT', 'the first cut is better', None)
-    assert recorded[0]['accepted_quote'] == 'Approved by answering the review slides: first answer #2 REJECT — the first cut is better'
+    S.decide(FakeConn({}), store, USER, RUN, '2.1', 'REJECT', 'the other shot is better', None)
+    assert recorded[0]['accepted_quote'] == 'Approved by answering the review slides: first answer #2.1 REJECT — the other shot is better'
 
 
 def test_no_answer_before_the_review_film_and_a_bad_answer_approves_nothing(recorded):
     sess = session()
     with pytest.raises(Problem, match='not rendered yet'):
-        S.decide(FakeConn({}), FakeStore(files(sess, with_plan=False)), USER, RUN, '1', 'KEEP', '', None)
+        S.decide(FakeConn({}), FakeStore(files(sess, with_plan=False)), USER, RUN, '1.1', 'KEEP', '', None)
     store = at_options()
     with pytest.raises(Problem, match='No slide #9'):
         S.decide(FakeConn({}), store, USER, RUN, '9', 'KEEP', '', None)
-    with pytest.raises(Problem, match='KEEP or DROP'):
-        S.decide(FakeConn({}), store, USER, RUN, '1A', 'REJECT', '', None)
+    with pytest.raises(Problem, match='DROP is retired'):
+        S.decide(FakeConn({}), store, USER, RUN, '1.1', 'DROP', '', None)
     assert recorded == [] and saved(store)['accepted'] is None
 
 
@@ -81,10 +81,10 @@ def test_an_explicit_approval_is_refused_and_records_nothing(recorded):
 
 def test_a_reject_records_with_or_without_a_reason(recorded):
     store = FakeStore(files(session(accepted={'version': 1, 'digest': 'd1'}), with_plan=False))
-    assert S.decide(FakeConn({}), store, USER, RUN, '2', 'REJECT', '', None)['action'] == 'REJECT'
-    assert saved(store)['decisions']['2']['note'] == ''
-    S.decide(FakeConn({}), store, USER, RUN, '2', 'REJECT', 'weaker', None)
-    assert saved(store)['decisions']['2']['note'] == 'weaker'
+    assert S.decide(FakeConn({}), store, USER, RUN, '2.1', 'REJECT', '', None)['action'] == 'REJECT'
+    assert saved(store)['decisions']['2.1']['note'] == ''
+    S.decide(FakeConn({}), store, USER, RUN, '2.1', 'REJECT', 'weaker', None)
+    assert saved(store)['decisions']['2.1']['note'] == 'weaker'
 
 
 # ---------- C: the final narration by its click ----------

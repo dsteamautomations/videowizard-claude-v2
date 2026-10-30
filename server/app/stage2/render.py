@@ -52,40 +52,73 @@ def _font(size):
         return ImageFont.load_default()
 
 
-BACKGROUNDS = {'black': (0, 0, 0), 'blue': (10, 32, 96)}   # design/125 O8: a second choice's card is deep blue (red reads as an error)
+DARK_RED = (139, 0, 0)   # design/127: B-roll is marked so it catches the eye: fine to reject
 
 
-def slate_png(lines, width, height, path, background='black'):
-    """A black slide (deep blue for a second choice, design/125 O8). A first line that starts "#NN | ..." shows the number large on its own line
-    (16 Oct: SK missed the small one)."""
+def _hex(colour):
+    c = str(colour or '').lstrip('#')
+    return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4)) if len(c) == 6 else None
+
+
+def _plain(text):
+    """The default font draws Latin only: the middle dot becomes a dash, anything outside Latin-1 a question mark."""
+    return ''.join(c if ord(c) < 256 else '?' for c in str(text).replace('·', '-'))
+
+
+def slate_png(lines, width, height, path, colour=None):
+    """design/127: a card on black with its scene's colour as a band down the left; the first line large, the rest one below the other."""
     from PIL import Image, ImageDraw
-    img = Image.new('RGB', (width, height), BACKGROUNDS.get(background, BACKGROUNDS['black']))
+    img = Image.new('RGB', (width, height), (0, 0, 0))
     draw = ImageDraw.Draw(img)
+    band = _hex(colour)
+    if band:
+        draw.rectangle([0, 0, max(6, width // 80) - 1, height], fill=band)
     size = max(12, height // 22)
-    rows = [''.join(c if ord(c) < 127 else '?' for c in line) for line in lines]
-    m = SLATE_HEAD.match(rows[0]) if rows else None
-    head = None
-    if m:
-        head, rows = m.group(1), [m.group(2)] + rows[1:]
-    y = height // 2 - int(((size * 3.2) if head else 0) + size * 0.8 * len(rows))
-    if head:
-        draw.text((width // 16, y), head, fill=(255, 190, 60), font=_font(size * 2))
-        y += int(size * 3.2)
-    for text in rows:
-        draw.text((width // 16, y), text, fill=(240, 240, 240), font=_font(size))
-        y += int(size * 1.6)
+    rows = [_plain(line) for line in lines]
+    y = height // 2 - int(size * 1.6 + size * 0.8 * max(0, len(rows) - 1))
+    for i, text in enumerate(rows):
+        big = i == 0
+        draw.text((width // 16, y), text, fill=(255, 190, 60) if big else (240, 240, 240), font=_font(size * 2 if big else size))
+        y += int(size * (3.0 if big else 1.6))
     img.save(path, format='PNG')
 
 
-def label_png(text, height, path):
-    """The small corner label on review-film footage, e.g. "#08" or "#11 DECISION"."""
+def strip_png(strip, width, height, path):
+    """design/127: the strip at the bottom of a footage shot in the review film: its scene's colour as a band, a dark red B-ROLL mark at
+    about two and a half times the text size when it is B-roll, the shot's label, and the words spoken (at most two lines, then "...")."""
     from PIL import Image, ImageDraw
-    size = max(12, height // 20)
-    font = _font(size)
-    text = ''.join(c if ord(c) < 127 else '?' for c in text)
-    w = int(draw_width(text, font)) + size
-    img = Image.new('RGBA', (w, int(size * 1.6)), (0, 0, 0, 170))
-    ImageDraw.Draw(img).text((size // 2, int(size * 0.25)), text, fill=(255, 190, 60), font=font)
+    size = max(12, height // 28)
+    font, big = _font(size), _font(int(size * 2.5))
+    pad = size // 2
+    left = max(6, width // 80) + pad
+    broll_w = int(draw_width('B-ROLL', big)) + 2 * pad if strip.get('b_roll') else 0
+    room = width - left - pad
+    words, lines = _plain(strip.get('words') or ''), []
+    for word in words.split():
+        if lines and draw_width(lines[-1] + ' ' + word, font) <= room:
+            lines[-1] += ' ' + word
+        else:
+            lines.append(word)
+    if len(lines) > 2:
+        lines = lines[:2]
+        lines[1] = lines[1][:max(0, len(lines[1]) - 3)] + '...'
+    head_h = max(int(size * 1.6), int(size * 2.5 * 1.3) if broll_w else 0)
+    h = pad + head_h + int(size * 1.4) * len(lines) + pad
+    img = Image.new('RGBA', (width, h), (0, 0, 0, 170))
+    draw = ImageDraw.Draw(img)
+    band = _hex(strip.get('colour'))
+    if band:
+        draw.rectangle([0, 0, max(6, width // 80) - 1, h], fill=band + (255,))
+    x = left
+    if broll_w:
+        draw.rectangle([x, pad, x + broll_w, pad + int(size * 2.5 * 1.25)], fill=DARK_RED + (255,))
+        draw.text((x + pad, pad), 'B-ROLL', fill=(255, 255, 255, 255), font=big)
+        x += broll_w + pad
+    draw.text((x, pad + (head_h - int(size * 1.4)) // 2), _plain(strip.get('label') or ''), fill=(255, 190, 60, 255), font=font)
+    y = pad + head_h
+    for line in lines:
+        draw.text((left, y), line, fill=(240, 240, 240, 255), font=font)
+        y += int(size * 1.4)
     img.save(path, format='PNG')
     return path
 
@@ -98,7 +131,6 @@ def draw_width(text, font):
 
 
 WATCHED_SIZE = {'review': (1280, 720), 'master': (1280, 720)}   # design/43 7.1, design/44 8.3: films watched once and never delivered are made at the size the operator watches
-SLATE_HEAD = re.compile(r'^(#\d+(?:-\d+)?[A-Z]*)\s*\|\s*(.*)$')             # "#2 | ..." or "#2B | ...": the label shows large on its own line
 
 
 DELIVERED = ('master', 'assembly')       # films with the whole narration under them; the assembly film is the delivered one
@@ -176,12 +208,12 @@ class Renderer:
         preset, crf = ('veryfast', '23') if self.fast else ('medium', '18')
         return ['-c:v', 'libx264', '-profile:v', 'high', '-preset', preset, '-crf', crf, '-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-r', str(self.fps), '-an']
 
-    def slate(self, lines, frames=SLATE_FRAMES, background='black'):
-        key = digest({'slate': lines, 'tl': self.tl, 'frames': frames, **({'background': background} if background != 'black' else {})})
+    def slate(self, lines, frames=SLATE_FRAMES, colour=None):
+        key = digest({'slate': lines, 'tl': self.tl, 'frames': frames, **({'colour': colour} if colour else {})})
         out = self.cache / f'slate-{key[:16]}.mp4'
         if not out.exists():
             png = self.cache / f'slate-{key[:16]}.png'
-            slate_png(lines, self.W, self.H, png, background)
+            slate_png(lines, self.W, self.H, png, colour)
             run([ffmpeg(), '-y', '-v', 'error', '-loop', '1', '-framerate', str(self.fps), '-i', str(png), '-frames:v', str(frames), *self.video_args(), str(out)])
         return out
 
@@ -255,7 +287,7 @@ class Renderer:
 
     def segment(self, src_path, src_sha, src_fps, ev, n_tl, crop_rect=None, rotation_deg=0.0, hdr=False, label=None, name=None):
         """One picture event: source frames [in,out) at src_fps → exactly n_tl timeline frames. hold_last_frame pads with the last frame.
-        label: a corner caption burned in (review film only, so the operator knows which numbered slide is playing)."""
+        label: the review film's strip (design/127: {label, words, b_roll, colour}) burned in at the bottom, so the operator knows which shot is playing."""
         if src_path not in self._sizes:   # design/91 N15: the source's shape decides fill or bars
             try:
                 self._sizes[src_path] = frame_size(src_path)
@@ -287,10 +319,9 @@ class Renderer:
         if ev.get('hold_last_frame'):
             filters.append(f'tpad=stop_mode=clone:stop_duration={float(n_tl / self.fps) + 1}')
         if label:
-            png = label_png(label, self.H, self.cache / f'label-{key[:16]}.png')
-            margin = max(8, self.H // 30)
+            png = strip_png(label, self.W, self.H, self.cache / f'strip-{key[:16]}.png')
             run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{float(start):.6f}', '-i', str(src_path), '-i', str(png), '-t', f'{float(Fraction(n_src) / src_fps) + 0.5:.6f}',
-                 '-filter_complex', f"[0:v]{','.join(filters)}[b];[b][1:v]overlay={margin}:{margin}[o]", '-map', '[o]', '-frames:v', str(n_tl), *self.video_args(), str(out)])
+                 '-filter_complex', f"[0:v]{','.join(filters)}[b];[b][1:v]overlay=0:H-h[o]", '-map', '[o]', '-frames:v', str(n_tl), *self.video_args(), str(out)])
             return out
         run([ffmpeg(), '-y', '-v', 'error', '-ss', f'{float(start):.6f}', '-i', str(src_path), '-t', f'{float(Fraction(n_src) / src_fps) + 0.5:.6f}',
              '-vf', ','.join(filters), '-frames:v', str(n_tl), *self.video_args(), str(out)])
@@ -418,7 +449,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
 
     def picture(item, n, tail=False):
         """One piece of n frames; with tail, past its planned end (a still or a graphic holds longer; a take or footage runs on, holding its last frame if it ends)."""
-        name = item.get('label') or item.get('name') or item.get('sub_clip_id')
+        name = item.get('name') or item.get('sub_clip_id')
         if item['kind'] == 'still':
             return r.still(sources[item['file']['sha256']], item['file']['sha256'], n, item.get('motion') or 'none', bool(item.get('graphic')), None if tail else name, bool(item.get('text')))   # design/112 K4
         if item['kind'] == 'sequence':
@@ -431,7 +462,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             extra = int(Fraction(n - int(item['timeline_frames'])) * Fraction(str(clip['fps'])) / r.fps)   # the tail in source frames
             ev = {**item, 'source_out_frame': item['source_out_frame'] + extra, 'hold_last_frame': True}
         return r.segment(sources[clip['id']], clip['sha256'], clip['fps'], ev, n, item.get('crop_rect'), clip.get('rotation_deg') or 0.0, bool(clip.get('hdr')),
-                         None if tail else item.get('label'), None if tail else name)
+                         None if tail else item.get('strip'), None if tail else name)
 
     for i, item in enumerate(plan['items']):
         if carry and item['kind'] not in ('event', 'still', 'sequence'):   # nothing to fade into: the plain piece, a cut
@@ -439,12 +470,12 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             carry = None
         if item['kind'] == 'slate':
             n = int(item.get('frames') or SLATE_FRAMES)
-            parts.append(r.slate(item['lines'], n, item.get('background') or 'black'))
+            parts.append(r.slate(item['lines'], n, item.get('colour')))
             silence_before += Fraction(n) / r.fps
             cursor += Fraction(n) / r.fps
         elif item['kind'] == 'card':   # design/21: a blank inside an option, captioned; the narration window already covers it
             n = int(item['frames'])
-            parts.append(r.slate(item['lines'], n))
+            parts.append(r.slate(item['lines'], n, item.get('colour')))
             cursor += Fraction(n) / r.fps
         elif item['kind'] == 'narration':
             if silence_before:
@@ -453,7 +484,7 @@ def render_film(kind, plan, sources, narration, work, timeline, narration_plan=N
             a1_parts.append(r.narration_window(narration, item['start_s'], item['end_s'], r.work / f'a1-{i}.wav'))
         else:   # a picture: a still, a graphic sequence (design/65 B8) or a footage piece; any may dissolve into the next (design/71 P4, design/91 N16)
             n, d = int(item['timeline_frames']), int(item.get('dissolve_into_next') or 0)
-            name = item.get('label') or item.get('name') or item.get('sub_clip_id') or item['kind']
+            name = item.get('slide') or item.get('name') or item.get('sub_clip_id') or item['kind']
             seg = picture(item, n)
             if item['kind'] == 'event' and item.get('stabilize'):
                 seg = r.stabilized(seg)

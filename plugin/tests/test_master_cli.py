@@ -173,4 +173,4 @@ def test_steps_and_command_text_carry_the_labels_and_the_one_approval():
     assert 'design/44' in STAGES['first_cut']['steps'][0]
     assert '#2A' in STAGES['options']['prompt'] and 'running numbers' in STAGES['options']['prompt']
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert '--file out/decisions.json' in md and 'vw master status --wait 600' in md and '2B' in md and 'first cut together' in md
+    assert '--file out/decisions.json' in md and 'vw master status --wait 600' in md and '2.2A1' in md and 'first cut together' in md   # design/127

@@ -122,52 +122,9 @@ def test_a_version_whose_package_changed_is_refused():
 
 # ---------- design/44 8.1, design/125 O2/O3: slide labels (scene numbers, a second choice N-2, letters inside) ----------
 
-def small_package():
-    return {'beats': [{'beat_id': 'BEAT_01', 'title': 'Laying the first course', 'timeline_start_frame': 0, 'timeline_end_frame': 250, 'target_beat_frames': 250},
-                      {'beat_id': 'BEAT_02', 'title': 'Curing', 'timeline_start_frame': 250, 'timeline_end_frame': 350, 'target_beat_frames': 100}],
-            'sub_clips': [{'sub_clip_id': 'c1:SUB_01', 'clip_id': 'c1', 'clip_name': 'C0120.MP4'}, {'sub_clip_id': 'c2:SUB_01', 'clip_id': 'c2', 'clip_name': 'C0121.MP4'}],
-            'cards': [{'clip_id': 'c1', 'descriptive_name': 'brick_stacking'}]}
-
-
-def small_doc():
-    shot = lambda sid, n, **kw: {'sub_clip_id': sid, 'source_in_frame': 0, 'source_out_frame': n, 'timeline_frames': n, 'match': 'direct', 'evidence': 'x', **kw}
-    return {'options': [{'option_number': 1, 'beat_id': 'BEAT_01', 'rank': 'PRIMARY',
-                         'events': [shot('c1:SUB_01', 75), {'blank': True, 'timeline_frames': 100, 'intent': 'a diagram'},
-                                    shot('c2:SUB_01', 75, decision={'kind': 'b_roll', 'question': 'Related footage: keep or drop?'})]},
-                        {'option_number': 2, 'beat_id': 'BEAT_01', 'rank': 'SECONDARY', 'events': [shot('c2:SUB_01', 250)]},
-                        {'option_number': 3, 'beat_id': 'BEAT_02', 'rank': 'PRIMARY', 'events': [shot('c1:SUB_01', 100)]}],
-            'gaps': []}
-
-
-def test_slides_take_scene_numbers_and_letters_inside_an_option():
-    from app.stage2 import slides as SL
-    sl = SL.slides(small_doc(), small_package(), 25)
-    assert [(s['no'], s['type']) for s in sl] == [('1', 'option'), ('1A', 'blank'), ('1B', 'decision'), ('1-2', 'backup'), ('2', 'option')]
-    assert sl[3]['backup_for'] == '1' and sl[3]['lines'][0].startswith('#1-2 | Scene 1: Laying the first course | second choice |')
-    assert sl[1]['lines'][0].startswith('#1A | BLANK | Scene 1') and sl[2]['lines'][0] == '#1B | DECISION | Scene 1: Laying the first course'
-    assert sl[4]['lines'][0].startswith('#2 | Scene 2: Curing |') and all(s['number'] == int(s['no'][0]) for s in sl)
-    assert SL.letter(1) == 'A' and SL.letter(26) == 'Z' and SL.letter(27) == 'AA'
-
-
-def test_review_items_carry_the_labels():
-    from app.stage2 import slides as SL
-    doc, pk = small_doc(), small_package()
-    items = SL.review_items(doc, pk, SL.slides(doc, pk, 25), lambda evs: [{'kind': 'event', 'frames': e['timeline_frames']} for e in evs], 25)
-    labels = [it.get('label') for it in items if it['kind'] == 'event']
-    assert labels == ['#1', '#1B DECISION', '#1-2', '#2']
-
-
-def test_slate_head_accepts_a_letter(tmp_path):
-    pytest.importorskip('PIL')
-    from app.stage2 import render as R
-    assert R.SLATE_HEAD.match('#2B | DECISION | Scene 2').group(1) == '#2B' and R.SLATE_HEAD.match('#12 | Scene 5').group(1) == '#12'
-    R.slate_png(['#2B | DECISION | Scene 2', 'Keep or drop?'], 320, 180, tmp_path / 's.png')
-    assert (tmp_path / 's.png').exists()
-
-
 def test_decide_label_normalisation():
     from app.stage2 import stage
-    assert stage.slide_label('#2b') == '2B' and stage.slide_label(7) == '7' and stage.slide_label(' 1a ') == '1A'
+    assert stage.slide_label('#2.1a1') == '2.1A1' and stage.slide_label(7) == '7' and stage.slide_label(' 1.2 ') == '1.2'
 
 
 # ---------- design/44 8.3: the master film at 720p with its sound measured ----------

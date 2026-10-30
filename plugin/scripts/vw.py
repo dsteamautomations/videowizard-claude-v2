@@ -1952,7 +1952,7 @@ def event_frames(ev, rows, fps):
 
 def second_look(m):
     """design/125 O4, O5: one file per scene for its helper (its sentences, its options with each event's place on the timeline, the pieces that fit it)
-    and a few free stills at both edges of every chosen piece, decisions included. A grab that fails is noted in the scene's file, never fatal."""
+    and a few free stills at both edges of every chosen piece, alternatives included. A grab that fails is noted in the scene's file, never fatal."""
     ws = workspace(m['code'])
     doc = load_json(ws / 'out' / 'options.json')
     if not isinstance(doc, dict) or not doc.get('options'):
@@ -1979,9 +1979,9 @@ def second_look(m):
                     n = None   # the check names it
                 events.append({'at_frame': at, 'frames': n, **ev})
                 at += n or 0
-            options.append({**{k: o.get(k) for k in ('option_number', 'rank', 'steps', 'carries_over', 'moves_place')}, 'events': events})
+            options.append({**{k: o.get(k) for k in ('option_number', 'steps', 'carries_over', 'moves_place')}, 'events': events})
         stills = {}
-        for sub in dict.fromkeys(e['sub_clip_id'] for o in options for e in o['events'] if e.get('sub_clip_id')):
+        for sub in dict.fromkeys(x['sub_clip_id'] for o in options for e in o['events'] for x in [e] + list(e.get('alternatives') or []) if x.get('sub_clip_id')):
             if sub not in grabbed:   # the free grab of `vw options frames`: stills around each edge; the first, the middle and the last are kept
                 grabbed[sub] = {'in': [], 'out': []}
                 for edge in ('in', 'out'):
@@ -2137,7 +2137,7 @@ def wait_for_film(run, film, wait_s, path=None):
 
 
 def slide_label(value):
-    """design/44 8.1, design/125 O2-O3: a scene's number ('2'), its second choice ('2-2'), the parts inside ('2A', '2-2A'); '#2b' and a number are accepted."""
+    """design/127: a scene is '2' (a header), its shots '2.1', '2.2', an alternative of shot 2.2 '2.2A1'; '#2.2a1' is accepted."""
     return str(value).strip().lstrip('#').strip().upper()
 
 
@@ -2148,9 +2148,8 @@ def cmd_master(a):
     if a.what == 'slides':   # design/44 8.1: what still needs an answer
         out = call('GET', base + '/slides')
         out['review_page_url'] = review_page_url(m['code'])   # design/62: the default place to decide
-        both = '; '.join(f"{b['scene']} (#{', #'.join(b['slides'])})" for b in out.get('both_kept') or [])   # design/63 rule 1
         emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none')
-             + (f". Both cuts kept: {both}: reject one" if both else '') + f". Review page: {out['review_page_url']}")
+             + f". Review page: {out['review_page_url']}")
     if a.what == 'decide':
         if a.file:   # design/44 8.1: every answer in one call, in order, stopping at the first refusal
             answers = _json_file(m, a.file)
@@ -2172,7 +2171,7 @@ def cmd_master(a):
             emit({'recorded': recorded, 'decided': last.get('decided'), 'of': last.get('of')}, 0, f"{len(recorded)} answers recorded; {last.get('decided')} of {last.get('of')} decided")
         n = a.slide or a.option
         if not n:
-            emit({'action': 'refused', 'message': 'Give the slide label (--slide 2, --slide 2B) or a file of answers (--file out/decisions.json).'}, 2)
+            emit({'action': 'refused', 'message': 'Give the shot label (--slide 2.1, --slide 2.1A1) or a file of answers (--file out/decisions.json).'}, 2)
         body = {'slide': slide_label(n), 'action': a.action, 'note': a.note or '', **({'edit': a.edit} if a.edit else {})}
         emit(write(base + '/decide', body))
     if a.what == 'rule':   # design/43 7.5: a client rule is the operator's; their yes travels with it

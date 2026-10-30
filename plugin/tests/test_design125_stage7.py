@@ -246,5 +246,5 @@ def test_the_command_text_points_to_the_steps_and_drops_the_old_ways():
     assert 'remains for an explicit approval' not in options and 'backup are 2 and 3' not in options and 'design/21' not in options
     assert 'the steps name the flags to act on' in options and 'act on R5, B1' not in options   # P10
     assert '`vw options second-look`' in options and '`vw-scene-review`' in options and 'join-second-look' in options
-    assert '2-2' in options and 'its parts decide it; a trim if wanted' in options and 'a clip reused in another scene' in options and 'procedure versions 2 and 3' not in options
+    assert '2.2A1' in options and 'KEEP_WITH_EDIT' not in options and 'a clip reused in another scene' in options and 'procedure versions 2 and 3' not in options   # design/127
     assert 'vw-scene-review' in COMMAND and 'vw-plan-gaps' in COMMAND
