@@ -38,8 +38,9 @@ def test_p2_no_change_history_labels_and_the_rule_codes_kept():
         assert code in o, code
 
 
-def test_p7_a_scene_covers_one_chapter():
-    assert 'a scene covers one chapter: a paragraph covering two is split where the second begins' in V3['options']['steps'][1]
+def test_p7_retired_by_design126_op2_a_scene_lists_every_chapter():
+    assert 'a scene covers one chapter' not in V3['options']['steps'][1]
+    assert 'list every chapter the paragraph covers; split a paragraph only when the operator asks' in V3['options']['steps'][1]
 
 
 def test_p9_rule_3_an_abstract_idea_has_nothing_to_show_and_is_no_longer():

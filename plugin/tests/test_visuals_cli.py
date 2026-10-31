@@ -284,6 +284,7 @@ def test_prepare_writes_the_files_and_prints_the_page_link(harness, monkeypatch,
     code, out, err = run(args(what='prepare'), capsys)
     assert code == 0 and out['visuals_page_url'] == 'https://x.example/runs/VW-9/visuals' and 'work/visuals/' in err and 'https://x.example/runs/VW-9/visuals' in err
     assert any(f['file'] == 'work/visuals/prompt.md' for f in out['files'])
+    assert 'Read prompt.md, then part-preparation.md (what to read first).' in err and 'gaps.json and intended-visuals.json first' not in err   # design/126 VI1
 
 
 def test_prepare_writes_one_file_per_part_and_names_them(harness, monkeypatch, capsys):

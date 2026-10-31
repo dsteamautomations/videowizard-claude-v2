@@ -62,6 +62,11 @@ def test_p3_one_file_per_scene_with_its_sentences_and_its_pieces_in_fit_order(tm
     assert set(piece) == {'sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'native_shot_size', 'effective_shot_size',
                           'outcome_state', 'eligibility', 'min_hold_s'}   # the empty ones (action_peak, pairing_constraints, risk_flags) left out
     assert piece['seen'] == 'A mason lays bricks on edge.' and 'seen' not in one['pieces'][1]   # a clip's overview once a file
+    # design/126 OP1: a related piece is one short row (its full row on demand); direct and chapter rows keep every field
+    assert one['pieces'][1] == {'sub_clip_id': 'c1:S2', 'clip_name': 'C1.mp4', 'fit': 'related', 'grade': 'B', 'duration_s': 4.0}
+    assert one['pieces'][2] == {'sub_clip_id': 'c3:S1', 'clip_name': 'C3.mp4', 'seen': 'Wet sacks on a wall.', 'fit': 'related', 'grade': 'A', 'duration_s': 4.0}
+    assert set(one['pieces'][3]) == set(piece) and one['pieces'][3]['fit'] == 'chapter' and one['pieces'][3]['outcome_state'] == 'a course laid'
+    assert read_rows(folder / 'pieces-BEAT_02.json')['pieces'][0]['in_frame'] == 0   # c3:S1 is direct in BEAT_02: its full row there
     assert vw.pieces_by_scene({**package(), 'sub_clips': [row('c1:S1', primary_fits=['BEAT_01'], risk_flags=['ppe'], action_peak={'in_frame': 5})]})[0][0]['pieces'][0]['risk_flags'] == ['ppe']
     assert 'steps' not in read_rows(folder / 'beats.json')[0] and 'text' not in read_rows(folder / 'beats.json')[0]
     assert [p['sub_clip_id'] for p in read_rows(folder / 'pieces-other.json')] == ['c4:S1']   # fits no scene: listed once, at the end

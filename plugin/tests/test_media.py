@@ -67,23 +67,30 @@ def test_prepare_keeps_name_order_reports_size_and_stores_stat(ws):
     assert len(json.dumps(out)) < 4000
 
 
-def test_prepare_guesses_the_footage_character_from_the_probe_and_record_stores_the_operators_answer(ws):
-    """design/77 L42 (VW-6: the assistant assumed phone footage; the clips were from a cinema camera)."""
-    from stages_av import footage_guess
+def test_prepare_prints_no_footage_line_and_record_stores_no_footage_character(ws):
+    """design/126 ME1: the footage is measured at visuals (design/88); the media step neither guesses nor stores it."""
+    import stages_av
     clip(ws / 'in' / 'a.mp4')
     out = media_prepare(ws, PROC, prior)
-    assert out['footage_guess'].startswith('looks like phone footage') and 'Do not ask what the footage is' in out['message']   # design/88: measured at visuals
-    assert footage_guess([{'width': 3840, 'height': 2160, 'bit_rate': 120_000_000, 'pix_fmt': 'yuv422p10le', 'codec': 'prores'}]).startswith('looks professional')
-    assert 'prores' in footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'prores'}])
-    assert footage_guess([{'width': 1920, 'height': 1080, 'bit_rate': 8_000_000, 'pix_fmt': 'yuv420p', 'codec': 'h264'}]).startswith('looks like phone footage')
-    calls = []
-    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='ok', footage={'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'})
-    assert res['summary']['footage_character'] == {'camera': 'cinema', 'support': 'tripod', 'look': 'natural', 'quote': 'Shot on a cinema camera, tripod, ungraded.'}
-    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='ok')
-    assert res['summary']['footage_character'] is None
+    assert 'footage_guess' not in out and 'looks like' not in json.dumps(out) and 'Do not ask what the footage is' in out['message']
+    assert not hasattr(stages_av, 'footage_guess')
+    res = media_record(ws, PROC, prior, fake_upload([]), copies='originals', camera_audio='allowed', note='ok')
+    assert 'footage_character' not in res['summary']
     assert {'codec', 'pix_fmt', 'bit_rate', 'make', 'model'} <= set(res['summary']['clips'][0])   # design/88 F1: what the server measures from
+    with pytest.raises(TypeError):
+        media_record(ws, PROC, prior, fake_upload([]), copies='originals', camera_audio='allowed', footage={'camera': 'cinema'})
     steps = ' '.join(PROC['steps'])
-    assert '--camera cinema' not in steps and '--look' not in steps and 'Do not ask what the footage is' in steps   # design/88 F5: the old flags still work, the steps no longer ask
+    assert '--camera cinema' not in steps and '--look' not in steps and 'Do not ask what the footage is' in steps
+
+
+@pytest.mark.parametrize('flag,value', [('--camera', 'cinema'), ('--support', 'tripod'), ('--look', 'graded'), ('--footage-note', 'Sony, handheld')])
+def test_media_record_refuses_the_footage_flags_by_name(flag, value, capsys):
+    """design/126 ME1: refused before anything is read or uploaded, naming the flag and where the footage is corrected."""
+    a = vw.build_parser().parse_args(['stage', 'media', 'record', '--camera-audio', 'allowed', '--copies', 'originals', flag, value])
+    with pytest.raises(SystemExit) as exc:
+        vw.cmd_stage(a)
+    out, err = capsys.readouterr()
+    assert exc.value.code == 2 and flag in out + err and 'measured at the visuals stage' in out + err and '`vw visuals footage`' in out + err
 
 
 def test_the_maker_and_model_come_from_the_tags_when_the_camera_wrote_them():
@@ -179,15 +186,14 @@ def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, c
         posted.update(body)
         return {'id': 'out-1', 'stage': 'media', 'files': body['files'], 'summary': body['summary'], 'next': {'stage': 'analysis', 'paid': 'gemini-3.8-flash'}}
     monkeypatch.setattr(vw, 'write', write)
-    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound', copies='originals',   # design/107 §6
-                           camera='mirrorless', support='handheld', look='graded', footage_note='Sony, handheld, graded in camera')
+    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound', copies='originals')   # design/107 §6
     with pytest.raises(SystemExit) as exc:
         vw.cmd_stage(a)
     out, err = capsys.readouterr()
     assert exc.value.code == 0, err
     assert 'uploaded 1/2 ' in err and 'uploaded 2/2 ' in err and '(0 MB)' in err and 'Recorded media. Next: analysis.' in err
     assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound' and len(posted['summary']['clips']) == 2 and posted['summary']['copies'] == 'originals'
-    assert posted['summary']['footage_character'] == {'camera': 'mirrorless', 'support': 'handheld', 'look': 'graded', 'quote': 'Sony, handheld, graded in camera'}   # design/77 L42
+    assert 'footage_character' not in posted['summary']   # design/126 ME1
     shown = json.loads(out)   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
     assert shown['id'] == 'out-1' and shown['next']['stage'] == 'analysis' and shown['clips_recorded'] == 2 and 'total_mb' in shown
     assert 'clips' not in shown['summary'] and shown['summary']['camera_audio'] == 'excluded' and isinstance(shown['files'], str) and '3 file' in shown['files']   # out/media.json and the two clips
