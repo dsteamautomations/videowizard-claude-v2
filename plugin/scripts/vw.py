@@ -163,6 +163,7 @@ def options_reading_files(ws, data):
 
 PIECE_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'native_shot_size', 'effective_shot_size',
                 'action_peak', 'outcome_state', 'pairing_constraints', 'risk_flags', 'eligibility', 'min_hold_s')   # design/125 P3: what a choice needs
+RELATED_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s')   # design/126 OP1: a related piece in one short row; its full row on demand
 FIT_ORDER = ('direct', 'related', 'chapter')
 
 
@@ -184,7 +185,7 @@ def pieces_by_scene(data):
     rows = [r for r in data.get('sub_clips') or [] if isinstance(r, dict)]
 
     def light(r, fit):
-        p = {k: seen.get(r.get('clip_id'), '') if k == 'seen' else fit if k == 'fit' else r.get(k) for k in PIECE_FIELDS}
+        p = {k: seen.get(r.get('clip_id'), '') if k == 'seen' else fit if k == 'fit' else r.get(k) for k in (RELATED_FIELDS if fit == 'related' else PIECE_FIELDS)}
         return {k: v for k, v in p.items() if v not in (None, '', [], {})}
 
     def once(pieces):   # ponytail: a clip's overview once per file; the later pieces of that clip read it above
@@ -803,6 +804,9 @@ def cmd_stage(a):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import stages_text
     import stages_av
+    old = [f for f in ('camera', 'support', 'look', 'footage_note') if getattr(a, f, None)]
+    if old:   # design/126 ME1: design/77 L42's footage answer at media retired by refusal
+        emit({'action': 'refused', 'message': f"{', '.join('--' + f.replace('_', '-') for f in old)}: the footage is measured at the visuals stage; correct it there with `vw visuals footage`."}, 2)
     m = active()
     scripts = {**stages_text.STAGES, 'media': (stages_av.media_prepare, stages_av.media_record), 'voice': (stages_av.voice_prepare, stages_av.voice_record)}
     if a.stage not in scripts:
@@ -835,10 +839,8 @@ def cmd_stage(a):
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
                 print(f'uploaded {k}/{n} {name} ({size / 1e6:.0f} MB)', file=sys.stderr, flush=True)
-            footage = ({'camera': a.camera, 'support': getattr(a, 'support', None), 'look': getattr(a, 'look', None), 'quote': getattr(a, 'footage_note', None) or ''}
-                       if getattr(a, 'camera', None) else None)   # design/77 L42: the operator's confirmed footage character
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
-                            camera_audio=a.camera_audio, note=a.note, progress=progress, footage=footage, copies=getattr(a, 'copies', None))   # design/107 §6
+                            camera_audio=a.camera_audio, note=a.note, progress=progress, copies=getattr(a, 'copies', None))   # design/107 §6
         elif a.stage == 'voice':
             job = None
             if a.job:   # design/52 D: the record from a kept narration, fetched for the operator to listen to
@@ -1486,7 +1488,7 @@ def cmd_visuals(a):
         if parts:
             told = f"The instructions are split by step: read prompt.md once, then part-<step>.md when you reach that step ({', '.join(parts)}). " + told
         emit({**out, 'files': files, 'visuals_page_url': url, 'not_shareable': NOT_SHAREABLE}, 0,
-             f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, gaps.json and intended-visuals.json first. "
+             f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, then part-preparation.md (what to read first). "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
              f"Visuals page (give the operator this link): {url}. " + told)
     if a.what == 'footage':   # design/88 F4: the measured footage, told; a correction only with the operator's words
@@ -2521,8 +2523,8 @@ def build_parser():
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
     s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
-    s.add_argument('--camera', choices=['cinema', 'mirrorless', 'phone', 'mixed'], help='media record: accepted for one release and kept as the correction; the footage is measured at visuals (design/88)')
-    s.add_argument('--support', choices=['handheld', 'tripod', 'gimbal', 'mixed']); s.add_argument('--look', choices=['natural', 'graded', 'log']); s.add_argument('--footage-note', help="media record: the operator's words on the footage")
+    for f in ('--camera', '--support', '--look', '--footage-note'):   # design/126 ME1: refused by name; the footage is measured at visuals
+        s.add_argument(f, help=argparse.SUPPRESS)
     s.add_argument('--copies', choices=['originals', 'copies'], help='media record: are these the camera originals, or copies made by an editor (design/107)')
     s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
