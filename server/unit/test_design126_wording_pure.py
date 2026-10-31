@@ -43,6 +43,8 @@ def test_sc1_to_sc5_script_prompt_and_step():
     assert 'add `decision` to every change' in V3['script']['steps'][3] and 'The tool checks that only the accepted changes are applied' in p
     assert 'fixed-row' not in p and 'can use an empty before' not in p and 'a deletion has an empty after; anchor an insertion on a short before excerpt.' in p   # SC5
     assert 'Every edit must be a listed change with an exact before that occurs once.' in V3['script']['steps'][1]
+    shape = json.dumps(V3['script']['output_shape'])   # SC5 follow-up: the answer shape agrees with the prompt
+    assert 'empty for an insertion' not in shape and 'an insertion anchors on a short excerpt' in shape
 
 
 def test_an1_analysis_starts_without_asking():

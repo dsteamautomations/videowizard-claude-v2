@@ -125,7 +125,7 @@
         "assessment": "concise brief-fit assessment",
         "changes": [
           {
-            "before": "exact excerpt of the current wording (empty for an insertion)",
+            "before": "exact excerpt of the current wording (an insertion anchors on a short excerpt)",
             "after": "proposed wording (empty for a deletion)",
             "reason": "",
             "decision": "accepted | rejected | reworded (after the operator decides)",
