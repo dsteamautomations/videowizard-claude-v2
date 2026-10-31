@@ -1284,6 +1284,20 @@ Checked in the live code (main d1335eb; pages `templates/review.html` and `templ
 | U6 | "if web search is not bringing results … earlier we had an option to upload a user-given reference image or an image link" | It exists: **"Add your own picture"**, a file or an https link, saved and approved for that thing (design/110, live). But it is shown only on a thing's own view (after the round), not in the **round view** the screenshots show (`renderRound` has no such box), which is where a search comes back empty | **Partly done.** Proposed: the same box under each thing's search in the round view, and shown first when a search finds nothing. **SK, 31 Oct 2026:** the upload and link option appears in the same place as the selected picture (the panel on the right where a picture opens), for that thing |
 | U7 | "some image requirements I am not able to make out where exactly that will be useful … mention the narration line or the scene description" | A thing's card shows its id, name and kind only (for example "clay_pan · Iron pan of wet clay · object"); the page already holds the plan's shots that show each thing, with their words | **Not done.** Proposed: under each thing's name, "used in": each shot that shows it (gap, shot) with the narration words under that shot and its one-line picture, so the operator can judge and refine the search |
 
+## Why VW-12 hits one defect after another (defects 35–38, 31 Oct 2026)
+
+Read in the code, the live server's log and the defects table.
+
+**Defect 38's cause:** for a reference sheet (and a component), the server adds its own lines to the prompt (design/119 rule 2, 28 Oct; design/117 P1) *before* it keeps "the writer's words" for the answer check (`visuals_stage.generate_image`: `sheet_block` and the component block are composed, then `writer_prompt = body['prompt']`). The check then compares the answer's prompt with a prompt the server has already lengthened, so **every sheet sent with its answer form is refused**, however exactly the prompt matches. Present since 28 Oct; no film reached a sheet since then until VW-12. Second fault in the same defect: `image --file` splits `parents` on commas only, so a parent with a crop (`id@left,top,width,height`) breaks into pieces that are not references ("Parents must be approved references"); the single command parses crops (design/119 rule 1), the file path never did.
+
+**Why it keeps happening (the pattern):**
+1. **The later visuals steps had not run on a real film since many changes.** Between 28 and 30 Oct the picture steps changed several times (design/117, 119, 120, 121, 124, 125); every film was closed on 30 Oct; VW-12 is the first to reach the sheets. Each new step it reaches is the first real use of that code since those changes, so faults that were always there come out one at a time.
+2. **The tests are pieces, not the whole path.** They load the tool as a module and stub the server, so they could not see a helper missing when `vw` runs as a script (35), a request missing its id (35), or a prompt changed before its check (38): each piece passed alone. The database tests that run the server end to end (Docker) are not run on this PC.
+3. **Two copies of each command in the tool.** A file of rows (`--file`) and a single command build the same request separately; the file path lacked the request id (35) and the crop parsing (38).
+4. **Laptops behind on the tool** (36), now stopped by the server's minimum version (G2).
+
+**Proposed:** fix 38 (keep the writer's words before the server's lines; the file path parses crops like the single command, through the same function); then, before the operator reaches them, a read-only sweep of every remaining visuals command (sheet, golden, state, component, keyframe, take, draw, record) for these same three kinds of fault, and one test per command that runs the request through the server's real request model and checks.
+
 ## Blocks found (point 13), across all stages
 | # | Where | Decision or refusal | Recommendation | SK |
 |---|---|---|---|---|

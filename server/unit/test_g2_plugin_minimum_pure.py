@@ -5,7 +5,7 @@ from app.main import plugin_refusal
 
 def test_an_older_tool_is_told_to_update_and_0_64_1_passes():
     minimum = Settings.model_fields['PLUGIN_MIN_VERSION'].default
-    assert minimum == '0.64.2'
-    said = plugin_refusal('/api/runs/x/visuals/images', '0.64.1', minimum)
-    assert said and '0.64.1' in said and '0.64.2' in said and 'update it' in said
-    assert plugin_refusal('/api/runs/x/visuals/images', '0.64.2', minimum) is None and plugin_refusal('/api/runs/x', '0.65.0', minimum) is None
+    assert minimum == '0.64.3'
+    said = plugin_refusal('/api/runs/x/visuals/images', '0.64.2', minimum)
+    assert said and '0.64.2' in said and '0.64.3' in said and 'update it' in said
+    assert plugin_refusal('/api/runs/x/visuals/images', '0.64.3', minimum) is None and plugin_refusal('/api/runs/x', '0.65.0', minimum) is None

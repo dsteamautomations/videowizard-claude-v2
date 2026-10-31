@@ -1648,7 +1648,7 @@ def cmd_visuals(a):
             for i, it in enumerate(items):
                 parents = it.get('parents') or []
                 body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
-                        'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt') or _answer_prompt(m, it.get('answer')), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
+                        'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt') or _answer_prompt(m, it.get('answer')), **_parents_and_crops(parents if isinstance(parents, str) else ','.join(parents)),   # defect 38: crops (id@left,top,width,height) read as the single command reads them
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
                         **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
                         **_pair_fields(m, it.get('variants'), it.get('end_answer')), **({'shot_id': it['shot']} if it.get('shot') else {}),   # design/86 K1, K4; design/91 N8

@@ -48,3 +48,14 @@ def test_an_image_with_its_answer_form_and_no_prompt_sends_the_answers_prompt(ha
     monkeypatch.setattr(vw, 'request', lambda m, p, wait=None, **kw: (sent.append(kw['json']) or ({'reference_id': 'R2'}, 0)))
     code, out, err = run(args(what='image', file='out/images.json'), capsys)
     assert code == 0 and sent[0]['prompt'] == 'one brick on edge'
+
+
+def test_an_image_file_row_reads_a_parents_crop_as_the_single_command_does(harness, monkeypatch, capsys):   # defect 38
+    ws, _ = harness
+    (ws / 'out' / 'images.json').write_text(json.dumps([{'element': 'E1', 'kind': 'sheet', 'prompt': 'p', 'parents': 'K1,L2@0.5,0,0.5,0.5'},
+                                                        {'element': 'E2', 'kind': 'sheet', 'prompt': 'p', 'parents': ['K1', 'L2@0.5,0,0.5,0.5']}]), encoding='utf-8')
+    sent = []
+    monkeypatch.setattr(vw, 'request', lambda m, p, wait=None, **kw: (sent.append(kw['json']) or ({'reference_id': 'R'}, 0)))
+    code, out, err = run(args(what='image', file='out/images.json'), capsys)
+    crop = {'L2': {'left': 0.5, 'top': 0.0, 'width': 0.5, 'height': 0.5}}
+    assert code == 0 and all(b['parents'] == ['K1', 'L2'] and b['crops'] == crop for b in sent)

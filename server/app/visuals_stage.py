@@ -2255,6 +2255,7 @@ def generate_image(conn, store, user, run, outputs, body):
             d = unknown[0]
             need(False, f"{element['id']} has a size still unknown ({d.get('part')} {d.get('measure')}) and an approved footage frame {frames_ok[0]['id']}: measure it first "
                         f"(`vw visuals measure --refs {frames_ok[0]['id']} --question ...`), then put the value in the plan with status measured, before its first picture.")
+    writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own (defect 38: kept before the component and sheet lines, which the answer form never holds)
     if body['kind'] == 'component':   # design/117 P1: a thing alone, in the approved style, on a transparent background; the style picture is Image 1
         need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
         style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
@@ -2266,7 +2267,6 @@ def generate_image(conn, store, user, run, outputs, body):
     if body['kind'] == 'sheet' and body['element_id'] != STYLE:   # design/119 rule 2: the server's lines on a reference sheet
         body = {**body, 'prompt': with_composed(body['prompt'], sheet_block(element))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
-    writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own
     crops = body.get('crops') or {}   # design/119 rule 1: {parent id: region}; the server crops before the upload
     for pid, region in crops.items():
         need(pid in (body.get('parents') or []), f'crops names {pid}, which is not among the parents.')
