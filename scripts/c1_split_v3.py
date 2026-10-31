@@ -68,6 +68,8 @@ if __name__ == '__main__':
         apply_visuals(parts)
         from d125_stage7_wording_v3 import apply_visuals as stage7   # design/125 stage 7, O9: the plan's named helper
         stage7(parts)
+        from d37_wording_v3 import apply_visuals as d37   # defect 37: the spec correction folded into out/visual-plan.json
+        d37(parts)
         assert (st['prompt'], st['parts'], st['steps']) == (prompt, parts, steps), 'v3.json does not hold the split (with the part references)'
         print('ok: v3.json holds the split (common + parts == the Phase B text, asserted in build) with the part references')
     else:

@@ -1731,6 +1731,14 @@ def current_plan(store, session):
     return load_json(store, entry['file']['key'])['document']
 
 
+def plan_of(store, run, outputs):
+    """Defect 37: the current visual plan, for `vw visuals plan` (a machine without out/visual-plan.json folds a spec correction into it and proposes again)."""
+    session = session_of(store, run, outputs)
+    need(session.get('current'), 'Propose a visual plan first.')
+    entry = next(v for v in session['versions'] if v['plan_digest'] == session['current'])
+    return {'version': entry['version'], 'plan_digest': session['current'], 'plan': load_json(store, entry['file']['key'])['document']}
+
+
 def select_choice(store, user, run, outputs, choices):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))

@@ -1122,6 +1122,12 @@ def visuals_scene(run_id: UUID, body: SceneUpload, user=User, conn=DB):   # desi
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_scene(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64)))
 
 
+@app.get('/api/runs/{run_id}/visuals/plan')
+def visuals_plan_get(run_id: UUID, user=User, conn=DB):   # defect 37: the current plan, for `vw visuals plan`
+    run, outputs = _visuals_run(conn, user, run_id)
+    return visuals_stage.guarded(lambda: visuals_stage.plan_of(storage(), run, outputs))
+
+
 @app.get('/api/runs/{run_id}/visuals/scene/{shot_id}')
 def visuals_scene_get(run_id: UUID, shot_id: str, user=User, conn=DB):   # design/117 P4: the scene as the loop left it
     run, outputs = _visuals_run(conn, user, run_id)

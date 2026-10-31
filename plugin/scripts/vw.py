@@ -1341,14 +1341,14 @@ def retired(what):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
 _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
-    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps'},
+    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
@@ -1729,6 +1729,12 @@ def cmd_visuals(a):
             emit({'action': 'refused', 'message': 'Give one .ttf or .otf file: `font --file brand.ttf`.'}, 2)
         out = write(base + '/font', {'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
         emit(out, 0, out.get('next'))
+    if a.what == 'plan':   # defect 37: the server's current plan, where a spec correction is folded in before proposing again
+        out = call('GET', base + '/plan')
+        p = ws / 'out' / 'visual-plan.json'
+        save_json(p, out['plan'])
+        emit({'version': out.get('version'), 'plan_digest': out.get('plan_digest'), 'file': str(p)}, 0,
+             f"Plan version {out.get('version')} written to out/visual-plan.json: fold the correction into it, then `vw visuals propose --file out/visual-plan.json` (accepted gaps stay accepted; the operator approves the spec again).")
     if a.what == 'scene':   # design/117 P2: the SVG scene of a drawn shot, one file named by the plan through its sha256; --download: the scene as the loop left it
         import base64 as _b64
         if not a.shot:
