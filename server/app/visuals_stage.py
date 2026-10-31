@@ -994,7 +994,7 @@ def figure_repeat(store, session, row, scene):
                               'individual as a figure in an earlier picture (same face, build, hair, clothes, markings)? Answer repeated true or false, and in detail name the pair '
                               'and what matches. Be literal; two figures of one kind that differ in face, clothes or markings are not repeated.'})
         received, rec['key_index'] = keys.gemini(_gemini_transport(), image_check.CHECK_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'maxOutputTokens': 512}}),
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 8192}}),
             settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
         rec.update(repeated=bool(body.get('repeated')), detail=str(body.get('detail') or '')[:500])
@@ -1207,7 +1207,7 @@ def not_this(store, user, run, outputs, element_id):
     need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
         received, _ = keys.gemini(_gemini_transport(), NOT_THIS_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'maxOutputTokens': 1024}}),
+            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 8192}}),
             settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
     except Exception as exc:
@@ -2735,7 +2735,12 @@ def measure(store, user, run, outputs, ref_ids, question):
     need((question or '').strip(), 'Say what to measure.')
     session = session_of(store, run, outputs)
     frames = [session['references'].get(r) for r in ref_ids or []]
-    need(frames and all(f and f.get('kind') == 'frame' and f['status'] == 'approved' for f in frames), 'Measure reads approved footage frames only: name frames taken from the clips.')
+    need(frames and all(frames), 'Measure reads approved footage frames only: name frames taken from the clips (`vw visuals status` lists them).')
+    for rid, f in zip(ref_ids, frames):   # defect 40: say which frame and why, and the approved ones to use
+        if f.get('kind') != 'frame' or f['status'] != 'approved':
+            ok = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('element_id') == f.get('element_id')]
+            why_ = 'was rejected in the picture round' if f.get('status') == 'rejected' else f"is a {f.get('kind')} picture, not an approved footage frame" if f.get('kind') != 'frame' else f"is {f.get('status')}"
+            need(False, f"{rid} {why_}: measure reads approved footage frames only" + (f"; {f.get('element_id')}'s: {', '.join(ok)}." if ok else f"; {f.get('element_id')} has none: approve one first."))
     where = [f"clip {(f.get('source') or {}).get('media_id')} at {(f.get('source') or {}).get('requested_s')} s" for f in frames]
     parts = []
     for n, (f, w) in enumerate(zip(frames, where), 1):
@@ -2745,7 +2750,7 @@ def measure(store, user, run, outputs, ref_ids, question):
     need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
         received, _ = keys.gemini(_gemini_transport(), MEASURE_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 4096}}),
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 32768}}),
             settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
     except Exception as exc:
@@ -3504,7 +3509,7 @@ def _pair_check(store, start, end, changes):
                           'or state; a person\'s place, pose or what they hold; the light. Ignore the camera\'s framing. For each difference give the number of the planned change '
                           'below that causes it, or 0 when none does. Be literal.\nPlanned changes:\n' + listed}]
         received, rec['key_index'] = keys.gemini(_gemini_transport(), MEASURE_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'maxOutputTokens': 4096}}),
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 8192}}),
             settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
         diffs = [{'what': str(d.get('what') or '')[:300], 'change': d.get('change') if isinstance(d.get('change'), int) else 0} for d in body.get('differences') or [] if isinstance(d, dict)]

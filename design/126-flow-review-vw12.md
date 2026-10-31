@@ -1284,6 +1284,84 @@ Checked in the live code (main d1335eb; pages `templates/review.html` and `templ
 | U6 | "if web search is not bringing results … earlier we had an option to upload a user-given reference image or an image link" | It exists: **"Add your own picture"**, a file or an https link, saved and approved for that thing (design/110, live). But it is shown only on a thing's own view (after the round), not in the **round view** the screenshots show (`renderRound` has no such box), which is where a search comes back empty | **Partly done.** Proposed: the same box under each thing's search in the round view, and shown first when a search finds nothing. **SK, 31 Oct 2026:** the upload and link option appears in the same place as the selected picture (the panel on the right where a picture opens), for that thing |
 | U7 | "some image requirements I am not able to make out where exactly that will be useful … mention the narration line or the scene description" | A thing's card shows its id, name and kind only (for example "clay_pan · Iron pan of wet clay · object"); the page already holds the plan's shots that show each thing, with their words | **Not done.** Proposed: under each thing's name, "used in": each shot that shows it (gap, shot) with the narration words under that shot and its one-line picture, so the operator can judge and refine the search |
 
+### Phase 3 — The detailed plan (resumed 31 Oct 2026, with the review prompt vw2-notes/124-c4-review-prompt.md, unchanged since 30 Oct 09:27)
+
+**Where VW-12 is in the visuals stage (read on the server, 31 Oct afternoon):** the plan proposed at 17:13 IST on 30 Oct (version 1, the only one) and **all 12 gaps accepted**; the picture search (phase 4) **complete** (108 searches; 27 web pictures and 6 footage frames approved, 6 frames rejected); two size corrections sent (brick, mortar: defect 37) and not yet folded in; **no picture made yet** (no paid job). So phases 3 and 4 are done and reviewable; phase 5 (sheets) has not produced anything.
+
+**VW-12's plan (I read the stored copy):** 38 elements (15 objects, 8 places, 7 people, 5 techniques, 2 materials, 1 process), 23 scenes, **25 shots** (16 AI video, 7 drawn, 1 still, 1 graphic sequence), 2 material specs and 7 drawing specs, no choices; 276 KB; 11 warnings at proposal (cut_off_pause 5, spec_unresearched 2, ai_run 2, life_missing 1, still_long 1). **No graphics-run warning on any drawn shot**, which confirms the builder's finding for TR1: the plan's 8 s rule does not count drawn shots.
+
+**The map (waiting for SK's yes).** Words: the live plan part (3,153) by paragraph and step 2 (35). Server checks: the plan check (`visual_contract.validate_plan`, about 167 refuse or warn lines; counted by sub-step when reviewed).
+
+| # | Sub-step | Words | VW-12 |
+|---|---|---|---|
+| 9.3.1 | Order of work: plan-base (foundation, elements, style, sequence), helpers write the gaps at once (`vw-plan-gaps`), plan-join, check until valid, warning answers, the review before proposing, propose, accept per gap, revisions | 354 + 35 | proposed 17:13, 12 accepted |
+| 9.3.2 | The foundation: world, exclusions, specifications, constraints, appearance; requirement / Proposed / unknown | 292 | – |
+| 9.3.3 | Meaning: claims, descriptors, evidence, visual facts, messages | 196 | – |
+| 9.3.4 | Elements: exact or representative, footage frames for the client's own, techniques, sizes and material specs, people, a real speaker | 391 | 38 elements |
+| 9.3.5 | Scenes and life: activity level, background people and crowds, holds, ambient line, light and air, props, signs of use | 447 | 23 scenes |
+| 9.3.6 | Positions, states and beats: landmarks, start and end states, beats, fixed landmarks, gaze | 339 | – |
+| 9.3.7 | Timing and movement: cuts in pauses, shot lengths, AI runs, footage shots, motion of stills, sizes and camera reasons, crops, transitions, no picture twice | 534 | 25 shots |
+| 9.3.8 | Graphics: builds, drawn shots, labels, claims, one graphic style | 283 | 7 drawn, 1 sequence |
+| 9.3.9 | Drawing specs: research order, status, illustrative, the operator's approval table and corrections | 313 | 9 specs; 2 corrections |
+
+Total: 3,188 words. Free (no picture is made).
+
+### 9.3.1 — Order of work (reviewed 31 Oct 2026; SK repeated the map's question, taken as the yes)
+
+**What happened on VW-12 (read in the stored plan and the run's session):** treatment recorded 16:42, plan proposed 17:13 (31 minutes); one version; every gap accepted with "Yes Approved" (the operator's words); 11 warnings at proposal, **15 warning answers**, each in its own box, never in the picture's purpose (design/124 Change 7 at work); the sequence overview says what each gap adds ("Gap 3 introduces the drawn cutaway… Gap 4 develops it"); no open question. Whether the `vw-plan-gaps` helpers wrote the gaps is not recorded on the server (the plan files stay on the laptop).
+
+**Findings (I read the plan part's first paragraph, 354 words, step 2, the plan's warnings and their answers)**
+- Works: one pass, checked, answered, accepted gap by gap.
+- ⚠ **The treatment fixes lengths the plan then warns about, so the warnings are answered away (points 3 and 13, the same root as TR1):** the plan warns on AI video running back to back over 12 s (`ai_run`: gap 5-B1 13.9 s, gap 8-B1 18.8 s) and a still over 4 s (`still_long`: 3-B2's 5.6 s). Each answer says, in effect, "the accepted treatment set this length" ("The accepted treatment makes this gap three AI video shots (6.6, 5.04 and 7.2 s)…"). The treatment's check knows neither rule, so the operator accepted the lengths without the warning, and the plan's warning came too late to act on. The 12 s run rule is SK's decision (d) of 29 Oct ("AI video is broken up… the run rule stays").
+- The `cut_off_pause` answers ("the narration has no longer pause here; the cut falls at the end of the sentence") are real answers: fine.
+- Nothing paid; no keys; helpers: not visible; no older way; no label.
+
+**Proposed (waiting for SK)**
+- **TR3 — The treatment gives the plan's two other length warnings too:** with TR1's graphics run, the treatment check reads each gap's `shots` (route and seconds) and gives the plan's own `ai_run` warning (AI video back to back over 12 s in a gap) and `still_long` warning (a still over 4 s), shown on the line before the operator accepts. No instruction text added. Hurts: every film with long AI stretches (VW-12: 2 gaps, 1 still). Work: the treatment check reuses the plan's two rules (one server function) and a test; built into the waiting design/126 build with TR1. Breaks: nothing stored. Undo: remove the calls. Operator: sees the warning before accepting the length. Success: VW-12's treatment re-checked gives the two AI-run warnings and the long still. **Older way:** retired in this release (the limits first met at the plan).
+
+| Decided | Parked | Open |
+|---|---|---|
+| TR3 agreed (SK, 31 Oct 2026: "Yes, approve TR3") | whether the plan helpers ran (not recorded on the server) | – |
+
+**For the builder (TR3):** with TR1 in `visuals_stage.treatment`: from each entry's `shots`, back-to-back `video` shots over `AI_RUN_S` (12 s) give `visual_contract`'s `ai_run` warning, a `still` shot over the plan's still limit (4 s) its `still_long` warning; returned with the draft and shown on the line. Test: VW-12's treatment gives the two AI-run warnings and the long still.
+
+### 9.3.2 — The foundation (reviewed 31 Oct 2026)
+
+**What happened on VW-12 (I read the plan's foundation whole):** six world rules, three exclusions, two specifications, one production and one editing constraint, the appearance, the graphic style, and the treatment opening word for word with the Direction. Every rule names its source: the client card (Kanyakumari, Tamil Nadu), clip findings by clip number (masons in beige or cream collared shirts, dark trousers, sandals: C0088, C0097, C0120…; the site's tools: trowel, tasla, straightedge, plumb bob, coconut-midrib broom), the brief (PPE flags waived, Tamil speech), the claims ("only 25 percent and 20, 35 and 75 kg/cm²; the comparable-strength graphic carries no numbers"). The editing constraint even says what the two rejected shots showed (C0089 clearing the surface, C0100 finishing joints): written by hand, what MA1 will give the stage by itself. Exclusions are real consequences of the Direction (no client signboards or campus; no bad practice shown as right). No invented region or dress.
+
+**Findings (I read the foundation paragraph, 292 words, and the plan check's proportion rule)**
+- Works: a casting and production-design brief another director could use.
+- ⚠ **An example in the instructions became a rule of the film (point 7, prompts that write prompts; point 20):** the world rule W_bricks says bricks are "about 3 : 1.5 : 1 in length, width and height", marked "Proposed from the usual Indian modular brick". That figure is the instructions' own example ("a spec of a real object its proportions (a brick about 3 : 1.5 : 1 …)"; the server's warning repeats it: "for example a brick about 3 : 1.5 : 1"). The operator's correction says **190 × 90 × 90 mm** (the Indian modular brick, about 2.1 : 1 : 1). Every picture of a brick would follow the example, not the brick.
+- **A consequence for VW-12's correction (defect 37):** folding the brick size into the element's material spec alone leaves W_bricks saying 3 : 1.5 : 1; correcting W_bricks too changes the foundation, which **un-accepts all 12 gaps** (a gap's acceptance covers the foundation; only a material spec is left out). The operator then accepts them again (one "accept all"). Defect 37's note says "accepted gaps stay accepted", which is true only for the spec.
+- Nothing paid; no keys; no block; no helper; no older way; no label.
+
+**Proposed (waiting for SK)**
+- **PL1 — No brick figure as the example:** the plan part's "(a brick about 3 : 1.5 : 1; a drawing spec is warned without them, a material spec refused)" becomes "(a drawing spec is warned without them, a material spec refused)", and the server's warning drops "for example a brick about 3 : 1.5 : 1,". Shorter. Hurts: every film with bricks or blocks (the proportion is copied). Work: one replacement in v3 (with the split check), one in the server's message, a test. Breaks: nothing stored; VW-12's plan keeps its rule until corrected. Undo: the old text. Success: no brick figure in the plan part or the server's warnings. **Older way:** retired in this release.
+- **For VW-12 now (no build):** when the brick correction is folded in, W_bricks is corrected to 190 × 90 × 90 mm too, and the operator accepts the 12 gaps again; I add this to defect 37's note on SK's yes.
+
+| Decided | Parked | Open |
+|---|---|---|
+| PL1 agreed (SK, 31 Oct 2026: "remove the brick example") | – | the note for VW-12: replaced by F37b below |
+
+**For the builder (PL1):** v3 plan part: "(a brick about 3 : 1.5 : 1; a drawing spec is warned without them, a material spec refused)" → "(a drawing spec is warned without them, a material spec refused)" (a replacement script hooked into `c1_split_v3.py --check`); `visual_contract.py` line ~738: "for example a brick about 3 : 1.5 : 1, " removed. Test: no "3 : 1.5 : 1" in v3 or the server.
+
+#### F37b — A proper way to resubmit a revised spec (SK, 31 Oct 2026: "need a proper fix"; requirements, waiting for SK)
+**Today:** after an operator's correction, the only way to put a revised spec in is the whole plan: download it (`vw visuals plan`, defect 37), edit the JSON by hand, check, propose again. The operator's assistant had already written the revised specs as files (`out/spec-brick.json`, `out/spec-mortar.json`) and found no command that takes them. Hand-editing a 276 KB plan is where mistakes come from.
+**Proposed:**
+1. `vw visuals spec --element E --file out/spec-E.json` (a material spec) and `vw visuals spec --shot S --file out/spec-S.json` (a drawing spec): one server step that checks the file against the spec form, puts it in place of that element's or shot's spec as a new plan version, and changes nothing else. Accepted gaps stay accepted (a spec is not part of a gap's acceptance, design/124 C2 fix 6); the correction stops waiting (the spec changed); the operator then approves the table as today (page or `vw visuals spec --quote`). The same server step serves the page later (one flow, two front ends).
+2. The plan part's correction sentence names this command instead of the plan download (same length or shorter).
+3. One rule, said where the foundation is described: a material's sizes and proportions live only in its spec, never in the foundation (so a correction is made once). Word count kept by trimming the same paragraph.
+**Edge cases:** a file that fails the spec form is refused by name, nothing changed; a shot or element without a spec refused; a spec for an element not in the plan refused; a spec whose numbers are still unknown keeps its research warnings; two corrections in a row each replace the last.
+**For VW-12:** the foundation's W_bricks still says 3 : 1.5 : 1 (the example, PL1). With F37b the brick spec (190 × 90 × 90 mm) is approved and pasted into every brick prompt by the server (design/111 F10); W_bricks is corrected once with the plan download when convenient (that one change makes the 12 gaps need accepting again).
+**Older way:** the hand-edited whole plan for a spec correction: retired for specs in this release (`vw visuals plan` stays for other revisions).
+
+#### Defect 40 (VW-12, 17:46): measuring fails; frames refused (read on the server and in the code)
+1. **The measure call fails every time ("Provider did not complete with STOP").** `visuals_stage.measure` asks Gemini 3.8 Flash for at most 4,096 tokens and sets no thinking level, so the model's own thinking (which counts against that limit) uses it up and the answer is cut off; the transport refuses a cut-off answer. The checks of pictures and takes set `thinkingLevel: LOW` with their limits; four calls do not: **measure (4,096), the web figure research (512), the not-this list (1,024) and the start/end pair check (4,096)**, so each is likely to fail the same way the first time it is used. (Assumed from the code and the error, not confirmed with a live call: the cut-off reason is not in the message.)
+2. **"Not footage frames":** both refused requests named a frame the operator **rejected** in the picture round (84c8… for the trowel; 6d02… with the approved 73a5… for the wall). The refusal is right, but its words ("approved footage frames only: name frames taken from the clips") do not say which frame or why, and the status lists rejected frames beside approved ones.
+3. **The corrections and the measured sizes:** measured sizes go into the elements' `size` and the corrections into their material specs; both are left out of a gap's acceptance, so `vw visuals plan`, edit, `propose` keeps the 12 gaps accepted (only a change to the foundation, such as W_bricks, un-accepts them). So the operator's own route works now, and covers sizes, which F37b (specs only) would not. **Recommended: drop F37b; keep the plan route.**
+
+**Proposed fix D40:** measure gets room to answer (`maxOutputTokens` 32,768, as the fix call has) ; the figure research, not-this and pair check get `thinkingLevel: LOW` and 8,192 like the other checks; a measure naming a frame that is not approved says which and why ("84c8… was rejected in the picture round: measure an approved frame of trowel: …", listing the approved ones). With PL1 in the same release. Tests: each call's settings; the refusal names the frame and the approved ones.
+
 ## Why VW-12 hits one defect after another (defects 35–38, 31 Oct 2026)
 
 Read in the code, the live server's log and the defects table.
