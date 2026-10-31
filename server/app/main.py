@@ -85,6 +85,11 @@ def size_guard(request: Request):
         raise Problem(413, 'BODY_TOO_LARGE', 'Store large content as a file; the database keeps only hashes and a short summary.')
 
 
+def plan_size_guard(request: Request):   # defect 41: the visual plan is saved to storage, so its limit is the plan's, not the database's
+    if int(request.headers.get('content-length') or 0) > settings().PLAN_MAX_BODY_BYTES:
+        raise Problem(413, 'BODY_TOO_LARGE', f'The plan is over {settings().PLAN_MAX_BODY_BYTES // (1024 * 1024)} MB; split long text out of it.')
+
+
 PLANNING_RETIRED = 'The planning stage is retired with procedure version 1; films on version 3 use options and master (`vw options`, `vw master`).'
 OPTION_NUMBER_RETIRED = 'option_number is retired; answer by slide (`slide`, a label such as 2 or 2B).'
 
@@ -1062,13 +1067,13 @@ def visuals_prepare(run_id: UUID, body: Write, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.prepare(conn, storage(), user, run, outputs))
 
 
-@app.post('/api/runs/{run_id}/visuals/check', dependencies=[Depends(size_guard)])
+@app.post('/api/runs/{run_id}/visuals/check', dependencies=[Depends(plan_size_guard)])
 def visuals_check(run_id: UUID, body: VisualPlan, user=User, conn=DB):
     run, outputs = _visuals_run(conn, user, run_id)
     return Response(visuals_stage.check(storage(), run, outputs, body.plan))
 
 
-@app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(size_guard)])
+@app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(plan_size_guard)])
 def visuals_propose(run_id: UUID, body: VisualPlan, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan))
 

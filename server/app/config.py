@@ -14,10 +14,11 @@ class Settings(BaseSettings):
     SESSION_HOURS: int = 168
     DEFAULT_PROCEDURE_VERSION: str = '3'  # clip-log-v1 analysis; version 1 keeps the v1 evidence contract
     MAX_BODY_BYTES: int = 256 * 1024            # guard against blobs in the database; files go to storage
+    PLAN_MAX_BODY_BYTES: int = 4 * 1024 * 1024   # defect 41: a visual plan is stored as a file, never in the database; VW-12's is about 280 KB
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.77.6'
+    SERVER_VERSION: str = '0.77.7'
     GEMINI_IMAGE_MODEL: str = 'gemini-3-pro-image'   # design/120: Nano Banana Pro as Google's docs name it; SK's exact id goes in server/.env (VW2_GEMINI_IMAGE_MODEL)
     GEMINI_IMAGE_SIZE: str = '2K'                     # design/120: 1K, 2K or 4K (uppercase K)
     GEMINI_IMAGE_USD: float = 0.134                   # design/120: Google's price per 1K/2K picture, 28 Oct 2026
