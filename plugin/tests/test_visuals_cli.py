@@ -421,7 +421,7 @@ def test_still_bind_and_approve_take_a_file_of_rows_in_order_and_stop_at_the_fir
         return {'shot_id': json.get('shot_id'), 'kind': 'still'}, 0
     monkeypatch.setattr(vw, 'request', req)
     code, out, err = run(args(what='still', file='out/stills.json'), capsys)
-    assert code == 2 and [c[1]['shot_id'] for c in calls] == ['IM1', 'IM2'] and calls[0][1] == {'shot_id': 'IM1', 'reference_id': 'R1', 'quote': 'yes'}
+    assert code == 2 and [c[1]['shot_id'] for c in calls] == ['IM1', 'IM2'] and {k: v for k, v in calls[0][1].items() if k != 'request_id'} == {'shot_id': 'IM1', 'reference_id': 'R1', 'quote': 'yes'} and calls[0][1]['request_id']   # defect 35
     assert out['done'] == ['IM1'] and out['refused']['shot'] == 'IM2' and out['remaining'] == ['IM3'] and 'animation shot' in err
     (ws / 'out' / 'bindings.json').write_text(json.dumps([{'shot': 'VS1', 'refs': {'E1': ['R1', 'R2']}}, {'shot': 'VS2', 'refs': {'E1': ['R3']}, 'selectors': {'E1': {'R3': 'the chair'}}}]), encoding='utf-8')
     calls.clear()
@@ -433,7 +433,7 @@ def test_still_bind_and_approve_take_a_file_of_rows_in_order_and_stop_at_the_fir
     calls.clear()
     monkeypatch.setattr(vw, 'request', lambda m, p, json=None, **kw: calls.append((p, json)) or ({'id': p.split('/')[-2], 'status': 'approved'}, 0))
     code, out, err = run(args(what='approve', file='out/approvals.json'), capsys)
-    assert code == 0 and calls[0][0].endswith('/references/R1/approve') and calls[1][1] == {'sha256': 'b' * 64, 'quote': 'yes'} and out['done'] == ['R1', 'R2'] and '2 approved' in err
+    assert code == 0 and calls[0][0].endswith('/references/R1/approve') and {k: v for k, v in calls[1][1].items() if k != 'request_id'} == {'sha256': 'b' * 64, 'quote': 'yes'} and calls[1][1]['request_id'] and out['done'] == ['R1', 'R2'] and '2 approved' in err
 
 
 def test_prompt_and_steps_say_a_still_shot_needs_no_bind_and_name_the_file_forms():
@@ -560,7 +560,7 @@ def test_frame_file_posts_the_rows_in_order_and_stops_at_the_first_refusal(harne
         return ({'action': 'refused', 'message': 'Unknown clip c9.'}, 422) if kw['json']['source_media_id'] == 'c9' else ({'id': 'R-' + kw['json']['element_id'], 'kind': 'frame'}, 0)
     monkeypatch.setattr(vw, 'request', request)
     code, out, err = run(args(what='frame', file='out/frames.json'), capsys)
-    assert code == 2 and [p['element_id'] for p in posted] == ['E1', 'E2', 'E3'] and posted[0] == {'element_id': 'E1', 'name': 'frame-E1', 'kind': 'frame', 'subject': 'the mason', 'source_media_id': 'c1', 'requested_s': 12.5}
+    assert code == 2 and [p['element_id'] for p in posted] == ['E1', 'E2', 'E3'] and {k: v for k, v in posted[0].items() if k != 'request_id'} == {'element_id': 'E1', 'name': 'frame-E1', 'kind': 'frame', 'subject': 'the mason', 'source_media_id': 'c1', 'requested_s': 12.5} and posted[0]['request_id']   # defect 35: every write carries its request id
     assert 'E1@12.5' in json.dumps(out) and 'E2@3' in json.dumps(out) and 'Unknown clip c9' in json.dumps(out)
     assert 'frame --file' in json.dumps(STAGES['visuals']) and 'frame --file' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
 

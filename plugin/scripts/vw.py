@@ -42,9 +42,21 @@ RUNS = Path(os.environ.get('VW2_RUNS') or Path.cwd() / 'runs')
 
 def emit(payload, code=0, summary=None):
     print(json.dumps(payload, indent=1, default=str))
-    hint = (payload.get('message') or payload.get('action')) if isinstance(payload, dict) else f'{len(payload)} item(s)'
+    hint = (why(payload)) if isinstance(payload, dict) else f'{len(payload)} item(s)'
     print(summary or hint or 'ok', file=sys.stderr)
     sys.exit(code)
+
+
+def why(payload):
+    """defect 35: what a refusal says: its message, else its action, else the server's validation detail (never None)."""
+    if not isinstance(payload, dict):
+        return str(payload)
+    if payload.get('message') or payload.get('action'):
+        return payload.get('message') or payload.get('action')
+    d = payload.get('detail')
+    if isinstance(d, list):
+        return '; '.join(f"{'.'.join(str(x) for x in (e.get('loc') or [])[1:])}: {e.get('msg')}" for e in d if isinstance(e, dict)) or 'refused'
+    return str(d or 'refused (no reason given)')
 
 
 def load_json(path, default=None):
@@ -1636,7 +1648,7 @@ def cmd_visuals(a):
             for i, it in enumerate(items):
                 parents = it.get('parents') or []
                 body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
-                        'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt'), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
+                        'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt') or _answer_prompt(m, it.get('answer')), 'parents': parents.split(',') if isinstance(parents, str) else list(parents),
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
                         **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
                         **_pair_fields(m, it.get('variants'), it.get('end_answer')), **({'shot_id': it['shot']} if it.get('shot') else {}),   # design/86 K1, K4; design/91 N8
@@ -1647,14 +1659,14 @@ def cmd_visuals(a):
                 if code:
                     if code == 401:
                         finish(payload, code)
-                    emit({'queued': queued, 'refused': {'element': body['element_id'], 'message': payload.get('message') or payload.get('action')},
+                    emit({'queued': queued, 'refused': {'element': body['element_id'], 'message': why(payload)},
                           'remaining': [x.get('element') for x in items[i + 1:]], 'action': 'refused'}, 2,
-                         f"{len(queued)} queued; {body['element_id']} refused: {payload.get('message')}; fix it and run the file again")
+                         f"{len(queued)} queued; {body['element_id']} refused: {why(payload)}; fix it and run the file again")
                 queued.append(payload['reference_id'])
                 warned += [f"{body['element_id']}: {w}" for w in payload.get('warnings') or []]   # design/89 C, D
             emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid images queued with the film's picture AI; tell the operator, then `vw visuals status --wait 300`." +
                  (' Warnings: ' + '; '.join(warned) if warned else ''))
-        body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt,
+        body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt or _answer_prompt(m, a.answer),
                 **_parents_and_crops(a.parents), **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),   # design/119 rule 1: id or id@left,top,width,height
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
                 **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {}),   # design/91 N8; design/106 T1
@@ -1750,7 +1762,7 @@ def cmd_visuals(a):
             if code == 401:
                 finish(payload, code)
             if code:
-                refused[sid] = payload.get('message') or payload.get('action')
+                refused[sid] = why(payload)
             else:
                 queued.append(sid)
         emit({'queued': queued, 'refused': refused}, 0 if queued or not refused else 2,
@@ -1873,6 +1885,14 @@ def _reuse_fields(a):
     return out
 
 
+def _answer_prompt(m, answer):
+    """defect 35: the prompt of an answer form (the server refuses a prompt that differs from its answer's), None without one."""
+    if not answer:
+        return None
+    ans = _json_file(m, answer)
+    return ans.get('prompt') if isinstance(ans, dict) else None
+
+
 def _pair_fields(m, variants, end_answer):
     """design/86 K1, K4: two candidates for a start, and the end prompt written with it (its answer file; the prompt is the answer's prompt)."""
     out = {}
@@ -1891,12 +1911,12 @@ def _batch(rows, build, label, done_line, note=None):
     done, notes = [], []
     for i, row in enumerate(rows):
         name, method, path, body = build(row)
-        payload, code = request(method, path, json=body)
+        payload, code = request(method, path, json={'request_id': str(uuid.uuid4()), **body} if method == 'POST' else body)   # defect 35: a write without its request id was refused for every row
         if code:
             if code == 401:
                 finish(payload, code)
-            emit({'done': done, 'refused': {label: name, 'message': payload.get('message') or payload.get('action')}, 'remaining': [build(r)[0] for r in rows[i + 1:]], 'action': 'refused'}, 2,
-                 f"{len(done)} done; {name} refused: {payload.get('message')}; fix it and run the file again with the rest")
+            emit({'done': done, 'refused': {label: name, 'message': why(payload)}, 'remaining': [build(r)[0] for r in rows[i + 1:]], 'action': 'refused'}, 2,
+                 f"{len(done)} done; {name} refused: {why(payload)}; fix it and run the file again with the rest")
         done.append(name)
         said = note(name, payload) if note else None   # design/95 F8: what each call did, when it says
         if said:
@@ -1987,7 +2007,7 @@ def second_look(m):
                 for edge in ('in', 'out'):
                     payload, code = request('POST', f"/api/runs/{m['run_id']}/options/frames", json={'request_id': str(uuid.uuid4()), 'sub_clip_id': sub, 'edge': edge})
                     if code:
-                        grabbed[sub]['note'] = f"{edge}: {payload.get('message') or payload.get('action') or code}"
+                        grabbed[sub]['note'] = f"{edge}: {why(payload) or code}"
                         continue
                     shots = payload.get('frames') or []
                     keep = [shots[i] for i in sorted({0, len(shots) // 2, len(shots) - 1})] if shots else []
@@ -2163,9 +2183,9 @@ def cmd_master(a):
                 if code:
                     if code == 401:
                         finish(payload, code)
-                    emit({'recorded': recorded, 'refused': {'slide': body['slide'], 'message': payload.get('message') or payload.get('action')},
+                    emit({'recorded': recorded, 'refused': {'slide': body['slide'], 'message': why(payload)},
                           'remaining': [slide_label(x.get('slide', '')) for x in answers[i + 1:]], 'action': 'refused'}, 2,
-                         f"{len(recorded)} recorded; #{body['slide']} refused: {payload.get('message')}; fix it and run the file again")
+                         f"{len(recorded)} recorded; #{body['slide']} refused: {why(payload)}; fix it and run the file again")
                 recorded.append(body['slide'])
                 last = payload
             emit({'recorded': recorded, 'decided': last.get('decided'), 'of': last.get('of')}, 0, f"{len(recorded)} answers recorded; {last.get('decided')} of {last.get('of')} decided")
@@ -2230,8 +2250,8 @@ def cmd_assembly(a):
                 if code:
                     if code == 401:
                         finish(payload, code)
-                    emit({'recorded': recorded, 'refused': {'shot': body['shot_id'], 'message': payload.get('message') or payload.get('action')},
-                          'remaining': [x.get('shot') for x in items[i + 1:]], 'action': 'refused'}, 2, f"{len(recorded)} recorded; {body['shot_id']} refused: {payload.get('message')}; fix it and run the file again")
+                    emit({'recorded': recorded, 'refused': {'shot': body['shot_id'], 'message': why(payload)},
+                          'remaining': [x.get('shot') for x in items[i + 1:]], 'action': 'refused'}, 2, f"{len(recorded)} recorded; {body['shot_id']} refused: {why(payload)}; fix it and run the file again")
                 recorded.append(body['shot_id'])
             emit({'recorded': recorded}, 0, f'{len(recorded)} fill choices recorded; `vw assembly build`')
         emit(write(base + '/choose', {'shot_id': a.shot, 'offset_frames': int(a.offset or 0), 'end_policy': a.end or 'trim', 'accept_as_is': bool(a.accept_as_is)}))
@@ -2580,13 +2600,6 @@ def build_parser():
     return p
 
 
-if __name__ == '__main__':
-    try:
-        main()
-    except SystemExit:
-        raise
-    except Exception as exc:  # last resort: never a traceback into the chat
-        emit({'action': 'tell_builder', 'message': f'vw failed unexpectedly: {exc.__class__.__name__}: {exc}'}, 1)
 
 
 def _parents_and_crops(text):
@@ -2616,3 +2629,12 @@ def _split_at(text):
             out.append(parts[i])
             i += 1
     return out
+
+
+if __name__ == '__main__':   # defect 35: last, so every helper above exists when vw runs as a script
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as exc:  # last resort: never a traceback into the chat
+        emit({'action': 'tell_builder', 'message': f'vw failed unexpectedly: {exc.__class__.__name__}: {exc}'}, 1)
