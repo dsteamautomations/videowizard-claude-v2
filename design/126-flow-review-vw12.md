@@ -1038,6 +1038,252 @@ Not reached on VW-12 (no trim). Nothing to discuss.
 |---|---|---|
 | 8.1, 8.1.1: no change | – | – |
 
+### 8.2 — Building the master (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the master record):** built at 16:03 with no refusal: rejected shots 1.2, 6.7 and 9.4 took their kept alternative; 6.1 and 8.1 had none and became blanks; neighbouring blanks were joined (scene 3's five blanks became two gaps of 21.3 and 16.4 s; scene 5's four became one of 45.6 s). Free.
+
+**How a rejected shot's gap is described (I read `stage2/stage.py`, the build):** "in place of rejected Scene 6 · Shot 1: Construction begins with proper preparation of the plinth surface. The" (the shot's title and the words spoken under it), then joined with the next blank's description. VW-12's two:
+- "in place of rejected Scene 6 · Shot 1: Construction begins with proper preparation of the plinth surface. The; Plinth top swept clean of dust and loose material…"
+- "in place of rejected Scene 8 · Shot 1: Since the brickwork often remains exposed, pointing is carried; Pointing: on a finished exposed rat-trap bond wall, a mason fills…"
+
+**Findings**
+- Works: the refusals (a scene sent back to find footage, a blank under 3 s, a trim that changes a scene's length, a clip used twice) and the joining.
+- ⚠ **The parked item of design/125 (8.2.4), still true (point 7, prompts that write prompts):** a rejected shot's gap tells the visuals stage only the words (which it gets anyway, after "| narration:"). It does not say **what the rejected footage showed** (what the operator turned down, so the picture does not repeat it), and **the operator's reason, when given, is dropped**: the build reads the answer's action but never its note (the note is used only to propose a client rule, 8.5).
+- Nothing paid; no keys; nothing parallel; no block; no helper; no older way; no label. Fingerprint: the gap's description is what the visuals stage plans from; this changes only new masters.
+
+**Proposed (waiting for SK)**
+- **MA1 — A rejected shot's gap says what was turned down and why:** "in place of rejected Scene 6 · Shot 1 (it showed: <the piece's 'what is seen'>; the operator: <their reason, when given>)". The words stay in the gap's narration part, not repeated. Hurts: every film with a rejected shot and no alternative (VW-12: 2). Work: one line in the build and a test. Breaks: nothing stored; masters already recorded keep their gaps. Undo: the old line. Operator: nothing (a reason, when they give one, now reaches the pictures). Success: on VW-12's answers, gap 6's description carries the rejected clip's "what is seen" line and no narration fragment. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| MA1 agreed (SK, 30 Oct 2026: "Yes, approve MA1") | – | – |
+
+**For the builder (MA1):** `server/app/stage2/stage.py`, the build's rejected-shot blank: `intent` = f"in place of rejected {title} (it showed: {the piece's card overview}" + (f"; the operator: {note}" if the answer has a note) + ")"; the words no longer repeated in the intent. Test: a rejected shot without an alternative gives that intent, with and without a note.
+
+### 8.3 — Rendering the master (reviewed 30 Oct 2026)
+16:03:08 → 16:05:20 (2.2 min, free): 296.28 s, loudness −16.4 LUFS, peak −2.6 dB (the mix rule's target −16). Nothing to discuss.
+
+### 8.4 — Approval (reviewed 30 Oct 2026)
+Recorded 16:19:26, 14 minutes after the film was ready, with "Watched and listened to the master, approved" (both said, as the step requires); master and first cut recorded together. Nothing to discuss.
+
+### 8.5 — A client rule from a rejection note
+Not reached (no reason given on any Reject; no rule added). Nothing to discuss.
+
+### 8.6 — The gaps handed to the visuals stage (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the master record):** **12 gaps, 185.9 s (63 % of the film)**, from 3.5 s (guide strings) to 45.6 s (scene 5: a brick close-up, the strength graphic in two parts, the testing machine); each gap carries the cut's descriptions in order, joined by ";", then the narration under it. The visuals stage started at 16:20.
+
+**Findings (I read step 2, 26 words, and the gaps)**
+- Works: every AI stretch and every rejected shot without an alternative became a gap with its description; joined gaps keep each description in order, so the visuals plan sees the cut's intended shots.
+- The 2 rejected-shot gaps: MA1. A 45.6 s gap is long, but the visuals stage already breaks AI video over 12 s with footage or stills (its own rule).
+- Nothing paid; no keys; no block; no helper; no older way; no label. **Nothing else to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 8.3–8.6: no change beyond MA1 | – | – |
+
+### Stage 8 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| MA1 (a rejected shot's gap says what was turned down and why; design/125's parked 8.2.4 item closed) | – | – |
+
+---
+
+## Stage 9 — Visuals
+
+The visuals stage has its own flowchart: `design/visuals-flowchart.md` (created 30 Oct 2026 from design/121 and 124, then grown phase by phase). Phases 1–4 were reviewed on earlier films (design/121, 124); on VW-12 each phase is walked again by its sub-steps with the review prompt, without raising again what was decided there.
+
+### Where VW-12 is (read in the database and storage, 30 Oct, about 17:00 IST)
+| Step | When (IST) | What |
+|---|---|---|
+| 1 Preparation | 16:20–16:21 | package written (240 KB) |
+| Defect 34 | filed 16:43, fixed 16:48 (by another session, server only) | "vw next reports paid: openai-images" on a Nano Banana film; a fixed label, the pictures already followed the run's choice |
+| 2 Treatment and after | not started | – |
+
+### Phase 1 — Preparation: the map (waiting for SK's yes)
+
+Words: the live v3 visuals common part (1,168, read at every step) and the preparation part (151) and step (20). VW-12's package as stored: world files 85 KB (46 clips), the parts 54 KB, source 42 KB, plan form 27 KB, footage look 14 KB, brief 4 KB, intended pictures 3 KB, claims 1 KB.
+
+| # | Sub-step | Words | VW-12 |
+|---|---|---|---|
+| 9.1.1 | `vw visuals prepare`: the package as files, the parts per step, the prompt guide per step | 151 + 20 | 16:20, 240 KB |
+| 9.1.2 | What to read first: prompt.md, gaps, intended pictures, claims; the world files at the plan | (in 9.1.1) | – |
+| 9.1.3 | The footage look, measured from the clips, told in one line; corrected on the page | (in 9.1.1) | "camera not known, tripod, natural look" |
+| 9.1.4 | The page link and the "what next" message (with the paid line of defect 34) | (in 9.1.1) | defect 34 |
+| 9.1.5 | The common part (sections A–D) read at every step | 1,168 | – |
+
+Free; nothing paid at this phase.
+
+**SK, 30 Oct 2026:** "We will review this again with the prompt as we have many additional checks added." The visuals stage is reviewed separately, phase by phase, with the review prompt (vw2-notes/124-c4-review-prompt.md, with its added checks); this map and the flowchart are its starting point. design/126 ends here: stages 0–8 reviewed on VW-12.
+
+**SK, 30 Oct 2026: "1 Preparation - step"** — the phase named; its review starts here, with every point of the prompt (1–22). From the rule list (design/124-a0): 21 preparation rules (7 in the steps, 1 in the guide, 6 server refusals, 7 "what next" lines); two of them flagged as contradicting in October (R2191/R2290: plan before treatment), fixed by design/124 Change 1 (I read the live server's message: treatment first, then the plan).
+
+### 9.1.1 — `vw visuals prepare` (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in storage):** session 16:20, package 16:21 (240 KB): 12 gaps with timed narration and neighbours, 9 intended-picture scenes, 6 claims, the brief with its rules, the footage look (14 KB, per clip), 46 world files (85 KB: people, objects and landmarks per clip), the plan form (27 KB), the video tools, the instructions (common part and 5 parts, 54 KB). Free, seconds. The chat tool wrote one file per section and the prompt guide per step.
+
+**Findings (I read the server's `visuals_stage.prepare`, the chat tool's `visuals prepare` and its message, the preparation part, 151 words, and step 0)**
+- Works: one "what next" (treatment, then the plan: Change 1); the instructions split by step (C2): the chat tool says "read prompt.md once, then part-<step>.md when you reach that step"; the version-1 evidence retired by refusal (design/125).
+- ⚠ **The other voice is behind (point 19):** the chat tool's message says "Read prompt.md, gaps.json and intended-visuals.json first"; the preparation part (since S3, design/125) says those **and claims.json** (the figures, checked or not). The message's own read list is a third copy (the step says it too) and the one that is out of date.
+- Too much input (point 11): read first, about 1,500 words of instructions plus the gaps, intended pictures and claims: fine; the 85 KB of world files wait for the plan (as the part says).
+- Nothing paid; no keys; nothing parallel; no decision; no block; no helper; no older way; no label in the part; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **VI1 — The chat tool's message points to the part instead of its own list:** "Read prompt.md, gaps.json and intended-visuals.json first." becomes "Read prompt.md, then part-preparation.md (what to read first)." (9 → 8 words). One list (the part's, with claims.json) instead of three. Hurts: every film (the claims can be missed at the treatment). Work: one line of the chat tool and a test. Breaks: nothing. Undo: the old line. Operator: nothing. Success: on the next film, the message after prepare names part-preparation.md and the assistant reads claims.json before the treatment. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| VI1 agreed (SK, 30 Oct 2026: "Yes, approve VI1") | – | – |
+
+**For the builder (VI1):** `plugin/scripts/vw.py`, `visuals prepare`'s message: the replacement above; test: the message names part-preparation.md and no longer lists gaps.json.
+
+### 9.1.2 — What to read first (reviewed 30 Oct 2026)
+Covered by VI1 (one list, the part's, with claims.json). The world files are read at the plan, as the part says. Nothing else to discuss.
+
+### 9.1.3 — The footage look, measured and told (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the package):** "Your footage: camera not known, tripod, natural look (measured from the clips)": camera unknown on 45 clips (Sony's "C0123" file names are deliberately not classified: they can be a mirrorless or a cinema camera), drone on 1; support tripod on 32, gimbal 10, handheld 4 (two thirds is the bar: tripod); look natural on all 46. No correction recorded.
+
+**Findings (I read `server/app/footage.py` and where the result is used)**
+- Works as designed (design/88): measured, told in one line, corrected only with the operator's words (on the page or `vw visuals footage`); its three refusals (no words; no value; a value outside the list) are in place.
+- "Camera not known" costs nothing: the camera is used only to add a phrase ("mirrorless camera") to the picture requests' texture line, and an unknown camera is simply left out (I read the one place it is used). The operator may still correct it.
+- Nothing paid; no keys; no block; no helper; no older way (ME1 retires the media step's guess); no label. **Nothing to change.**
+
+### 9.1.4 — The page link and the "what next" message (reviewed 30 Oct 2026)
+
+**What happened on VW-12:** the page link and the footage line were given (the chat tool's message carries both). At 16:43 the operator filed **defect 34**: `vw next` said "paid: openai-images,video" on a Nano Banana film. The other session's fix (16:48, server only, d1335eb): a wrong label, not a wrong model (the pictures follow the run's choice); `vw next` now names the run's own picture AI. I read the defect and its resolution in the database.
+
+**Findings:** fixed already; the instruction file's own `paid` field still reads "openai-images,video" (the fix computes the line per run instead). Nothing else; **nothing to change** here.
+
+### 9.1.5 — The common part, read at every step (reviewed 30 Oct 2026)
+
+**What it is:** sections A–D (stop and ask, never guess; the routes; the shared rules; the reading guide), 1,168 words, read with every part. Tidied in design/124 (Phase B, C1).
+
+**Findings (I read it whole)**
+- No "design/" label inside it (searched), no contradiction with the preparation part.
+- **One version label left (point 16):** its heading reads "VW-VISUALS v2.0 — direction, references, pictures and takes for the blanks of the first cut" on instruction version 3; "v2.0" means nothing to the assistant (the same kind of heading BR2, SC… removed in design/125).
+- Nothing paid; no keys; no block; no helper; no older way; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **VI2 — The version label removed from the heading:** "VW-VISUALS v2.0 — direction, references, pictures and takes for the blanks of the first cut" becomes "Visuals: direction, references, pictures and takes for the blanks of the first cut" (15 → 13 words). Work: one replacement (the split check `c1_split_v3.py` updated) and a test. Breaks: nothing. Undo: the old heading. **Older way:** retired in this release.
+
+| Decided | Parked | Open |
+|---|---|---|
+| 9.1.2–9.1.4: no change; VI2 declined (SK, 30 Oct 2026: "Leave it") | – | – |
+
+### Phase 1 closing table (30 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| VI1 (the chat tool's message points to the part's reading list); VI2 declined; defect 34 already fixed by another session | – | – |
+
+**Where VW-12 is next (read on the server, 17:07 IST):** the treatment's draft was sent at 16:42 (its direction begins "By the end the viewer should understand that the hollow cavities are the point of rat-trap bond…"); no gap accepted yet, no picture made. Phase 2 is reviewed once the operator has accepted the treatment.
+
+### Phase 2 — Treatment
+
+**What happened on VW-12 (read in the run's visuals session):** the treatment was recorded at 16:42 IST; every line accepted on the page ("accepted by SK", the page's own words, as at the voice). (My reading at 17:07 that it was "not accepted" was wrong: I looked at the plan's acceptances, which are empty, not the treatment's lines.) Its contents:
+- **Direction:** the cavities are the point; a documentary explainer told from the site; real footage of masons carries the film; what a camera could have filmed with more time becomes a realistic AI scene (muted, true to life, never the client's own site); what is invisible to a camera (the cavity, heat, load, the saving, strength by storey, the sill) becomes **one drawn cutaway of a rat-trap bond wall that returns and develops across the film**, with the script's figures drawn exactly.
+- **12 gaps, 186 s:** video 7 gaps (96.1 s), drawn 5 (76.5 s), a still 5.6 s, a graphic sequence 7.7 s; 20 pictures; nothing held frozen; **estimate ₹935.65**.
+
+**The map (waiting for SK's yes).** Words: the treatment part (832) by paragraph and step 1 (43). Refusals: the server's `treatment` (14) and its line-by-line accept (I read `visuals_stage.treatment`).
+
+| # | Sub-step | Words | Server refusals | VW-12 |
+|---|---|---|---|---|
+| 9.2.1 | The Direction first (a few lines: the viewer's understanding, the viewpoint, the approach, the roles of footage, stills, scenes and graphics) | 203 | 2 (missing; over 2,000 characters) | written |
+| 9.2.2 | Planning the gaps as one progression: graphic or scene by a test, one visual language, variety, the team's intended pictures as a requirement, the opening gap (C4), the look beside no footage | 329 | 0 (some warned at the plan) | one recurring cutaway |
+| 9.2.3 | One line per gap (picture, routes, seconds and segments, picture count, what each graphic shows, frozen seconds, shots) and the totals with the cost estimate | 134 | 12 | 12 lines; ₹935.65 |
+| 9.2.4 | The draft sent; each line accepted or sent back on the page (C6); recorded when all are accepted | 164 + 43 | (line refusals) | all accepted, 16:42 |
+| 9.2.5 | Settled before any plan; a change of direction revises everything it touches | (in 9.2.4) | the plan is checked against it | – |
+
+Total: 875 words, about 14 refusals. Free (no picture is made).
+
+### 9.2.1 — The Direction (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read it whole):** 175 words (1,017 characters, under the 2,000 limit). It says what the viewer should understand (the cavities are the point: fewer bricks and mortar, cooler, strong enough for three storeys) and see (the careful work); the viewpoint (a documentary explainer told from the site); the approach (real footage carries the film; what a camera could have filmed becomes a realistic AI scene, muted, natural daylight, a red-brick site in Tamil Nadu, never the client's own site; what is invisible becomes one drawn cutaway that returns and develops, with the script's figures drawn exactly) and why. Accepted on the page.
+
+**Findings (I read the part's first paragraph, 203 words, and the server's two checks)**
+- Works: the Direction (design/124 Change 3) is specific and becomes the rule the plan is checked against; it follows the brief (calm documentary, the mason's craft) and the claims (figures drawn exactly).
+- Small gap, not proposed: the rule asks for the roles of "footage, stills, generated scenes and graphics"; stills are not named, though the treatment uses one 5.6 s still (scene 3's three-storey building). Harmless: the still is in its gap's line, accepted.
+- Nothing paid; no keys; nothing parallel; one decision; no block; no helper; no older way; no label; nothing written twice that disagrees. Fingerprint: the treatment's direction opens the plan's foundation word for word; changing the rule's wording does not change a recorded direction. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 9.2.1: no change | – | – |
+
+### 9.2.2 — Planning the gaps as one progression (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (I read every gap's line):**
+- **The opening gap (C4) works:** the film opens on a gap, and its line is "a wide view of a busy Indian housing site with masons laying a conventional brick wall…, then a family looking at the rising houses": the subject at work, wide first.
+- **Graphic or scene by the test:** drawn where a camera cannot see (the cavity, heat, load, strength by storey, the sill course); AI scenes for kilns, plinth, guide strings, pointing, curing, families at home. No numbers invented ("no numbers, as the script gives none" on the load drawing).
+- **The team's intended pictures:** every gap cites them ("Follows 'cleaning and wetting the plinth'"); the departures are named with a reason ("as a drawn cutaway rather than 3D"; "the engineer inspecting is folded into the testing scene"; "the drone and finished houses come from the real footage around it").
+- **One visual language:** one drawn cutaway returning in gaps 2-B2, 3-B1, 3-B2, 7-B1 and 9-B1.
+
+**Findings (I read the part's second paragraph, 329 words, the treatment check and the plan's graphics rule)**
+- ⚠ **A plan rule the treatment does not know (points 3, 13 and 19):** the plan check warns when graphics run more than **8 s** without a camera picture ("break it with a camera shot"; over 12 s "give the reason in the treatment"), the length SK kept on 29 Oct (design/124 decision b). The treatment already states each shot's route and seconds, yet neither the treatment's text nor its check mentions the limit, so the operator accepted four runs over it: **gap 5-B1's strength chart, 23.9 s** (over 12 s, with no reason in the treatment), 2-B2's cutaway 11.8 s, 3-B2's load drawing 10.8 s, 3-B1's heat drawing 9.1 s. The plan will warn on all four; following the warning changes shots the operator has already accepted.
+- To watch (parked): the strength chart is drawn (the cutaway's language) while the resource icons of gap 4-B1 are an AI graphic sequence (a different maker); whether they read as one language shows at the pictures.
+- Nothing paid; no keys; nothing parallel; no helper; no older way; no label; not part of a shot's fingerprint (the treatment is checked, not fingerprinted).
+
+**Proposed (waiting for SK)**
+- **TR1 — The treatment warns on a graphics run over 8 s, as the plan does:** the treatment check reads each gap's `shots` (route and seconds) and gives the plan's own warning ("… s of graphics in a row: above 8 s, break it with a camera shot; above 12 s, give the reason in the treatment"), shown with the draft on the page before the operator accepts. No instruction text added (the warning says what to do). Hurts: every film with diagrams or charts (VW-12: 4 of 5 drawn gaps). Work: the treatment check reuses the plan's rule (one server function) and a test. Breaks: nothing stored; a treatment already accepted is not re-checked. Undo: remove the call. Operator: sees the warning on the line before accepting. Success: VW-12's treatment re-checked gives the four warnings; a treatment whose drawn shots are each 8 s or less gives none. **Older way:** retired in this release (the limit first met at the plan).
+
+| Decided | Parked | Open |
+|---|---|---|
+| TR1 agreed (SK, 30 Oct 2026: "Yes, approve TR1") | drawn cutaway beside an AI graphic sequence (gap 4-B1): one language? at the pictures | – |
+
+**For the builder (TR1):** `server/app/visuals_stage.treatment`: from each entry's `shots` (route, seconds), the runs of graphic routes (drawn, graphic_sequence, a still that is a graphic) give `visual_contract._graphics_run`'s warning; returned with the draft and shown on the line on the page. Test: VW-12's treatment gives four warnings (23.9, 11.8, 10.8, 9.1 s); drawn shots of 8 s or less give none.
+
+### 9.2.3 — One line per gap, the totals and the cost estimate (reviewed 30 Oct 2026)
+
+**What happened on VW-12 (read in the treatment):** 12 lines, every field present; pictures counted as the rule says (one start picture per video segment: gap 1 two segments, two pictures; gap 8 three segments, three; gap 4 two videos and a three-state graphic, five); what each graphic shows listed (`depicts`); nothing held frozen. Totals: video 96.14 s, drawn 76.52 s (free: rendered by the server), still 5.56 s, graphic sequence 7.7 s; 20 pictures; **estimate ₹935.65** (20 × ₹4 + 96.14 s × ₹8.90). The page shows "spend ₹0 of ₹5,000" (SK's screenshot).
+
+**Findings (I read the part's third paragraph, 134 words, the treatment check, `prices`, `image_cost_inr`, `visuals_spend` and every place an estimate is made)**
+- Works: the 12 refusals (a gap missing or twice, an unknown route, a picture line missing, seconds, a count that is not a whole number, frozen seconds…).
+- ⚠ **The estimate prices every picture at GPT Image's figure on a Nano Banana film (point 10):** every estimate uses one flat picture price, ₹4 (the treatment's total, the plan check's "cost against the cap", the budget's "still needs", a fix's "₹4", "make a new start (₹4)"). The spend already counts a Nano Banana picture at its own price ($0.134, about ₹11.8 at ₹88, plus a little per input picture: `image_cost_inr`), so on a Nano Banana film the estimate says one thing and the spend another. VW-12: pictures ₹80 estimated against about ₹236; the treatment's total about **₹1,090, not ₹936**. The live server sets no price of its own (I read its settings: only the Gemini model line).
+- Noted, not proposed now: the estimate counts the pictures for the shots only; the reference pictures (one sheet per thing: VW-12's page lists 38 things), the style sheet and any fixes come later and are not in it. Shown at the plan, which knows the things.
+- Nothing else: no keys; nothing parallel; no block; no helper; no older way; no label; not part of a shot's fingerprint.
+
+**Proposed (waiting for SK)**
+- **TR2 — Every estimate uses the film's own picture price:** one price per film: Nano Banana at its configured dollar price (and the 4K price when asked) times the rupee rate; GPT Image at the configured ₹ figure, as today. Used by the treatment's estimate, the plan's cost line, the budget's "still needs", the cost said for a fix and for a new start. Hurts: every Nano Banana film (VW-12 now; half the team's films). Work: one price function and its callers (one server file) and tests. Breaks: nothing stored; recorded estimates keep their figure, new ones change. Undo: the flat price. Operator: sees a truer figure before accepting. Success: VW-12's treatment re-estimated gives about ₹1,092 (20 × ₹11.79 + 96.14 × ₹8.90); a GPT Image film's estimate unchanged. **Older way:** retired in this release (one flat picture price for both picture AIs).
+
+| Decided | Parked | Open |
+|---|---|---|
+| TR2 agreed (SK, 31 Oct 2026: "Yes, approve TR2") | reference pictures not in the treatment's estimate: at the plan | – |
+
+**For the builder (TR2):** `server/app/visuals_stage.py`: one `image_price_inr(run, tier=None)` (gemini: `GEMINI_IMAGE_USD` or `_4K` × `VISUALS_USD_INR`; openai: `VISUALS_PRICE_IMAGE_INR`), used by `treatment`, `check`, `budget`, `check_cap`'s per-image amounts, the fix line and the "make a new start" choice. Tests: VW-12's totals on a gemini run give about ₹1,092; the same on an openai run ₹935.65.
+
+### 9.2.4 — Accepting each line on the page (reviewed 31 Oct 2026)
+**What happened on VW-12:** the draft was sent and every line, the Direction and the 12 gaps, was accepted on the page, each recorded with the page's own words "accepted by SK" (the operators sign in with SK's account, as noted at 0.2 and 4.7); no line sent back. Works as built (design/124 Change 6). TR1 adds the 8 s warning to the lines before they are accepted. **Nothing else to change.**
+
+### 9.2.5 — Settled before the plan (reviewed 31 Oct 2026)
+The plan was written after the treatment was recorded, and the server checks the plan's routes against it (VW-12's run is now at the picture search, so its plan passed). Nothing to discuss.
+
+### Phase 2 closing table (31 Oct 2026)
+| Decided | Parked | Open |
+|---|---|---|
+| TR1 (the 8 s graphics warning at the treatment), TR2 (estimates at the film's own picture price) | the drawn cutaway beside an AI graphic sequence: at the pictures; reference pictures in the estimate: at the plan | – |
+
+**SK, 31 Oct 2026:** "Covered all the points that are mentioned" (U1–U7 as proposed, U5 at 12 words, U6 in the picture's panel). Phase 3 (the detailed plan) next: VW-12's plan was proposed at 17:13 on 30 Oct (stored, 276 KB) and its run is now at the picture search; reading it needs the VM sign-in (gcloud), expired on 31 Oct.
+
+## Issues reported by the users (SK's screenshots, 30 Oct 2026)
+
+Checked in the live code (main d1335eb; pages `templates/review.html` and `templates/visuals.html`) and VW-12's stored session. Nothing built.
+
+| # | Page | What the users saw | What I found | Status |
+|---|---|---|---|---|
+| U1 | Options review page (design/127) | The film highlights the shot playing on the right, but the list does not scroll to it; the highlighted row is off screen | I read it: on every tick of the film the page moves the highlight (`cur`) but never scrolls; it scrolls only when the film stops for an answer. After the answers close (VW-12: "answers closed: the master film is built") it never scrolls | **Not done.** Proposed fix: when the highlight moves, scroll that row into view in the list (one line, `scrollIntoView({block:'nearest'})` beside the highlight), not while the operator is typing a note |
+| U2 | Reference pictures, the picture opened beside the list | No way to close the opened picture | A close button (×, and Esc) exists (design/99 C1), but it sits at the top of the panel's own scrolling area: when the panel is scrolled down to the note box, as in the screenshots, the × scrolls out of sight; the panel also scrolls sideways (the scrollbar at its bottom), which can push the × off the right edge | **Built, not usable when scrolled.** Proposed fix: keep the × fixed at the top of the panel (sticky, like the Approve and Reject bar at its bottom) and stop the sideways scroll |
+| U3 | Reference pictures, a note on a ticked picture | Earlier, the operator's notes were not saved and not carried to the later steps | design/121 Change 4 is **built and live** (I read it): every note on a picture is added to the reference sheet's request ("The operator's note on Image k: …") and becomes a must point of the picture check; a note changed after the sheet marks it "sources changed". Saving: ticks and their notes stay on the page until the operator saves them (per thing, or Done for the whole pass), shown as "ticked · not saved", with a warning when leaving the step or the page. On VW-12 (read at about 17:30): no web picture saved yet, so **no note saved yet**; the cement-bag note in the screenshot is still "ticked · not saved" | **Done in code; not yet seen on VW-12.** To check after the operator's Done: the notes are on the saved pictures and in the sheet's request |
+| U4 | Reference pictures, a Google picture opened beside the list | A footage picture opens the zoom view (− + Close), a Google search picture does not | I read it: the zoom view opens only from a picture already saved for the run (footage frames, saved web pictures, sheets: `data-view` on `big()`); a search result shown in the panel has no `data-view`, so a click does nothing, although the panel's style shows the zoom cursor on every picture (the "+" cursor in the screenshot) | **Not done.** Proposed fix: a search result opens the same zoom view, its Previous / Next moving through that search's results (the panel already has them); no change to saving |
+
+**SK's added requirements (31 Oct 2026), checked in the live code (`templates/visuals.html`, `visuals_stage.py`):**
+
+| # | SK's words (short) | What I found | Status |
+|---|---|---|---|
+| U3 (again) | "I add a note but there is no way to save this note with the selected image" | A ticked web picture and its note are held on the page until **Save N pictures** (per thing, in the bar at the bottom) or **Done** (the whole pass); the panel itself has no Save, and the note box says nothing about saving. Once a picture is saved, its note has its own "Save the note" (seen on the coconut broom in the screenshot) | **Not done as asked.** Proposed: a **Save** button under the note in the panel, saving that picture with its note at once (the existing per-thing save, for that one picture); the note box says "saved" after it |
+| U4 (again) | "I need to be able to zoom in for reference images … only the web search references I'm not able to zoom in on" | As U4 above | **Not done** (U4) |
+| U5 | "a restriction in the search string … about six or seven words … whether that is a limitation of the API" | **Our own rule, not the API's:** the server refuses fewer than 2 or more than 6 words ("Keywords are two to six words: the thing and its place or trade… Google Images is not Google search", `visuals_stage.search`), and the box says "two to six words". Google Images through the search service takes longer queries | **Not done.** Proposed: allow up to 12 words (the stock site's name stays outside the count, as today); the box's hint and the instructions' "two to six" changed with it. **Decided (SK, 31 Oct 2026: "Yes, 12 words"): 2 to 12 words** |
+| U6 | "if web search is not bringing results … earlier we had an option to upload a user-given reference image or an image link" | It exists: **"Add your own picture"**, a file or an https link, saved and approved for that thing (design/110, live). But it is shown only on a thing's own view (after the round), not in the **round view** the screenshots show (`renderRound` has no such box), which is where a search comes back empty | **Partly done.** Proposed: the same box under each thing's search in the round view, and shown first when a search finds nothing. **SK, 31 Oct 2026:** the upload and link option appears in the same place as the selected picture (the panel on the right where a picture opens), for that thing |
+| U7 | "some image requirements I am not able to make out where exactly that will be useful … mention the narration line or the scene description" | A thing's card shows its id, name and kind only (for example "clay_pan · Iron pan of wet clay · object"); the page already holds the plan's shots that show each thing, with their words | **Not done.** Proposed: under each thing's name, "used in": each shot that shows it (gap, shot) with the narration words under that shot and its one-line picture, so the operator can judge and refine the search |
+
 ## Blocks found (point 13), across all stages
 | # | Where | Decision or refusal | Recommendation | SK |
 |---|---|---|---|---|
