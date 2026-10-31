@@ -257,8 +257,8 @@ def validate_options(doc, package, policy):
                     refusals.append(f'OPTION #{n}: N17 step {sid} is shown by shot {k}: say why (the logged action, process_stage or outcome_state that shows it)')
                 row = rows.get(e.get('sub_clip_id')) or {}
                 if row.get('process_stage') and beat.get('process_stages') and row['process_stage'] not in beat['process_stages']:
-                    flags.append(f"OPTION #{n}: N17 step {sid} ({own_steps[sid]['text'][:60]}) is shown by a clip of the stage {row['process_stage']!r}; the scene narrates "
-                                 f"{', '.join(beat['process_stages'])}: the right step? (the operator decides)")
+                    flags.append(f"OPTION #{n}: N17 stage: step {sid} ({own_steps[sid]['text'][:60]}) is shown by a clip of the stage {row['process_stage']!r}; the scene narrates "
+                                 f"{', '.join(beat['process_stages'])}: the right step?")   # design/126 OP3: for information, its reason already required
                 if s.get('claim'):
                     flags.append(f"OPTION #{n}: N17 step {sid} is a claim ({own_steps[sid]['text'][:60]}) shown by footage: the shot must show its evidence or its result, "
                                  'or leave a blank for a graphic or a scene of the result')
@@ -317,7 +317,7 @@ def validate_options(doc, package, policy):
     return {'refusals': refusals, 'flags': flags}
 
 
-RULE_RE = re.compile(r'(?:^|: )(rule 11|[A-Z]\d{1,2})(?=[ :])')
+RULE_RE = re.compile(r'(?:^|: )(rule 11|N17 stage|[A-Z]\d{1,2})(?=[ :])')   # design/126 OP3: N17's chapter flag is its own kind
 
 
 def group_flags(flags):
@@ -333,7 +333,7 @@ def group_flags(flags):
     return sorted(groups.values(), key=lambda g: (-g['count'], g['rule']))
 
 
-INFO_KINDS = ('R1', 'R4', 'R8', 'R10')   # design/125 P11: information only when shots are cut to the meaning across clips
+INFO_KINDS = ('R1', 'R4', 'R8', 'R10', 'N17 stage')   # design/125 P11: information only when shots are cut to the meaning across clips; design/126 OP3
 
 
 def answer_flags(flags):

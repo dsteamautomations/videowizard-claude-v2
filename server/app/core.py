@@ -159,7 +159,7 @@ def refuse_retired(version):
         raise Problem(409, 'VERSION_RETIRED', RETIRED_VERSIONS[str(version)])
 
 
-def create_run(conn, user, title, client, version, image_provider='openai'):
+def create_run(conn, user, title, client, version, image_provider):   # design/126 ST1: no default picture AI
     version = version or settings().DEFAULT_PROCEDURE_VERSION
     refuse_retired(version)
     if stage_table(version) is None:

@@ -13,8 +13,11 @@ WRAP = 58   # characters per line at the card font size
 COLOURS = ('#1D9E75', '#7F77DD', '#D85A30', '#378ADD', '#BA7517', '#D4537E', '#639922', '#5F5E5A')   # one per scene, in turn
 
 
+DASHES_QUOTES = str.maketrans({'—': ' - ', '–': ' - ', '’': "'", '‘': "'", '“': '"', '”': '"'})   # design/126 OP4: kept readable, not dropped
+
+
 def ascii_text(text):
-    return unicodedata.normalize('NFKD', str(text)).encode('ascii', 'ignore').decode('ascii')
+    return unicodedata.normalize('NFKD', str(text).translate(DASHES_QUOTES)).encode('ascii', 'ignore').decode('ascii')
 
 
 def wrap(text, width=WRAP):

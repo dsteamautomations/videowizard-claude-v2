@@ -166,11 +166,13 @@ def test_p1_prepare_names_the_scenes_step_until_they_are_approved():
     assert 'propose the scenes' not in S.prepare_next(True)
 
 
-def test_p7_a_scene_with_two_chapters_is_warned():
-    scenes = [{'title': b['title'], 'process_stages': b['process_stages']} for b in VW11['beats']]
-    w = NR.chapter_warnings(scenes)
-    assert len(w) == 2 and w[0].startswith('Scene 2 lists two chapters') and w[1].startswith('Scene 6 lists two chapters')
-    assert 'set_scenes' in (APP / 'stage2' / 'stage.py').read_text(encoding='utf-8') and "'warnings': NR.chapter_warnings(" in (APP / 'stage2' / 'stage.py').read_text(encoding='utf-8')
+def test_op2_a_scene_listing_three_chapters_passes_without_a_warning():
+    """design/126 OP2 (retires P7's two-chapter warning): a scene lists every chapter its paragraph covers."""
+    words = [{'id': 'w0', 'text': 'Lay', 'start_frame': 0, 'end_frame': 5}, {'id': 'w1', 'text': 'bricks.', 'start_frame': 6, 'end_frame': 10}]
+    three = [{'first_word_id': 'w0', 'title': 'The construction process', 'process_stages': ['Preparing the plinth and mortar', 'Laying bricks on edge', 'Checking line, level and plumb']}]
+    assert NR.validate_scenes(words, three, ['Preparing the plinth and mortar', 'Laying bricks on edge', 'Checking line, level and plumb']) is None
+    src = (APP / 'stage2' / 'stage.py').read_text(encoding='utf-8')
+    assert not hasattr(NR, 'chapter_warnings') and 'chapter_warnings' not in src and 'lists two chapters' not in src
 
 
 def test_p14_the_message_after_propose_says_the_first_answer_approves():

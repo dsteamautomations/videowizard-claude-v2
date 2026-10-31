@@ -183,7 +183,7 @@ def test_build_a_rejected_shot_takes_its_kept_alternative_else_becomes_ai_with_i
     S.build_master(FakeConn({}), store, USER, RUN)
     m = plan(store)
     assert [e['kind'] for e in m['events']][:3] == ['gap', 'event', 'gap'] and m['events'][2]['timeline_frames'] == 75
-    assert 'in place of rejected Scene 1 · Shot 3: less. Bricks' in m['gaps'][1]['reason']
+    assert 'in place of rejected Scene 1 · Shot 3 (it showed: workers on site)' in m['gaps'][1]['reason']   # design/126 MA1: a card without an OVERVIEW line: its descriptive name
 
 
 def test_build_refuses_a_rejection_that_leaves_ai_under_3_s_between_two_shots():

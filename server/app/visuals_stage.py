@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -280,7 +280,7 @@ def check(store, run, outputs, document):
         return {'status': 'rejected', 'error': str(exc)}
     r = routes(plan, _fps(session) or 25)
     pr = prices()
-    planned = round(r['images_estimated'] * pr['image_inr'] + r['seconds']['video'] * pr['video_inr_per_s'], 2)   # design/65 B7: the cost against the cap, before anything is paid
+    planned = round(r['images_estimated'] * image_price_inr(run) + r['seconds']['video'] * pr['video_inr_per_s'], 2)   # design/65 B7: the cost against the cap, before anything is paid
     alike = look_alike_placed(store, session)   # design/89 H6: the pictures already placed that look alike
     warnings += answer_warnings(plan, [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike])   # design/124 Change 7
     split = {}
@@ -343,8 +343,22 @@ IMAGE_USD_PER_M = {'input': 8.0, 'output': 30.0}   # design/82 U2: OpenAI's GPT 
 
 
 def provider_of(run):
-    """design/120: the run's image model family, chosen at creation; runs from before the choice are openai."""
-    return (run or {}).get('image_provider') or 'openai'
+    """design/120: the run's image model family, chosen once at creation. design/126 ST1: a run without one is refused, never given GPT Image."""
+    p = (run or {}).get('image_provider')
+    if not p:
+        raise Problem(409, 'NO_PICTURE_AI', 'this film has no picture AI; it is chosen at `vw start --images`')
+    return p
+
+
+def image_price_inr(run, tier=None):
+    """design/126 TR2: one picture's price on this film, for every estimate: Nano Banana at its dollar price (4K when the tier is 4K; the
+    configured size when no tier is given) times the rupee rate; GPT Image at the configured rupee figure."""
+    pr = prices()
+    if provider_of(run) == 'gemini':
+        s = settings()
+        usd = s.GEMINI_IMAGE_USD_4K if str(tier or s.GEMINI_IMAGE_SIZE).upper() == '4K' else s.GEMINI_IMAGE_USD
+        return usd * pr.get('usd_inr', s.VISUALS_USD_INR)
+    return pr['image_inr']
 
 
 def image_cost_inr(cost, pr):
@@ -394,12 +408,28 @@ def budget(conn, store, run, outputs):
     if session.get('current'):
         r = routes(current_plan(store, session), _fps(session) or 25)
         planned = {'images': r['images_estimated'], 'video_seconds': r['seconds']['video'],
-                   'inr': round(r['images_estimated'] * sp['prices']['image_inr'] + r['seconds']['video'] * sp['prices']['video_inr_per_s'], 2)}
+                   'inr': round(r['images_estimated'] * image_price_inr(run) + r['seconds']['video'] * sp['prices']['video_inr_per_s'], 2)}
     cap = cap_of(session)
     return {**sp, 'cap_inr': cap, 'left_inr': round(cap - sp['spent_inr'], 2), 'planned': planned}
 
 
 # ---------- design/65 B6: the treatment as a record ----------
+
+TREATMENT_GRAPHIC_ROUTES = ('drawn', 'graphic_sequence')   # design/126 TR1: a still's kind (photo or diagram) is not in the treatment, so a still breaks a run
+
+
+def graphics_runs(entry):
+    """design/126 TR1: the plan's G1 warning (design/93) on the treatment: a run of graphic shots over 8 s within the gap, from each shot's route and seconds."""
+    out, run_s, ids = [], 0.0, []
+    for i, sh in enumerate([s for s in entry.get('shots') or [] if isinstance(s, dict)] + [None], 1):
+        if sh and sh.get('route') in TREATMENT_GRAPHIC_ROUTES and isinstance(sh.get('seconds'), (int, float)):
+            run_s, ids = run_s + float(sh['seconds']), ids + [str(sh.get('id') or f'shot {i}')]
+            continue
+        if run_s > 8:
+            out.append(_graphics_run(entry['gap_id'], ids, run_s))
+        run_s, ids = 0.0, []
+    return out
+
 
 def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes=''):
     """One entry per gap: the team's intended visuals cited or departed from, the picture in a line, the routes, the seconds, the images.
@@ -421,7 +451,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
     gaps = session['source']['gaps']
     seen, totals = set(), {'gaps': 0, 'images': 0, 'routes': {}, 'seconds': {}, 'frozen_seconds': 0.0}
-    video_seconds = 0.0
+    video_seconds, warnings = 0.0, []
     for e in entries:
         need(isinstance(e, dict) and e.get('gap_id') in gaps, f"The treatment names an unknown gap: {(e or {}).get('gap_id')!r}.")
         need(e['gap_id'] not in seen, f"gap {e['gap_id']} appears twice in the treatment.")
@@ -454,6 +484,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
             video_seconds += float(e['seconds']) if 'video' in routes_ else 0.0
         for r, x in parts:
             totals['seconds'][r] = round(totals['seconds'].get(r, 0.0) + float(x), 2)
+        warnings += graphics_runs(e)
     missing = sorted(set(gaps) - seen)
     need(not missing, 'The treatment covers every gap; missing: ' + ', '.join(missing) + '.')
     film = film_frames(outputs)   # design/89 B4: the expected frozen share, shown before approval
@@ -461,8 +492,8 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         totals['frozen_share'] = round(totals['frozen_seconds'] / (film / float(Fraction(str(session['source'].get('fps') or 25)))), 3)
         totals['frozen_limit'] = float(session.get('frozen_limit') or FROZEN_SHARE)
     pr = prices()
-    estimate = round(totals['images'] * pr['image_inr'] + video_seconds * pr['video_inr_per_s'], 2)
-    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
+    estimate = round(totals['images'] * image_price_inr(run) + video_seconds * pr['video_inr_per_s'], 2)
+    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
               **({'direction': str(document['direction']).strip()} if str((document or {}).get('direction') or '').strip() else {})}   # design/124 Change 3
     if not str(quote or '').strip():   # the draft the page shows for approval
         record['lines'] = _carry_lines(session, record)   # design/124 Change 6
@@ -470,11 +501,11 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         if all(v['state'] == 'accepted' for v in record['lines'].values()):   # every line accepted already, word for word
             return _record_lines(store, run, session)
         save_session(store, run, session)
-        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
+        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
     session['treatment'] = {**record, 'quote': quote}
     session.pop('treatment_draft', None)
     save_session(store, run, session)
-    return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'cap_inr': cap_of(session), 'digest': record['digest']}
+    return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'cap_inr': cap_of(session), 'digest': record['digest']}
 
 
 # ---------- design/124 Change 6: a state per line of the treatment ----------
@@ -508,7 +539,7 @@ def _record_lines(store, run, session):
     quotes = list(dict.fromkeys(v['quote'] for v in draft['lines'].values() if v.get('quote')))
     session['treatment'] = {**draft, 'quote': ' / '.join(quotes)}
     save_session(store, run, session)
-    return {'recorded': True, 'totals': draft['totals'], 'estimate_inr': draft['estimate_inr'], 'cap_inr': cap_of(session), 'digest': draft['digest'], 'lines': _line_states(draft['lines']),
+    return {'recorded': True, 'totals': draft['totals'], 'estimate_inr': draft['estimate_inr'], 'warnings': draft.get('warnings', []), 'cap_inr': cap_of(session), 'digest': draft['digest'], 'lines': _line_states(draft['lines']),
             'next': 'Treatment recorded: every line accepted. The assistant writes the plan to it.'}
 
 
@@ -798,7 +829,7 @@ def not_yet_lines(shot):
             for s, b in _acting_beats(shot)]
 
 
-def _not_yet_gate(store, session, row, at_approval=False, shot=None):
+def _not_yet_gate(store, run, session, row, at_approval=False, shot=None):
     """F3 at approval and before a take: the stored "not yet done" line decides; failed or undecided refuses and asks the operator (rule 0, fork 5);
     at approval a start checked before this release is asked the line once; the operator's "approve anyway" lets it through."""
     if row.get('not_yet_ok') or (shot is None and (row.get('kind') != 'keyframe' or _picture_word(store, session, row) != 'start image')):
@@ -829,7 +860,7 @@ def _not_yet_gate(store, session, row, at_approval=False, shot=None):
     why = (f"{row['id']} already shows the result of {sid}'s action ({line.get('seen') or 'no detail'})" if line.get('pass') is False
            else f"whether {row['id']} already shows the result of {sid}'s action could not be decided ({line.get('seen') or 'no answer'})")
     if row['id'] not in (session.get('questions') or {}):
-        _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({prices()['image_inr']:g} INR)", 'approve anyway'], 'server', fork='not_yet')
+        _open(session, row['id'], f"{why}. Make a new start, or approve this one anyway?", [f"make a new start ({round(image_price_inr(run), 2):g} INR)", 'approve anyway'], 'server', fork='not_yet')
     need(False, f"{why}; the operator decides: make a new start, or approve anyway (the question is on its card; `vw visuals answer --item {row['id']} …`).")
 
 
@@ -1943,7 +1974,7 @@ def _search_into(session, user, run, plan, element_id, keywords, quote, results=
     need(any(e['id'] == element_id for e in plan['elements']), f'Unknown element {element_id}.')
     quote = said(quote, 'Searched', user)   # design/99 C4: the click is the operator's yes to the web search
     words = str(keywords or '').split()
-    need(2 <= len(words) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')   # R6
+    need(2 <= len(words) <= 12, 'Keywords are two to twelve words: the thing and its place or trade, nothing else (Google Images is not Google search).')   # R6
     rows = results if results is not None else apify.search_images(' '.join(words), 10)
     sid = digest({'run': str(run['id']), 'element': element_id, 'keywords': ' '.join(words), 'source': source, 'at': datetime.now(timezone.utc).isoformat()})[:12]
     session.setdefault('searches', {})[sid] = {'search_id': sid, 'element_id': element_id, 'keywords': ' '.join(words), 'quote': quote, 'by': user['id'],
@@ -1961,10 +1992,10 @@ def prefetch_key(run, url):
 def search_rows(store, run, keywords, source=''):
     """design/121 changes 5, 6: before the run's lock, the plain search and, with a source word, the stock search, at once; then every picture of both
     downloaded (eight at a time) and stored, so Save is instant and a picture that will not download is marked on its row before it is ticked.
-    {'plain': rows or {'error'}, 'stock': ...}; nothing when the keywords are not two to six words (search() refuses them under the lock)."""
+    {'plain': rows or {'error'}, 'stock': ...}; nothing when the keywords are not two to twelve words (search() refuses them under the lock)."""
     from concurrent.futures import ThreadPoolExecutor
     words, src = ' '.join(str(keywords or '').split()), ' '.join(str(source or '').split())
-    if not 2 <= len(words.split()) <= 6:
+    if not 2 <= len(words.split()) <= 12:
         return {}
     queries = {'plain': words, **({'stock': f'{words} {src}'} if src else {})}
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -1989,7 +2020,7 @@ def search_rows(store, run, keywords, source=''):
 def search(store, user, run, outputs, element_id, keywords, quote, source='', found=None):
     """design/73 R3: a Google Images search for an element, on the operator's yes; design/121: with a source word a stock search beside it, every picture
     downloaded at once; in an open round the thing's row takes the new searches (pass 1 and pass 2 alike), so Done counts them."""
-    need(2 <= len(str(keywords or '').split()) <= 6, 'Keywords are two to six words: the thing and its place or trade, nothing else (Google Images is not Google search).')
+    need(2 <= len(str(keywords or '').split()) <= 12, 'Keywords are two to twelve words: the thing and its place or trade, nothing else (Google Images is not Google search).')
     if found is None:
         found = search_rows(store, run, keywords, source)
     session = session_of(store, run, outputs)
@@ -2466,7 +2497,7 @@ def generate_image(conn, store, user, run, outputs, body):
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
-    check_cap(conn, run, session, prices()['image_inr'] * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
+    check_cap(conn, run, session, image_price_inr(run) * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):
@@ -2853,7 +2884,7 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
         raise Problem(409, 'REFERENCE_MISMATCH', 'Approve the exact stored image hash after viewing it.')
     if row['status'] == 'candidate':
         try:
-            _not_yet_gate(store, session, row, at_approval=True)   # design/110 F3, rule 0 fork 5
+            _not_yet_gate(store, run, session, row, at_approval=True)   # design/110 F3, rule 0 fork 5
         except ValueError:
             save_session(store, run, session)   # the question, and the line asked once, are kept
             raise
@@ -2942,7 +2973,7 @@ def request_fix(conn, store, user, run, outputs, ref_id):
     session['references'][ref_id]['fix_queued'] = out['reference_id']
     session['references'][out['reference_id']]['fix_for'] = failed[0]['check']
     save_session(store, run, session)
-    return {'reference_id': out['reference_id'], 'of': ref_id, 'for': failed[0]['check'], 'cost_inr': prices()['image_inr'], 'next': 'Fix requested: it appears here in about a minute.'}
+    return {'reference_id': out['reference_id'], 'of': ref_id, 'for': failed[0]['check'], 'cost_inr': image_price_inr(run), 'next': 'Fix requested: it appears here in about a minute.'}
 
 
 def _picture_word(store, session, row):
@@ -3381,7 +3412,7 @@ def prepare_take(store, user, run, outputs, body):
     need(body.get('start_image'), 'A start image is required.')
     if session['references'].get(body['start_image']):
         try:
-            _not_yet_gate(store, session, session['references'][body['start_image']], shot=planned)   # design/110 F3: never a take from a start that shows the result
+            _not_yet_gate(store, run, session, session['references'][body['start_image']], shot=planned)   # design/110 F3: never a take from a start that shows the result
         except ValueError:
             save_session(store, run, session)
             raise

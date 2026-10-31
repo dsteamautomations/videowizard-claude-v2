@@ -23,8 +23,10 @@ def test_the_migration_adds_the_column_with_openai_for_old_runs_and_the_two_valu
     assert "add column if not exists image_provider text not null default 'openai'" in sql and "check (image_provider in ('openai', 'gemini'))" in sql
 
 
-def test_provider_of_reads_the_run_and_defaults_to_openai():
-    assert VS.provider_of({'image_provider': 'gemini'}) == 'gemini' and VS.provider_of({'image_provider': 'openai'}) == 'openai' and VS.provider_of({}) == 'openai'
+def test_provider_of_reads_the_run_and_refuses_a_run_without_one():
+    assert VS.provider_of({'image_provider': 'gemini'}) == 'gemini' and VS.provider_of({'image_provider': 'openai'}) == 'openai'
+    with pytest.raises(Exception, match='this film has no picture AI'):   # design/126 ST1: no silent GPT Image
+        VS.provider_of({})
 
 
 def test_create_run_writes_the_provider(monkeypatch):

@@ -58,7 +58,7 @@ class FakeConn:
         return R()
 
 
-RUN = {'id': 'run-1', 'code': 'VW-9'}
+RUN = {'id': 'run-1', 'code': 'VW-9', 'image_provider': 'openai'}   # design/126 ST1: every run names its picture AI
 USER = {'id': 'u1', 'name': 'SK'}
 GAPS = {'G1': {'start_frame': 0, 'end_frame': 500, 'passage_ids': ['P001'], 'requirement': 'the cavity'}, 'G2': {'start_frame': 900, 'end_frame': 1150, 'passage_ids': ['P002'], 'requirement': 'curing'}}
 STATE = {'position': {'landmark_id': 'L1', 'relation': 'on it', 'amount': 0, 'unit': 'hand'}, 'facing': {'landmark_id': 'L1', 'edge': 'toward camera', 'camera_side': 'front'}, 'pose': 'upright', 'holding': [], 'progress': 'whole'}
@@ -1005,8 +1005,8 @@ def test_a_search_is_stored_with_the_operators_yes_and_a_pick_becomes_a_web_refe
     monkeypatch.setattr(VS.apify, 'search_images', lambda keywords, n=10: rows)
     store = store_with(sess, doc)
     # design/99: a click needs no typed words; this step no longer refuses without them
-    with pytest.raises(Problem, match='two to six words'):
-        g(lambda: VS.search(store, USER, RUN, [], 'E1', 'a very long sentence that is not a keyword search at all', 'yes'))
+    with pytest.raises(Problem, match='two to twelve words'):   # design/126 U5
+        g(lambda: VS.search(store, USER, RUN, [], 'E1', 'a very long sentence that is not a keyword search at all today', 'yes'))
     with pytest.raises(Problem, match='Unknown element'):
         g(lambda: VS.search(store, USER, RUN, [], 'E9', 'kadapari tool', 'yes'))
     out = VS.search(store, USER, RUN, [], 'E1', 'kadapari tool', 'Yes, search the web for it.')

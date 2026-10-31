@@ -65,7 +65,7 @@ def test_the_source_word_adds_a_stock_search_and_does_not_count_in_the_six_words
     web['queries'].clear()
     VS.search_rows(store, RUN, 'red clay brick', '')
     assert web['queries'] == ['red clay brick']                                    # an empty source box: the plain search alone
-    with pytest.raises(Problem, match='two to six words'):
+    with pytest.raises(Problem, match='two to twelve words'):   # design/126 U5
         g(lambda: VS.search(store, USER, RUN, [], 'E1', 'brick', '', source='depositphotos', found={}))
 
 

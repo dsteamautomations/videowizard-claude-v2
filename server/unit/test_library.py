@@ -9,7 +9,7 @@ from app import library as L
 from app.errors import Problem
 
 VERSION = 'vwlib-2026-10-29-3d60877d3d23'   # design/35 Old ways 8: the only snapshot installed; the 21 Oct one is removed
-RUN = {'id': 'run-1', 'code': 'VW-9', 'client_id': 'NARDEP'}
+RUN = {'id': 'run-1', 'code': 'VW-9', 'client_id': 'NARDEP', 'image_provider': 'openai'}   # design/126 ST1
 PLAN = {'foundation': {'treatment': 'documentary', 'appearance': 'overcast yard light', 'exclusions': [{'id': 'X1', 'statement': 'no logos', 'scope': 'all', 'source': 'brief'}],
                        'editing_constraints': [{'id': 'C1', 'statement': 'no gift boxes', 'scope': 'all', 'source': 'operator'}]},
         'elements': [{'id': 'E1', 'name': 'Mason hands', 'kind': 'person', 'identity': 'representative', 'requirements': 'brown hands, no rings'}]}

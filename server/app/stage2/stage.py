@@ -206,8 +206,7 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     return {**out, 'scenes': [{k: b[k] for k in ('beat_id', 'title', 'target_beat_frames', 'process_stages')} | {'seconds': round(b['target_beat_frames'] / TIMELINE['fps'], 2),
                                                                                                                   'pauses': [{'after_word_id': p['after_word_id'], 'inserted_s': round(p['inserted_frames'] / TIMELINE['fps'], 2)} for p in b['pauses']]}
                                 for b in bs],
-            'film_seconds': round(plan['total_frames'] / TIMELINE['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / TIMELINE['fps'], 2),
-            'warnings': NR.chapter_warnings(document['scenes'])}   # design/125 P7
+            'film_seconds': round(plan['total_frames'] / TIMELINE['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / TIMELINE['fps'], 2)}   # design/126 OP2: a scene lists every chapter its paragraph covers; no warning
 
 
 def coverage(store, run):
@@ -727,6 +726,12 @@ def _trim(ev, edit, row, tl_fps, title):
     return ev
 
 
+def _overview(card):
+    """design/126 MA1: what a clip shows, from its card's OVERVIEW line (some cards number their lines), else its descriptive name."""
+    line = next((str(l) for l in card.get('lines') or [] if re.match(r'^\d*\s*OVERVIEW:', str(l))), '')
+    return line.split('OVERVIEW:', 1)[1].strip() if line else str(card.get('descriptive_name') or '')
+
+
 def build_master(conn, store, user, run):
     """design/127: per shot: KEEP the shot, TRIM it, or REJECT it for its kept alternative, else an AI stretch with its words; adjacent AI
     stretches merge; an all-AI scene answered Find footage goes back to the assistant."""
@@ -736,6 +741,7 @@ def build_master(conn, store, user, run):
     doc, entry = current(store, session)
     pk = _package(store, session)
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
+    seen = {c.get('clip_id'): _overview(c) for c in pk.get('cards') or []}
     beats = pk['beats']
     decisions = session['decisions']
     sl = _slides(store, session, doc, entry)
@@ -766,7 +772,9 @@ def build_master(conn, store, user, run):
                 if alt:
                     ev = {**ev['alternatives'][alt['alt_index']], 'timeline_frames': ev['timeline_frames'], 'from_alternative': alt['no']}
                 else:
-                    ev = {'blank': True, 'timeline_frames': ev['timeline_frames'], 'intent': f"in place of rejected {s['title']}: {s.get('words') or ''}".strip(),
+                    note = str((decisions.get(str(s['no'])) or {}).get('note') or '').strip()   # design/126 MA1: what was turned down and why; the words stay in the narration part
+                    ev = {'blank': True, 'timeline_frames': ev['timeline_frames'],
+                          'intent': f"in place of rejected {s['title']} (it showed: {seen.get(rows[ev['sub_clip_id']].get('clip_id'), '')}" + (f"; the operator: {note}" if note else '') + ')',
                           'rejected': s['no'], 'title': s['title']}
             elif (ev.get('note') or {}).get('kind') == 'reuse':
                 ev['reuse_approved'] = True

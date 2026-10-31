@@ -90,7 +90,7 @@ def test_creating_or_adopting_a_run_on_a_retired_version_is_refused(version):
     from app import core
     msg = f'procedure version {version} is retired; new films use version 3'
     with pytest.raises(Problem) as e:
-        core.create_run(None, {'id': 'u'}, 't', 'c', version)
+        core.create_run(None, {'id': 'u'}, 't', 'c', version, 'openai')
     assert e.value.message == msg
     with pytest.raises(Problem) as e:
         core.adopt(None, {'id': 'u'}, {'id': 'r'}, version)
