@@ -2260,7 +2260,7 @@ def generate_image(conn, store, user, run, outputs, body):
         need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
         style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
         need(style_ref, 'A component is made in the approved style: approve the style picture first (the Pictures step).')
-        if style_ref['id'] not in (body.get('parents') or []):
+        if style_ref['id'] not in (body.get('parents') or []) and not body.get('fix_of'):   # W4: a fix keeps the picture to fix as Image 1
             body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
         block = COMPONENT_BLOCK if provider_of(run) == 'openai' else COMPONENT_BLOCK_GREEN   # design/120: Gemini has no transparent output; the server keys the green out
         body = {**body, 'prompt': with_composed(body['prompt'], block.format(name=element.get('name') or body['element_id']))}
@@ -2297,7 +2297,7 @@ def generate_image(conn, store, user, run, outputs, body):
             if p and body['kind'] == 'keyframe' and p.get('kind') == 'keyframe' and p.get('status') == 'candidate' and p['id'] != body.get('fix_of'):
                 need(False, f"{p['id']} is a start image still waiting for approval: an end image is made only from an approved start. Write the end with the start "
                             "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start.")
-        need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate' and p['id'] == body.get('fix_of')))
+        need(all(p and (p['status'] == 'approved' or (p['status'] == 'candidate' and p['id'] == body.get('fix_of')))   # W4: a fix starts from its candidate, whatever its kind
                  for p in parents), 'Parents must be approved references of this run.')
     library.check_prompt(body['prompt'], fix=bool(body.get('fix_of')))   # design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
@@ -2350,7 +2350,7 @@ def generate_image(conn, store, user, run, outputs, body):
     answer = body.get('answer')
     if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
         try:
-            library.check_answer(answer, writer_prompt)
+            library.check_answer({**answer, 'exact_text': []} if body.get('fix_of') else answer, writer_prompt)   # W5: a fix's prompt is its one change; the exact texts are added after this check
             library.check_exact_places(answer, {lm['id'] for lm in (found[2].get('landmarks') if found else []) or []})   # design/111 F13
             library.check_quoted(writer_prompt, library.exact_entries(answer))
         except ValueError as exc:
@@ -2979,7 +2979,7 @@ def _approved_next(store, session, row):
             exact = bool(locate(store, session, sid)[3].get('end_state_exact'))
         except Exception:
             exact = False
-        return (f"Approved: this shot's end must be exact: its end image is made from this start next (`vw visuals image --kind keyframe --role end --parents {row['id']} --region …`)."
+        return (f"Approved: this shot's end must be exact: its end image is made from this start next (`vw visuals image --element {row.get('element_id')} --kind keyframe --role end --parents {row['id']} --region …`)."
                 if exact else f"Approved: the take for {sid} is the next step.")
     if word == 'reference sheet':   # design/124 A4 item 11: a thing's golden picture comes next; a person's sheet is its golden picture
         try:
@@ -3314,7 +3314,7 @@ def _route_gate(shot, wanted):
     if vt == wanted or (wanted == 'still' and vt in STILL_TYPES + ('footage',)):   # design/124-b item 1: a footage shot takes a footage frame (or a clip stretch)
         return
     takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)',
-             'footage': 'a clip stretch (`vw visuals clip`) or a footage frame (`vw visuals still`)'}.get(vt, 'a still (`vw visuals still`)')
+             'footage': 'a clip stretch (`vw visuals clip`) or a footage frame (`vw visuals still`)', 'drawn': 'a drawing (`vw visuals draw --shot S`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
 
@@ -3517,6 +3517,7 @@ def submit_take(conn, store, user, run, outputs, shot_id):
     session = session_of(store, run, outputs)
     prep = session['preparations'].get(shot_id)
     need(prep, 'Prepare the take first.')
+    need(not prep.get('drawn'), f'{shot_id} is a drawn shot: it is rendered with `vw visuals draw --shot {shot_id}`, not a take.')   # W3
     open_job = conn.execute("select id from vw2_jobs where run_id=%s and stage='visuals' and unit=%s and provider='video' and status in ('queued','running','submitted','submission_unknown','storage_pending')",
                             (run['id'], shot_id)).fetchone()
     if open_job:

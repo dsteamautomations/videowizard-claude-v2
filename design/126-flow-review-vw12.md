@@ -1298,6 +1298,26 @@ Read in the code, the live server's log and the defects table.
 
 **Proposed:** fix 38 (keep the writer's words before the server's lines; the file path parses crops like the single command, through the same function); then, before the operator reaches them, a read-only sweep of every remaining visuals command (sheet, golden, state, component, keyframe, take, draw, record) for these same three kinds of fault, and one test per command that runs the request through the server's real request model and checks.
 
+### The sweep of the remaining visuals commands (31 Oct 2026; read-only, a helper; findings 1, 2, 3 and 6 re-checked by me in the code)
+
+| # | Command | What breaks | Smallest fix |
+|---|---|---|---|
+| W1 | any command whose answer has no message (prepare-take, review, asset, generator, select, accept) | **the tool's summary line says "refused (no reason given)" although it succeeded** (exit 0): introduced by defect 35's `why()` in `emit` (my fault) | `emit` uses `why()` only when the exit code is not 0 |
+| W2 | `review` without `--notes` or `--quote` | always refused (the tool sends None, the server wants text) although the reason is optional (design/99 C3) | send `''` |
+| W3 | `take --shots all`, `take --shot <drawn>` | a drawn shot counts as "prepared" and goes to the take path; refused with the bare message `'provider'` | take only video shots; the server refuses a drawn shot by name ("rendered with `vw visuals draw`") |
+| W4 | `fix` on an isolated picture (a golden candidate), a sheet, a style, a component | refused ("Parents must be approved references"): only keyframes and states may be fixed from a candidate; a component's fix puts the style picture first while the fix prompt says Image 1 is the picture to fix | allow the picture being fixed as a candidate parent for any kind; no style prepend on a fix |
+| W5 | `fix` of any picture whose answer has exact text (labels, titles) | refused ("The exact text … is not in the prompt"): the fix prompt lacks the answer's exact texts | check a fix's answer without its exact texts (the server adds them after the check) |
+| W6 | a drawn shot sent to prepare-take, still or sequence | told to use `vw visuals still` ("takes a still, not a still") | name `vw visuals draw --shot S` for a drawn shot |
+| W7 | `font --file`, `scene --file` | the file is looked for in the folder the tool started in, not the run folder (every other `--file` uses the run folder), so `--file work/scene-S-fixed.svg` is refused | read it from the run folder |
+| W8 | `spec --element E` (a material spec) | prints "Drawing spec of None approved" | print the server's `next` line |
+| W9 | `bind --file`, `still --file` | rows built differently from the single command: bind's `E=R1,R2` strings refused; still drops `move`, `reuse`, `considered`, `crop` | the rows go through the same parsing as the single command |
+| W10 | `select` without `--gap`/`--job`, `fetch` without `--ref`/`--job` | print nothing and end "ok" | one refusal line naming the flags |
+| W11 | `prepare-take --seconds 5.5`, `clip --at 1:20`, a bad `--crop`, `asset` without `--file` | Python crash instead of a refusal | a refusal naming the expected form |
+| W12 | the line after approving a start whose end must be exact | names `vw visuals image --kind keyframe --role end …` without `--element`, which is required | add `--element <id>` |
+| W13 (minor) | `image` without `--kind`; status with only a drawn job open | default name "None-E"; status line starts " open;" | `kind or 'keyframe'`; count drawn jobs |
+
+Checked and found fine by the helper: every field the single commands send matches the server's models; every write now carries its request id; no other value is rewritten before its check; every command and flag the instructions name exists; refusals reach the operator with text. Not verified: nothing was run; the page's "Try a fix" button.
+
 ## Blocks found (point 13), across all stages
 | # | Where | Decision or refusal | Recommendation | SK |
 |---|---|---|---|---|

@@ -42,7 +42,7 @@ RUNS = Path(os.environ.get('VW2_RUNS') or Path.cwd() / 'runs')
 
 def emit(payload, code=0, summary=None):
     print(json.dumps(payload, indent=1, default=str))
-    hint = (why(payload)) if isinstance(payload, dict) else f'{len(payload)} item(s)'
+    hint = ((why(payload) if code else (payload.get('message') or payload.get('action'))) if isinstance(payload, dict) else f'{len(payload)} item(s)')   # W1: "refused" only when refused
     print(summary or hint or 'ok', file=sys.stderr)
     sys.exit(code)
 
@@ -1666,7 +1666,7 @@ def cmd_visuals(a):
                 warned += [f"{body['element_id']}: {w}" for w in payload.get('warnings') or []]   # design/89 C, D
             emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid images queued with the film's picture AI; tell the operator, then `vw visuals status --wait 300`." +
                  (' Warnings: ' + '; '.join(warned) if warned else ''))
-        body = {'element_id': a.element, 'name': a.name or f'{a.kind}-{a.element}', 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt or _answer_prompt(m, a.answer),
+        body = {'element_id': a.element, 'name': a.name or f"{a.kind or 'keyframe'}-{a.element}", 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt or _answer_prompt(m, a.answer),
                 **_parents_and_crops(a.parents), **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),   # design/119 rule 1: id or id@left,top,width,height
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
                 **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {}),   # design/91 N8; design/106 T1
@@ -1686,7 +1686,11 @@ def cmd_visuals(a):
     if a.what == 'bind':   # design/45 10.4: no quote needed; the approved references are the yes
         if a.file:   # design/77 L33b: several shots in one call
             def bind_row(r):
-                body = {'shot_id': r['shot'], 'references': r['refs'], **({'subject_selectors': r['selectors']} if r.get('selectors') else {}), **({'quote': r['quote']} if r.get('quote') else {})}
+                if isinstance(r['refs'], dict):   # W9: as --refs reads them
+                    refs_ = {e: (v.split(',') if isinstance(v, str) else list(v)) for e, v in r['refs'].items()}
+                else:
+                    refs_ = {e: v.split(',') for e, v in _pairs(r['refs'] if isinstance(r['refs'], list) else [r['refs']], 'refs', 'ELEMENT=REF1,REF2').items()}
+                body = {'shot_id': r['shot'], 'references': refs_, **({'subject_selectors': r['selectors']} if r.get('selectors') else {}), **({'quote': r['quote']} if r.get('quote') else {})}
                 return r['shot'], 'POST', base + '/bind', body
             _batch(_rows(m, a.file, ('shot', 'refs')), bind_row, 'shot', lambda done: f"{len(done)} shots bound: {', '.join(done)}; now `vw visuals packet --shot S` for each, then compose the start image (and the end image only where the shot must end exactly).")
         refs = {eid: text.split(',') for eid, text in _pairs(a.refs, '--refs', 'ELEMENT=REF1,REF2').items()}
@@ -1715,7 +1719,7 @@ def cmd_visuals(a):
             emit({'action': 'refused', 'message': 'Give the continuity line: `--continuity "what stays unchanged through the shot (and between the start and the end image when the shot has one); for a person five traits from the sheet"`.'}, 2)
         subjects = _pairs(a.subject, '--subject', 'ELEMENT="what this subject does in the shot"')
         body = {'shot_id': a.shot, 'start_image': a.start, **({'end_image': a.end} if a.end else {}), 'motion_prompt': a.motion, 'subject_reconciliation': subjects, 'continuity_notes': a.continuity or '',
-                **({'duration_seconds': int(a.seconds)} if a.seconds else {}), **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5
+                **({'duration_seconds': _number(a.seconds, '--seconds', whole=True)} if a.seconds else {}), **({'answer': _json_file(m, a.answer)} if a.answer else {})}   # design/68 L5
         emit(write(base + '/prepare-take', body))
     if a.what == 'draw':   # design/113 E2: the plan's scene of a drawn shot, rendered free
         if not a.shot:
@@ -1724,7 +1728,7 @@ def cmd_visuals(a):
         emit(out, 0, out.get('next'))
     if a.what == 'font':   # design/113 E4: the film's brand font
         import base64 as _b64
-        p = Path(a.file or '')
+        p = ws / a.file if a.file and (ws / a.file).is_file() else Path(a.file or '')   # W7: the run folder first, as every other --file
         if not a.file or not p.is_file() or p.suffix.lower() not in ('.ttf', '.otf'):
             emit({'action': 'refused', 'message': 'Give one .ttf or .otf file: `font --file brand.ttf`.'}, 2)
         out = write(base + '/font', {'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
@@ -1746,7 +1750,7 @@ def cmd_visuals(a):
             p.write_text(out['svg'], encoding='utf-8')
             emit({**{k: out.get(k) for k in ('shot_id', 'job_id', 'fixed', 'passes')}, 'file': str(p)}, 0,
                  f"Saved {p}" + (" (the scene as the server corrected it; put it in the plan as the shot's scene if you keep the changes)." if out.get('fixed') else ' (the plan\'s scene; the server changed nothing).'))
-        p = Path(a.file or '')
+        p = ws / a.file if a.file and (ws / a.file).is_file() else Path(a.file or '')   # W7
         if not a.file or not p.is_file() or p.suffix.lower() != '.svg':
             emit({'action': 'refused', 'message': 'Give one .svg file: `scene --shot S --file scene.svg`.'}, 2)
         out = write(base + '/scene', {'shot_id': a.shot, 'name': p.name, 'content_base64': _b64.b64encode(p.read_bytes()).decode('ascii')})
@@ -1759,7 +1763,7 @@ def cmd_visuals(a):
             st = call('GET', base)
             open_units = {j['unit'] for j in st.get('jobs') or [] if j.get('provider') == 'video' and j.get('status') in VISUALS_OPEN}
             shots = [s['shot_id'] for g in st.get('gaps') or [] for s in g.get('shots') or []
-                     if s.get('prepared') and not s.get('selected') and not s.get('asset') and s['shot_id'] not in open_units]
+                     if s.get('prepared') and s.get('visual_type', 'video') == 'video' and not s.get('selected') and not s.get('asset') and s['shot_id'] not in open_units]   # W3: a drawn shot is drawn, not taken
             if not shots:
                 emit({'queued': [], 'refused': {}}, 0, 'no prepared shot without a take; prepare a take first (`vw visuals prepare-take`)')
         queued, refused = [], {}
@@ -1791,7 +1795,8 @@ def cmd_visuals(a):
         round_line = f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': read the verdicts and make the sheets') if rd else ''
         if open_:
             images, takes = sum(1 for j in open_ if j.get('provider') in ('openai', 'gemini-image')), sum(1 for j in open_ if j.get('provider') == 'video')   # design/124 A4 item 20: both picture AIs
-            line = ', '.join(x for x in (f'{images} image{"s" if images != 1 else ""}' if images else '', f'{takes} take{"s" if takes != 1 else ""}' if takes else '') if x) + f' open; {ready} ready' + \
+            drawn = sum(1 for j in open_ if j.get('provider') == 'drawn')   # W13: a drawing open is named too
+            line = ', '.join(x for x in (f'{images} image{"s" if images != 1 else ""}' if images else '', f'{takes} take{"s" if takes != 1 else ""}' if takes else '', f'{drawn} drawing{"s" if drawn != 1 else ""}' if drawn else '') if x) + f' open; {ready} ready' + \
                    ('; run again with --wait' if a.wait else '')
         else:
             line = f'all done: {ready} ready' + (f', {rejected} rejected' if rejected else '') if jobs_ else 'no image or take jobs yet'
@@ -1818,15 +1823,20 @@ def cmd_visuals(a):
             path = _download(m, job['result']['key'], f"work/take-{a.job}.mp4")
             lines = next((j.get('checklist') for j in (call('GET', base).get('jobs') or []) if str(j.get('id')) == str(a.job)), None) or []   # design/74 L6
             emit({'job': a.job, 'path': path, 'sha256': job['result']['sha256'], 'evidence': job['result']['evidence'], 'checklist': lines}, 0, f'Take at {path}; let the operator watch it' + _checklist_line(lines))
+    if a.what == 'fetch':   # W10
+        emit({'action': 'refused', 'message': 'Give --ref R (a picture) or --job J (a take).'}, 2)
     if a.what == 'review':
-        emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes, 'timing_notes': a.timing or '', 'quote': a.quote}))
+        emit(write(base + '/review', {'job_id': a.job, 'decision': a.decision, 'notes': a.notes or '', 'timing_notes': a.timing or '', 'quote': a.quote or ''}))
     if a.what == 'select' and a.job:   # design/45 10.4: notes make the accepted review part of the selection
         a.job = _take_job(base, a.job)
         out = write(base + '/select-take', {'job_id': a.job, 'quote': a.quote or '', **({'notes': a.notes} if a.notes else {}), **({'timing_notes': a.timing} if a.timing else {})})
         emit(out, 0, out.get('next'))   # design/97 A4
+    if a.what == 'select':   # W10: neither a gap's choice nor a take
+        emit({'action': 'refused', 'message': 'Give --job J (a take to select) or --gap G --choice C (a plan choice).'}, 2)
     if a.what == 'still':   # design/45 10.3: an approved reference fills a still shot
         if a.file:   # design/77 L33b: several still shots in one call
-            _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or ''}), 'shot',
+            _batch(_rows(m, a.file, ('shot', 'ref')), lambda r: (r['shot'], 'POST', base + '/still', {'shot_id': r['shot'], 'reference_id': r['ref'], 'quote': r.get('quote') or '', **{k: r[k] for k in ('move', 'reuse', 'considered') if r.get(k)},
+                                                                                           **({'crop': [float(v) for v in str(r['crop']).split(',')]} if r.get('crop') else {})}), 'shot',   # W9
                    lambda done: f"{len(done)} stills set: {', '.join(done)}.")
         emit(write(base + '/still', {'shot_id': a.shot, 'reference_id': a.ref, 'quote': a.quote or '', **_reuse_fields(a), **({'move': a.move} if a.move else {})}), 0,
              f'Still set for {a.shot} from reference {a.ref}.')   # design/94 R1.7: --move, the operator's words for a picture made for another shot
@@ -1839,7 +1849,7 @@ def cmd_visuals(a):
     if a.what == 'clip':   # design/89 B3: a moving stretch of a clip fills the shot, from --at for the shot's length
         if not a.shot or not a.clip or a.at is None:
             emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)
-        out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': float(a.at), 'quote': a.quote, **_reuse_fields(a)})
+        out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': _number(a.at, '--at'), 'quote': a.quote, **_reuse_fields(a)})
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
     if a.what == 'reuse':   # design/89 H7: the operator approves a proposed reuse with their words
         emit(write(base + '/reuse', {'shot_id': a.shot, 'quote': a.quote}), 0, f'Reuse approved for {a.shot} with the operator\'s words.')
@@ -1856,7 +1866,7 @@ def cmd_visuals(a):
             emit(out, 0, (out.get('next') or '') + ''.join(f" {r['shot_id']}: " + '; '.join(f"{x['part']} {x['measure']} {x['size']} ({x['status']})".replace('  ', ' ') for x in r['table'])
                                                           for r in out.get('approved') or []))
         out = write(base + '/spec', {'shot_id': a.shot, 'quote': a.quote or ''})
-        emit(out, 0, f"Drawing spec of {out.get('shot_id')} approved" + (f" (depicts {out['depicts']})" if out.get('depicts') else '') + ': ' + '; '.join(f"{r['part']} {r['measure']} {r['size']} ({r['status']}{', ' + r['source'] if r.get('source') else ''})" for r in out.get('table') or []) + '.')
+        emit(out, 0, out.get('next') if not out.get('shot_id') and out.get('next') else f"Drawing spec of {out.get('shot_id')} approved" + (f" (depicts {out['depicts']})" if out.get('depicts') else '') + ': ' + '; '.join(f"{r['part']} {r['measure']} {r['size']} ({r['status']}{', ' + r['source'] if r.get('source') else ''})" for r in out.get('table') or []) + '.')
     if a.what == 'note':   # design/106 N4: a saved picture's note, until its element's sheet is made
         if not a.ref:
             emit({'action': 'refused', 'message': 'Name the picture: `vw visuals note --ref R --notes "<keep or avoid>"`.'}, 2)
@@ -1870,6 +1880,8 @@ def cmd_visuals(a):
         emit(out, 0, 'Measured: ' + ('; '.join(f"{m['part']} {m['measure']} {m['value']} {m['unit']} (from {m['source']})" for m in out.get('measurements') or []) or 'nothing readable') +
                      (f". Limits: {out['limits']}" if out.get('limits') else '') + '.')
     if a.what == 'asset':
+        if not a.file:   # W11
+            emit({'action': 'refused', 'message': 'Give the uploaded file: `asset --shot S --file out/<name> --kind … --quote "…"`.'}, 2)
         entry = next((f for f in m['files'] if f.get('name') == Path(a.file).name and f.get('receipt')), None)
         if not entry:
             emit({'action': 'refused', 'message': 'Upload the asset first: `vw upload --stage visuals --file out/<name>`.'}, 2)
@@ -1883,11 +1895,22 @@ def cmd_visuals(a):
         emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
 
 
+def _number(value, flag, whole=False):
+    """W11: a flag's number, or a refusal naming the flag and the expected form (never a crash)."""
+    try:
+        n = float(value)
+        if whole and n != int(n):
+            raise ValueError
+        return int(n) if whole else n
+    except (TypeError, ValueError):
+        emit({'action': 'refused', 'message': f"{flag} takes {'a whole number of seconds' if whole else 'a number'} (got {value!r})."}, 2)
+
+
 def _reuse_fields(a):
     """design/89 H2-H4: the reason, the reimagined shot considered, and the crop, x,y,w,h."""
     out = {k: getattr(a, k, None) for k in ('reuse', 'considered') if getattr(a, k, None)}
     if getattr(a, 'crop', None):
-        out['crop'] = [float(v) for v in str(a.crop).split(',')]
+        out['crop'] = [_number(v, '--crop x,y,w,h') for v in str(a.crop).split(',')]
     return out
 
 
