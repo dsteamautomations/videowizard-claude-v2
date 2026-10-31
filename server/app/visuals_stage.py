@@ -2120,7 +2120,7 @@ def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched
                                                 'quote': words or f"Approved when saved by {user.get('name') or user.get('id')}"})
         made.append(row)
     need(made, 'None of the ticked pictures could be downloaded: ' + '; '.join(f"{f['n']} ({f['site']}): {f['why']}" for f in failed) + '. Pick others, or save one yourself and `vw visuals supply` it.')
-    s['picked'] = [r['source']['n'] for r in made]
+    s['picked'] = list(dict.fromkeys((s.get('picked') or []) + [r['source']['n'] for r in made]))   # design/126 U3: a picture saved on its own adds to the earlier saves of the search
     s['failed'] = failed
     return {'search_id': search_id, 'references': made, 'failed': failed}
 

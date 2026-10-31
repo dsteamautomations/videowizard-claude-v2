@@ -205,7 +205,9 @@ $('film').addEventListener('timeupdate',()=>{
     if(s.type==='alternative'&&!s.needs_answer&&s.why&&/is kept/.test(s.why)&&t>=c[0]&&t<c[1]-0.1){f.currentTime=c[1];return;}   // design/127: a switched-off alternative is skipped
     if(s.type!=='scene'&&c[0]<=t+0.05&&c[0]>bt){bt=c[0];best=s.slide;}}
   if(best!==current){current=best;$('slides').querySelectorAll('.row').forEach(el=>el.classList.toggle('cur',el.dataset.slide===current));
-    const s=data.slides.find(x=>x.slide===current);$('now').textContent=s?('Now: '+s.title+(s.b_roll?' · B-roll':'')):'';}
+    const s=data.slides.find(x=>x.slide===current);$('now').textContent=s?('Now: '+s.title+(s.b_roll?' · B-roll':'')):'';
+    const el=$('slides').querySelector('.row.cur'), ae=document.activeElement, typing=ae&&/^(TEXTAREA|INPUT|SELECT)$/.test(ae.tagName)&&$('slides').contains(ae);
+    if(el&&!typing)el.scrollIntoView({block:'nearest'});}   // design/126 U1: the list follows the film when the shot changes, never while a note is typed
   if(!pauseOn||waitingFor||f.paused)return;
   for(const s of data.slides){   // design/127: stop at the end of a shot that still needs an answer
     const c=cue(s.slide);

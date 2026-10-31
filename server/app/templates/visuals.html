@@ -108,7 +108,7 @@ main:has(> .v2){max-width:1400px}
 .v2 .spacer{height:210px}
 /* design/97: the shared panel on every picture step, wider; the viewer; the check in one line; what waits */
 .v2 .split{grid-template-columns:minmax(0,1fr) minmax(360px,45%)}
-.v2 .panel img{max-height:50vh;cursor:zoom-in}
+.v2 .panel img{max-height:50vh}
 .v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding-top:8px;z-index:2}   /* design/100 S3: Approve and Reject always in view */
 .v2 details.pdet{margin-top:6px}.v2 details.pdet summary{cursor:pointer;color:var(--muted);font-size:15px}   /* design/100 S4 */
 .v2 .panel .pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px}
@@ -128,7 +128,10 @@ main:has(> .v2){max-width:1400px}
 #viewer .vw-stage img{max-width:100%;max-height:100%;transform-origin:center;user-select:none}
 #viewer .vw-side{background:var(--card);padding:12px;overflow:auto;color:var(--fg);font-size:16px}
 @media (max-width:900px){ #viewer{grid-template-columns:1fr} #viewer .vw-side{max-height:45vh}}   /* a space after each brace: a brace then a hash opens a Jinja comment */
-.v2 .pclose{display:flex;justify-content:flex-end;margin:-6px -6px 2px}
+.v2 .pclose{display:flex;justify-content:flex-end;margin:-6px 0 2px;position:sticky;top:0;background:var(--card);z-index:3}   /* design/126 U2: the × stays in view while the panel scrolls; no negative side margin */
+.v2 .panel{overflow-y:auto;overflow-x:hidden;overflow-wrap:anywhere}.v2 .panel .pnote,.v2 .panel input{box-sizing:border-box;max-width:100%}   /* design/126 U2: the panel never scrolls sideways */
+.v2 .panel img{cursor:default}.v2 .panel img[data-view],.v2 .panel img[data-sview]{cursor:zoom-in}   /* design/126 U4: the zoom cursor only where a click opens the viewer */
+.v2 .used{margin-top:4px}   /* design/126 U7 */
 .v2 .pclose .ic{font-size:24px;line-height:1}
 .v2 .rsn{margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:10px}
 @media (max-width:600px){.v2 .panel .act{position:sticky;bottom:0;background:var(--card);padding:6px 0;z-index:2}}
@@ -180,13 +183,16 @@ async function act(body){
   finally{inflight=false;}
 }
 async function send(body,okText){msg('Recording…',false,true);try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}msg((j&&j.next)||okText||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}catch(err){msg(err.message,true);highlightNamed(err.message,document);return null;}}
+const KW_TEXT='Two to twelve words to search for: the thing and its place or trade.';   // design/126 U5 (SK, 31 Oct: 2 to 12 words; the stock site's name is outside the count)
+function kwOk(kw){const n=String(kw||'').split(/\s+/).filter(Boolean).length;return n>=2&&n<=12;}
 async function roundSearch(eid){   // design/121 change 6: a thing's own search; not through act(), so the operator goes on to the next thing while it runs
   const kw=(($('kw-'+eid)||{}).value||'').trim(), src=(($('src-'+eid)||{}).value||'').trim();
-  if(kw.split(/\s+/).filter(Boolean).length<2||kw.split(/\s+/).length>6){needWords('kw-'+eid,'Two to six words to search for: the thing and its place or trade.');return;}
+  if(!kwOk(kw)){needWords('kw-'+eid,KW_TEXT);return;}
   searching[eid]=true;renderStep();footer();msg('Searching for '+eid+'… you can go on to the next thing.',false,true);
   try{const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'search',element_id:eid,keywords:kw,source:src})});let j=null;try{j=await r.json();}catch(e){j=null;}
     if(!r.ok)throw new Error((j&&j.message)||('The server answered '+r.status+'.'));
-    if(j&&j.view)data=j.view;msg(eid+': '+((j.results||[]).length+(j.stock_results||[]).length)+' pictures found'+(j.errors?' (one search failed: '+Object.values(j.errors).join('; ')+')':'')+'.',!!j.errors);}
+    if(j&&j.view)data=j.view;if(!((j.results||[]).length+(j.stock_results||[]).length)&&!selPic)selPic={supply:eid};   // design/126 U6: nothing found: the own-picture box opens in the panel
+    msg(eid+': '+((j.results||[]).length+(j.stock_results||[]).length)+' pictures found'+(j.errors?' (one search failed: '+Object.values(j.errors).join('; ')+')':'')+'.',!!j.errors);}
   catch(err){msg(eid+': '+err.message,true);await load();}
   finally{delete searching[eid];render();}
 }
@@ -403,6 +409,12 @@ function noteBox(r){   // design/106 N4: a saved picture's note, editable until 
   if(!['web','frame','supplied','isolated'].includes(r.kind)||r.status==='rejected'||stage()!=='visuals')return '';
   if((data.references||[]).some(x=>x.kind==='sheet'&&x.element_id===r.element_id&&x.status!=='rejected'))return r.note?'<div class="ds">Note: '+esc(r.note)+'</div>':'';
   return '<textarea id="ref-note" class="pnote keep" placeholder="note for the sheet: keep … / avoid …">'+esc(r.note||'')+'</textarea><div class="btns"><button data-a="save-note" data-ref="'+esc(r.id)+'">Save the note</button></div>';}
+function supplyBox(eid){return '<div class="search"><input type="file" id="up-'+esc(eid)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(eid)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(eid)+'">Add your own picture</button></div>';}   // design/110; design/126 U6: also in the round's panel
+function usedIn(eid){   // design/126 U7: each plan shot that shows the thing, with the narration words under it (film frames, as the gap's timing) and its one-line purpose
+  const out=[];(data.gaps||[]).forEach(g=>(g.shots||[]).forEach(s=>{if(!(s.element_ids||[]).includes(eid))return;
+    const w=((g.timing&&g.timing.words)||[]).filter(x=>x.start_frame>=s.start_frame&&x.start_frame<s.end_frame).map(x=>x.text).join(' ');
+    out.push('<div class="ds">'+esc(g.gap_id)+' · '+esc(s.shot_id)+(w?' · “'+esc(w)+'”':'')+((s.purpose||s.title)?' — '+esc(s.purpose||s.title):'')+'</div>');}));
+  return '<div class="used"><div class="ds"><b>Used in</b>'+(out.length?'':': no shot of the plan shows it')+'</div>'+out.join('')+'</div>';}
 function refsById(){const o={};(data.references||[]).forEach(r=>{o[r.id]=r;});return o;}
 function filmAt(s){return fmt(s.start_frame)+'–'+fmt(s.end_frame);}
 function isWaiting(id){return (data.waiting||[]).some(w=>w.item===id);}
@@ -448,14 +460,19 @@ function roundOpen(){const rd=data&&data.round;return rd&&(rd.pass===1||rd.pass=
 function panel(){
   const d=data, can=stage()==='visuals';
   if(!selPic)return '<div class="empty" style="padding:60px 12px">Click a picture to see it here.</div>';
+  if(selPic.supply)return '<div class="ds" style="margin-top:8px"><b>'+esc(selPic.supply)+'</b> · the search found no picture: add your own, or type new words and Search again.</div>'+supplyBox(selPic.supply);   // design/126 U6
   if(selPic.sid){
     const s=(d.searches||[]).find(x=>x.search_id===selPic.sid), r=s&&s.results.find(x=>x.n===selPic.n);
     if(!r)return '<div class="empty">That picture is gone.</div>';
-    const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0, i=s.results.indexOf(r);
-    return '<img src="'+esc(r.image_url)+'" alt="" onerror="this.onerror=null;this.src=\''+esc(r.thumbnail||'')+'\'">'+
+    const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0, i=s.results.indexOf(r), kept=(s.picked||[]).includes(r.n);
+    return '<img src="'+esc(r.image_url)+'" alt="" data-sview="'+esc(s.search_id)+':'+r.n+'" onerror="this.onerror=null;this.src=\''+esc(r.thumbnail||'')+'\'">'+   // design/126 U4: a click opens the viewer
       '<div class="ds" style="margin-top:8px"><b>'+esc(s.element_id)+'</b> · '+(r.n)+' of '+s.results.length+' · '+esc(r.site||'web')+' · '+esc(r.width||'?')+'×'+esc(r.height||'?')+(r.page_url?' · <a href="'+esc(r.page_url)+'" target="_blank" rel="noopener">source</a>':'')+'</div>'+
       '<div class="btns"><button id="p-prev" '+(i>0?'':'disabled')+'>‹ Previous</button><button id="p-next" '+(i<s.results.length-1?'':'disabled')+'>Next ›</button><button id="p-tick" class="'+(p?'':'go')+'">'+(p?'Untick (Image '+idx+')':'Tick as Image '+((picks[s.search_id]||[]).length+1))+'</button></div>'+
-      (p?'<textarea id="p-note" class="pnote" placeholder="your note for this picture: keep the handle shape; avoid the brand text">'+esc(p.note||'')+'</textarea><div class="chips">'+CHIPS.map(c=>'<button data-pchip="'+esc(c)+'">'+esc(c)+'</button>').join('')+'</div>':'<div class="ds">Tick it to add a note.</div>');
+      (kept?'<div><span class="badge ok">Saved ✓</span></div>':'')+
+      (p?'<textarea id="p-note" class="pnote" placeholder="your note for this picture: keep the handle shape; avoid the brand text">'+esc(p.note||'')+'</textarea><div class="chips">'+CHIPS.map(c=>'<button data-pchip="'+esc(c)+'">'+esc(c)+'</button>').join('')+'</div>'+
+        (can?'<div class="ds">The note is saved with the picture.</div><div class="btns"><button id="p-save" class="go">Save</button></div>':'')   // design/126 U3: this one picture and its note, saved at once
+       :(kept?'':'<div class="ds">Tick it to add a note.</div>'))+
+      (roundOpen()&&can?supplyBox(s.element_id):'');   // design/126 U6: the thing's own picture, beside the selected one
   }
   if(selPic.take){   // design/97 P2: a take is judged beside its player
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
@@ -493,28 +510,42 @@ function wirePanel(){
   const pn=$('panel');if(!pn)return;
   const s=selPic&&selPic.sid?(data.searches||[]).find(x=>x.search_id===selPic.sid):null;
   const move=k=>{if(!s)return;const i=s.results.findIndex(x=>x.n===selPic.n), next=s.results[i+k];if(next)selectPic({sid:s.search_id,n:next.n});};
-  if($('p-prev'))$('p-prev').addEventListener('click',()=>move(-1));
-  if($('p-next'))$('p-next').addEventListener('click',()=>move(1));
-  if($('p-tick'))$('p-tick').addEventListener('click',()=>{toggleTick(selPic.sid,selPic.n);renderReferences();footer();});
-  if($('p-note'))$('p-note').addEventListener('input',ev=>{const q=pickOf(selPic.sid,selPic.n);if(q)q.note=ev.target.value;});   // S4: no re-render while typing
-  pn.querySelectorAll('[data-pchip]').forEach(c=>c.addEventListener('click',()=>{const q=pickOf(selPic.sid,selPic.n);if(q){q.note=(q.note?q.note+'; ':'')+c.dataset.pchip;renderReferences();}}));
+  wireSearchPanel(pn,move,renderReferences);
   pn.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
   pn.querySelectorAll('img[data-view]').forEach(i=>i.addEventListener('click',()=>openViewer(i.dataset.view)));   // design/97 V1
+  pn.querySelectorAll('img[data-sview]').forEach(i=>i.addEventListener('click',()=>{const [sid,n]=i.dataset.sview.split(':');openSearchViewer(sid,Number(n));}));   // design/126 U4
   if($('p-close'))$('p-close').addEventListener('click',()=>selectPic(null));   // design/99 C1
 }
+function wireSearchPanel(root,move,redraw){   // a search result's controls, in the panel or in the viewer's side (design/126 U4)
+  const on=(id,ev,f)=>{const e=root.querySelector('#'+id);if(e)e.addEventListener(ev,f);}, q=()=>pickOf(selPic.sid,selPic.n);
+  on('p-prev','click',()=>move(-1));on('p-next','click',()=>move(1));
+  on('p-tick','click',()=>{toggleTick(selPic.sid,selPic.n);redraw();footer();});
+  on('p-note','input',ev=>{const p=q();if(p)p.note=ev.target.value;});   // S4: no re-render while typing
+  on('p-save','click',()=>savePick(selPic.sid,selPic.n));   // design/126 U3
+  root.querySelectorAll('[data-pchip]').forEach(c=>c.addEventListener('click',()=>{const p=q();if(p){p.note=(p.note?p.note+'; ':'')+c.dataset.pchip;redraw();}}));
+}
+async function savePick(sid,n){   // design/126 U3: the per-thing save (action 'pick') for this one picture and its note; it leaves the unsaved ticks once saved
+  const p=pickOf(sid,n);if(!p)return;const s=searchOf(sid);
+  const j=await send({action:'pick',search_id:sid,picks:[{n:p.n,note:p.note||''}]},'Image saved with its note for '+((s&&s.element_id)||'the thing')+'.');
+  if(!j)return;
+  picks[sid]=(picks[sid]||[]).filter(x=>x.n!==n);if(!picks[sid].length)delete picks[sid];
+  render();
+  if(j.failed&&j.failed.length)msg('The picture could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'.',true);}
 // ---------- design/97 V1, V3: the viewer, full size, with zoom, pan, arrows and the panel beside it ----------
 function viewList(id){const by=refsById(), r=by[id];if(!r)return [];const sh=r.shot_id?shotOf(r.shot_id):null;
   let list=sh&&sh.route==='graphic_sequence'?(sh.state_order||[]).map(x=>by[x]).filter(Boolean):sh?(data.references||[]).filter(x=>x.shot_id===sh.shot_id&&x.url&&x.status!=='rejected'):
     (data.references||[]).filter(x=>x.element_id===r.element_id&&x.url&&['frame','supplied','web','isolated','sheet','style','component'].includes(x.kind));   // design/117 P1
   if(!list.some(x=>x.id===id))list.unshift(r);return list;}
 function openViewer(id){const list=viewList(id);if(!list.length)return;view={list:list,i:Math.max(0,list.findIndex(x=>x.id===id)),z:1,x:0,y:0};drawViewer();}
+function openSearchViewer(sid,n){const s=searchOf(sid);if(!s||!s.results.length)return;   // design/126 U4: the viewer over one search's results, Previous / Next through them
+  const list=s.results.map(r=>({sid:sid,n:r.n,url:r.image_url||r.thumbnail,thumb:r.thumbnail}));view={list:list,i:Math.max(0,list.findIndex(x=>x.n===n)),z:1,x:0,y:0};drawViewer();}
 function closeViewer(){view=null;drawViewer();}
 function moveViewer(k){if(!view)return;const i=view.i+k;if(i<0||i>=view.list.length)return;view.i=i;view.z=1;view.x=0;view.y=0;drawViewer();}
 function zoomViewer(f){if(!view)return;view.z=Math.min(8,Math.max(1,view.z*f));if(view.z===1){view.x=0;view.y=0;}const im=$('vw-img');if(im)im.style.transform='translate('+view.x+'px,'+view.y+'px) scale('+view.z+')';}
 function drawViewer(){const v=$('viewer');
   if(!view){v.hidden=true;v.innerHTML='';renderStep();return;}
-  const r=view.list[view.i];selPic={ref:r.id};const pn=$('panel');if(pn)pn.innerHTML='<div class="empty">Open in the viewer.</div>';   // one panel at a time
-  v.hidden=false;v.innerHTML='<div class="vw-stage" id="vw-stage"><img id="vw-img" src="'+esc(r.url)+'" alt="" draggable="false" style="transform:translate('+view.x+'px,'+view.y+'px) scale('+view.z+')"></div>'+
+  const r=view.list[view.i];selPic=r.sid?{sid:r.sid,n:r.n}:{ref:r.id};const pn=$('panel');if(pn)pn.innerHTML='<div class="empty">Open in the viewer.</div>';   // one panel at a time
+  v.hidden=false;v.innerHTML='<div class="vw-stage" id="vw-stage"><img id="vw-img" src="'+esc(r.url)+'" alt="" draggable="false"'+(r.thumb?' onerror="this.onerror=null;this.src=\''+esc(r.thumb)+'\'"':'')+' style="transform:translate('+view.x+'px,'+view.y+'px) scale('+view.z+')"></div>'+
     '<div class="vw-side"><div class="btns"><button id="vw-prev" '+(view.i>0?'':'disabled')+'>‹</button><span class="ds">'+(view.i+1)+' of '+view.list.length+'</span><button id="vw-next" '+(view.i<view.list.length-1?'':'disabled')+'>›</button><button id="vw-out">−</button><button id="vw-in">+</button><button id="vw-close">Close (Esc)</button></div><div id="vw-panel">'+panel()+'</div></div>';
   $('vw-prev').addEventListener('click',()=>moveViewer(-1));$('vw-next').addEventListener('click',()=>moveViewer(1));
   $('vw-in').addEventListener('click',()=>zoomViewer(1.25));$('vw-out').addEventListener('click',()=>zoomViewer(0.8));$('vw-close').addEventListener('click',closeViewer);
@@ -524,6 +555,7 @@ function drawViewer(){const v=$('viewer');
   st.addEventListener('mousemove',ev=>{if(!drag||view.z===1)return;view.x=ev.clientX-drag.x;view.y=ev.clientY-drag.y;zoomViewer(1);});
   window.addEventListener('mouseup',()=>{drag=null;},{once:true});
   v.querySelectorAll('#vw-panel button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
+  if(r.sid){const side=$('vw-panel');side.querySelectorAll('img[data-sview]').forEach(i=>i.remove());wireSearchPanel(side,moveViewer,drawViewer);}   // design/126 U4: the picture is on the stage; tick, note and Save beside it
 }
 document.addEventListener('keydown',ev=>{   // S4: arrows move within the row, Escape clears the panel; design/97 V1: the viewer's keys first
   if(view&&!/^(TEXTAREA|INPUT)$/.test((ev.target||{}).tagName)){if(ev.key==='Escape')closeViewer();if(ev.key==='ArrowLeft')moveViewer(-1);if(ev.key==='ArrowRight')moveViewer(1);if(ev.key==='+'||ev.key==='=')zoomViewer(1.25);if(ev.key==='-')zoomViewer(0.8);return;}
@@ -544,14 +576,14 @@ function wireGrid(root,rerender){
 }
 function sidsOf(r){return (r&&(r.search_ids&&r.search_ids.length?r.search_ids:(r.search_id?[r.search_id]:[])))||[];}   // design/121 change 5: the plain and the stock search
 function searchOf(sid){return (data.searches||[]).find(x=>x.search_id===sid)||null;}
-function searchBar(eid,kw,src,cls){   // design/121 changes 5, 6: the words, the source word outside the six, and this thing's own Search button
+function searchBar(eid,kw,src,cls){   // design/121 changes 5, 6: the words, the source word outside the count, and this thing's own Search button
   const busy=!!searching[eid];
-  return '<div class="search"><input class="'+cls+'" data-el="'+esc(eid)+'" id="kw-'+esc(eid)+'" value="'+esc(kw)+'" placeholder="two to six words: the thing and its place or trade" style="flex:2">'+
+  return '<div class="search"><input class="'+cls+'" data-el="'+esc(eid)+'" id="kw-'+esc(eid)+'" value="'+esc(kw)+'" placeholder="two to twelve words: the thing and its place or trade" style="flex:2">'+
     '<input class="src" data-el="'+esc(eid)+'" id="src-'+esc(eid)+'" value="'+esc(src)+'" placeholder="stock site (optional)" title="a stock site name, added to a second search; clear it for the plain search only" style="flex:1;min-width:150px">'+
     '<button data-a="round-search" data-el="'+esc(eid)+'" '+(busy?'disabled':'')+'>'+(busy?'<span class="spin"></span>Searching…':'Search')+'</button></div>';
 }
 function strips(sids){return sids.map(searchOf).filter(Boolean).map(s=>'<div class="ds" style="margin-top:6px"><b>'+(s.source?'Stock · '+esc(s.source):'Google')+'</b> · “'+esc(s.keywords)+'” · '+s.results.length+' pictures'+
-  (s.results.some(x=>String(x.download||'').startsWith('failed'))?' · <span class="err">a picture marked “will not download” cannot be used; tick another</span>':'')+'</div>'+(s.results.length?'<div class="strip">'+s.results.map(x=>resultCard(s,x)).join('')+'</div>':'<div class="ds">No picture came back for these words.</div>')).join('');}
+  (s.results.some(x=>String(x.download||'').startsWith('failed'))?' · <span class="err">a picture marked “will not download” cannot be used; tick another</span>':'')+'</div>'+(s.results.length?'<div class="strip">'+s.results.map(x=>resultCard(s,x)).join('')+'</div>':'<div class="ds">No picture came back for these words.'+(roundOpen()&&stage()==='visuals'?' <button data-a="supply-open" data-el="'+esc(s.element_id)+'">Add your own picture</button>':'')+'</div>')).join('');}   // design/126 U6: opens the box in the panel
 function roundWaiting(rd){   // design/121 changes 1, 6: what keeps Done locked, by name
   const out=[];Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid], sids=sidsOf(r);
     if(rd.pass===1){if(verdictOf(eid,r)==='search'&&!sids.length)out.push(eid);}
@@ -571,7 +603,7 @@ function renderRound(rd){   // design/79: every element at once; pass 1 the fram
     const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, sids=sidsOf(r), v=vs[eid];
       let frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
       if(!frames.length)frames=(d.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));   // the element's frames count even when the row names none
-      return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span>'+
+      return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span>'+usedIn(eid)+
         '<div class="btns" style="margin:8px 0;gap:18px">'+(frames.length?'<label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v==='approve'?'checked':'')+'> Use the footage picture</label>':'')+
         '<label><input type="radio" name="v-'+esc(eid)+'" value="search" '+(v==='search'?'checked':'')+'> Search Google</label><label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
         (frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'"><img src="'+esc(thumbOf(f.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(f.id)+'"><div class="cap">from your footage'+(f.status==='approved'?' · approved':'')+'</div></div>').join('')+'</div>':'<div class="ds">no picture of it in the footage</div>')+
@@ -580,7 +612,7 @@ function renderRound(rd){   // design/79: every element at once; pass 1 the fram
   }else{
     const parts=ids.filter(eid=>rd.elements[eid].verdict==='search').map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, ign=!!ignoredEls[eid];
       return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> '+(ign?'<span class="badge dec">ignored</span> ':'')+
-        '<button data-a="ignore" data-el="'+esc(eid)+'">'+(ign?'Undo Ignore':'Ignore this')+'</button>'+(ign?'':searchBar(eid,kwOf(eid,r),srcOf(eid,r),'kw2')+(r.error?'<div class="ds err">The last search failed: '+esc(r.error)+'.</div>':'')+strips(sidsOf(r)))+'</div>';}).join('');
+        '<button data-a="ignore" data-el="'+esc(eid)+'">'+(ign?'Undo Ignore':'Ignore this')+'</button>'+usedIn(eid)+(ign?'':searchBar(eid,kwOf(eid,r),srcOf(eid,r),'kw2')+(r.error?'<div class="ds err">The last search failed: '+esc(r.error)+'.</div>':'')+strips(sidsOf(r)))+'</div>';}).join('');
     left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, pass 2 of 2:</b> for every searched thing, tick the pictures to use (the first tick is Image 1) with a note on each, or type new words and Search again, or press Ignore this. Click a picture to see it large on the right. Done unlocks when every thing has its answer.</p>'+parts;
   }
   $('s-references').innerHTML=split(left);
@@ -600,14 +632,14 @@ function renderReferences(){
   const kwNow=($('kw-'+e.id)||{}).value, okSheet=refs.find(r=>r.kind==='sheet'&&r.status==='approved'), pend=refs.find(r=>r.kind==='sheet'&&r.status==='candidate');
   if(pend&&!selPic&&!closed[e.id])selPic={ref:pend.id};   // design/97 R1: the sheet waiting for approval opens large, beside its sources
   const list='<div class="list">'+els.map(x=>{const st=elState(x);return '<a data-el="'+esc(x.id)+'" class="'+(x.id===selEl?'on':'')+'"><span class="nm" style="font-size:17px">'+esc(x.id)+'</span><div class="ds">'+esc(x.name)+' · '+esc(x.kind)+'</div><div class="ds"><span class="badge '+st[0]+'">'+st[1]+'</span></div></a>';}).join('')+'</div>';
-  let body='<div class="card"><span class="nm">'+esc(e.name)+'</span> <span class="ds">'+esc(e.id)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span><div class="ds" style="margin-top:4px">'+esc(e.requirements||'')+(e.size&&e.size.length?'<div>'+'Size: '+e.size.map(x=>esc(x.part)+' '+esc(x.measure)+' '+(x.value!=null?esc(x.value)+' '+esc(x.unit||''):'unknown')+' ('+esc(x.status)+')').join(' · ')+'</div>':'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div></div>'+materialBox(e)+(!e.material_spec&&e.not_this&&e.not_this.length?'<div class="ds">Not this: '+esc(e.not_this.join('; '))+'</div>':'')+qBox(e.id);
+  let body='<div class="card"><span class="nm">'+esc(e.name)+'</span> <span class="ds">'+esc(e.id)+' · '+esc(e.kind)+' · '+esc(e.identity)+'</span><div class="ds" style="margin-top:4px">'+esc(e.requirements||'')+(e.size&&e.size.length?'<div>'+'Size: '+e.size.map(x=>esc(x.part)+' '+esc(x.measure)+' '+(x.value!=null?esc(x.value)+' '+esc(x.unit||''):'unknown')+' ('+esc(x.status)+')').join(' · ')+'</div>':'')+(e.required_views&&e.required_views.length?' · views: '+esc(e.required_views.join(', ')):'')+'</div>'+usedIn(e.id)+'</div>'+materialBox(e)+(!e.material_spec&&e.not_this&&e.not_this.length?'<div class="ds">Not this: '+esc(e.not_this.join('; '))+'</div>':'')+qBox(e.id);
   let src='';
   src+='<h3>From your footage</h3><div class="ds">'+(hits.length?hits.slice(0,6).map(h=>esc(h.clip)+' at '+esc(h.seconds)+' s ('+esc(h.entity)+')').join(' · ')+' — the assistant grabs the frames':'not seen in the footage')+'</div>';
   const frames=refs.filter(r=>['frame','supplied','web','isolated'].includes(r.kind));
   if(frames.length){src+='<div class="strip">'+frames.map(r=>refCard({...r,name:(r.kind==='frame'?'from your footage':r.kind==='web'?'from the web':r.kind==='supplied'?'your file':'generated')+(r.note?' · '+r.note:'')},'',true)).join('')+'</div>';}
   const srcNow=($('src-'+e.id)||{}).value;
-  const searchBox='<h3>Google Images, for what the footage lacks</h3><div class="search"><input id="kw-'+esc(e.id)+'" placeholder="two to six words: the thing and its place or trade" value="'+esc(kwNow!=null?kwNow:(s?s.keywords:''))+'" style="flex:2"><input class="src" id="src-'+esc(e.id)+'" placeholder="stock site (optional)" title="a stock site name, added to a second search; clear it for the plain search only" value="'+esc(srcNow!=null?srcNow:(s?(s.source||''):(d.stock_source||'')))+'" style="flex:1;min-width:150px"><button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button></div>'+   // design/99 C4: the click is the yes; design/110 rule 0: always present, also after Done and after the sheet; design/121 change 5: the source box
-    (can?'<div class="search"><input type="file" id="up-'+esc(e.id)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(e.id)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(e.id)+'">Add your own picture</button></div>':'');   // design/110: the operator\'s own picture, approved when saved
+  const searchBox='<h3>Google Images, for what the footage lacks</h3><div class="search"><input id="kw-'+esc(e.id)+'" placeholder="two to twelve words: the thing and its place or trade" value="'+esc(kwNow!=null?kwNow:(s?s.keywords:''))+'" style="flex:2"><input class="src" id="src-'+esc(e.id)+'" placeholder="stock site (optional)" title="a stock site name, added to a second search; clear it for the plain search only" value="'+esc(srcNow!=null?srcNow:(s?(s.source||''):(d.stock_source||'')))+'" style="flex:1;min-width:150px"><button data-a="search" data-el="'+esc(e.id)+'">'+(s?'Search again':'Search')+'</button></div>'+   // design/99 C4: the click is the yes; design/110 rule 0: always present, also after Done and after the sheet; design/121 change 5: the source box
+    (can?supplyBox(e.id):'');   // design/110: the operator\'s own picture, approved when saved
   let web='';
   if(s){web+='<div class="ds"><b>'+esc(s.results.length)+' pictures found for “'+esc(s.keywords)+'”</b>'+(s.picked&&s.picked.length?' · <span class="ok">'+s.picked.length+' saved ✓ (#'+esc(s.picked.join(', #'))+')</span>':'')+(s.nothing_fits?' · <span class="err">nothing fit: '+esc(s.nothing_fits.reason)+'</span>':'')+'. Click a picture to see it large on the right; tick the ones to use, in order (the first tick is Image 1); the note goes in the panel.</div>';
     web+=strips(s.pair||[s.search_id]);}   // design/121 change 5: the plain and the stock search side by side
@@ -808,7 +840,7 @@ async function click(b){
   if(a==='unplace'){await send({action:'unplace',shot_id:b.dataset.shot},'Picture taken out of the shot; it stays approved.');return;}   // design/94 L3
   if(a==='select-take'){await send({action:'select-take',job_id:b.dataset.job},'Take selected.');return;}
   if(a==='reject-take'){const j=await send({action:'reject-take',job_id:b.dataset.job},'Take rejected.');if(j){rejOpen=b.dataset.job;renderStep();}return;}
-  if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kw){needWords('kw-'+b.dataset.el,'Two to six words to search for.');return;} await send({action:'search',element_id:b.dataset.el,keywords:kw,source:(($('src-'+b.dataset.el)||{}).value||'').trim()},'Search done: tick the pictures to use, then Save.');return;}   // design/121 change 5
+  if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kwOk(kw)){needWords('kw-'+b.dataset.el,KW_TEXT);return;} await send({action:'search',element_id:b.dataset.el,keywords:kw,source:(($('src-'+b.dataset.el)||{}).value||'').trim()},'Search done: tick the pictures to use, then Save.');return;}   // design/121 change 5
   if(a==='pick'){const sids=b.dataset.search.split(',').filter(sid=>(picks[sid]||[]).length);if(!sids.length){msg('Tick at least one picture first.',true);return;}   // design/121 change 5: each search's ticks saved in turn
     for(const sid of sids){const list=picks[sid];const j=await send({action:'pick',search_id:sid,picks:list},list.length+' picture'+(list.length>1?'s':'')+' saved as references for '+(selEl||'the element')+'; the assistant makes the sheet from them.');if(!j)return;delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='answer'){await send({action:'answer',item:b.dataset.item,answer:b.dataset.answer},'Answer recorded.');return;}   // design/110 rule 0
@@ -838,6 +870,7 @@ async function click(b){
     const verdicts={};Object.keys(rd.elements).forEach(eid=>{verdicts[eid]={verdict:verdictOf(eid,rd.elements[eid])};});   // design/121 change 6: Done runs no search
     await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the footage pictures you chose are approved; the searched things are on pass 2.');return;}
   if(a==='ignore'){const el=b.dataset.el;if(ignoredEls[el])delete ignoredEls[el];else ignoredEls[el]=true;renderStep();footer();return;}   // design/121 change 1: one click, no typing
+  if(a==='supply-open'){selectPic({supply:b.dataset.el});return;}   // design/126 U6
   if(a==='round-search'){roundSearch(b.dataset.el);return;}   // design/121 change 6: not through act(): several searches run at once
   if(a==='round-picks-back'){confirmPicks=false;footer();return;}   // design/106 N3
   if(a==='round-picks'){const rd=roundOpen();if(!rd)return;
