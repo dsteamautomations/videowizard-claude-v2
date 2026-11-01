@@ -9,7 +9,8 @@ P = ROOT / 'server' / 'procedures' / 'v3.json'
 
 SECTION = (
     '\n\n11. DRAWN SHOTS WITH HYPERFRAMES\n'
-    'On a film started with `--drawn motion` (`scene` and `draw` are refused there), once a drawn shot\'s pictures and spec are approved: `vw motion brief --shot S` '
+    'A film draws with HyperFrames unless started with `--drawn svg` (`scene` and `draw` are refused on a motion film); there a diagram, chart, map or timeline '
+    'that carries text is a drawn shot, never a painted one. Once a drawn shot\'s pictures and spec are approved: `vw motion brief --shot S` '
     'for each; one `vw-motion-rules` helper per shot, all at once (it writes work/motion/S/rules.md before anything is drawn); when the brief leaves a fact open, '
     'show the operator rules.md and ask them to tick, strike or add, once. Then one `vw-motion-shot` helper per shot, three or four at once, given only the shot id; '
     'each builds, uploads, checks and snapshots on the server and answers with its last upload\'s sha256 (with no pictures it stops at a still key frame first). '
@@ -22,8 +23,8 @@ SECTION = (
 PAIRS = [
     # part, change, old, new
     ('later', 'M1', "takes the drawn route: `visual_type: drawn`, named so in the plan; its `scene_svg` comes after",
-     "takes the drawn route: `visual_type: drawn`, named so in the plan; on a film started with `--drawn motion` it is made with HyperFrames (section 11); "
-     "otherwise its `scene_svg` comes after"),
+     "takes the drawn route: `visual_type: drawn`, named so in the plan; on a motion film (the default) it is made with HyperFrames (section 11); "
+     "on a `--drawn svg` film its `scene_svg` comes after"),
     ('later', 'M2', '`vw visuals supply --element E --file in/brand/<name>`.', '`vw visuals supply --element E --file in/brand/<name>`.' + SECTION),
 ]
 

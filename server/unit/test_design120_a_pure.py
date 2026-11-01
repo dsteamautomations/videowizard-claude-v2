@@ -46,5 +46,5 @@ def test_create_run_writes_the_provider(monkeypatch):
     import app.core as core
     row = core.create_run(Conn(), {'id': 'u', 'name': 'SK'}, 'title', 'Cobuild', '3', 'gemini')   # explicit: a local .env may still default to the retired version 2
     assert 'image_provider' in seen['sql'] and seen['params'][6] == 'gemini' and row['image_provider'] == 'gemini'
-    assert 'drawn_route' in seen['sql'] and row['drawn_route'] == 'svg'   # design/130: SVG unless the run asks for motion
-    assert core.create_run(Conn(), {'id': 'u', 'name': 'SK'}, 'title', 'Cobuild', '3', 'openai', 'motion')['drawn_route'] == 'motion'
+    assert 'drawn_route' in seen['sql'] and row['drawn_route'] == 'motion'   # design/130 §12: HyperFrames unless the run asks for svg
+    assert core.create_run(Conn(), {'id': 'u', 'name': 'SK'}, 'title', 'Cobuild', '3', 'openai', 'svg')['drawn_route'] == 'svg'

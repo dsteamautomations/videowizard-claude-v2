@@ -275,7 +275,8 @@ def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
-        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run))   # design/89 B4; design/124-b item 13
+        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
+                                       drawn_route(run) == 'motion')   # design/89 B4; design/124-b item 13; design/130 §12
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
     r = routes(plan, _fps(session) or 25)
@@ -296,7 +297,8 @@ def check(store, run, outputs, document):
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
-    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run)))
+    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
+                                                   drawn_route(run) == 'motion'))   # design/130 §12
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     direction = ' '.join(str(session['treatment'].get('direction') or '').split())   # design/124 Change 3: a treatment recorded before it has none
     need(not direction or ' '.join(plan['foundation']['treatment'].split()).startswith(direction),
@@ -3822,7 +3824,7 @@ def set_font(store, user, run, outputs, name, content):
 # ---------- design/130: the HyperFrames motion route for drawn shots ----------
 
 def drawn_route(run):
-    """design/130 §9: the film's drawn route, chosen once at `vw start --drawn`; a film without one draws SVG scenes (the older way, kept until phase 6)."""
+    """design/130 §9: the film's drawn route, chosen once at `vw start --drawn`; motion by default since 1 Nov 2026 (§12); a run row without one draws SVG scenes."""
     return (run or {}).get('drawn_route') or 'svg'
 
 

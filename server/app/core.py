@@ -159,7 +159,7 @@ def refuse_retired(version):
         raise Problem(409, 'VERSION_RETIRED', RETIRED_VERSIONS[str(version)])
 
 
-def create_run(conn, user, title, client, version, image_provider, drawn_route='svg'):   # design/126 ST1: no default picture AI; design/130: the drawn route
+def create_run(conn, user, title, client, version, image_provider, drawn_route='motion'):   # design/126 ST1: no default picture AI; design/130: the drawn route
     version = version or settings().DEFAULT_PROCEDURE_VERSION
     refuse_retired(version)
     if stage_table(version) is None:

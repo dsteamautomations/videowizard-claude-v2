@@ -113,7 +113,7 @@ class NewRun(Write):
     title: str = ''
     procedure_version: str | None = None
     image_provider: Literal['openai', 'gemini']   # design/120: required; the run's image model, never changed afterwards
-    drawn_route: Literal['svg', 'motion'] = 'svg'   # design/130: SVG scenes (the older way, kept until phase 6) or HyperFrames; never changed afterwards
+    drawn_route: Literal['svg', 'motion'] = 'motion'   # design/130 §12 (SK, 1 Nov 2026): HyperFrames by default; svg, the older way, kept until the pilot passes; never changed afterwards
 
 
 class FileRef(Strict):

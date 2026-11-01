@@ -592,7 +592,7 @@ def timing_warnings(gap_id, shots, timing, fps):
     return out
 
 
-def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True):
+def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False):   # design/130: labels_drawn on a motion film
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
     plan = Plan.model_validate(document)
     spec_warnings = []   # design/124 C2
@@ -698,7 +698,12 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                     if shot.visual_type in GRAPHIC_TYPES and scenes is counted and (any(d.status != 'unknown' and d.value is not None for d in (shot.drawing_spec.dimensions if shot.drawing_spec else []))
                                                                                     or any(re.search(r'\d', c) for c in shot.claims)):   # design/113 E6: a warning until SK approves the sample (answer 6)
                         need(False, f'shot {shot.id} is a {shot.visual_type} with exact sizes or numbers: the drawn route is the default for technical diagrams, charts, maps and timelines '
-                                    '(visual_type drawn, an uploaded SVG scene named by scene_svg, rendered free and reviewed on the Takes step); an AI-painted graphic is for a look, never for a figure.')
+                                    + ('(visual_type drawn, a HyperFrames project named by scene_motion, rendered free and reviewed on the Takes step)' if labels_drawn else
+                                       '(visual_type drawn, an uploaded SVG scene named by scene_svg, rendered free and reviewed on the Takes step)')
+                                    + '; an AI-painted graphic is for a look, never for a figure.')
+                    if labels_drawn and shot.visual_type in GRAPHIC_TYPES and shot.carries_text and scenes is counted:   # SK, 1 Nov 2026 (design/130 §12): the blind test picked HyperFrames for every labelled diagram
+                        need(False, f'shot {shot.id} is a {shot.visual_type} that carries text: on this film a labelled diagram, chart, map or timeline is drawn with HyperFrames '
+                                    '(visual_type drawn, a project named by scene_motion with its labels word for word); an AI-painted graphic is for a picture without words.')
                     if seconds is not None and shot.visual_type in GRAPHIC_TYPES + ('drawn',) and seconds < MIN_GRAPHIC_S:
                         warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
                     if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why

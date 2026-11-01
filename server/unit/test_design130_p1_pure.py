@@ -438,3 +438,29 @@ def test_take_jobs_never_lists_a_helpers_check_or_snapshot():
     conn = FakeConn([])
     VS.take_jobs(conn, MRUN)
     assert "provider <> 'motion'" in conn.sql[-1][0]
+
+
+# ---------- SK, 1 Nov: the motion route is the default, and a labelled graphic on a motion film is drawn ----------
+
+def test_a_labelled_graphic_on_a_motion_film_must_be_drawn():
+    from fractions import Fraction
+    from test_visuals_pure import GAPS, plan, shot as pshot
+    REST = [pshot('VS1', 100, 250, 'video'), pshot('VS2', 250, 500, 'video'), pshot('VS3', 500, 750, 'video'), pshot('VS4', 750, 1000, 'video')]   # takes of 10 s at most
+    labelled = plan([{**pshot('DG1', 0, 100, 'diagram'), 'carries_text': True}, *REST])
+    with pytest.raises(ValueError, match='DG1 is a diagram that carries text: on this film a labelled diagram, chart, map or timeline is drawn with HyperFrames'):
+        VC.validate_plan(labelled, GAPS, Fraction(25), labels_drawn=True)
+    VC.validate_plan(labelled, GAPS, Fraction(25))   # an SVG film keeps the older rule
+    plain = plan([pshot('DG1', 0, 100, 'diagram'), *REST])
+    VC.validate_plan(plain, GAPS, Fraction(25), labels_drawn=True)   # a graphic without words may still be painted
+    figures = plan([{**pshot('DG1', 0, 100, 'diagram'), 'claims': ['1 brick in 4 is saved']}, *REST])
+    with pytest.raises(ValueError, match='scene_motion'):
+        VC.validate_plan(figures, GAPS, Fraction(25), labels_drawn=True)
+
+
+def test_a_new_film_draws_with_hyperframes_unless_it_asks_for_svg():
+    import inspect
+    from app import core
+    from app.main import NewRun
+    assert NewRun.model_fields['drawn_route'].default == 'motion'
+    assert inspect.signature(core.create_run).parameters['drawn_route'].default == 'motion'
+    assert VS.drawn_route({'id': 'r'}) == 'svg'   # a run made before the column read as svg (the older way)

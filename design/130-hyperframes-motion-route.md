@@ -307,6 +307,16 @@ Recorded in the trial: whether the GSAP CDN and Google Fonts were fetched over t
 - `server/tests` (Docker) not run. Hindi and Tamil fonts are not on the VM. `--zoom` is unused.
 - The operator ticking rules.md in open mode is an instruction in the procedure, not a page control.
 
+## 12. The motion route is the default (SK, 1 Nov 2026)
+
+After the blind comparison (`diagram-compare/compare.html`: the same three VW-6 diagram prompts; HyperFrames won all three on accuracy and on looks), SK said "Yes, make it default". Two changes, server 0.79.1, plugin 0.66.1:
+
+1. **New films draw with HyperFrames.** `vw start` without `--drawn` makes a motion film (`NewRun.drawn_route` and `core.create_run` default `motion`). `--drawn svg` still makes an SVG film until the pilot passes (old ways 21, now "kept for a film started with --drawn svg"). Older run rows keep `svg`.
+2. **On a motion film a labelled graphic is drawn.** The plan check refuses a diagram or animation that carries text (`carries_text`) by name; a picture without words may still be painted. The figures rule now names `scene_motion` on a motion film. Old ways 22. Procedure section 11 says both (27 words).
+
+Older way: SVG films keep the older rules (only a graphic with figures must be drawn), retired with row 21 at phase 6.
+Not covered: the pilot film has not run; every new film now takes the motion route before a production film has used it end to end.
+
 ## 11. Found on the way (separate from this plan)
 
 - **Graphics listed as AI video:** `stage3/delivery.py:93` lists every selected drawn movie as "AI video" and leaves it out of the "Graphics" list. This is true on the live route today, not only after this plan.

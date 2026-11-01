@@ -2698,7 +2698,7 @@ def build_parser():
     s = sub.add_parser('start')
     s.add_argument('--client', required=True); s.add_argument('--version'); s.add_argument('--script', help='the script file to copy into in/ (design/34 1.6)')
     s.add_argument('--images', choices=['openai', 'gemini'], help='the image model of this run, asked of the operator, never changed later')
-    s.add_argument('--drawn', choices=['svg', 'motion'], help='how drawn shots are made: SVG scenes (default) or HyperFrames (design/130); never changed later')
+    s.add_argument('--drawn', choices=['svg', 'motion'], help='how drawn shots are made: HyperFrames (default since design/130 §12) or SVG scenes; never changed later')
     s.add_argument('--need-gb', type=float, default=5); s.add_argument('--keep-logs', action='store_true'); s.set_defaults(fn=cmd_start)
     s = sub.add_parser('next'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_next)
     s = sub.add_parser('output')
