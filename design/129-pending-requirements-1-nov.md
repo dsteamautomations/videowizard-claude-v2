@@ -65,7 +65,7 @@ Agreed on 30–31 Oct, built by three builders, never deployed. The branch was c
 
 Paused at visuals Phase 3, item 9.3.4 (the items). Phase 4 (pictures, takes, drawing) not reviewed yet.
 
-## G. New requirement UX1: the visuals page as slides (SK, 1 Nov 2026; requirements, waiting for SK)
+## G. New requirement UX1: the visuals page as slides (SK, 1 Nov 2026; requirements and layout approved, not built)
 
 Source: SK's note and a screenshot of `/runs/VW-12/visuals#takes/…`. In the screenshot, the graphic style card fills the left column and leaves empty space beside its picture. The take's player sits alone on the right. The whole page scrolls.
 
@@ -170,7 +170,7 @@ The page only shows what the server sends, and every decision still goes through
 ### Order and lane
 - **It goes after the `design126-build` branch.** U1–U7 on that branch change this same page (close button, saving notes, upload in the panel, search length), so UX1 is built on top of it, not beside it.
 - **Server deploy only:** the page is served by the server, and the plugin does not change.
-- **Recommended first step: a clickable mockup** (a static page with VW-12's real pictures, Pictures and Takes tabs), for SK to approve before the build.
+- **Mockup approved (SK, 1 Nov 2026: "Layout approved"):** `../ux1-mockup/index.html` (Pictures and Takes with VW-12's real pictures and takes; kept out of git, it holds the client's pictures). The build follows it for all six tabs.
 
 ### Old way (design/35)
 The scrolling visuals page is **retired at the UX1 deploy**, with no switch back. The same functions stay on the new layout, so nothing is lost.
