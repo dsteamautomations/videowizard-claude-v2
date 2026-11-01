@@ -126,16 +126,16 @@ def treat(doc, provider='gemini', quote=''):
 
 def test_tr1_vw12s_treatment_gives_four_graphics_run_warnings():
     out, store = treat(vw12())
-    msgs = [w['message'] for w in out['warnings']]
+    msgs = [w['message'] for w in out['warnings'] if w['kind'] == 'graphics_run']   # design/126 TR3 adds the length warnings beside them
     assert len(msgs) == 4 and [m.split(' s ')[0] for m in msgs] == ['23.9', '11.8', '10.8', '9.1']
-    assert all(w['kind'] == 'graphics_run' for w in out['warnings']) and 'give the reason in the treatment' in msgs[0] and 'give the reason' not in msgs[3]
+    assert 'give the reason in the treatment' in msgs[0] and 'give the reason' not in msgs[3]
     assert saved(store)['treatment_draft']['warnings'] == out['warnings']
     out, store = treat(vw12(), quote='Yes.')
-    assert len(out['warnings']) == 4 and len(saved(store)['treatment']['warnings']) == 4
+    assert len(out['warnings']) == len(saved(store)['treatment']['warnings']) and sum(w['kind'] == 'graphics_run' for w in out['warnings']) == 4
 
 
 def test_tr1_drawn_shots_of_8_s_or_less_give_none():
-    assert treat(vw12(drawn=(8, 8, 7.5, 4)))[0]['warnings'] == []
+    assert [w for w in treat(vw12(drawn=(8, 8, 7.5, 4)))[0]['warnings'] if w['kind'] == 'graphics_run'] == []
 
 
 def test_tr2_vw12s_totals_on_a_gemini_run_and_an_openai_run():

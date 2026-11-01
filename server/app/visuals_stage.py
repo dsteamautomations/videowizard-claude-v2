@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import AI_RUN_S, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -275,7 +275,7 @@ def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
-        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)))   # design/89 B4; design/124-b item 13
+        plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run))   # design/89 B4; design/124-b item 13
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
     r = routes(plan, _fps(session) or 25)
@@ -296,7 +296,7 @@ def check(store, run, outputs, document):
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
-    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs))))
+    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run)))
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     direction = ' '.join(str(session['treatment'].get('direction') or '').split())   # design/124 Change 3: a treatment recorded before it has none
     need(not direction or ' '.join(plan['foundation']['treatment'].split()).startswith(direction),
@@ -418,6 +418,31 @@ def budget(conn, store, run, outputs):
 TREATMENT_GRAPHIC_ROUTES = ('drawn', 'graphic_sequence')   # design/126 TR1: a still's kind (photo or diagram) is not in the treatment, so a still breaks a run
 
 
+OLD_PLAN_RULE_RUNS = {'VW-12'}   # design/126 TR1b: these runs keep the graphics run without drawn shots (design/35 old ways: until VW-12 closes)
+
+
+def drawn_in_run(run):
+    return (run or {}).get('code') not in OLD_PLAN_RULE_RUNS
+
+
+def treatment_length_warnings(entry):
+    """design/126 TR3: the plan's ai_run (design/85 G2) and still_long (design/89 B1) warnings on the treatment, from each shot's route and seconds."""
+    out, run_s, ids = [], 0.0, []
+    for i, sh in enumerate([s for s in entry.get('shots') or [] if isinstance(s, dict)] + [None], 1):
+        secs = sh.get('seconds') if sh else None
+        if sh and sh.get('route') == 'video' and isinstance(secs, (int, float)):
+            run_s, ids = run_s + float(secs), ids + [str(sh.get('id') or f'shot {i}')]
+            continue
+        if run_s > AI_RUN_S:
+            out.append({'gap_id': entry['gap_id'], 'kind': 'ai_run', 'message': f"gap {entry['gap_id']}: shots {', '.join(ids)} are {run_s:.1f} s of AI video back to back, over {AI_RUN_S} s: "
+                        'break the run with a still or a graphic, and cut the AI shots to three to five seconds each'})
+        run_s, ids = 0.0, []
+        if sh and sh.get('route') == 'still' and isinstance(secs, (int, float)) and secs > STILL_MOVING_MAX_S + 0.04:
+            out.append({'gap_id': entry['gap_id'], 'shot_id': str(sh.get('id') or f'shot {i}'), 'kind': 'still_long',
+                        'message': f"shot {sh.get('id') or i} is a still of {float(secs):.1f} s: at most {STILL_MOVING_MAX_S} s; fill the stretch with several different stills or a moving shot"})
+    return out
+
+
 def graphics_runs(entry):
     """design/126 TR1: the plan's G1 warning (design/93) on the treatment: a run of graphic shots over 8 s within the gap, from each shot's route and seconds."""
     out, run_s, ids = [], 0.0, []
@@ -484,7 +509,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
             video_seconds += float(e['seconds']) if 'video' in routes_ else 0.0
         for r, x in parts:
             totals['seconds'][r] = round(totals['seconds'].get(r, 0.0) + float(x), 2)
-        warnings += graphics_runs(e)
+        warnings += graphics_runs(e) + treatment_length_warnings(e)   # design/126 TR1, TR3
     missing = sorted(set(gaps) - seen)
     need(not missing, 'The treatment covers every gap; missing: ' + ', '.join(missing) + '.')
     film = film_frames(outputs)   # design/89 B4: the expected frozen share, shown before approval

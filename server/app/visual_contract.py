@@ -562,7 +562,7 @@ def timing_warnings(gap_id, shots, timing, fps):
     return out
 
 
-def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True):
+def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True):
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
     plan = Plan.model_validate(document)
     spec_warnings = []   # design/124 C2
@@ -954,7 +954,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
         share = frozen / (film_frames / float(fps))
         warnings.append({'kind': 'frozen_share', 'message': f'{frozen:.1f} s of frozen pictures, {share:.0%} of the film: over {frozen_limit:.0%}; give the stills movement, '
                                                           'build the graphics, or say why this film needs them still'})
-    warnings.extend(course_warnings(plan, fps))   # design/103
+    warnings.extend(course_warnings(plan, fps, drawn_in_run))   # design/103; design/126 TR1b
     result = plan.model_dump()
     answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
@@ -1051,7 +1051,7 @@ def footage_cited(element, facts):
     return next((s for s in sources if s and FOOTAGE_CITED.search(s)), '')
 
 
-def course_warnings(plan, fps):
+def course_warnings(plan, fps, drawn_in_run=True):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
     acting = {s.element_id for g in plan.gaps for sc in list(g.scenes) + [x for c in g.choices for x in c.scenes] for sh in sc.shots for s in sh.subjects if s.beats}
@@ -1076,7 +1076,7 @@ def course_warnings(plan, fps):
             if scene.continues_footage:   # design/124-b item 11: the footage beside the gap showed the place and its subjects wider
                 seen, sizes = {e: 0 for sh in scene.shots for e in sh.element_ids}, ['footage']
             for shot in scene.shots:
-                if shot.visual_type in GRAPHIC_TYPES:
+                if shot.visual_type in GRAPHIC_TYPES + (('drawn',) if drawn_in_run else ()):   # design/126 TR1b: a drawn shot is a graphic in the run (VW-12 keeps today's rule)
                     run_s += (shot.end_frame - shot.start_frame) / float(fps) if fps else 0
                     run_ids.append(shot.id)
                     if shot.claim == 'visible':   # G2
