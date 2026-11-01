@@ -90,7 +90,7 @@ Redesign how the visuals page (`server/app/templates/visuals.html`, six tabs: Tr
 | Record | one card per gap (recorded or not) | what the gap holds and what is still missing, Record |
 
 ### The rail
-- **Width:** 260 px by default, so a 16:9 thumbnail of about 228 × 128 px plus two lines of text fits. The user can drag it between 200 and 360 px; the page remembers the width on that computer only. Under 1100 px of screen width the thumbnail shrinks and the text stays. On a phone, the rail becomes a strip across the top.
+- **Width:** 260 px by default, so a 16:9 thumbnail of about 228 × 128 px plus two lines of text fits. The user can drag it between 200 and 360 px; the page remembers the width on that computer only. **Desktop only (SK, 1 Nov 2026):** built for 1366 × 768 and larger; no phone or tablet layout.
 - **Each card shows:**
   - a thumbnail;
   - a short title, such as `03-B2 · sh2 · Still · 5.6 s`;
@@ -103,7 +103,7 @@ Redesign how the visuals page (`server/app/templates/visuals.html`, six tabs: Tr
 
 ### The stage
 - **Wide screens:** two columns. The picture or player takes about 60 % of the width. The facts, check and decisions go in the other column. The decision buttons stay pinned at the bottom of that column.
-- **Narrow screens:** one column, picture first.
+- **A desktop window narrower than 1280 px:** the stage goes to one column, picture first; the rail keeps its width.
 - **Nothing hidden:** every state an item can pass through is shown on the stage and on its card: queued, generating, checking, fix queued, failed (with the reason), waiting for storage, ready, approved and placed, rejected, recorded.
 
 ### Versions (pictures and takes)
@@ -142,21 +142,30 @@ Redesign how the visuals page (`server/app/templates/visuals.html`, six tabs: Tr
 | Two people on the same run | each sees the other's decisions at the next refresh; a refused action says why |
 | The refresh fails (network) | amber: "not refreshed since 14:59; retrying"; the decisions already on screen stay |
 | An action refused by the server | red on the bar and on the item's stage, with the server's words |
-| A small screen or phone | the rail becomes a top strip; the stage is one column |
+| A desktop window narrower than 1280 px | the stage is one column; the rail keeps its width (no phone or tablet layout, SK 1 Nov) |
+
+### Everything that works today keeps working (SK, 1 Nov 2026)
+- **Only the layout changes.** The server routes, the requests the page sends, the data it reads and the refresh stay exactly as they are. No server code changes and no plugin change.
+- **The working code is reused, not rewritten.** Today's pieces that build each picture, take, check, checklist, reason box, fix button, search round and viewer (`panel`, `checklist`, `takeCheck`, `reasonBox`, `fixBtn`, `renderRound`, `openViewer` and the rest) are placed on the rail and the stage. They are not written again.
+- **An inventory before the build:** every control, action, keyboard key, address (`#tab/…`) and automatic behaviour of today's page (refresh, unsaved-tick protection, Next waiting, zoom), listed in a checklist. Each line is ticked after the build with where it now lives.
+- **Same click, same request:** for every action, the request today's page sends and the request the new page sends are recorded in the browser check and must be identical.
+- If anything cannot be kept as it is, it is raised with SK before the build, never dropped quietly.
 
 ### Failure modes
-The page only shows what the server sends, and every decision still goes through the same server routes. So a layout fault can hide or misplace something, but it cannot change data. Test 1 below guards against that.
+The page only shows what the server sends, and every decision still goes through the same server routes. So a layout fault can hide or misplace something, but it cannot change data. Tests 1 and 5 guard against that.
 
 ### Tests first
-1. **Every control that exists today exists after the change:** a pure test lists every `data-a` action and every button id in today's `visuals.html`, and checks each one is still present.
+1. **Every control that exists today exists after the change:** a pure test lists every `data-a` action, every button and input id, and every address form in today's `visuals.html`, and checks each one is still present.
 2. **The version order:** from a set of references with `fix_of`, rejections and times, the page's version function gives "Version 3 · new / 2 · rejected / 1 · fixed into 3". The same for takes.
 3. **The rail cards:** for VW-12's data, the cards per tab and their badges, including **Waiting for me**.
 4. **A browser check on a local copy of the page** with VW-12's data (the method in memory "VW2 page browser check"):
-   - at 1920 × 1080, 1366 × 768 and phone width;
+   - at 1920 × 1080, 1366 × 768 (desktop only);
    - each tab opened;
    - every action button clicked once against a stub;
    - refresh with a ticked picture and a typed note: nothing lost;
    - screenshots for SK.
+5. **Same click, same request:** the old and new pages are opened side by side on the same data with a stub server. Every action is clicked on both, and the route and body each one sends must be identical. Any difference fails the test.
+6. **The existing tests that read `visuals.html`** (server/unit, for example design/100, 101, 103 and defects 28–30) still pass unchanged.
 
 ### Order and lane
 - **It goes after the `design126-build` branch.** U1–U7 on that branch change this same page (close button, saving notes, upload in the panel, search length), so UX1 is built on top of it, not beside it.
