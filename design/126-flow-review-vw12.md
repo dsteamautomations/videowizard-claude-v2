@@ -1360,7 +1360,20 @@ Total: 3,188 words. Free (no picture is made).
 2. **"Not footage frames":** both refused requests named a frame the operator **rejected** in the picture round (84c8… for the trowel; 6d02… with the approved 73a5… for the wall). The refusal is right, but its words ("approved footage frames only: name frames taken from the clips") do not say which frame or why, and the status lists rejected frames beside approved ones.
 3. **The corrections and the measured sizes:** measured sizes go into the elements' `size` and the corrections into their material specs; both are left out of a gap's acceptance, so `vw visuals plan`, edit, `propose` keeps the 12 gaps accepted (only a change to the foundation, such as W_bricks, un-accepts them). So the operator's own route works now, and covers sizes, which F37b (specs only) would not. **Recommended: drop F37b; keep the plan route.**
 
-**Proposed fix D40:** measure gets room to answer (`maxOutputTokens` 32,768, as the fix call has) ; the figure research, not-this and pair check get `thinkingLevel: LOW` and 8,192 like the other checks; a measure naming a frame that is not approved says which and why ("84c8… was rejected in the picture round: measure an approved frame of trowel: …", listing the approved ones). With PL1 in the same release. Tests: each call's settings; the refusal names the frame and the approved ones.
+**Proposed fix D40:** measure gets room to answer (`maxOutputTokens` 32,768, as the fix call has) ; the figure research, not-this and pair check get `thinkingLevel: LOW` and 8,192 like the other checks; a measure naming a frame that is not approved says which and why ("84c8… was rejected in the picture round: measure an approved frame of trowel: …", listing the approved ones). With PL1 in the same release. Tests: each call's settings; the refusal names the frame and the approved ones. **Built and deployed alone on SK's word ("first fix this"; c6df964, server 0.77.6); PL1 and F37b kept for a later build. Then defect 41 (de9b420, server 0.77.7): a plan's check and propose take up to 4 MB.**
+
+### 9.3.3 — Meaning (reviewed 31 Oct 2026)
+
+**What happened on VW-12 (I read the plan's shots and facts):** every one of the 25 shots carries its claims, descriptors, evidence and fact ids; 24 carry a one-line message (6 with what they add); 12 claims are visible, 13 invisible. 17 visual facts, each with a source (10 confirmed, 3 observed from clips by number, 4 unknown, none filled in by guess). Examples: the strength chart's evidence is "the script's own three strength figures, bars to one exact scale (20 : 35 : 75)"; the "comparable strength" drawing is "drawn without figures (claims.json, checked: the operator kept the wording 'comparable')"; "bricks are tested" is shown by a test, a brick crushed in a compression machine while the engineer records the load. No warning on a missing claim, evidence or fact.
+
+**Findings (I read the meaning paragraph, 196 words)**
+- Works: the claims list from the script stage (S3) reached the plan and was used as intended: figures drawn exactly as spoken, the contradicted claim drawn without numbers.
+- **Parked item 2 answered:** the 20 / 35 / 75 kg/cm² table was not researched at the visuals stage; it is drawn exactly as narrated, the client's figures. Nothing requires an unchecked claim to be checked later ("a checked one is not searched again" only skips the checked ones), and the script stage left the choice with the operator. No change proposed.
+- Nothing paid; no keys; no block; no helper; no older way; no label. **Nothing to change.**
+
+| Decided | Parked | Open |
+|---|---|---|
+| 9.3.3: no change; parking item 2 closed | – | – |
 
 ## Why VW-12 hits one defect after another (defects 35–38, 31 Oct 2026)
 
@@ -1412,6 +1425,6 @@ Checked and found fine by the helper: every field the single commands send match
 | # | From | Item | Where it goes |
 |---|---|---|---|
 | 1 | 2.4 | VW-12 has 15 chapters on 9 paragraphs; with P7 (one chapter per scene) the options step may cut about 15 scenes, some of one sentence (5–8 s), each with a slide, an answer and a helper | options 7.2 on VW-12: count the scenes and the shortest | **seen: 9 scenes**; looked at in 7.2 |
-| 2 | 3.3 | The brick-strength table (20 / 35 / 75 kg/cm²), which a graphic will draw, was not checked at the script | visuals: check it is researched before the graphic is made |
+| 2 | 3.3 | The brick-strength table (20 / 35 / 75 kg/cm²), which a graphic will draw, was not checked at the script | visuals: check it is researched before the graphic is made | **closed at 9.3.3:** not researched; drawn exactly as narrated (the client's figures); no rule asks for it |
 | 3 | 6.2 | The plain mode found six fewer grade-B pieces on short clips | options: not checked scene by scene; scenes 3 and 4 gained footage over VW-11 |
 | 4 | 7.6 | The second look leaves no mark on the server: whether it ran and what it fixed cannot be read afterwards | a later build, if SK wants it |

@@ -120,8 +120,9 @@ class Provider:
 
     def output(self,result):
         videos=[c for s in result.get('steps',[]) if s.get('type')=='model_output' for c in s.get('content',[]) if c.get('type')=='video']
-        if len(videos)!=1 or videos[0].get('mime_type')!='video/mp4':raise ValueError('Expected one MP4 video output.')
+        if len(videos)!=1 or videos[0].get('mime_type') not in ('video/mp4',None):raise ValueError('Expected one MP4 video output.')
         # GET interactions currently returns inline content, including URI-mode creations.
         raw=base64.b64decode(videos[0]['data'],validate=True)
         if not raw or len(raw)>MAX_VIDEO:raise ValueError('Empty or oversized video output.')
+        if raw[4:8]!=b'ftyp':raise ValueError('The video output is not an MP4 file.')   # defect 42: since 31 Oct the provider may leave mime_type out; the file itself says MP4
         return raw
