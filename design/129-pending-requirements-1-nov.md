@@ -67,7 +67,9 @@ Agreed on 30–31 Oct, built by three builders, never deployed. The branch was c
 
 Paused at visuals Phase 3, item 9.3.4 (the items). Phase 4 (pictures, takes, drawing) not reviewed yet.
 
-## G. New requirement UX1: the visuals page as slides (SK, 1 Nov 2026; requirements and layout approved, not built)
+## G. New requirement UX1: the visuals page as slides (SK, 1 Nov 2026; built on branch `ux1`, server 0.78.1, not deployed)
+
+**Build, 1 Nov:** the page keeps every step view and adds the rail (cards per step, with an "All" card for the whole step as before), the stage that shows the chosen card, version tabs in the panel (pictures and takes), the coloured message bar with History, the rail width (200-360 px, remembered) and the up and down arrow keys. Tests: `server/unit/test_ux1_page_pure.py` (every action, id and data attribute of the old page; every request body; the new pieces), 958 server tests pass. Browser check on test data: the old and new pages clicked side by side sent the same 17 requests (approve, reject, reject-take, reject-take-why, select-take, t-accept, t-back, treatment); the other actions are checked by their request text only (test 5). Not checked: VW-12's real data (reading it from the VM was blocked), References with a live search round, the Docker suite.
 
 Source: SK's note and a screenshot of `/runs/VW-12/visuals#takes/…`. In the screenshot, the graphic style card fills the left column and leaves empty space beside its picture. The take's player sits alone on the right. The whole page scrolls.
 

@@ -8,7 +8,7 @@ def test_the_page_is_six_steps_on_the_voices_frame():
     """design/78 (L45)."""
     for step in ('treatment', 'plan', 'references', 'pictures', 'takes', 'record'):
         assert f'id="s-{step}"' in HTML, step
-    assert "['treatment','Treatment']" in HTML and "['record','Record']" in HTML and 'id="steps"' in HTML and 'class="v2"' in HTML and 'class="foot"' in HTML
+    assert "['treatment','Treatment']" in HTML and "['record','Record']" in HTML and 'id="steps"' in HTML and 'class="v2 ux1"' in HTML and 'class="foot"' in HTML
     assert 'id="pl"' in HTML and '<video id="pl"' in HTML   # the docked player, as the voices page has for audio
     assert 'localStorage' in HTML   # the step chosen survives a refresh
 
