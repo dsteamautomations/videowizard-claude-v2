@@ -21,6 +21,13 @@ def motion_text(snapshot):
     two=bool(snapshot.get('end_image'))
     prompt='[# Sources <FIRST_FRAME>@Image1'+(' <LAST_FRAME>@Image2' if two else '')+']\n'
     prompt+=snapshot['motion_prompt']
+    if (snapshot.get('prompt_version') or 1)>=2:   # design/128 T1, T2 (a record without prompt_version is read as 1: today's text)
+        tl=snapshot.get('timeline') or []
+        if tl:
+            prompt+='\nThe events happen in this order and at these times:'
+            for b in tl:prompt+=f"\n{b['start_s']:.1f}–{b['end_s']:.1f} s: {b['name']}: {b['action']}"+(f"; {b['result']}" if b.get('result') else '')+'.'
+            if snapshot['duration_seconds']>max(b['end_s'] for b in tl)+0.05:prompt+=f"\nThen hold until {snapshot['duration_seconds']} s."
+        if snapshot.get('end_state'):prompt+='\nBy the end and until the last frame: '+'; '.join(snapshot['end_state'])+'; each stays where it is, in plain view.'
     if (snapshot.get('ambient') or '').strip() and not re.match(r'\s*still\b',snapshot['ambient'],re.I):prompt+='\nThroughout the shot the surroundings stay alive: '+snapshot['ambient'].strip().rstrip('.')+'.'   # design/101 M3; a `still:` line asks for nothing
     prompt+='\nNatural, unhurried motion; no sudden, exaggerated or floating movement.'   # design/102 B3: how things move, not how much
     prompt+='\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
@@ -120,8 +127,9 @@ class Provider:
 
     def output(self,result):
         videos=[c for s in result.get('steps',[]) if s.get('type')=='model_output' for c in s.get('content',[]) if c.get('type')=='video']
-        if len(videos)!=1 or videos[0].get('mime_type')!='video/mp4':raise ValueError('Expected one MP4 video output.')
+        if len(videos)!=1 or videos[0].get('mime_type') not in ('video/mp4',None):raise ValueError('Expected one MP4 video output.')
         # GET interactions currently returns inline content, including URI-mode creations.
         raw=base64.b64decode(videos[0]['data'],validate=True)
         if not raw or len(raw)>MAX_VIDEO:raise ValueError('Empty or oversized video output.')
+        if raw[4:8]!=b'ftyp':raise ValueError('The video output is not an MP4 file.')   # defect 42: since 31 Oct the provider may leave mime_type out; the file itself says MP4
         return raw

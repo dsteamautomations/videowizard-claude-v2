@@ -85,6 +85,11 @@ def size_guard(request: Request):
         raise Problem(413, 'BODY_TOO_LARGE', 'Store large content as a file; the database keeps only hashes and a short summary.')
 
 
+def plan_size_guard(request: Request):   # defect 41: the visual plan is saved to storage, so its limit is the plan's, not the database's
+    if int(request.headers.get('content-length') or 0) > settings().PLAN_MAX_BODY_BYTES:
+        raise Problem(413, 'BODY_TOO_LARGE', f'The plan is over {settings().PLAN_MAX_BODY_BYTES // (1024 * 1024)} MB; split long text out of it.')
+
+
 PLANNING_RETIRED = 'The planning stage is retired with procedure version 1; films on version 3 use options and master (`vw options`, `vw master`).'
 OPTION_NUMBER_RETIRED = 'option_number is retired; answer by slide (`slide`, a label such as 2 or 2B).'
 
@@ -204,6 +209,7 @@ class ImageGenerate(Write):
     golden: bool = False                   # design/111 F11: the element's golden picture
     region: dict | None = None             # design/111 F11: an edit's region, fractions of the frame
     end_region: dict | None = None         # design/111 F11: the end's region, written with the start
+    role: Literal['start', 'end'] | None = None   # design/106 T1, defect 35: sent by `vw visuals image --role`; the model refused it
 
 
 class ReferenceApprove(Write):
@@ -1061,13 +1067,13 @@ def visuals_prepare(run_id: UUID, body: Write, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.prepare(conn, storage(), user, run, outputs))
 
 
-@app.post('/api/runs/{run_id}/visuals/check', dependencies=[Depends(size_guard)])
+@app.post('/api/runs/{run_id}/visuals/check', dependencies=[Depends(plan_size_guard)])
 def visuals_check(run_id: UUID, body: VisualPlan, user=User, conn=DB):
     run, outputs = _visuals_run(conn, user, run_id)
     return Response(visuals_stage.check(storage(), run, outputs, body.plan))
 
 
-@app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(size_guard)])
+@app.post('/api/runs/{run_id}/visuals/propose', dependencies=[Depends(plan_size_guard)])
 def visuals_propose(run_id: UUID, body: VisualPlan, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.propose(conn, storage(), user, run, outputs, body.plan))
 
@@ -1119,6 +1125,12 @@ def visuals_font(run_id: UUID, body: FontUpload, user=User, conn=DB):
 def visuals_scene(run_id: UUID, body: SceneUpload, user=User, conn=DB):   # design/117 P2: the SVG scene of a drawn shot
     import base64 as b64
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_scene(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64)))
+
+
+@app.get('/api/runs/{run_id}/visuals/plan')
+def visuals_plan_get(run_id: UUID, user=User, conn=DB):   # defect 37: the current plan, for `vw visuals plan`
+    run, outputs = _visuals_run(conn, user, run_id)
+    return visuals_stage.guarded(lambda: visuals_stage.plan_of(storage(), run, outputs))
 
 
 @app.get('/api/runs/{run_id}/visuals/scene/{shot_id}')

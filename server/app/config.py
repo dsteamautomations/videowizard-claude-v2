@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     SESSION_HOURS: int = 168
     DEFAULT_PROCEDURE_VERSION: str = '3'  # clip-log-v1 analysis; version 1 keeps the v1 evidence contract
     MAX_BODY_BYTES: int = 256 * 1024            # guard against blobs in the database; files go to storage
+    PLAN_MAX_BODY_BYTES: int = 4 * 1024 * 1024   # defect 41: a visual plan is stored as a file, never in the database; VW-12's is about 280 KB
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     GEMINI_IMAGE_USD_4K: float = 0.24
     GEMINI_IMAGE_INPUT_USD: float = 0.0011             # per input picture (560 tokens)
     DRAWN_FIX_MODEL: str = 'gemini-3.8-flash'   # design/117 answer 3: Flash first; the Pro model is this one line
-    PLUGIN_MIN_VERSION: str = '0.42.0'   # design/95 F5; design/97: the procedure gives the links `vw visuals status` prints from 0.42.0
+    PLUGIN_MIN_VERSION: str = '0.64.4'   # design/95 F5; G2 (SK, 31 Oct 2026, after defect 36): an older tool is told to update; 0.64.2 `vw visuals plan` (defect 37); 0.64.3 crops in image files (defect 38); 0.64.4 the sweep fixes W1-W13
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
     STORAGE_SUPABASE_SERVICE_KEY: SecretStr = SecretStr('')

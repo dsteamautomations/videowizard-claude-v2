@@ -1025,7 +1025,7 @@ def figure_repeat(store, session, row, scene):
                               'individual as a figure in an earlier picture (same face, build, hair, clothes, markings)? Answer repeated true or false, and in detail name the pair '
                               'and what matches. Be literal; two figures of one kind that differ in face, clothes or markings are not repeated.'})
         received, rec['key_index'] = keys.gemini(_gemini_transport(), image_check.CHECK_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'maxOutputTokens': 512}}),
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': FIGURE_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 8192}}),
             settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
         rec.update(repeated=bool(body.get('repeated')), detail=str(body.get('detail') or '')[:500])
@@ -1238,7 +1238,7 @@ def not_this(store, user, run, outputs, element_id):
     need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
         received, _ = keys.gemini(_gemini_transport(), NOT_THIS_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'maxOutputTokens': 1024}}),
+            {'contents': [{'role': 'user', 'parts': [{'text': text}]}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': NOT_THIS_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 8192}}),
             settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=20, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
     except Exception as exc:
@@ -1762,6 +1762,14 @@ def current_plan(store, session):
     return load_json(store, entry['file']['key'])['document']
 
 
+def plan_of(store, run, outputs):
+    """Defect 37: the current visual plan, for `vw visuals plan` (a machine without out/visual-plan.json folds a spec correction into it and proposes again)."""
+    session = session_of(store, run, outputs)
+    need(session.get('current'), 'Propose a visual plan first.')
+    entry = next(v for v in session['versions'] if v['plan_digest'] == session['current'])
+    return {'version': entry['version'], 'plan_digest': session['current'], 'plan': load_json(store, entry['file']['key'])['document']}
+
+
 def select_choice(store, user, run, outputs, choices):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
@@ -2278,18 +2286,18 @@ def generate_image(conn, store, user, run, outputs, body):
             d = unknown[0]
             need(False, f"{element['id']} has a size still unknown ({d.get('part')} {d.get('measure')}) and an approved footage frame {frames_ok[0]['id']}: measure it first "
                         f"(`vw visuals measure --refs {frames_ok[0]['id']} --question ...`), then put the value in the plan with status measured, before its first picture.")
+    writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own (defect 38: kept before the component and sheet lines, which the answer form never holds)
     if body['kind'] == 'component':   # design/117 P1: a thing alone, in the approved style, on a transparent background; the style picture is Image 1
         need(element['kind'] in ('object', 'material', 'process', 'technique'), 'A component is a picture of a thing (an object, a material, a process or a technique), never a person, a graphic or the style.')
         style_ref = next((r for r in session['references'].values() if r.get('kind') == 'style' and r.get('status') == 'approved'), None)
         need(style_ref, 'A component is made in the approved style: approve the style picture first (the Pictures step).')
-        if style_ref['id'] not in (body.get('parents') or []):
+        if style_ref['id'] not in (body.get('parents') or []) and not body.get('fix_of'):   # W4: a fix keeps the picture to fix as Image 1
             body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
         block = COMPONENT_BLOCK if provider_of(run) == 'openai' else COMPONENT_BLOCK_GREEN   # design/120: Gemini has no transparent output; the server keys the green out
         body = {**body, 'prompt': with_composed(body['prompt'], block.format(name=element.get('name') or body['element_id']))}
     if body['kind'] == 'sheet' and body['element_id'] != STYLE:   # design/119 rule 2: the server's lines on a reference sheet
         body = {**body, 'prompt': with_composed(body['prompt'], sheet_block(element))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
-    writer_prompt = body['prompt']   # the writer's words, before the server adds any line of its own
     crops = body.get('crops') or {}   # design/119 rule 1: {parent id: region}; the server crops before the upload
     for pid, region in crops.items():
         need(pid in (body.get('parents') or []), f'crops names {pid}, which is not among the parents.')
@@ -2320,7 +2328,7 @@ def generate_image(conn, store, user, run, outputs, body):
             if p and body['kind'] == 'keyframe' and p.get('kind') == 'keyframe' and p.get('status') == 'candidate' and p['id'] != body.get('fix_of'):
                 need(False, f"{p['id']} is a start image still waiting for approval: an end image is made only from an approved start. Write the end with the start "
                             "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start.")
-        need(all(p and (p['status'] == 'approved' or (body['kind'] == 'keyframe' and p['kind'] == 'keyframe' and p['status'] == 'candidate' and p['id'] == body.get('fix_of')))
+        need(all(p and (p['status'] == 'approved' or (p['status'] == 'candidate' and p['id'] == body.get('fix_of')))   # W4: a fix starts from its candidate, whatever its kind
                  for p in parents), 'Parents must be approved references of this run.')
     library.check_prompt(body['prompt'], fix=bool(body.get('fix_of')))   # design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
@@ -2373,7 +2381,7 @@ def generate_image(conn, store, user, run, outputs, body):
     answer = body.get('answer')
     if answer is not None:   # design/68 L5: the library's answer form travels with the prompt
         try:
-            library.check_answer(answer, writer_prompt)
+            library.check_answer({**answer, 'exact_text': []} if body.get('fix_of') else answer, writer_prompt)   # W5: a fix's prompt is its one change; the exact texts are added after this check
             library.check_exact_places(answer, {lm['id'] for lm in (found[2].get('landmarks') if found else []) or []})   # design/111 F13
             library.check_quoted(writer_prompt, library.exact_entries(answer))
         except ValueError as exc:
@@ -2758,7 +2766,12 @@ def measure(store, user, run, outputs, ref_ids, question):
     need((question or '').strip(), 'Say what to measure.')
     session = session_of(store, run, outputs)
     frames = [session['references'].get(r) for r in ref_ids or []]
-    need(frames and all(f and f.get('kind') == 'frame' and f['status'] == 'approved' for f in frames), 'Measure reads approved footage frames only: name frames taken from the clips.')
+    need(frames and all(frames), 'Measure reads approved footage frames only: name frames taken from the clips (`vw visuals status` lists them).')
+    for rid, f in zip(ref_ids, frames):   # defect 40: say which frame and why, and the approved ones to use
+        if f.get('kind') != 'frame' or f['status'] != 'approved':
+            ok = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('element_id') == f.get('element_id')]
+            why_ = 'was rejected in the picture round' if f.get('status') == 'rejected' else f"is a {f.get('kind')} picture, not an approved footage frame" if f.get('kind') != 'frame' else f"is {f.get('status')}"
+            need(False, f"{rid} {why_}: measure reads approved footage frames only" + (f"; {f.get('element_id')}'s: {', '.join(ok)}." if ok else f"; {f.get('element_id')} has none: approve one first."))
     where = [f"clip {(f.get('source') or {}).get('media_id')} at {(f.get('source') or {}).get('requested_s')} s" for f in frames]
     parts = []
     for n, (f, w) in enumerate(zip(frames, where), 1):
@@ -2768,7 +2781,7 @@ def measure(store, user, run, outputs, ref_ids, question):
     need(keys.pool('gemini', settings()), 'No Gemini key on the server.')
     try:
         received, _ = keys.gemini(_gemini_transport(), MEASURE_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 4096}}),
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': MEASURE_SCHEMA, 'maxOutputTokens': 32768}}),
             settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
     except Exception as exc:
@@ -3002,7 +3015,7 @@ def _approved_next(store, session, row):
             exact = bool(locate(store, session, sid)[3].get('end_state_exact'))
         except Exception:
             exact = False
-        return (f"Approved: this shot's end must be exact: its end image is made from this start next (`vw visuals image --kind keyframe --role end --parents {row['id']} --region …`)."
+        return (f"Approved: this shot's end must be exact: its end image is made from this start next (`vw visuals image --element {row.get('element_id')} --kind keyframe --role end --parents {row['id']} --region …`)."
                 if exact else f"Approved: the take for {sid} is the next step.")
     if word == 'reference sheet':   # design/124 A4 item 11: a thing's golden picture comes next; a person's sheet is its golden picture
         try:
@@ -3337,7 +3350,7 @@ def _route_gate(shot, wanted):
     if vt == wanted or (wanted == 'still' and vt in STILL_TYPES + ('footage',)):   # design/124-b item 1: a footage shot takes a footage frame (or a clip stretch)
         return
     takes = {'video': 'a take (`vw visuals prepare-take`)', 'animation': 'a graphic sequence (`vw visuals sequence`)',
-             'footage': 'a clip stretch (`vw visuals clip`) or a footage frame (`vw visuals still`)'}.get(vt, 'a still (`vw visuals still`)')
+             'footage': 'a clip stretch (`vw visuals clip`) or a footage frame (`vw visuals still`)', 'drawn': 'a drawing (`vw visuals draw --shot S`)'}.get(vt, 'a still (`vw visuals still`)')
     article = 'an' if vt in ('animation', 'image') else 'a'
     need(False, f"shot {shot['id']} is {article} {vt} shot: it takes {takes}, not " + {'video': 'a take', 'still': 'a still', 'animation': 'a sequence'}[wanted] + '.')
 
@@ -3402,6 +3415,46 @@ def shot_guidance(shot, neighbours):
 
 AMBIENT_START = ("Put in the frame what the scene's ambient line says moves (the trees, the people in the background, the dust in the light), "
                  'so the take can move it.')   # design/101 M5
+
+
+OLD_PROMPT_RUNS = {'VW-12'}   # design/128 T4: these runs keep the take prompt without a timeline (design/35 old ways: until VW-12 closes)
+TIMES_IN_PROMPT = re.compile(r'\b\d+(?:\.\d+)?\s*(?:-|–|to)\s*\d+(?:\.\d+)?\s*s\b|\bat\s+\d+(?:\.\d+)?\s*s(?:econds?)?\b', re.I)
+
+
+def take_prompt_fields(run, plan, shot, fps, duration):
+    """design/128 T1, T2: the beats of every acting subject in seconds from the shot's start, in time order, and the end state from the change list.
+    Empty for a run in OLD_PROMPT_RUNS (today's prompt). A beat that cannot be timed is refused by name, never sent half built."""
+    if (run or {}).get('code') in OLD_PROMPT_RUNS:
+        return {}
+    names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
+    timeline = []
+    for s in shot.get('subjects') or []:
+        for b in s.get('beats') or []:
+            try:
+                timeline.append({'start_s': round((b['start_frame'] - shot['start_frame']) / float(fps), 1), 'end_s': round((b['end_frame'] - shot['start_frame']) / float(fps), 1),
+                                 'name': names.get(s['element_id'], s['element_id']), 'action': str(b.get('action') or '').strip().rstrip('.'), 'result': str(b.get('result') or '').strip().rstrip('.')})
+            except (KeyError, TypeError, ValueError) as exc:
+                need(False, f"shot {shot.get('id')}: beat {b.get('id')} cannot be timed ({exc.__class__.__name__}); fix the plan's beat.")
+    timeline.sort(key=lambda t: t['start_s'])   # stable: subjects keep their order when beats start together
+    end = [str(c.get('what') or '').strip().rstrip('.') for c in shot.get('changes') or [] if str(c.get('what') or '').strip()]
+    return {'prompt_version': 2, **({'timeline': timeline} if timeline else {}), **({'end_state': end} if end else {})}
+
+
+def take_prompt_warnings(plan, shot, motion_prompt, timeline_sent=True):
+    """design/128 T3: one person in the shot described as a man or a woman, and the motion prompt uses the other's pronoun: a warning, never a refusal.
+    And a motion prompt that names its own times, beside the plan's timeline."""
+    out, text = [], str(motion_prompt or '')
+    people = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] in (shot.get('element_ids') or [])]
+    if len(people) == 1:
+        d = str(people[0].get('description') or '').lower()
+        woman, man = bool(re.search(r'\bwom[ae]n\b', d)), bool(re.search(r'\bm[ae]n\b', d))
+        if woman and not man and re.search(r'\b(he|his|him)\b', text, re.I):
+            out.append(f"{people[0].get('name')} is described as a woman, and the motion prompt says he, his or him: make them agree.")
+        if man and not woman and re.search(r'\b(she|her|hers)\b', text, re.I):
+            out.append(f"{people[0].get('name')} is described as a man, and the motion prompt says she, her or hers: make them agree.")
+    if timeline_sent and TIMES_IN_PROMPT.search(text):
+        out.append("the motion prompt names its own times; the plan's timeline is sent too: make them agree.")
+    return out
 
 
 def prepare_take(store, user, run, outputs, body):
@@ -3488,6 +3541,8 @@ def prepare_take(store, user, run, outputs, body):
               **({'gaze_lines': gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion') else {}),   # design/111 F7
               **({'fixed_line': fixed_line(base['preparation']['scene'], shot)} if fixed_line(base['preparation']['scene'], shot) else {}),   # design/111 F8
               **({'light': base['preparation']['scene']['light']} if base['preparation']['scene'].get('light') else {})}   # design/103 A1   # design/101 M3, M4: the take text and the take check read it
+    record.update(take_prompt_fields(run, plan_full, planned, fps, record['duration_seconds']))   # design/128 T1, T2, T4
+    form += take_prompt_warnings(plan_full, planned, body['motion_prompt'], timeline_sent=bool(record.get('timeline')))   # design/128 T3
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)
@@ -3527,7 +3582,7 @@ def _pair_check(store, start, end, changes):
                           'or state; a person\'s place, pose or what they hold; the light. Ignore the camera\'s framing. For each difference give the number of the planned change '
                           'below that causes it, or 0 when none does. Be literal.\nPlanned changes:\n' + listed}]
         received, rec['key_index'] = keys.gemini(_gemini_transport(), MEASURE_MODEL, lambda t: t.generate(
-            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'maxOutputTokens': 4096}}),
+            {'contents': [{'role': 'user', 'parts': parts}], 'generationConfig': {'responseMimeType': 'application/json', 'responseJsonSchema': PAIR_SCHEMA, 'thinkingConfig': {'thinkingLevel': 'LOW'}, 'maxOutputTokens': 8192}}),
             settings(), terminal_deadline_seconds=120, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)   # design/114
         body = received.get('body') if isinstance(received.get('body'), dict) else json.loads(received.get('raw') or '{}')
         diffs = [{'what': str(d.get('what') or '')[:300], 'change': d.get('change') if isinstance(d.get('change'), int) else 0} for d in body.get('differences') or [] if isinstance(d, dict)]
@@ -3540,6 +3595,7 @@ def submit_take(conn, store, user, run, outputs, shot_id):
     session = session_of(store, run, outputs)
     prep = session['preparations'].get(shot_id)
     need(prep, 'Prepare the take first.')
+    need(not prep.get('drawn'), f'{shot_id} is a drawn shot: it is rendered with `vw visuals draw --shot {shot_id}`, not a take.')   # W3
     open_job = conn.execute("select id from vw2_jobs where run_id=%s and stage='visuals' and unit=%s and provider='video' and status in ('queued','running','submitted','submission_unknown','storage_pending')",
                             (run['id'], shot_id)).fetchone()
     if open_job:
