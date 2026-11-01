@@ -64,3 +64,108 @@ Agreed on 30–31 Oct, built by three builders, never deployed. The branch was c
 ## F. The review itself
 
 Paused at visuals Phase 3, item 9.3.4 (the items). Phase 4 (pictures, takes, drawing) not reviewed yet.
+
+## G. New requirement UX1: the visuals page as slides (SK, 1 Nov 2026; requirements, waiting for SK)
+
+Source: SK's note and a screenshot of `/runs/VW-12/visuals#takes/…`. In the screenshot, the graphic style card fills the left column and leaves empty space beside its picture. The take's player sits alone on the right. The whole page scrolls.
+
+### Requirement
+
+Redesign how the visuals page (`server/app/templates/visuals.html`, six tabs: Treatment, Plan, References, Pictures, Takes, Record) is laid out, **without removing or changing any function it has today**. The model is PowerPoint:
+- **Left rail ("slides"):** one card for each thing to look at in the current tab, in film order. It scrolls on its own.
+- **Right stage:** the selected card's content in full, laid out to be read at once, with its decisions. Clicking a card replaces the stage.
+- **No whole-page scroll.** The top bar (tabs, spend, "N waiting", Next waiting) and the message bar stay fixed. Only the rail scrolls, and the stage scrolls only if its content is longer than the screen.
+- **Versions:** when a picture or take is fixed or made again, the newest version is in front. Older versions sit in tabs named so that new and old are obvious, each with its rejection reason.
+- **Messages:** what the page is doing and what the user must do, in colour, in one place that is always in sight.
+
+### What each tab's rail and stage show
+
+| Tab | Rail cards | Stage for the selected card |
+|---|---|---|
+| Treatment | Direction, then one card per gap line | the line in full, its shots (route, seconds), its warnings (TR1/TR3), Accept / send back |
+| Plan | Foundation, graphic style, then one card per gap | the gap's shots with their warnings and answers, Accept |
+| References | Graphic style, then one card per element (badge: needs a picture / pictures to approve / sheet to approve / sheet approved) | the element's search round (the web results grid, ticks, notes, Save), its own upload, frames from the footage, the sheet beside its sources |
+| Pictures | Graphic style, then gaps → shots (thumbnail, route, seconds, state) | the shot's picture(s) large: start and end pair, the states of a sequence, a still. Beside them: the check, the fix (with price), the note, Approve / Reject / Use for the shot / Remove, and where in the film the picture is used |
+| Takes | gaps → shots (thumbnail of the newest take, state) | the player (or the drawn shot's frame sheet), the take check, the checklist, Select / Reject with a reason, Download |
+| Record | one card per gap (recorded or not) | what the gap holds and what is still missing, Record |
+
+### The rail
+- **Width:** 260 px by default, so a 16:9 thumbnail of about 228 × 128 px plus two lines of text fits. The user can drag it between 200 and 360 px; the page remembers the width on that computer only. Under 1100 px of screen width the thumbnail shrinks and the text stays. On a phone, the rail becomes a strip across the top.
+- **Each card shows:**
+  - a thumbnail;
+  - a short title, such as `03-B2 · sh2 · Still · 5.6 s`;
+  - one coloured state badge;
+  - a dot when it waits for the user;
+  - a spinner while something runs on it.
+- **Grouping:** cards are grouped under their gap, and a gap's group can be collapsed.
+- **At the top of the rail:** chips for All / a gap / **Waiting for me**.
+- **Keyboard:** ↑ and ↓ move between cards, as in PowerPoint.
+
+### The stage
+- **Wide screens:** two columns. The picture or player takes about 60 % of the width. The facts, check and decisions go in the other column. The decision buttons stay pinned at the bottom of that column.
+- **Narrow screens:** one column, picture first.
+- **Nothing hidden:** every state an item can pass through is shown on the stage and on its card: queued, generating, checking, fix queued, failed (with the reason), waiting for storage, ready, approved and placed, rejected, recorded.
+
+### Versions (pictures and takes)
+- **Tabs above the picture:** "Version 3 · new" (in front), "Version 2 · rejected", "Version 1 · fixed into version 3". A fix is named "fix of version 1".
+- **On an old version's tab:** the rejection reason and the user's words, in red.
+- **Takes** work the same way: "Take 2 · new", "Take 1 · rejected: …".
+- **Order:** versions are numbered by the time each was made, from what the page already receives (`fix_of`, `parents`, `status`, `rejection`, `reviews`). No server change.
+
+### Messages
+- **One fixed message bar under the top bar,** replacing the line at the foot. Its colours:
+  - **blue**, with a spinner: working ("Generating 3 pictures…");
+  - **green:** done;
+  - **red:** refused or failed, with the server's own reason;
+  - **amber:** waiting for you ("2 pictures wait for your verdict: Next waiting").
+- **History:** the last 5 messages can be opened from the bar.
+- **On the stage:** a red refusal also stays on the stage of the item it concerns until the next action on that item.
+
+### Unstated but expected
+- Every link that works today keeps working, such as `#takes/<shot>/<job>`. Selecting a card updates the address, so a link opens on that card.
+- The page refreshes itself every few seconds, as today. A refresh never loses the selected card, the rail's scroll position, ticked web pictures or a note being typed (today's `unsavedTicks` protection).
+- The zoom viewer, the search round's Save and Done bar, "Add your own picture", "Try a fix (₹…)" and the reason chips all stay. They only move.
+- Dark theme as today. Readable at 1366 × 768, the operators' laptops.
+- **One flow, two front ends:** no new step, so the chat tool (`vw`) does not change.
+
+### Edge cases and how each is handled
+
+| Case | Handling |
+|---|---|
+| A tab with nothing yet (no plan, no takes) | the stage says what comes next and which command or button starts it; the rail shows one card "Nothing yet" |
+| The selected item disappears after a refresh (deleted, regenerated) | select its newest version, or else the next card waiting; the message bar says so |
+| 100+ pictures in References | thumbnails load as they scroll into view (lazy), and the rail stays fast |
+| A long title or element name | cut with "…"; the full text appears on hover and on the stage |
+| A picture or video that fails to load | the card shows "picture not available" and the stage offers the link; nothing breaks |
+| A graphic sequence (2–4 states) or a start/end pair | side by side on the stage, as today, each with its own version tabs |
+| A take still being generated or waiting for storage | the card has a spinner; the stage shows the state and the time it was asked for |
+| Two people on the same run | each sees the other's decisions at the next refresh; a refused action says why |
+| The refresh fails (network) | amber: "not refreshed since 14:59; retrying"; the decisions already on screen stay |
+| An action refused by the server | red on the bar and on the item's stage, with the server's words |
+| A small screen or phone | the rail becomes a top strip; the stage is one column |
+
+### Failure modes
+The page only shows what the server sends, and every decision still goes through the same server routes. So a layout fault can hide or misplace something, but it cannot change data. Test 1 below guards against that.
+
+### Tests first
+1. **Every control that exists today exists after the change:** a pure test lists every `data-a` action and every button id in today's `visuals.html`, and checks each one is still present.
+2. **The version order:** from a set of references with `fix_of`, rejections and times, the page's version function gives "Version 3 · new / 2 · rejected / 1 · fixed into 3". The same for takes.
+3. **The rail cards:** for VW-12's data, the cards per tab and their badges, including **Waiting for me**.
+4. **A browser check on a local copy of the page** with VW-12's data (the method in memory "VW2 page browser check"):
+   - at 1920 × 1080, 1366 × 768 and phone width;
+   - each tab opened;
+   - every action button clicked once against a stub;
+   - refresh with a ticked picture and a typed note: nothing lost;
+   - screenshots for SK.
+
+### Order and lane
+- **It goes after the `design126-build` branch.** U1–U7 on that branch change this same page (close button, saving notes, upload in the panel, search length), so UX1 is built on top of it, not beside it.
+- **Server deploy only:** the page is served by the server, and the plugin does not change.
+- **Recommended first step: a clickable mockup** (a static page with VW-12's real pictures, Pictures and Takes tabs), for SK to approve before the build.
+
+### Old way (design/35)
+The scrolling visuals page is **retired at the UX1 deploy**, with no switch back. The same functions stay on the new layout, so nothing is lost.
+
+### Not covered
+- The other pages (`run.html`, `review.html`, voices): out of scope unless SK asks.
+- Drag to reorder cards: the film order is fixed by the plan.
