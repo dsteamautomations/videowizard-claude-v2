@@ -182,3 +182,17 @@ The scrolling visuals page is **retired at the UX1 deploy**, with no switch back
 ### Not covered
 - The other pages (`run.html`, `review.html`, voices): out of scope unless SK asks.
 - Drag to reorder cards: the film order is fixed by the plan.
+
+## H. SK's decisions, 1 Nov 2026
+
+| # | Decision |
+|---|---|
+| F37b | **Drop** (the plan download covers specs and sizes) |
+| D39 | **Build**: the first file download retries; a network timeout says "run it again", not a defect |
+| G1 | **Build**: the plugin's guard acts only in the operator folder |
+| P4 | explained to SK; decision pending |
+| S1 | **Wait** for SK's tech person |
+| Old ways 9, 10 (VW-11's slide rows and declared gaps) | **Retire** in the next release |
+| VW-12 review | **Stopped**: VW-12 is a trial run, not completed; SK deletes it soon. Then rows 17 and 18 (`OLD_PROMPT_RUNS`, `OLD_PLAN_RULE_RUNS`) are emptied. |
+
+D39, G1 and the retirement of rows 9 and 10 go in one release (server and plugin), so the laptops update once. Requirements note first, for SK's approval.
