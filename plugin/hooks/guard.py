@@ -37,6 +37,22 @@ def builder_checkout(cwd, root):
     return here == repo or repo in here.parents or here in root.parents
 
 
+def operator_folder(cwd):
+    """design/129 G1: the hooks act only in a folder whose own Claude settings name the VideoWizard server (the operator folder), or below it.
+    The user's own settings folder is not counted, so a plugin switched on everywhere steps aside everywhere else."""
+    here, home = Path(cwd).resolve(), Path.home().resolve()
+    for d in (here, *here.parents):
+        if d == home:
+            continue
+        for name in ('settings.json', 'settings.local.json'):
+            try:
+                if 'VW2_SERVER_URL' in (d / '.claude' / name).read_text(encoding='utf-8'):
+                    return True
+            except (OSError, UnicodeDecodeError):
+                continue
+    return False
+
+
 def runs_dir(cwd):
     return Path(os.environ.get('VW2_RUNS') or cwd / 'runs').resolve()
 
@@ -166,6 +182,8 @@ def main():
     vw = (root / 'scripts' / 'vw.py').resolve()
     if builder_checkout(cwd, root):
         sys.exit(0)  # builder checkout: the session works inside the repo that holds the plugin source; operators never do
+    if not operator_folder(cwd):
+        sys.exit(0)  # design/129 G1: not the operator folder; the plugin stays out of the way
     reason = decide(tool, inp, cwd, vw)
     if reason:
         log_block(cwd, tool, reason, detail_of(tool, inp, reason))

@@ -232,6 +232,30 @@ def check(store, run, doc):
     return out
 
 
+def options_sha(options):
+    """design/129 P4: the options' fingerprint, the same as the vw tool's `options_sha` at the join."""
+    return hashlib.sha256(json.dumps(options, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
+def second_look_record(doc):
+    """design/129 P4: the second look's record as the tool wrote it at the join, kept as far as it reads (never a refusal), lists capped;
+    `edited_after` when the options proposed are not the ones joined. None when the cut carries no record."""
+    sl = doc.get('second_look')
+    if not isinstance(sl, dict):
+        return None
+    words = lambda v, n=300: str(v)[:n]
+    names = lambda v: [words(x, 80) for x in v[:60]] if isinstance(v, list) else []
+    try:
+        scenes = int(sl.get('scenes') or 0)
+    except (TypeError, ValueError):
+        scenes = 0
+    unchanged = {words(k, 80): words(v) for k, v in list(sl.get('unchanged').items())[:60]} if isinstance(sl.get('unchanged'), dict) else {}
+    fixes = [{'scene': words(f.get('scene', ''), 80), 'option': f.get('option') if isinstance(f.get('option'), int) else None, 'why': words(f.get('why', ''))}
+             for f in (sl.get('fixes') if isinstance(sl.get('fixes'), list) else [])[:200] if isinstance(f, dict)]
+    return {'at': words(sl.get('at', ''), 40), 'scenes': scenes, 'changed': names(sl.get('changed')), 'unchanged': unchanged, 'no_fix_file': names(sl.get('no_fix_file')),
+            'fixes': fixes, 'edited_after': sl.get('joined_sha') != options_sha(doc.get('options') or [])}
+
+
 def propose(conn, store, user, run, doc):
     session = session_of(store, run)
     if not session.get('scenes'):   # design/43 7.3: titles, chapters and pauses are approved before any option
@@ -240,7 +264,9 @@ def propose(conn, store, user, run, doc):
     pk = _package(store, session)
     if doc.get('contract') != CONTRACT_OPTIONS:
         _bump(conn, run, 'options', [f'contract must be {CONTRACT_OPTIONS}'])
+    second = second_look_record(doc)   # design/129 P4: kept beside the version, never in the cut's fingerprint
     work = deepcopy(doc)
+    work.pop('second_look', None)
     result = V.validate_options(work, pk, session['package']['policy'])
     if result['refusals']:
         _bump(conn, run, 'options', result['refusals'])
@@ -254,8 +280,8 @@ def propose(conn, store, user, run, doc):
     record = {'run_id': str(run['id']), 'version': version, 'package_digest': session['package']['digest'], 'document': work, 'flags': result['flags'], 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     saved = save_json(store, key(run, f'options-v{version}.json'), record)
     identity = digest(work)
-    session['versions'].append({'version': version, 'file': saved, 'digest': identity, 'flags': result['flags'], 'options': len(work['options']), 'gaps': [g['beat_id'] for g in work.get('gaps') or []],
-                                'slides': slides, 'scenes': scenes})
+    session['versions'].append({'version': version, 'file': saved, 'digest': identity, 'flags': result['flags'], 'options': len(work['options']), 'gaps': [],   # design/129 old way 10: a declared gap is refused at propose (design/125 P13)
+                                'slides': slides, 'scenes': scenes, 'second_look': second})
     session['current'] = identity
     session['accepted'] = None
     session['decisions'] = {}
@@ -634,7 +660,8 @@ def review_view(conn, store, run):
     accepted = session.get('accepted') or {}
     return {'state': 'prepared', 'version': entry['version'], 'digest': entry['digest'], 'slides': rows, **_progress(rows), 'film': film, 'cues': cues,
             'render': ({'status': r.get('status'), 'error': r.get('error'), 'current': is_current} if r else None),
-            'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'approved_by': accepted.get('approved_by'), 'master_built': bool(session.get('master'))}
+            'accepted': bool(accepted) and accepted.get('digest') == entry['digest'], 'approved_by': accepted.get('approved_by'), 'master_built': bool(session.get('master')),
+            'second_look': entry.get('second_look')}   # design/129 P4
 
 
 def _refuse_answer(s, sl, decisions, lab, action, edit):

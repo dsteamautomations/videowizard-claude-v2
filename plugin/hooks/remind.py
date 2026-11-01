@@ -22,6 +22,9 @@ def main():
     repo = root.parent
     if cwd == repo or repo in cwd.parents or cwd in root.parents:
         sys.exit(0)
+    from guard import operator_folder   # design/129 G1: silent outside the operator folder
+    if not operator_folder(cwd):
+        sys.exit(0)
     if asks_for_procedure(data.get('prompt')):
         print(REMINDER)
     sys.exit(0)

@@ -138,6 +138,11 @@ function draw(){
   else{line+=' · <strong>'+d.answered+' of '+d.of+'</strong> answered · waiting: '+(d.waiting.length?esc(d.waiting.join(', ')):'none');}
   if(d.accepted&&d.approved_by&&d.approved_by.slide){line+=' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')';}   // design/98 D6
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open on this run; nothing can be recorded until it is fixed</span>';}
+  const sl=d.second_look;   // design/129 P4: whether the second look ran on this version, and what it changed
+  line+='<div class="ds">'+(sl?'Second look: ran '+esc(String(sl.at||'').slice(0,16).replace('T',' '))+' · '+esc(sl.scenes)+' scenes · '+esc(sl.changed.length)+' changed'+(sl.changed.length?' ('+esc(sl.changed.join(', '))+')':'')+
+    ' · '+esc(Object.keys(sl.unchanged||{}).length)+' unchanged'+(sl.no_fix_file.length?' · no fix file for '+esc(sl.no_fix_file.join(', ')):'')+(sl.edited_after?' · <span class="err">the cut was changed after the second look</span>':'')+
+    (sl.fixes.length?'<details><summary style="cursor:pointer">'+esc(sl.fixes.length)+' fix'+(sl.fixes.length>1?'es':'')+'</summary>'+sl.fixes.map(f=>'<div>'+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')+'</details>':'')
+    :'Second look: not recorded for this version')+'</div>';
   $('line').innerHTML=line;
   clearTimeout(timer);
   if(d.film){

@@ -1289,6 +1289,12 @@ def _fetch_to(url, part, size):
         list(pool.map(one, ranges))
 
 
+def _dropped(key, exc):
+    """design/129 D39: the network dropped and stayed down through the retries: the operator runs the same command again; never a defect."""
+    emit({'action': 'unreachable', 'message': f"Download of {key} stopped: this computer's network connection dropped ({exc.__class__.__name__}). "
+                                              'This is not a defect: check the network, then run the same command again.'}, 2)
+
+
 def _download(m, key, rel, expect=None):
     """design/108: streamed to disk (D1); skipped when already here with the manifest's fingerprint (D2); big files in parallel parts (D3); verified (D4).
     `expect`: the manifest's row, with sha256 and bytes, when there is one."""
@@ -1297,8 +1303,16 @@ def _download(m, key, rel, expect=None):
     want_sha, want_bytes = (expect or {}).get('sha256'), (expect or {}).get('bytes')
     if want_sha and dest.exists() and (not want_bytes or dest.stat().st_size == want_bytes) and _sha256_of(dest) == want_sha:
         return str(dest)   # D2
-    with api() as c:
-        r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=False)
+    for wait in (*DOWNLOAD_WAITS, None):   # design/129 D39: the file's link is asked again when the connection drops, like the storage part
+        try:
+            with api() as c:
+                r = c.get(f"/api/runs/{m['run_id']}/files/{key}", follow_redirects=False)
+            break
+        except httpx.RequestError as exc:
+            if wait is None:
+                _dropped(key, exc)
+            print(f'the file link did not answer ({exc.__class__.__name__}); retrying in {wait} s', file=sys.stderr, flush=True)
+            time.sleep(wait)
     direct = r.status_code == 200   # served by the server itself (small answers); the usual answer is a redirect to the storage link
     if not direct and (r.status_code not in (301, 302, 303, 307, 308) or not r.headers.get('location')):
         emit({'action': 'tell_builder', 'message': f'Download of {key} failed: HTTP {r.status_code}.'}, 2)
@@ -1310,7 +1324,10 @@ def _download(m, key, rel, expect=None):
                 part.write_bytes(r.content)
             else:
                 _fetch_to(r.headers['location'], part, want_bytes)
-        except (httpx.RequestError, RuntimeError) as exc:
+        except httpx.RequestError as exc:
+            part.unlink(missing_ok=True)
+            _dropped(key, exc)
+        except RuntimeError as exc:
             part.unlink(missing_ok=True)
             emit({'action': 'tell_builder', 'message': f'Download of {key} failed after retries ({exc.__class__.__name__}: {exc}).'}, 2)
         if not want_sha or _sha256_of(part) == want_sha:
@@ -2053,6 +2070,11 @@ def second_look(m):
          "each writes out/second-look/<scene>.json. Then `vw options join-second-look` and `vw options check` again.")
 
 
+def options_sha(options):
+    """design/129 P4: the fingerprint of the options as joined; the server computes the same one when the cut is proposed."""
+    return hashlib.sha256(json.dumps(options, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
 def join_second_look(m):
     """design/125 O6: each out/second-look/<scene>.json replaces the events (and the steps, when given) of its scene's options in out/options.json.
     All or nothing: a fix naming another scene's option, an unknown piece, or events that do not sum to the scene's frames refuses the join by name."""
@@ -2102,8 +2124,12 @@ def join_second_look(m):
         o['events'] = f['events']
         if f.get('steps'):
             o['steps'] = f['steps']
-    save_json(ws / 'out' / 'options.json', doc)
     missing = [b for b in beats if b not in changed and b not in unchanged]
+    whys = {path.stem: str((load_json(path) or {}).get('why') or '') for path in fixes}
+    doc['second_look'] = {'at': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'scenes': len(beats), 'changed': changed, 'unchanged': unchanged, 'no_fix_file': missing,   # design/129 P4
+                          'fixes': [{'scene': o['beat_id'], 'option': o['option_number'], 'why': str(f.get('why') or whys.get(o['beat_id']) or '')} for o, f in plan],
+                          'joined_sha': options_sha(doc['options'])}
+    save_json(ws / 'out' / 'options.json', doc)
     emit({'changed': changed, 'unchanged': unchanged, 'no_fix_file': missing}, 0,
          f"Joined: {len(changed)} scene(s) changed, {len(unchanged)} unchanged" + (f", no fix file for {', '.join(missing)}" if missing else '') + '. Run `vw options check` again.')
 

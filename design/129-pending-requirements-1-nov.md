@@ -196,3 +196,30 @@ The scrolling visuals page is **retired at the UX1 deploy**, with no switch back
 | VW-12 review | **Stopped**: VW-12 is a trial run, not completed; SK deletes it soon. Then rows 17 and 18 (`OLD_PROMPT_RUNS`, `OLD_PLAN_RULE_RUNS`) are emptied. |
 
 D39, G1 and the retirement of rows 9 and 10 go in one release (server and plugin), so the laptops update once. Requirements note first, for SK's approval.
+
+## I. The release after UX1: P4, D39, G1, old ways 9 and 10 (SK, 1 Nov 2026: "build the second record. go ahead with all other approvals")
+
+### P4 — the second look leaves a record
+**Requirement:** when `vw options join-second-look` succeeds, the tool writes a short record into out/options.json: when, how many scenes, which scenes changed and which stayed (with the helper's reason), the scenes with no fix file, each fix (scene, option, the helper's reason), and a fingerprint of the options as joined. `vw options propose` carries it to the server, which keeps it with that version (never in the cut's own fingerprint). The review page's top line says "Second look: ran 1 Nov 12:20 · 9 scenes · 4 changed …", or "Second look: not recorded for this version", or adds "the cut was changed after the second look" when the options proposed differ from the ones joined.
+**Edge cases:** a version proposed without a join → "not recorded"; a join refused → no record (the file is untouched); a second join → the latest record replaces the earlier one; the operator edits options.json after the join → "changed after the second look"; a malformed or oversized record → kept as far as it is readable, lists capped, never a refusal of the cut; an older tool sends none → "not recorded".
+**Older way:** a second look with no record: retired at this release (an older tool is refused by the minimum version).
+
+### D39 — a dropped connection during a download is "run it again", not a defect
+**Requirement:** the tool's first request of a file download (the server's link to the file) is retried like the storage part (5, 15, 30 s). When the network still fails, the tool says the operator's network dropped and to run the same command again, with action `unreachable`, not `tell_builder`. A server answer that is an error (HTTP status) still goes to the builder.
+**Edge cases:** the link request times out once then works → the download continues; the storage part fails after its retries → "run it again"; a fingerprint mismatch twice → still named for the builder.
+**Older way:** a crash ("unexpected failure") on a dropped connection: retired.
+
+### G1 — the guard acts only in the operator folder
+**Requirement:** the plugin's two hooks (the guard and the reminder) act only in a folder whose Claude settings (`.claude/settings.json` or `settings.local.json`, in the folder or a folder above it) name `VW2_SERVER_URL`, which only the operator folder does. Everywhere else they step aside, so the desktop app switching the plugin on everywhere no longer blocks other work.
+**Edge cases:** the operator opens Claude in a sub-folder of the operator folder → still guarded; a settings file that is not valid JSON → read as text for the name; the builder checkout → steps aside, as today.
+**Older way:** the desktop app's "Vw off" switch as the only way out: no longer needed (kept harmless).
+
+### Old ways 9 and 10 — VW-11's leftovers
+Both are already refused by name since the design/127 build (a cut in the old form, design/35 row 12; a declared gap, at propose). What is left: the version record still copies a declared-gap list, always empty since then. It is removed; rows 9 and 10 are marked retired.
+
+### Lane and versions
+Regular. Server 0.78.2, plugin 0.65.1, minimum tool 0.65.1 (the guard fix and the record reach every laptop with one update). Tests first, in server/unit and plugin/tests.
+
+### Not covered
+- The second look's quality: the record says what the helpers changed, not whether the changes were right.
+- The Docker suite.

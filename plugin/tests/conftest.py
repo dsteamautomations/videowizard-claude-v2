@@ -27,8 +27,13 @@ def ws(tmp_path):
     return root
 
 
-def run_hook(name, payload, cwd, runs=None):
-    """Run a hook the way Claude Code does: JSON on stdin, CLAUDE_PLUGIN_ROOT set. Returns (exit code, stdout, stderr)."""
+def run_hook(name, payload, cwd, runs=None, operator=True):
+    """Run a hook the way Claude Code does: JSON on stdin, CLAUDE_PLUGIN_ROOT set. Returns (exit code, stdout, stderr).
+    `operator`: a folder outside the repo is made an operator folder (its settings name VW2_SERVER_URL, design/129 G1), as on an operator machine."""
+    here = Path(cwd).resolve()
+    if operator and here != REPO and REPO not in here.parents and not (here / '.claude' / 'settings.json').exists():
+        (here / '.claude').mkdir(exist_ok=True)
+        (here / '.claude' / 'settings.json').write_text('{"env": {"VW2_SERVER_URL": "https://example.test"}}', encoding='utf-8')
     env = {**os.environ, 'CLAUDE_PLUGIN_ROOT': str(PLUGIN)}
     if runs is not None:
         env['VW2_RUNS'] = str(runs)
