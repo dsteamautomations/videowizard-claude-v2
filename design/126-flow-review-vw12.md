@@ -1218,7 +1218,7 @@ Total: 875 words, about 14 refusals. Free (no picture is made).
 - **One visual language:** one drawn cutaway returning in gaps 2-B2, 3-B1, 3-B2, 7-B1 and 9-B1.
 
 **Findings (I read the part's second paragraph, 329 words, the treatment check and the plan's graphics rule)**
-- ⚠ **A plan rule the treatment does not know (points 3, 13 and 19):** the plan check warns when graphics run more than **8 s** without a camera picture ("break it with a camera shot"; over 12 s "give the reason in the treatment"), the length SK kept on 29 Oct (design/124 decision b). The treatment already states each shot's route and seconds, yet neither the treatment's text nor its check mentions the limit, so the operator accepted four runs over it: **gap 5-B1's strength chart, 23.9 s** (over 12 s, with no reason in the treatment), 2-B2's cutaway 11.8 s, 3-B2's load drawing 10.8 s, 3-B1's heat drawing 9.1 s. The plan will warn on all four; following the warning changes shots the operator has already accepted.
+- ⚠ **A plan rule the treatment does not know (points 3, 13 and 19):** the plan check warns when graphics run more than **8 s** without a camera picture ("break it with a camera shot"; over 12 s "give the reason in the treatment"), the length SK kept on 29 Oct (design/124 decision b). The treatment already states each shot's route and seconds, yet neither the treatment's text nor its check mentions the limit, so the operator accepted four runs over it: **gap 5-B1's strength chart, 23.9 s** (over 12 s, with no reason in the treatment), 2-B2's cutaway 11.8 s, 3-B2's load drawing 10.8 s, 3-B1's heat drawing 9.1 s. ~~The plan will warn on all four~~ **Corrected 1 Nov:** the plan does *not* warn on them: its run rule counts only diagrams and animations (`GRAPHIC_TYPES`, design/65), written before drawn graphics existed (design/113), so a drawn shot resets the count like a camera shot. All four runs are drawn, so VW-12's plan gave no graphics-run warning at all. (The too-short rule already counts drawn: `GRAPHIC_TYPES + ('drawn',)`.)
 - To watch (parked): the strength chart is drawn (the cutaway's language) while the resource icons of gap 4-B1 are an AI graphic sequence (a different maker); whether they read as one language shows at the pictures.
 - Nothing paid; no keys; nothing parallel; no helper; no older way; no label; not part of a shot's fingerprint (the treatment is checked, not fingerprinted).
 
@@ -1228,6 +1228,10 @@ Total: 875 words, about 14 refusals. Free (no picture is made).
 | Decided | Parked | Open |
 |---|---|---|
 | TR1 agreed (SK, 30 Oct 2026: "Yes, approve TR1") | drawn cutaway beside an AI graphic sequence (gap 4-B1): one language? at the pictures | – |
+
+**SK, 1 Nov 2026 (the open question on TR1): "Yes, count drawn".** TR1b: the plan's graphics run counts drawn shots too, so the treatment (TR1) and the plan give the same warning. VW-12 keeps today's plan rule (its plan is accepted; a re-proposal would otherwise need four new answers); the exception is retired when VW-12 closes (design/35, a new row at build).
+
+**For the builder (TR1b):** `visual_contract.py` gaps loop (~line 1079): `shot.visual_type in GRAPHIC_TYPES + ('drawn',)` for the run; a drawn shot no longer resets the run or gets `camera_reason_missing`. Skipped for runs in an exception set (as `OLD_PROMPT_RUNS`, design/128). Test: three drawn shots of 4 s in a gap give `graphics_run` (12.0 s); a drawn shot between two camera shots gives none; a VW-12 plan gives none. Build on `design126-build` with TR1 and TR3.
 
 **For the builder (TR1):** `server/app/visuals_stage.treatment`: from each entry's `shots` (route, seconds), the runs of graphic routes (drawn, graphic_sequence, a still that is a graphic) give `visual_contract._graphics_run`'s warning; returned with the draft and shown on the line on the page. Test: VW-12's treatment gives four warnings (23.9, 11.8, 10.8, 9.1 s); drawn shots of 8 s or less give none.
 
