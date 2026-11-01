@@ -113,6 +113,7 @@ class NewRun(Write):
     title: str = ''
     procedure_version: str | None = None
     image_provider: Literal['openai', 'gemini']   # design/120: required; the run's image model, never changed afterwards
+    drawn_route: Literal['svg', 'motion'] = 'svg'   # design/130: SVG scenes (the older way, kept until phase 6) or HyperFrames; never changed afterwards
 
 
 class FileRef(Strict):
@@ -666,7 +667,7 @@ def me(user=User):
 @app.post('/api/runs', status_code=201)
 def create_run(body: NewRun, user=User, conn=DB):
     def create():
-        run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version, body.image_provider))
+        run = dict(core.create_run(conn, user, body.title, body.client, body.procedure_version, body.image_provider, body.drawn_route))
         return 201, {**run, 'client_runs': core.client_runs(conn, run['client_id']),            # earlier titles for this client (design/36 1.5)
                      'last_brief': core.last_brief(conn, run['client_id']),                    # what the client said last time (design/37 2.2)
                      'client_rules': core.client_rules(conn, run['client_id']),               # rules learned for the client (design/37 2.3)
@@ -1127,6 +1128,73 @@ def visuals_scene(run_id: UUID, body: SceneUpload, user=User, conn=DB):   # desi
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_scene(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64)))
 
 
+class MotionUpload(Write):   # design/130
+    shot_id: str
+    name: str
+    content_base64: str
+
+
+class MotionTool(Write):   # design/130: a helper's check or snapshot, run on the server
+    shot_id: str
+    op: Literal['check', 'snapshot']
+    sha256: str = Field(default='', pattern=r'^([0-9a-f]{64})?$')
+    at: list[float] = Field(default_factory=list, max_length=12)
+    zoom: str = Field(default='', max_length=80)
+    crops: list[list[float]] = Field(default_factory=list, max_length=6)
+
+
+class MotionVerdict(Write):   # design/130 §4 step 5: the fact checker's verdict on one uploaded project
+    shot_id: str
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    round: int = Field(default=1, ge=1, le=10)
+    stranger: list[str] = Field(default_factory=list, max_length=20)
+    rules: list[dict] = Field(min_length=1, max_length=80)
+
+
+class SubjectRule(Write):   # design/130 §4 step 8
+    subject: str = Field(min_length=1, max_length=80)
+    rule: str = Field(min_length=1, max_length=400)
+    quote: str
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/verdict')
+def visuals_motion_verdict(run_id: UUID, body: MotionVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.motion_verdict(storage(), user, run, outputs, body_dict(body)))
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/rule')
+def visuals_motion_rule(run_id: UUID, body: SubjectRule, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_subject_rule(storage(), user, run, body.subject, body.rule, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/upload')
+def visuals_motion_upload(run_id: UUID, body: MotionUpload, user=User, conn=DB):   # design/130 §4: the shot's HyperFrames project as one zip
+    import base64 as b64
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_motion(storage(), user, run, outputs, body.shot_id, body.name, b64.b64decode(body.content_base64)))
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/tool', status_code=201)
+def visuals_motion_tool(run_id: UUID, body: MotionTool, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.motion_tool(conn, storage(), user, run, outputs, body_dict(body)), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/render', status_code=201)
+def visuals_motion_render(run_id: UUID, body: Draw, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.render_motion(conn, storage(), user, run, outputs, body_dict(body)), 201)
+
+
+@app.get('/api/runs/{run_id}/visuals/motion/brief/{shot_id}')
+def visuals_motion_brief(run_id: UUID, shot_id: str, user=User, conn=DB):   # design/130 §4 step 1
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: visuals_stage.motion_brief(storage(), run, outputs, shot_id)))
+
+
+@app.get('/api/runs/{run_id}/visuals/motion/jobs/{job_id}')
+def visuals_motion_job(run_id: UUID, job_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)   # design/92: a read never waits for the lock
+    return Response(visuals_stage.guarded(lambda: visuals_stage.motion_job(conn, storage(), run, job_id)))
+
+
 @app.get('/api/runs/{run_id}/visuals/plan')
 def visuals_plan_get(run_id: UUID, user=User, conn=DB):   # defect 37: the current plan, for `vw visuals plan`
     run, outputs = _visuals_run(conn, user, run_id)
@@ -1551,7 +1619,8 @@ def meta():
     from . import keys
     return Response({'server_version': settings().SERVER_VERSION, 'plugin_min_version': settings().PLUGIN_MIN_VERSION, 'app_origin': settings().APP_ORIGIN,
                      'keys': {'pools': keys.sizes(), 'cooling': {'openai': keys.cooling('openai'), 'gemini': keys.cooling('gemini')}},   # design/114 P4: sizes and indexes, never keys
-                     'chromium': __import__('app.drawn', fromlist=['available']).available()})   # design/117 §5: can this host render drawn shots
+                     'chromium': __import__('app.drawn', fromlist=['available']).available(),   # design/117 §5: can this host render drawn shots
+                     'hyperframes': settings().MOTION_VERSION if __import__('app.motion', fromlist=['available']).available() else None})   # design/130: the pinned CLI, when installed
 
 
 # ---------- connect flow ----------

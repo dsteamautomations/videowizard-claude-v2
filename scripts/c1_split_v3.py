@@ -72,6 +72,8 @@ if __name__ == '__main__':
         d37(parts)
         from d126_wording_v3 import apply_visuals as d126   # design/126 U5: two to twelve keywords
         d126(parts)
+        from d130_wording_v3 import apply_visuals as d130   # design/130: the HyperFrames motion route (section 11)
+        d130(parts)
         assert (st['prompt'], st['parts'], st['steps']) == (prompt, parts, steps), 'v3.json does not hold the split (with the part references)'
         print('ok: v3.json holds the split (common + parts == the Phase B text, asserted in build) with the part references')
     else:

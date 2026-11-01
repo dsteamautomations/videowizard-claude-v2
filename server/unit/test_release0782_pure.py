@@ -60,5 +60,5 @@ def test_old_ways_9_and_10_a_version_no_longer_copies_a_declared_gap_list():
     assert "work.get('gaps')" not in inspect.getsource(S.propose)
 
 
-def test_the_minimum_tool_is_0_65_1():
-    assert Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.65.1'
+def test_the_minimum_tool_is_0_65_1_or_later():   # design/130 raised it to 0.66.0
+    assert tuple(int(x) for x in Settings.model_fields['PLUGIN_MIN_VERSION'].default.split('.')) >= (0, 65, 1)

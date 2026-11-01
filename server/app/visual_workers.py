@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from datetime import datetime, timezone
@@ -433,6 +434,8 @@ def process_drawn(job):
     from . import drawn, image_check, svg_scene
     from .analysis_jobs import transport_factory
     req, jid = job['request'], str(job['id'])
+    if req.get('kind') == 'motion':   # design/130: a HyperFrames project, rendered by the pinned CLI
+        return process_motion(job)
     store = storage()
     folder = SPOOL / jid
     try:
@@ -523,6 +526,100 @@ def process_drawn(job):
         return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
 
 
+def _motion_folder(store, request, folder):
+    """design/130: the project unpacked into the job's spool folder with GSAP, the fonts, the approved pictures and the timing sidecar beside it."""
+    from . import drawn, motion
+    fonts = {n: (store.get(k) if k else drawn.font_file().read_bytes()) for n, k in (request.get('fonts') or {'NotoSans-Variable.ttf': None}).items()}
+    refs = {rid: store.get(k) for rid, k in (request.get('images') or {}).items()}
+    if folder.exists():
+        shutil.rmtree(folder)
+    return motion.prepare(folder, motion.unpack(store.get(request['project_key'])), gsap=motion.gsap_bytes(), fonts=fonts, refs=refs, sidecar=request.get('sidecar') or {'assertions': []})
+
+
+def process_motion(job):
+    """design/130 §4 step 4: check (the rules, the layout, the timing sidecar), render at the film's fps, measure the frames and the size, keep the movie and
+    its contact sheet. A check error fails the render with HyperFrames' own fix lines; a wrong length or size is a must line, so the drawing is held.
+    Free. Returns (status, result, error, cost, retry_in)."""
+    from . import drawn, motion
+    req, jid = job['request'], str(job['id'])
+    store = storage()
+    try:
+        request = json.loads(store.get(req['request_key']).decode('utf-8'))
+        project = _motion_folder(store, request, SPOOL / jid / 'project')
+        report = motion.check(project)
+        if report.get('errors'):
+            lines = '; '.join(f"{e['code']}: {e['message']}" + (f" (fix: {e['fix']})" if e.get('fix') else '') for e in report['errors'][:4])
+            return 'failed', {'phase': 'check', 'errors': report['errors'][:12]}, f'HyperFrames check failed: {lines}', None, None
+        planned, fps, W, H = int(request['frames']), Fraction(str(request['fps'])), int(request['width']), int(request['height'])
+        path = motion.render(project, request['fps'], SPOOL / jid / 'output.mp4')
+        ev = probe(path)
+        code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(ev['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(ev['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},
+                {'check': 'size', 'weight': 'must', 'pass': (ev.get('width'), ev.get('height')) == (W, H), 'seen': f"{ev.get('width')}x{ev.get('height')} for {W}x{H}"}]
+        sheet = drawn.sheet(motion.frames_png(path, drawn.sheet_indexes(str(fps), planned)), str(fps), W, H)
+        data = Path(path).read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        k, sheet_key = f"{job['run_id']}/visuals/drawn/{jid}.mp4", f"{job['run_id']}/visuals/drawn/{jid}-sheet-1.jpg"
+        store.put(k, data, 'video/mp4')
+        store.put(sheet_key, sheet, 'image/jpeg')
+        exact = planned / fps
+        evidence = dict(ev)
+        evidence.update(requested_duration_seconds=float(exact), placement=request['placement'], creative_approval=False, **timing_evidence(evidence['duration_seconds'], str(exact)))
+        failed = [c for c in code if c['pass'] is False]
+        check = {'lines': code, 'must_failed': failed, 'model': None, 'best_pass': 1, 'sheet_key': sheet_key, 'fixed_svg_key': None, 'passes': [{'pass': 1, 'failed': [c['check'] for c in failed]}],
+                 'hyperframes': {'version': settings().MOTION_VERSION, 'warnings': report.get('warnings', [])[:12]}}
+        return 'ready', {'provider_id': 'motion', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': code, 'sheet_key': sheet_key, 'fixed_svg_key': None,
+                         'check': check}, None, {'provider': 'motion', 'seconds': float(exact), 'inr': 0}, None
+    except Exception as exc:   # a render that fails is reported, never retried blindly
+        return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
+
+
+def process_motion_tool(job):
+    """design/130 §4 step 3: a helper's `check` (the findings) or `snapshot` (PNGs kept with the run) of an uploaded project. Free; never a take."""
+    from . import motion
+    req, jid = job['request'], str(job['id'])
+    store = storage()
+    request = {}
+    try:
+        request = json.loads(store.get(req['request_key']).decode('utf-8'))
+        project = _motion_folder(store, request, SPOOL / jid / 'project')
+        if request['kind'] == 'motion-check':
+            return 'ready', motion.check(project), None, {'provider': 'motion', 'inr': 0}, None
+        shots, out_dir = [], SPOOL / jid / 'snapshots'
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for t, p in zip(request['at'], motion.snapshot(project, request['at'], request.get('zoom') or '', out_dir)):
+            k = f"{job['run_id']}/visuals/motion/tools/{jid}/{len(shots)}.png"
+            data = Path(p).read_bytes()
+            store.put(k, data, 'image/png')
+            crops = []
+            for n, box in enumerate(request.get('crops') or []):   # design/130: a close-up at twice its size, so a checker sees joints and letters
+                ck = f"{job['run_id']}/visuals/motion/tools/{jid}/{len(shots)}-crop{n + 1}.png"
+                store.put(ck, crop_png(data, box), 'image/png')
+                crops.append({'box': box, 'key': ck})
+            shots.append({'at': t, 'key': k, **({'crops': crops} if crops else {})})
+        return 'ready', {'snapshots': shots}, None, {'provider': 'motion', 'inr': 0}, None
+    except Exception as exc:
+        return 'failed', {'phase': request.get('kind') or 'motion'}, f'{exc.__class__.__name__}: {exc}', None, None
+
+
+def crop_png(png, box, scale=2):
+    from io import BytesIO
+    from PIL import Image
+    with Image.open(BytesIO(png)) as im:
+        w, h = im.size
+        l, t, cw, ch = (int(round(float(v) * d)) for v, d in zip(box, (w, h, w, h)))
+        out = im.convert('RGB').crop((l, t, l + cw, t + ch)).resize((cw * scale, ch * scale), Image.LANCZOS)
+        buf = BytesIO()
+        out.save(buf, format='PNG')
+        return buf.getvalue()
+
+
+def renders_free(conn, cap):
+    """design/130 §4: drawn and motion jobs running across the workers stay under the cap, so renders never starve analysis and takes.
+    ponytail: a count, then a claim; two workers can pass at once and run cap+1 for a moment; a lock if that ever matters."""
+    row = conn.execute("select count(*) as n from vw2_jobs where status='running' and provider in ('drawn', 'motion')").fetchone()
+    return (row['n'] if isinstance(row, dict) else row[0]) < cap
+
+
 def check_drawn(job, result):
     """design/117 P4: the loop's record (the lines of the best pass, every pass, the sheet) kept on the session like a take's check. Never raises."""
     store = storage()
@@ -563,7 +660,14 @@ def tick():
     if worker.STOP:
         return busy
     with connect() as conn:
-        job = jobs.claim(conn, 'drawn')   # design/113 E2: a render, a few seconds, free
+        job = jobs.claim(conn, 'motion') if renders_free(conn, settings().MOTION_CAP) else None   # design/130: a helper's check or snapshot
+    if job:
+        status, result, error, cost, retry_in = process_motion_tool(job)
+        with connect() as conn:
+            jobs.finish(conn, job['id'], status, result=result, error=error, cost=cost, retry_in=retry_in)
+        busy = True
+    with connect() as conn:
+        job = jobs.claim(conn, 'drawn') if renders_free(conn, settings().MOTION_CAP) else None   # design/113 E2: a render, free; design/130: capped with the motion jobs
     if job:
         status, result, error, cost, retry_in = process_drawn(job)
         with connect() as conn:

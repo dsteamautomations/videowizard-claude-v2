@@ -159,14 +159,14 @@ def refuse_retired(version):
         raise Problem(409, 'VERSION_RETIRED', RETIRED_VERSIONS[str(version)])
 
 
-def create_run(conn, user, title, client, version, image_provider):   # design/126 ST1: no default picture AI
+def create_run(conn, user, title, client, version, image_provider, drawn_route='svg'):   # design/126 ST1: no default picture AI; design/130: the drawn route
     version = version or settings().DEFAULT_PROCEDURE_VERSION
     refuse_retired(version)
     if stage_table(version) is None:
         raise Problem(404, 'VERSION_UNKNOWN', f'Procedure version {version!r} is not published.')
     chosen = resolve_client(client)
-    return conn.execute('insert into vw2_runs(title, client, client_id, owner_id, owner_name, procedure_version, image_provider) values (%s,%s,%s,%s,%s,%s,%s) returning *',   # design/120: chosen once, never changed
-                        (title or '', chosen['client_name'], chosen['client_id'], user['id'], user['name'], version, image_provider)).fetchone()
+    return conn.execute('insert into vw2_runs(title, client, client_id, owner_id, owner_name, procedure_version, image_provider, drawn_route) values (%s,%s,%s,%s,%s,%s,%s,%s) returning *',   # design/120, design/130: chosen once, never changed
+                        (title or '', chosen['client_name'], chosen['client_id'], user['id'], user['name'], version, image_provider, drawn_route)).fetchone()
 
 
 def is_admin(user):

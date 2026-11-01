@@ -211,12 +211,41 @@ class SvgScene(Model):   # design/117 P2: the scene is one SVG file (data, never
     actions: list[DrawnAction] = Field(default_factory=list, max_length=100)
 
 
+class MotionCue(Model):   # design/130: an element of the HyperFrames project that appears at a second of the shot or a word of its narration
+    selector: str = Field(pattern=r'^#[A-Za-z][A-Za-z0-9_-]*$')
+    at_s: Num | None = None
+    word: str = Field(default='', max_length=80)
+
+
+class MotionScene(Model):   # design/130: the shot's HyperFrames project, uploaded apart from the plan and named here by its hash
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    labels: list[str] = Field(default_factory=list, max_length=20)   # every text the viewer reads, word for word; the server finds each in the project
+    cues: list[MotionCue] = Field(default_factory=list, max_length=50)
+
+
 HEX = re.compile(r'^#[0-9A-Fa-f]{6}$')
 FIGURE = re.compile(r'\d')
 
 
 def _dim_key(d):
     return f'{d.part} {d.measure}'.strip().lower() if hasattr(d, 'part') else f"{d.get('part', '')} {d.get('measure', '')}".strip().lower()
+
+
+def motion_needs(shot, seconds):
+    """design/130: a motion shot keys every cue inside the shot (a second within it or a word of its narration); one scene kind per shot."""
+    label = f'shot {shot.id}'
+    need(shot.scene_svg is None or shot.scene_motion is None, f"{label}: a drawn shot has scene_svg or scene_motion, not both (the film's drawn route decides which).")
+    if shot.scene_motion is None:
+        return
+    words = ' '.join(_tokens(shot.narration))
+    for n, c in enumerate(shot.scene_motion.cues, 1):
+        need((c.at_s is not None) != bool(c.word.strip()), f'{label}: cue {n} ({c.selector}): give at_s or word, one of the two.')
+        if c.at_s is not None and seconds is not None:
+            need(0 <= c.at_s <= seconds + 0.04, f'{label}: cue {n} ({c.selector}) is at {float(c.at_s):.1f} s, past the end of {shot.id} ({seconds:.1f} s).')
+        if c.word.strip():
+            need(' '.join(_tokens(c.word)) in words, f"{label}: cue {n} ({c.selector}): the word '{c.word}' is not in the narration of {shot.id}.")
+    for l in shot.scene_motion.labels:
+        need(l.strip() and len(l) <= 120, f'{label}: a label is one to 120 characters.')
 
 
 def svg_needs(shot, seconds):
@@ -273,6 +302,7 @@ class Shot(Model):
     motion_reason: str = Field(default='', max_length=1000)   # why a still stays frozen (`none`)
     carries_text: bool = False   # design/112 K2, K4: the still shows words (a label, a title, a caption): push_in only, placed whole, never cropped or panned
     scene_svg: SvgScene | None = None   # design/117 P2 (design/113 E1 was the primitive scene)
+    scene_motion: MotionScene | None = None   # design/130: the HyperFrames project of a drawn shot on a motion film
     return_of: str = Field(default='', max_length=80)         # design/89 H7: the earlier shot whose subject this one shows again, reimagined
     differs_by: str = Field(default='', max_length=1000)      # what is different: angle, distance, moment
     claims: list[str] = Field(default_factory=list, max_length=10)   # design/89 C1: the claims spoken over a graphic, one must line each
@@ -740,6 +770,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                                 need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
                     if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
                         svg_needs(shot, seconds)
+                        motion_needs(shot, seconds)   # design/130
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:
                             warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state'})
@@ -996,7 +1027,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
     return result, warnings
 
 
-SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers', 'scene_svg', 'drawing_spec'), ('size', 'material_spec')   # design/124 C2 fix 6: specs are researched after the picture search and approved in their own table, so they never need the gap accepted again   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale
+SCENE_NOTES, SHOT_NOTES, ELEMENT_NOTES = ('ambient', 'light', 'air'), ('size', 'size_reason', 'camera_reason', 'claim', 'warning_answers', 'scene_svg', 'scene_motion', 'drawing_spec'), ('size', 'material_spec')   # design/124 C2 fix 6: specs are researched after the picture search and approved in their own table, so they never need the gap accepted again   # design/101, 103; design/124 Change 7: an answer needs no re-acceptance and never makes a take stale
 
 
 def _drop(d, keys):

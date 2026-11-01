@@ -635,7 +635,8 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                  'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
                                                  'reviews': [{k: rv.get(k) for k in ('decision', 'notes', 'quote', 'by')} for rv in session['reviews'].get(str(j['id']), [])],
                                                  'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j),
-                                                 'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key')) if res.get('sheet_key') else None})   # design/91 N3; design/117 P4
+                                                 'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key')) if res.get('sheet_key') else None,   # design/91 N3; design/117 P4
+                                                 **({'fact_check': ((session.get('motion_checks') or {}).get(j['unit']) or [None])[-1]} if (j.get('request') or {}).get('kind') == 'motion' else {})})   # design/130: the latest verdict on the shot
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
         entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, 'warnings': [], **_accepted_words(session, gid)}
@@ -3641,7 +3642,7 @@ def take_checklist(session, job):
 
 
 def take_jobs(conn, run, shot_id=None):
-    sql = "select id, unit, provider, status, request, result, error, cost, attempt, created_at, updated_at from vw2_jobs where run_id=%s and stage='visuals'"
+    sql = "select id, unit, provider, status, request, result, error, cost, attempt, created_at, updated_at from vw2_jobs where run_id=%s and stage='visuals' and provider <> 'motion'"   # design/130: a helper's check or snapshot is never a take
     rows = conn.execute(sql + (' and unit=%s' if shot_id else '') + ' order by created_at', (run['id'], shot_id) if shot_id else (run['id'],)).fetchall()
     return rows
 
@@ -3681,10 +3682,16 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     reviews = session['reviews'].get(str(job_id), [])
     need(reviews and reviews[-1]['decision'] == 'accepted', 'Select only a take whose latest review is accepted.')
     prep = load_json(store, job['request']['request_key'])
-    if prep.get('kind') == 'drawn':   # design/113 E3: a drawing stands on the plan it was rendered from
-        need(prep.get('plan_digest') == digest(current_plan(store, session)), 'The plan changed since this drawing was rendered; render it again (`vw visuals draw --shot S`).')
+    if prep.get('kind') in ('drawn', 'motion'):   # design/113 E3: a drawing stands on the plan it was rendered from; design/130: so does a motion drawing
+        again = '`vw motion render --shot S`' if prep.get('kind') == 'motion' else '`vw visuals draw --shot S`'
+        need(prep.get('plan_digest') == digest(current_plan(store, session)), f'The plan changed since this drawing was rendered; render it again ({again}).')
         failed = [l.get('check') for l in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('must_failed') or []]   # design/117 answer 1: held after the loop
         need(not failed or str(notes or '').strip(), f"This drawing is held: {', '.join(failed)} still failed after the server's passes. Select it with --notes saying why it is taken anyway, or reject it with what to change.")
+        if prep.get('kind') == 'motion':   # design/130 §4 step 6: a motion drawing is selected after a clean fact check of the project it was rendered from
+            checks = [c for c in (session.get('motion_checks') or {}).get(job['unit']) or [] if c.get('sha256') == prep.get('sha256')]
+            bad = [r['rule'] for r in (checks[-1]['rules'] if checks else []) if r.get('pass') is False]
+            need(checks or str(notes or '').strip(), 'This drawing has no fact check of its project yet: run a vw-motion-check helper and `vw motion verdict`, or select it with --notes saying why not.')
+            need(not bad or str(notes or '').strip(), f"This drawing is held: the fact check failed: {'; '.join(bad)}. Select it with --notes saying why it is taken anyway, or redo the shot.")
         context = prep['plan_digest']
     else:
         live = packet(store, run, outputs, job['unit'], session)
@@ -3705,6 +3712,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     plan, its pictures approved, the spec approved when the shot has one (E5), the cues from the timed narration, the run's brand font, the style and the
     palette for the read; cached by the request's digest; never counted against the cap."""
     from . import drawn, svg_scene
+    need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: `vw motion render --shot S` (design/130).')
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, body['shot_id']))
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_svg).")
@@ -3759,6 +3767,7 @@ def set_scene(store, user, run, outputs, shot_id, name, content):
     """design/117 P2: a drawn shot's SVG scene, one file kept with the run and named by the plan through its sha256; refused with the reasons when it
     breaks a rule (never rendered). The plan's scene_svg points at it."""
     from . import svg_scene
+    need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: upload the project with `vw motion upload` (design/130).')
     session = session_of(store, run, outputs)
     need(re.search(r'\.svg$', name or '', re.I), 'The scene is one .svg file.')
     need(content and len(content) <= svg_scene.MAX_BYTES, f'The scene file is empty or over {svg_scene.MAX_BYTES // 1_000_000} MB: use <use> for repeats and components for things.')
@@ -3808,6 +3817,262 @@ def set_font(store, user, run, outputs, name, content):
     session['font'] = {'key': k, 'name': name, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     save_session(store, run, session)
     return {'font': session['font'], 'next': f'{name} is the font of this film: every drawn graphic uses it from the next render.'}
+
+
+# ---------- design/130: the HyperFrames motion route for drawn shots ----------
+
+def drawn_route(run):
+    """design/130 §9: the film's drawn route, chosen once at `vw start --drawn`; a film without one draws SVG scenes (the older way, kept until phase 6)."""
+    return (run or {}).get('drawn_route') or 'svg'
+
+
+def _motion_run(run):
+    need(drawn_route(run) == 'motion', 'This film draws its drawn shots as SVG scenes (`vw visuals scene`, `vw visuals draw`); the motion route is chosen at `vw start --drawn motion`.')
+
+
+def _film_frame(session):
+    fps = session['source']['fps']
+    res = session['source'].get('resolution') or [1920, 1080]
+    W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
+    return fps, W, H
+
+
+def _motion_fonts(store, session):
+    """{file name: bytes} placed in assets/fonts, and the family names a project may use."""
+    from . import drawn
+    files, names = {'NotoSans-Variable.ttf': drawn.font_file().read_bytes()}, ['Noto Sans']
+    if session.get('font'):
+        files[Path(session['font']['name']).name] = store.get(session['font']['key'])
+        names.append(Path(session['font']['name']).stem)
+    return files, names
+
+
+def set_motion(store, user, run, outputs, shot_id, name, content):
+    """design/130 §4: a drawn shot's HyperFrames project, one zip kept with the run and named by the plan through its sha256; refused with the reasons
+    when it breaks a rule (never checked or rendered)."""
+    from . import motion
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    shot = guarded(lambda: locate(store, session, shot_id))[3]
+    need(re.search(r'\.zip$', name or '', re.I), 'The project is one .zip file of the shot\'s folder (index.html at its root).')
+    need(content and len(content) <= motion.MAX_ZIP, f'The project zip is empty or over {motion.MAX_ZIP // 1_000_000} MB: pictures come from assets/ref, not inside the zip.')
+    try:
+        files = motion.unpack(content)
+    except ValueError as exc:
+        need(False, f'The project cannot be read: {exc}.')
+    fps, W, H = _film_frame(session)
+    names = _motion_fonts(store, session)[1]
+    problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
+    need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
+    sha = hashlib.sha256(content).hexdigest()
+    k = f"{run['id']}/visuals/motion/projects/{sha}.zip"
+    store.put(k, content, 'application/zip')
+    session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
+            'next': f"Project stored. Check it with `vw motion check --shot {shot_id} --sha {sha}`; when it is right, put scene_motion: {{sha256: {sha}, labels: [...], cues: [...]}} "
+                    f"on {shot_id} in the plan, then `vw motion render --shot {shot_id}`."}
+
+
+def _motion_request(store, session, run, shot_id, sha=None):
+    """The request a check, snapshot or render reads: the project, the server's files, the film's frame, the plan's labels and cues as a timing sidecar."""
+    from . import drawn, motion
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: the motion route is for a drawn shot.")
+    sm = shot.get('scene_motion') or {}
+    sha = sha or sm.get('sha256') or ''
+    row = (session.get('motion_projects') or {}).get(sha)
+    need(row, f"{shot['id']}: the plan's scene_motion names no uploaded project: upload it (`vw motion upload --shot {shot['id']} --dir <folder>`) and put its sha256 in the plan."
+         if not sha or sha == sm.get('sha256') else f"{shot['id']}: {sha[:12]}… is no uploaded project of this film.")
+    fps, W, H = _film_frame(session)
+    words = ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words')
+    cues = sm.get('cues') if sha == sm.get('sha256') else []
+    seconds = guarded(lambda: drawn.cue_seconds({'actions': cues or []}, shot, words, fps))
+    images = {}
+    files = motion.unpack(store.get(row['key']))
+    for rid in motion.ref_ids(files):
+        ref = session['references'].get(rid)
+        need(ref and ref.get('status') == 'approved' and ref.get('key'), f"the project places assets/ref/{rid}.png, which is not an approved picture of this run.")
+        images[rid] = ref['key']
+    fonts = {n: k for n, k in [('NotoSans-Variable.ttf', None)] + ([(Path(session['font']['name']).name, session['font']['key'])] if session.get('font') else [])}
+    spec = shot.get('drawing_spec')
+    frames = shot['end_frame'] - shot['start_frame']
+    exact = Fraction(frames) / Fraction(str(fps))
+    labels = sm.get('labels') or [] if sha == sm.get('sha256') else []
+    return shot, spec, files, {
+        'kind': 'motion', 'shot_id': shot['id'], 'sha256': sha, 'project_key': row['key'], 'width': W, 'height': H, 'fps': str(fps), 'frames': frames,
+        'images': images, 'fonts': fonts, 'labels': labels, 'sidecar': motion.sidecar(seconds, [c['selector'] for c in cues or []]),
+        'plan_digest': digest(plan), 'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
+        'claims': shot.get('claims') or [], 'relationships': (spec or {}).get('relationships') or [], 'view': spec_view(shot)[0] if spec else None,
+        'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
+
+
+def motion_tool(conn, store, user, run, outputs, body):
+    """design/130 §4 step 3: `hyperframes check` or `snapshot` of an uploaded project of the shot, run in the worker on the VM (no laptop needs Node);
+    the helper reads the findings or the PNGs back. Free; never a take."""
+    _motion_run(run)
+    op = body.get('op')
+    need(op in ('check', 'snapshot'), 'op is check or snapshot (a render is `vw motion render`).')
+    session = session_of(store, run, outputs)
+    _shot, _spec, files, request = _motion_request(store, session, run, body['shot_id'], body.get('sha256'))
+    at = [round(float(t), 3) for t in (body.get('at') or [])][:12]
+    if op == 'snapshot':
+        need(at and all(0 <= t <= request['frames'] / float(Fraction(str(request['fps']))) for t in at), 'Give the seconds to snapshot (--at 0.5,2.0), inside the shot.')
+    crops = [[round(float(x), 4) for x in c] for c in (body.get('crops') or [])][:6]   # design/130 §4 step 5: close-ups for the checker, fractions of the frame
+    need(all(len(c) == 4 and 0 <= c[0] < 1 and 0 <= c[1] < 1 and 0 < c[2] <= 1 - c[0] + 1e-9 and 0 < c[3] <= 1 - c[1] + 1e-9 for c in crops),
+         'A crop is left,top,width,height as fractions of the frame, inside it (0.5,0.4,0.3,0.3).')
+    request.update(kind=f'motion-{op}', at=at, zoom=str(body.get('zoom') or '')[:80], crops=crops)
+    key_ = key(run, f"motion/tools/{digest({**request, 'n': uuid.uuid4().hex})}.json")
+    save_json(store, key_, request)
+    row = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'motion',%s, gen_random_uuid()) returning id",
+                       (run['id'], body['shot_id'], Jsonb({'kind': request['kind'], 'request_key': key_, 'shot_id': body['shot_id']}))).fetchone()
+    return {'job_id': str(row['id']), 'request_key': key_, 'next': f'{op} queued: `vw motion status --job {row["id"]}` shows the findings' + (' and saves the PNGs.' if op == 'snapshot' else '.')}
+
+
+def render_motion(conn, store, user, run, outputs, body):
+    """design/130 §4 step 4: the plan's HyperFrames project rendered by the pinned CLI at the film's size and frame rate, every label found word for word
+    first, the spec approved when the shot has one; cached by the request's digest; free; reviewed and selected like a take."""
+    from . import motion
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    shot, spec, files, request = _motion_request(store, session, run, body['shot_id'])
+    _no_question(session, shot['id'])   # design/110 rule 0
+    if spec:
+        need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
+             f"the drawing spec of {shot['id']} is not approved, or changed since: approve the specs as one table (`vw visuals spec`, or on the page) before the drawing is rendered.")
+    missing = motion.missing_labels(files, request['labels'])
+    need(not missing, '; '.join(f'the project does not show the label "{l}" word for word' for l in missing) + ': fix the text in the project or the label in the plan.')
+    lost = motion.missing_selectors(files, [c['selector'] for c in (shot.get('scene_motion') or {}).get('cues') or []])
+    need(not lost, f"the plan's cues name {', '.join(lost)}, which the project does not have (an element id).")
+    identity = digest(request)
+    key_ = key(run, f'takes/{identity}.motion.json')
+    save_json(store, key_, request)
+    frames, exact = request['frames'], request['placement']['exact_seconds']
+    same = [j for j in take_jobs(conn, run, shot['id']) if j.get('provider') == 'drawn' and (j.get('request') or {}).get('preparation_id') == identity and j['status'] not in ('failed', 'rejected', 'cancelled')]
+    session['preparations'][shot['id']] = {'preparation_id': identity, 'key': key_, 'drawn': True}
+    if same:
+        save_session(store, run, session)
+        return {'job_id': str(same[0]['id']), 'preparation_id': identity, 'frames': frames, 'cached': True, 'next': 'Already rendered from this project (nothing changed): see it on the Takes step.'}
+    row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
+                        (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact}))).fetchone()
+    save_session(store, run, session)
+    return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames,
+            'next': f'Rendering {frames} frames on the server, free: HyperFrames checks the project and the timing, renders, and the drawing and its sheet show on the Takes step; '
+                    'select it there or reject it with what to change.'}
+
+
+SUBJECT_RULES = Path(__file__).resolve().parents[1] / 'subject_rules'   # design/130 §4 step 8: one file per subject, seeded in the repo
+
+
+def subject_rule_files():
+    return sorted(p.stem for p in SUBJECT_RULES.glob('*.md'))
+
+
+def _subject_rules(store, stem):
+    """The subject's rules: the repo's seed lines, then the operators' additions kept in storage (every film reads both)."""
+    seed = [l[2:].strip() for l in (SUBJECT_RULES / f'{stem}.md').read_text(encoding='utf-8').splitlines() if l.startswith('- ')]
+    try:
+        added = [r['rule'] for r in json.loads(store.get(f'subject-rules/{stem}.json').decode('utf-8'))]
+    except Problem:
+        added = []
+    return seed + added
+
+
+def add_subject_rule(store, user, run, subject, rule, quote):
+    """design/130 §4 step 8: a correction kept as a rule of its subject for every later film, only with the operator's words."""
+    stem = re.sub(r'[^a-z0-9-]', '', str(subject or '').lower())
+    need(stem in subject_rule_files(), f"There is no subject rules file named {subject!r} ({', '.join(subject_rule_files())}); a new subject is added by the builder.")
+    need(str(rule or '').strip() and len(rule) <= 400, 'Give the rule in one line (at most 400 characters).')
+    quote = said(quote, 'Added', user)
+    k = f'subject-rules/{stem}.json'
+    try:
+        rows = json.loads(store.get(k).decode('utf-8'))
+    except Problem:
+        rows = []
+    rows.append({'rule': rule.strip(), 'quote': quote, 'by': user['id'], 'run': run.get('code'), 'at': datetime.now(timezone.utc).isoformat()})
+    store.put(k, json.dumps(rows, ensure_ascii=False).encode('utf-8'), 'application/json')
+    return {'subject': stem, 'rules': rows, 'next': f'Kept: every later film on {stem} starts its rules with it.'}
+
+
+def _subjects_of(plan):
+    """The subjects whose every name word is in the film's plan text (ponytail: a word match; a subject field on the brief if two subjects ever collide)."""
+    text = ' '.join([json.dumps(plan.get('foundation') or {}), *(g.get('intent') or '' for g in plan.get('gaps') or []),
+                     *(s.get('narration') or '' for g in plan.get('gaps') or [] for sc in all_scenes(g) for s in sc.get('shots') or [])]).lower()
+    words = set(re.findall(r'[a-z0-9]+', text))
+    return [stem for stem in subject_rule_files() if set(stem.split('-')) <= words]
+
+
+def motion_verdict(store, user, run, outputs, body):
+    """design/130 §4 step 5: a fresh checker's verdict on one uploaded project of a shot, kept per shot by round; the failed rules go back to a builder
+    helper, at most two redo rounds; select holds a drawing whose project has no clean verdict."""
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    shot = guarded(lambda: locate(store, session, body.get('shot_id') or ''))[3]
+    sha = body.get('sha256') or ''
+    need(sha in (session.get('motion_projects') or {}), f"{shot['id']}: {sha[:12]}… is no uploaded project of this film.")
+    rules = body.get('rules') or []
+    need(rules and all(isinstance(r, dict) and isinstance(r.get('pass'), bool) and str(r.get('rule') or '').strip() for r in rules),
+         'The verdict lists the rules checked; every rule has pass true or false and its words (`rule`).')
+    failed = [r for r in rules if r['pass'] is False]
+    rec = {'sha256': sha, 'round': int(body.get('round') or 1), 'stranger': [str(x)[:500] for x in body.get('stranger') or []][:20],
+           'rules': [{k: (str(r.get(k))[:500] if k != 'pass' else r[k]) for k in ('n', 'group', 'rule', 'pass', 'where', 'fix') if k in r} for r in rules][:80],
+           'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    session.setdefault('motion_checks', {}).setdefault(shot['id'], []).append(rec)
+    save_session(store, run, session)
+    names = [r['rule'] for r in failed]
+    return {'shot_id': shot['id'], 'round': rec['round'], 'failed': names,
+            'next': (f"{len(names)} rules failed: give them to a vw-motion-shot helper for {shot['id']} to redo (round {rec['round'] + 1}; after round 3 the drawing is held)."
+                     if names else f"Clean: name {sha[:12]}… in the plan's scene_motion and `vw motion render --shot {shot['id']}`.")}
+
+
+def motion_brief(store, run, outputs, shot_id):
+    """design/130 §4 step 1: the designer's brief for one drawn shot, built from the plan (the test bench's prompt.txt shape): the length to the frame,
+    the narration with each word's second, what it shows, the palette, the spec, the claims, the labels, the pictures and the rules. Deterministic."""
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
+    need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: a brief is for a drawn shot.")
+    fps, W, H = _film_frame(session)
+    frames = shot['end_frame'] - shot['start_frame']
+    exact = Fraction(frames) / Fraction(str(fps))
+    f = float(Fraction(str(fps)))
+    words = [w for w in ((session['source']['gaps'].get(gap['gap_id']) or {}).get('timing') or {}).get('words') or [] if shot['start_frame'] <= w['start_frame'] < shot['end_frame']]
+    timed = ', '.join(f"{w['text']} {(w['start_frame'] - shot['start_frame']) / f:.2f}" for w in words) or 'none recorded: key cues with at_s'
+    spec = shot.get('drawing_spec') or {}
+    dims = '; '.join(f"{d.get('part')} {d.get('measure')} {d.get('value')} {d.get('unit')} ({d.get('status') or 'given'})" for d in spec.get('dimensions') or [])
+    fonts = _motion_fonts(store, session)
+    pictures = [(rid, r) for rid, r in session['references'].items() if r.get('status') == 'approved' and r.get('key') and r.get('kind') in ('component', 'golden', 'style', 'sheet')]
+    sm = shot.get('scene_motion') or {}
+    lines = [f"# Brief: drawn shot {shot['id']} (HyperFrames)", '',
+             f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\".",
+             f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\"",
+             f"Each word's start, seconds from the shot's start: {timed}.",
+             f"Shows: {shot.get('depicts') or shot.get('purpose')}. Message: {shot.get('message') or '-'}. Progression: {shot.get('information_progression') or '-'}.",
+             f"Framing: {shot.get('framing')}. Appearance: {shot.get('appearance') or (plan.get('foundation') or {}).get('appearance') or '-'}.",
+             f"Palette: {((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or 'the approved style picture'}.",
+             f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."]
+    if spec:
+        lines += [f"Drawing spec, view {spec.get('view') or '-'}: parts {', '.join(spec.get('parts') or []) or '-'}; sizes {dims or '-'}; relationships {'; '.join(spec.get('relationships') or []) or '-'}; "
+                  f"proportions {'; '.join(spec.get('proportions') or []) or '-'}; label \"{spec.get('label') or ''}\"" + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.')]
+    lines += [f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in sm.get('labels') or []) or 'name them in the plan (scene_motion.labels) and use them exactly'}.",
+              'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.',
+              f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family.",
+              f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; text at least 2.6 % of the frame height, inside the inner 90 %; "
+              'flat, clean, technical; every label sentence case as written above.']
+    for stem in _subjects_of(plan):   # design/130 §4 step 8: what earlier films taught about this subject
+        lines += ['', f'Subject rules ({stem}): every one holds in this drawing.', *(f'- {r}' for r in _subject_rules(store, stem))]
+    return {'shot_id': shot['id'], 'brief': '\n'.join(lines) + '\n', 'refs': [rid for rid, _ in pictures], 'frames': frames, 'fps': str(fps)}
+
+
+def motion_job(conn, store, run, job_id):
+    """design/130: a motion check, snapshot or render as the helper reads it: its status, findings, and the snapshots as base64 PNGs."""
+    job = conn.execute("select * from vw2_jobs where id=%s and run_id=%s and provider in ('motion', 'drawn')", (job_id, run['id'])).fetchone()
+    need(job, f'{job_id} is no motion job of this film.')
+    res = dict(job.get('result') or {})
+    if res.get('snapshots'):
+        res['snapshots'] = [{'at': s['at'], 'png_base64': base64.b64encode(store.get(s['key'])).decode(),
+                             'crops': [{'box': c['box'], 'png_base64': base64.b64encode(store.get(c['key'])).decode()} for c in s.get('crops') or []]} for s in res['snapshots']]
+    return {'job_id': str(job['id']), 'status': job['status'], 'kind': (job.get('request') or {}).get('kind'), 'error': job.get('error'), 'result': res}
 
 
 def made_for(session, row):

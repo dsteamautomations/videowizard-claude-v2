@@ -636,7 +636,8 @@ def cmd_start(a):
     if getattr(a, 'images', None) not in ('openai', 'gemini'):   # design/120: the image model is chosen once, at the start, and never changes
         emit({'action': 'refused', 'message': 'Ask the operator which image model this run uses: GPT Image (openai) or Gemini Nano Banana (gemini); it cannot change later. Then `vw start --client … --images openai|gemini`. No run was created.'}, 2)
     preflight(a.need_gb)
-    run = write('/api/runs', {'client': a.client, 'image_provider': a.images, **({'procedure_version': a.version} if a.version else {})})
+    run = write('/api/runs', {'client': a.client, 'image_provider': a.images, **({'procedure_version': a.version} if a.version else {}),
+                              **({'drawn_route': a.drawn} if getattr(a, 'drawn', None) else {})})   # design/130: SVG scenes unless the operator chose motion
     if workspace(run['code']).exists():
         emit({'action': 'refused', 'message': f"Folder runs/{run['code']} already exists on this machine."}, 2)
     write(f"/api/runs/{run['id']}/claim", {'machine': machine_id()})
@@ -652,7 +653,119 @@ def cmd_start(a):
                   'message': f"Run {run['code']} was created, but {script.name} could not be copied into in/ ({exc.__class__.__name__}). Ask the operator to copy it by hand, then run `vw stage intake prepare`."}, 2)
     nxt = call('GET', f"/api/runs/{run['id']}/next")
     emit({**run, 'workspace': str(workspace(run['code'])), 'script_file': copied, 'next': nxt}, 0,
-         f"Started {run['code']} for {run.get('client')} in {m['code']}/; images: {run.get('image_provider') or a.images}" + (f"; {copied} copied into in/" if copied else '') + f"; {directory_line(run.get('client_card'))}. " + next_line(nxt))
+         f"Started {run['code']} for {run.get('client')} in {m['code']}/; images: {run.get('image_provider') or a.images}; drawn shots: {run.get('drawn_route') or 'svg'}" + (f"; {copied} copied into in/" if copied else '') + f"; {directory_line(run.get('client_card'))}. " + next_line(nxt))
+
+
+MOTION_SKIP = ('.hyperframes', 'node_modules', 'snapshots', 'refs')   # design/130: never in the upload
+MOTION_SERVER = ('assets/vendor/', 'assets/fonts/', 'assets/ref/')     # the server places these at check and render
+MOTION_WAIT_S = 600
+
+
+def motion_zip(folder):
+    """design/130: the shot's project folder as one zip, the server's own files and the helper's scratch left out (standard library only)."""
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as z:
+        for p in sorted(folder.rglob('*')):
+            rel = p.relative_to(folder)
+            if (p.is_file() and not set(rel.parts[:-1]) & set(MOTION_SKIP) and not rel.as_posix().startswith(MOTION_SERVER)
+                    and p.suffix.lower() != '.mp4' and rel.name != 'index.motion.json'):
+                z.write(p, rel.as_posix())
+    return buf.getvalue()
+
+
+def motion_wait(base, job, wait=MOTION_WAIT_S, poll=3):
+    """A check or snapshot runs on the server in seconds; wait for it here, as the helper's loop needs the answer before it goes on."""
+    end = time.time() + wait
+    while True:
+        out = call('GET', f'{base}/motion/jobs/{job}')
+        if out.get('status') in ('ready', 'failed', 'rejected', 'cancelled') or time.time() >= end:
+            return out
+        time.sleep(poll)
+
+
+def cmd_motion(a):
+    """design/130: one drawn shot of a film started with --drawn motion: brief, upload, check, snapshot, render, status. HyperFrames runs on the server;
+    nothing on this computer needs Node."""
+    import base64 as _b64
+    m = active()
+    base = f"/api/runs/{m['run_id']}/visuals"
+    ws = workspace(m['code'])
+    if a.what == 'status':
+        if not a.job:
+            emit({'action': 'refused', 'message': 'Give the job: `vw motion status --job J`.'}, 2)
+        emit(call('GET', f'{base}/motion/jobs/{a.job}'), 0)
+    if a.what == 'rule':   # design/130 §4 step 8: a correction kept for every later film on the subject, with the operator's words
+        if not (a.subject and a.add and a.quote):
+            emit({'action': 'refused', 'message': 'Give the subject, the rule and the operator\'s words: `vw motion rule --subject rat-trap-bond --add "…" --quote "<their yes>"`.'}, 2)
+        out = write(base + '/motion/rule', {'subject': a.subject, 'rule': a.add, 'quote': a.quote})
+        emit(out, 0, out.get('next'))
+    if not a.shot:
+        emit({'action': 'refused', 'message': f'Give the drawn shot: `vw motion {a.what} --shot S`.'}, 2)
+    folder = ws / 'work' / 'motion' / a.shot
+    last = folder / 'last-upload.json'
+    if a.what == 'brief':
+        out = call('GET', f'{base}/motion/brief/{a.shot}')
+        (folder / 'project').mkdir(parents=True, exist_ok=True)
+        (folder / 'brief.md').write_text(out['brief'], encoding='utf-8')
+        refs = [_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
+        emit({'shot_id': a.shot, 'brief': str(folder / 'brief.md'), 'refs': refs, 'project': str(folder / 'project')}, 0,
+             f"Brief for {a.shot} written to work/motion/{a.shot}/brief.md with {len(refs)} pictures in refs/: start one vw-motion-shot helper with the shot id {a.shot}.")
+    if a.what == 'upload':
+        proj = (ws / a.dir) if a.dir and (ws / a.dir).is_dir() else (Path(a.dir) if a.dir else folder / 'project')
+        if not (proj / 'index.html').is_file():
+            emit({'action': 'refused', 'message': f'No index.html in {proj}: the project is work/motion/{a.shot}/project/ with index.html at its root.'}, 2)
+        out = write(base + '/motion/upload', {'shot_id': a.shot, 'name': f'{a.shot}.zip', 'content_base64': _b64.b64encode(motion_zip(proj)).decode('ascii')})
+        save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat()})
+        emit(out, 0, out.get('next'))
+    if a.what in ('check', 'snapshot'):
+        sha = a.sha or (json.loads(last.read_text(encoding='utf-8')).get('sha256') if last.is_file() else '')
+        if not sha:
+            emit({'action': 'refused', 'message': f'Upload the project first (`vw motion upload --shot {a.shot}`), or give --sha.'}, 2)
+        at = [float(x) for x in (a.at or '').split(',') if x.strip()]
+        if a.what == 'snapshot' and not at:
+            emit({'action': 'refused', 'message': 'Give the seconds to snapshot: --at 0.5,2.0,4.5'}, 2)
+        try:
+            crops = [[float(x) for x in c.split(',')] for c in (a.crop or [])]
+        except ValueError:
+            emit({'action': 'refused', 'message': 'A crop is left,top,width,height as fractions of the frame: --crop 0.5,0.4,0.3,0.3'}, 2)
+        job = write(base + '/motion/tool', {'shot_id': a.shot, 'op': a.what, 'sha256': sha, 'at': at, 'zoom': a.zoom or '', **({'crops': crops} if crops else {})})
+        out = motion_wait(base, job['job_id'])
+        res = out.get('result') or {}
+        if a.what == 'snapshot':
+            saved = []
+            for s_ in res.get('snapshots') or []:
+                p = folder / 'snapshots' / f"at-{float(s_['at']):g}s.png"
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(_b64.b64decode(s_['png_base64']))
+                saved.append(str(p))
+                for n, c in enumerate(s_.get('crops') or [], 1):   # close-ups for the fact checker, at twice their size
+                    cp = p.with_name(f"at-{float(s_['at']):g}s-crop{n}.png")
+                    cp.write_bytes(_b64.b64decode(c['png_base64']))
+                    saved.append(str(cp))
+            res = {'snapshots': saved}
+            line = f"{len(saved)} snapshots saved in work/motion/{a.shot}/snapshots/: look at each one." if out.get('status') == 'ready' else f"Snapshot failed: {out.get('error')}"
+        else:
+            save_json(folder / 'check.json', res)
+            errs = res.get('errors') or []
+            line = (f"Check clean ({len(res.get('warnings') or [])} warnings) for {sha[:12]}." if out.get('status') == 'ready' and not errs
+                    else f"Check found {len(errs)} errors (work/motion/{a.shot}/check.json): fix each, upload, check again." if out.get('status') == 'ready' else f"Check failed: {out.get('error')}")
+        emit({'job_id': job['job_id'], 'sha256': sha, 'status': out.get('status'), 'error': out.get('error'), **res}, 0 if out.get('status') == 'ready' else 2, line)
+    if a.what == 'verdict':   # design/130 §4 step 5: the fact checker's check-<round>.json, kept with the run
+        p = (ws / a.file) if a.file and (ws / a.file).is_file() else Path(a.file or '')
+        if not a.file or not p.is_file():
+            emit({'action': 'refused', 'message': f'Give the checker\'s file: `vw motion verdict --shot {a.shot} --file work/motion/{a.shot}/check-1.json`.'}, 2)
+        try:
+            v = json.loads(p.read_text(encoding='utf-8'))
+        except ValueError as exc:
+            emit({'action': 'refused', 'message': f'{p.name} is not valid JSON ({exc}); ask the checker to write it again.'}, 2)
+        out = write(base + '/motion/verdict', {'shot_id': a.shot, 'sha256': v.get('sha256') or '', 'round': int(v.get('round') or 1),
+                                               'stranger': v.get('stranger') or [], 'rules': v.get('rules') or []})
+        emit(out, 0, out.get('next'))
+    if a.what == 'render':
+        out = write(base + '/motion/render', {'shot_id': a.shot})
+        emit(out, 0, out.get('next'))
 
 
 def directory_line(card):
@@ -2585,6 +2698,7 @@ def build_parser():
     s = sub.add_parser('start')
     s.add_argument('--client', required=True); s.add_argument('--version'); s.add_argument('--script', help='the script file to copy into in/ (design/34 1.6)')
     s.add_argument('--images', choices=['openai', 'gemini'], help='the image model of this run, asked of the operator, never changed later')
+    s.add_argument('--drawn', choices=['svg', 'motion'], help='how drawn shots are made: SVG scenes (default) or HyperFrames (design/130); never changed later')
     s.add_argument('--need-gb', type=float, default=5); s.add_argument('--keep-logs', action='store_true'); s.set_defaults(fn=cmd_start)
     s = sub.add_parser('next'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_next)
     s = sub.add_parser('output')
@@ -2632,6 +2746,11 @@ def build_parser():
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
+    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule'])   # design/130
+    for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote'):
+        s.add_argument(flag)
+    s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
+    s.set_defaults(fn=cmd_motion)
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film'):
         s.add_argument(flag)

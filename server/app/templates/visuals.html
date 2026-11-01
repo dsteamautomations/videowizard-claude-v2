@@ -451,6 +451,12 @@ function drawnPasses(c){   // design/117 P4: what the server's loop did with the
   return '<details class="chkd"'+(held?' open':'')+'><summary class="'+(held?'err':'ok')+'">'+esc('Server passes: '+c.passes.length+(held?' · held: '+c.must_failed.map(l=>l.check).join(', ')+' still failed':' · clean'))+'</summary><ul class="passes">'+
     c.passes.map(p=>'<li>Pass '+p.pass+': '+(p.failed&&p.failed.length?'marked '+esc(p.failed.join(', ')):'clean')+(p.changed?' · fixed: '+esc(p.changed):'')+(p.fix_dropped?' · a fix was dropped: '+esc(p.fix_dropped.join('; ')):'')+(p.fix_error?' · no fix: '+esc(p.fix_error):'')+'</li>').join('')+'</ul>'+
     (held?'<div class="ds err">Held: look at the sheet and the drawing; select it with your reason in the note, or reject it with what to change.</div>':'')+'</details>';}
+function factCheck(f){   // design/130: the fresh checker's latest verdict on the shot, rule by rule; a failed rule holds the drawing
+  if(f===undefined)return '';
+  if(!f)return '<div class="ds err" style="margin:2px 6px">No fact check yet: the drawing is held until a checker has looked at it.</div>';
+  const bad=(f.rules||[]).filter(r=>r.pass===false), ok=(f.rules||[]).length-bad.length;
+  return '<details class="chkd"'+(bad.length?' open':'')+'><summary class="'+(bad.length?'err':'ok')+'">'+esc('Fact check, round '+f.round+': '+ok+' rules passed'+(bad.length?' · '+bad.length+' failed':' · clean'))+'</summary><ul class="chk">'+
+    (f.rules||[]).map(r=>'<li class="'+(r.pass?'ok':'err')+'">'+(r.pass?'✓ ':'✗ ')+esc((r.n?r.n+'. ':'')+(r.rule||''))+(r.where?' <i>('+esc(r.where)+')</i>':'')+(r.pass||!r.fix?'':' → '+esc(r.fix))+'</li>').join('')+'</ul></details>';}
 function checklist(lines,check){   // design/74 L6; design/86 K2; design/97 K1: one line, coloured by the worst result, a failed must's text in it; a click opens the lines
   if(check&&check.lines&&check.lines.length){const bad=check.lines.filter(c=>c.pass===false), must=bad.filter(c=>c.weight==='must'), ok=check.lines.filter(c=>c.pass===true).length;
     const sum=ok+' passed'+(bad.length?' · '+bad.length+' to look at':'')+(must.length?': '+must.map(c=>c.check).join('; '):'');
@@ -537,7 +543,7 @@ function panelBody(){
   if(selPic.take){   // design/97 P2: a take is judged beside its player
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
     if(!k)return '<div class="empty">That take is gone.</div>';
-    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+(k.sheet_url?'<img class="sheet" src="'+esc(k.sheet_url)+'" alt="every frame of the drawing, the time under each">':'')+checklist(k.checklist)+takeCheck(k.check)+drawnPasses(k.check)+
+    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+(k.sheet_url?'<img class="sheet" src="'+esc(k.sheet_url)+'" alt="every frame of the drawing, the time under each">':'')+checklist(k.checklist)+takeCheck(k.check)+drawnPasses(k.check)+factCheck(k.fact_check)+
       (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
   }
   const by=refsById(), r=by[selPic.ref];

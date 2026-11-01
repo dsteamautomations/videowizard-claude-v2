@@ -21,8 +21,9 @@ WEB_MINUTES = 10   # design/48 O.1: one recorded yes covers the search and the f
 WEB_BLOCKED = ("Blocked: a web search needs the operator's yes. Say to them: 'I am deviating from the usual procedure. I want to search the web for X, "
                "because Y. The result may affect Z.' On their yes run vw web --about \"X\" --ok \"<their words>\", then search.")
 RECORDS = ('guard.log', 'manifest.json', '.active')   # design/48 O.4: the tool's own records, read-only for the assistant
-VW_SKILLS = ('vw:vw', 'vw')
-VW_HELPERS = ('vw:vw-scene-review', 'vw-scene-review', 'vw:vw-plan-gaps', 'vw-plan-gaps')   # design/125 O6, O9: the plugin's own helpers; their calls pass this guard too
+VW_SKILLS = ('vw:vw', 'vw', 'vw:motion', 'motion')   # design/130: the motion skill of the drawn-shot helper
+VW_HELPERS = ('vw:vw-scene-review', 'vw-scene-review', 'vw:vw-plan-gaps', 'vw-plan-gaps',   # design/125 O6, O9: the plugin's own helpers; their calls pass this guard too
+              'vw:vw-motion-shot', 'vw-motion-shot', 'vw:vw-motion-rules', 'vw-motion-rules', 'vw:vw-motion-check', 'vw-motion-check')   # design/130
 NOT_HERE = ("Blocked: {tool} is not available to the operator assistant. It uses only the vw tool, files inside the active run folder, "
             "questions to the operator, and the web after the warning and the operator's yes.")
 
@@ -123,6 +124,14 @@ def decide(tool, inp, cwd, vw):
             if target != allowed and allowed not in target.parents:
                 return f'Blocked: only files inside {allowed} can be shown to the operator.'
         return None
+    if tool in READ_TOOLS:   # design/130: the plugin's own skill files (the motion references) are readable; never writable
+        raw0 = inp.get('file_path') or inp.get('path') or ''
+        if raw0:
+            t0 = Path(raw0).expanduser()
+            t0 = (t0 if t0.is_absolute() else cwd / t0).resolve()
+            skills = (vw.parent.parent / 'skills').resolve()
+            if t0 == skills or skills in t0.parents:
+                return None
     if tool in WRITE_TOOLS or tool in READ_TOOLS:
         allowed = active_run(cwd)
         if allowed is None:
@@ -143,7 +152,7 @@ def decide(tool, inp, cwd, vw):
         return None
     if tool == 'Skill':
         name = str(inp.get('skill') or '')
-        return None if name in VW_SKILLS else f'Blocked: only the vw:vw skill is available here, not {name!r}.'
+        return None if name in VW_SKILLS else f'Blocked: only the vw:vw and vw:motion skills are available here, not {name!r}.'
     return NOT_HERE.format(tool=tool)
 
 
