@@ -3386,6 +3386,46 @@ AMBIENT_START = ("Put in the frame what the scene's ambient line says moves (the
                  'so the take can move it.')   # design/101 M5
 
 
+OLD_PROMPT_RUNS = {'VW-12'}   # design/128 T4: these runs keep the take prompt without a timeline (design/35 old ways: until VW-12 closes)
+TIMES_IN_PROMPT = re.compile(r'\b\d+(?:\.\d+)?\s*(?:-|–|to)\s*\d+(?:\.\d+)?\s*s\b|\bat\s+\d+(?:\.\d+)?\s*s(?:econds?)?\b', re.I)
+
+
+def take_prompt_fields(run, plan, shot, fps, duration):
+    """design/128 T1, T2: the beats of every acting subject in seconds from the shot's start, in time order, and the end state from the change list.
+    Empty for a run in OLD_PROMPT_RUNS (today's prompt). A beat that cannot be timed is refused by name, never sent half built."""
+    if (run or {}).get('code') in OLD_PROMPT_RUNS:
+        return {}
+    names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
+    timeline = []
+    for s in shot.get('subjects') or []:
+        for b in s.get('beats') or []:
+            try:
+                timeline.append({'start_s': round((b['start_frame'] - shot['start_frame']) / float(fps), 1), 'end_s': round((b['end_frame'] - shot['start_frame']) / float(fps), 1),
+                                 'name': names.get(s['element_id'], s['element_id']), 'action': str(b.get('action') or '').strip().rstrip('.'), 'result': str(b.get('result') or '').strip().rstrip('.')})
+            except (KeyError, TypeError, ValueError) as exc:
+                need(False, f"shot {shot.get('id')}: beat {b.get('id')} cannot be timed ({exc.__class__.__name__}); fix the plan's beat.")
+    timeline.sort(key=lambda t: t['start_s'])   # stable: subjects keep their order when beats start together
+    end = [str(c.get('what') or '').strip().rstrip('.') for c in shot.get('changes') or [] if str(c.get('what') or '').strip()]
+    return {'prompt_version': 2, **({'timeline': timeline} if timeline else {}), **({'end_state': end} if end else {})}
+
+
+def take_prompt_warnings(plan, shot, motion_prompt, timeline_sent=True):
+    """design/128 T3: one person in the shot described as a man or a woman, and the motion prompt uses the other's pronoun: a warning, never a refusal.
+    And a motion prompt that names its own times, beside the plan's timeline."""
+    out, text = [], str(motion_prompt or '')
+    people = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] in (shot.get('element_ids') or [])]
+    if len(people) == 1:
+        d = str(people[0].get('description') or '').lower()
+        woman, man = bool(re.search(r'\bwom[ae]n\b', d)), bool(re.search(r'\bm[ae]n\b', d))
+        if woman and not man and re.search(r'\b(he|his|him)\b', text, re.I):
+            out.append(f"{people[0].get('name')} is described as a woman, and the motion prompt says he, his or him: make them agree.")
+        if man and not woman and re.search(r'\b(she|her|hers)\b', text, re.I):
+            out.append(f"{people[0].get('name')} is described as a man, and the motion prompt says she, her or hers: make them agree.")
+    if timeline_sent and TIMES_IN_PROMPT.search(text):
+        out.append("the motion prompt names its own times; the plan's timeline is sent too: make them agree.")
+    return out
+
+
 def prepare_take(store, user, run, outputs, body):
     session = session_of(store, run, outputs)
     plan_full, _, _, planned = guarded(lambda: locate(store, session, body['shot_id']))
@@ -3470,6 +3510,8 @@ def prepare_take(store, user, run, outputs, body):
               **({'gaze_lines': gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion')} if gaze_lines(plan_full, base['preparation']['scene'], shot, 'motion') else {}),   # design/111 F7
               **({'fixed_line': fixed_line(base['preparation']['scene'], shot)} if fixed_line(base['preparation']['scene'], shot) else {}),   # design/111 F8
               **({'light': base['preparation']['scene']['light']} if base['preparation']['scene'].get('light') else {})}   # design/103 A1   # design/101 M3, M4: the take text and the take check read it
+    record.update(take_prompt_fields(run, plan_full, planned, fps, record['duration_seconds']))   # design/128 T1, T2, T4
+    form += take_prompt_warnings(plan_full, planned, body['motion_prompt'], timeline_sent=bool(record.get('timeline')))   # design/128 T3
     record['effective_prompt'] = motion_text(record)
     identity = digest(record)
     save_json(store, key(run, f'takes/{identity}.request.json'), record)

@@ -21,6 +21,13 @@ def motion_text(snapshot):
     two=bool(snapshot.get('end_image'))
     prompt='[# Sources <FIRST_FRAME>@Image1'+(' <LAST_FRAME>@Image2' if two else '')+']\n'
     prompt+=snapshot['motion_prompt']
+    if (snapshot.get('prompt_version') or 1)>=2:   # design/128 T1, T2 (a record without prompt_version is read as 1: today's text)
+        tl=snapshot.get('timeline') or []
+        if tl:
+            prompt+='\nThe events happen in this order and at these times:'
+            for b in tl:prompt+=f"\n{b['start_s']:.1f}–{b['end_s']:.1f} s: {b['name']}: {b['action']}"+(f"; {b['result']}" if b.get('result') else '')+'.'
+            if snapshot['duration_seconds']>max(b['end_s'] for b in tl)+0.05:prompt+=f"\nThen hold until {snapshot['duration_seconds']} s."
+        if snapshot.get('end_state'):prompt+='\nBy the end and until the last frame: '+'; '.join(snapshot['end_state'])+'; each stays where it is, in plain view.'
     if (snapshot.get('ambient') or '').strip() and not re.match(r'\s*still\b',snapshot['ambient'],re.I):prompt+='\nThroughout the shot the surroundings stay alive: '+snapshot['ambient'].strip().rstrip('.')+'.'   # design/101 M3; a `still:` line asks for nothing
     prompt+='\nNatural, unhurried motion; no sudden, exaggerated or floating movement.'   # design/102 B3: how things move, not how much
     prompt+='\nSubject reconciliation:\n'+json.dumps(snapshot['subject_reconciliation'],ensure_ascii=False)
