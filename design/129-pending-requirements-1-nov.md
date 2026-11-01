@@ -5,7 +5,9 @@ Everything deployed since 30 Oct is **not** listed: defects 35, 37, 38, 40, 41, 
 
 Mark the **SK** column (go / hold / drop) for each record you want taken up.
 
-## A. Built, not deployed (branch `design126-build`, a727388: server 0.78.0, plugin 0.65.0)
+## A. Deployed 1 Nov 2026 (main 221b0bb: server 0.78.0, plugin 0.65.0, minimum tool 0.65.0), with TR1b and TR3
+
+The branch was brought up to date with main, TR1b and TR3 were added, and main was fast-forwarded to it. Not verified: U1–U7 clicked in a browser (the live page data could not be read here; the scripts parse and the page loads without errors), and the Docker suite.
 
 Agreed on 30–31 Oct, built by three builders, never deployed. The branch was cut **before** every hotfix, so it must first be brought up to date with main (35–42, W1–W13, design/128) and tested again. Deploying it changes both the server and the plugin, so every laptop has to update its plugin.
 
