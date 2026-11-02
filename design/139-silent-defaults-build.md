@@ -366,3 +366,37 @@ Each step is tested before the next. One commit per step. One release at the end
 - A client's own font file uploaded (Q4).
 - The live spending-limit value. It is read at deploy (R7).
 - The Docker server suite (`server/tests`). As before, the unit tests and plugin tests run; the Docker suite does not.
+
+## Build record (2 Nov 2026, after SK's "Approve, start build")
+
+Built, tested and committed on `main`; **not deployed** (deploy hold). Server 0.83.0, plugin 0.69.0. Migration `011_film_choices.sql` runs at the next server start.
+
+| Step | Commit | What |
+| --- | --- | --- |
+| design/137 + R1 base | 3b8c13a | `vw2_runs.film` (NULL on every older run, `{}` on new ones); `vw category`, `vw shape`, `vw colours`, `vw font`; the brief waits for the category, the analysis for the shape |
+| R4, R9 | ca7e49f | the cut waits for an approved scene split; no blank minimum; AI video at least 2 s; the 12 s and 4 s warnings gone |
+| R6, R10, R11 | 7fa1e3d | the drawing note; `--kind` required; camera "not known" instead of a codec guess (phone or professional) |
+| R5, R14 | 6e07b51 | languages detected and reported; narration language read from the script; industry from the card or asked once; the shape leaves the brief |
+| R1 | da96fe1 | the analysis, the cut, pictures and takes follow the recorded shapes and rate |
+| R2 | 506bc43 | v4 only; the two settings on the voices page with "Try again with these settings"; a narration uses that voice's latest audition settings (page or chat) |
+| R3, R12 | 3d1b55c | a highlight names its colour; framing by category |
+| R13 | 9a8eb11 | five fonts (OFL, `server/fonts`); both drawing routes |
+| R8 | 34a686f | every join named on a new film |
+| Wording | ce9cedf and the last commit | intake, brief, media, analysis, options, voice and visuals instructions; old wording retired; two agents |
+
+**Tests:** server unit 1066 passed, 4 skipped. Plugin 397 passed, with the 4 failures already known (3 Windows-only, 1 design/127 master wording). The instruction split check passes. The voices page script was checked for syntax in a browser; a quote error found there was fixed.
+
+**Differences from the plan above:**
+1. **A client's own font file already exists.** `vw visuals font --file brand.ttf` is the older brand-font step. It keeps working and also answers the font question (Q4 said it did not exist; it does).
+2. **New-film checks are switched on per film.** The plan check takes `new_film` (highlight colour, joins), and the server passes it as "not a film from before". Older fixtures and older films keep today's rules.
+3. **Chat auditions count too.** The narration reads the voice's latest audition from the job records, not only from the page, so a chat audition with other settings is honoured (one flow, two front ends).
+4. **The analysis instruction was kept within its word limit**, so the languages line is short.
+5. **Found in passing and fixed:** the drawn-shot checker agent said "a drawn shot of a training film"; it now says "of a film" (all categories).
+
+**For SK's decision at deploy:** the minimum plugin version stays 0.66.0. Films started before this release (VW-13, VW-16, VW-17) work with any plugin. A **new** film needs plugin 0.69.0, because `vw category` and `vw shape` are new: an older plugin answers "unknown command" when the server asks for them. Raising the minimum to 0.69.0 would make every laptop update first.
+
+**Still not covered (added to the list above):**
+- The voices page sliders were not seen working against live data, only checked for syntax.
+- No vertical film has been made end to end.
+- A Tamil or Hindi label in a drawing: Noto Sans (the variable file) does not draw those scripts either, as before.
+- One shot-guidance line still names construction traces ("mortar droppings": `visuals_stage.shot_guidance`, B8). That breaks the all-categories rule and is a candidate for the next clean-up.
