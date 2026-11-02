@@ -52,3 +52,7 @@ Codex left one question open: whether the reviewer's or the rule's trim was bett
 10. B11: the protective-equipment waiver when the brief has no rules: keep, or ask?
 
 B10 needs no decision: it is a wording reminder for the analysis step.
+
+## 5. SK's answers
+
+- **Q1 (B1), 2 Nov:** **Match by meaning.** Claude judges whether the description shows the same thing under another name and records its reason; the server's word match becomes a warning, never a refusal.
