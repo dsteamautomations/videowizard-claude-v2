@@ -52,7 +52,7 @@ def test_op3_on_a_cut_shaped_like_vw12_act_on_keeps_e2_and_r5_only():
              + ['OPTION #1 event 2: R1 cut not at a natural cut point'] * 16 + ['OPTION #2 event 1: R10 colour group changes'] * 12 + ['OPTION #4 event 3: R4 energy drops'] * 4)
     out = V.answer_flags(flags)
     assert sorted({f.split(': ')[1].split()[0] for f in out['act_on']}) == ['E2', 'R5'] and len(out['act_on']) == 5
-    assert out['for_information'] == '42 for information: R1 16, R10 12, N17 stage 10, R4 4'
+    assert out['for_information'] == '42 for information: R1 16, R10 12, N17 stage 10, R4 4; the full list is in `vw options status`'
     assert V.answer_flags([claim])['act_on'] == [claim]   # the claim N17 flag stays to act on
 
 

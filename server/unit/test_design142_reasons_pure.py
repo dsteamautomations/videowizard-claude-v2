@@ -58,3 +58,15 @@ def test_the_flag_is_answered_by_a_reason_and_stays_without_one():
     assert V.carry_flag('rebar', {'sub_clip_id': 'a', 'carries_over_seen': 'reinforcement_steel_bars is the rebar'}, ['reinforcement_steel_bars']) is False
     assert V.carry_flag('rebar', {'sub_clip_id': 'a'}, ['reinforcement_steel_bars']) is True
     assert V.carry_flag('rebar', {'blank': True}, []) is False
+
+
+# ---------- R10 ----------
+
+def test_the_check_points_to_the_full_list_of_information_flags():
+    out = V.answer_flags(['OPTION #1 shot 1 (c:1): R1 a natural cut point was within reach of the in-point and was not used'])
+    assert 'vw options status' in out['for_information']
+
+
+def test_a_row_carries_seconds_and_the_package_states_the_frame_base():
+    from app.stage2 import package as P
+    assert 'source_fps' in P.FRAME_BASE and 'in_s' in P.FRAME_BASE

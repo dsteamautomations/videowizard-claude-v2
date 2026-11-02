@@ -379,7 +379,7 @@ def answer_flags(flags):
     info = [g for g in group_flags(flags) if g['rule'] in INFO_KINDS]
     total = sum(g['count'] for g in info)
     return {'act_on': [f for f in flags if (RULE_RE.search(f) or [None, 'other'])[1] not in INFO_KINDS],
-            'for_information': f"{total} for information: " + ', '.join(f"{g['rule']} {g['count']}" for g in info) if info else ''}
+            'for_information': f"{total} for information: " + ', '.join(f"{g['rule']} {g['count']}" for g in info) + '; the full list is in `vw options status`' if info else ''}   # design/142 R10
 
 
 def validate_master(master, package):

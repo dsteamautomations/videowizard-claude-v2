@@ -40,7 +40,22 @@ RUNS = Path(os.environ.get('VW2_RUNS') or Path.cwd() / 'runs')
 
 # ---------- output helpers ----------
 
+LAST_CMD = None   # design/142 R10: the command being run, so its answer is kept in work/last/ (a background command's output can be read)
+
+
+def keep_last(payload, code):
+    try:
+        code_ = (RUNS / '.active').read_text(encoding='utf-8').strip() if LAST_CMD and (RUNS / '.active').exists() else ''
+        if code_ and (RUNS / code_).is_dir():
+            out = RUNS / code_ / 'work' / 'last' / f'{LAST_CMD}.json'
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps({'code': code, 'answer': payload}, indent=1, default=str, ensure_ascii=False), encoding='utf-8')
+    except OSError:
+        pass
+
+
 def emit(payload, code=0, summary=None):
+    keep_last(payload, code)
     print(json.dumps(payload, indent=1, default=str))
     hint = ((why(payload) if code else (payload.get('message') or payload.get('action'))) if isinstance(payload, dict) else f'{len(payload)} item(s)')   # W1: "refused" only when refused
     print(summary or hint or 'ok', file=sys.stderr)
@@ -173,7 +188,7 @@ def options_reading_files(ws, data):
     return files
 
 
-PIECE_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'native_shot_size', 'effective_shot_size',
+PIECE_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'in_s', 'out_s', 'native_shot_size', 'effective_shot_size',
                 'action_peak', 'outcome_state', 'pairing_constraints', 'risk_flags', 'eligibility', 'min_hold_s')   # design/125 P3: what a choice needs
 RELATED_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s')   # design/126 OP1: a related piece in one short row; its full row on demand
 FIT_ORDER = ('direct', 'related', 'chapter')
@@ -2742,6 +2757,8 @@ def _one_subject(a):
 def main(argv=None):
     p = build_parser()
     a = p.parse_args(argv)
+    global LAST_CMD
+    LAST_CMD = '-'.join(str(x) for x in (a.cmd, getattr(a, 'what', None)) if x)
     if a.cmd not in ('connect',) and not session().get('token'):
         need_connect()
     a.fn(a)

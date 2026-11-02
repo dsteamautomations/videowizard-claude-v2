@@ -54,3 +54,19 @@ def test_the_scene_reviewer_knows_the_servers_rules():
     text = (vw.ROOT / 'agents' / 'vw-scene-review.md').read_text(encoding='utf-8') if hasattr(vw, 'ROOT') else open(__file__.replace('tests\test_design142.py', 'agents\vw-scene-review.md').replace('tests/test_design142.py', 'agents/vw-scene-review.md'), encoding='utf-8').read()
     for words in ('reuse, check_by_eye, poor_quality, join, other', 'whole action peak', 'camera move', '6 to 12 frames before the word', 'marker_reasons', 'considered', 'preferred_because', 'as cut'):
         assert words in text, words
+
+
+def test_a_command_keeps_its_answer_in_the_run_folder(harness, capsys):   # design/142 R10: a background command's output can be read
+    (vw.RUNS / '.active').write_text('VW-9', encoding='utf-8')
+    vw.LAST_CMD = 'options-second-look'
+    try:
+        vw.emit({'files': 3}, 0, 'done')
+    except SystemExit:
+        pass
+    saved = (vw.RUNS / 'VW-9' / 'work' / 'last' / 'options-second-look.json').read_text(encoding='utf-8')
+    assert '"files": 3' in saved and '"code": 0' in saved
+    vw.LAST_CMD = None
+
+
+def test_a_piece_shows_its_seconds_beside_its_frames():
+    assert 'in_s' in vw.PIECE_FIELDS and 'out_s' in vw.PIECE_FIELDS

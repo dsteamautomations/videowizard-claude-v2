@@ -120,7 +120,7 @@ RETIRED = json.loads((ROOT / 'retired-sentences.json').read_text(encoding='utf-8
 
 def ai_text():
     st = next(s for s in V3['stages'] if s['name'] == 'visuals')
-    agents = ''.join(p.read_text(encoding='utf-8') for p in (ROOT.parent / 'plugin' / 'agents').glob('*.md'))
+    agents = ''.join(p.read_text(encoding='utf-8') for p in list((ROOT.parent / 'plugin' / 'agents').glob('*.md')) + list((ROOT.parent / 'plugin' / 'commands').glob('*.md')))   # design/142: the command text too
     return json.dumps(V3, ensure_ascii=False) + st['prompt'] + ''.join(p['text'] for p in st['parts']) + agents
 
 

@@ -18,6 +18,10 @@
     "the languages spoken in the footage (an empty list if nobody speaks",
     "16:9 and no destinations unless they say",
     "the fonts Noto Sans or the run's brand font",
-    "rule 11, E1, E2"
+    "rule 11, E1, E2",
+    "ask in one message: should the model listen to the clips' audio",
+    "AI video over 12 s back to back in a gap is broken by",
+    "a graphic dissolves in and out over 8 frames, every other cut is hard",
+    "the one chapter it covers (from the brief"
   ]
 }

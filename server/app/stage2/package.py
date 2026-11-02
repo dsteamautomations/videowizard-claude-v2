@@ -58,6 +58,8 @@ def confidence_of(sub):
     return round(max(0.0, score), 2)
 
 
+FRAME_BASE = ('design/142 R10: source frames (in_frame, out_frame, source_in_frame, source_out_frame, the action peak, accent and natural cut frames) count '
+              "at the clip's own rate (source_fps); timeline frames count at the film's rate (timeline.fps); in_s and out_s give a piece's seconds in its clip.")
 SCENES_SHAPE = {'contract': 'vw2-scenes-v1',   # design/142 R8: the shape of out/scenes.json (Revathi's point 1)
                 'scenes': [{'first_word_id': 'the id of the word the scene starts at (a sentence start)', 'title': 'a few plain words',
                             'process_stages': ['every chapter of the brief this scene covers; empty for an opening, a closing or a title'],
@@ -86,7 +88,7 @@ def sub_clip_row(clip, log, sub, timeline_fps):
     peak = sub.get('must_include_action_peak')
     crop = (st.get('crop_solution') or {}) if st['visual_eligibility'] == 'ELIGIBLE_WITH_CROP' else {}
     return {'sub_clip_id': f"{clip['id']}:{sub['sub_clip_id']}", 'log_sub_clip_id': sub['sub_clip_id'], 'clip_id': clip['id'], 'clip_name': clip['name'], 'source_fps': str(src_fps), 'source_width': clip.get('width'), 'source_height': clip.get('height'),
-            'in_frame': w['in_frame'], 'out_frame': w['out_frame'], 'duration_s': w['duration_s'],
+            'in_frame': w['in_frame'], 'out_frame': w['out_frame'], 'in_s': round(float(Fraction(w['in_frame']) / src_fps), 3), 'out_s': round(float(Fraction(w['out_frame']) / src_fps), 3), 'duration_s': w['duration_s'],
             'handles': {k: w[k] for k in ('video_handle_frames_before', 'video_handle_frames_after')},
             'grade': sub['usability_grade'], 'shot_role': sub['shot_role'], 'client_safe': st.get('client_safe_effective', sub['client_safe']),
             'risk_flags': st.get('risk_flags_effective', sub.get('risk_flags') or []), 'risk_flags_waived': st.get('risk_flags_waived') or [],
@@ -173,7 +175,7 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
     beats = with_steps(beats, (narration or {}).get('sentences'))
     return {'contract': 'vw2-options-package-v1', 'project': {'code': run['code'], 'client': run.get('client'), **production}, 'timeline': timeline, 'policy': policy,
             'narration': narration or {}, 'beats': beats, 'cards': cards, 'sub_clips': rows, 'landmarks': sorted(landmarks), 'entities': entities, 'learned_rules': learned_rules,
-            'coverage': coverage(beats, rows, policy), 'prompt': prompt, 'ruled_out': ruled_out(rows),   # design/142 R2
+            'coverage': coverage(beats, rows, policy), 'prompt': prompt, 'ruled_out': ruled_out(rows), 'frame_base': FRAME_BASE,   # design/142 R2, R10
             'shapes': {'scenes': SCENES_SHAPE, 'options': {'contract': 'vw2-options-v1', 'options': [{'option_number': 1, 'beat_id': 'BEAT_01',   # design/127: one option per scene
                                                                               'events': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'hold_last_frame': False, 'crop': 'solver|full|hands_only',
                                                                                           'a2_intervals': [{'in_frame': 0, 'out_frame': 0}], 'marker': {'name': '', 'note': '', 'colour': 'Blue'},

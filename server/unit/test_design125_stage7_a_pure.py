@@ -68,7 +68,7 @@ def test_p8_prepare_uses_the_new_fits():
 def test_p11_vw11_flags_give_three_to_act_on_and_one_count_line():
     out = V.answer_flags(VW11['flags'])
     assert len(out['act_on']) == 3 and all('N17' in f for f in out['act_on'])
-    assert out['for_information'] == '38 for information: R1 17, R10 13, R4 5, R8 3'
+    assert out['for_information'] == '38 for information: R1 17, R10 13, R4 5, R8 3; the full list is in `vw options status`'
     assert V.answer_flags([]) == {'act_on': [], 'for_information': ''}
 
 
