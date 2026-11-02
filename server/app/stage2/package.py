@@ -58,6 +58,12 @@ def confidence_of(sub):
     return round(max(0.0, score), 2)
 
 
+def ruled_out(rows):
+    """design/142 R2: the sub-clips the analysis ruled out, with its reason, so the first cut can say why they were never candidates."""
+    return [{'sub_clip_id': r['sub_clip_id'], 'clip': r.get('clip_name'), 'eligibility': r['eligibility'], 'reason': r.get('ruled_out_reason') or r['eligibility'].replace('_', ' ').lower()}
+            for r in rows if not str(r['eligibility']).startswith('ELIGIBLE')]
+
+
 def sub_clip_row(clip, log, sub, timeline_fps):
     src_fps = Fraction(str(clip.get('fps') or timeline_fps))
     w = sub['max_usable_window']
@@ -71,7 +77,7 @@ def sub_clip_row(clip, log, sub, timeline_fps):
             'grade': sub['usability_grade'], 'shot_role': sub['shot_role'], 'client_safe': st.get('client_safe_effective', sub['client_safe']),
             'risk_flags': st.get('risk_flags_effective', sub.get('risk_flags') or []), 'risk_flags_waived': st.get('risk_flags_waived') or [],
             'native_shot_size': cam['native_shot_size'], 'effective_shot_size': st.get('effective_post_crop_shot_size') or cam['native_shot_size'],
-            'eligibility': st['visual_eligibility'], 'crop_rect': crop.get('crop_rect'), 'zoom': crop.get('zoom_x'), 'position': [crop.get('position_x'), crop.get('position_y')] if crop else None,
+            'eligibility': st['visual_eligibility'], 'ruled_out_reason': (st.get('crop_solution') or {}).get('reason'), 'crop_rect': crop.get('crop_rect'), 'zoom': crop.get('zoom_x'), 'position': [crop.get('position_x'), crop.get('position_y')] if crop else None,
             'ui_path': st.get('ui_path'), 'still_eligible': st.get('still_frame_dynamic_zoom_eligible'),
             'entry_eye_grid': pace['entry_eye_grid'], 'exit_eye_grid': pace['exit_eye_grid'], 'screen_direction': cam['subject_screen_direction'],
             'lighting': lighting_class(log.get('lighting_and_weather')), 'color_group': log.get('color_match_group_id'), 'energy': pace['kinetic_energy_score'],
@@ -153,7 +159,7 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
     beats = with_steps(beats, (narration or {}).get('sentences'))
     return {'contract': 'vw2-options-package-v1', 'project': {'code': run['code'], 'client': run.get('client'), **production}, 'timeline': timeline, 'policy': policy,
             'narration': narration or {}, 'beats': beats, 'cards': cards, 'sub_clips': rows, 'landmarks': sorted(landmarks), 'entities': entities, 'learned_rules': learned_rules,
-            'coverage': coverage(beats, rows, policy), 'prompt': prompt,
+            'coverage': coverage(beats, rows, policy), 'prompt': prompt, 'ruled_out': ruled_out(rows),   # design/142 R2
             'shapes': {'options': {'contract': 'vw2-options-v1', 'options': [{'option_number': 1, 'beat_id': 'BEAT_01',   # design/127: one option per scene
                                                                               'events': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'hold_last_frame': False, 'crop': 'solver|full|hands_only',
                                                                                           'a2_intervals': [{'in_frame': 0, 'out_frame': 0}], 'marker': {'name': '', 'note': '', 'colour': 'Blue'},
@@ -161,8 +167,13 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
                                                                                           'note': {'kind': 'reuse|check_by_eye|poor_quality|join|other', 'question': 'what the operator should look at'},
                                                                                           'alternatives': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'crop': 'solver|full|hands_only', 'match': 'direct|b_roll',
                                                                                                             'evidence': 'another clip for the same words, the same length, used nowhere else'}],
+                                                                                          'preferred_because': 'only with alternatives: why this clip beat them',
+                                                                                          'carries_over_seen': 'only when its landmark labels name the carried thing another way: why it is the same thing',
                                                                                           'illustrates_word_id': '', 'action_word_id': ''},
-                                                                                         {'blank': True, 'timeline_frames': 75, 'intent': 'what the AI video or animation must show'}],
+                                                                                         {'blank': True, 'timeline_frames': 75, 'intent': 'what the AI video or animation must show',
+                                                                                          'considered': [{'sub_clip_id': '', 'why': 'wrong action|wrong object|already used|claim or number|too short|unusable crop|contradicts the words|other',
+                                                                                                          'words': 'only for other'}],
+                                                                                          'none_fit': 'instead of considered, when no eligible piece fits these sentences at all'}],
                                                                               'reasoning': 'why these sub-clips, which log fields drove it', 'log_fields_cited': ['SUB_x.primary_fit_for_beats'],
                                                                               'best_unchosen': {'sub_clip_id': '', 'rule': 'the rule that excluded it'},
                                                                               'steps': [{'step_id': 'BEAT_01.S1', 'event': 1, 'why': 'the logged action, process_stage or outcome_state that shows this step',

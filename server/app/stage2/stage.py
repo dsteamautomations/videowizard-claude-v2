@@ -12,7 +12,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from .. import core, film, jobs
+from .. import core, film, jobs, runlog
 from ..errors import Problem
 from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, narration as NR, package as P, slides as SL, validator as V
 
@@ -98,6 +98,21 @@ def _check_blocked(conn, run, stage):
 
 
 # ---------- options: prepare ----------
+
+def cut_log(run, doc, version):
+    """design/142 R1, R2: one log entry per blank (the clips considered and why) and per shot chosen over its alternatives."""
+    out = []
+    for o in doc.get('options') or []:
+        for i, ev in enumerate(o.get('events') or [], 1):
+            about = f"{o.get('beat_id')} event {i}"
+            if ev.get('blank'):
+                why = '; '.join(f"{c['sub_clip_id']}: {c['why']}" + (f" ({c['words']})" if c.get('words') else '') for c in ev.get('considered') or []) or f"none fit: {ev.get('none_fit')}"
+                out.append({'kind': 'blank', 'about': about, 'entry': f"blank of {ev.get('timeline_frames')} frames for {ev.get('intent')!r}; considered: {why}"})
+            elif ev.get('preferred_because'):
+                alts = ', '.join(a.get('sub_clip_id') or '' for a in ev.get('alternatives') or [])
+                out.append({'kind': 'choice', 'about': about, 'entry': f"{ev.get('sub_clip_id')} chosen over {alts}: {ev['preferred_because']}"})
+    return [{**e, 'run_id': run['id'], 'stage': 'options', 'rule': f'options v{version} (design/142 R2)', 'by_kind': 'assistant', 'by_name': '', 'quote': '', 'request_id': None} for e in out]
+
 
 def need_scenes(approved):
     """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph."""
@@ -231,6 +246,7 @@ def check(store, run, doc):
         return {'status': 'rejected', 'refusals': [f"contract must be {CONTRACT_OPTIONS}"], 'flags': []}
     work = deepcopy(doc)
     result = V.validate_options(work, pk, session['package']['policy'])
+    result['refusals'] += V.cut_reasons(doc, {r['sub_clip_id']: r for r in pk['sub_clips']})   # design/142 R2: every new proposal carries its reasons
     out = {'status': 'rejected' if result['refusals'] else 'valid', 'refusals': result['refusals'],
            **V.answer_flags(result['flags']), 'flags_total': len(result['flags'])}   # design/125 P11
     if not result['refusals']:
@@ -274,6 +290,7 @@ def propose(conn, store, user, run, doc):
     work = deepcopy(doc)
     work.pop('second_look', None)
     result = V.validate_options(work, pk, session['package']['policy'])
+    result['refusals'] += V.cut_reasons(doc, {r['sub_clip_id']: r for r in pk['sub_clips']})   # design/142 R2
     if result['refusals']:
         _bump(conn, run, 'options', result['refusals'])
     for o in work['options']:
@@ -294,6 +311,8 @@ def propose(conn, store, user, run, doc):
     session['master'] = None
     session['renders'].pop('review', None)
     conn.execute("delete from vw2_attempts where run_id=%s and stage='options' and unit=%s", (run['id'], core.UNIT_NONE))
+    for e in cut_log(run, work, version):   # design/142 R1: the cut's own reasons, in the run's decision log
+        runlog.write(conn, e)
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
             **V.answer_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,

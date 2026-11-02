@@ -249,7 +249,7 @@ def validate_options(doc, package, policy):
         for kept in o.get('carries_over') or []:   # design/91 N14: the state the step before left is still visible
             for k, e in enumerate(events, 1):
                 lm = (rows.get(e.get('sub_clip_id')) or {}).get('landmarks') or []
-                if not e.get('blank') and not any(str(kept).lower() in str(x).lower() or str(x).lower() in str(kept).lower() for x in lm):
+                if carry_flag(kept, e, lm):
                     flags.append(f"OPTION #{n}: N14 shot {k} ({e.get('sub_clip_id')}) does not show {kept!r}, which the step before left (its log lists {', '.join(map(str, lm)) or 'nothing'})")
         if total != beat['target_beat_frames']:
             refusals.append(f"OPTION #{n}: G11 timeline length {total} frames must equal the beat's {beat['target_beat_frames']}")
@@ -298,6 +298,46 @@ def validate_options(doc, package, policy):
 
 
 RULE_RE = re.compile(r'(?:^|: )(rule 11|N17 stage|[A-Z]\d{1,2})(?=[ :])')   # design/126 OP3: N17's chapter flag is its own kind
+
+
+def _words(text):
+    return ' '.join(re.split(r'[\s_\-]+', str(text).lower())).strip()
+
+
+def carried(kept, labels):
+    """design/142 R3: a carry-over entry is in a clip's landmark labels when either holds the other, spaces, underscores and hyphens counting as one."""
+    return all(any(_words(k) in _words(x) or _words(x) in _words(k) for x in labels) for k in kept)
+
+
+def carry_flag(kept, ev, labels):
+    """N14 is answered by the words, or by the assistant's reason that a label is the same thing under another name (carries_over_seen)."""
+    return not ev.get('blank') and not carried([kept], labels) and not str(ev.get('carries_over_seen') or '').strip()
+
+
+WHY_KINDS = ('wrong action', 'wrong object', 'already used', 'claim or number', 'too short', 'unusable crop', 'contradicts the words', 'other')   # design/142 R2
+
+
+def cut_reasons(doc, rows):
+    """design/142 R2: the cut carries its own reasons. A blank names the clips considered with why each was turned down, or none_fit; a shot with
+    alternatives says preferred_because. rows: {sub_clip_id: row}. Returns refusals; run on every new proposal (a cut proposed before keeps its form)."""
+    out = []
+    for o in (doc or {}).get('options') or []:
+        for i, ev in enumerate(o.get('events') or [], 1):
+            tag = f"OPTION #{o.get('option_number')} event {i}"
+            if ev.get('blank'):
+                considered, none_fit = ev.get('considered') or [], str(ev.get('none_fit') or '').strip()
+                if not considered and not none_fit:
+                    out.append(f'{tag}: a blank names the clips considered (considered: [{{sub_clip_id, why}}]) or says none_fit with one line: which clips were looked at, and why each did not fit')
+                for c in considered:
+                    if not isinstance(c, dict) or c.get('sub_clip_id') not in rows:
+                        out.append(f"{tag}: considered names an unknown sub-clip {(c or {}).get('sub_clip_id') if isinstance(c, dict) else c!r}")
+                    elif c.get('why') not in WHY_KINDS:
+                        out.append(f"{tag}: considered {c['sub_clip_id']}: why is one of {', '.join(WHY_KINDS)}")
+                    elif c['why'] == 'other' and not str(c.get('words') or '').strip():
+                        out.append(f"{tag}: considered {c['sub_clip_id']}: why other needs its words")
+            elif ev.get('alternatives') and not str(ev.get('preferred_because') or '').strip():
+                out.append(f"{tag} ({ev.get('sub_clip_id')}): a shot with alternatives says why it was preferred (preferred_because)")
+    return out
 
 
 def group_flags(flags):
