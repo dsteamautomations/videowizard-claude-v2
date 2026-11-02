@@ -92,7 +92,8 @@ class ElevenLabs:
     def synthesize(self, snapshot):
         suffix = '/with-timestamps' if snapshot.get('timing_mode') == 'generation' else ''
         return self.request('POST', '/v1/text-to-speech/' + identifier(snapshot['voice_id']) + suffix, params={'output_format': 'mp3_44100_128'},
-                            json={'text': snapshot['text'], 'model_id': snapshot['model_id'], 'voice_settings': snapshot['settings']})
+                            json={'text': snapshot['text'], 'model_id': snapshot['model_id'], 'voice_settings': snapshot['settings'],
+                                  **({'pronunciation_dictionary_locators': snapshot['dictionaries']} if snapshot.get('dictionaries') else {})})   # design/144 V1
 
 
 # ---------- catalog discovery (ported from v1 voice_catalog.py) ----------

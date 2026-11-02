@@ -438,6 +438,7 @@ def record_direction(store, run, outputs, body, user):
         chosen_passage = {'n': choice, **pp, 'words': pp['last_word'] - pp['first_word'] + 1, 'text': VD.passage_text(script['spoken_text'], pp['first_word'], pp['last_word'])}
     doc = {'contract': 'vw2-voice-direction-v2', 'kind_of_film': body.get('kind_of_film') or '', 'options': body.get('options') or {}, 'registers': body.get('registers') or {},
            'chosen': chosen, 'register': register, 'base': items, 'digest': digest, 'approved_by': user['name'], 'at': datetime.now(timezone.utc).isoformat(),
+           'number': direction_number(direction_of(store, run), digest),   # design/144 V3
            'quote': body.get('quote') or '', 'tweaks': (direction_of(store, run) or {}).get('tweaks') or {},
            'test_passages': passages, 'passage': chosen_passage, 'sentences': len(VD.sentences_of(script['spoken_text']))}
     state = page_state(store, run)
@@ -446,7 +447,7 @@ def record_direction(store, run, outputs, body, user):
         mark_direction_change(state, digest)
         save_doc(store, run, 'page.json', state)
     save_doc(store, run, 'direction.json', doc)
-    return {'chosen': chosen, 'digest': digest, 'items': len(items), 'register': register, 'passage': choice if passages else None, 'sentences': doc['sentences']}
+    return {'chosen': chosen, 'digest': digest, 'number': doc['number'], 'items': len(items), 'register': register, 'passage': choice if passages else None, 'sentences': doc['sentences']}
 
 
 def set_tweaks(store, run, outputs, voice_id, tweaks):
@@ -460,6 +461,95 @@ def set_tweaks(store, run, outputs, voice_id, tweaks):
     doc.setdefault('tweaks', {})[voice_id] = [{'passage_id': t['passage_id'], 'sentence': t['sentence'], 'tag': t['tag']} for t in tweaks]
     save_doc(store, run, 'direction.json', doc)
     return {'voice_id': voice_id, 'tweaks': len(tweaks)}
+
+
+def next_direction_number(previous):
+    """design/144 V3: direction 1, 2, 3 as the operator records them; one recorded before numbers counts as the first."""
+    return 1 if not previous else int(previous.get('number') or 1) + 1
+
+
+def direction_number(previous, digest):
+    """The same direction recorded again keeps its number; a changed one takes the next."""
+    if previous and previous.get('digest') == digest:
+        return previous.get('number') or 1
+    return next_direction_number(previous)
+
+
+# ---------- design/144 V1: how the narration says the words a voice may say wrongly ----------
+
+PRONOUNCE_KINDS = ('name', 'place', 'organisation', 'local', 'abbreviation', 'other')
+
+
+def check_pronunciations(items):
+    if not isinstance(items, list) or not items:
+        raise Problem(422, 'PRONUNCIATIONS', 'Give the list: [{word, say_as, ipa, kind}], at least one word.')
+    seen = set()
+    for it in items:
+        if not isinstance(it, dict) or not str(it.get('word') or '').strip():
+            raise Problem(422, 'PRONUNCIATIONS', 'Every entry names its word.')
+        if it.get('kind') not in PRONOUNCE_KINDS:
+            raise Problem(422, 'PRONUNCIATIONS', f"{it.get('word')}: kind is one of {', '.join(PRONOUNCE_KINDS)}.")
+        if not str(it.get('say_as') or '').strip() and not str(it.get('ipa') or '').strip():
+            raise Problem(422, 'PRONUNCIATIONS', f"{it['word']}: give how it is said (say_as, and ipa for a name, place or local word).")
+        if it['word'].strip().lower() in seen:
+            raise Problem(422, 'PRONUNCIATIONS', f"{it['word']} is listed twice.")
+        seen.add(it['word'].strip().lower())
+    return items
+
+
+def pronunciation_rules(items):
+    """SK, 2 Nov 2026 (design/144): IPA (a phoneme rule) for names, places and local words; a respelling (an alias rule) for abbreviations, or where no
+    IPA is given. ElevenLabs applies the first rule that matches, so longer words come first."""
+    out = []
+    for it in sorted(items, key=lambda x: -len(x['word'])):
+        w, ipa = it['word'].strip(), str(it.get('ipa') or '').strip().strip('/')
+        out.append({'type': 'phoneme', 'string_to_replace': w, 'phoneme': ipa, 'alphabet': 'ipa'} if ipa and it['kind'] != 'abbreviation'
+                   else {'type': 'alias', 'string_to_replace': w, 'alias': str(it.get('say_as') or '').strip() or w})
+    return out
+
+
+def make_dictionary(name, rules):
+    """One ElevenLabs pronunciation dictionary and its locator for every narration (the key needs pronunciation_dictionaries_write)."""
+    d = elevenlabs.ElevenLabs().request('POST', '/v1/pronunciation-dictionaries/add-from-rules', json={'name': name, 'rules': rules}).json()
+    return {'pronunciation_dictionary_id': d['id'], 'version_id': d['version_id']}
+
+
+def pronunciations_of(store, run):
+    return load_doc(store, run, 'pronunciations.json', None)
+
+
+def dictionaries_for(store, run):
+    doc = pronunciations_of(store, run)
+    return [doc['dictionary']] if doc and doc.get('dictionary') else []
+
+
+def set_pronunciations(store, user, run, items, quote):
+    """design/144 V1: the list the operator answered in one message, recorded with their words, as this run's dictionary; older narrations are marked."""
+    quote = str(quote or '').strip()
+    if not quote:
+        raise Problem(422, 'PRONUNCIATIONS', "Pass the operator's own words with --quote.")
+    items = check_pronunciations(items)
+    previous = pronunciations_of(store, run) or {}
+    version = int(previous.get('version') or 0) + 1
+    dictionary = make_dictionary(f"vw2-{run.get('code') or run['id']}-v{version}", pronunciation_rules(items))
+    doc = {'version': version, 'items': items, 'dictionary': dictionary, 'quote': quote, 'by': user.get('name'), 'at': datetime.now(timezone.utc).isoformat()}
+    save_doc(store, run, 'pronunciations.json', doc)
+    state = page_state(store, run)
+    if state.get('narrations'):
+        for n in state['narrations']:
+            if n.get('pronunciations_version') != version:
+                n['made_before_pronunciations_change'] = True
+        save_doc(store, run, 'page.json', state)
+    return doc
+
+
+def last_client_list(store, runs):
+    """design/144 (SK: offer it): the newest list among the client's other runs, given newest first."""
+    for r in runs:
+        doc = load_doc(store, r, 'pronunciations.json', None)
+        if doc and doc.get('items'):
+            return doc['items']
+    return []
 
 
 def direction_for(store, run, voice_id):
@@ -479,10 +569,15 @@ def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tw
     row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'narration', 'voice_id': voice_id, 'text': script['spoken_text'], 'model_id': elevenlabs.DEFAULT_MODEL,
                                                        'settings': heard_settings(conn, run, voice_id)}, request_id, store=store)
     add_narration(state, {'job_id': str(row['id']), 'voice_id': row['request']['voice_id'], 'name': row['request'].get('name'), 'model_id': row['request'].get('model_id'),
+                          'direction_number': (direction_of(store, run) or {}).get('number'), 'pronunciations_version': row['request'].get('pronunciations_version'),   # design/144 V1, V3
                           'settings': row['request'].get('settings'), 'direction_digest': row['request'].get('direction_digest'), 'tweaks': row['request'].get('tweaks') or [],
                           'by': user['name'], 'at': datetime.now(timezone.utc).isoformat(), 'from': by})
     save_doc(store, run, 'page.json', state)
-    return row
+    return {**dict(row), 'direction_number': (direction_of(store, run) or {}).get('number'), 'hint': TWEAK_HINT}
+
+
+TWEAK_HINT = ("To change one sentence's tag for this voice: the voices page, Narrations step, the narration's row, 'Change a sentence's tag' "
+              '(or `vw voice tweak --voice ID --file out/<tweaks>.json`).')   # design/144 V4: the chat side cannot see the page
 
 
 def heard_settings(conn, run, voice_id):

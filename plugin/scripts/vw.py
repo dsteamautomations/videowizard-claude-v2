@@ -1164,7 +1164,7 @@ def fetch_job_files(m, job):
 
 
 def cmd_voice(a):
-    m = active() if a.what in ('audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak') else None
+    m = active() if a.what in ('audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak', 'pronounce') else None
     if a.what == 'direct':   # design/52 D: the delivery direction, proposed once per run as two lists
         ws = workspace(m['code'])
         if a.step == 'prepare':
@@ -1207,6 +1207,16 @@ def cmd_voice(a):
             emit(out, 0, f"direction recorded: {a.choice} ({out.get('items', 0)} tag(s)) and test passage {a.passage}; both apply to every tryout and narration of this run. "
                  f"Give the operator the voices page: {voice_page_url(m['code'])} (everything else happens there; say 'what is next' when a narration is final).")
         emit({'action': 'refused', 'message': 'vw voice direct prepare | record'}, 2)
+    if a.what == 'pronounce':   # design/144 V1: the words a voice may say wrongly, how each is said; one message, one answer
+        if not a.file:
+            out = call('GET', f"/api/runs/{m['run_id']}/voice/pronunciations")
+            emit(out, 0, 'This run\'s list, and the client\'s last list to start from. Write out/pronunciations.json ([{word, say_as, ipa, kind}]), show the operator the one message, '
+                         'then `vw voice pronounce --file out/pronunciations.json --quote "<their words>"`.')
+        items = load_json(workspace(m['code']) / a.file)
+        if not isinstance(items, list) or not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': f'{a.file} must hold a list of {{word, say_as, ipa, kind}}, and --quote the operator\'s words.'}, 2)
+        out = write(f"/api/runs/{m['run_id']}/voice/pronunciations", {'items': items, 'quote': a.quote})
+        emit(out, 0, f"Pronunciation list {out['version']} kept ({len(items)} words); every narration from now on uses it.")
     if a.what == 'tweak':
         if not a.voice or not a.file:
             emit({'action': 'refused', 'message': 'vw voice tweak --voice ID --file out/<tweaks>.json (a list of {passage_id, sentence, tag}).'}, 2)
@@ -2793,13 +2803,13 @@ def build_parser():
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)
     s = sub.add_parser('brand'); s.add_argument('what', choices=['fetch']); s.set_defaults(fn=cmd_brand)   # design/50 D
-    s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak', 'history'])
+    s = sub.add_parser('voice'); s.add_argument('what', choices=['catalog', 'models', 'preview', 'add-library', 'audition', 'narrate', 'jobs', 'fetch', 'recover', 'resolve', 'direct', 'tweak', 'history', 'pronounce'])
     s.add_argument('step', nargs='?', choices=['prepare', 'record'], help='direct: prepare | record (design/52 D)')
     s.add_argument('--choice', choices=['best_fit', 'experimental', 'none'], help="direct record: the operator's choice"); s.add_argument('--quote', help="direct record: the operator's words")
     s.add_argument('--passage', type=int, help='direct record: the test passage the operator chose (1, 2 or 3; design/54)')
     s.add_argument('--page', type=int, default=0, help='catalog: 20 voices a page'); s.add_argument('--tab', choices=['explore', 'mine', 'favourites'], help='catalog: the library, my voices or the favourites')
     s.add_argument('--sort', choices=['trending', 'created_date', 'usage_character_count_1y', 'cloned_by_count'], help='catalog: trending (default), latest, most used, most cloned')
-    s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag} inside the run folder')
+    s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag}; pronounce: a list of {word, say_as, ipa, kind}; inside the run folder')
     s.add_argument('--scope', default='library'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
     s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')

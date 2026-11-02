@@ -245,7 +245,7 @@ def _voices2_state(conn, user, run):
         known = voices.known_voices(last_voice, favs, mine)
     except Problem:
         known = voices.known_voices(last_voice, [], [])
-    return {'run': {'code': run['code'], 'title': run.get('title'), 'client': run.get('client'), 'stage': nxt.get('stage')}, 'state': state, 'direction': direction, 'jobs': jobs_,
+    return {'run': {'code': run['code'], 'title': run.get('title'), 'client': run.get('client'), 'stage': nxt.get('stage')}, 'state': state, 'direction': direction, 'pronunciations': voices.pronunciations_of(store, run), 'jobs': jobs_,
             'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account, 'last_voice': last_voice, 'known': known}
 
 

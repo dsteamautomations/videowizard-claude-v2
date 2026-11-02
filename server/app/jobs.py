@@ -71,7 +71,9 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
                                     and request->>'kind' = 'narration' and request->>'voice_id' = %s""", (run['id'], list(OPEN), voice['voice_id'])).fetchall()   # design/54: up to three voices at once
         if open_jobs:
             raise Problem(409, 'JOB_OPEN', 'Finish or recover the open narration in this voice before starting another.', jobs=[str(j['id']) for j in open_jobs])
+    said = voices.pronunciations_of(store, run) if store is not None else None   # design/144 V1: every narration and audition after the list carries it, both front ends
     snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text, **({'saved_from_library': True} if saved_now else {}),
+                **({'dictionaries': [said['dictionary']], 'pronunciations_version': said['version']} if said and said.get('dictionary') else {}),
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
                 **({'timing_mode': 'generation', 'pieces': pieces, **directed} if kind == 'narration' else {})}
     row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'voice',%s,'elevenlabs',%s,%s) returning *''',

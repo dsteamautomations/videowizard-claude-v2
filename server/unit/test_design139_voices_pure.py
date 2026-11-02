@@ -30,6 +30,7 @@ def test_the_narration_uses_the_latest_audition_settings(monkeypatch):
     sent = []
     monkeypatch.setattr(V, 'page_state', lambda store, run: state)
     monkeypatch.setattr(V, 'save_doc', lambda *a: None)
+    monkeypatch.setattr(V, 'direction_of', lambda store, run: None)   # design/144 V3: the narration reads the direction's number
     monkeypatch.setattr(V, 'script_text', lambda store, outputs: ({'spoken_text': 'Hello.'}, None))
     monkeypatch.setattr(jobs, 'submit_voice', lambda conn, user, run, outputs, req, rid, store=None: (sent.append(req) or {'id': 1, 'request': req}))
     for vid in ('v1', 'v2', 'v3'):

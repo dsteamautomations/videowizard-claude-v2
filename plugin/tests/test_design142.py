@@ -70,3 +70,12 @@ def test_a_command_keeps_its_answer_in_the_run_folder(harness, capsys):   # desi
 
 def test_a_piece_shows_its_seconds_beside_its_frames():
     assert 'in_s' in vw.PIECE_FIELDS and 'out_s' in vw.PIECE_FIELDS
+
+
+def test_pronounce_sends_the_list_with_the_operators_words(harness, monkeypatch, capsys):   # design/144 V1
+    sent = {}
+    (vw.RUNS / 'VW-9' / 'out' / 'pronunciations.json').write_text('[{"word": "NARDEP", "say_as": "NAR-dep", "ipa": "", "kind": "abbreviation"}]', encoding='utf-8')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (sent.update(path=path, **body) or {'version': 1}))
+    code, out = run(['voice', 'pronounce', '--file', 'out/pronunciations.json', '--quote', 'yes, add Kendra too'], capsys)
+    assert code == 0 and sent['path'].endswith('/voice/pronunciations') and sent['items'][0]['word'] == 'NARDEP' and sent['quote'] == 'yes, add Kendra too'
+    assert run(['voice', 'pronounce', '--file', 'out/pronunciations.json'], capsys)[0] == 2   # without their words
