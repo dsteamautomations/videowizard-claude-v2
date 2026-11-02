@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.errors import Problem
 from app.stage2 import narration as NR
 from app.stage2.validator import group_flags
 
@@ -24,15 +25,6 @@ def test_group_flags_counts_per_rule_with_three_examples():
     assert group_flags([]) == []
 
 
-def test_a_blank_over_twelve_seconds_is_flagged_e2_not_refused():
-    """design/85 G1."""
-    from app.stage2.validator import long_blank_flag
-    assert long_blank_flag(12 * 25, 25, 'OPTION #1 blank at event 2') is None
-    f = long_blank_flag(13 * 25, 25, 'OPTION #1 blank at event 2')
-    assert f.startswith('OPTION #1 blank at event 2: E2 blank of 13.0 s is over 12 s') and 'footage cut-in' in f
-    assert [g['rule'] for g in group_flags([f])] == ['E2']
-
-
 def test_group_flags_keeps_an_unknown_shape_under_other():
     assert group_flags(['something the validator said'])[0]['rule'] == 'other'
 
@@ -47,13 +39,13 @@ def words_for(beats):
     return out
 
 
-def test_paragraph_scenes_are_titled_by_their_first_six_words():
-    beats = [{'beat_id': 'BEAT_01', 'passage_id': 'P001', 'text': 'As the demand for affordable housing continues to grow, the sector faces a challenge.'},
-             {'beat_id': 'BEAT_02', 'passage_id': 'P002', 'text': 'Walls are cured for seven days.'},
-             {'beat_id': 'BEAT_03', 'passage_id': 'P003', 'text': 'Six words make one whole title.'}]
-    scenes = NR.paragraph_scenes(beats, words_for(beats))
-    assert [s['title'] for s in scenes] == ['As the demand for affordable housing…', 'Walls are cured for seven days.', 'Six words make one whole title.']
-    assert scenes[0]['first_word_id'] == 'P001-0' and scenes[0]['process_stages'] == []
+def test_options_wait_for_an_approved_scene_split():   # design/139 R4 (SK, 2 Nov 2026, design/138 A6): never one scene per paragraph silently
+    from app.stage2 import stage as ST
+    with pytest.raises(Problem) as e:
+        ST.need_scenes(None)
+    assert 'vw options scenes' in e.value.message
+    assert ST.need_scenes({'document': {'scenes': []}}) == {'document': {'scenes': []}}
+    assert not hasattr(NR, 'paragraph_scenes')
 
 
 # ---------- design/60 L18: scenes must name chapters when the brief has them ----------

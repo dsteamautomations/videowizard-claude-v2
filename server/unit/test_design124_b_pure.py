@@ -237,9 +237,6 @@ def test_a_close_insert_that_continues_the_footage_place_is_not_warned_for_size(
 # ---------- item 13: no footage, no footage advice ----------
 
 def test_a_film_with_no_footage_is_not_told_to_use_a_frame_from_the_footage():
-    d = plan([{**pshot('VS1', 0, 250, 'video'), 'purpose': 'because it moves'}, {**pshot('VS2', 250, 500, 'video'), 'purpose': 'because it moves'}, pshot('IM1', 500, 1000, 'image')])
-    msg = lambda **kw: next(w['message'] for w in check(d, **kw)[1] if w['kind'] == 'ai_run')
-    assert 'footage' in msg() and 'footage' not in msg(footage=False)
     gd = plan([{**pshot('DG1', 0, 100, 'diagram'), 'depicts': 'a'}, {**pshot('DG2', 100, 1000, 'diagram'), 'depicts': 'b'}])
     allg = lambda **kw: next(w['message'] for w in check(gd, **kw)[1] if w['kind'] == 'all_graphics')
     assert 'footage' in allg() and 'footage' not in allg(footage=False)

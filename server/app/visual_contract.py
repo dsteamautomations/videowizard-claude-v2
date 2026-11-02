@@ -499,7 +499,7 @@ FROZEN_SHARE = 0.10                        # design/89 B4 (SK): warn when frozen
 PAUSE_GAP_S = 0.12                         # design/89 A3: a silence between words this long is a pause a cut may fall in
 CUT_TOLERANCE_S = 0.3                      # a cut further than this from a pause is warned
 WORD_TOLERANCE_S = 0.5                     # a picture that starts more than this after its words is warned
-AI_RUN_S = 12   # design/85 G2: seconds of AI video back to back in one gap before the check warns
+VIDEO_MIN_ON_SCREEN_S = 2   # design/139 R9 (SK, 2 Nov 2026): made at the generator's 3 s and cut; under 2 s it is one picture
 
 
 def _default_generator():
@@ -795,6 +795,8 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                         omni = _default_generator()
                         need(seconds <= omni['max_seconds'] + 1e-6, f"shot {shot.id} is {seconds:.1f} s; every take is Gemini Omni, {omni['min_seconds']}–{omni['max_seconds']} s: "
                                                                     'split it into shots of up to that, cut where an action begins or ends')
+                        need(seconds >= VIDEO_MIN_ON_SCREEN_S - 1e-6, f"shot {shot.id} is {seconds:.1f} s of AI video; a take is made at {omni['min_seconds']} s and cut to at least "
+                                                                      f"{VIDEO_MIN_ON_SCREEN_S} s on screen: under that, use a single picture (a still)")
                     need(set(shot.element_ids) <= elements, 'Shot names an unknown reference element.')
                     subjects = unique(shot.subjects, 'element_id', 'visible subject')
                     need(subjects <= set(shot.element_ids), 'Every visible subject must be a required shot element.')
@@ -968,21 +970,6 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             need(len(e.signs_of_use) >= 2, f'{e.id} is a place the film shows: give signs_of_use, two or more traces of work or living, each at one of its landmarks.')
             for s in e.signs_of_use:
                 need(s.landmark_id in place_marks[e.id], f'{e.id}: {s.landmark_id} is not a landmark of a scene that shows {e.id} (signs_of_use).')
-    for gap in plan.gaps:   # design/85 G2, G3: a run of AI video over AI_RUN_S in one gap, unbroken by a frame, a still or a graphic
-        own = sorted((p for p in placed if p[0] == gap.gap_id), key=lambda p: p[3])
-        run_, runs = [], []
-        for p in own + [None]:
-            if p and p[2] == 'video' and (not run_ or run_[-1][4] == p[3]):
-                run_.append(p)
-                continue
-            if run_:
-                runs.append(run_)
-            run_ = [p] if p and p[2] == 'video' else []
-        for r in runs:
-            seconds = (r[-1][4] - r[0][3]) / float(fps or 25)
-            if seconds > AI_RUN_S:
-                warnings.append({'gap_id': gap.gap_id, 'shot_id': r[0][1], 'kind': 'ai_run', 'message': f"gap {gap.gap_id}: shots {', '.join(p[1] for p in r)} are {seconds:.1f} s of AI video back to back, over {AI_RUN_S} s: "
-                                 f"break the run with {'a frame from the footage, ' if footage else ''}a still or a graphic, and cut the AI shots to three to five seconds each; a run that long reads as synthetic"})   # design/124-b item 13
     for gap in plan.gaps:
         own = [p for p in placed if p[0] == gap.gap_id]
         if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):
@@ -1173,7 +1160,6 @@ WARNING_PLAIN = {
     'look_only': 'The only change in this video is a look or an expression, which AI video often gets wrong.',
     'message_repeated': 'This shot says again what an earlier shot already said.',
     'graphics_back_to_back': 'Two graphics follow each other with no camera picture between them.',
-    'ai_run': 'Several AI videos run back to back here for a long stretch.',
     'all_graphics': 'Every shot of this gap is a graphic, with nothing from the footage or a scene.',
     'graphics_run': 'Graphics run for more than 8 seconds here without a camera picture.',
     'claim_visible_graphic': 'This graphic shows something a camera could film.',

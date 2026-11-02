@@ -96,6 +96,13 @@ def _check_blocked(conn, run, stage):
 
 # ---------- options: prepare ----------
 
+def need_scenes(approved):
+    """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph."""
+    if not approved:
+        fail('No scene split is approved yet: propose the scenes to the operator and record them with `vw options scenes` (with their words), then prepare again.', 'SCENES_NOT_APPROVED')
+    return approved
+
+
 def learned_rules(conn, run):
     return core.client_rules(conn, run.get('client_id') or '')   # one source for every stage (design/37 2.7)
 
@@ -111,16 +118,12 @@ def prepare(conn, store, user, run, outputs):
     if not beats:
         fail('The script has no beats; re-record the script on this build.')
     session = session_of(store, run, create=True)
-    approved = session.get('scenes')
+    approved = need_scenes(session.get('scenes'))
     words = timing['words']
     duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
     try:
-        if approved:
-            plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], approved['document'].get('pauses') or [])
-            windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, TIMELINE['fps'])
-        else:
-            plan, to_tl = NR.plan(words, duration, TIMELINE['fps'])
-            windows = NR.beats(words, NR.paragraph_scenes(beats, words), plan, to_tl, TIMELINE['fps'], ids=[b['beat_id'] for b in beats])
+        plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], approved['document'].get('pauses') or [])
+        windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, TIMELINE['fps'])
     except ValueError as exc:
         fail(exc)
     narration = {**plan, 'scenes_approved': bool(approved), 'words': NR.word_rows(words, TIMELINE['fps'], to_tl),
@@ -817,9 +820,6 @@ def build_master(conn, store, user, run):
                               'rejected': merged[-1].get('rejected') or ev.get('rejected'), 'title': merged[-1].get('title') or ev.get('title')}
             else:
                 merged.append(ev)
-        for ev in merged:
-            if ev.get('blank') and ev.get('rejected') and ev['timeline_frames'] < V.MIN_BLANK_S * fps:
-                fail(f"Rejecting {ev['title']} leaves {ev['timeline_frames'] / fps:.1f} s of AI between two shots: keep it, trim a neighbour, or reject a neighbour too.")
         o['events'] = merged
         kept[o['beat_id']] = o
     words = (pk.get('narration') or {}).get('words') or []

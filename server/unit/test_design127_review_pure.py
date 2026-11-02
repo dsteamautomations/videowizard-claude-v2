@@ -186,20 +186,6 @@ def test_build_a_rejected_shot_takes_its_kept_alternative_else_becomes_ai_with_i
     assert 'in place of rejected Scene 1 · Shot 3 (it showed: workers on site)' in m['gaps'][1]['reason']   # design/126 MA1: a card without an OVERVIEW line: its descriptive name
 
 
-def test_build_refuses_a_rejection_that_leaves_ai_under_3_s_between_two_shots():
-    doc, pk = film()
-    doc['options'][2]['events'] = [{'sub_clip_id': f'c{i}:S', 'source_in_frame': 0, 'source_out_frame': n, 'timeline_frames': n, 'match': 'direct', 'evidence': 'x'}
-                                   for i, n in ((3, 40), (5, 30), (4, 30))]
-    store = session_store()
-    store.files['run-1/stage2/options-v1.json'] = json.dumps({'document': doc, 'package_digest': 'pk1'}).encode('utf-8')
-    sess = saved(store)
-    sess['versions'][0]['slides'] = SL.slides(doc, pk, 25)
-    store.files['run-1/stage2/session.json'] = json.dumps(sess).encode('utf-8')
-    answer_all(store, **{'3.1': 'KEEP', '3.2': 'REJECT', '3.3': 'KEEP'})
-    with pytest.raises(Problem, match=r'Rejecting Scene 3 · Shot 2 leaves 1\.2 s of AI between two shots: keep it, trim a neighbour, or reject a neighbour too'):
-        S.build_master(FakeConn({}), store, USER, RUN)
-
-
 def test_build_find_footage_on_an_all_ai_scene_sends_it_back():
     store = session_store()
     answer_all(store, **{'2.1': 'REJECT'})

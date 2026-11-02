@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import GAZE_CAMERA, take_seconds, AI_RUN_S, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import GAZE_CAMERA, take_seconds, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -435,18 +435,11 @@ def drawn_in_run(run):
 
 
 def treatment_length_warnings(entry):
-    """design/126 TR3: the plan's ai_run (design/85 G2) and still_long (design/89 B1) warnings on the treatment, from each shot's route and seconds."""
-    out, run_s, ids = [], 0.0, []
-    for i, sh in enumerate([s for s in entry.get('shots') or [] if isinstance(s, dict)] + [None], 1):
-        secs = sh.get('seconds') if sh else None
-        if sh and sh.get('route') == 'video' and isinstance(secs, (int, float)):
-            run_s, ids = run_s + float(secs), ids + [str(sh.get('id') or f'shot {i}')]
-            continue
-        if run_s > AI_RUN_S:
-            out.append({'gap_id': entry['gap_id'], 'kind': 'ai_run', 'message': f"gap {entry['gap_id']}: shots {', '.join(ids)} are {run_s:.1f} s of AI video back to back, over {AI_RUN_S} s: "
-                        'break the run with a still or a graphic, and cut the AI shots to three to five seconds each'})
-        run_s, ids = 0.0, []
-        if sh and sh.get('route') == 'still' and isinstance(secs, (int, float)) and secs > STILL_MOVING_MAX_S + 0.04:
+    """design/126 TR3: the plan's still_long (design/89 B1) warning on the treatment, from each shot's route and seconds (design/139 R9: the AI-run warning is gone)."""
+    out = []
+    for i, sh in enumerate([s for s in entry.get('shots') or [] if isinstance(s, dict)], 1):
+        secs = sh.get('seconds')
+        if sh.get('route') == 'still' and isinstance(secs, (int, float)) and secs > STILL_MOVING_MAX_S + 0.04:
             out.append({'gap_id': entry['gap_id'], 'shot_id': str(sh.get('id') or f'shot {i}'), 'kind': 'still_long',
                         'message': f"shot {sh.get('id') or i} is a still of {float(secs):.1f} s: at most {STILL_MOVING_MAX_S} s; fill the stretch with several different stills or a moving shot"})
     return out

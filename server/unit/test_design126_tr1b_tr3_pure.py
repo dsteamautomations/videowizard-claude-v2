@@ -47,11 +47,6 @@ def test_tr1b_vw12_keeps_todays_rule():
     assert VS.drawn_in_run({'code': 'VW-12'}) is False and VS.drawn_in_run({'code': 'VW-13'}) is True and VS.drawn_in_run(None) is True
 
 
-def test_tr3_ai_video_back_to_back_over_12_s_warns():
-    w = VS.treatment_length_warnings(entry('BEAT_08-B1', [('video', 6.6), ('video', 5.04), ('video', 7.2)]))
-    assert [x['kind'] for x in w] == ['ai_run'] and '18.8 s' in w[0]['message'] and 'BEAT_08-B1-1, BEAT_08-B1-2, BEAT_08-B1-3' in w[0]['message']
-
-
 def test_tr3_a_graphic_or_a_still_breaks_the_ai_run():
     assert VS.treatment_length_warnings(entry('G', [('video', 7.0), ('drawn', 4.0), ('video', 7.0)])) == []
     assert VS.treatment_length_warnings(entry('G', [('video', 6.0), ('video', 6.0)])) == []   # 12 s is not over 12 s
@@ -66,4 +61,4 @@ def test_tr3_a_still_over_4_s_warns_and_4_s_does_not():
 def test_tr3_vw12s_treatment_gives_the_length_warnings_with_the_four_graphics_runs():
     out = treat(vw12())[0]
     kinds = [w['kind'] for w in out['warnings']]
-    assert kinds.count('graphics_run') == 4 and kinds.count('still_long') == 1 and kinds.count('ai_run') == 1   # the fixture's 88.14 s video line and its 5.56 s still
+    assert kinds.count('graphics_run') == 4 and kinds.count('still_long') == 1 and kinds.count('ai_run') == 0   # its 5.56 s still; design/139 R9: no AI-run warning
