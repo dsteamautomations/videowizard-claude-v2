@@ -120,3 +120,28 @@ All questions answered; the requirements wait for SK's approval before any code.
 ## Not covered
 - Words the narration voice says wrongly that the assistant did not spot and the operator did not add (heard only in the narration).
 - How well each IPA spelling is spoken depends on ElevenLabs; the listening test checks five words, not every language.
+
+## Build record (2 Nov 2026, after SK's "Approve, start build")
+
+Built, tested and pushed (commit 6d27ee2); **not deployed**. Server 0.85.0, plugin 0.71.0; the minimum plugin version stays 0.70.0 unless SK raises it.
+
+- **V1, the pronunciation list:**
+  - `voices.set_pronunciations` builds the ElevenLabs dictionary from the list (IPA for names, places and local words; a respelling for abbreviations; longer words first) and saves `<run>/voice/pronunciations.json` with its version and SK's words.
+  - Narrations made before a change are marked.
+  - `jobs.submit_voice` puts the dictionary on every narration and audition made after the list, on both front ends, and `elevenlabs.synthesize` sends it as `pronunciation_dictionary_locators`.
+  - The API is `GET/POST /api/runs/{run}/voice/pronunciations`; the GET also returns the client's last list. The tool command is `vw voice pronounce`.
+  - The voices page shows the list on the Narrations step.
+  - The one-message wording is in `plugin/commands/vw.md`.
+- **V2:** `scripts/d144_wording_v3.py` takes the volume-lowering tags out of the direction vocabulary and adds the deep-voice warning. The old line is on the retired list.
+- **V3:** each recorded direction has a number. Each narration row shows "direction N" and "pronunciations N", and is marked when it was made before the pronunciations changed. The chat narration answer gives the direction number.
+- **V4:** the page control reads "Change a sentence's tag", and the chat narration answer carries the hint.
+
+**Tests:**
+- Server: 1106 passed.
+- Plugin: 406 passed, with the 4 known failures.
+- The voices page script was checked for syntax in a browser.
+
+**Not covered:**
+- A real narration with the dictionary through the worker; the listening test covered the ElevenLabs side.
+- The page seen live.
+- VW-16's voice stage is already recorded, so the new step applies to it only if its voice is revised. New films get it at their voice stage.
