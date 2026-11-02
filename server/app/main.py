@@ -448,6 +448,13 @@ class ScenesBody(Write):
     quote: str = ''   # the stage refuses an empty one with a readable message
 
 
+class StillsBody(Write):   # design/142 R6: the shot as cut
+    sub_clip_id: str
+    in_frame: int = Field(ge=0)
+    out_frame: int = Field(gt=0)
+    step_s: Literal[0.5, 1.0] = 1.0
+
+
 class FramesBody(Write):
     sub_clip_id: str
     edge: Literal['in', 'out'] = 'in'
@@ -1542,6 +1549,11 @@ def options_propose(run_id: UUID, body: OptionsDoc, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/options/frames')
 def options_frames(run_id: UUID, body: FramesBody, user=User, conn=DB):
     return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.frames(storage(), user, run, body.sub_clip_id, body.edge))
+
+
+@app.post('/api/runs/{run_id}/options/stills')
+def options_stills(run_id: UUID, body: StillsBody, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.stills(storage(), user, run, body.sub_clip_id, body.in_frame, body.out_frame, body.step_s))
 
 
 @app.post('/api/runs/{run_id}/options/inspect', status_code=201)

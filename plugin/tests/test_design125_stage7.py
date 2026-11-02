@@ -136,24 +136,25 @@ def ws(tmp_path, monkeypatch):
 def test_second_look_writes_one_file_per_scene_with_its_own_sentences_and_frames(ws, monkeypatch, capsys):
     asked = []
 
-    def request(method, path, **kw):
-        asked.append((path, kw['json']['sub_clip_id'], kw['json']['edge']))
-        if kw['json']['sub_clip_id'] == 'c4:S1' and kw['json']['edge'] == 'out':
+    def request(method, path, **kw):   # design/142 R6: stills from the shot as cut
+        j = kw['json']
+        asked.append((path, j['sub_clip_id'], j['in_frame'], j['out_frame'], j['step_s']))
+        if j['sub_clip_id'] == 'c4:S1':
             return {'action': 'refused', 'message': 'no frame there'}, 422
-        return {'frames': [{'frame_id': f'F{i}', 'key': f'k{i}'} for i in range(1, 10)]}, 0
+        return {'frames': [{'frame_id': f'S{i}', 'key': f'k{i}'} for i in range(1, 4)]}, 0
     monkeypatch.setattr(vw, 'request', request)
     monkeypatch.setattr(vw, '_download', lambda m, key, rel, expect=None: rel)
     code, out, err = run(vw.cmd_options, opt(what='second-look'), capsys)
     assert code == 0 and 'vw-scene-review' in err and 'join-second-look' in err
-    assert {(s, e) for _, s, e in asked} == {('c1:S1', 'in'), ('c1:S1', 'out'), ('c4:S1', 'in'), ('c4:S1', 'out')} and asked[0][0] == '/api/runs/run-1/options/frames'
+    assert [a[1:] for a in asked] == [('c1:S1', 0, 75, 1.0), ('c4:S1', 0, 200, 1.0)] and asked[0][0] == '/api/runs/run-1/options/stills'
     one = read_rows(ws / 'work' / 'options' / 'scenes' / 'BEAT_01.json')
     assert [s['step_id'] for s in one['sentences']] == ['BEAT_01.S1', 'BEAT_01.S2'] and one['target_beat_frames'] == 150
     assert [(e['at_frame'], e['frames']) for e in one['options'][0]['events']] == [(0, 75), (75, 75)]
     assert [p['sub_clip_id'] for p in one['candidates']][:2] == ['c1:S1', 'c1:S2'] and one['candidates'][0]['seen'] == 'A mason lays bricks on edge.'
-    assert one['frames']['c1:S1']['in'] == ['work/frames/c1-S1-in/F1.png', 'work/frames/c1-S1-in/F5.png', 'work/frames/c1-S1-in/F9.png']
+    assert one['frames']['c1:S1@0-75']['stills'] == ['work/stills/c1-S1-0-75-1.0/S1.png', 'work/stills/c1-S1-0-75-1.0/S2.png', 'work/stills/c1-S1-0-75-1.0/S3.png']
     two = read_rows(ws / 'work' / 'options' / 'scenes' / 'BEAT_02.json')
     assert [s['step_id'] for s in two['sentences']] == ['BEAT_02.S1'] and two['options'][0]['events'][0]['frames'] == 100   # 200 source frames at 50 fps
-    assert two['frames']['c4:S1']['out'] == [] and 'no frame there' in two['frames']['c4:S1']['note']
+    assert two['frames']['c4:S1@0-200']['stills'] == [] and 'no frame there' in two['frames']['c4:S1@0-200']['note']
     assert {f['file'] for f in out['files']} == {'work/options/scenes/BEAT_01.json', 'work/options/scenes/BEAT_02.json'}
 
 

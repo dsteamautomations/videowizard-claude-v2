@@ -386,6 +386,41 @@ def _row(store, session, sub_clip_id):
     return pk, row
 
 
+def still_times(a, z, step, fps=25):
+    """design/142 R6: the stills of a shot as cut, from a to z seconds: its first frame, one every `step` seconds, its middle and its last frame."""
+    last = round(z - 1 / float(fps), 3)
+    times = {round(a, 3), round((a + z) / 2, 3), last}
+    t = a
+    while t < last - 1e-6:
+        times.add(round(t, 3))
+        t += step
+    return sorted(x for x in times if a - 1e-6 <= x <= last + 1e-6)
+
+
+def stills(store, user, run, sub_clip_id, in_frame, out_frame, step_s):
+    """design/142 R6 (free): the stills the second look reads, from the shot as cut (its own in and out), not the logged piece's edges."""
+    session = session_of(store, run)
+    pk, row = _row(store, session, sub_clip_id)
+    clip = session['package']['clips'][row['clip_id']]
+    fps = Fraction(row['source_fps'])
+    duration = float(clip.get('duration_s') or 0)
+    a, z = float(Fraction(in_frame) / fps), float(Fraction(out_frame) / fps)
+    if not (0 <= a < z <= duration + 0.04):
+        fail(f'{sub_clip_id}: frames {in_frame}-{out_frame} are not inside the clip ({duration:.2f} s at {fps} fps)')
+    rows = []
+    with tempfile.TemporaryDirectory(prefix='vw2-stills-') as folder:
+        original = Path(folder) / 'original.mp4'
+        original.write_bytes(store.get(f"{run['id']}/media/{clip['name']}"))
+        for i, t in enumerate(still_times(a, z, float(step_s), fps), 1):
+            out = Path(folder) / f'S{i}.png'
+            subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{t:.6f}', '-i', str(original), '-frames:v', '1', str(out)], check=True, capture_output=True, timeout=120)
+            png = out.read_bytes()
+            k = key(run, f"stills/{sub_clip_id.replace(':', '-')}-{in_frame}-{out_frame}/S{i}.png")
+            store.put(k, png, 'image/png')
+            rows.append({'frame_id': f'S{i}', 'at_s': t, 'key': k, 'sha256': hashlib.sha256(png).hexdigest()})
+    return {'sub_clip_id': sub_clip_id, 'in_frame': in_frame, 'out_frame': out_frame, 'step_s': step_s, 'frames': rows}
+
+
 def frames(store, user, run, sub_clip_id, edge):
     """Unpaid: stills at in_tc ± 1.0 s (every 0.25 s) for the operator to look at before any paid check (design/17 A5)."""
     session = session_of(store, run)

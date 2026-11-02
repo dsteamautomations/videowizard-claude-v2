@@ -2138,7 +2138,32 @@ def event_frames(ev, rows, fps):
     return int(round((int(ev['source_out_frame']) - int(ev['source_in_frame'])) * Fraction(str(fps)) / Fraction(str(row['source_fps']))))
 
 
-def second_look(m):
+def still_plan(options):
+    """design/142 R6: (sub-clip, in, out, step) for every shot and alternative as cut; every half second under a claim or a state (the step's claim,
+    a check_by_eye note, or the event's state), every second otherwise."""
+    plan = []
+    for o in options:
+        claims = {s.get('event') for s in o.get('steps') or [] if isinstance(s, dict) and s.get('claim')}
+        for n, ev in enumerate(o.get('events') or [], 1):
+            if ev.get('blank'):
+                continue
+            close = n in claims or ev.get('state') or ((ev.get('note') or {}).get('kind') == 'check_by_eye' if isinstance(ev.get('note'), dict) else False)
+            for x in [ev] + list(ev.get('alternatives') or []):
+                if x.get('sub_clip_id') and isinstance(x.get('source_in_frame'), int) and isinstance(x.get('source_out_frame'), int):
+                    item = (x['sub_clip_id'], x['source_in_frame'], x['source_out_frame'], 0.5 if close else 1.0)
+                    if item not in plan:
+                        plan.append(item)
+    return plan
+
+
+def cuts_changed(before, after):
+    """design/142 R6: the scenes whose shots or cut points changed, so their stills are taken again."""
+    cut = lambda o: [(e.get('sub_clip_id'), e.get('source_in_frame'), e.get('source_out_frame')) for e in o.get('events') or []]
+    old = {o.get('beat_id'): cut(o) for o in before}
+    return [o.get('beat_id') for o in after if old.get(o.get('beat_id')) != cut(o)]
+
+
+def second_look(m, only=None):
     """design/125 O4, O5: one file per scene for its helper (its sentences, its options with each event's place on the timeline, the pieces that fit it)
     and a few free stills at both edges of every chosen piece, alternatives included. A grab that fails is noted in the scene's file, never fatal."""
     ws = workspace(m['code'])
@@ -2149,9 +2174,9 @@ def second_look(m):
     rows, fps = {r['sub_clip_id']: r for r in pk.get('sub_clips') or []}, pk['timeline']['fps']
     scenes, _ = pieces_by_scene(pk)
     folder = ws / 'work' / 'options' / 'scenes'
-    if folder.exists():
+    if folder.exists() and not only:
         shutil.rmtree(folder)
-    folder.mkdir(parents=True)
+    folder.mkdir(parents=True, exist_ok=True)
     starts = {b['beat_id']: b.get('timeline_start_frame') or 0 for b in pk.get('beats') or []}
     grabbed, files = {}, []
     for s in scenes:
@@ -2169,18 +2194,19 @@ def second_look(m):
                 at += n or 0
             options.append({**{k: o.get(k) for k in ('option_number', 'steps', 'carries_over', 'moves_place')}, 'events': events})
         stills = {}
-        for sub in dict.fromkeys(x['sub_clip_id'] for o in options for e in o['events'] for x in [e] + list(e.get('alternatives') or []) if x.get('sub_clip_id')):
-            if sub not in grabbed:   # the free grab of `vw options frames`: stills around each edge; the first, the middle and the last are kept
-                grabbed[sub] = {'in': [], 'out': []}
-                for edge in ('in', 'out'):
-                    payload, code = request('POST', f"/api/runs/{m['run_id']}/options/frames", json={'request_id': str(uuid.uuid4()), 'sub_clip_id': sub, 'edge': edge})
-                    if code:
-                        grabbed[sub]['note'] = f"{edge}: {why(payload) or code}"
-                        continue
-                    shots = payload.get('frames') or []
-                    keep = [shots[i] for i in sorted({0, len(shots) // 2, len(shots) - 1})] if shots else []
-                    grabbed[sub][edge] = [_download(m, f['key'], f"work/frames/{sub.replace(':', '-')}-{edge}/{f['frame_id']}.png") for f in keep]
-            stills[sub] = grabbed[sub]
+        if only and s['beat_id'] not in only:
+            continue
+        for sub, a_, z_, step in still_plan(options):   # design/142 R6: the shot as cut, across the whole shot; a shot unchanged since the last grab is reused
+            name = f'{sub}@{a_}-{z_}'
+            folder_ = ws / 'work' / 'stills' / f"{sub.replace(':', '-')}-{a_}-{z_}-{step}"
+            if name not in grabbed:
+                kept = sorted(folder_.glob('*.png')) if folder_.exists() else []
+                if kept:
+                    grabbed[name] = {'step_s': step, 'stills': [p.relative_to(ws).as_posix() for p in kept]}
+                else:
+                    payload, code = request('POST', f"/api/runs/{m['run_id']}/options/stills", json={'request_id': str(uuid.uuid4()), 'sub_clip_id': sub, 'in_frame': a_, 'out_frame': z_, 'step_s': step})
+                    grabbed[name] = {'step_s': step, 'note': why(payload) or code, 'stills': []} if code else                         {'step_s': step, 'stills': [_download(m, f['key'], f"{folder_.relative_to(ws).as_posix()}/{f['frame_id']}.png") for f in payload.get('frames') or []]}
+            stills[name] = grabbed[name]
         used = [{'scene': o.get('beat_id'), 'sub_clip_id': x['sub_clip_id'], 'clip_id': (rows.get(x['sub_clip_id']) or {}).get('clip_id'),
                  'source_in_frame': x.get('source_in_frame'), 'source_out_frame': x.get('source_out_frame')}
                 for o in doc['options'] if o.get('beat_id') != s['beat_id'] for ev in o.get('events') or [] for x in [ev] + list(ev.get('alternatives') or []) if x.get('sub_clip_id')]   # design/134 11
@@ -2188,7 +2214,7 @@ def second_look(m):
                 'candidates': s['pieces'], 'frames': stills, 'used_elsewhere': used}
         (folder / f"{s['beat_id']}.json").write_text(json.dumps(body, indent=1, ensure_ascii=False, default=str) + '\n', encoding='utf-8')
         files.append({'file': f"work/options/scenes/{s['beat_id']}.json", 'options': len(options), 'candidates': len(s['pieces']),
-                      'stills': sum(len(v['in']) + len(v['out']) for v in stills.values())})
+                      'stills': sum(len(v['stills']) for v in stills.values())})
     emit({'files': files}, 0, f"{len(files)} scene files in work/options/scenes/. Start one `vw-scene-review` helper per scene, all at once, each given only its file; "
          "each writes out/second-look/<scene>.json. Then `vw options join-second-look` and `vw options check` again.")
 
@@ -2243,6 +2269,7 @@ def join_second_look(m):
         changed.append(beat)
     if problems:
         emit({'action': 'refused', 'message': 'Second look not joined; fix these files and join again: ' + '; '.join(problems)}, 2)
+    before = json.loads(json.dumps(doc['options']))
     for o, f in plan:
         o['events'] = f['events']
         if f.get('steps'):
@@ -2253,8 +2280,10 @@ def join_second_look(m):
                           'fixes': [{'scene': o['beat_id'], 'option': o['option_number'], 'why': str(f.get('why') or whys.get(o['beat_id']) or '')} for o, f in plan],
                           'joined_sha': options_sha(doc['options'])}
     save_json(ws / 'out' / 'options.json', doc)
-    emit({'changed': changed, 'unchanged': unchanged, 'no_fix_file': missing}, 0,
-         f"Joined: {len(changed)} scene(s) changed, {len(unchanged)} unchanged" + (f", no fix file for {', '.join(missing)}" if missing else '') + '. Run `vw options check` again.')
+    recut = cuts_changed(before, doc['options'])   # design/142 R6: the helper sees the shot that will be used
+    emit({'changed': changed, 'unchanged': unchanged, 'no_fix_file': missing, 'cuts_changed': recut}, 0,
+         f"Joined: {len(changed)} scene(s) changed, {len(unchanged)} unchanged" + (f", no fix file for {', '.join(missing)}" if missing else '') + '. Run `vw options check` again.'
+         + (f" The cut changed in {', '.join(recut)}: run `vw options second-look --scene {','.join(recut)}` and the helpers for those scenes again." if recut else ''))
 
 
 def cmd_options(a):
@@ -2299,7 +2328,7 @@ def cmd_options(a):
     if a.what == 'show':
         emit(call('GET', f'{base}/{a.option}'))
     if a.what == 'second-look':
-        second_look(m)
+        second_look(m, [x.strip() for x in (getattr(a, 'scene', None) or '').split(',') if x.strip()])
     if a.what == 'join-second-look':
         join_second_look(m)
     if a.what == 'log':
@@ -2780,7 +2809,7 @@ def build_parser():
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.set_defaults(fn=cmd_motion)
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
-    for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film'):
+    for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film', '--scene'):   # design/142 R6: --scene BEAT_02,BEAT_07 for the second look again
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the film (status)')
     s.set_defaults(fn=cmd_options)

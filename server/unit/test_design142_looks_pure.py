@@ -34,3 +34,13 @@ def test_r1_fires_only_when_a_natural_cut_was_within_reach_and_unused():
     assert V.natural_cut_missed(100, [100], 2) is False     # used
     assert V.natural_cut_missed(100, [160], 2) is False     # 30 timeline frames away: not within reach
     assert V.natural_cut_missed(100, [], 2) is False
+
+
+# ---------- R6: the second look sees the shot as cut (design/140 Q5; design/141 point 8, Q4) ----------
+
+def test_stills_cover_the_shot_as_cut():
+    from app.stage2 import stage as S
+    assert S.still_times(2.0, 5.0, 1.0) == [2.0, 3.0, 3.5, 4.0, 4.96]   # first, every second, the middle, the last frame (at 25 fps)
+    assert S.still_times(2.0, 2.6, 1.0) == [2.0, 2.3, 2.56]             # under a second: first, middle, last
+    half = S.still_times(0.0, 3.0, 0.5)
+    assert half[:4] == [0.0, 0.5, 1.0, 1.5] and len(half) == 7
