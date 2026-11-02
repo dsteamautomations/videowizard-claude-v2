@@ -76,6 +76,8 @@ if __name__ == '__main__':
         d130(parts)
         from d134_wording_v3 import apply as d134   # design/134: the Codex process review, findings 9 and 10
         prompt = d134(prompt, parts)
+        from d139_wording_v3 import apply_visuals as d139   # design/139: SK's design/138 answers
+        prompt = d139(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

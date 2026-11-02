@@ -48,10 +48,10 @@ def test_b2_s1_v3_the_first_systems_leftovers_and_the_labels_are_gone():
 
 def test_b3_one_list_of_what_to_ask_on_every_film_in_the_steps():
     step = V3['brief']['steps'][1]
-    for words in ('brand and safety rules', 'languages spoken in the footage (an empty list if nobody speaks or there is no footage)', 'narration language',
-                  'speaker may be seen on camera', 'frame shape', '16:9 and no destinations unless they say', 'watched muted'):
+    for words in ('brand and safety rules', 'narration_language (the script', 'speaker may be seen on camera', 'watched muted', 'industry (only when the client card has none',
+                  'Never ask the footage languages'):   # design/139 R5, R14, R1
         assert words in step, words
-    assert '16:9, 9:16, 1:1 or 4:5' in V3['brief']['prompt']
+    assert '16:9, 9:16, 1:1 or 4:5' not in V3['brief']['prompt'] and 'asked after the clips are listed' in V3['brief']['prompt']
 
 
 def test_s2_s3_the_tools_check_said_once_and_the_claims_asked_for():

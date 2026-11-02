@@ -31,3 +31,4 @@ def test_a_new_film_asks_the_font_before_drawing():
         VS.need_font({'film': {}})
     VS.need_font({'film': None})
     VS.need_font({'film': {'font': {'value': 'Noto Sans'}}})
+    VS.need_font({'film': {}}, {'font': {'name': 'brand.ttf', 'key': 'k'}})   # a brand font given with `vw visuals font`

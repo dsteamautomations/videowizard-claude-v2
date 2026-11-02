@@ -55,7 +55,7 @@ def test_an1_analysis_starts_without_asking():
 def test_op2_op3_options_steps():
     assert 'list every chapter the paragraph covers; split a paragraph only when the operator asks' in V3['options']['steps'][1]
     assert 'a scene covers one chapter' not in V3['options']['steps'][1]
-    assert 'E2, N17 (claims), N14' in V3['options']['steps'][3]
+    assert 'B2, N17 (claims), N14' in V3['options']['steps'][3]
 
 
 def test_u5_keywords_two_to_twelve_words():

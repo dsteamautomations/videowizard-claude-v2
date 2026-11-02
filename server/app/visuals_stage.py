@@ -3750,8 +3750,8 @@ def render_drawn(conn, store, user, run, outputs, body):
     palette for the read; cached by the request's digest; never counted against the cap."""
     from . import drawn, svg_scene
     need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: `vw motion render --shot S`.')
-    need_font(run)
     session = session_of(store, run, outputs)
+    need_font(run, session)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, body['shot_id']))
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_svg).")
     _no_question(session, shot['id'])   # design/110 rule 0
@@ -3882,9 +3882,10 @@ def film_font_files(run):
     return {film.FONTS[name]: 'server'} if name and name != 'Noto Sans' else {}
 
 
-def need_font(run):
-    """design/139 R13: the drawing font is asked once, before the first drawing, with Noto Sans as the reference."""
-    need(film.font(run), 'Ask the operator the drawing font once, Noto Sans recommended (or ' + ', '.join(f for f in film.FONTS if f != 'Noto Sans') +
+def need_font(run, session=None):
+    """design/139 R13: the drawing font is asked once, before the first drawing, with Noto Sans as the reference; a brand font given with
+    `vw visuals font --file` answers it too."""
+    need(film.font(run) or (session or {}).get('font'), 'Ask the operator the drawing font once, Noto Sans recommended (or ' + ', '.join(f for f in film.FONTS if f != 'Noto Sans') +
                          '), and record it: `vw font <name> --quote "<their words>"`.')
 
 
@@ -3914,7 +3915,7 @@ def set_motion(store, user, run, outputs, shot_id, name, content):
     except ValueError as exc:
         need(False, f'The project cannot be read: {exc}.')
     fps, W, H = _film_frame(session)
-    need_font(run)
+    need_font(run, session)
     names = _motion_fonts(store, session, run)[1]
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))

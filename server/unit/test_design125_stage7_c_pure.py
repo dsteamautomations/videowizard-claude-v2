@@ -34,7 +34,7 @@ def test_p2_no_change_history_labels_and_the_rule_codes_kept():
     for stage in ('options', 'master', 'first_cut'):
         assert all('design/' not in t for t in texts(stage)), stage
     o = '\n'.join(texts('options'))
-    for code in ('R1', 'R5', 'B1', 'E2', 'N14', 'N17'):
+    for code in ('R1', 'R5', 'B1', 'N14', 'N17'):   # design/139 R9: E1, E2 and rule 11 are gone
         assert code in o, code
 
 

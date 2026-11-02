@@ -7,6 +7,17 @@
     "Post a start's end request with it",
     "then the start image with its end request",
     "The same action, on the same object, done the same way; related is not enough.",
-    "Never read the project's HTML, the builder's REVIEW.md or anything else."
+    "Never read the project's HTML, the builder's REVIEW.md or anything else.",
+    "A real shot over 4 s needs hold_reason",
+    "A blank under 3 s is refused",
+    "a run of AI pictures that long reads as synthetic",
+    "3–5 s in an AI run",
+    "over 12 s of AI video back to back in a gap is warned",
+    "A graphic dissolves in and out over 8 frames and other cuts are hard",
+    "takes stability, similarity, style, speed and speaker boost",
+    "the languages spoken in the footage (an empty list if nobody speaks",
+    "16:9 and no destinations unless they say",
+    "the fonts Noto Sans or the run's brand font",
+    "rule 11, E1, E2"
   ]
 }
