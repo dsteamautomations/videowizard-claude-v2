@@ -27,7 +27,7 @@ def _eye_ok(a, b):
     return abs(ia // 3 - ib // 3) <= 1 and abs(ia % 3 - ib % 3) <= 1   # adjacent cells count as a match
 
 
-def _piece(tag, ev, row, policy, refusals):
+def _piece(tag, ev, row, policy, refusals, flags=None):
     """The checks every footage piece passes, a shot or an alternative: eligible, client-safe, speaker policy, match and evidence, inside its
     window (G1), its action peak (G2), its hold (G3). Returns False when its frames are unusable (the caller stops there)."""
     if not row['eligibility'].startswith('ELIGIBLE') or not row['client_safe'] or row['risk_flags']:
@@ -41,7 +41,11 @@ def _piece(tag, ev, row, policy, refusals):
         refusals.append(f"{tag}: G1 source frames {a}-{z} must lie inside the usable window {row['in_frame']}-{row['out_frame']}")
         return False
     peak = row.get('action_peak')
-    if peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
+    move = next((m for m in row.get('camera_moves') or [] if peak and peak['in_frame'] < m['start_frame'] <= peak['out_frame'] and z >= m['start_frame']), None)
+    if peak and a <= peak['in_frame'] and peak['out_frame'] > z and move:   # design/142 R4: the action is complete where the reported camera move starts
+        if flags is not None:
+            flags.append(f"{tag}: G2 move: ends at {z}, before the reported {move['kind']} at {move['start_frame']}; the action is complete")
+    elif peak and not (a <= peak['in_frame'] and peak['out_frame'] <= z):
         refusals.append(f"{tag}: G2 must_include_action_peak {peak['in_frame']}-{peak['out_frame']} dropped")
     if (z - a) / Fraction(row['source_fps']) < row['min_hold_s'] and not ev.get('hold_last_frame'):
         refusals.append(f"{tag}: G3 shorter than min_comprehension_hold_s {row['min_hold_s']}")
@@ -137,7 +141,7 @@ def validate_options(doc, package, policy):
                 b_rolls.append((n, i, row['clip_id']))
             else:
                 direct.setdefault(row['clip_id'], n)
-            if not _piece(tag, ev, row, policy, refusals):
+            if not _piece(tag, ev, row, policy, refusals, flags):
                 continue
             a, z = ev['source_in_frame'], ev['source_out_frame']
             src_fps = Fraction(row['source_fps'])
@@ -173,7 +177,7 @@ def validate_options(doc, package, policy):
                     refusals.append(f'{atag}: unknown sub-clip')
                     continue
                 alts.append((n, i, m, arow['clip_id']))
-                if _piece(atag, alt, arow, policy, refusals) and _tl_frames(alt, arow, tl_fps)[0] != n_tl:
+                if _piece(atag, alt, arow, policy, refusals, flags) and _tl_frames(alt, arow, tl_fps)[0] != n_tl:
                     refusals.append(f"{atag}: an alternative fills its shot's time exactly: {n_tl} frames (it has {_tl_frames(alt, arow, tl_fps)[0]})")
             total += n_tl
             if prev:
@@ -208,7 +212,9 @@ def validate_options(doc, package, policy):
             if awid in words and row['accent_frames']:
                 accents = [cursor + int(round((f - a) * ratio)) for f in row['accent_frames'] if a <= f < z]
                 if accents and min(abs(x - words[awid]['start_frame']) for x in accents) > 6:
-                    flags.append(f"{tag}: B2 the word {words[awid]['text']!r} is not within 6 frames of the shot's action accent")
+                    said = str((ev.get('marker_reasons') or {}).get('action') or '').strip()   # design/142 R4: the whole action and the pre-roll come first; a reason makes it information
+                    flags.append(f"{tag}: B2 answered: the word {words[awid]['text']!r} is not within 6 frames of the action accent ({said})" if said else
+                                 f"{tag}: B2 the word {words[awid]['text']!r} is not within 6 frames of the shot's action accent")
             if i > 0 and not row['nat_sound'] and any(s['start_frame'] < cursor < s['end_frame'] for s in silences):
                 flags.append(f'{tag}: B3 cuts inside a narration pause of 1.2 s or more; hold the shot or use a sub-clip with clean natural sound')
             cursor += n_tl
@@ -297,7 +303,7 @@ def validate_options(doc, package, policy):
     return {'refusals': refusals, 'flags': flags}
 
 
-RULE_RE = re.compile(r'(?:^|: )(rule 11|N17 stage|[A-Z]\d{1,2})(?=[ :])')   # design/126 OP3: N17's chapter flag is its own kind
+RULE_RE = re.compile(r'(?:^|: )(rule 11|N17 stage|B2 answered|G2 move|[A-Z]\d{1,2})(?=[ :])')   # design/142 R4: an answered B2 and a cut before a camera move   # design/126 OP3: N17's chapter flag is its own kind
 
 
 def _words(text):
@@ -335,8 +341,13 @@ def cut_reasons(doc, rows):
                         out.append(f"{tag}: considered {c['sub_clip_id']}: why is one of {', '.join(WHY_KINDS)}")
                     elif c['why'] == 'other' and not str(c.get('words') or '').strip():
                         out.append(f"{tag}: considered {c['sub_clip_id']}: why other needs its words")
-            elif ev.get('alternatives') and not str(ev.get('preferred_because') or '').strip():
-                out.append(f"{tag} ({ev.get('sub_clip_id')}): a shot with alternatives says why it was preferred (preferred_because)")
+            else:
+                if ev.get('alternatives') and not str(ev.get('preferred_because') or '').strip():
+                    out.append(f"{tag} ({ev.get('sub_clip_id')}): a shot with alternatives says why it was preferred (preferred_because)")
+                said = ev.get('marker_reasons') if isinstance(ev.get('marker_reasons'), dict) else {}
+                for field, key in (('illustrates_word_id', 'illustrates'), ('action_word_id', 'action')):   # design/142 R4 (SK, design/140 Q2)
+                    if not ev.get(field) and not str(said.get(key) or '').strip():
+                        out.append(f"{tag} ({ev.get('sub_clip_id')}): name {field}, or say why it cannot be met in marker_reasons.{key} (shown to the operator)")
     return out
 
 
@@ -353,7 +364,7 @@ def group_flags(flags):
     return sorted(groups.values(), key=lambda g: (-g['count'], g['rule']))
 
 
-INFO_KINDS = ('R1', 'R4', 'R8', 'R10', 'N17 stage')   # design/125 P11: information only when shots are cut to the meaning across clips; design/126 OP3
+INFO_KINDS = ('R1', 'R4', 'R8', 'R10', 'N17 stage', 'B2 answered', 'G2 move')   # design/125 P11: information only when shots are cut to the meaning across clips; design/126 OP3
 
 
 def answer_flags(flags):

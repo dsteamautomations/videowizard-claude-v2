@@ -604,7 +604,7 @@ def _slide_rows(sl, decisions, fps):
         lab = str(s['no'])
         d = decisions.get(lab)
         needs, why = needs_answer(s, sl, decisions)
-        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'note', 'of', 'ai_only', 'intent')},
+        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'note', 'of', 'ai_only', 'intent', 'marker_reasons')},
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows

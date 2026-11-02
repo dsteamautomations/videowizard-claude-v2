@@ -90,6 +90,7 @@ def slides(doc, pk, fps):
             what = clip_name(row, cards)
             out.append({**common, 'no': label, 'type': 'shot', 'title': name, 'clip': what, 'b_roll': b_roll,
                         'note': ev.get('note') if isinstance(ev.get('note'), dict) else None,
+                        'marker_reasons': {k: v for k, v in (ev.get('marker_reasons') or {}).items() if str(v or '').strip()} or None,   # design/142 R4: shown to the operator
                         'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it',
                         'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said)})
             for m, alt in enumerate(ev.get('alternatives') or [], 1):

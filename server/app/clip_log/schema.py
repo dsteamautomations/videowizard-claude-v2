@@ -29,13 +29,14 @@ CROP_MODULE = O({'speaker_head_mouth_box': BOX, 'speaker_full_body_box': BOX, 'm
                  'active_speech_tc_range': NUL(O({'in_tc': TC, 'out_tc': TC})), 'settle_buffer_applied_in_tc': NUL(TC),   # design/12 additions (blueprint CLIP_04)
                  'speaker_moves_during_subclip': B(), 'suggested_split_s': NUL(N()), 'limits': S(description='approximation of the boxes, occlusion, anything the crop solver should know')})
 DEFECT = E('focus_hunt', 'exposure_pump', 'camera_bump', 'rolling_shutter', 'single_channel_audio', 'other')
+CAMERA_MOVE = O({'start_s': N(), 'end_s': N(), 'kind': E('pan', 'tilt', 'whip', 'push_in', 'pull_out', 'shake', 'other')})   # design/142 R4
 SUB_CLIP = O({
     'sub_clip_id': S(), 'tc_confidence': E('HIGH', 'MEDIUM', 'NEEDS_BOUNDARY_CHECK'),
     'client_safe': B(), 'risk_flags': A(S()), 'ocr_text_on_screen': A(S()),
     'usability_grade': E('A', 'B', 'C', 'REJECT'),
     'shot_role': E('ESTABLISHING', 'PROCESS_ACTION_B_ROLL', 'DETAIL_INSERT_B_ROLL', 'TALKING_HEAD_A_ROLL', 'HYBRID_SPEAKER_ACTION', 'TRANSITION'),
     'pairing_constraints': A(S()),
-    'max_usable_window': WINDOW, 'must_include_action_peak': NUL(PEAK), 'hero_frame_tc': TC, 'hero_frame_s': N(), 'hero_frame_index': I(),
+    'max_usable_window': WINDOW, 'must_include_action_peak': NUL(PEAK), 'camera_moves': A(CAMERA_MOVE), 'hero_frame_tc': TC, 'hero_frame_s': N(), 'hero_frame_index': I(),
     'action_completeness': E('COMPLETE', 'PARTIAL_ONGOING', 'TRUNCATED_CUT_OFF', 'STATIC_ENVIRONMENT'),
     'visual_action_observed': S(), 'visual_action_uncertainty': S(description='what in visual_action_observed is inferred rather than seen; empty only if nothing'), 'why_sliced_here': S(),
     'people_and_speaker_analysis': O({'people_count': I(), 'people_roles': A(S()), 'audio_nature': E('MOS_SILENT', 'NAT_SOUND_ONLY', 'OFF_CAMERA_SPEECH', 'ON_CAMERA_SPEECH'),
@@ -64,6 +65,7 @@ SUB_CLIP = O({
     'editorial_ideas': A(S(description='how an editor could use this sub-clip in the film')),
     'sub_clip_uncertainty': S(description='consequential uncertainties of this sub-clip as a whole: approximate boundaries, unseen outcomes'),
 })
+SUB_CLIP['required'].remove('camera_moves')   # design/142 R4: a log from before it still reads
 
 
 def build_schema(clip_id, filename, max_safe_zoom_hint='1.35 for 1080p source on a 1080p timeline; 2.0 for 4K'):

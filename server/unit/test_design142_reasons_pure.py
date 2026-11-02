@@ -34,7 +34,7 @@ def test_an_unknown_clip_is_refused():
 
 
 def test_a_shot_with_alternatives_says_why_it_won():
-    shot = {'sub_clip_id': 'c1:S1', 'alternatives': [{'sub_clip_id': 'c2:S1'}]}
+    shot = {'sub_clip_id': 'c1:S1', 'alternatives': [{'sub_clip_id': 'c2:S1'}], 'illustrates_word_id': 'W1', 'action_word_id': 'W2'}
     assert 'preferred_because' in V.cut_reasons(cut(shot), ROWS)[0]
     assert V.cut_reasons(cut({**shot, 'preferred_because': 'the whole tile laid, not only lifted'}), ROWS) == []
 

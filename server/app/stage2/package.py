@@ -58,6 +58,12 @@ def confidence_of(sub):
     return round(max(0.0, score), 2)
 
 
+def camera_moves(sub, src_fps):
+    """design/142 R4: the camera moves the analysis reported apart from the action, in source frames."""
+    return [{'start_frame': int(round(Fraction(str(m['start_s'])) * src_fps)), 'end_frame': int(round(Fraction(str(m['end_s'])) * src_fps)), 'kind': m.get('kind') or 'other'}
+            for m in sub.get('camera_moves') or [] if isinstance(m, dict) and m.get('start_s') is not None and m.get('end_s') is not None]
+
+
 def ruled_out(rows):
     """design/142 R2: the sub-clips the analysis ruled out, with its reason, so the first cut can say why they were never candidates."""
     return [{'sub_clip_id': r['sub_clip_id'], 'clip': r.get('clip_name'), 'eligibility': r['eligibility'], 'reason': r.get('ruled_out_reason') or r['eligibility'].replace('_', ' ').lower()}
@@ -77,7 +83,7 @@ def sub_clip_row(clip, log, sub, timeline_fps):
             'grade': sub['usability_grade'], 'shot_role': sub['shot_role'], 'client_safe': st.get('client_safe_effective', sub['client_safe']),
             'risk_flags': st.get('risk_flags_effective', sub.get('risk_flags') or []), 'risk_flags_waived': st.get('risk_flags_waived') or [],
             'native_shot_size': cam['native_shot_size'], 'effective_shot_size': st.get('effective_post_crop_shot_size') or cam['native_shot_size'],
-            'eligibility': st['visual_eligibility'], 'ruled_out_reason': (st.get('crop_solution') or {}).get('reason'), 'crop_rect': crop.get('crop_rect'), 'zoom': crop.get('zoom_x'), 'position': [crop.get('position_x'), crop.get('position_y')] if crop else None,
+            'camera_moves': camera_moves(sub, src_fps), 'eligibility': st['visual_eligibility'], 'ruled_out_reason': (st.get('crop_solution') or {}).get('reason'), 'crop_rect': crop.get('crop_rect'), 'zoom': crop.get('zoom_x'), 'position': [crop.get('position_x'), crop.get('position_y')] if crop else None,
             'ui_path': st.get('ui_path'), 'still_eligible': st.get('still_frame_dynamic_zoom_eligible'),
             'entry_eye_grid': pace['entry_eye_grid'], 'exit_eye_grid': pace['exit_eye_grid'], 'screen_direction': cam['subject_screen_direction'],
             'lighting': lighting_class(log.get('lighting_and_weather')), 'color_group': log.get('color_match_group_id'), 'energy': pace['kinetic_energy_score'],
@@ -169,7 +175,8 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
                                                                                                             'evidence': 'another clip for the same words, the same length, used nowhere else'}],
                                                                                           'preferred_because': 'only with alternatives: why this clip beat them',
                                                                                           'carries_over_seen': 'only when its landmark labels name the carried thing another way: why it is the same thing',
-                                                                                          'illustrates_word_id': '', 'action_word_id': ''},
+                                                                                          'illustrates_word_id': '', 'action_word_id': '',
+                                                                                          'marker_reasons': {'illustrates': 'only when no illustrated word can be met: why', 'action': 'only when no action word can be met: why'}},
                                                                                          {'blank': True, 'timeline_frames': 75, 'intent': 'what the AI video or animation must show',
                                                                                           'considered': [{'sub_clip_id': '', 'why': 'wrong action|wrong object|already used|claim or number|too short|unusable crop|contradicts the words|other',
                                                                                                           'words': 'only for other'}],
