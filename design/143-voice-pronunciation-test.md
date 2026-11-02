@@ -50,3 +50,10 @@ One question, answered in one reply: a "yes" accepts all of them; any other word
 - **The clips** are in `C:\Coworkspace\Review Videobuilder Tool\voice-test-143\`, kept outside the repository.
 
 **Found:** the dictionary route could not be tried. The server's ElevenLabs key lacks the permission `pronunciation_dictionaries_write`, and ElevenLabs refused with that reason. So the test wrote the pronunciation into the text itself, which sounds the same as a dictionary rule but cannot be built that way: the respelling would then appear in the timing and the subtitles. Building the dictionary route needs that permission switched on for the key, in ElevenLabs' settings, by the account owner. The six clips differ, so the voice did read each version differently. Which sounds right is SK's call by ear.
+
+## Listening test, the dictionary route (2 Nov 2026, after SK switched on the key's dictionary permission)
+
+- **Dictionaries:** two, made on the account: `vw2-design143-test-alias` (respelling rules, id RMfngYLiyWMBQEZ7YYHa) and `vw2-design143-test-phoneme` (IPA rules, id DzEA0jdBZbrkB59kP9Up).
+- **What was read:** the same two sentences as written, each with one dictionary, giving four more clips: `s1-dict-alias`, `s1-dict-phoneme`, `s2-dict-alias`, `s2-dict-phoneme`, in the same folder.
+- **Result:** ElevenLabs took both dictionaries on Eleven v4 without refusal. All four clips differ from each other and from the plain readings, so the rules were applied. Which reading is right is SK's call by ear.
+- **The two test dictionaries stay on the account.** They are small and named as tests. Remove them on request.
