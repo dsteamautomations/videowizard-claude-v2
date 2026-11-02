@@ -39,3 +39,14 @@ One question, answered in one reply: a "yes" accepts all of them; any other word
 
 - **How ElevenLabs takes the pronunciation for Eleven v4.** It has two ways: a spelling replacement (the voice reads "MUNG-guh-lore" instead of "Mangalore"), which works with every model; and exact sounds (IPA), which only some models accept. Which one v4 honours must be checked against ElevenLabs' current documentation, then heard in a short paid test: the five words above, read by the chosen VW-16 voice with and without the change. That test is about a sentence each, a few rupees.
 - **Where the list is kept:** with the run (and offered again to the client's next film, since place and organisation names repeat), so the narration, a re-narration and the next film all use it.
+
+## Listening test (2 Nov 2026, SK: "Yes, run the test")
+
+- **Voice:** VW-16's narration voice, Reyaansh (`emceOb89ymaMozXE8Kfw`), on Eleven v4 at 0.5 / 0.75.
+- **Sentences:** two from the script.
+  - s1, Mangalore: "Suitable filler materials include Mangalore tiles, hollow clay blocks or even coconut shells."
+  - s2, Vivekananda, Kendra, NARDEP, Kanyakumari: the demonstration sentence.
+- **Three readings of each:** as written; respelled in the text; IPA written inline between slashes. That makes six clips, about 900 characters.
+- **The clips** are in `C:\Coworkspace\Review Videobuilder Tool\voice-test-143\`, kept outside the repository.
+
+**Found:** the dictionary route could not be tried. The server's ElevenLabs key lacks the permission `pronunciation_dictionaries_write`, and ElevenLabs refused with that reason. So the test wrote the pronunciation into the text itself, which sounds the same as a dictionary rule but cannot be built that way: the respelling would then appear in the timing and the subtitles. Building the dictionary route needs that permission switched on for the key, in ElevenLabs' settings, by the account owner. The six clips differ, so the voice did read each version differently. Which sounds right is SK's call by ear.
