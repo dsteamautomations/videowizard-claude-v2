@@ -76,3 +76,13 @@ def test_choice_checks():
 
 def test_locks():
     assert F.locked_by('category') == 'visuals' and F.locked_by('shape') == 'analysis'
+
+
+def test_pictures_and_takes_follow_their_shape():   # design/139 R1
+    from app import visuals_stage as VS
+    run = {'film': {'shape': {'value': 'vertical', 'video': 'horizontal', 'fps': 25}}}
+    brief = [{'stage': 'brief', 'unit': None, 'summary': {'production': {'format': {'frame': '9:16'}}}}]
+    assert VS.aspect_of(run, [], 'take') == '16:9' and VS.aspect_of(run, [], 'keyframe') == '16:9' and VS.aspect_of(run, [], 'sheet') == '9:16'
+    assert VS.aspect_of(run, [], 'take', {'aspect_ratio': '9:16'}) == '9:16'   # said on the request
+    old = {'film': None}
+    assert VS.aspect_of(old, brief, 'take', {'aspect_ratio': None}) == '16:9' and VS.aspect_of(old, brief, 'sheet') == '9:16'   # a film from before reads as it did

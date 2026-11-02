@@ -2860,7 +2860,7 @@ MEASURE_MODEL = 'gemini-3.8-flash'
 
 def _queue_image(conn, store, session, run, outputs, element, body, parents, answer, op, name, request_id, pending_end):
     ref_id = digest({'run': str(run['id']), 'request': request_id})[:32]
-    frame = default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), {})   # design/71 P3: the size follows the brief's frame
+    frame = aspect_of(run, outputs, body['kind'])   # design/71 P3, design/139 R1: the size follows the shape the picture is for
     first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
     provider = provider_of(run)   # design/120: the run's image model
     if provider == 'gemini':
@@ -3394,11 +3394,16 @@ def select_generator(store, user, run, outputs, shot_id, provider, model):
     return session['generator_choices'][shot_id]
 
 
-def default_aspect(brief_summary, body):
-    """design/53 L7: a take's aspect ratio is the body's, else the brief's frame, else 16:9."""
-    if body.get('aspect_ratio'):
+def aspect_of(run, outputs, kind, body=None):
+    """design/139 R1: a take and its start and end pictures (keyframes) are the AI video shape, every other picture the film's; a request that says one wins.
+    A film from before keeps the old reading: pictures by the brief's frame, takes 16:9 (the tool never sent one)."""
+    if (body or {}).get('aspect_ratio'):
         return body['aspect_ratio']
-    return (((brief_summary or {}).get('production') or {}).get('format') or {}).get('frame') or '16:9'
+    if film.older(run):
+        brief = next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
+        return '16:9' if kind == 'take' else (((brief or {}).get('production') or {}).get('format') or {}).get('frame') or '16:9'
+    film.timeline(run)
+    return film.frame(run, video=kind in ('take', 'keyframe'))
 
 
 def _route_gate(shot, wanted):
@@ -3585,7 +3590,7 @@ def prepare_take(store, user, run, outputs, body):
     record = {'contract': 'videowizard-video-request-v1', 'run_id': str(run['id']), 'shot_id': body['shot_id'], 'plan_digest': base['plan_digest'],
               'base_preparation_digest': base['preparation_digest'], 'motion_prompt': body['motion_prompt'], 'subject_reconciliation': body['subject_reconciliation'],
               'continuity_notes': body.get('continuity_notes') or '', 'duration_seconds': int(duration), 'camera_move': shot.get('camera_move') or '',   # design/112 S4
-              'aspect_ratio': default_aspect(next((o['summary'] for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None), body),   # design/53 L7
+              'aspect_ratio': aspect_of(run, outputs, 'take', body),   # design/139 R1: the AI video shape
               'resolution': body.get('resolution') or '720p',   # design/124 A4 decision 5: Omni only
               **images, 'provider': selected['provider'], 'model': selected['model'],
               'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)},

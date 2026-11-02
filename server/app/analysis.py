@@ -7,6 +7,7 @@ import json
 import math
 from fractions import Fraction
 
+from . import film
 from .errors import Problem
 
 STAGE = 'analysis'
@@ -35,7 +36,6 @@ def processing_mode(procedure, duration_s):
     return mode
 
 
-TIMELINE = {'width': 1920, 'height': 1080, 'fps': 25, 'aspect_ratio': '16:9'}
 
 
 def language_config(production):
@@ -63,6 +63,7 @@ def request_policy(policy, production):
 
 def build_request_clip_log(run, procedure, brief, script, clip, policy, *, generation=None):
     from .clip_log import CONTRACT, prompt as P, schema as S
+    TIMELINE = film.timeline(run)   # design/139 R1: the film's shape and rate as the operator recorded them (a film from before: 1920 x 1080 at 25)
     duration = float(clip.get('duration_s') or 0)
     if not math.isfinite(duration) or duration <= 0:
         raise Problem(422, 'ANALYSIS_SOURCE', f"Clip {clip.get('name')} has no usable duration.")

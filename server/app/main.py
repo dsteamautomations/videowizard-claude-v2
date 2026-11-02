@@ -370,7 +370,7 @@ class PrepareTake(Write):
     subject_reconciliation: dict[str, str]
     continuity_notes: str = ''
     duration_seconds: int | None = None
-    aspect_ratio: Literal['16:9', '9:16'] = '16:9'
+    aspect_ratio: Literal['16:9', '9:16'] | None = None   # design/139 R1: when left out, the AI video shape the operator recorded
     resolution: Literal['720p', '1080p'] | None = None
     answer: dict | None = None   # design/68 L5
 

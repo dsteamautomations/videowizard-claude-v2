@@ -12,11 +12,14 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from .. import core, jobs
+from .. import core, film, jobs
 from ..errors import Problem
 from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, narration as NR, package as P, slides as SL, validator as V
 
-TIMELINE = {'width': 1920, 'height': 1080, 'fps': 25}
+def timeline(run):
+    """design/139 R1: the cut's timeline from the operator's recorded shape and rate; a film from before keeps 1920 x 1080 at 25."""
+    t = film.timeline(run)
+    return {k: t[k] for k in ('width', 'height', 'fps')}
 BOUNDARY_PROMPT = ('Targeted boundary check (blueprint v3.2 §3 step 1.4). Watch ONLY the interval given below, which surrounds a planned cut point of a clip where a speaker was trimmed out. '
                    'Answer whether any residual lip movement or a look at the lens is visible inside the interval, with the exact seconds of the last such movement if any. Do not describe anything else.')
 BOUNDARY_SCHEMA = {'type': 'object', 'properties': {'residual_lip_movement': {'type': 'string', 'enum': ['yes', 'no', 'unclear']}, 'last_movement_s': {'anyOf': [{'type': 'number'}, {'type': 'null'}]},
@@ -122,12 +125,12 @@ def prepare(conn, store, user, run, outputs):
     words = timing['words']
     duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
     try:
-        plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], approved['document'].get('pauses') or [])
-        windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, TIMELINE['fps'])
+        plan, to_tl = NR.plan(words, duration, timeline(run)['fps'], approved['document'].get('pauses') or [])
+        windows = NR.beats(words, approved['document']['scenes'], plan, to_tl, timeline(run)['fps'])
     except ValueError as exc:
         fail(exc)
-    narration = {**plan, 'scenes_approved': bool(approved), 'words': NR.word_rows(words, TIMELINE['fps'], to_tl),
-                 'sentences': NR.sentences(words, TIMELINE['fps'], to_tl), 'silences': NR.silences(words, TIMELINE['fps'], to_tl, plan['total_frames']),
+    narration = {**plan, 'scenes_approved': bool(approved), 'words': NR.word_rows(words, timeline(run)['fps'], to_tl),
+                 'sentences': NR.sentences(words, timeline(run)['fps'], to_tl), 'silences': NR.silences(words, timeline(run)['fps'], to_tl, plan['total_frames']),
                  'pause_rules': {'only_after_sentence_end': True, 'max_seconds': NR.MAX_PAUSE_S, 'seconds_means': 'total silence wanted; the recording\'s own gap counts toward it'}}
     clips = {c['id']: c for c in media_o['summary']['clips']}
     cards, rows, landmarks, entities, policy = [], [], set(), [], None
@@ -144,7 +147,7 @@ def prepare(conn, store, user, run, outputs):
         policy = policy or (doc['identity'].get('speaker_policy') or {})
         cards.append({'clip_id': clip['id'], 'clip_name': clip['name'], 'descriptive_name': log.get('descriptive_name'), 'lines': log.get('summary_card_lines') or []})
         for sub in log.get('sub_clips') or []:
-            rows.append(P.sub_clip_row(clip, log, sub, TIMELINE['fps']))
+            rows.append(P.sub_clip_row(clip, log, sub, timeline(run)['fps']))
             landmarks.update((sub.get('continuity_and_story') or {}).get('world_landmarks_and_props') or [])
         entities.extend({'clip_id': clip['id'], **e} for e in log.get('entities') or [])
     if not rows:
@@ -158,9 +161,9 @@ def prepare(conn, store, user, run, outputs):
                 paragraphs[b['beat_id']] = (at[own[0]]['start_frame'], at[own[-1]]['end_frame'])
         P.scene_fits(rows, windows, paragraphs)
     rules = core.effective_rules(conn, run, outputs)['learned']   # design/37 2.7
-    pk = P.build(run, production, windows, cards, rows, landmarks, entities, rules, TIMELINE, policy or {}, procedure.get('prompt') or '', narration)
+    pk = P.build(run, production, windows, cards, rows, landmarks, entities, rules, timeline(run), policy or {}, procedure.get('prompt') or '', narration)
     saved = save_json(store, key(run, 'package.json'), pk)
-    session['package'] = {**saved, 'digest': digest({k: pk[k] for k in ('beats', 'sub_clips', 'timeline', 'policy', 'narration')}), 'beats': windows, 'timeline': TIMELINE, 'policy': policy or {},
+    session['package'] = {**saved, 'digest': digest({k: pk[k] for k in ('beats', 'sub_clips', 'timeline', 'policy', 'narration')}), 'beats': windows, 'timeline': timeline(run), 'policy': policy or {},
                           'narration_key': next(f['key'] for f in voice_o['files'] if f['name'] == 'narration.mp3'), 'clips': {c['id']: c for c in media_o['summary']['clips']},
                           'narration': {k: plan[k] for k in ('pieces', 'total_frames', 'fps', 'cuts')}}
     save_session(store, run, session)
@@ -191,8 +194,8 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     try:
         document = {**document, 'scenes': NR.normalise_scenes(document.get('scenes'))}
         NR.validate_scenes(words, document.get('scenes'), stages)
-        plan, to_tl = NR.plan(words, duration, TIMELINE['fps'], document.get('pauses') or [])
-        bs = NR.beats(words, document['scenes'], plan, to_tl, TIMELINE['fps'])
+        plan, to_tl = NR.plan(words, duration, timeline(run)['fps'], document.get('pauses') or [])
+        bs = NR.beats(words, document['scenes'], plan, to_tl, timeline(run)['fps'])
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         fail(exc)
     session = session_of(store, run, create=True)
@@ -206,10 +209,10 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     session['renders'].pop('review', None)
     save_session(store, run, session)
     out = prepare(conn, store, user, run, outputs)
-    return {**out, 'scenes': [{k: b[k] for k in ('beat_id', 'title', 'target_beat_frames', 'process_stages')} | {'seconds': round(b['target_beat_frames'] / TIMELINE['fps'], 2),
-                                                                                                                  'pauses': [{'after_word_id': p['after_word_id'], 'inserted_s': round(p['inserted_frames'] / TIMELINE['fps'], 2)} for p in b['pauses']]}
+    return {**out, 'scenes': [{k: b[k] for k in ('beat_id', 'title', 'target_beat_frames', 'process_stages')} | {'seconds': round(b['target_beat_frames'] / timeline(run)['fps'], 2),
+                                                                                                                  'pauses': [{'after_word_id': p['after_word_id'], 'inserted_s': round(p['inserted_frames'] / timeline(run)['fps'], 2)} for p in b['pauses']]}
                                 for b in bs],
-            'film_seconds': round(plan['total_frames'] / TIMELINE['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / TIMELINE['fps'], 2)}   # design/126 OP2: a scene lists every chapter its paragraph covers; no warning
+            'film_seconds': round(plan['total_frames'] / timeline(run)['fps'], 2), 'inserted_seconds': round(plan['inserted_frames'] / timeline(run)['fps'], 2)}   # design/126 OP2: a scene lists every chapter its paragraph covers; no warning
 
 
 def coverage(store, run):
@@ -231,7 +234,7 @@ def check(store, run, doc):
     out = {'status': 'rejected' if result['refusals'] else 'valid', 'refusals': result['refusals'],
            **V.answer_flags(result['flags']), 'flags_total': len(result['flags'])}   # design/125 P11
     if not result['refusals']:
-        out['scenes'] = SL.scene_summary(work, pk, TIMELINE['fps'])
+        out['scenes'] = SL.scene_summary(work, pk, timeline(run)['fps'])
     return out
 
 
@@ -277,8 +280,8 @@ def propose(conn, store, user, run, doc):
         for ev in o['events']:
             ev['timeline_frames'] = ev.pop('_timeline_frames')
             ev['fps_ratio'] = ev.pop('_fps_ratio')
-    slides = SL.slides(work, pk, TIMELINE['fps'])
-    scenes = SL.scene_summary(work, pk, TIMELINE['fps'])
+    slides = SL.slides(work, pk, timeline(run)['fps'])
+    scenes = SL.scene_summary(work, pk, timeline(run)['fps'])
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'package_digest': session['package']['digest'], 'document': work, 'flags': result['flags'], 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     saved = save_json(store, key(run, f'options-v{version}.json'), record)
@@ -294,7 +297,7 @@ def propose(conn, store, user, run, doc):
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
             **V.answer_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
-            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of') if s.get(k) is not None} | {'seconds': round(s['frames'] / TIMELINE['fps'], 2)} for s in slides],
+            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of') if s.get(k) is not None} | {'seconds': round(s['frames'] / fps, 2)} for s in slides],
             **({'advice': round_advice(version)} if round_advice(version) else {}),
             'next': PROPOSE_NEXT}
 
@@ -444,7 +447,7 @@ def render(conn, store, user, run, kind):
     if kind == 'review':
         doc, entry = current(store, session)
         _same_package(store, session, entry)
-        items = SL.review_items(doc, pk, _slides(store, session, doc, entry), lambda evs: _event_items(session, pk, evs, rows), TIMELINE['fps'])
+        items = SL.review_items(doc, pk, _slides(store, session, doc, entry), lambda evs: _event_items(session, pk, evs, rows), timeline(run)['fps'])
         version, plan_digest = entry['version'], entry['digest']
     else:
         if not session.get('master'):
@@ -459,7 +462,7 @@ def render(conn, store, user, run, kind):
     open_job = session['renders'].get(kind)
     if open_job and open_job.get('status') in ('queued', 'running') and open_job.get('digest') == plan_digest:
         raise Problem(409, 'JOB_OPEN', f'The {kind} film is already rendering.', job_id=open_job['job_id'])
-    plan = {'kind': kind, 'items': items, 'timeline': TIMELINE, 'narration_key': session['package']['narration_key'], 'narration': session['package'].get('narration'), 'version': version, 'digest': plan_digest,
+    plan = {'kind': kind, 'items': items, 'timeline': timeline(run), 'narration_key': session['package']['narration_key'], 'narration': session['package'].get('narration'), 'version': version, 'digest': plan_digest,
             'out_key': key(run, f'{kind}-v{version}-{plan_digest[:8]}.mp4')}
     rk = save_json(store, key(run, f'render-{kind}-v{version}.json'), plan)
     job = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,%s,%s,'render',%s, gen_random_uuid()) returning id",
@@ -575,7 +578,7 @@ def missing_answers(sl, decisions):
     return [str(s['no']) for s in sl if needs_answer(s, sl, decisions)[0] and str(s['no']) not in decisions]
 
 
-def _slide_rows(sl, decisions):
+def _slide_rows(sl, decisions, fps):
     """One row per scene, shot and alternative, with the answer so far (the page and the chat path show the same)."""
     rows = []
     for s in sl:
@@ -583,7 +586,7 @@ def _slide_rows(sl, decisions):
         d = decisions.get(lab)
         needs, why = needs_answer(s, sl, decisions)
         rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'note', 'of', 'ai_only', 'intent')},
-                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / TIMELINE['fps'], 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
+                     'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows
 
@@ -597,7 +600,7 @@ def slides_view(store, run):
     """Every row of the current version with the answer so far, and the labels still waiting (design/44 8.1)."""
     session = session_of(store, run)
     doc, entry = current(store, session)
-    rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {})
+    rows = _slide_rows(_slides(store, session, doc, entry), session.get('decisions') or {}, timeline(run)['fps'])
     return {'version': entry['version'], 'slides': rows, **_progress(rows)}
 
 
@@ -631,7 +634,7 @@ def _cues_for(store, run, entry):
     if k not in _CUES:
         try:
             plan = load_json(store, k[0])
-            _CUES[k] = slide_cues(plan, TIMELINE['fps']) if plan.get('digest') == entry['digest'] else {}
+            _CUES[k] = slide_cues(plan, timeline(run)['fps']) if plan.get('digest') == entry['digest'] else {}
         except Problem:
             return {}
     return _CUES[k]
@@ -653,7 +656,7 @@ def review_view(conn, store, run):
     except Problem as e:   # design/127: a cut proposed in the old form is proposed again
         return {'state': 'old_form', 'message': e.message}
     _refresh(conn, store, run, session)
-    rows = _slide_rows(sl, session.get('decisions') or {})
+    rows = _slide_rows(sl, session.get('decisions') or {}, timeline(run)['fps'])
     r = session['renders'].get('review') or {}
     film, cues = None, {}
     is_current = bool(r) and r.get('digest') == entry['digest']
@@ -713,7 +716,7 @@ def decide(conn, store, user, run, slide_no, action, note, edit):
                                  'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session['master'] = None
     save_session(store, run, session)
-    progress = _progress(_slide_rows(sl, session['decisions']))
+    progress = _progress(_slide_rows(sl, session['decisions'], timeline(run)['fps']))
     return {'slide': lab, 'type': s['type'], 'action': action, 'decided': progress['answered'], 'of': progress['of'],
             **({'options_approved': True} if approved_now else {})}
 
@@ -779,7 +782,7 @@ def build_master(conn, store, user, run):
     if missing:
         fail(f"Every shot needs an answer; missing: {', '.join(missing)}")
     row_of = {(s['option_number'], s['type'], s.get('event_index'), s.get('alt_index')): s for s in sl}
-    fps = TIMELINE['fps']
+    fps = timeline(run)['fps']
     kept = {}
     for o in deepcopy(doc['options']):
         n_scene = row_of[(o['option_number'], 'scene', None, None)]['number']
@@ -852,7 +855,7 @@ def build_master(conn, store, user, run):
                            'timeline_in_frame': cursor, 'timeline_out_frame': cursor + n, 'edited': ev.get('edited'), 'reuse_approved': bool(ev.get('reuse_approved')),
                            **({'from_alternative': ev['from_alternative']} if ev.get('from_alternative') else {})})
             cursor += n
-    plan = {'contract': CONTRACT_MASTER, 'run_id': str(run['id']), 'options_version': entry['version'], 'options_digest': entry['digest'], 'timeline': TIMELINE, 'events': events,
+    plan = {'contract': CONTRACT_MASTER, 'run_id': str(run['id']), 'options_version': entry['version'], 'options_digest': entry['digest'], 'timeline': timeline(run), 'events': events,
             'gaps': gaps, 'duration_frames': cursor, 'decisions': decisions, 'extra_rules': session['extra_rules'],
             'sfx_cues': [{'sub_clip_id': r['sub_clip_id'], **c} for r in pk['sub_clips'] if any(e.get('sub_clip_id') == r['sub_clip_id'] for e in events) for c in r['sfx_cues']],
             'finishing_preview': _finishing(pk, events)}
@@ -916,7 +919,7 @@ def record_master(conn, store, user, run, quote):
     for r in plan['extra_rules']:
         conn.execute("insert into vw2_client_rules(client_id, rule, source_run) values (%s,%s,%s)", (run.get('client_id') or '', r['rule'], run['code']))
         added += 1
-    summary = {'version': m['version'], 'plan_digest': m['digest'], 'fps': str(TIMELINE['fps']), 'resolution': [TIMELINE['width'], TIMELINE['height']], 'duration_frames': plan['duration_frames'],
+    summary = {'version': m['version'], 'plan_digest': m['digest'], 'fps': str(timeline(run)['fps']), 'resolution': [timeline(run)['width'], timeline(run)['height']], 'duration_frames': plan['duration_frames'],
                'gaps': plan['gaps'], 'units': {'visuals': [g['shot_id'] for g in plan['gaps']]}, 'events': m['events'], 'learned_rules_added': added,
                'film': {'sha256': film['sha256'], 'duration_s': film.get('duration_s'), 'mix': (film.get('record') or {}).get('mix')}}
     out = core.output(conn, user, run, {'stage': 'master', 'files': files, 'accepted_quote': quote, 'summary': summary})
