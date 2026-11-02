@@ -163,7 +163,7 @@ SK: (2 Nov) **Keep.**
 
 **C16. Diagrams use Noto Sans when there is no brand font. Should the brand font be used when the client card has one?**
 Suggested: **Yes: the brand font from the client card; Noto Sans only when there is none.**
-SK: (2 Nov) **The brand font from the client card; when there is none, the operator is asked once** (like A5's colours). Noto Sans only when the chosen font cannot draw the script.
+SK: (2 Nov) **The operator is asked for the font once per film, with Noto Sans as the recommended reference** ("Noto Sans, or a font of the same quality"), so a poor-quality font is not chosen. Noto Sans also stays where the chosen font cannot draw the script.
 
 **C17. One reference-picture round per film: keep?**
 Suggested: **Keep.**
