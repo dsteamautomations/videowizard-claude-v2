@@ -212,13 +212,15 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
     try:
         document = {**document, 'scenes': NR.normalise_scenes(document.get('scenes'))}
         NR.validate_scenes(words, document.get('scenes'), stages)
+        intake_o = next((o for o in outputs if o['stage'] == 'intake' and o['unit'] is None), None)
+        NR.scenes_cover(document.get('scenes'), stages, document.get('dropped_chapters'), ((intake_o or {}).get('summary') or {}).get('intended_visuals'))   # design/142 R8, R9
         plan, to_tl = NR.plan(words, duration, timeline(run)['fps'], document.get('pauses') or [])
         bs = NR.beats(words, document['scenes'], plan, to_tl, timeline(run)['fps'])
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         fail(exc)
     session = session_of(store, run, create=True)
     version = (session.get('scenes') or {}).get('version', 0) + 1
-    record = {'version': version, 'document': {'scenes': document['scenes'], 'pauses': document.get('pauses') or []}, 'quote': quote, 'by': user['id'],
+    record = {'version': version, 'document': {'scenes': document['scenes'], 'pauses': document.get('pauses') or [], 'dropped_chapters': document.get('dropped_chapters') or []}, 'quote': quote, 'by': user['id'],
               'at': datetime.now(timezone.utc).isoformat()}
     saved = save_json(store, key(run, f'scenes-v{version}.json'), record)
     session['scenes'] = {**record, 'file': saved, 'digest': digest(record['document'])}

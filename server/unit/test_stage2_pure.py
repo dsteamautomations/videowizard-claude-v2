@@ -56,7 +56,7 @@ def test_scenes_without_chapters_are_refused_when_the_brief_has_them():
     untagged = [{'first_word_id': 'P001-0', 'title': 'Curing', 'process_stages': []}]
     with pytest.raises(ValueError) as exc:
         NR.validate_scenes(words, untagged, ['Mixing the mortar', 'Curing the wall'])
-    assert 'process_stages' in str(exc.value) and 'Mixing the mortar, Curing the wall' in str(exc.value) and 'none of the scenes' in str(exc.value)
+    assert 'process_stages' in str(exc.value) and 'Mixing the mortar, Curing the wall' in str(exc.value) and 'No scene names a chapter' in str(exc.value)
     NR.validate_scenes(words, [{'first_word_id': 'P001-0', 'title': 'Curing', 'process_stages': ['Curing the wall']}], ['Mixing the mortar', 'Curing the wall'])
     NR.validate_scenes(words, untagged, [])   # a film without chapters: untagged scenes are fine
 

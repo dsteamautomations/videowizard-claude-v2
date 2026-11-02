@@ -58,6 +58,14 @@ def confidence_of(sub):
     return round(max(0.0, score), 2)
 
 
+SCENES_SHAPE = {'contract': 'vw2-scenes-v1',   # design/142 R8: the shape of out/scenes.json (Revathi's point 1)
+                'scenes': [{'first_word_id': 'the id of the word the scene starts at (a sentence start)', 'title': 'a few plain words',
+                            'process_stages': ['every chapter of the brief this scene covers; empty for an opening, a closing or a title'],
+                            'why': 'why this paragraph was split, or kept together although it covers two chapters (shown to the operator)'}],
+                'pauses': [{'after_word_id': 'the last word of a sentence', 'seconds': 1.0, 'reason': 'why the picture needs the breath'}],
+                'dropped_chapters': [{'chapter': 'a chapter of the brief no scene carries', 'words': "the operator's words dropping it"}]}
+
+
 def camera_moves(sub, src_fps):
     """design/142 R4: the camera moves the analysis reported apart from the action, in source frames."""
     return [{'start_frame': int(round(Fraction(str(m['start_s'])) * src_fps)), 'end_frame': int(round(Fraction(str(m['end_s'])) * src_fps)), 'kind': m.get('kind') or 'other'}
@@ -166,7 +174,7 @@ def build(run, production, beats, cards, rows, landmarks, entities, learned_rule
     return {'contract': 'vw2-options-package-v1', 'project': {'code': run['code'], 'client': run.get('client'), **production}, 'timeline': timeline, 'policy': policy,
             'narration': narration or {}, 'beats': beats, 'cards': cards, 'sub_clips': rows, 'landmarks': sorted(landmarks), 'entities': entities, 'learned_rules': learned_rules,
             'coverage': coverage(beats, rows, policy), 'prompt': prompt, 'ruled_out': ruled_out(rows),   # design/142 R2
-            'shapes': {'options': {'contract': 'vw2-options-v1', 'options': [{'option_number': 1, 'beat_id': 'BEAT_01',   # design/127: one option per scene
+            'shapes': {'scenes': SCENES_SHAPE, 'options': {'contract': 'vw2-options-v1', 'options': [{'option_number': 1, 'beat_id': 'BEAT_01',   # design/127: one option per scene
                                                                               'events': [{'sub_clip_id': '', 'source_in_frame': 0, 'source_out_frame': 0, 'hold_last_frame': False, 'crop': 'solver|full|hands_only',
                                                                                           'a2_intervals': [{'in_frame': 0, 'out_frame': 0}], 'marker': {'name': '', 'note': '', 'colour': 'Blue'},
                                                                                           'match': 'direct|b_roll', 'evidence': 'the log fields showing this shot shows the words it sits under',

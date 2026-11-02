@@ -120,6 +120,29 @@ def normalise_scenes(scenes):
     return out
 
 
+def scenes_cover(scenes, process_stages, dropped, intended_visuals):
+    """design/142 R8, R9: every chapter of the brief is named by a scene or dropped with the operator's words (never silently); an uncovered chapter is
+    shown with the client's picture notes that speak of it. A pause belongs at the top of the file, never inside a scene."""
+    for n, s in enumerate(scenes or [], 1):
+        if isinstance(s, dict) and 'pauses' in s:
+            raise ValueError(f'Scene {n} carries pauses: pauses go at the top of the file (pauses: [{{after_word_id, seconds, reason}}]), not inside a scene.')
+    gone = {}
+    for d in dropped or []:
+        if not isinstance(d, dict) or not str(d.get('words') or '').strip():
+            raise ValueError("Each dropped chapter carries the operator's words: dropped_chapters: [{chapter, words}].")
+        gone[d.get('chapter')] = d['words']
+    covered = {c for s in scenes or [] if isinstance(s, dict) for c in s.get('process_stages') or []}
+    missing = [c for c in process_stages or [] if c not in covered and c not in gone]
+    if missing:
+        lines = []
+        for c in missing:
+            keys = {w.lower() for w in re.findall(r'\w{4,}', c)}
+            notes = [line for g in intended_visuals or [] for line in g.get('lines') or [] if keys & {w.lower() for w in re.findall(r'\w{4,}', line)}]
+            lines.append(f'{c!r}' + (f" (the client's picture notes speak of it: {'; '.join(notes[:4])})" if notes else ''))
+        raise ValueError('No scene carries these chapters of the brief: ' + ', '.join(lines) + '. Show them to the operator: they place each under a scene (process_stages), '
+                         "or drop it with their words (dropped_chapters: [{chapter, words}]); this topic is in the client's picture notes but no scene carries it.")
+
+
 def validate_scenes(words, scenes, process_stages=()):
     if not isinstance(scenes, list) or not scenes:
         raise ValueError('Give at least one scene.')
@@ -128,7 +151,8 @@ def validate_scenes(words, scenes, process_stages=()):
     previous = -1
     allowed = set(process_stages or [])
     if allowed and not any(s.get('process_stages') for s in scenes if isinstance(s, dict)):   # design/60 L18: coverage matches footage by chapter
-        raise ValueError(f"Every scene names the chapter it covers under process_stages, from the brief's list ({', '.join(process_stages)}); none of the scenes has one.")
+        raise ValueError(f"No scene names a chapter under process_stages. Name the chapters each scene covers, from the brief's list ({', '.join(process_stages)}); "
+                         'a scene that covers none (an opening, a closing, a title) may leave it empty.')   # design/142 R8: says what it checks
     for n, s in enumerate(scenes, 1):
         wid = s.get('first_word_id')
         if wid not in index:
