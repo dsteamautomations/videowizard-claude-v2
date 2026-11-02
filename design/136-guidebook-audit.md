@@ -54,3 +54,7 @@ Before anything is built: SK approves this direction; the builder then writes th
 ## Not covered
 - The guidebooks no step reads (the rest of the library shelf): not audited; the map never routes to them.
 - Whether each kept rule makes better pictures: the audit judges fit and freshness, not results. The free comparison, then real films, show that.
+
+## Where the build stands (paused 2 Nov 2026, SK: finish the Codex findings first)
+- Drafted, in `design/136-guidebook-drafts/` (not yet a library version, not yet shown to SK): `playbooks/video-frame.md` (general part with the still card, reference sheets, the prompt, the end image, checklist, fixes; then advertisement-product, training/documentary, narrative/social parts) and `video/consistent-character-frames.md` (the person description from words, rules, vague-and-precise examples; category parts).
+- Next, in this order: `playbooks/video-clip.md` (the audit's rewrites in C-video-and-examples.md: frame first, motion hold, the motion brief core, consequences, the §8 checklist; sound and other models filed as "not available yet"); the word-list's generic section 1 table (D-model-sheets-and-checks.md); show SK these four; then the other fourteen files from the audit; the new library folder with its MANIFEST; the category field and the section packing (design/135), tests first; the free comparison on three VW-12 shots.
