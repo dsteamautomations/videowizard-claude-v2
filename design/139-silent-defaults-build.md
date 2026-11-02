@@ -45,7 +45,7 @@ VW-12 (the rat-trap brick trial film, to be deleted), VW-13 (30 Oct), VW-16 and 
 | A phone clip stored wide with a 90° rotation flag | counted by its picture as seen (rotation applied) |
 | Clips at 29.97 or 59.94, or variable-rate phone clips | the film rate is a whole number (24, 25, 30, 50, 60); 23.976, 29.97 and 59.94 are offered as 24, 30 and 60, and the assistant says so. Clips already conform to the nearest frame (`stage2/validator.py:_tl_frames`). See Q2 |
 | Rates disagree | the majority is recommended, together with the shape question (one message) |
-| A changed mind after the analysis has started | refused: the analysis judged crops against the first answer; the refusal says to start the analysis again (`vw analysis` re-run) if the shape must change |
+| A changed mind after the analysis has started | refused: the analysis judged crops against the first answer; the refusal says to start the analysis again (`vw analysis --again`) if the shape must change |
 | Asked twice for the same film | the second record replaces the first only while nothing reads it yet (before the analysis); otherwise refused as above |
 
 **Failure modes**
@@ -69,25 +69,25 @@ VW-12 (the rat-trap brick trial film, to be deleted), VW-13 (30 Oct), VW-16 and 
 
 ---
 
-## R2. Voices page: Eleven v4 settings shown and editable; the narration uses the chosen audition's settings (A4, C4)
+## R2. Voices page: Eleven v4 settings shown and editable; the narration uses the voice's latest audition settings (A4, C4)
 
 **Requirement**
 1. The voices page shows Eleven v4's two settings with their plain effect: stability and similarity, 0 to 1, starting at 0.5 and 0.75.
 2. "Try again with these settings" re-reads the test passage.
 3. Each audition records its model and settings. Today the request already carries them (`voices.py:478-500`, `row['request']['settings']`).
-4. **The fault:** a narration uses the settings of the audition the operator chose for that voice. Today it uses the defaults (`voices.py:473` `narrate`). This is fixed in the server function both front ends call.
+4. **The fault:** a narration in a voice uses the settings of that voice's latest audition (the page has no separate chosen-audition record; the operator chooses a voice and narrates in it), shown before the narration starts. Today it uses the defaults (`voices.py:473` `narrate`). This is fixed in the server function both front ends call.
 5. v2 and v3 are not offered. A request naming them is refused by name on both front ends (older way: retired).
 
 **Edge cases**
 - A value outside 0 to 1 is refused.
 - A voice with no audition yet narrates at 0.5 / 0.75, and the page says so.
 - An audition made before this change has its settings recorded already. If none are recorded, it was made at 0.5 / 0.75.
-- Several auditions of one voice: the one the operator chose is used, otherwise the latest.
+- Several auditions of one voice: the latest is used.
 
 **Impact:** the voices page template and its two calls, `voices.narrate` and `voices.tryout`. The chat flow keeps working. Its `--model` choice narrows to v4.
 
 **Tests**
-1. The narration carries the chosen audition's settings.
+1. The narration carries the latest audition's settings.
 2. Out-of-range values and a v2 or v3 request are refused.
 3. A page check on a local copy (as design/UX1).
 
@@ -349,7 +349,9 @@ Each step is tested before the next. One commit per step. One release at the end
 5. **A1 timing** was raised as Q1 rather than built as worded, for the reason given there.
 6. **Fonts on the drawn motion route** were only Noto Sans, and renders have no network. R13 would fail silently if the font were not a file, so the list is limited to files on the server (Q4).
 7. **Old films** were checked against Supabase: four are open (VW-12, 13, 16, 17). Every R names what they keep, so nothing in flight breaks.
-8. **One flow, two front ends.** Every new record (`vw shape`, `vw colours`, `vw font`) is a server step, so a page can call it later.
+8. **No chosen-audition record exists on the voices page.** R2 now uses the voice's latest audition, shown before the narration starts.
+9. **The analysis re-run** is `vw analysis --again` (checked in the plugin).
+10. **One flow, two front ends.** Every new record (`vw shape`, `vw colours`, `vw font`) is a server step, so a page can call it later.
 
 ## Not covered
 
