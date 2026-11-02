@@ -79,3 +79,8 @@ Nothing in the design/139 build covers these points. design/139 changed the blan
 ## 6. SK's answers
 
 - **Q1 (point 2), 2 Nov:** **All three sources, and for every stage of the pipeline.** Server events, the assistant's entries through `vw log`, and the reasons the cut must carry. The log covers every stage, not only analysis and options: the treatment, the plan, the visuals, the pictures and takes, assembly and delivery included. Kept on the server with the run.
+- **Q2 (point 3d), 2 Nov:** **The whole action first, then starting before the word, then the action landing on its word.** The last gives way first, with the reason shown to the operator on that shot (design/140 Q2).
+- **Q3 (point 4), 2 Nov:** **Yes, as proposed.** Picture notes are kept from intake with the sentence they sit under. At the scenes step, a topic no scene carries is shown to the operator, who places it or drops it with their words. At visuals, a scene's notes are offered for its empty slots. Nothing is dropped silently.
+- **Q4 (point 8), 2 Nov:** **Stills every half second** for a shot under a state or a claim. Every other shot gets about one a second, from the shot as cut, taken again when the cut changes.
+
+All questions answered. Next: the build requirements (design/140 + design/141 together), for SK's approval before any code.
