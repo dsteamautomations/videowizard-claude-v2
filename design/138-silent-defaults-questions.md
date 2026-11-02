@@ -83,15 +83,15 @@ SK: (2 Nov) **Keep.**
 
 **B10. Camera copies left out of the editor's download unless asked: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **B11. The footage analysis starts without asking and listens to the clips' sound: keep?**
 Suggested: **Keep**, as long as the operator was asked about camera sound at the media step (they are).
-SK:
+SK: (2 Nov) **Keep.**
 
 **B12. Instruction version 3 for every new film: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 ## Group C: silent defaults
 
