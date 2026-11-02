@@ -296,6 +296,12 @@ VW-12 (the rat-trap brick trial film, to be deleted), VW-13 (30 Oct), VW-16 and 
 - **Q3. The "professional" guess.** The same codec rule calls any 10-bit or high-bitrate clip "professional". An iPhone recording in ProRes is 10-bit, so it would be called professional. Proposed: unknown too, the same as D1.
 - **Q4. The font list.** Proposed: Noto Sans (recommended), Inter, Roboto, Montserrat and Lato. All are free (OFL) and added as files under `server/fonts`. A client's own brand font file would come later (no upload step exists today).
 
+**SK's answers (2 Nov, in chat):**
+- **Q1:** the shape is asked after the clips are listed, before the analysis starts.
+- **Q2:** the rate is rounded to 30 or 60, and the operator is told.
+- **Q3:** the "professional" guess also becomes "not known". No camera is guessed from the file's codec. In R11, the codec rule goes entirely.
+- **Q4:** five free fonts are offered: Noto Sans (recommended), Inter, Roboto, Montserrat and Lato. A client's own font file comes later.
+
 ## Answers that need no build (kept as they are)
 
 | Answer | What stays |
