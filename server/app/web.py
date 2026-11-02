@@ -103,6 +103,23 @@ def runs_page(request: Request, vw2_session: str | None = Cookie(default=None)):
     return render(request, 'runs.html', user=user, runs=runs)
 
 
+@router.get('/runs/{code}/log')
+def run_log_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """design/142 R1: the run's decision log as one Markdown file, every stage."""
+    from fastapi.responses import PlainTextResponse
+    from . import runlog
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        row = conn.execute('select id from vw2_runs where code = %s', (code,)).fetchone()
+        if not row:
+            raise Problem(404, 'NOT_FOUND', 'Run not found.')
+        run = core.load_run(conn, user, row['id'])
+        text = runlog.markdown(run['code'], runlog.rows(conn, run['id']))
+    return PlainTextResponse(text, media_type='text/markdown; charset=utf-8', headers={'Content-Disposition': f'inline; filename="{code}-decision-log.md"'})
+
+
 @router.get('/runs/{code}', response_class=HTMLResponse)
 def run_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
     user = page_user(vw2_session)

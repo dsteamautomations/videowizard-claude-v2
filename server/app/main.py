@@ -8,9 +8,11 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+from starlette.responses import Response as RawResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from . import analysis_jobs, auth, connect, core, elevenlabs, film, files, jobs, library, visuals_stage, voices, web, worker
+from . import analysis_jobs, auth, connect, core, elevenlabs, film, files, jobs, library, runlog, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -64,6 +66,30 @@ async def plugin_version_gate(request, call_next):
     if message:
         return JSONResponse({'code': 'PLUGIN_TOO_OLD', 'message': message, 'required': settings().PLUGIN_MIN_VERSION}, status_code=426)
     return await call_next(request)
+
+
+@app.middleware('http')
+async def decision_log(request, call_next):
+    """design/142 R1: every write under /api/runs/{run}/ and every refusal is one entry of the run's decision log, written on its own connection."""
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE') or not runlog.PATH.match(request.url.path):
+        return await call_next(request)
+    body = {}
+    if 'json' in (request.headers.get('content-type') or ''):
+        try:
+            body = json.loads(await request.body() or b'{}')
+        except ValueError:
+            body = {}
+    response = await call_next(request)
+    chunks = [c async for c in response.body_iterator]
+    raw = b''.join(chunks)
+    try:
+        parsed = json.loads(raw) if 'json' in (response.headers.get('content-type') or '') else {}
+    except ValueError:
+        parsed = {}
+    entry = runlog.entry_from(request.url.path, body, response.status_code, parsed)
+    if entry:
+        await run_in_threadpool(runlog.write_apart, entry)
+    return RawResponse(content=raw, status_code=response.status_code, headers=dict(response.headers), media_type=response.media_type)
 
 
 @app.exception_handler(Problem)
@@ -971,6 +997,29 @@ def _analysis_run(conn, user, run_id, stage_check=True):
         if nxt['stage'] != 'analysis':
             raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not 'analysis'.", next=nxt)
     return run
+
+
+class LogEntry(Write):   # design/142 R1: the assistant's judgement call, with the rule or "no rule"
+    text: str = Field(min_length=1, max_length=4000)
+    about: str = Field(default='', max_length=200)
+    rule: str = Field(default='', max_length=200)
+    kind: Literal['decision', 'workaround', 'choice', 'blank', 'no_rule'] = 'decision'
+
+
+@app.post('/api/runs/{run_id}/log', status_code=201)
+def post_log(run_id: UUID, body: LogEntry, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    if run['status'] == 'closed':
+        raise Problem(409, 'RUN_CLOSED', 'This run is closed.')
+    entry = runlog.assistant_entry(str(run['id']), core.next_for(conn, run).get('stage') or '', body_dict(body))
+    runlog.write(conn, entry)
+    return Response({'logged': True, 'stage': entry['stage']}, status_code=201)
+
+
+@app.get('/api/runs/{run_id}/log')
+def get_log(run_id: UUID, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response({'markdown': runlog.markdown(run.get('code') or str(run['id']), runlog.rows(conn, run['id']))})
 
 
 class FilmChoice(Write):   # design/137, design/139: one choice with the operator's words

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from psycopg.types.json import Json, Jsonb
 
-from . import analysis, core, film, jobs
+from . import analysis, core, film, jobs, runlog
 from .config import settings
 from .db import connect
 from .errors import Problem
@@ -500,14 +500,27 @@ def finalize(conn, user_id, job, status, result, error, cost, retry_in):
         if not existing:
             core.output(conn, user, run, {'stage': 'analysis', 'unit': clip['id'], 'files': files,
                                           'summary': {**result['summary'], 'cost': cost, 'job_id': str(job['id'])}})
+            runlog.write(conn, clip_entry(run['id'], clip, result['summary']))   # design/142 R1
     elif passing_failure(status, result) and not job['request'].get('retry_of') and int(job['request'].get('auto_retries') or 0) < AUTO_RETRIES:
         # design/125 A4: a passing failure is retried by itself up to three times (same frozen request, fresh row, the next key); an operator's retry gets none
         request = {k: v for k, v in job['request'].items() if k not in ('retry_of', 'retry_note', 'auto_retry_of', 'capacity_retry_of')}
+        runlog.write(conn, {'run_id': job['run_id'], 'stage': 'analysis', 'kind': 'retry', 'about': f"clip {(job['request'].get('clip') or {}).get('name') or job['unit']}",
+                            'rule': 'design/125 A4 (a passing failure is retried by the server, up to three times)', 'entry': f'retried by the server after: {status}',
+                            'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
         conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id, attempt) values (%s,'analysis',%s,%s,%s, gen_random_uuid(), 1)''',
                      (job['run_id'], job['unit'], PROVIDER, Jsonb({**request, 'auto_retries': int(job['request'].get('auto_retries') or 0) + 1, 'auto_retry_of': str(job['id'])})))
 
 
 AUTO_RETRIES = 3
+
+
+def clip_entry(run_id, clip, summary):
+    """design/142 R1: what the analysis decided about one clip, from its summary: the sub-clips kept and thrown out, the verdicts by eligibility, the risk flags."""
+    elig = ', '.join(f'{k} {v}' for k, v in (summary.get('by_eligibility') or {}).items()) or 'none'
+    text = (f"retained: {summary.get('sub_clips', 0)} sub-clips ({elig}); {summary.get('excluded_sub_clips', 0)} thrown out by the gate; "
+            f"{summary.get('risk_flags', 0)} risk flags; languages heard: {', '.join(summary.get('languages') or []) or 'none'}")
+    return {'run_id': run_id, 'stage': 'analysis', 'kind': 'decision', 'about': f"clip {clip.get('name') or clip.get('id')}", 'rule': 'the analysis gate (eligibility and crops)',
+            'entry': text, 'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None}
 PASSING = ('provider_stream_error', 'incomplete_response', 'empty_response')
 
 

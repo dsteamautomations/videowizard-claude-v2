@@ -2634,6 +2634,23 @@ def cmd_pull(a):
     emit({**full, 'workspace': str(workspace(a.code))}, 0, f"Pulled {a.code}; files are listed in the manifest (downloads arrive with storage).")
 
 
+def cmd_log(a):
+    """design/142 R1: the run's decision log. With text, the assistant's own entry (what was decided, about what, by which rule or "no rule");
+    with --show, the whole log, every stage, written to work/decision-log.md. Not `vw options log`, which downloads one clip's analysis log."""
+    m = active()
+    if a.show:
+        out = call('GET', f"/api/runs/{m['run_id']}/log")
+        path = workspace(m['code']) / 'work' / 'decision-log.md'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(out['markdown'], encoding='utf-8')
+        emit({'path': str(path), 'lines': out['markdown'].count(chr(10))}, 0, f"Decision log written to work/decision-log.md")
+        return
+    text = ' '.join(a.text or []).strip()
+    if not text:
+        emit({'action': 'refused', 'message': 'Say what was decided and why: `vw log --about <clip or shot> --rule "<rule or no rule>" "<text>"`, or `vw log --show`.'}, 2)
+    emit(write(f"/api/runs/{m['run_id']}/log", {'text': text, 'about': a.about or '', 'rule': a.rule or '', 'kind': a.kind}))
+
+
 IMAGE_KINDS = 'keyframe for a start or end picture, isolated, sheet, state, style or component'   # the server's kinds (main.py ImageRequest)
 
 
@@ -2784,6 +2801,9 @@ def build_parser():
     s.add_argument('--camera', action='store_true', help='download: bring the low-resolution camera copies too (left out by default, design/115)'); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
+    s = sub.add_parser('log', help="the run's decision log (design/142): add an entry, or --show the whole log"); s.add_argument('text', nargs='*')
+    s.add_argument('--about'); s.add_argument('--rule'); s.add_argument('--kind', default='decision', choices=['decision', 'workaround', 'choice', 'blank', 'no_rule'])
+    s.add_argument('--show', action='store_true'); s.set_defaults(fn=cmd_log)
     for key, helptext in (('category', "the film's video category, read from the script and confirmed by the operator (design/137)"),
                           ('shape', "the film's shape, then the AI video shape, from the clip count (design/139 R1); with no value: the count and the recommendation"),
                           ('colours', 'the colours the operator prefers when the client card has none, or "no preference" (design/139 R3)'),
