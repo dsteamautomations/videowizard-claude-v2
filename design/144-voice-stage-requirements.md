@@ -29,7 +29,11 @@ Sources:
    Each comes with how it is said (a respelling, and IPA).
 2. **One message, one answer.** The operator sees the list and one question: "Reply yes to go ahead, or tell me any other words to add (and how they are said, if you know); I'll include them and start the narration." Their reply both accepts the list and adds to it. There is no form on the page and no second question.
 3. **Recorded on the server with their words:** `vw voice pronounce --file out/pronunciations.json --quote "<their words>"`. The file holds `[{word, say_as, ipa, kind}]`.
-4. **The server keeps one ElevenLabs pronunciation dictionary per run**, built from the list. It is replaced whenever the list changes.
+4. **The server keeps one ElevenLabs pronunciation dictionary per run**, built from the list. It is replaced whenever the list changes. **The rule per word follows SK's choice (2 Nov, after the listening test):**
+   - names, places and local words get an IPA (phoneme) rule, the exact sounds;
+   - abbreviations and acronyms get a respelling (alias) rule: "NAR-dep" when said as a word, "N A R D E P" when spelt out.
+   - ElevenLabs applies one rule per word, the first that matches, so longer words are listed first.
+   - The list carries both forms for every word, so a word may switch kind if the operator says it still sounds wrong.
 5. **Every narration made after that carries the dictionary**, on the page and in chat (one flow, two front ends: in `voices.narrate`). So do re-narrations and auditions made after the list.
 6. **On the page,** the Narrations step shows the list ("5 words said as recorded"). Each narration says whether it used the list, and which version.
 7. **Kept for the client's next film:** the list is offered as the starting point (like the last brief), and the operator confirms it in the same one message.
@@ -104,7 +108,7 @@ The old wording goes on the retired list.
 
 ## Questions for SK (one at a time in chat)
 
-1. Run the short paid listening test first (the five VW-16 words read by the chosen voice: as written, respelled, and in IPA), to choose respelling or IPA?
+1. ~~Respelling or IPA?~~ **Answered (SK, 2 Nov): the combination**: IPA for names, places and local words; a respelling for abbreviations. The listening test (design/143) showed Eleven v4 takes both dictionary kinds; the server key now has the dictionary permission.
 2. Keep the list per client for later films?
 
 ## Older ways (design/35)
