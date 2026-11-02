@@ -223,3 +223,19 @@ Regular. Server 0.78.2, plugin 0.65.1, minimum tool 0.65.1 (the guard fix and th
 ### Not covered
 - The second look's quality: the record says what the helpers changed, not whether the changes were right.
 - The Docker suite.
+
+## G. Parked, added 2 Nov 2026
+
+| # | Item | Waiting for | SK |
+|---|---|---|---|
+| PK1 | **Deploy of design/137 + design/139** (server 0.83.0, plugin 0.69.0, main db565b9): built, tested and pushed; deploy held | SK's go ("Not yet", 2 Nov) | parked |
+| PK2 | The minimum plugin version at that deploy: it stays 0.66.0 (films already running work with any plugin), or is raised to 0.69.0 (every laptop updates first; a new film needs 0.69.0 for `vw category` and `vw shape`) | decided at PK1 | |
+| PK3 | A short vertical test film before a client's: the cut, the editor's package and HyperFrames have never made one | after PK1 | |
+| PK4 | The voices page sliders seen working with live data (only checked for syntax so far) | after PK1 | |
+| PK5 | A font for Tamil and Hindi labels in drawings (Noto Sans's file does not draw them) | a film that needs it | |
+| PK6 | One shot-guidance line still names construction traces ("mortar droppings", `visuals_stage.shot_guidance`, B8): make it generic | the next clean-up | |
+| PK7 | Vertical short videos cut from a horizontal film (design/138 A1) | a future update | |
+| PK8 | Square and 4:5 shapes (design/138 A3) | a future update | |
+| PK9 | The deploy script's restart order (the server stays down while the workers drain; the 2 Nov outage) | SK ("Not now", 2 Nov) | |
+| PK10 | Empty OLD_PROMPT_RUNS and OLD_PLAN_RULE_RUNS once VW-12 is deleted | VW-12 deleted | |
+| PK11 | Review of Codex's round 2 findings (codex-review/process-findings.md, committed 21713c2) | SK's time | |
