@@ -6,35 +6,42 @@ One question per row of `design/138-silent-defaults.md`. Each has the answer the
 
 **A1. When a film is vertical, should its AI videos be vertical too?**
 Suggested: **Yes, every take follows the film's shape.** Today every take is horizontal because the tool never sends the shape.
-SK:
+SK (2 Nov, in chat): **The film's shape is decided from the footage, then the AI videos follow it.**
+1. Once the clips are listed and analysed, count the vertical and horizontal clips and recommend the shape most clips have; the operator decides. Offer, for example, "a fully horizontal film, the vertical clips used as they are where they come up".
+2. Then ask about the AI videos: recommended, the film's shape ("there is no use in making AI videos horizontal" in a vertical film). The operator may still choose otherwise: no restriction, trusting a skilled operator.
+3. The two questions come one after the other: the film's shape first, then the AI videos.
+4. **Parked, as a reminder:** a horizontal film from which the operator wants several short vertical videos cut. Not designed yet.
 
 **A2. Should the cut and the footage analysis follow the film's shape and frame rate, instead of always widescreen at 25 frames a second?**
 Suggested: **Yes.** The shape comes from the brief; the frame rate from the client's footage (most clips share one); if clips disagree, the operator is asked once.
-SK:
+SK (2 Nov): **From the footage.** The rate most clips share; if they disagree, asked once together with the film's shape (A1).
 
 **A3. The brief offers four shapes (horizontal, vertical, square, 4:5), but only two are made. Which do we support?**
 Suggested: **Offer only horizontal and vertical for now**, and refuse the other two by name. Adding square and 4:5 means new picture sizes, a new cut layout and new video settings; worth doing when a client asks.
-SK:
+SK (2 Nov): **Only horizontal and vertical now. Square and 4:5 are kept for a future update** (parked, like A1's vertical shorts from a horizontal film).
 
 **A4. On the voices page, should the voice model and its settings be shown, as the chat tool shows them?**
 Suggested: **Yes, shown and changeable**, with today's model and settings as the starting values.
-SK:
+SK (2 Nov, after the details in design/138-a4-voice-settings.md): **Eleven v4 only. Show and allow editing every setting v4 takes**; v2 and v3 and their settings are not offered. v4 takes two: stability and similarity (both shown with their plain effect, today's 0.5 and 0.75 as the start; a change is heard by re-reading the test passage). The narration uses the settings of the audition the operator chose (the fault found).
 
 **A5. Should diagrams use the client's own colours for highlights, instead of a fixed yellow?**
 Suggested: **Yes: the strongest brand colour from the client card; yellow only when the card has no colours.**
-SK:
+SK (2 Nov): **The assistant chooses the highlight colour for each drawing so it stands out and does not clash with the background or anything else in the frame.** Brand colours are used where given or found; if none, the operator is asked once: "What colours would you prefer to use?" Used wisely: a preferred colour is never forced where it would not stand out.
 
 **A6. If no scene split was approved, should the cut go ahead with one scene per paragraph?**
 Suggested: **No: the cut is refused until the operator approves a scene split.** The instructions already propose one; the server should not invent it.
-SK:
+SK (2 Nov): **Refuse until approved.**
 
 **A7. If the brief does not say the language spoken, should the analysis assume English?**
 Suggested: **No: the brief asks for the narration language and the language spoken in the footage**, and the analysis refuses to start without them.
-SK:
+SK (2 Nov): **Never assume English; detect the language from the material.**
+- **Footage:** the Gemini analysis already transcribes each clip's sound; it reports the languages spoken (the main one first, and one or two others when the speech is mixed), instead of being told "English".
+- **Narration:** read from the narration text itself (the script sent to ElevenLabs), which may be Hindi, Tamil or another language.
+- Today no one speaks on camera in the films, so the footage language matters less for now; it is still detected, not assumed.
 
 **A8. The tool's own note still says the older drawing method is the default. Fix it?**
 Suggested: **Yes, correct the note.** It is wording only; new films already use the new method.
-SK:
+SK (2 Nov): **Correct the note.**
 
 ## Group B: your earlier decisions
 
