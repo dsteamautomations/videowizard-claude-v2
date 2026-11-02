@@ -27,7 +27,7 @@ def _pro(clip):
 
 
 def camera_of(clip):
-    """(value, evidence): the maker and model tags, else the file name, else the codec rule; 'unknown' when a run recorded before design/88 has none of them."""
+    """(value, evidence): the maker and model tags, else the file name; otherwise 'unknown', with the file details as evidence (design/139 R11)."""
     make, model = str(clip.get('make') or '').strip(), str(clip.get('model') or '').strip()
     tag = ' '.join(x for x in (make, model) if x)
     low = make.lower()
@@ -43,9 +43,8 @@ def camera_of(clip):
     for pattern, who, value in NAME_HINTS:
         if re.match(pattern, clip.get('name') or '', re.I):
             return value, f"file name {clip.get('name')} ({who})"
-    if clip.get('codec') or clip.get('bit_rate'):
-        bits = f"{clip.get('codec') or '?'}, {clip.get('pix_fmt') or '?'}, {(clip.get('bit_rate') or 0) / 1e6:.0f} Mbit/s"
-        return ('professional', bits) if _pro(clip) else ('phone', bits)
+    if clip.get('codec') or clip.get('bit_rate'):   # design/139 R11, Q3 (SK, 2 Nov 2026): never a phone or a professional camera guessed from the codec
+        return 'unknown', f"no maker tag or known file name; file details {clip.get('codec') or '?'}, {clip.get('pix_fmt') or '?'}, {(clip.get('bit_rate') or 0) / 1e6:.0f} Mbit/s"
     return 'unknown', 'no maker tag, name pattern or codec on record'
 
 

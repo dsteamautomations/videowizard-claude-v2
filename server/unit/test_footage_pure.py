@@ -25,7 +25,10 @@ def test_vw7_names_without_tags_are_read_from_the_file_name_and_a_drone_flies_on
     dji = {'id': 'b', 'name': 'DJI_20241217163840_0071_D.MP4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 22_000_000}
     assert F.camera_of(sony) == ('unknown', 'file name C0012.MP4 (Sony, mirrorless or cinema: not classified)')   # L57, SK 23 Oct: left unclassified, never the codec rule
     assert F.camera_of(dji)[0] == 'drone' and F.support_of([], 'drone') == ('gimbal', 'a drone, no analysis yet')
-    assert F.camera_of({'id': 'c', 'name': 'clip.mp4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 22_000_000})[0] == 'phone'   # the codec rule, last
+    # design/139 R11 + Q3 (SK, 2 Nov 2026): no camera is guessed from the codec; the file details stay in the evidence
+    assert F.camera_of({'id': 'c', 'name': 'clip.mp4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 22_000_000}) == ('unknown', 'no maker tag or known file name; file details h264, yuv420p, 22 Mbit/s')
+    assert F.camera_of({'id': 'e', 'name': 'clip.mov', 'codec': 'prores', 'pix_fmt': 'yuv422p10le', 'bit_rate': 150_000_000})[0] == 'unknown'
+    assert F.camera_of({'id': 'f', 'name': 'clip.mov', 'make': 'Apple', 'codec': 'h264'})[0] == 'phone' and F.camera_of({'id': 'g', 'name': 'PXL_20261101.mp4'})[0] == 'phone'
     assert F.camera_of({'id': 'd', 'name': 'clip.mp4'}) == ('unknown', 'no maker tag, name pattern or codec on record')   # a run recorded before design/88
 
 

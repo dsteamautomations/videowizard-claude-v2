@@ -72,8 +72,8 @@ def test_bad_numbers_are_refused_not_crashed(harness, capsys):   # W11
     assert code == 2 and 'asset' in out['message']
 
 
-def test_an_image_without_kind_is_named_as_a_keyframe(harness, monkeypatch, capsys):   # W13
+def test_an_image_without_kind_is_refused(harness, monkeypatch, capsys):   # design/139 R10 (SK, 2 Nov 2026, design/138 C11): never assumed to be a start picture
     posted = {}
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (posted.update(body) or {'model': 'm', 'reference_id': 'R'}))
-    run(args(what='image', element='E1', prompt='p'), capsys)
-    assert posted['name'] == 'keyframe-E1'
+    code, out, err = run(args(what='image', element='E1', prompt='p'), capsys)
+    assert code == 2 and '--kind' in out['message'] and 'keyframe' in out['message'] and not posted

@@ -637,7 +637,7 @@ def cmd_start(a):
         emit({'action': 'refused', 'message': 'Ask the operator which image model this run uses: GPT Image (openai) or Gemini Nano Banana (gemini); it cannot change later. Then `vw start --client … --images openai|gemini`. No run was created.'}, 2)
     preflight(a.need_gb)
     run = write('/api/runs', {'client': a.client, 'image_provider': a.images, **({'procedure_version': a.version} if a.version else {}),
-                              **({'drawn_route': a.drawn} if getattr(a, 'drawn', None) else {})})   # design/130: SVG scenes unless the operator chose motion
+                              **({'drawn_route': a.drawn} if getattr(a, 'drawn', None) else {})})   # design/130 §12: HyperFrames (motion) unless the operator chose svg; the server's default (design/139 R6)
     if workspace(run['code']).exists():
         emit({'action': 'refused', 'message': f"Folder runs/{run['code']} already exists on this machine."}, 2)
     write(f"/api/runs/{run['id']}/claim", {'machine': machine_id()})
@@ -1779,9 +1779,12 @@ def cmd_visuals(a):
             if not isinstance(items, list):
                 emit({'action': 'refused', 'message': f'{a.file} must be a list of {{element, kind, prompt, name, parents, size, quality}}.'}, 2)
             queued, warned = [], []
+            unkinded = [str(it.get('element')) for it in items if isinstance(it, dict) and not it.get('kind')]
+            if unkinded:   # design/139 R10: a picture's kind decides its checks; it is never assumed
+                emit({'action': 'refused', 'message': f"{', '.join(unkinded)}: give each picture its kind ({IMAGE_KINDS}); nothing was queued."}, 2)
             for i, it in enumerate(items):
                 parents = it.get('parents') or []
-                body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it.get('kind') or 'keyframe'}-{it.get('element')}", 'kind': it.get('kind') or 'keyframe',
+                body = {'request_id': str(uuid.uuid4()), 'element_id': it.get('element'), 'name': it.get('name') or f"{it['kind']}-{it.get('element')}", 'kind': it['kind'],
                         'subject': it.get('subject') or it.get('element'), 'prompt': it.get('prompt') or _answer_prompt(m, it.get('answer')), **_parents_and_crops(parents if isinstance(parents, str) else ','.join(parents)),   # defect 38: crops (id@left,top,width,height) read as the single command reads them
                         **({'size': it['size']} if it.get('size') else {}), **({'quality': it['quality']} if it.get('quality') else {}),
                         **({'answer': _json_file(m, it['answer'])} if it.get('answer') else {}),   # design/68 L5
@@ -1800,7 +1803,9 @@ def cmd_visuals(a):
                 warned += [f"{body['element_id']}: {w}" for w in payload.get('warnings') or []]   # design/89 C, D
             emit({'queued': queued, **({'warnings': warned} if warned else {})}, 0, f"{len(queued)} paid images queued with the film's picture AI; tell the operator, then `vw visuals status --wait 300`." +
                  (' Warnings: ' + '; '.join(warned) if warned else ''))
-        body = {'element_id': a.element, 'name': a.name or f"{a.kind or 'keyframe'}-{a.element}", 'kind': a.kind or 'keyframe', 'subject': _one_subject(a), 'prompt': a.prompt or _answer_prompt(m, a.answer),
+        if not a.kind:   # design/139 R10 (SK, 2 Nov 2026): never assumed to be a start picture
+            emit({'action': 'refused', 'message': f'Give the picture its kind with --kind ({IMAGE_KINDS}): the kind decides which checks it gets.'}, 2)
+        body = {'element_id': a.element, 'name': a.name or f"{a.kind}-{a.element}", 'kind': a.kind, 'subject': _one_subject(a), 'prompt': a.prompt or _answer_prompt(m, a.answer),
                 **_parents_and_crops(a.parents), **({'size': a.size} if a.size else {}), **({'quality': a.quality} if a.quality else {}),   # design/119 rule 1: id or id@left,top,width,height
                 **({'answer': _json_file(m, a.answer)} if a.answer else {}), **_pair_fields(m, a.variants, a.end_answer),   # design/68 L5; design/86 K1, K4
                 **({'shot_id': a.shot} if a.shot else {}), **({'role': a.role} if getattr(a, 'role', None) else {}),   # design/91 N8; design/106 T1
@@ -2627,6 +2632,9 @@ def cmd_pull(a):
     files = [{**f, 'stage': o['stage'], 'action': 'upload'} for o in full['outputs'] for f in o['files']]
     m = make_workspace(full, files=files)
     emit({**full, 'workspace': str(workspace(a.code))}, 0, f"Pulled {a.code}; files are listed in the manifest (downloads arrive with storage).")
+
+
+IMAGE_KINDS = 'keyframe for a start or end picture, isolated, sheet, state, style or component'   # the server's kinds (main.py ImageRequest)
 
 
 def cmd_film(a):
