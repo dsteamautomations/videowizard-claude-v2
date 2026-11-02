@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 FRAMES = 5
-LOOK_DISTANCE = 0.12   # ponytail: set from first principles; checked on VW-16's one-yard, one-day footage at deploy (design/142 R5), tune here if it splits
+LOOK_DISTANCE = 0.35   # design/142 R5, set on VW-16's 50 clips (2 Nov 2026): one yard, one day, furthest pair 0.34 apart; a night-time look (0.6 away) still splits
 
 
 def look_of(paths):
