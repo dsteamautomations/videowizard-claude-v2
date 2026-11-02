@@ -1,0 +1,1262 @@
+{
+ "foundation": {
+  "appearance": "Match the measured footage: natural look, standard contrast, Rec.709, mostly tripod or smooth gimbal, sharp. Outdoor daylight on sandy ground under trees, warm sun with soft shade, true-to-life colour: red-orange burnt clay bricks, grey wet cement mortar, beige and white cotton shirts, dark trousers, green foliage. Muted, not saturated; no grading look, no filters, no haze added. AI scenes are photographic and documentary, eye-level or slightly high, never glossy or advertising.",
+  "editing_constraints": [
+   {
+    "id": "E_rejected",
+    "scope": "BEAT_06-B1, BEAT_08-B1",
+    "source": "operator's review answers 6.1 and 8.1 REJECT",
+    "statement": "Two footage shots were rejected at the first cut: C0089 (masons clearing the work surface) under 'Construction begins…' and C0100 (joint finishing) under 'pointing is carried out'; neither returns in those slots."
+   }
+  ],
+  "exclusions": [
+   {
+    "id": "X_not_client_site",
+    "scope": "AI scenes",
+    "source": "direction: nothing staged as the client's own site or result",
+    "statement": "No AI scene shows the client's signboards (Takshashila, Nachiketa), the VK NARDEP campus or its people; AI scenes are representative places."
+   },
+   {
+    "id": "X_no_invented_numbers",
+    "scope": "graphics",
+    "source": "direction; claims.json",
+    "statement": "No figure appears that the script does not say: only 25 percent and 20, 35 and 75 kg/cm²; the comparable-strength graphic carries no numbers."
+   },
+   {
+    "id": "X_no_bad_practice",
+    "scope": "every shot of the work",
+    "source": "script: good practice is the message",
+    "statement": "No shot shows mortar dropped into the cavities, bricks laid flat in a rat-trap wall, or a dry, uncured wall presented as finished."
+   }
+  ],
+  "graphic_style": {
+   "background": "Flat warm cream, no texture or gradient.",
+   "frame_fill": "The drawing fills about 70% of the frame, centred, with a calm margin for labels.",
+   "labels": "Short sentence-case phrases in a plain sans serif, charcoal on cream, at least 4% of frame height (titles 6%), leader lines ending on their part.",
+   "line_weight": "Clean 3 px charcoal outlines at 1080p, 1.5 px for brick joints; no hatching.",
+   "palette": "Terracotta red-orange for brick (#B5562F), warm cream background (#F3E9DA), charcoal lines and text (#2B2B2B), mortar grey (#9A9A94), air and cavity a pale sky blue (#BFD8E6), heat a warm amber (#E39B2D), one accent green for 'saved' (#5E8C4A)."
+  },
+  "production_constraints": [
+   {
+    "id": "P_cut_fixed",
+    "scope": "the whole stage",
+    "source": "master recorded 2026-10-30",
+    "statement": "The approved first cut, its narration and timing are fixed; pictures fill the gaps only."
+   }
+  ],
+  "specifications": [
+   {
+    "id": "S_frame",
+    "scope": "every picture and take",
+    "source": "brief production format; source resolution",
+    "statement": "16:9, 1920x1080, 25 fps, watched with sound on website and YouTube."
+   },
+   {
+    "id": "S_figures",
+    "scope": "graphics and labels",
+    "source": "accepted script",
+    "statement": "Figures exactly as narrated: nearly 25% fewer bricks; minimum crushing strength 20 kg/cm² (single-storey), 35 kg/cm² (two-storey), 75 kg/cm² (three-storey); at least seven days of curing."
+   }
+  ],
+  "treatment": "By the end the viewer should understand that the hollow cavities are the point of rat-trap bond (fewer bricks and less mortar, a cooler home, strength enough for up to three storeys) and should have seen the careful work it needs. This is a documentary explainer told from the site: the real footage of masons at work carries the film, and the gaps are filled two ways. Where a camera could have filmed it with more time (housing construction, the plinth, guide strings, kilns, pointing, curing, finished homes and the people in them), a realistic representative AI scene, muted and true to life to match the footage (natural daylight, a red-brick site in Tamil Nadu, nothing staged as the client's own site or result). Where the meaning is invisible to a camera (the cavity inside the wall, heat, load, the brick saving, strength by storey, the sill course), one drawn cutaway of a rat-trap bond wall that comes back and develops across the film, in one graphic language, with the script's own figures drawn exactly.",
+  "world": [
+   {
+    "id": "W_place",
+    "scope": "every AI scene of a site or home",
+    "source": "client card (Kanyakumari, Tamil Nadu); clip findings: sandy_ground, neem_trees, coconut_palms, construction_site_yard",
+    "statement": "Rural and peri-urban Tamil Nadu, South India: open sandy yards under neem and coconut trees, low brick buildings, red earth and sand underfoot."
+   },
+   {
+    "id": "W_people",
+    "scope": "every AI person at work",
+    "source": "clip findings: mason in beige/cream collared shirt, dark trousers, sandals (C0088, C0097, C0120, C0119, C0109); brief waives PPE flags",
+    "statement": "Masons and helpers are Indian men in light short-sleeved collared cotton shirts (beige, cream, white or light checks) and dark grey or charcoal trousers, with open sandals; no helmets or safety vests, as in the footage."
+   },
+   {
+    "id": "W_bricks",
+    "scope": "every brick shown",
+    "source": "clip findings (C0081 country-burnt row, C0120 wire-cut bricks); proportion Proposed from the usual Indian modular brick",
+    "statement": "Red-orange burnt clay bricks, rectangular, 230 x 110 x 75 mm in length, width and height in the drawn cutaways (operator's answer, 1 Nov); country-burnt bricks show chipped edges and mixed tones, wire-cut bricks sharp edges and even colour."
+   },
+   {
+    "id": "W_bond",
+    "scope": "every rat-trap wall, drawn or scene",
+    "source": "clip findings across C0091, C0104, C0115, C0116; script",
+    "statement": "Rat-trap bond: bricks laid on edge, two outer faces with headers across, leaving continuous rectangular cavities inside the wall, joints in grey cement-sand mortar."
+   },
+   {
+    "id": "W_tools",
+    "scope": "every AI scene of work",
+    "source": "clip findings (C0097, C0099, C0113, C0093, C0095)",
+    "statement": "Tools are the site's own: pointed steel trowel with a wooden handle, a shallow round iron mortar pan (tasla), wooden or aluminium straightedge, plumb bob on a wooden block, coconut-midrib broom."
+   },
+   {
+    "id": "W_language",
+    "scope": "AI scenes",
+    "source": "brief: field speech Tamil; no brand rules",
+    "statement": "Spoken Tamil only as background on site; any sign or text in a scene is plain and unbranded."
+   }
+  ]
+ },
+ "shots": {
+  "BEAT_01-B1-S1": {
+   "gap_id": "BEAT_01-B1",
+   "scene": {
+    "id": "BEAT_01-B1-SC1",
+    "light": "Mid-morning sun high to one side of the street, warm white and strong: hard sunlight on the brick walls and sand, soft shade under the neem trees; true-to-life colour matching the footage's natural daylight.",
+    "air": "clean, a little dust lifting near the brick stack",
+    "landmarks": [
+     {
+      "description": "The half-built single-storey house nearest the camera: its front wall of conventional brickwork (bricks laid flat, solid) raised to about the chest of a standing man, a door opening in the middle, two bamboo scaffold poles leaning at its left corner.",
+      "id": "near_house"
+     },
+     {
+      "description": "The top course of the near house's front wall: flat bricks with fresh grey mortar along them, an iron mortar pan resting on the wall top at the mason's right.",
+      "id": "wall_top"
+     },
+     {
+      "description": "A waist-high stack of red burnt clay bricks on the sand about six metres along the street from the near house, broken brick bats at its foot.",
+      "id": "brick_stack"
+     },
+     {
+      "description": "A stack of plain, unprinted grey cement bags on a wooden pallet beside the brick stack, on the street side, one bag torn open with spilt cement dust.",
+      "id": "cement_stack"
+     },
+     {
+      "description": "The new sandy street from the stacks past the near house to the far houses, footprints and wheelbarrow tracks in the sand.",
+      "id": "street"
+     },
+     {
+      "description": "Three more half-built brick houses along the street beyond the near house, their walls at different heights, under neem and coconut trees.",
+      "id": "far_houses"
+     }
+    ]
+   },
+   "shot": {
+    "allows": [],
+    "appearance": "",
+    "camera": "Smooth gimbal at about 2 m, slightly high, across the street from the near house's front wall; 35 mm equivalent; slow lateral drift to the right.",
+    "camera_move": "slow drift right",
+    "camera_reason": "A slightly high wide view shows many houses rising at once, observational like the footage; the drift reveals the street going on.",
+    "carries_text": false,
+    "changes": [
+     {
+      "beat_id": "S1-mason-1",
+      "what": "Brick in the mason's hand: 1 to 0, laid flat into the top course (the course grows by one brick)."
+     },
+     {
+      "beat_id": "S1-mason-2",
+      "what": "A fresh strip of mortar appears on the top course beyond the new brick."
+     },
+     {
+      "beat_id": "S1-helper-2",
+      "what": "Bricks in the helper's arms: 4 to 0; loose bricks on the wall top: 0 to 4."
+     }
+    ],
+    "claim": "visible",
+    "claims": [
+     "Housing construction is growing to meet the demand for affordable homes"
+    ],
+    "compare_to": "",
+    "descriptors": [
+     "busy",
+     "many houses rising at once",
+     "conventional brick walls",
+     "bricks laid flat"
+    ],
+    "element_ids": [
+     "housing_site",
+     "conventional_wall",
+     "laying_flat",
+     "mason",
+     "helper",
+     "brick",
+     "mortar",
+     "trowel",
+     "mortar_pan",
+     "cement_bags"
+    ],
+    "end_frame": 129,
+    "end_state_exact": false,
+    "evidence": "Shown as a representative scene of several houses rising on one street; no figure or statistic is shown or implied.",
+    "face_in_frame": true,
+    "fact_ids": [
+     "F_site",
+     "F_flat",
+     "F_mortar"
+    ],
+    "fixed": [
+     "cement_stack",
+     "street",
+     "far_houses"
+    ],
+    "focus": "Deep focus from the near wall to the far houses; the mason and the wall top sharpest.",
+    "framing": "The near house and the mason left of centre; the helper walking in from the right toward the wall; the street receding to the far houses at upper right; horizon in the upper third.",
+    "graphic_kind": "diagram",
+    "groups": [
+     {
+      "count": 4,
+      "items": [
+       "cream shirt, carrying bricks in a head pan",
+       "white shirt, mixing mortar with a spade",
+       "light-check shirt, laying bricks on a far wall",
+       "beige shirt, walking with a bucket"
+      ],
+      "kind": "workers",
+      "mode": "varied",
+      "reason": "Background crowd at the far houses, dressed per W_people, each at a different task."
+     },
+     {
+      "count": 3,
+      "items": [
+       "walls at plinth height",
+       "walls at window height with bamboo scaffold poles",
+       "walls nearly at roof height"
+      ],
+      "kind": "half-built houses",
+      "mode": "varied",
+      "reason": "The far houses at different stages show construction going on along the street."
+     },
+     {
+      "count": 4,
+      "items": [],
+      "kind": "brick",
+      "mode": "same",
+      "reason": "Four identical country-burnt bricks from the one stack."
+     },
+     {
+      "count": 8,
+      "items": [],
+      "kind": "cement bags",
+      "mode": "same",
+      "reason": "One delivery of plain, unprinted grey bags stacked on a pallet."
+     }
+    ],
+    "id": "BEAT_01-B1-S1",
+    "information_progression": "",
+    "message": "Homes are being built everywhere, the conventional way.",
+    "narration": "As the demand for affordable housing continues to grow, the construction sector faces",
+    "production_method": "AI video (Gemini Omni) from one approved start image, 5.16 s.",
+    "props": [
+     {
+      "element_id": "trowel",
+      "end": {
+       "cause": "",
+       "position": null,
+       "where": "in_hand"
+      },
+      "holder": "mason",
+      "start": {
+       "amount": 0.2,
+       "landmark_id": "wall_top",
+       "relation": "in the mason's right hand above the wall top",
+       "unit": "m"
+      }
+     },
+     {
+      "element_id": "brick",
+      "end": {
+       "cause": "laid into the wall in beat S1-mason-1",
+       "position": {
+        "amount": 0.0,
+        "landmark_id": "wall_top",
+        "relation": "laid flat at the end of the top course",
+        "unit": "m"
+       },
+       "where": "set_down"
+      },
+      "holder": "mason",
+      "start": {
+       "amount": 0.1,
+       "landmark_id": "wall_top",
+       "relation": "in the mason's left hand above the end of the top course",
+       "unit": "m"
+      }
+     },
+     {
+      "element_id": "brick",
+      "end": {
+       "cause": "delivered in beat S1-helper-2",
+       "position": {
+        "amount": 0.4,
+        "landmark_id": "wall_top",
+        "relation": "stacked on the wall top to the mason's left",
+        "unit": "m"
+       },
+       "where": "set_down"
+      },
+      "holder": "helper",
+      "start": {
+       "amount": 3.0,
+       "landmark_id": "street",
+       "relation": "four bricks in the helper's arms on the street",
+       "unit": "m"
+      }
+     }
+    ],
+    "purpose": "Realistic documentary-style AI video of a busy housing site: a mason behind the chest-high front wall of a half-built house lays a red brick flat and taps it level, a helper brings four bricks to the wall, and workers build three more houses down the sandy street.",
+    "relation": "context",
+    "review_notes": "The cut between the two segments is at frame 129, in the pause between 'faces' and 'a', not at the treatment's 5.4 s (frame 135, inside 'major'); segments are 5.16 s and 5.6 s. Check that the generated wall shows bricks laid flat (no rat-trap pattern) on every house.",
+    "scene_svg": null,
+    "size": "WS",
+    "size_reason": "The film opens wide to establish the site, the work and its scale before any closer view.",
+    "start_frame": 0,
+    "subjects": [
+     {
+      "beats": [
+       {
+        "action": "lowers the brick flat onto the mortar bed at the end of the top course and taps it level twice with the trowel handle",
+        "done": "the brick sits flat and level in the course and his left hand rests on it",
+        "end": {
+         "facing": {
+          "camera_side": "faces the camera across the wall, head bowed to the wall top",
+          "edge": "toward camera",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head bowed toward the end of the top course",
+          "mouth": "closed",
+          "target": "wall_top"
+         },
+         "holding": [
+          "trowel"
+         ],
+         "objects": [
+          {
+           "count": 0,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.1,
+            "landmark_id": "wall_top",
+            "relation": "in the mason's left hand just above the end of the top course",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing bent slightly forward over the wall, left hand resting on the newly laid brick, right hand holding the trowel",
+         "position": {
+          "amount": 0.5,
+          "landmark_id": "near_house",
+          "relation": "standing inside the house behind the right half of the front wall",
+          "unit": "m"
+         },
+         "progress": "top course one brick longer, the new brick flat and level"
+        },
+        "end_frame": 75,
+        "id": "S1-mason-1",
+        "min_s": 3.0,
+        "path": "the brick comes down a hand's width from his left hand onto the mortar; the trowel handle comes down on it twice",
+        "result": "one more brick lies flat in the top course, a little mortar squeezed from the joint",
+        "start": {
+         "facing": {
+          "camera_side": "faces the camera across the wall, head bowed to the wall top",
+          "edge": "toward camera",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head bowed toward the end of the top course",
+          "mouth": "closed",
+          "target": "wall_top"
+         },
+         "holding": [
+          "brick",
+          "trowel"
+         ],
+         "objects": [
+          {
+           "count": 1,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.1,
+            "landmark_id": "wall_top",
+            "relation": "in the mason's left hand just above the end of the top course",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing bent slightly forward over the wall, left hand holding a brick flat a hand's width above the mortar bed, right hand holding the trowel",
+         "position": {
+          "amount": 0.5,
+          "landmark_id": "near_house",
+          "relation": "standing inside the house behind the right half of the front wall",
+          "unit": "m"
+         },
+         "progress": "top course of flat bricks partly laid, a mortar bed spread at its end"
+        },
+        "start_frame": 0,
+        "target": "wall_top"
+       },
+       {
+        "action": "scoops mortar from the iron pan on the wall top with the trowel and spreads it along the course for the next brick",
+        "done": "mortar spread, the trowel held just above it",
+        "end": {
+         "facing": {
+          "camera_side": "faces the camera across the wall, head bowed to the wall top",
+          "edge": "toward camera",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head bowed toward the end of the top course",
+          "mouth": "closed",
+          "target": "wall_top"
+         },
+         "holding": [
+          "trowel"
+         ],
+         "objects": [
+          {
+           "count": 0,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.1,
+            "landmark_id": "wall_top",
+            "relation": "in the mason's left hand just above the end of the top course",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing bent slightly forward over the wall, right hand holding the trowel over a fresh strip of mortar, left hand on the wall top",
+         "position": {
+          "amount": 0.5,
+          "landmark_id": "near_house",
+          "relation": "standing inside the house behind the right half of the front wall",
+          "unit": "m"
+         },
+         "progress": "top course one brick longer, a fresh mortar bed spread for the next brick"
+        },
+        "end_frame": 129,
+        "id": "S1-mason-2",
+        "min_s": 2.0,
+        "path": "the trowel goes to the pan at his right on the wall top and back along the course beyond the new brick",
+        "result": "a fresh strip of grey mortar lies on the top course beyond the new brick",
+        "start": {
+         "facing": {
+          "camera_side": "faces the camera across the wall, head bowed to the wall top",
+          "edge": "toward camera",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head bowed toward the end of the top course",
+          "mouth": "closed",
+          "target": "wall_top"
+         },
+         "holding": [
+          "trowel"
+         ],
+         "objects": [
+          {
+           "count": 0,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.1,
+            "landmark_id": "wall_top",
+            "relation": "in the mason's left hand just above the end of the top course",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing bent slightly forward over the wall, left hand resting on the newly laid brick, right hand holding the trowel",
+         "position": {
+          "amount": 0.5,
+          "landmark_id": "near_house",
+          "relation": "standing inside the house behind the right half of the front wall",
+          "unit": "m"
+         },
+         "progress": "top course one brick longer, the new brick flat and level"
+        },
+        "start_frame": 75,
+        "target": "wall_top"
+       }
+      ],
+      "behaviour": "acts",
+      "continuity_note": "",
+      "element_id": "mason",
+      "end": {
+       "facing": {
+        "camera_side": "faces the camera across the wall, head bowed to the wall top",
+        "edge": "toward camera",
+        "landmark_id": "wall_top"
+       },
+       "gaze": {
+        "head_turn": "head bowed toward the end of the top course",
+        "mouth": "closed",
+        "target": "wall_top"
+       },
+       "holding": [
+        "trowel"
+       ],
+       "objects": [
+        {
+         "count": 0,
+         "element_id": "brick",
+         "place": {
+          "amount": 0.1,
+          "landmark_id": "wall_top",
+          "relation": "in the mason's left hand just above the end of the top course",
+          "unit": "m"
+         }
+        }
+       ],
+       "pose": "standing bent slightly forward over the wall, right hand holding the trowel over a fresh strip of mortar, left hand on the wall top",
+       "position": {
+        "amount": 0.5,
+        "landmark_id": "near_house",
+        "relation": "standing inside the house behind the right half of the front wall",
+        "unit": "m"
+       },
+       "progress": "top course one brick longer, a fresh mortar bed spread for the next brick"
+      },
+      "hold_reason": "",
+      "role": "primary",
+      "screen_position": "left of centre, behind the near house's front wall, seen from the waist up above it",
+      "start": {
+       "facing": {
+        "camera_side": "faces the camera across the wall, head bowed to the wall top",
+        "edge": "toward camera",
+        "landmark_id": "wall_top"
+       },
+       "gaze": {
+        "head_turn": "head bowed toward the end of the top course",
+        "mouth": "closed",
+        "target": "wall_top"
+       },
+       "holding": [
+        "brick",
+        "trowel"
+       ],
+       "objects": [
+        {
+         "count": 1,
+         "element_id": "brick",
+         "place": {
+          "amount": 0.1,
+          "landmark_id": "wall_top",
+          "relation": "in the mason's left hand just above the end of the top course",
+          "unit": "m"
+         }
+        }
+       ],
+       "pose": "standing bent slightly forward over the wall, left hand holding a brick flat a hand's width above the mortar bed, right hand holding the trowel",
+       "position": {
+        "amount": 0.5,
+        "landmark_id": "near_house",
+        "relation": "standing inside the house behind the right half of the front wall",
+        "unit": "m"
+       },
+       "progress": "top course of flat bricks partly laid, a mortar bed spread at its end"
+      }
+     },
+     {
+      "beats": [
+       {
+        "action": "walks along the street to the outside of the near house's front wall, carrying the four bricks",
+        "done": "arrived at the wall",
+        "end": {
+         "facing": {
+          "camera_side": "profile, his right side to camera",
+          "edge": "left",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head tipped down toward the wall top",
+          "mouth": "closed",
+          "target": "wall_top"
+         },
+         "holding": [
+          "brick"
+         ],
+         "objects": [
+          {
+           "count": 4,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.6,
+            "landmark_id": "near_house",
+            "relation": "in the helper's arms at the front wall",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing upright at the wall, forearms carrying the four bricks against his chest",
+         "position": {
+          "amount": 0.6,
+          "landmark_id": "near_house",
+          "relation": "standing outside the front wall at its right end, beside the mason",
+          "unit": "m"
+         },
+         "progress": "four bricks brought to the wall"
+        },
+        "end_frame": 80,
+        "id": "S1-helper-1",
+        "min_s": 3.0,
+        "path": "about three metres left along the sandy street to the right end of the front wall",
+        "result": "he stands at the wall outside, beside the mason, still holding the bricks",
+        "start": {
+         "facing": {
+          "camera_side": "profile, his right side to camera",
+          "edge": "left",
+          "landmark_id": "near_house"
+         },
+         "gaze": {
+          "head_turn": "head turned left toward the near house",
+          "mouth": "closed",
+          "target": "near_house"
+         },
+         "holding": [
+          "brick"
+         ],
+         "objects": [
+          {
+           "count": 4,
+           "element_id": "brick",
+           "place": {
+            "amount": 3.0,
+            "landmark_id": "street",
+            "relation": "in the helper's arms on the street",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "walking upright, both forearms carrying a stack of four bricks against his chest",
+         "position": {
+          "amount": 3.0,
+          "landmark_id": "street",
+          "relation": "on the street halfway between the brick stack and the near house, walking from the stack",
+          "unit": "m"
+         },
+         "progress": "carrying four bricks from the stack to the mason"
+        },
+        "start_frame": 0,
+        "target": "near_house"
+       },
+       {
+        "action": "leans in and sets the four bricks on the wall top within the mason's reach",
+        "done": "bricks set down, his hands free",
+        "end": {
+         "facing": {
+          "camera_side": "profile, his right side to camera",
+          "edge": "left",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head turned left toward the mason",
+          "mouth": "closed",
+          "target": "mason"
+         },
+         "holding": [],
+         "objects": [
+          {
+           "count": 4,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.4,
+            "landmark_id": "wall_top",
+            "relation": "stacked on the wall top to the mason's left",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing upright at the wall, hands empty at his sides",
+         "position": {
+          "amount": 0.6,
+          "landmark_id": "near_house",
+          "relation": "standing outside the front wall at its right end, beside the mason",
+          "unit": "m"
+         },
+         "progress": "four bricks delivered to the wall top"
+        },
+        "end_frame": 129,
+        "id": "S1-helper-2",
+        "min_s": 1.5,
+        "path": "arms forward and down onto the wall top to the mason's left",
+        "result": "four bricks stacked flat on the wall top beside the mason",
+        "start": {
+         "facing": {
+          "camera_side": "profile, his right side to camera",
+          "edge": "left",
+          "landmark_id": "wall_top"
+         },
+         "gaze": {
+          "head_turn": "head tipped down toward the wall top",
+          "mouth": "closed",
+          "target": "wall_top"
+         },
+         "holding": [
+          "brick"
+         ],
+         "objects": [
+          {
+           "count": 4,
+           "element_id": "brick",
+           "place": {
+            "amount": 0.6,
+            "landmark_id": "near_house",
+            "relation": "in the helper's arms at the front wall",
+            "unit": "m"
+           }
+          }
+         ],
+         "pose": "standing upright at the wall, forearms carrying the four bricks against his chest",
+         "position": {
+          "amount": 0.6,
+          "landmark_id": "near_house",
+          "relation": "standing outside the front wall at its right end, beside the mason",
+          "unit": "m"
+         },
+         "progress": "four bricks brought to the wall"
+        },
+        "start_frame": 80,
+        "target": "wall_top"
+       }
+      ],
+      "behaviour": "acts",
+      "continuity_note": "",
+      "element_id": "helper",
+      "end": {
+       "facing": {
+        "camera_side": "profile, his right side to camera",
+        "edge": "left",
+        "landmark_id": "wall_top"
+       },
+       "gaze": {
+        "head_turn": "head turned left toward the mason",
+        "mouth": "closed",
+        "target": "mason"
+       },
+       "holding": [],
+       "objects": [
+        {
+         "count": 4,
+         "element_id": "brick",
+         "place": {
+          "amount": 0.4,
+          "landmark_id": "wall_top",
+          "relation": "stacked on the wall top to the mason's left",
+          "unit": "m"
+         }
+        }
+       ],
+       "pose": "standing upright at the wall, hands empty at his sides",
+       "position": {
+        "amount": 0.6,
+        "landmark_id": "near_house",
+        "relation": "standing outside the front wall at its right end, beside the mason",
+        "unit": "m"
+       },
+       "progress": "four bricks delivered to the wall top"
+      },
+      "hold_reason": "",
+      "role": "secondary",
+      "screen_position": "right third, walking along the street to the near house's wall",
+      "start": {
+       "facing": {
+        "camera_side": "profile, his right side to camera",
+        "edge": "left",
+        "landmark_id": "near_house"
+       },
+       "gaze": {
+        "head_turn": "head turned left toward the near house",
+        "mouth": "closed",
+        "target": "near_house"
+       },
+       "holding": [
+        "brick"
+       ],
+       "objects": [
+        {
+         "count": 4,
+         "element_id": "brick",
+         "place": {
+          "amount": 3.0,
+          "landmark_id": "street",
+          "relation": "in the helper's arms on the street",
+          "unit": "m"
+         }
+        }
+       ],
+       "pose": "walking upright, both forearms carrying a stack of four bricks against his chest",
+       "position": {
+        "amount": 3.0,
+        "landmark_id": "street",
+        "relation": "on the street halfway between the brick stack and the near house, walking from the stack",
+        "unit": "m"
+       },
+       "progress": "carrying four bricks from the stack to the mason"
+      }
+     }
+    ],
+    "visual_type": "video"
+   },
+   "elements": [
+    {
+     "description": "",
+     "id": "housing_site",
+     "identity": "representative",
+     "kind": "place",
+     "material_spec": null,
+     "name": "Housing construction site",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "Several half-built brick houses on a new street, brick and cement stacks, scaffolding poles.",
+     "signs_of_use": [
+      {
+       "landmark_id": "wall_top",
+       "what": "Mortar droppings along the wall top"
+      },
+      {
+       "landmark_id": "street",
+       "what": "Tyre tracks and footprints in the sandy street"
+      },
+      {
+       "landmark_id": "brick_stack",
+       "what": "Broken bricks and brick dust around the stack"
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "conventional_wall",
+     "identity": "representative",
+     "kind": "object",
+     "material_spec": null,
+     "name": "Conventional solid brick wall",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "A solid wall of the same red burnt clay bricks laid flat in English bond, full mortar joints, no cavities; shown only as the contrast the narration names.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "thickness",
+       "part": "wall",
+       "source": "",
+       "status": "unknown",
+       "tried": "client material: none; footage: none; maker's sheet: not yet searched; reference picture: none yet",
+       "unit": "",
+       "value": null
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "laying_flat",
+     "identity": "representative",
+     "kind": "technique",
+     "material_spec": null,
+     "name": "Laying bricks flat",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "The usual way: a brick buttered and set flat on its widest face into a mortar bed, tapped level with the trowel.",
+     "signs_of_use": []
+    },
+    {
+     "description": "Indian man in his forties, slim, dark hair with grey at the temples, a thin moustache, a beige short-sleeved collared cotton shirt with a pen in the pocket, charcoal trousers, open rubber sandals.",
+     "id": "mason",
+     "identity": "representative",
+     "kind": "person",
+     "material_spec": null,
+     "name": "AI mason",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "Matches the footage's masons in dress and manner; works with a steel trowel and an iron mortar pan.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "standing height",
+       "part": "height",
+       "source": "",
+       "status": "unknown",
+       "tried": "client material: none; footage: faces and full figures rarely in frame; maker's sheet: not applicable; reference picture: none yet",
+       "unit": "",
+       "value": null
+      }
+     ]
+    },
+    {
+     "description": "Indian man in his fifties, grey hair, a white long-sleeved cotton shirt rolled to the elbow, grey trousers, sandals.",
+     "id": "helper",
+     "identity": "representative",
+     "kind": "person",
+     "material_spec": null,
+     "name": "AI site helper",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "Carries pans, sweeps and wets surfaces, sprays curing water.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "standing height",
+       "part": "height",
+       "source": "",
+       "status": "unknown",
+       "tried": "client material: none; footage: none measured; maker's sheet: not applicable; reference picture: none yet",
+       "unit": "",
+       "value": null
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "brick",
+     "identity": "exact",
+     "kind": "material",
+     "material_spec": {
+      "dimensions": [
+       {
+        "measure": "length",
+        "part": "brick",
+        "source": "operator's correction, 31 Oct (spec-brick.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: bricks visible on approved frames, no scale object; standard: IS 1077 modular brick 190 x 90 x 90 mm; operator's correction on the spec: 190 mm x 90 mm x 90 mm",
+        "unit": "mm",
+        "value": 190
+       },
+       {
+        "measure": "width",
+        "part": "brick",
+        "source": "operator's correction, 31 Oct (spec-brick.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: no scale object; standard: IS 1077, 90 mm; operator's correction on the spec: 190 mm x 90 mm x 90 mm",
+        "unit": "mm",
+        "value": 90
+       },
+       {
+        "measure": "height",
+        "part": "brick",
+        "source": "operator's correction, 31 Oct (spec-brick.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: no scale object; standard: IS 1077, 90 mm; operator's correction on the spec: 190 mm x 90 mm x 90 mm",
+        "unit": "mm",
+        "value": 90
+       }
+      ],
+      "illustrative": false,
+      "joint": "",
+      "label": "",
+      "laid": "on edge in rat-trap bond; flat only in the conventional-wall contrast",
+      "not_this": [],
+      "parts": [
+       "stretcher on edge",
+       "header on edge",
+       "cavity",
+       "mortar joint"
+      ],
+      "pattern": "rat-trap bond: two faces of bricks on edge with headers across, continuous cavities",
+      "proportions": [
+       "about 2.1 : 1 : 1 length : width : height"
+      ],
+      "relationships": [],
+      "view": "",
+      "view_reason": ""
+     },
+     "name": "Burnt clay brick",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "The footage's red-orange burnt clay brick; country-burnt in walls, wire-cut where named.",
+     "signs_of_use": []
+    },
+    {
+     "description": "",
+     "id": "mortar",
+     "identity": "exact",
+     "kind": "material",
+     "material_spec": {
+      "dimensions": [
+       {
+        "measure": "thickness",
+        "part": "joint",
+        "source": "operator's correction, 31 Oct (spec-mortar.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: joints visible on approved frames but too thin to measure; standard: IS 2212, 10 mm; operator's correction on the spec: mortar joint 10 mm",
+        "unit": "mm",
+        "value": 10
+       }
+      ],
+      "illustrative": false,
+      "joint": "bed and perpend joints of cement-sand mortar, struck flush on the exposed face",
+      "label": "",
+      "laid": "as a bed on the top edges of each course and pressed into the vertical joints; never inside the cavities",
+      "not_this": [],
+      "parts": [
+       "bed joint",
+       "perpend joint"
+      ],
+      "pattern": "thin grey joints framing each brick on edge, cavities left open",
+      "proportions": [
+       "joint thin compared with the brick, about one tenth of the brick's height"
+      ],
+      "relationships": [],
+      "view": "",
+      "view_reason": ""
+     },
+     "name": "Cement mortar",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "Wet grey cement-sand mortar, as in every work clip.",
+     "signs_of_use": []
+    },
+    {
+     "description": "",
+     "id": "trowel",
+     "identity": "representative",
+     "kind": "object",
+     "material_spec": null,
+     "name": "Steel trowel",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "Pointed steel brick trowel with a wooden handle, the common Indian mason's pattern; the operator confirmed on 31 Oct that the footage shows no usable frame of it, so a representative trowel from the approved search picture stands for it.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "blade length",
+       "part": "trowel",
+       "source": "",
+       "status": "unknown",
+       "tried": "client material: none; footage: no usable frame, five grabbed frames rejected by the operator as showing no trowel; maker's sheet: not yet searched; reference picture: the approved search picture, no scale object",
+       "unit": "",
+       "value": null
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "mortar_pan",
+     "identity": "exact",
+     "kind": "object",
+     "material_spec": null,
+     "name": "Iron mortar pan (tasla)",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "Shallow round iron pan holding wet mortar, as in the footage.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "diameter",
+       "part": "pan",
+       "source": "clip 20dd79acf0504a6b at 0.5 s",
+       "status": "measured",
+       "tried": "client material: none; footage: measured on the approved frame 507df459a2c38e6168478bf6efdf2b6a (vw visuals measure 889c889322b6); maker's sheet: not applicable; reference picture: footage frames",
+       "unit": "mm",
+       "value": 415
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "cement_bags",
+     "identity": "representative",
+     "kind": "object",
+     "material_spec": null,
+     "name": "Cement bag stack",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "A stack of grey 50 kg cement bags with plain unbranded print on a housing site, partly covered.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "length x width",
+       "part": "bag",
+       "source": "",
+       "status": "unknown",
+       "tried": "client material: none; footage: none; maker's sheet: not yet searched; reference picture: none yet",
+       "unit": "",
+       "value": null
+      }
+     ]
+    }
+   ]
+  },
+  "BEAT_03-B2_sh2": {
+   "gap_id": "BEAT_03-B2",
+   "scene": {
+    "id": "BEAT_03-B2_sc2",
+    "light": "Warm late-morning sun from the upper left, hard, lighting the brick face, with soft shade under the neem trees; natural, muted, true-to-life colour.",
+    "air": "clean",
+    "landmarks": [
+     {
+      "description": "The unplastered three-storey front in rat-trap bond: red-orange bricks on edge with headers, grey joints, windows on all three floors, balconies on the upper floors with potted plants and washing.",
+      "id": "facade"
+     },
+     {
+      "description": "The flat roof terrace above the third floor with a low parapet and a black water tank.",
+      "id": "roof_terrace"
+     },
+     {
+      "description": "A low brick compound wall with an iron gate in front of the building, a two-wheeler parked just inside.",
+      "id": "front_gate"
+     },
+     {
+      "description": "Neem trees at both sides of the street, framing the building.",
+      "id": "neem_trees"
+     }
+    ]
+   },
+   "shot": {
+    "allows": [],
+    "appearance": "No departure from the shared appearance.",
+    "camera": "Still photograph, 35 mm equivalent, eye level about 1.6 m from the far side of the street, verticals straight; slow 5 percent push-in.",
+    "camera_move": "",
+    "camera_reason": "An honest eye-level view from the street shows the three floors whole; the slow push draws the viewer toward the brickwork that carries them.",
+    "carries_text": false,
+    "claim": "visible",
+    "claims": [
+     "Buildings up to three storeys can be safely built with rat-trap bond when constructed properly."
+    ],
+    "compare_to": "",
+    "descriptors": [
+     "three-storey",
+     "exposed rat-trap bond brickwork",
+     "finished and lived in",
+     "standing firm"
+    ],
+    "element_ids": [
+     "three_storey",
+     "rat_trap_wall",
+     "brick"
+    ],
+    "end_frame": 2516,
+    "end_state_exact": false,
+    "evidence": "The result in a scene: a finished, lived-in three-storey building whose exposed face shows rat-trap bond.",
+    "face_in_frame": true,
+    "fact_ids": [
+     "F_home",
+     "F_bond"
+    ],
+    "fixed": [],
+    "focus": "Deep focus across the whole building.",
+    "framing": "Wide from across the street, the whole building centred with its roof terrace and the front gate in frame, neem trees at both edges, a little sky above.",
+    "graphic_kind": "diagram",
+    "groups": [],
+    "id": "BEAT_03-B2_sh2",
+    "information_progression": "1) Opens on the whole building, roof terrace to front gate. 2) The slow push-in narrows toward the brick face of the middle floor. 3) The building remains unchanged throughout.",
+    "message": "Built properly, rat-trap bond buildings can rise to three storeys.",
+    "motion": "push_in",
+    "narration": "When constructed properly, buildings up to three storeys can be safely built using this technology.",
+    "props": [],
+    "purpose": "Photographic AI still of a finished, lived-in three-storey building of exposed rat-trap bond brickwork in a tree-lined Tamil Nadu street, seen whole from across the street, with a slow push-in toward its brick face.",
+    "relation": "illustration",
+    "review_notes": "Check the candidate shows exactly three floors above ground (the roof terrace with its parapet and tank must not read as a fourth floor), the face in rat-trap bond with bricks on edge, no plaster, and no signboard or lettering.",
+    "scene_svg": null,
+    "size": "WS",
+    "size_reason": "All three storeys must be in view, roof to ground.",
+    "start_frame": 2377,
+    "subjects": [],
+    "visual_type": "image",
+    "warning_answers": [
+     {
+      "answer": "The accepted treatment set this one sentence as a still of 5.56 s; its slow push-in carries it, and it sits between a drawn animation and the kiln video, so a second still would only cut one image in two.",
+      "kind": "still_long"
+     }
+    ]
+   },
+   "elements": [
+    {
+     "description": "",
+     "id": "three_storey",
+     "identity": "representative",
+     "kind": "place",
+     "material_spec": null,
+     "name": "Three-storey brick building",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "A three-storey exposed red-brick building, unplastered, in a tree-lined street.",
+     "signs_of_use": [
+      {
+       "landmark_id": "roof_terrace",
+       "what": "Clothes drying on a line on the roof terrace"
+      },
+      {
+       "landmark_id": "front_gate",
+       "what": "A bicycle leaning by the gate and a worn path to the door"
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "rat_trap_wall",
+     "identity": "exact",
+     "kind": "object",
+     "material_spec": null,
+     "name": "Rat-trap bond wall",
+     "repeating": false,
+     "required_views": [
+      "top course with cavities",
+      "face of a finished exposed wall"
+     ],
+     "requirements": "The client's wall as filmed: red bricks on edge, continuous rectangular cavities, grey mortar joints; its footage frames are its views.",
+     "signs_of_use": [],
+     "size": [
+      {
+       "measure": "thickness",
+       "part": "wall",
+       "source": "clip 2652bcbbb1ffc0df at 0.5 s",
+       "status": "measured",
+       "tried": "client material: none; footage: measured on the approved frame 73a5d2fca0205c0d2c3d9196153f069f (vw visuals measure 37c5cb1259fa); maker's sheet: not applicable; reference picture: footage frames",
+       "unit": "mm",
+       "value": 190
+      }
+     ]
+    },
+    {
+     "description": "",
+     "id": "brick",
+     "identity": "exact",
+     "kind": "material",
+     "material_spec": {
+      "dimensions": [
+       {
+        "measure": "length",
+        "part": "brick",
+        "source": "operator's correction, 31 Oct (spec-brick.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: bricks visible on approved frames, no scale object; standard: IS 1077 modular brick 190 x 90 x 90 mm; operator's correction on the spec: 190 mm x 90 mm x 90 mm",
+        "unit": "mm",
+        "value": 190
+       },
+       {
+        "measure": "width",
+        "part": "brick",
+        "source": "operator's correction, 31 Oct (spec-brick.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: no scale object; standard: IS 1077, 90 mm; operator's correction on the spec: 190 mm x 90 mm x 90 mm",
+        "unit": "mm",
+        "value": 90
+       },
+       {
+        "measure": "height",
+        "part": "brick",
+        "source": "operator's correction, 31 Oct (spec-brick.json)",
+        "status": "confirmed",
+        "tried": "client material: none; footage: no scale object; standard: IS 1077, 90 mm; operator's correction on the spec: 190 mm x 90 mm x 90 mm",
+        "unit": "mm",
+        "value": 90
+       }
+      ],
+      "illustrative": false,
+      "joint": "",
+      "label": "",
+      "laid": "on edge in rat-trap bond; flat only in the conventional-wall contrast",
+      "not_this": [],
+      "parts": [
+       "stretcher on edge",
+       "header on edge",
+       "cavity",
+       "mortar joint"
+      ],
+      "pattern": "rat-trap bond: two faces of bricks on edge with headers across, continuous cavities",
+      "proportions": [
+       "about 2.1 : 1 : 1 length : width : height"
+      ],
+      "relationships": [],
+      "view": "",
+      "view_reason": ""
+     },
+     "name": "Burnt clay brick",
+     "repeating": false,
+     "required_views": [],
+     "requirements": "The footage's red-orange burnt clay brick; country-burnt in walls, wire-cut where named.",
+     "signs_of_use": []
+    }
+   ]
+  }
+ }
+}
