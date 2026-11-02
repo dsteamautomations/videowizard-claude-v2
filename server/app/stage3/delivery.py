@@ -12,7 +12,7 @@ from .. import core, jobs
 from ..errors import Problem
 from ..stage2 import stage as S2
 from . import CONTRACT_BUNDLE, timeline as TL
-from .assembly import key, session_of, save_session, fail
+from .assembly import key, session_of, save_session, fail, early_inputs
 
 FINAL_WORDS = {'watched': ('watch',), 'listened': ('listen',), 'subtitles read': ('srt', 'subtitle'), 'timeline verified': ('drt', 'timeline'), 'package complete': ('package', 'bundle')}
 
@@ -197,7 +197,7 @@ def visuals_info(store, run, outputs):
 
 
 def bundle(conn, store, user, run, outputs):
-    session = session_of(store, run)
+    session = session_of(store, run, create=True)   # design/132: the early package comes before any assembly session exists
     if not any(o['stage'] == 'assembly' and o['unit'] is None for o in outputs):   # design/115 H1: every shot placed, no assembly yet: the editor's early package
         return bundle_early(conn, store, user, run, outputs, session)
     asm_o = S2._output(outputs, 'assembly')
@@ -323,7 +323,8 @@ def bundle_early(conn, store, user, run, outputs, session):
     mk = S2.save_json(store, key(run, 'delivery/manifest.json'), manifest)
     for f in files + [{'name': 'manifest.json', **mk}]:
         jobs.record_file(conn, run['id'], 'delivery', f['key'], f['name'], f['sha256'], f['bytes'], 'application/octet-stream')
-    session['bundle'] = {'manifest': mk, 'film_sha256': None, 'early': True, 'files': len(files), 'bytes': sum(f['bytes'] for f in files)}
+    session['bundle'] = {'manifest': mk, 'film_sha256': None, 'early': True, 'files': len(files), 'bytes': sum(f['bytes'] for f in files),
+                         'inputs': early_inputs(outputs)}   # design/132 E2: the assembly's gate compares these
     save_session(store, run, session)
     return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'early': True, 'cuts': len(events),
             'next': "the editor's package, before the assembly: on the operator's computer `vw delivery check`, `vw delivery download` (no camera copies by default), then `vw delivery open --originals \"<folder>\"` on Resolve Studio."}

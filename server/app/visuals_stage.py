@@ -4451,7 +4451,16 @@ def record_gaps(conn, store, user, run, outputs, gap_ids, quote):
         for gid in gap_ids:
             record_gap(conn, store, user, run, outputs, gid, quote)
             recorded.append(gid)
-    return {'recorded': recorded, 'skipped': skipped, 'next': 'vw next' if not skipped else 'finish the skipped gaps, then record again'}
+    return {'recorded': recorded, 'skipped': skipped, 'next': record_next(plan, session_of(store, run, outputs)['recorded_gaps'], skipped)}
+
+
+def record_next(plan, recorded_gaps, skipped):
+    """design/132 E4: once every gap is recorded, the editor's package comes next, before the assembly."""
+    if skipped:
+        return 'finish the skipped gaps, then record again'
+    if all(g['gap_id'] in recorded_gaps for g in plan['gaps']):
+        return "`vw delivery bundle` (the editor's package, before the assembly)"
+    return '`vw next`'
 
 
 def boundary_of(request):

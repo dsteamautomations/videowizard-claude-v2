@@ -1,6 +1,6 @@
 # design/132: the editor's package first, then the assembly (enforced)
 
-2 Nov 2026. Status: **requirements for SK's approval. Nothing is built.** Regular lane.
+2 Nov 2026. Status: **approved by SK (2 Nov) and built (server 0.80.0, plugin 0.67.0); not deployed.** Regular lane. Build results in §8.
 
 **Source:** SK, 2 Nov 2026: "The below has to be done and enforced. Editors package first then followed by assembly." Watch list A7 (VW-12 monitoring P15).
 
@@ -80,3 +80,22 @@ Plus:
 - **The download and open on the operator's computer are not enforced.** Enforcing them would need the laptop to report back (for example `vw delivery confirm` for the early package). Add this if SK wants the editor's receipt, not only the package, to gate the assembly.
 - Dropping the server assembly (C2): SK's separate decision.
 - The Docker database suite (`server/tests`) is not run (B1); unit tests and compile checks only.
+
+## 8. Build (2 Nov 2026)
+
+- **Found while building:** `delivery.bundle()` loaded the stage 3 session without `create=True`, so the early package failed with "Run `vw assembly prepare` first" on a run with no assembly yet. design/115's early package could never be made before the assembly. Fixed: the bundle creates the session.
+- **Server:**
+  - `stage3/assembly.py`: `early_inputs`, and `package_first`, called at the start of `prepare` and `build`.
+  - `stage3/delivery.py`: `bundle_early` saves `inputs`.
+  - `visuals_stage.record_next`: after the last gap, next is `vw delivery bundle`.
+  - `SERVER_VERSION` 0.80.0.
+- **Procedure:** `scripts/d132_wording_v3.py` adds the package as the assembly's first step and makes the delivery's bundle "again … the full package". It is chained into `c1_split_v3.py --check`, which now also allows the assembly and delivery stages to differ from the base.
+- **Plugin:**
+  - `commands/vw.md`: the package before `vw assembly prepare`.
+  - `vw.py`: the record line prints the server's next step.
+  - `plugin.json` 0.67.0; `PLUGIN_MIN_VERSION` unchanged at 0.66.0.
+- **Tests:**
+  - `server/unit/test_design132_pure.py`: 11 tests, all failing before the change and all passing after. Server unit suite: 1010 passed, 4 skipped.
+  - `plugin/tests/test_design132.py`: 2 tests. Plugin suite: 389 passed, 4 failing, the same 4 that fail on HEAD (3 Windows-only, plus the `test_master_cli` slides).
+  - `c1_split_v3.py --check`: ok. Compile checks: ok.
+- **Not run:** the Docker database suite (B1). No live run yet: the first new film's package and assembly will show the gate.

@@ -2024,7 +2024,7 @@ def cmd_visuals(a):
             emit({'action': 'refused', 'message': 'Give the gaps: --gaps G1 G2 … or --gaps all (or --gap G).'}, 2)
         out = write(base + '/record', {'gap_ids': gaps, 'quote': a.quote})
         skipped = out.get('skipped') or {}
-        emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else '; `vw next`'))
+        emit(out, 0, f"{len(out.get('recorded') or [])} recorded" + (f"; skipped: " + '; '.join(f'{g} ({why})' for g, why in skipped.items()) if skipped else f"; next {out.get('next') or '`vw next`'}"))   # design/132: the package after the last gap
 
 
 def _number(value, flag, whole=False):

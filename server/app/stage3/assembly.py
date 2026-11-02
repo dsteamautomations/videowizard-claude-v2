@@ -83,6 +83,30 @@ def save_session(store, run, session):
     return session
 
 
+def early_inputs(outputs):
+    """design/132 E2: what the editor's early package was made from: the master plan and each gap's recorded visuals output."""
+    master = S2._output(outputs, 'master') or {}
+    return {'master_digest': (master.get('summary') or {}).get('plan_digest'),
+            'gaps': {o['unit']: str(o['id']) for o in outputs if o['stage'] == 'visuals' and o['unit']}}
+
+
+def package_first(session, outputs):
+    """design/132 E1 (SK, 2 Nov 2026): the editor's package first, then the assembly. Refused without an early package that matches the recorded visuals."""
+    first = "The editor's package comes first: run `vw delivery bundle`, then the assembly."
+    b = (session or {}).get('bundle') or {}
+    if not b.get('early'):
+        raise Problem(409, 'NOT_ALLOWED', first)
+    was, now = b.get('inputs'), early_inputs(outputs)
+    if was == now:
+        return
+    if not was:
+        raise Problem(409, 'NOT_ALLOWED', "The editor's package was made before this release; run `vw delivery bundle` again, then the assembly.")
+    if was.get('master_digest') != now['master_digest']:
+        raise Problem(409, 'NOT_ALLOWED', "The master plan changed after the editor's package; run `vw delivery bundle` again, then the assembly.")
+    changed = sorted(g for g in set(was['gaps']) | set(now['gaps']) if was['gaps'].get(g) != now['gaps'].get(g))
+    raise Problem(409, 'NOT_ALLOWED', f"{', '.join(changed)} {'was' if len(changed) == 1 else 'were'} recorded again after the editor's package; run `vw delivery bundle` again, then the assembly.")
+
+
 def fill_file(files, shot, name, visuals_assets):
     """A gap's file for one shot, by name. Ticket 12: gaps recorded before 16 Oct dropped a second shot's entry when two shots shared one
     file; the shot's asset in the visuals record names that file, and it is used only if the gap's recorded output holds the same
@@ -118,6 +142,7 @@ def prepare(conn, store, user, run, outputs):
     pk = S2._package(store, s2)
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
     session = session_of(store, run, create=True)
+    package_first(session, outputs)   # design/132
     fills = {}
     found = []   # ticket 12: find every fill's file before probing any, so a missing file fails in seconds, not after the downloads
     visuals_assets = None
@@ -217,6 +242,7 @@ def stabilize(store, user, run, sub_clip_id, choice):
 def build(conn, store, user, run, outputs):
     """The assembly plan: master events (with stabilisation decisions within the zoom cap) and gap fills with their choices."""
     session = session_of(store, run)
+    package_first(session, outputs)   # design/132
     master_o = S2._output(outputs, 'master')
     plan, _ = S2._file(store, master_o, f"master-v{master_o['summary']['version']}.json")
     s2 = S2.session_of(store, run)
