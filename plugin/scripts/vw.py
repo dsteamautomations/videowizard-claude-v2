@@ -711,12 +711,14 @@ def cmd_motion(a):
         (folder / 'brief.md').write_text(out['brief'], encoding='utf-8')
         refs = [_download(m, f"{m['run_id']}/visuals/references/{rid}.png", f'work/motion/{a.shot}/refs/{rid}.png') for rid in out.get('refs') or []]
         emit({'shot_id': a.shot, 'brief': str(folder / 'brief.md'), 'refs': refs, 'project': str(folder / 'project')}, 0,
-             f"Brief for {a.shot} written to work/motion/{a.shot}/brief.md with {len(refs)} pictures in refs/: start one vw-motion-shot helper with the shot id {a.shot}.")
+             f"Brief for {a.shot} written to work/motion/{a.shot}/brief.md with {len(refs)} pictures in refs/: start vw-motion-rules for {a.shot}, then vw-motion-shot.")   # design/134 14
     if a.what == 'upload':
         proj = (ws / a.dir) if a.dir and (ws / a.dir).is_dir() else (Path(a.dir) if a.dir else folder / 'project')
         if not (proj / 'index.html').is_file():
             emit({'action': 'refused', 'message': f'No index.html in {proj}: the project is work/motion/{a.shot}/project/ with index.html at its root.'}, 2)
         out = write(base + '/motion/upload', {'shot_id': a.shot, 'name': f'{a.shot}.zip', 'content_base64': _b64.b64encode(motion_zip(proj)).decode('ascii')})
+        if (load_json(last) or {}).get('sha256') != out['sha256']:   # design/134 5: a corrected project's checker sees only its own snapshots
+            shutil.rmtree(folder / 'snapshots', ignore_errors=True)
         save_json(last, {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat()})
         emit(out, 0, out.get('next'))
     if a.what in ('check', 'snapshot'):
@@ -2174,8 +2176,11 @@ def second_look(m):
                     keep = [shots[i] for i in sorted({0, len(shots) // 2, len(shots) - 1})] if shots else []
                     grabbed[sub][edge] = [_download(m, f['key'], f"work/frames/{sub.replace(':', '-')}-{edge}/{f['frame_id']}.png") for f in keep]
             stills[sub] = grabbed[sub]
+        used = [{'scene': o.get('beat_id'), 'sub_clip_id': x['sub_clip_id'], 'clip_id': (rows.get(x['sub_clip_id']) or {}).get('clip_id'),
+                 'source_in_frame': x.get('source_in_frame'), 'source_out_frame': x.get('source_out_frame')}
+                for o in doc['options'] if o.get('beat_id') != s['beat_id'] for ev in o.get('events') or [] for x in [ev] + list(ev.get('alternatives') or []) if x.get('sub_clip_id')]   # design/134 11
         body = {**{k: s[k] for k in ('beat_id', 'title', 'process_stages', 'target_beat_frames', 'sentences')}, 'fps': fps, 'options': options,
-                'candidates': s['pieces'], 'frames': stills}
+                'candidates': s['pieces'], 'frames': stills, 'used_elsewhere': used}
         (folder / f"{s['beat_id']}.json").write_text(json.dumps(body, indent=1, ensure_ascii=False, default=str) + '\n', encoding='utf-8')
         files.append({'file': f"work/options/scenes/{s['beat_id']}.json", 'options': len(options), 'candidates': len(s['pieces']),
                       'stills': sum(len(v['in']) + len(v['out']) for v in stills.values())})
@@ -2501,6 +2506,8 @@ def cmd_delivery(a):
     if a.what == 'status':
         emit(call('GET', f'/api/runs/{run}/stage3'))
     if a.what == 'resolve':
+        if a.run_it:   # design/134 17: the rebuild in Resolve is retired (design/107); the checked package is opened instead
+            emit({'action': 'refused', 'message': '`vw delivery resolve --run` is retired: on the operator\'s computer run `vw delivery check`, `vw delivery download`, then `vw delivery open`.'}, 2)
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import resolve_bridge
         st = call('GET', f'/api/runs/{run}/stage3')
@@ -2512,26 +2519,6 @@ def cmd_delivery(a):
             emit({'ledger': st.get('resolve')}, 0, 'Current Resolve ledger state.')
         if a.close:
             emit(write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'closed', 'note': a.note or 'closed by operator'}))
-        if a.run_it:
-            led = write(base + '/resolve/reserve', {'machine': machine_id(), 'authorization': a.authorization or ''})
-            if not (ws / 'work' / 'manifest.json').exists():
-                _download(m, st['bundle']['manifest']['key'], 'work/manifest.json')
-            manifest = _json_file(m, 'work/manifest.json')
-            bundle_dir = ws / 'bundle'
-            download_bundle(m, manifest)   # design/47 12.4
-            write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'dispatched'})
-            out_dir = ws / 'out' / 'delivery'
-            out_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                report = resolve_bridge.build(resolve_bridge.adapter(), bundle_dir, manifest, m['code'], out_dir)
-            except SystemExit as exc:
-                emit({'action': 'tell_builder', 'message': f'Resolve step failed after dispatch: {exc}. The ledger stays dispatched; inspect in Resolve, then `vw delivery resolve --close`.'}, 2)
-            drt = upload_file(m, 'delivery', out_dir / 'Approved-timeline.drt', hashlib.sha256((out_dir / 'Approved-timeline.drt').read_bytes()).hexdigest(), (out_dir / 'Approved-timeline.drt').stat().st_size)
-            (out_dir / 'resolve-report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
-            rep = upload_file(m, 'delivery', out_dir / 'resolve-report.json', hashlib.sha256((out_dir / 'resolve-report.json').read_bytes()).hexdigest(), (out_dir / 'resolve-report.json').stat().st_size)
-            led = write(base + '/resolve/mark', {'machine': machine_id(), 'state': 'reported', 'report': {**{k: report[k] for k in ('timeline', 'events', 'readback_events', 'differences', 'drt_verified', 'check')},
-                                                                                                           'readback': {'events': report['readback_events']}, 'drt': drt, 'report': rep}})
-            emit({'ledger': led, 'differences': report['differences']}, 0, 'Resolve timeline built, DRT exported and verified; report uploaded.' if report['drt_verified'] else 'Resolve timeline built but the DRT readback differs; show the differences to the operator.')
     if a.what in ('check', 'download'):   # design/107 Steps B to E
         st = call('GET', f'/api/runs/{run}/stage3')
         if not st.get('bundle'):

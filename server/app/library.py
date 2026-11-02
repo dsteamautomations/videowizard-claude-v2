@@ -123,8 +123,7 @@ def job_form(step, *, run, plan, gap, scene, shot, refs, generator, brief, card,
     if step == 'state':
         copy = [{'role': 'label', 'text': s['what_appears']} for s in shot.get('states') or []]
     else:
-        progression = (shot.get('information_progression') or '').strip()
-        copy = [{'role': 'body', 'text': progression}] if progression else 'none'
+        copy = 'none'   # design/134 8: words to render come only from approved lettering (exact_text); the shot's progression is a description, not a caption
     brand = [(label, (card or {}).get(col)) for label, col in (('Colours', 'color_palette'), ('Type', 'typography_fonts'), ('Guidelines', 'client_brand_guidelines'), ('Trademarks', 'trademark_patterns'))]
     preamble = '\n'.join(f'{label}: {value}' for label, value in brand if value)
     model = ((generator or DEFAULT_GENERATOR).get('model')) if step == 'take' else settings().GEMINI_IMAGE_MODEL if provider_of(run) == 'gemini' else IMAGE_MODELS['generate' if mode == 'generate' else 'edit']   # design/124 A4: the film's picture AI

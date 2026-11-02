@@ -1,4 +1,5 @@
 """Combined visual planning. Positions belong to the set, never to the camera."""
+import math
 import re
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
@@ -510,6 +511,11 @@ def route_of(shot):
     return 'footage' if shot['visual_type'] == 'footage' else 'video' if shot['visual_type'] == 'video' else 'graphic_sequence' if shot['visual_type'] == 'animation' else 'drawn' if shot['visual_type'] == 'drawn' else 'still'   # design/113
 
 
+def take_seconds(seconds):
+    """design/134 12: the seconds a take is generated at: the placed seconds rounded up to a whole second, at least the generator's minimum (as prepare_take)."""
+    return max(_default_generator()['min_seconds'], math.ceil(round(seconds, 6)))
+
+
 def routes(plan, fps=25):
     """design/65 B1: every shot is made in the pipeline. Counts and seconds per route (video takes, stills, graphic sequences), the seconds of
     graphics, and the images the plan will need: a start image per video shot and an end only where the shot's final state must be exact (design/112 S1),
@@ -528,6 +534,8 @@ def routes(plan, fps=25):
                 seconds = (shot['end_frame'] - shot['start_frame']) / float(fps)
                 out[kind] += 1
                 out['seconds'][kind] = round(out['seconds'][kind] + seconds, 2)
+                if kind == 'video':
+                    out['video_take_seconds'] = out.get('video_take_seconds', 0) + take_seconds(seconds)   # design/134 12: what the takes cost
                 if shot['visual_type'] in GRAPHIC_TYPES + ('drawn',):
                     out['graphic_seconds'] = round(out['graphic_seconds'] + seconds, 2)
                 if kind == 'video':

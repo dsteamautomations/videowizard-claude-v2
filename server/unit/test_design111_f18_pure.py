@@ -62,14 +62,14 @@ def test_the_real_light_line_is_composed_once_per_run_from_the_footage():
                    footage={'summary': {'camera': 'phone', 'support': 'handheld', 'look': 'natural'}, 'per_clip': {}})
     store = FakeStore({'run-1/visuals/references/F1.png': png((70, 85, 65)), 'run-1/visuals/references/F2.png': png((60, 70, 55))})
     line = VS.real_light_line(store, sess)
-    assert line.startswith('Real light, as the footage has it: natural look, phone; dim light, ') and 'no added saturation' in line and sess['real_light'] == line
+    assert line.startswith('Real light, as the footage has it: natural look, phone; dim light, ') and 'no added saturation' in line and sess['real_light_parts']['measured'].startswith('dim light')   # design/134 3: the parts are kept, the line is built per scene
     sess['footage']['summary']['look'] = 'graded'
     assert VS.real_light_line(store, sess) == line   # once per run
     assert VS.real_light_line(FakeStore({}), session()) == ''   # no footage, no frames: no line
 
 
 def test_a_keyframe_prompt_carries_the_real_light_line_and_the_lines_ride_on_the_check(monkeypatch):
-    monkeypatch.setattr(VS, 'real_light_line', lambda store, sess: 'Real light, as the footage has it: natural look.')
+    monkeypatch.setattr(VS, 'real_light_line', lambda store, sess, scene=None: 'Real light, as the footage has it: natural look.')
     store = start_store()
     out = revise_start(store, role='start')
     assert 'Real light' not in saved(store)['references'][out['reference_id']]['generation']['prompt']   # E1 is a graphic there: no real-light line

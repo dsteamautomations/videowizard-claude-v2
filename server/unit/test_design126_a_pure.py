@@ -139,8 +139,8 @@ def test_tr1_drawn_shots_of_8_s_or_less_give_none():
 
 
 def test_tr2_vw12s_totals_on_a_gemini_run_and_an_openai_run():
-    assert treat(vw12())[0]['estimate_inr'] == pytest.approx(1091.49, abs=0.01)   # 20 × $0.134 × 88 + 96.14 s × ₹8.90
-    assert treat(vw12(), provider='openai')[0]['estimate_inr'] == 935.65
+    assert treat(vw12())[0]['estimate_inr'] == pytest.approx(1099.14, abs=0.01)   # 20 × $0.134 × 88 + 97 s × ₹8.90 (design/134 12: each take at its generated seconds, 88.14 → 89)
+    assert treat(vw12(), provider='openai')[0]['estimate_inr'] == 943.3   # 20 × ₹4 + 97 s × ₹8.90 (design/134 12)
 
 
 def test_tr2_one_picture_price_per_film(monkeypatch):

@@ -13,7 +13,7 @@ Read, inside the run folder:
 - `work/motion/<shot>/brief.md`: what the shot is for, for context only.
 - Every PNG in `work/motion/<shot>/snapshots/` (list them with Glob first): the frames (`at-<seconds>s.png`) and their close-ups (`at-<seconds>s-crop<n>.png`, at twice their size). Look closely at every label, letter by letter, and at every part the rules name: joints, edges, where things meet.
 
-Never read the project's HTML, the builder's REVIEW.md or anything else.
+Also read last-upload.json; never read the project's HTML or REVIEW.md.
 
 Ask of every thing in the frames: does it read as what it is? A shape that reads as something else fails, even when a rule's words seem met (a pale box drawn inside a brick reads as a hole in the brick, not as a cavity behind it). While something builds, a part may be missing on purpose: judge the structure on the finished state, and every frame for labels, overlaps and things leaving the frame.
 

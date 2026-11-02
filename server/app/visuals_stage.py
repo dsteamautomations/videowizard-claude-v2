@@ -26,7 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
-from .visual_contract import AI_RUN_S, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import GAZE_CAMERA, take_seconds, AI_RUN_S, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -281,7 +281,7 @@ def check(store, run, outputs, document):
         return {'status': 'rejected', 'error': str(exc)}
     r = routes(plan, _fps(session) or 25)
     pr = prices()
-    planned = round(r['images_estimated'] * image_price_inr(run) + r['seconds']['video'] * pr['video_inr_per_s'], 2)   # design/65 B7: the cost against the cap, before anything is paid
+    planned = round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * pr['video_inr_per_s'], 2)   # design/134 12: r['video_take_seconds']   # design/65 B7: the cost against the cap, before anything is paid
     alike = look_alike_placed(store, session)   # design/89 H6: the pictures already placed that look alike
     warnings += answer_warnings(plan, [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike])   # design/124 Change 7
     split = {}
@@ -410,7 +410,7 @@ def budget(conn, store, run, outputs):
     if session.get('current'):
         r = routes(current_plan(store, session), _fps(session) or 25)
         planned = {'images': r['images_estimated'], 'video_seconds': r['seconds']['video'],
-                   'inr': round(r['images_estimated'] * image_price_inr(run) + r['seconds']['video'] * sp['prices']['video_inr_per_s'], 2)}
+                   'inr': round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * sp['prices']['video_inr_per_s'], 2)}   # r['video_take_seconds']
     cap = cap_of(session)
     return {**sp, 'cap_inr': cap, 'left_inr': round(cap - sp['spent_inr'], 2), 'planned': planned}
 
@@ -505,7 +505,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         totals['routes'][first] = totals['routes'].get(first, 0) + 1
         parts = [(sh.get('route') or first, sh.get('seconds')) for sh in e.get('shots') or [] if isinstance(sh, dict)]   # design/124-b item 14: a mixed gap's seconds per route
         if parts and all(isinstance(x, (int, float)) and x > 0 for _, x in parts):
-            video_seconds += sum(float(x) for r, x in parts if r == 'video')
+            video_seconds += sum(take_seconds(float(x)) for r, x in parts if r == 'video')   # design/134 12: each take at its generated seconds
         else:   # no seconds per shot: today's sum, the first route, all of it as video when video is named
             parts = [(first, e['seconds'])]
             video_seconds += float(e['seconds']) if 'video' in routes_ else 0.0
@@ -970,10 +970,21 @@ def signs_lines(session, plan, scene, shot, element_id):
     return ['Signs of use: ' + '; '.join(f"{s['what']} at {marks.get(s['landmark_id'], s['landmark_id'])}" for s in chosen[shot['id']]) + '.'] if chosen[shot['id']] else []
 
 
-def real_light_line(store, session):
-    """Composed once per run from the footage character and the measured light of the approved footage frames, then kept on the session."""
-    if session.get('real_light'):
-        return session['real_light']
+def real_light_line(store, session, scene=None):
+    """Composed once per run from the footage character and the measured light of the approved footage frames, then kept on the session.
+    design/134 3: a scene with its own light keeps the footage's look and the no-glow clause, never the film's measured brightness and colour."""
+    parts = session.get('real_light_parts')
+    if parts is None:
+        parts = session['real_light_parts'] = _real_light_parts(store, session)
+    own = bool(scene) and bool(str(scene.get('light') or '').strip())
+    words = [w for w in (parts['look'], '' if own else parts['measured']) if w]
+    if not (parts['look'] or parts['measured']):
+        return ''
+    return ('Real light, as the footage has it: ' + '; '.join(words) + '. ' if words else '') + 'No studio light, no glow, no added saturation' + (
+        '; the same light and colour as the footage beside it.' if not own else '.')
+
+
+def _real_light_parts(store, session):
     f = (session.get('footage') or {}).get('summary') or {}
     stats = []
     for r in [r for r in session.get('references', {}).values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('key')][:6]:
@@ -981,18 +992,15 @@ def real_light_line(store, session):
             stats.append(image_check._light(store.get(r['key'])))
         except Exception:
             continue
-    words = []
+    look = measured = ''
     if f.get('look') and f['look'] not in ('unknown', 'mixed'):
-        words.append(f"{f['look']} look" + (f", {FM.CAMERA_WORDS.get(f['camera'], f['camera'])}" if f.get('camera') and f['camera'] not in ('unknown', 'mixed') else ''))
+        look = f"{f['look']} look" + (f", {FM.CAMERA_WORDS.get(f['camera'], f['camera'])}" if f.get('camera') and f['camera'] not in ('unknown', 'mixed') else '')
     if stats:
         m = {k: sum(s[k] for s in stats) / len(stats) for k in ('brightness', 'saturation', 'warmth')}
-        words.append(('dim' if m['brightness'] < 0.35 else 'bright' if m['brightness'] > 0.65 else 'mid') + ' light, '   # ponytail: first-guess bands on 0..1 means, tune on real films
-                     + ('muted' if m['saturation'] < 0.3 else 'rich' if m['saturation'] > 0.55 else 'ordinary') + ' colour, '
-                     + ('cool' if m['warmth'] < -0.03 else 'warm' if m['warmth'] > 0.05 else 'neutral') + ' cast')
-    if not words:
-        return ''
-    session['real_light'] = 'Real light, as the footage has it: ' + '; '.join(words) + '. No studio light, no glow, no added saturation; the same light and colour as the footage beside it.'
-    return session['real_light']
+        measured = (('dim' if m['brightness'] < 0.35 else 'bright' if m['brightness'] > 0.65 else 'mid') + ' light, '   # ponytail: first-guess bands on 0..1 means, tune on real films
+                    + ('muted' if m['saturation'] < 0.3 else 'rich' if m['saturation'] > 0.55 else 'ordinary') + ' colour, '
+                    + ('cool' if m['warmth'] < -0.03 else 'warm' if m['warmth'] > 0.05 else 'neutral') + ' cast')
+    return {'look': look, 'measured': measured}
 
 
 # ---------- design/111 F17: groups of a kind, said; background figures compared within the scene ----------
@@ -1157,8 +1165,16 @@ def gaze_lines(plan, scene, shot, when):
             continue
         out.append(f"{s['element_id']}'s eyes are on {_target_words(plan, marks, gz.get('target'))}; head turned {gz.get('head_turn')}; mouth {gz.get('mouth')}.")
     if out:
-        out[-1] += ' No one looks at the lens' + ('; no one looks where they looked in Image 1 unless named here.' if when in ('end', 'motion') else '.')
+        tail = (['no one looks at the lens'] if not looks_at_camera(shot, when) else []) + (['no one looks where they looked in Image 1 unless named here'] if when in ('end', 'motion') else [])
+        if tail:
+            said_ = '; '.join(tail)
+            out[-1] += ' ' + said_[0].upper() + said_[1:] + '.'
     return out
+
+
+def looks_at_camera(shot, when):
+    """design/134 7: a person the plan has look at the camera (design/124-b item 17); then nothing forbids the lens."""
+    return any(((s.get('end' if when in ('end', 'motion') else 'start') or {}).get('gaze') or {}).get('target') == GAZE_CAMERA for s in shot.get('subjects') or [])
 
 
 def fixed_line(scene, shot):
@@ -1481,8 +1497,9 @@ def tool_lines(plan, scene, shot, when):
     out = []
     for p in shot.get('props') or []:
         name = names.get(p['element_id'], p['element_id'])
-        same = (f"The same {name}: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; {p['holder']} holds nothing else; no second one appears; "
-                "it is fully inside the frame. ")
+        out_of_frame = when != 'start' and (p.get('end') or {}).get('where') == 'carried_out'   # design/134 1: a tool the action carries out is not also fully inside
+        same = (f"The same {name}: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; no second one appears"
+                + ('' if out_of_frame else '; it is fully inside the frame') + '. ')
         if when == 'start':
             out.append(same + f"At the start it is {place_words(marks, p.get('start'))}.")
         elif when == 'end':
@@ -1562,7 +1579,7 @@ def picture_rule_lines(plan, scene, shot, when):
     if when == 'end':
         if gaze_lines(plan, scene, shot, 'end'):   # design/111 F7
             out.append({'check': 'eye lines', 'weight': 'must', 'pass_when': 'each person\'s eyes are on the named target, head turned and mouth as written: ' + ' '.join(gaze_lines(plan, scene, shot, 'end'))
-                        + '; no one looks at the lens; no one looks where they looked in Image 1 unless named'})
+                        + ('' if looks_at_camera(shot, 'end') else '; no one looks at the lens') + '; no one looks where they looked in Image 1 unless named'})
         if fixed_line(scene, shot):   # design/111 F8
             marks_ = {lm['id']: lm['description'] for lm in scene.get('landmarks') or []}
             out.append({'check': 'background kept', 'weight': 'must', 'pass_when': ', '.join(marks_.get(l, l) for l in shot.get('fixed') or []) + ' are in the same place, size and light as in Image 1; none has moved or gone'})
@@ -2523,7 +2540,7 @@ def generate_image(conn, store, user, run, outputs, body):
         if pl:
             lines.append(pl)
     if element['kind'] not in ('graphic', 'style') and body['kind'] in ('keyframe', 'isolated') and not body.get('fix_of'):   # design/111 F18: the real light, once per run, in every prompt
-        rl = real_light_line(store, session)
+        rl = real_light_line(store, session, found[2] if found else None)
         if rl:
             body = {**body, 'prompt': with_composed(body['prompt'], rl)}
     if lw:
@@ -2748,6 +2765,18 @@ def approve_specs(store, user, run, outputs, quote=''):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     quote = said(quote, 'Approved', user)
+    built = False
+    for e in plan.get('elements') or []:   # design/134 6: each material's not-this list, built as the single approval builds it, before anything is approved
+        spec = e.get('material_spec')
+        if spec and not material_approved(session, e) and not correction_pending(session, material_key(e['id']), spec) and not (session.get('not_this') or {}).get(e['id']):
+            researched(f"material spec of {e['id']}", spec, material=True)
+            try:
+                not_this(store, user, run, outputs, e['id'])
+                built = True
+            except (Problem, ValueError):   # the model call failed: the approval stands; `vw visuals not-this --element` builds the list later
+                pass
+    if built:
+        session = session_of(store, run, outputs)
     approved, waiting_ = [], []
     for _, sh in _accepted_shots(plan, session):
         spec = sh.get('drawing_spec')
@@ -3714,7 +3743,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     plan, its pictures approved, the spec approved when the shot has one (E5), the cues from the timed narration, the run's brand font, the style and the
     palette for the read; cached by the request's digest; never counted against the cap."""
     from . import drawn, svg_scene
-    need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: `vw motion render --shot S` (design/130).')
+    need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: `vw motion render --shot S`.')
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, body['shot_id']))
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_svg).")
@@ -3769,7 +3798,7 @@ def set_scene(store, user, run, outputs, shot_id, name, content):
     """design/117 P2: a drawn shot's SVG scene, one file kept with the run and named by the plan through its sha256; refused with the reasons when it
     breaks a rule (never rendered). The plan's scene_svg points at it."""
     from . import svg_scene
-    need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: upload the project with `vw motion upload` (design/130).')
+    need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: upload the project with `vw motion upload`.')
     session = session_of(store, run, outputs)
     need(re.search(r'\.svg$', name or '', re.I), 'The scene is one .svg file.')
     need(content and len(content) <= svg_scene.MAX_BYTES, f'The scene file is empty or over {svg_scene.MAX_BYTES // 1_000_000} MB: use <use> for repeats and components for things.')
@@ -3996,10 +4025,12 @@ def add_subject_rule(store, user, run, subject, rule, quote):
     return {'subject': stem, 'rules': rows, 'next': f'Kept: every later film on {stem} starts its rules with it.'}
 
 
-def _subjects_of(plan):
-    """The subjects whose every name word is in the film's plan text (ponytail: a word match; a subject field on the brief if two subjects ever collide)."""
-    text = ' '.join([json.dumps(plan.get('foundation') or {}), *(g.get('intent') or '' for g in plan.get('gaps') or []),
-                     *(s.get('narration') or '' for g in plan.get('gaps') or [] for sc in all_scenes(g) for s in sc.get('shots') or [])]).lower()
+def _subjects_of(plan, shot=None):
+    """The subjects whose every name word is in the film's plan text, or in the shot's own words when a shot is named (design/134 16)
+    (ponytail: a word match; a subject field on the brief if two subjects ever collide)."""
+    text = (' '.join(str(shot.get(k) or '') for k in ('narration', 'depicts', 'purpose', 'message')) if shot else
+            ' '.join([json.dumps(plan.get('foundation') or {}), *(g.get('intent') or '' for g in plan.get('gaps') or []),
+                      *(s.get('narration') or '' for g in plan.get('gaps') or [] for sc in all_scenes(g) for s in sc.get('shots') or [])])).lower()
     words = set(re.findall(r'[a-z0-9]+', text))
     return [stem for stem in subject_rule_files() if set(stem.split('-')) <= words]
 
@@ -4043,7 +4074,7 @@ def motion_brief(store, run, outputs, shot_id):
     spec = shot.get('drawing_spec') or {}
     dims = '; '.join(f"{d.get('part')} {d.get('measure')} {d.get('value')} {d.get('unit')} ({d.get('status') or 'given'})" for d in spec.get('dimensions') or [])
     fonts = _motion_fonts(store, session)
-    pictures = [(rid, r) for rid, r in session['references'].items() if r.get('status') == 'approved' and r.get('key') and r.get('kind') in ('component', 'golden', 'style', 'sheet')]
+    pictures = brief_pictures(session, shot)
     sm = shot.get('scene_motion') or {}
     lines = [f"# Brief: drawn shot {shot['id']} (HyperFrames)", '',
              f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\".",
@@ -4061,9 +4092,17 @@ def motion_brief(store, run, outputs, shot_id):
               f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family.",
               f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; text at least 2.6 % of the frame height, inside the inner 90 %; "
               'flat, clean, technical; every label sentence case as written above.']
-    for stem in _subjects_of(plan):   # design/130 §4 step 8: what earlier films taught about this subject
+    for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16)
         lines += ['', f'Subject rules ({stem}): every one holds in this drawing.', *(f'- {r}' for r in _subject_rules(store, stem))]
     return {'shot_id': shot['id'], 'brief': '\n'.join(lines) + '\n', 'refs': [rid for rid, _ in pictures], 'frames': frames, 'fps': str(fps)}
+
+
+def brief_pictures(session, shot):
+    """design/134 2, 16: the approved pictures a drawn shot may place: its own elements' sheets and components, their golden pictures, and the style picture."""
+    els = set(shot.get('element_ids') or [])
+    gold = {golden_of(session, e) for e in els} - {None}
+    return [(rid, r) for rid, r in session['references'].items() if r.get('status') == 'approved' and r.get('key')
+            and (r.get('kind') == 'style' or rid in gold or (r.get('kind') in ('component', 'sheet') and r.get('element_id') in els))]
 
 
 def motion_job(conn, store, run, job_id):

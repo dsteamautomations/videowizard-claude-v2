@@ -311,7 +311,7 @@ def round_advice(version):
 def _slides(store, session, doc, entry):
     """The version's stored rows. A version proposed before design/21 carries none, one before design/127 is in the old form: both refused."""
     if 'slides' not in entry:
-        raise Problem(409, 'NOT_ALLOWED', f"Version {entry['version']} has no stored slides (proposed before design/21): `vw options check` and `propose` again.")
+        raise Problem(409, 'NOT_ALLOWED', f"Version {entry['version']} has no stored slides (proposed in an older form): `vw options check` and `propose` again.")
     if any(s.get('scheme') != 3 for s in entry['slides']):   # design/127: scenes and shots; a cut in the old form (letters, second choices) is proposed again
         raise Problem(409, 'NOT_ALLOWED', f"Version {entry['version']} was proposed in the old form: the assistant proposes it again (`vw options propose`).")
     return entry['slides']

@@ -273,7 +273,7 @@ def bundle(conn, store, user, run, outputs):
     session['bundle'] = {'manifest': mk, 'film_sha256': film['sha256'], 'files': len(files), 'bytes': sum(f['bytes'] for f in files)}
     session['resolve'] = None if (session.get('resolve') or {}).get('film_sha256') != film['sha256'] else session['resolve']
     save_session(store, run, session)
-    return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the operator\'s computer (Windows or Mac): `vw pull <code>` then `vw delivery resolve --check`, then `--run --authorization "<operator words>"`'}
+    return {'manifest': mk, 'files': len(files), 'bytes': session['bundle']['bytes'], 'next': 'on the operator\'s computer: `vw pull <code>`, `vw delivery check`, `vw delivery download`, then `vw delivery open`.'}   # design/134 17
 
 
 def bundle_early(conn, store, user, run, outputs, session):

@@ -1,4 +1,4 @@
-# design/134: SK's decisions on the Codex process review (2 Nov 2026)
+# design/134: SK's decisions on the Codex process review (2 Nov 2026); built in server 0.81.0, plugin 0.68.0 (finding 15 goes with design/136)
 
 Source: `codex-review/process-findings.md` (18 findings, a reading review run with the prompt of design/133). Each finding was checked in the code before SK decided. Nothing is built yet.
 

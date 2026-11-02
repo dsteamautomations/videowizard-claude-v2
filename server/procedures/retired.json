@@ -1,0 +1,12 @@
+{
+  "note": "design/134 9a (SK, 2 Nov 2026): wording a later change replaced. A test (server/unit/test_design134_pure.py) fails while any of these is still in v3.json or plugin/agents. Every change that replaces a rule adds its old wording here.",
+  "sentences": [
+    "Words alone do not decide the route (image models write words accurately)",
+    "the server draws an SVG scene the plan writes, with the approved pictures placed in it",
+    "or a diagram or labelled picture without figures",
+    "Post a start's end request with it",
+    "then the start image with its end request",
+    "The same action, on the same object, done the same way; related is not enough.",
+    "Never read the project's HTML, the builder's REVIEW.md or anything else."
+  ]
+}

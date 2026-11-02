@@ -341,11 +341,13 @@ function styleCard(){   // design/89 C2: the film's one graphic style, approved 
 function specRow(r){return '<tr'+(r.status==='unknown'?' class="err"':'')+'><td>'+esc(r.part)+'</td><td>'+esc(r.measure)+'</td><td>'+esc(r.size)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.source)+'</td></tr>';}
 function specsBlock(){   // design/106 D5: every spec still to approve, one table, one approval
   const shots=[];(data.gaps||[]).forEach(g=>{if(g.accepted)g.shots.forEach(s=>{if(s.spec&&!s.spec.approved)shots.push(s);});});
-  if(!shots.length)return '';const can=stage()==='visuals';
-  return '<div class="card" data-item="specs" id="card-specs" data-unit="specs"><span class="nm">Drawing specs to approve</span> <span class="ds">'+shots.length+' spec'+(shots.length>1?'s':'')+'; the sizes come from the planner, with their sources</span>'+
+  const mats=(data.elements||[]).filter(e=>e.material_spec&&!e.material_spec.approved);   // design/134 6: the material specs the same click approves, shown with them
+  if(!shots.length&&!mats.length)return '';const can=stage()==='visuals', n=shots.length+mats.length;
+  return '<div class="card" data-item="specs" id="card-specs" data-unit="specs"><span class="nm">Specs to approve</span> <span class="ds">'+n+' spec'+(n>1?'s':'')+'; the sizes come from the planner, with their sources</span>'+
     '<table class="ds" style="width:100%;margin-top:4px"><tr><th align="left">Drawing</th><th align="left">Part</th><th align="left">Measure</th><th align="left">Value or ratio</th><th align="left">Status</th><th align="left">Source</th></tr>'+
     shots.map(s=>s.spec.table.length?s.spec.table.map(r=>specRow(r).replace('<td>','<td>'+esc(s.shot_id)+'</td><td>')).join('')
-      :'<tr class="err"><td>'+esc(s.shot_id)+'</td><td colspan="5">no size or proportion given: the planner researches them before you approve</td></tr>').join('')+'</table>'+   // design/106 D1: an empty spec is never silent
+      :'<tr class="err"><td>'+esc(s.shot_id)+'</td><td colspan="5">no size or proportion given: the planner researches them before you approve</td></tr>').join('')+
+    mats.map(e=>e.material_spec.table.map(r=>specRow(r).replace('<td>','<td>'+esc('Material · '+(e.name||e.id))+'</td><td>')).join('')).join('')+'</table>'+   // design/106 D1: an empty spec is never silent
     shots.flatMap(s=>s.spec.table.filter(r=>r.risk).map(r=>'<div class="err">'+esc(s.shot_id)+': '+esc(r.risk)+'</div>')).join('')+
     (can?'<div class="btns"><button class="go" data-a="approve-specs">Approve all specs</button></div><div class="ds">To correct one value, use the box under that drawing.</div>':'')+'</div>';}
 function materialBox(e){const m=e.material_spec;if(!m)return '';const can=stage()==='visuals';   // design/111 F10: one measured spec per repeating material, approved once here

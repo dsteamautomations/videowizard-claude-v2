@@ -105,7 +105,7 @@ def test_the_server_composes_the_inventory_the_tool_sentence_and_the_headings():
     assert inv == 'Inventory, exactly: Red brick × 2 on the table; Pointing trowel × 1 in E1\'s hands. Nothing else of these kinds in frame.'   # design/124 A4 item 15: no stack named
     assert VS.inventory_line(d, scene, sh, 'end') == 'Inventory, exactly: Red brick × 4 on the table; E1 holds nothing. Nothing else of these kinds in frame.'
     tools = VS.tool_lines(d, scene, sh, 'start')
-    assert tools == ["The same Pointing trowel: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; E1 holds nothing else; no second one appears; it is fully inside the frame. "
+    assert tools == ["The same Pointing trowel: it keeps its shape, size, colour and handle (where it has one) in every picture it appears in; no second one appears; it is fully inside the frame. "
                      'At the start it is in the hand above the table, 1 hand from it.']
     assert VS.tool_lines(d, scene, sh, 'end')[0].endswith('At the end it is set down on the top course of the table, 2 bricks from it.')
     assert VS.tool_lines(d, scene, sh, 'motion')[0].endswith('By the end it is set down on the top course of the table, 2 bricks from it; it never changes into another thing and never simply disappears.')
