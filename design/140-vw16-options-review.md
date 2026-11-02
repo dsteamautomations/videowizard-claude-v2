@@ -55,4 +55,5 @@ B10 needs no decision: it is a wording reminder for the analysis step.
 
 ## 5. SK's answers
 
-- **Q1 (B1), 2 Nov:** **Match by meaning.** Claude judges whether the description shows the same thing under another name and records its reason; the server's word match becomes a warning, never a refusal.
+- **Q1 (B1), 2 Nov:** **Match by meaning as well as by word** (SK: "it should also refer by meaning"). A word match still passes as today; where the words differ, Claude judges whether the description shows the same thing under another name (rebar and reinforcement_steel_bars) and records its reason, and the shot is accepted. A shot is refused only when neither the words nor the meaning match.
+- **Q2 (B2), 2 Nov:** **Required, or a reason.** Every real shot names both markers (the word it shows and the action word), or says why one cannot be met (for example: no action word in its sentence); the reason is shown to the operator on that shot.
