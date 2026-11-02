@@ -280,3 +280,40 @@ Tests are written first for each step, with one commit per step.
 - **The Docker server suite** is not run, as before.
 - **VW-16's current cut** is not re-made: the new rules apply from its next proposal.
 - **The log's view on the web page** is a download link, not a page of its own.
+
+## Build record (2 Nov 2026, after SK's "Approve, start build")
+
+Built, tested and pushed on `main`; **not deployed** (deploy hold). Server 0.84.0, plugin 0.70.0 (on top of the undeployed design/139 build). Migration `012_decision_log.sql` runs at the next server start.
+
+| Step | Commit | What |
+| --- | --- | --- |
+| R1 | 9313590 | `vw2_log`; one middleware logs every write and every refusal (own connection); each analysed clip and server retry; `POST/GET /api/runs/{run}/log`; `vw log`, `vw log --show`; the run page's "Decision log" link (`/runs/<code>/log`) |
+| R2, R3 | f3aab2e | `considered` or `none_fit` on every blank, `preferred_because` with alternatives (refused without), copied to the log at propose; the package's `ruled_out`; carry-over matching treats spaces, underscores and hyphens as one, or takes `carries_over_seen` |
+| R4 | b7b168c | both markers or `marker_reasons` (shown on the review page); B2 with a reason is information; `camera_moves` in the analysis schema (optional) and prompt; a shot may end before a reported move inside the peak |
+| R5 | 706b497 | `stage2/looks.py`; looks measured in the analysis worker, grouped at prepare; an unknown look never trips R10; R1 only when a natural cut was within reach; `scripts/d142_looks_check.py` for VW-16 at deploy |
+| R6, R7 | 7d5a8a6 | `options/stills` (the shot as cut, one a second, half a second under a claim or state); `second-look --scene`; the join lists recut scenes; the scene reviewer's rules |
+| R8, R9 | aa768cb | the chapter message; chapters covered or dropped with words, uncovered ones with the picture notes; pauses only at the top; `SCENES_SHAPE` in `shapes.json`; `vw.md` scene wording |
+| R10 + wording | the last commit | `work/last/<command>.json`; `in_s`/`out_s` and `frame_base`; the check's pointer to `vw options status`; `vw.md` fixes; versions |
+
+**Tests:**
+- Server unit tests: 1097 passed, 4 skipped.
+- Plugin tests: 405 passed, with the 4 failures already known (3 Windows-only, 1 design/127 master wording).
+- The instruction split check passes.
+- The retired-wording test now also scans `plugin/commands/vw.md`.
+
+**Differences from the plan:**
+1. **Picture notes (R9).** Picture notes were already kept from intake and offered in the visuals packet (design/65 S3, `intended_visuals`). R9 added only the scenes-step check.
+2. **The cause of B10 was the command file.** The analysis questions came from `plugin/commands/vw.md`, which told the assistant to ask them. It now says to start without asking. The same file still held two rules design/139 had retired (the 12-second AI-run advice and the default 8-frame dissolve). Both are removed and guarded, and the design/139 deploy needs this fix with it.
+3. **Looks are measured in the analysis worker, not at prepare.** The worker already holds the clip, so prepare stays fast. Clips analysed before this release have no look and never trip R10.
+4. **The decision log is written from one middleware**, not from `core.with_receipt`. It sees every write and every refusal of every stage in one place.
+
+**At deploy (with SK's approval):**
+- Run `python scripts/d142_looks_check.py VW-16` on the VM and set `LOOK_DISTANCE` so VW-16's footage is one group.
+- SK's team removes the hand-kept log request from the operator folder's `CLAUDE.local.md` once the log is live.
+- The plugin minimum question from design/139 applies here too: a new film needs plugin 0.70.0.
+
+**Not covered:**
+- The colour threshold on real footage.
+- The middleware against the live database (tested with the plugin-gate refusal only; the database write is the same `insert` the unit tests cover).
+- The voices sliders and the review page's timing line, seen only as code (no live page check).
+- The Docker suite.
