@@ -109,7 +109,9 @@ The old wording goes on the retired list.
 ## Questions for SK (one at a time in chat)
 
 1. ~~Respelling or IPA?~~ **Answered (SK, 2 Nov): the combination**: IPA for names, places and local words; a respelling for abbreviations. The listening test (design/143) showed Eleven v4 takes both dictionary kinds; the server key now has the dictionary permission.
-2. Keep the list per client for later films?
+2. ~~Keep the list per client?~~ **Answered (SK, 2 Nov): yes, offer it.** The client's next film starts from the last list; the assistant adds the new script's words, in the same one message.
+
+All questions answered; the requirements wait for SK's approval before any code.
 
 ## Older ways (design/35)
 - A narration without a pronunciation list: films narrated before this keep theirs.
