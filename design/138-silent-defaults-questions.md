@@ -127,43 +127,43 @@ SK: (2 Nov) SK's limits: an AI video (Google, Seedance) needs at least 3 s to ge
 
 **C7. Pictures always at high quality: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C8. One candidate per picture, two only when asked: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C9. Gemini pictures at 2K: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C10. The exact picture model inside the chosen picture AI is fixed by the server: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C11. A picture requested without a kind is treated as a start picture. Keep?**
 Suggested: **No: refused until the kind is named.** A wrong kind gets the wrong checks.
-SK:
+SK: (2 Nov) **Refused until the kind is named.**
 
 **C12. A shot under 4 seconds with no visible action becomes a moving still: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C13. No camera move named means a steady camera on a tripod: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C14. The framing rule given to the AI is the rule of thirds. Should it depend on the category?**
 Suggested: **Yes: rule of thirds in general; an advertisement or product film may centre the product.**
-SK:
+SK: (2 Nov) **By category**: rule of thirds in general; an advertisement or product film may centre the product (the category from design/137).
 
 **C15. A graphic with no kind named is a diagram; a section drawing is a cutaway. Keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C16. Diagrams use Noto Sans when there is no brand font. Should the brand font be used when the client card has one?**
 Suggested: **Yes: the brand font from the client card; Noto Sans only when there is none.**
-SK:
+SK: (2 Nov) **The brand font from the client card; when there is none, the operator is asked once** (like A5's colours). Noto Sans only when the chosen font cannot draw the script.
 
 **C17. One reference-picture round per film: keep?**
 Suggested: **Keep.**
