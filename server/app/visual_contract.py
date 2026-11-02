@@ -250,7 +250,7 @@ def motion_needs(shot, seconds):
         need(l.strip() and len(l) <= 120, f'{label}: a label is one to 120 characters.')
 
 
-def svg_needs(shot, seconds, colour_required=True):
+def svg_needs(shot, seconds, new_film=False):
     """design/117 P2: a drawn shot names its uploaded scene and keys every action inside the shot; the spec is required when the shot carries figures
     (a claim with a number), and its sizes are checked against the scene's text at render, when the file is read."""
     label = f'shot {shot.id}'
@@ -266,7 +266,7 @@ def svg_needs(shot, seconds, colour_required=True):
         if a.word.strip():
             need(' '.join(_tokens(a.word)) in words, f"{label}: action {n}: the word '{a.word}' is not in the narration of {shot.id}.")
         need(a.kind != 'move' or len(a.path) >= 2, f'{label}: action {n}: move needs a path of two points or more.')
-        need(a.kind != 'highlight' or a.color or not colour_required, f'{label}: action {n}: a highlight names its colour (highlight_color, as color "#RRGGBB"): '
+        need(a.kind != 'highlight' or a.color or not new_film, f'{label}: action {n}: a highlight names its colour (highlight_color, as color "#RRGGBB"): '
                                                                       'one that stands out against the background and everything else in the frame, the brand colours where they do (design/139 R3).')
 
 
@@ -603,7 +603,7 @@ def timing_warnings(gap_id, shots, timing, fps):
     return out
 
 
-def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False, colour_required=True):   # design/130: labels_drawn on a motion film
+def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False, new_film=False):   # design/130: labels_drawn on a motion film
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
     plan = Plan.model_validate(document)
     spec_warnings = []   # design/124 C2
@@ -785,7 +785,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             if any(d.status == 'unknown' for d in spec.dimensions):
                                 need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
                     if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
-                        svg_needs(shot, seconds, colour_required)
+                        svg_needs(shot, seconds, new_film)
                         motion_needs(shot, seconds)   # design/130
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:
@@ -947,8 +947,13 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
             last = scenes[-1].shots[-1].id if scenes and scenes[-1].shots else None   # design/91 N16
             for sh in (s for sc in scenes for s in sc.shots):
                 need(not sh.transition_out or sh.id == last, f'shot {sh.id}: transition_out is for the last shot of a gap; set the next shot\'s transition_in instead.')
-                need(not (sh.transition_in or sh.transition_out) or sh.transition_reason.strip(), f'shot {sh.id}: a chosen transition needs its reason (transition_reason); '
-                                                                                            'without a choice, a graphic dissolves 8 frames and everything else cuts.')
+                if new_film:   # design/139 R8 (SK, 2 Nov 2026, design/138 B6): the plan decides every join; a dissolve or a match gives its reason
+                    need(sh.transition_in and (sh.id != last or sh.transition_out), f"shot {sh.id}: name its join: transition_in (cut, dissolve or match)"
+                         + (' and transition_out, into what follows the gap' if sh.id == last else '') + '; the plan decides every join.')
+                    need(not ({sh.transition_in, sh.transition_out} & {'dissolve', 'match'}) or sh.transition_reason.strip(), f'shot {sh.id}: a dissolve or a match needs its reason (transition_reason).')
+                else:   # a film from before: the older way, a graphic dissolving 8 frames and a cut elsewhere unless chosen (design/35, until it closes)
+                    need(not (sh.transition_in or sh.transition_out) or sh.transition_reason.strip(), f'shot {sh.id}: a chosen transition needs its reason (transition_reason); '
+                                                                                                'without a choice, a graphic dissolves 8 frames and everything else cuts.')
             need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
             warnings += timing_warnings(gap.gap_id, gap_shots, window.get('timing'), fps)   # design/89 A3
     said.sort(key=lambda s: s.start_frame)   # design/91 N11: one message once, unless the later shot says what it adds
