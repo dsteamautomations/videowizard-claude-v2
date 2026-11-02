@@ -95,7 +95,7 @@ Facts you could not see, which apply throughout:
 
 ## What to look for in a second round
 
-Each pattern below is behind at least one confirmed finding. Search the whole of v3.json, server/library, plugin/agents, plugin/scripts/vw.py and the server's message and added-line code for more of each.
+Each pattern below is behind at least one confirmed finding. Search the whole of v3.json, plugin/agents, plugin/scripts/vw.py and the server's message and added-line code for more of each.
 
 1. **A rule replaced in one place and not in the others** (9, 10). For every "only when", "by default" or "no longer" in v3.json, search for older unconditional wording elsewhere: v3.json, the library guides, agent files and server messages.
 2. **Fixed lines the server adds that contradict a plan value allowed later** (1, 7). For each enum or option in `visual_contract.py`'s plan model (gaze targets, prop ends, camera moves, motion `none`), check every fixed sentence or must line the server adds for it.
