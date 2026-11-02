@@ -167,7 +167,7 @@ SK: (2 Nov) **The operator is asked for the font once per film, with Noto Sans a
 
 **C17. One reference-picture round per film: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C18. A reused clip is not cropped when the analysis gave no limit: keep?**
 Suggested: **Keep.**
