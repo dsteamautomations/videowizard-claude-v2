@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     GEMINI_IMAGE_USD_4K: float = 0.24
     GEMINI_IMAGE_INPUT_USD: float = 0.0011             # per input picture (560 tokens)
     DRAWN_FIX_MODEL: str = 'gemini-3.8-flash'   # design/117 answer 3: Flash first; the Pro model is this one line
-    PLUGIN_MIN_VERSION: str = '0.66.0'   # design/95 F5; 0.66.0 design/130 (vw motion, the motion helpers, the guard's motion skill); 0.65.1 design/129 I (the guard only in the operator folder, the second look's record, downloads run again); 0.65.0 the design/126 build (ST2, ME1, VI1, OP1, U1-U7); G2 (SK, 31 Oct 2026, after defect 36): an older tool is told to update; 0.64.2 `vw visuals plan` (defect 37); 0.64.3 crops in image files (defect 38); 0.64.4 the sweep fixes W1-W13
+    PLUGIN_MIN_VERSION: str = '0.70.0'   # design/142 (SK, 2 Nov 2026: "YES change"): vw category, shape, colours, font, log and the second look's stills; design/95 F5; 0.66.0 design/130 (vw motion, the motion helpers, the guard's motion skill); 0.65.1 design/129 I (the guard only in the operator folder, the second look's record, downloads run again); 0.65.0 the design/126 build (ST2, ME1, VI1, OP1, U1-U7); G2 (SK, 31 Oct 2026, after defect 36): an older tool is told to update; 0.64.2 `vw visuals plan` (defect 37); 0.64.3 crops in image files (defect 38); 0.64.4 the sweep fixes W1-W13
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
     STORAGE_SUPABASE_SERVICE_KEY: SecretStr = SecretStr('')
