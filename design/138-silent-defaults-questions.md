@@ -47,39 +47,39 @@ SK (2 Nov): **Correct the note.**
 
 **B1. Drawn shots made with the new drawing method unless a film is started with the older one: keep?**
 Suggested: **Keep.** It won the blind test on 1 Nov.
-SK:
+SK: (2 Nov) **Keep.**
 
 **B2. Is the ₹5,000 visual spending limit per film meant to be on or off?**
 Suggested: **On, but shown at the start of the visuals stage with the estimate**, so the operator knows it before the first picture. Our notes say it was removed on 28 Oct, yet the code still applies it; the live setting needs checking either way.
-SK:
+SK: (2 Nov) **On, shown at the start of the visuals stage with the estimate.**
 
 **B3. The prices behind the spending figures (₹4 a picture, ₹8.90 a video second, ₹88 to the dollar) are the builder's estimates. Should you set the real ones?**
 Suggested: **Yes: you give the real figures once; they go in the server's settings.** Until then every estimate is a guess.
-SK:
+SK: (2 Nov) **Keep the builder's estimates** for now.
 
 **B4. One video model (Gemini Omni), takes at 720p: keep?**
 Suggested: **Keep the model; review 720p** once the first finished film is watched at full size: 720p takes in a 1080p film may look soft.
-SK:
+SK: (2 Nov) **Keep; review 720p later**, once a finished film is watched at full size.
 
 **B5. Stills and graphics push in slowly (5 %) unless the plan says otherwise: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep as is.** (The push-in applies to still pictures and AI-painted graphics, never to drawn motion graphics.)
 
 **B6. An 8-frame dissolve where a graphic meets other shots, a cut elsewhere: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **The plan must always decide** the joins; no fixed dissolve rule.
 
 **B7. A video made from its start picture alone, unless its last moment must be exact: keep?**
 Suggested: **Keep.** It saves a picture, a check and an approval per shot.
-SK:
+SK: (2 Nov) **Keep.**
 
 **B8. Pexels as the stock-picture source: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **B9. After three review rounds, the assistant suggests turning failing scenes into AI passages, and asks: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **B10. Camera copies left out of the editor's download unless asked: keep?**
 Suggested: **Keep.**
@@ -194,3 +194,9 @@ SK:
 **C25. The film title is empty until chosen: keep?**
 Suggested: **Keep.**
 SK:
+
+## Group D: found while answering
+
+**D1. When a clip has no camera maker saved and an unfamiliar file name, should the system guess "phone"?**
+Today `footage.py` guesses "phone" for any ordinary-quality recording (8-bit, under 50 Mbit/s), so many regular cameras are called phones. The Gemini analysis has no camera field; the camera is read from the file's own details.
+SK (2 Nov, after seeing "mobile videos matched" on a film): **Say "not known".** No guess; the footage line says the camera is not known and nothing downstream assumes a phone. The operator can still correct it.
