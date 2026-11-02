@@ -445,6 +445,8 @@ def process_drawn(job):
         fonts = {'Noto Sans': drawn.font_file().read_bytes()}
         if request.get('font_key'):
             fonts[request.get('font_name') or 'Brand'] = store.get(request['font_key'])
+        if request.get('film_font'):   # design/139 R13: the font the operator chose, a file under server/fonts
+            fonts[request['font_name']] = (drawn.FONTS / request['film_font']).read_bytes()
         refs = {rid: {'status': 'approved'} for rid in images}
         W, H = int(request['width']), int(request['height'])
         actions = request['scene'].get('actions') or []
@@ -529,7 +531,7 @@ def process_drawn(job):
 def _motion_folder(store, request, folder):
     """design/130: the project unpacked into the job's spool folder with GSAP, the fonts, the approved pictures and the timing sidecar beside it."""
     from . import drawn, motion
-    fonts = {n: (store.get(k) if k else drawn.font_file().read_bytes()) for n, k in (request.get('fonts') or {'NotoSans-Variable.ttf': None}).items()}
+    fonts = {n: ((drawn.FONTS / n).read_bytes() if k in (None, 'server') else store.get(k)) for n, k in (request.get('fonts') or {'NotoSans-Variable.ttf': None}).items()}   # design/139 R13: 'server', a file under server/fonts
     refs = {rid: store.get(k) for rid, k in (request.get('images') or {}).items()}
     if folder.exists():
         shutil.rmtree(folder)

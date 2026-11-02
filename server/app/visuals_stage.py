@@ -3750,6 +3750,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     palette for the read; cached by the request's digest; never counted against the cap."""
     from . import drawn, svg_scene
     need(drawn_route(run) == 'svg', 'This film draws its drawn shots with HyperFrames: `vw motion render --shot S`.')
+    need_font(run)
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, body['shot_id']))
     need(shot['visual_type'] == 'drawn', f"shot {shot['id']} is {shot['visual_type']}: `draw` is for a drawn shot (visual_type drawn, with scene_svg).")
@@ -3781,6 +3782,7 @@ def render_drawn(conn, store, user, run, outputs, body):
                'frames': frames, 'cues': cues, 'images': images, 'plan_digest': digest(plan), 'style_key': style['key'] if style else None,
                'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
                **({'font_key': session['font']['key'], 'font_name': Path(session['font']['name']).stem} if session.get('font') else {}),
+               **({'film_font': next(iter(film_font_files(run))), 'font_name': film.font(run)} if film_font_files(run) else {}),   # design/139 R13
                'claims': shot.get('claims') or [], 'relationships': (spec or {}).get('relationships') or [], 'view': spec_view(shot)[0] if spec else None,
                'spec': {'dimensions': (spec or {}).get('dimensions') or []},   # design/117 P2: the sizes checked against the scene's text at render
                'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame'], 'film_fps': str(fps), 'duration_seconds': str(exact), 'exact_seconds': float(exact)}}
@@ -3874,10 +3876,24 @@ def _film_frame(session):
     return fps, W, H
 
 
-def _motion_fonts(store, session):
-    """{file name: bytes} placed in assets/fonts, and the family names a project may use."""
+def film_font_files(run):
+    """design/139 R13: the film's chosen font as {file name: 'server'} (a file under server/fonts), none for Noto Sans or a film from before."""
+    name = film.font(run)
+    return {film.FONTS[name]: 'server'} if name and name != 'Noto Sans' else {}
+
+
+def need_font(run):
+    """design/139 R13: the drawing font is asked once, before the first drawing, with Noto Sans as the reference."""
+    need(film.font(run), 'Ask the operator the drawing font once, Noto Sans recommended (or ' + ', '.join(f for f in film.FONTS if f != 'Noto Sans') +
+                         '), and record it: `vw font <name> --quote "<their words>"`.')
+
+
+def _motion_fonts(store, session, run=None):
+    """{file name: bytes} placed in assets/fonts, and the family names a project may use (Noto Sans always, for the scripts the chosen font lacks)."""
     from . import drawn
     files, names = {'NotoSans-Variable.ttf': drawn.font_file().read_bytes()}, ['Noto Sans']
+    for file in film_font_files(run):
+        files[file], names = (drawn.FONTS / file).read_bytes(), names + [film.font(run)]
     if session.get('font'):
         files[Path(session['font']['name']).name] = store.get(session['font']['key'])
         names.append(Path(session['font']['name']).stem)
@@ -3898,7 +3914,8 @@ def set_motion(store, user, run, outputs, shot_id, name, content):
     except ValueError as exc:
         need(False, f'The project cannot be read: {exc}.')
     fps, W, H = _film_frame(session)
-    names = _motion_fonts(store, session)[1]
+    need_font(run)
+    names = _motion_fonts(store, session, run)[1]
     problems = motion.problems(files, refs=session['references'], fonts=names, frames=shot['end_frame'] - shot['start_frame'], fps=fps, width=W, height=H)
     need(not problems, 'The project breaks the rules: ' + '; '.join(problems[:6]) + ('' if len(problems) <= 6 else f' (+{len(problems) - 6} more)'))
     sha = hashlib.sha256(content).hexdigest()
@@ -3931,7 +3948,7 @@ def _motion_request(store, session, run, shot_id, sha=None):
         ref = session['references'].get(rid)
         need(ref and ref.get('status') == 'approved' and ref.get('key'), f"the project places assets/ref/{rid}.png, which is not an approved picture of this run.")
         images[rid] = ref['key']
-    fonts = {n: k for n, k in [('NotoSans-Variable.ttf', None)] + ([(Path(session['font']['name']).name, session['font']['key'])] if session.get('font') else [])}
+    fonts = {n: k for n, k in [('NotoSans-Variable.ttf', None)] + ([(Path(session['font']['name']).name, session['font']['key'])] if session.get('font') else []) + list(film_font_files(run).items())}   # design/139 R13
     spec = shot.get('drawing_spec')
     frames = shot['end_frame'] - shot['start_frame']
     exact = Fraction(frames) / Fraction(str(fps))
@@ -4079,7 +4096,7 @@ def motion_brief(store, run, outputs, shot_id):
     timed = ', '.join(f"{w['text']} {(w['start_frame'] - shot['start_frame']) / f:.2f}" for w in words) or 'none recorded: key cues with at_s'
     spec = shot.get('drawing_spec') or {}
     dims = '; '.join(f"{d.get('part')} {d.get('measure')} {d.get('value')} {d.get('unit')} ({d.get('status') or 'given'})" for d in spec.get('dimensions') or [])
-    fonts = _motion_fonts(store, session)
+    fonts = _motion_fonts(store, session, run)
     pictures = brief_pictures(session, shot)
     sm = shot.get('scene_motion') or {}
     lines = [f"# Brief: drawn shot {shot['id']} (HyperFrames)", '',
