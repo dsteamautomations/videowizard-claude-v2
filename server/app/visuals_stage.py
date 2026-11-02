@@ -266,9 +266,16 @@ def library_version_of(session):
     return session.get('library_version') or library.latest()
 
 
+def category_of(session):
+    """design/136: the film's video category; documentary-explainer until a film records its own, and for an unknown name."""
+    c = (session or {}).get('video_category')
+    return c if c in library.CATEGORIES else library.DEFAULT_CATEGORY
+
+
 def library_pack(store, run, outputs):
-    """design/68 L3: every step's library files with their text, for the plugin to write once per step."""
-    return library.steps(library_version_of(session_of(store, run, outputs)))
+    """design/68 L3: every step's library files with their text, for the plugin to write once per step; design/136: by the film's category."""
+    session = session_of(store, run, outputs)
+    return library.steps(library_version_of(session), category_of(session))
 
 
 def check(store, run, outputs, document):

@@ -75,4 +75,7 @@ An edit of the approved start, in one region, at the same framing and light. Onl
 ## For narrative-story and social-ugc
 
 - The eye line: where each person looks, and why.
-- *Not available yet:* cover and thumbnail frames (one idea, three to five words, readable at thumbnail size). VideoWizard does not make them today.
+
+## Not available yet
+
+- Cover and thumbnail frames (social-ugc): one idea, three to five words, readable at thumbnail size. VideoWizard does not make them today.
