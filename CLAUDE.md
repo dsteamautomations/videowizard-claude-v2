@@ -8,6 +8,13 @@ This folder (`/Users/vasudha/Codex/videowizard-claude-v2`, GitHub `dsteamautomat
 - **Operator.** Works in `/Users/vasudha/Documents/videobuilder - Operator ` with `/vw:vw`. The operator always runs the **live server** `https://8-234-82-225.sslip.io` (set by `VW2_SERVER_URL` in that folder's `.claude/settings.json`) and the **pushed plugin** (`vw@vw-local`, installed at user scope from the GitHub marketplace `dsteamautomations/videowizard-claude-v2`, which reads `plugin/` on `main`; enabled only in the operator folder by its `.claude/settings.json` and disabled at user scope, so its guard hook never runs in any other folder). Never point the operator at this working copy. Operator-side guidance: `plugin/operator-CLAUDE.md`, `design/30-operator-handoff-live-server.md`.
 - **Live server.** GCE VM `vw2`, project `sm-project-435806`, zone `asia-south1-a`; code in `/opt/vw2/app` (user `vw2`), venv `/opt/vw2/venv`, services `vw2-server` and `vw2-worker`, spool `/var/lib/vw2/spool`. SSH: `gcloud compute ssh vw2 --zone asia-south1-a --project sm-project-435806 --tunnel-through-iap`. Logs: `journalctl -u vw2-server` / `-u vw2-worker`. History: `design/25`, `design/26`, `design/29`. Builder handoff (state, reading list, deploy steps from a new laptop): `design/72`.
 
+## What VideoWizard is for (SK, 2 Nov 2026)
+
+VideoWizard is built for **every category of video**: documentaries and explainers, advertisements, product films, training, social clips and the rest. The films made so far are documentaries because that is what we test with first; they are not the product's limit. Every builder and every reader holds to this:
+- **A rule is generic, or it is filed under the category it serves.** Never write a rule that only fits documentaries into the general set, and never delete a rule because documentaries do not need it: file it under its category, so a step reads only the general rules plus its own category's.
+- **Nothing tuned to one outside project.** Text copied from a public source that carries that project's own brand, product, look or constraints (a race advert's palette, a fashion shop's handbag field, sign-making rules) is converted to a generic rule or removed.
+- **Rules are written for today's picture and video models.** Habits for older models (keyword stacks, quality tags, heavy repetition, long negative lists) are removed.
+
 ## Working rules
 
 - Requirements before code. Write down what will change and why; wait for SK's approval before coding.
