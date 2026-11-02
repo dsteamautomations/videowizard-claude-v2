@@ -115,7 +115,7 @@ def test_8_copy_is_none_unless_a_graphic_state_carries_labels():
 
 # ---------- 9, 10 and the retired sentences ----------
 
-RETIRED = json.loads((ROOT / 'procedures' / 'retired.json').read_text(encoding='utf-8'))
+RETIRED = json.loads((ROOT / 'retired-sentences.json').read_text(encoding='utf-8'))
 
 
 def ai_text():
@@ -168,3 +168,9 @@ def test_18_no_refusal_or_next_message_carries_a_design_label():
             if re.search(r"(need\(|Problem\(|'next':).*\(?(proposed before )?design/\d", code):
                 found.append(f'{p.name}:{n}')
     assert found == []
+
+
+def test_every_file_in_procedures_is_a_procedure_the_server_can_load():
+    """2 Nov 2026: a data file without a version in server/procedures/ stopped the server at start-up (db.migrate loads every *.json there)."""
+    for p in (ROOT / 'procedures').glob('*.json'):
+        assert 'version' in json.loads(p.read_text(encoding='utf-8')), p.name

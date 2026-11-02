@@ -1,5 +1,5 @@
 """design/134 (the Codex process review, SK 2 Nov 2026): instruction version 3, findings 9 and 10, one exact replacement each; every new text
-is shorter. The old wording goes on RETIRED (server/procedures/retired.json), which a test keeps out of v3.json for good.
+is shorter. The old wording goes on RETIRED (server/retired-sentences.json), which a test keeps out of v3.json for good.
 Run once: python scripts/d134_wording_v3.py. c1_split_v3.py --check applies apply()."""
 import json
 import sys
