@@ -14,7 +14,7 @@ from psycopg.types.json import Jsonb
 
 from .. import core, film, jobs, runlog
 from ..errors import Problem
-from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, narration as NR, package as P, slides as SL, validator as V
+from . import CONTRACT_MASTER, CONTRACT_OPTIONS, SLATE_FRAMES, looks, narration as NR, package as P, slides as SL, validator as V
 
 def timeline(run):
     """design/139 R1: the cut's timeline from the operator's recorded shape and rate; a film from before keeps 1920 x 1080 at 25."""
@@ -167,6 +167,9 @@ def prepare(conn, store, user, run, outputs):
         entities.extend({'clip_id': clip['id'], **e} for e in log.get('entities') or [])
     if not rows:
         raise Problem(409, 'NOT_ALLOWED', 'No analysed clips; run analysis first.')
+    grouped = looks.groups({o['unit']: o['summary'].get('look') for o in outputs if o['stage'] == 'analysis' and o['unit'] is not None and not o['summary'].get('excluded')})
+    for r in rows:   # design/142 R5: the colour group is the server's own measure, not the analysis's label
+        r['color_group'] = grouped.get(r['clip_id'])
     if approved:   # design/125 P8: the logs know the script's paragraphs; each is mapped to the approved scenes its words fall in, beside the chapter
         at = {w['id']: w for w in narration['words']}
         paragraphs = {}

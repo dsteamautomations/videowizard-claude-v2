@@ -163,8 +163,8 @@ def validate_options(doc, package, policy):
                     refusals.append(f"{tag}: Q6 A2 interval {iv['in_frame']}-{iv['out_frame']} is not inside a clean_nat_sound_interval")
             if row['handles']['video_handle_frames_before'] == 0 and a == row['in_frame'] and ev.get('transition_in'):
                 refusals.append(f'{tag}: G9 no transition into a zero-handle edge')
-            if row['natural_cut_frames'] and min(abs(a - f) for f in row['natural_cut_frames']) > 6 and a != row['in_frame']:
-                flags.append(f'{tag}: R1 in-point is not at a natural cut point')
+            if natural_cut_missed(a, row['natural_cut_frames'], Fraction(row['source_fps']) / Fraction(str(tl_fps))) and a != row['in_frame']:   # design/142 R5
+                flags.append(f'{tag}: R1 a natural cut point was within reach of the in-point and was not used')
             if row['accent_frames'] and all(f > z or f < a for f in row['accent_frames']):
                 flags.append(f'{tag}: R1 no accent event inside the shot')
             n_tl, ratio = _tl_frames(ev, row, tl_fps)
@@ -197,7 +197,7 @@ def validate_options(doc, package, policy):
                     flags.append(f"{tag}: G6 eye-trace {prev['exit_eye_grid']} → {row['entry_eye_grid']} without a neutral buffer")
                 if prev['screen_direction'] not in NEUTRAL and row['screen_direction'] not in NEUTRAL and prev['screen_direction'] != row['screen_direction']:
                     refusals.append(f'{tag}: G7 screen direction flips without a neutral shot')
-                if prev['color_group'] != row['color_group']:
+                if prev['color_group'] and row['color_group'] and prev['color_group'] != row['color_group']:   # design/142 R5: an unknown look never trips it
                     flags.append(f'{tag}: R10 colour group changes inside the beat')
                 if prev['energy'] > row['energy']:
                     flags.append(f'{tag}: R4 energy drops inside the beat')
@@ -285,7 +285,7 @@ def validate_options(doc, package, policy):
         oa, ob = by_beat[a['beat_id']][0], by_beat[b['beat_id']][0]
         last = next((rows.get(e.get('sub_clip_id')) for e in reversed(oa.get('events') or []) if not e.get('blank') and e.get('sub_clip_id') in rows), None)
         first = next((rows.get(e.get('sub_clip_id')) for e in ob.get('events') or [] if not e.get('blank') and e.get('sub_clip_id') in rows), None)
-        if last and first and last.get('color_group') != first.get('color_group') and not str(ob.get('moves_place') or '').strip():
+        if last and first and last.get('color_group') and first.get('color_group') and last.get('color_group') != first.get('color_group') and not str(ob.get('moves_place') or '').strip():
             flags.append(f"OPTION #{ob.get('option_number')}: N14 {a['beat_id']} and {b['beat_id']} narrate one process but cut from colour group {last.get('color_group')} "
                          f"to {first.get('color_group')}: another place mid-process; keep one place, or name the move (moves_place)")
     energies = []
@@ -318,6 +318,13 @@ def carried(kept, labels):
 def carry_flag(kept, ev, labels):
     """N14 is answered by the words, or by the assistant's reason that a label is the same thing under another name (carries_over_seen)."""
     return not ev.get('blank') and not carried([kept], labels) and not str(ev.get('carries_over_seen') or '').strip()
+
+
+def natural_cut_missed(a, natural, ratio):
+    """design/142 R5 (SK, design/140 Q4): R1 fires only when a natural cut point lay within B1's six-frame window of the in-point (in source frames:
+    six timeline frames times source fps over timeline fps) and the shot did not start on it."""
+    reach = 6 * ratio
+    return any(0 < abs(a - f) <= reach for f in natural or [])
 
 
 WHY_KINDS = ('wrong action', 'wrong object', 'already used', 'claim or number', 'too short', 'unusable crop', 'contradicts the words', 'other')   # design/142 R2

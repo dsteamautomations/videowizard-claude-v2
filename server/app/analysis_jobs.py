@@ -413,6 +413,13 @@ def process(job):
                 if hashlib.sha256(data).hexdigest() != clip['sha256']:
                     raise Problem(409, 'ANALYSIS_SOURCE', 'Stored clip hash differs from the media record.')
                 original.write_bytes(data)
+                try:   # design/142 R5: the clip's look, measured while the worker holds it; never fails the analysis
+                    from .stage2 import looks
+                    look = looks.measure(original, clip.get('duration_s'), directory, settings().FFMPEG_EXECUTABLE,
+                                         log='log' in str(clip.get('color_transfer') or '').lower() or clip.get('color_transfer') == 'arib-std-b67')
+                    durable(paths['response.json'].parent / 'look.json', json.dumps(look).encode('utf-8'))
+                except Exception:   # noqa: BLE001
+                    pass
                 attachment = original if request['identity']['understand_audio'] else silent_copy(original, directory)
                 sha = hashlib.sha256(attachment.read_bytes()).hexdigest()
                 k_idx, k_key = _key()
@@ -462,7 +469,7 @@ def process(job):
         raw_bytes = saved['raw'].encode('utf-8')
         store.put(base + '.response.json', raw_bytes, 'application/json')
         result = {'response_key': base + '.response.json', 'response_sha256': hashlib.sha256(raw_bytes).hexdigest(), 'response_bytes': len(raw_bytes),
-                  'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': analysis.summary_of(reviewed, clip)}
+                  'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': {**analysis.summary_of(reviewed, clip), 'look': read_json(paths['response.json'].parent / 'look.json')}}
         if reviewed['status'] == 'retained':
             from .clip_log import gate
             ev = json.dumps(gate.evidence_document(reviewed, request, clip), ensure_ascii=False).encode('utf-8')
