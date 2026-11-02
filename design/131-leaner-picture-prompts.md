@@ -1,6 +1,6 @@
 # design/131: leaner picture prompts
 
-2 Nov 2026. Status: **requirements for SK's approval. Nothing is built.**
+2 Nov 2026. Status: **ON HOLD (SK, 2 Nov 2026): needs more time to address the issues. Nothing is built.** SK set aside the prompt-test results as a basis for prompt changes (C1 to C5) until more image tests are run (quality `medium`, 2048x1152, more photo prompts).
 
 **Evidence:** `prompt-test/report.html` (11 real prompts from VW-6, VW-9 and VW-12 against one change at a time, judged blind), `image-edit-test/results.html` (the edit loop) and `diagram-compare/compare.html` (HyperFrames against GPT Image). Every run used the live GPT Image 2.5 setup, apart from VideoWizard.
 
