@@ -97,27 +97,33 @@ SK: (2 Nov) **Keep.**
 
 **C1. Should a film end with a sales call to action?**
 Suggested: **Decided by the category: an advertisement or product film asks the operator; other categories have none.**
-SK:
+SK: (2 Nov) **Keep none**: no call to action unless the operator brings it up (every category).
 
 **C2. If the operator does not say the film's shape, should it be horizontal?**
 Suggested: **No: the brief asks the shape** (with A3's two choices). Shape is too important to assume.
-SK:
+SK: (2 Nov) **Settled by A1**: the shape is recommended from the footage and the operator decides; never assumed.
 
 **C3. A 0.8-second pause after each paragraph of the narration: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C4. The voice model and settings when none are given: keep today's?**
 Suggested: **Keep, and show them** (see A4).
-SK:
+SK: (2 Nov) **Settled by A4**: Eleven v4, settings shown and editable.
 
 **C5. A clip over 15 seconds gets the dearer, deeper analysis: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C6. An AI passage is at least 3 seconds; over 12 seconds, and a real shot over 4 seconds, are flagged as long: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) SK's limits: an AI video (Google, Seedance) needs at least 3 s to generate; at worst 3 s is made and cut to 2 s; 1 s is a single picture. Explainer and drawn graphics can be 1 to 2 s. Longest take: 10 s (Gemini Omni; 30 s is the ceiling for any model today, unused). Approved changes:
+1. No minimum on a blank (the 3 s refusal at `stage2/validator.py:10` goes).
+2. An AI video shot is at least 2 s on screen (made at 3 s and trimmed, as today); under 2 s is refused with "use a single picture".
+3. Drawn and explainer graphics: no minimum.
+4. Longest take 10 s: kept (Omni is the only video model).
+5. Both 12 s warnings removed (`stage2/validator.py:11` long blank, `visual_contract.py:502` AI run).
+6. The 4 s long-real-shot warning removed (`stage2/validator.py:19`).
 
 **C7. Pictures always at high quality: keep?**
 Suggested: **Keep.**
