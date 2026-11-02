@@ -23,14 +23,14 @@ STEPS = {
     'reference': {'task': 'continuity-kit', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/consistent-character-frames.md'),
                   'when': 'a generated reference of a person, object or place (`vw visuals image --kind isolated|sheet`); consistent-character-frames for a person'},
     'frame': {'task': None, 'playbook': None, 'files': ('library/video/gap-fill.md',), 'when': 'choosing a frame from a clip (`vw visuals frame`): gap-fill section 3; no prompt is written'},
-    'still-scene': {'task': 'keyframe', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/craft/animatic-keyframes.md', 'library/video/gap-fill.md', 'library/00-method/de-slop.md'),
+    'still-scene': {'task': 'keyframe', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/gap-fill.md', 'library/00-method/de-slop.md'),
                     'when': 'an AI still for an image shot (`image --kind keyframe`, then `still`); de-slop for a photographic look'},
     'still-diagram': {'task': 'process-explainer', 'playbook': 'web-app', 'files': ('library/playbooks/web-app.md', GPT, 'library/00-method/craft.md', 'library/prompts/05-information.md'),
                       'when': 'a diagram, chart or labelled picture for a diagram shot (`image`, then `still`); craft section 5 for the diagram grammar'},
     'state': {'task': 'graphic-states', 'playbook': 'diagram-in-states', 'files': ('library/video/diagram-in-states.md', GPT, 'library/00-method/craft.md'),
               'when': 'a state of a graphic sequence (`image --kind state --parents R`, then `sequence`)'},
-    'start': {'task': 'keyframe', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/craft/animatic-keyframes.md', 'library/video/gap-fill.md', 'library/video/consistent-character-frames.md'),
-              'when': "the start image of a video shot (`image --kind keyframe`); the generator's sheet for its accepted size"},
+    'start': {'task': 'keyframe', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/gap-fill.md', 'library/video/consistent-character-frames.md'),
+              'when': "the start image of a video shot (`image --kind keyframe`)"},
     'end': {'task': 'first-last-frame', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/gap-fill.md'),
             'when': 'the end image of a video shot (`image --kind keyframe --parents <start>`): gap-fill section 3'},
     'take': {'task': 'clip-from-frame', 'playbook': 'video-clip',
@@ -79,13 +79,31 @@ def text(version, path):
     return file.read_text(encoding='utf-8')
 
 
-def steps(version):
-    """What the plugin writes per step at prepare (design/68 L4): the always-open files, each step's files with their text, the compliance checklist, the two maps."""
+CATEGORIES = ('documentary-explainer', 'advertisement-product', 'training-education', 'social-ugc', 'narrative-story')   # design/136 (SK, 2 Nov 2026): every category of video
+DEFAULT_CATEGORY = 'documentary-explainer'   # until a film records its own
+
+
+def for_category(text_, category):
+    """design/136: a guidebook's general part plus the film's own category part. A '## For …' part is kept when it names the category; a
+    '## Not available yet' part is never read. A file with neither is returned as it is."""
+    out, keep = [], True
+    for line in text_.splitlines(keepends=True):
+        if line.startswith('## ') and not line.startswith('### '):
+            head = line[3:].strip().lower()
+            keep = not head.startswith('not available yet') and (not head.startswith('for ') or category in head)
+        if keep:
+            out.append(line)
+    return ''.join(out)
+
+
+def steps(version, category=DEFAULT_CATEGORY):
+    """What the plugin writes per step at prepare (design/68 L4): the always-open files, each step's files with their text, the compliance checklist, the two maps.
+    design/136: each file's general part plus the film's category part."""
     def files(paths):
-        return [{'path': p, 'text': text(version, p)} for p in paths]
-    return {'version': version, 'always': files(ALWAYS),
+        return [{'path': p, 'text': for_category(text(version, p), category)} for p in paths]
+    return {'version': version, 'category': category, 'always': files(ALWAYS),
             'steps': {name: {'task': s['task'], 'playbook': s['playbook'], 'when': s['when'], 'files': files(s['files'])} for name, s in STEPS.items()},
-            'compliance': {'path': COMPLIANCE, 'text': text(version, COMPLIANCE)},
+            'compliance': {'path': COMPLIANCE, 'text': for_category(text(version, COMPLIANCE), category)},
             'map': text(version, 'VW-MAP.md'), 'field_sources': text(version, 'FIELD-SOURCES.md')}
 
 
@@ -98,7 +116,7 @@ def steps_of(shot):
 def step_files(step, generator=None):
     """The step's files, with the sheet of the shot's generator where a generator matters."""
     paths = [p for p in STEPS[step]['files'] if p not in ALL_SHEETS]
-    if step in ('start', 'take'):
+    if step == 'take':   # design/136: the video model's sheet is for the take; the start image's size is the server's
         paths += list(MODEL_SHEETS.get((generator or DEFAULT_GENERATOR).get('model')) or ())
     return paths
 

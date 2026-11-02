@@ -152,14 +152,14 @@ def _fingerprint(files):
 
 def test_the_new_snapshot_is_the_only_one_and_matches_its_manifest_and_its_name():
     new = L.latest()
-    assert L.versions() == [VERSION] == [new]   # design/35 Old ways 8: older snapshots removed
+    assert L.versions()[-1] == new and VERSION in L.versions()   # design/136: the 29 Oct version stays for runs pinned to it (design/35 row 24)
     for v in L.versions():
         m = L.manifest(v)
         assert L.verify(v) == [] and m['version'] == v
         assert m['fingerprint_sha256'] == _fingerprint(m['files']) and v.endswith(m['fingerprint_sha256'][:12])
         for f in m['files']:
             assert (L.ROOT / v / f['path']).stat().st_size == f['bytes'], f['path']
-    assert 'design/124 A4' in L.manifest(new)['note']
+    assert 'design/136' in L.manifest(new)['note']
 
 
 def test_the_new_snapshot_drops_kling_seedance_and_higgsfield_and_nothing_points_at_them():

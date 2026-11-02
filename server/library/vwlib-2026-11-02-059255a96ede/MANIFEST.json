@@ -1,0 +1,178 @@
+{
+  "version": "vwlib-2026-11-02-059255a96ede",
+  "created": "2026-11-02",
+  "library_master": "C:/Rev/DS/image-prompt-library 2 (not under git; this snapshot is identified by its fingerprint)",
+  "fingerprint_sha256": "059255a96ede10a8d9dc6eb42b9fa208099134305715aed746c2ff77bb623e6e",
+  "fingerprint_rule": "sha256 over the files in path order, each contributing \"<path>\" NUL \"<file sha256>\" newline",
+  "note": "design/136 (SK, 2 Nov 2026): every guidebook a step reads rewritten from the audit in design/136-guidebook-audit: a general part, then parts by video category (documentary-explainer, advertisement-product, training-education, social-ugc, narrative-story), then parts not available yet; text tuned to the copied projects, habits of older models, server-only settings and provenance removed. The animatic-keyframes file is left out. Copied from vwlib-2026-10-29-3d60877d3d23.",
+  "files": [
+    {
+      "path": "FIELD-SOURCES.md",
+      "sha256": "0459834e4cbdeb720a3c555d756862eab60c68230b0d4d517cfbff2c782bf4b4",
+      "bytes": 3649,
+      "library_source": null,
+      "status": "videowizard-specific"
+    },
+    {
+      "path": "VW-MAP.md",
+      "sha256": "e5e8fa02be001224274192cea2744bd1ab854b3e5891543e6bfccbe48a5fd641",
+      "bytes": 5848,
+      "library_source": null,
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/00-method/craft.md",
+      "sha256": "5f2ecfb05fb50c2c695adfd961d96d39c69ea887ef8d4483c0c9669c4b547975",
+      "bytes": 3744,
+      "library_source": "00-method/craft.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/00-method/de-slop.md",
+      "sha256": "0c87d961105a3501250315cdde3a203d4c526a16871e48485ffd1d93cbeb1a11",
+      "bytes": 5672,
+      "library_source": "00-method/de-slop.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/RULEBOOK.md",
+      "sha256": "d79a0f40396b81db371ca5a4b84edb2c0c1360e550dc428130e91ddc446e1fb6",
+      "bytes": 7864,
+      "library_source": "RULEBOOK.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/agency/compliance-checklist.md",
+      "sha256": "57daa37287c1458c27f69fe216c137d91ff0f40070273627f86c146b57b4ff5a",
+      "bytes": 3151,
+      "library_source": "agency/compliance-checklist.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/agency/deterministic-checks.md",
+      "sha256": "c487c321cd2e1cb7c567bffeff97f24789a95e3593b4023c1ff7c85960aeb988",
+      "bytes": 2778,
+      "library_source": "agency/deterministic-checks.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/feedback/README.md",
+      "sha256": "e586a5d6c28d337c6031fbbc6a5539280bde0ce6bf5a7960404d1edc6c12d1f3",
+      "bytes": 3636,
+      "library_source": "feedback/README.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/feedback/record-template.videowizard.yaml",
+      "sha256": "dea231baed27bb6ae8c4aa6fe1d42e11c4bb3677a6b9e6676a86c7533be5fd91",
+      "bytes": 1865,
+      "library_source": null,
+      "status": "draft, untested (new 2026-10-21)"
+    },
+    {
+      "path": "library/feedback/record-template.yaml",
+      "sha256": "115e3bb6f3639d35b000f26027eb82e745994e8fe00c825912e0f184286f8daf",
+      "bytes": 975,
+      "library_source": "feedback/record-template.yaml",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/forms/answer-form.md",
+      "sha256": "2a7f28849001707c0f4e85ae1e51056fa75a601d035b6b658da8137367acd8bc",
+      "bytes": 13395,
+      "library_source": "forms/answer-form.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/forms/answer-form.videowizard.md",
+      "sha256": "4eaf5f5e0648e4acfa8b99946891f9901187d2cde65c3c5665c5d2a19a432521",
+      "bytes": 5447,
+      "library_source": null,
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/forms/job-form.md",
+      "sha256": "4510c916e0c6f91e3b7e61b82668bc042f2f7c6aa61e3b24a47aa31c223fca62",
+      "bytes": 11780,
+      "library_source": "forms/job-form.md",
+      "status": "snapshot"
+    },
+    {
+      "path": "library/models/gpt-image/FACT-SHEET.md",
+      "sha256": "03c47391d96c0ab1e3ab4b97ce234a0062c05536394ca13f8e48e97527982cfc",
+      "bytes": 5759,
+      "library_source": "models/gpt-image/FACT-SHEET.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/playbooks/video-clip.md",
+      "sha256": "e77b12c36ff4b73cb640f50d962f6d1f5ac3c8e64eb8f845f0f67f9ce3da07f4",
+      "bytes": 3785,
+      "library_source": "playbooks/video-clip.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/playbooks/video-frame.md",
+      "sha256": "5a0ccc5a8022c271fc01953098f9404636f860af6b82863443c914287ba4a982",
+      "bytes": 5402,
+      "library_source": "playbooks/video-frame.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/playbooks/web-app.md",
+      "sha256": "a6aaf0e091d3328820277862744b845c6709351aa5dcb9637308024114412754",
+      "bytes": 3323,
+      "library_source": "playbooks/web-app.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/prompts/05-information.md",
+      "sha256": "bd5692e2a7f55448cb3ebbba4778fc3b1895e21ee47587d336007034b2f90d95",
+      "bytes": 5359,
+      "library_source": "prompts/05-information.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/video/consistent-character-frames.md",
+      "sha256": "c518595de0e8b0ec13307ca362693e65c227ef6cb55648c06906e4b7c54dbf44",
+      "bytes": 2834,
+      "library_source": "video/consistent-character-frames.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/video/craft/camera-lighting-vocabulary.md",
+      "sha256": "0d9a2922e68b44208bfba5d0f4004f1c0ae335dff11ca88589d435c115344ff2",
+      "bytes": 5609,
+      "library_source": "video/craft/camera-lighting-vocabulary.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/video/diagram-in-states.md",
+      "sha256": "79d7ce77781c7657f4d325b9faa2cb76c0f5119ec2eaa079cc2866c31d96670e",
+      "bytes": 4916,
+      "library_source": "video/diagram-in-states.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/video/gap-fill.md",
+      "sha256": "cf4462bf23fc7755984f6eaf728abd614305e18d8c37b19793e4c7e43647e84a",
+      "bytes": 3398,
+      "library_source": "video/gap-fill.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/video/models/gemini-omni-1-1/FACT-SHEET.md",
+      "sha256": "fe59d66932d4a24cc5ff9e613977ee92a3289a9f20b843a9036a5ec6bc9a5dfb",
+      "bytes": 4441,
+      "library_source": "video/models/gemini-omni-1-1/FACT-SHEET.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    },
+    {
+      "path": "library/video/still-to-motion-pipeline.md",
+      "sha256": "38c5dc1f8d3ba1c38450ce6ef64ed7d04a007f114d6bd7708c8dd70d7344c9bd",
+      "bytes": 7431,
+      "library_source": "video/still-to-motion-pipeline.md",
+      "status": "videowizard, design/136: general part plus parts by video category (2026-11-02)"
+    }
+  ]
+}
