@@ -475,8 +475,9 @@ def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tw
     if tweaks is not None:
         set_tweaks(store, run, outputs, voice_id, tweaks)
     script, _ = script_text(store, outputs)
-    row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'narration', 'voice_id': voice_id, 'text': script['spoken_text']}, request_id, store=store)
     state = page_state(store, run)
+    row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'narration', 'voice_id': voice_id, 'text': script['spoken_text'], 'model_id': elevenlabs.DEFAULT_MODEL,
+                                                       'settings': heard_settings(conn, run, voice_id)}, request_id, store=store)
     add_narration(state, {'job_id': str(row['id']), 'voice_id': row['request']['voice_id'], 'name': row['request'].get('name'), 'model_id': row['request'].get('model_id'),
                           'settings': row['request'].get('settings'), 'direction_digest': row['request'].get('direction_digest'), 'tweaks': row['request'].get('tweaks') or [],
                           'by': user['name'], 'at': datetime.now(timezone.utc).isoformat(), 'from': by})
@@ -484,9 +485,26 @@ def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tw
     return row
 
 
-def tryout(conn, store, user, run, outputs, voice_ids, request_id):
-    """design/54 step 2: up to six voices read the chosen test passage with the direction's register and tags; a library voice is saved to the account by the submission."""
+def heard_settings(conn, run, voice_id):
+    """design/139 R2: the settings of this voice's latest audition, from the page or the chat (the fault: the narration used the defaults).
+    No audition, or one made with a retired model, means the v4 defaults."""
+    row = conn.execute("select request->>'model_id' as model, request->'settings' as settings from vw2_jobs where run_id=%s and stage='voice' "
+                       "and request->>'kind'='audition' and request->>'voice_id'=%s order by created_at desc limit 1", (run['id'], voice_id)).fetchone()
+    return v4_settings(row['settings'] if row and row['model'] == elevenlabs.DEFAULT_MODEL else None)
+
+
+def v4_settings(values):
+    """design/139 R2: Eleven v4's two settings, 0 to 1; none given means the defaults (0.5, 0.75), what every audition before this was made at."""
+    values = dict(values) if values else dict(elevenlabs.DEFAULT_SETTINGS[elevenlabs.DEFAULT_MODEL])
+    elevenlabs.validate_settings(elevenlabs.DEFAULT_MODEL, values)
+    return values
+
+
+def tryout(conn, store, user, run, outputs, voice_ids, request_id, settings=None):
+    """design/54 step 2: up to six voices read the chosen test passage with the direction's register and tags; a library voice is saved to the account by the submission.
+    design/139 R2: read with the operator's v4 settings, recorded on each tryout so the narration uses them."""
     check_cap(voice_ids, TRYOUT_MAX, 'tryout')
+    settings = v4_settings(settings)
     doc = direction_of(store, run)
     if not doc or not doc.get('passage'):
         raise Problem(409, 'NOT_ALLOWED', 'Ask the assistant for the direction and the test passage first (vw voice direct); the tryout reads that passage.')
@@ -497,10 +515,11 @@ def tryout(conn, store, user, run, outputs, voice_ids, request_id):
     for i, vid in enumerate(voice_ids):
         tweaks = (doc.get('tweaks') or {}).get(vid) or []
         text = VD.directed_passage(script['spoken_text'], doc.get('base') or [], doc.get('register') or '', pp['first_word'], pp['last_word'], tweaks) if doc.get('chosen') != 'none' else pp['text']
-        row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': vid, 'text': text, 'directed': doc.get('chosen') != 'none', 'passage': pp['n']}, sub_request_id(request_id, i), store=store)
+        row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': vid, 'text': text, 'directed': doc.get('chosen') != 'none', 'passage': pp['n'],
+                                                           'model_id': elevenlabs.DEFAULT_MODEL, 'settings': settings}, sub_request_id(request_id, i), store=store)
         rows.append(row)
         state['tried'] = [t for t in state['tried'] if t['voice_id'] != row['request']['voice_id']] + \
-            [{'voice_id': row['request']['voice_id'], 'asked_as': vid, 'name': row['request'].get('name'), 'job_id': str(row['id']), 'at': datetime.now(timezone.utc).isoformat()}]
+            [{'voice_id': row['request']['voice_id'], 'asked_as': vid, 'name': row['request'].get('name'), 'job_id': str(row['id']), 'settings': settings, 'at': datetime.now(timezone.utc).isoformat()}]
     state['step'] = 'try'
     save_doc(store, run, 'page.json', state)
     return rows

@@ -15,6 +15,14 @@ from .errors import Problem
 OPEN = ('queued', 'running', 'storage_pending', 'submission_unknown')
 
 
+def voice_model(request):
+    """design/139 R2 (SK, 2 Nov 2026): Eleven v4 only; v2 and v3 are retired (design/35), refused by name on both front ends."""
+    model = request.get('model_id') or elevenlabs.DEFAULT_MODEL
+    if model != elevenlabs.DEFAULT_MODEL:
+        raise Problem(422, 'VOICE_MODEL', f'{model} is retired: every audition and narration uses Eleven v4 (eleven_v4), with stability and similarity.')
+    return model
+
+
 def submit_voice(conn, user, run, outputs, request, request_id, store=None):
     """Validate an audition/narration request against the accepted script, then queue it. Paid; informed, not gated.
     A narration carries the run's recorded direction (design/52 D): the provider reads the tagged text, the record keeps the accepted one."""
@@ -31,7 +39,7 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
         raise Problem(409, 'SCRIPT_CHANGED', 'Narration text must be exactly the accepted script (content digest mismatch). Re-read out/script.json.')
     if kind == 'audition' and len(text) > 3000:
         raise Problem(422, 'VOICE_REQUEST', 'Audition excerpts are at most 3000 characters.')
-    model = request.get('model_id') or elevenlabs.DEFAULT_MODEL
+    model = voice_model(request)
     settings_ = request.get('settings') or elevenlabs.DEFAULT_SETTINGS.get(model)
     elevenlabs.validate_settings(model, settings_)
     provider = elevenlabs.ElevenLabs()

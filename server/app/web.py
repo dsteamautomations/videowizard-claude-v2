@@ -563,7 +563,7 @@ def _voices2_act(code, vw2_session, body):
             voices.save_doc(store, run, 'page.json', state)
             return JSONResponse({'step': state['step']})
         if action == 'tryout':
-            rows = voices.tryout(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid)
+            rows = voices.tryout(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid, body.get('settings'))   # design/139 R2
             return JSONResponse({'jobs': [str(r['id']) for r in rows], 'saved': [r['request'].get('name') for r in rows if r['request'].get('saved_from_library')]})
         if action == 'narrate':
             rows = voices.narrate_many(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid, 'page')

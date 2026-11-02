@@ -573,6 +573,7 @@ class Direction(Write):
 
 class VoiceIds(Write):
     voice_ids: list[str] = Field(min_length=1, max_length=6)
+    settings: dict[str, Any] | None = None   # design/139 R2: Eleven v4 stability and similarity for a tryout
 
 
 class Step(Write):
@@ -843,7 +844,7 @@ def voice_search(user=User, conn=DB, tab: str = 'explore', search: str = '', lan
 
 @app.post('/api/runs/{run_id}/voice/tryout', status_code=201)
 def voice_tryout(run_id: UUID, body: VoiceIds, user=User, conn=DB):
-    return _voice_write(run_id, body, user, conn, lambda run, outputs: [dict(r) for r in voices.tryout(conn, storage(), user, run, outputs, body.voice_ids, body_dict(body)['request_id'])], 201)
+    return _voice_write(run_id, body, user, conn, lambda run, outputs: [dict(r) for r in voices.tryout(conn, storage(), user, run, outputs, body.voice_ids, body_dict(body)['request_id'], body.settings)], 201)
 
 
 @app.post('/api/runs/{run_id}/voice/narrate-many', status_code=201)
