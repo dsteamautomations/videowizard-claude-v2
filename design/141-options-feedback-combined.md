@@ -75,3 +75,7 @@ Nothing in the design/139 build covers these points. design/139 changed the blan
 15. The scenes file's shape is in the package.
 16. The client's picture notes are kept from intake, and a topic no scene carries is shown to the operator.
 17. The instructions say that a B-roll shot named by a step needs its own "why", and the analysis step does not ask questions.
+
+## 6. SK's answers
+
+- **Q1 (point 2), 2 Nov:** **All three sources, and for every stage of the pipeline.** Server events, the assistant's entries through `vw log`, and the reasons the cut must carry. The log covers every stage, not only analysis and options: the treatment, the plan, the visuals, the pictures and takes, assembly and delivery included. Kept on the server with the run.
