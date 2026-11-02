@@ -171,35 +171,35 @@ SK: (2 Nov) **Keep.**
 
 **C18. A reused clip is not cropped when the analysis gave no limit: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C19. When the client card is empty, the picture requests say industry "other" and audience "general". Keep?**
 Suggested: **No: read them from the client card and the brief; if still empty, the brief asks once.**
-SK:
+SK: (2 Nov) **Read from the client card and the brief; if still empty, the operator is asked once** for industry and audience.
 
 **C20. Frames a second fall back to 25 when a film has none recorded. Keep?**
 Suggested: **No: taken from the footage** (see A2).
-SK:
+SK: (2 Nov) **Settled by A2**: from the footage; 25 is never assumed.
 
 **C21. Each video starts at its beginning; a long one is trimmed, a short one holds its last frame (listed to the operator at assembly): keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C22. A shaky clip is left as it is. Keep?**
 Suggested: **No: when the analysis flags a clip as shaky, the operator is asked: steady it, or leave it.**
-SK:
+SK: (2 Nov) **Keep as is**: a shaky clip is left alone.
 
 **C23. A picture fills the frame by enlarging up to 1.35 times, then keeps bars: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 **C24. Narration loudness, peak level, camera-sound level and fades are fixed. Should they follow where the film is shown?**
 Suggested: **Keep today's levels for now**; a platform's own loudness becomes a choice when a film is made for one (the brief already names destinations).
-SK:
+SK: (2 Nov) **Keep today's levels for now.**
 
 **C25. The film title is empty until chosen: keep?**
 Suggested: **Keep.**
-SK:
+SK: (2 Nov) **Keep.**
 
 ## Group D: found while answering
 
