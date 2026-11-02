@@ -319,7 +319,7 @@ def brief_record(ws, procedure, prior, client_card=None):
             raise Refused(f"out/brief.json: question {q['id']} is required; ask the operator and store their exact answer in `answers`.")
     body = {k: data.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')}
     body['answers'] = {k: str(v) for k, v in answers.items()}
-    body['production'] = production_inputs(data.get('production') or {})
+    body['production'] = production_inputs(data.get('production') or {}, client_card or {})
     summary = {**body, 'questions': len(questions), 'source_intake': intake['summary']['source_digest'], 'content_digest': digest(json.dumps(body, sort_keys=True)),
                'client_card': client_card or {}, 'directory_differences': directory_differences(data), **stamps(ws, 'brief')}   # design/50 C, E
     return {'files': ['out/brief.json'], 'summary': summary, 'retain': True, 'upload': True}
@@ -337,42 +337,47 @@ GENERIC_STAGES = ['Stage_1_Setup', 'Stage_2_Preparation', 'Stage_3_Execution', '
 BLUEPRINT_DEFAULTS = {'target_runtime_s': None, 'process_stages': [],   # the chapters of the film, from the script, or empty
                       'brand_and_safety_rules': [],   # asked of the operator at brief; never filled with blueprint examples (VW-2, 15 Oct 2026)
                       'show_speaker_video': False}
-ASKED_EVERY_FILM = ('field_speech_languages', 'narration_language')   # no default: the operator answers on every film (design/37 2.8)
-FRAMES = ('16:9', '9:16', '1:1', '4:5')   # design/53 L7
-FORMAT_DEFAULT = {'frame': '16:9', 'destinations': [], 'watched_muted': False}
+FORMAT_DEFAULT = {'destinations': [], 'watched_muted': False}   # design/139 R1: the shape is not in the brief; it is asked after the clips are listed (`vw shape`)
 
 
 def format_inputs(given):
-    """design/53 L7: where the film plays and its frame shape; defaults when the operator said nothing."""
+    """design/53 L7: where the film plays; defaults when the operator said nothing."""
     if given is None:
         return dict(FORMAT_DEFAULT)
     if not isinstance(given, dict):
-        raise Refused('out/brief.json: production.format must be an object {frame, destinations, watched_muted}.')
-    frame = given.get('frame', FORMAT_DEFAULT['frame'])
-    if frame not in FRAMES:
-        raise Refused('out/brief.json: production.format.frame must be one of ' + ', '.join(FRAMES) + '.')
+        raise Refused('out/brief.json: production.format must be an object {destinations, watched_muted}.')
+    if 'frame' in given:
+        raise Refused('out/brief.json: square and 4:5 are kept for a future update (SK, 2 Nov 2026).' if given['frame'] in ('1:1', '4:5') else
+                      "out/brief.json: the film's shape is not part of the brief; it is asked after the clips are listed and recorded with `vw shape` (design/139). Remove production.format.frame.")
     dests = given.get('destinations', [])
     if not isinstance(dests, list) or not all(isinstance(x, str) and x.strip() for x in dests):
         raise Refused('out/brief.json: production.format.destinations must be a list of names (YouTube, Instagram …), empty when not given.')
     muted = given.get('watched_muted', False)
     if not isinstance(muted, bool):
         raise Refused('out/brief.json: production.format.watched_muted must be true or false.')
-    return {'frame': frame, 'destinations': [d.strip() for d in dests], 'watched_muted': muted}
+    return {'destinations': [d.strip() for d in dests], 'watched_muted': muted}
 
 
-def production_inputs(given):
-    """Blueprint v3.2 project inputs (design/12 §A.1). Defaults apply only to keys the operator did not supply; nothing is invented per client."""
+def production_inputs(given, client_card=None):
+    """Blueprint v3.2 project inputs (design/12 §A.1). Defaults apply only to keys the operator did not supply; nothing is invented per client.
+    design/139 R5: the narration language is read from the script (never English by default); the footage languages are detected by the analysis.
+    design/139 R14: the industry comes from the client card, else the operator is asked once."""
     out = {}
-    missing = [k for k in ASKED_EVERY_FILM if given.get(k) in (None, '')]   # design/125 B1: an empty list of footage languages is an answer (nobody speaks)
-    if missing:
-        raise Refused('out/brief.json: production.field_speech_languages (languages spoken in the footage) and production.narration_language are asked of the operator on every film; '
-                      'record their answers (missing: ' + ', '.join(missing) + ').')
-    langs, narration = given['field_speech_languages'], given['narration_language']
-    if not isinstance(langs, list) or not all(isinstance(x, str) and x.strip() for x in langs):
-        raise Refused('out/brief.json: production.field_speech_languages must be a list of language codes.')
+    narration = given.get('narration_language')
     if not isinstance(narration, str) or not narration.strip():
-        raise Refused('out/brief.json: production.narration_language must be a language code.')
-    out['field_speech_languages'], out['narration_language'] = langs, narration
+        raise Refused('out/brief.json: production.narration_language is read from the script (the language its words are in, as a code: ta, hi, en …); '
+                      'tell the operator and record it.')
+    out['narration_language'] = narration
+    if 'field_speech_languages' in given:   # an older brief's answer; new briefs leave it out and the analysis detects the languages
+        langs = given['field_speech_languages']
+        if not isinstance(langs, list) or not all(isinstance(x, str) and x.strip() for x in langs):
+            raise Refused('out/brief.json: production.field_speech_languages must be a list of language codes.')
+        out['field_speech_languages'] = langs
+    industry = str(given.get('industry') or '').strip()
+    if industry:
+        out['industry'] = industry
+    elif client_card is not None and not str((client_card or {}).get('industry') or '').strip():
+        raise Refused('out/brief.json: the client card has no industry: ask the operator once what industry the client is in and record it as production.industry.')
     for k, default in BLUEPRINT_DEFAULTS.items():
         v = given.get(k, default)
         if k == 'target_runtime_s':

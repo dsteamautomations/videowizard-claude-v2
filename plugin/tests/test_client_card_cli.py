@@ -40,7 +40,7 @@ def test_brief_prepare_shows_the_card_and_the_precedence_rule(ws):
 
 def base(**over):
     return {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'constraints': '', 'questions': [], 'answers': {},
-            'production': {'field_speech_languages': ['ta'], 'narration_language': 'en'}, **over}
+            'production': {'field_speech_languages': ['ta'], 'narration_language': 'en', 'industry': 'construction'}, **over}
 
 
 def test_brief_record_keeps_the_card_and_the_differences(ws):

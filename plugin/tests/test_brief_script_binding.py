@@ -42,7 +42,7 @@ def test_records_carry_prepared_and_recorded_at(ws):
     (ws / 'out' / 'source.txt').write_text(CLEANED, encoding='utf-8')
     brief_prepare(ws, STAGES['brief'], outputs(ws))
     (ws / 'out' / 'brief.json').write_text(json.dumps({'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e',
-                                                       'production': {'field_speech_languages': ['ta'], 'narration_language': 'en'}}), encoding='utf-8')
+                                                       'production': {'field_speech_languages': ['ta'], 'narration_language': 'en', 'industry': 'construction'}}), encoding='utf-8')
     s = brief_record(ws, STAGES['brief'], outputs(ws))['summary']
     assert s['prepared_at'] and s['recorded_at'] >= s['prepared_at']
     script_prepare(ws, STAGES['script'], outputs(ws))

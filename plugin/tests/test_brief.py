@@ -22,7 +22,7 @@ def prior_of():
 
 def base(**over):
     return {'purpose': 'p', 'audience': 'a', 'message': 'm', 'tone': 't', 'ending': 'e', 'constraints': '', 'questions': [], 'answers': {},
-            'production': {'field_speech_languages': ['ta'], 'narration_language': 'en', **over.pop('production', {})}, **over}
+            'production': {'field_speech_languages': ['ta'], 'narration_language': 'en', 'industry': 'construction', **over.pop('production', {})}, **over}
 
 
 def test_prompt_is_clean_of_v1_machinery_and_carries_the_client_memory(ws):
@@ -53,17 +53,24 @@ def test_steps_carry_chapters_production_block_and_the_web_rule():
     assert 'on every film' in steps and 'same as last time' in steps
 
 
-def test_languages_are_required_on_every_film():
-    for prod in ({}, {'field_speech_languages': ['ta']}, {'narration_language': 'en'}):
+def test_the_narration_language_is_read_from_the_script_and_the_footage_languages_are_detected():   # design/139 R5 (SK, 2 Nov 2026)
+    for prod in ({}, {'field_speech_languages': ['ta']}):
         with pytest.raises(Refused) as exc:
             production_inputs(prod)
-        assert 'every film' in str(exc.value)
+        assert 'narration_language' in str(exc.value) and 'script' in str(exc.value)
     with pytest.raises(Refused):
         production_inputs({'field_speech_languages': 'ta', 'narration_language': 'en'})
-    assert production_inputs({'field_speech_languages': [], 'narration_language': 'en'})['field_speech_languages'] == []   # design/125 B1: nobody speaks
-    out = production_inputs({'field_speech_languages': ['ta', 'en'], 'narration_language': 'en'})
-    assert out['field_speech_languages'] == ['ta', 'en'] and out['narration_language'] == 'en'
-    assert 'field_speech_languages' not in out['defaults_applied'] and 'narration_language' not in out['defaults_applied']
+    out = production_inputs({'narration_language': 'ta'})
+    assert out['narration_language'] == 'ta' and 'field_speech_languages' not in out   # the analysis detects them; never English by default
+    assert production_inputs({'field_speech_languages': ['ta', 'en'], 'narration_language': 'en'})['field_speech_languages'] == ['ta', 'en']   # an older brief's answer is kept
+
+
+def test_the_industry_is_read_from_the_card_or_asked_once():   # design/139 R14 (SK, 2 Nov 2026, design/138 C19)
+    with pytest.raises(Refused) as exc:
+        production_inputs({'narration_language': 'en'}, {'company_legal_name': 'X'})
+    assert 'industry' in str(exc.value)
+    assert production_inputs({'narration_language': 'en', 'industry': 'construction'}, {})['industry'] == 'construction'
+    assert 'industry' not in production_inputs({'narration_language': 'en'}, {'industry': 'cement'})
 
 
 def test_chapters_default_empty_generic_refused_script_names_accepted():
@@ -122,11 +129,15 @@ def test_prompt_shows_the_document_timing_and_says_what_chapters_are(ws):
     assert 'frame shape' in ' '.join(PROC['steps'])
 
 
-def test_format_is_validated_and_defaulted():
-    out = production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en'})
-    assert out['format'] == {'frame': '16:9', 'destinations': [], 'watched_muted': False} and 'format' in out['defaults_applied']
-    out = production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'format': {'frame': '9:16', 'destinations': ['Instagram', 'TikTok'], 'watched_muted': True}})
-    assert out['format'] == {'frame': '9:16', 'destinations': ['Instagram', 'TikTok'], 'watched_muted': True} and 'format' not in out['defaults_applied']
-    for bad in ({'frame': '21:9'}, {'frame': '16:9', 'destinations': 'YouTube'}, {'frame': '16:9', 'watched_muted': 'yes'}, 'vertical'):
+def test_format_is_validated_and_defaulted_and_the_shape_is_not_in_the_brief():   # design/139 R1: the shape is asked after the clips are listed (`vw shape`)
+    out = production_inputs({'narration_language': 'en'})
+    assert out['format'] == {'destinations': [], 'watched_muted': False} and 'format' in out['defaults_applied']
+    out = production_inputs({'narration_language': 'en', 'format': {'destinations': ['Instagram', 'TikTok'], 'watched_muted': True}})
+    assert out['format'] == {'destinations': ['Instagram', 'TikTok'], 'watched_muted': True} and 'format' not in out['defaults_applied']
+    for bad in ({'destinations': 'YouTube'}, {'watched_muted': 'yes'}, 'vertical'):
         with pytest.raises(Refused):
-            production_inputs({'field_speech_languages': ['ta'], 'narration_language': 'en', 'format': bad})
+            production_inputs({'narration_language': 'en', 'format': bad})
+    for frame, words in (('9:16', 'vw shape'), ('1:1', 'future update'), ('4:5', 'future update')):
+        with pytest.raises(Refused) as exc:
+            production_inputs({'narration_language': 'en', 'format': {'frame': frame}})
+        assert words in str(exc.value)

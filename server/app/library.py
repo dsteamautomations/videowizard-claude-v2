@@ -132,8 +132,20 @@ def job_form(step, *, run, plan, gap, scene, shot, refs, generator, brief, card,
         raise ValueError(f'unknown library step {step!r}')
     from .visuals_stage import IMAGE_MODELS, provider_of   # late: visuals_stage imports this module
     from .config import settings
+    from . import film   # late: film imports this module
     foundation = plan.get('foundation') or {}
-    frame = (((brief or {}).get('production') or {}).get('format') or {}).get('frame') or '16:9'
+    production = (brief or {}).get('production') or {}
+    if film.older(run):   # a film from before design/139 keeps its brief's frame and the old fallbacks (design/35, until it closes)
+        frame = video_frame = (production.get('format') or {}).get('frame') or '16:9'
+        industry, audience = (card or {}).get('industry') or 'other', (brief or {}).get('audience') or 'general'
+    else:   # design/139 R1: a start, end or take is the AI video's shape; a still or graphic the film's; R14: nothing filled in
+        film.timeline(run)
+        video_frame = film.frame(run, video=True)
+        frame = video_frame if step in ('start', 'end', 'take') else film.frame(run)
+        industry = (card or {}).get('industry') or production.get('industry')
+        audience = (brief or {}).get('audience') or (card or {}).get('target_audience')
+        if not industry or not audience:
+            raise Problem(409, 'BRIEF_FIELD', f"The {'industry' if not industry else 'audience'} is not recorded: ask the operator once and record it in the brief (production.industry, audience).")
     elements = {e['id']: e for e in plan.get('elements') or []}
     images = [{'id': r['reference_id'], 'tag': 'scene' if r.get('kind') == 'frame' else 'approved', 'element_id': r['element_id'],
                'keep': (elements.get(r['element_id']) or {}).get('requirements') or ''} for r in refs or []]
@@ -146,11 +158,11 @@ def job_form(step, *, run, plan, gap, scene, shot, refs, generator, brief, card,
     preamble = '\n'.join(f'{label}: {value}' for label, value in brand if value)
     model = ((generator or DEFAULT_GENERATOR).get('model')) if step == 'take' else settings().GEMINI_IMAGE_MODEL if provider_of(run) == 'gemini' else IMAGE_MODELS['generate' if mode == 'generate' else 'edit']   # design/124 A4: the film's picture AI
     form = {'job_id': f"{run.get('code')}-{shot['id']}-{round_}", 'client_code': run.get('client_id') or '', 'requested_by': {'kind': 'agent', 'id': 'vw-operator-assistant'}, 'round': round_,
-            'playbook': spec['playbook'], 'task': spec['task'], 'mode': mode, 'industry': (card or {}).get('industry') or 'other',
-            'placement': frame, 'video_aspect': frame,
+            'playbook': spec['playbook'], 'task': spec['task'], 'mode': mode, 'industry': industry,
+            'placement': frame, 'video_aspect': video_frame,
             'request': {'words': shot.get('narration') or '', 'purpose': shot.get('purpose') or ''},
             'purpose': {'intent': gap.get('intent') or '', 'treatment_fit': gap.get('treatment_fit') or ''},
-            'audience': (brief or {}).get('audience') or 'general',
+            'audience': audience,
             'style_direction': {'foundation': foundation.get('appearance') or '', 'shot': shot.get('appearance') or ''},
             'copy': copy, 'text_mode': 'rendered', 'mandatory_text': 'none', 'logo': 'none', 'images': images,
             'brand_kit_id': run.get('client_id') or '', 'brand_preamble': preamble or 'none',

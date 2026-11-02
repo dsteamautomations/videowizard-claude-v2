@@ -38,6 +38,12 @@ def processing_mode(procedure, duration_s):
 TIMELINE = {'width': 1920, 'height': 1080, 'fps': 25, 'aspect_ratio': '16:9'}
 
 
+def language_config(production):
+    """design/139 R5 (SK, 2 Nov 2026): never assume English; a language the brief recorded is passed on, otherwise the analysis detects it."""
+    return {'expected_field_speech_languages': production.get('field_speech_languages') or 'not given: detect and report each spoken language (ISO code)',
+            'final_vo_language': production.get('narration_language') or 'not given: read it from the script beats'}
+
+
 def speaker_policy(policy, production):
     """design/14 §2 default mapping: camera audio excluded → Mode 3; allowed → Mode 2, or Mode 1 when the brief shows the speaker."""
     allow = policy.get('camera_audio') == 'allowed'
@@ -75,7 +81,7 @@ def build_request_clip_log(run, procedure, brief, script, clip, policy, *, gener
                       'target_aspect_ratio': TIMELINE['aspect_ratio'], 'timeline_resolution_width': TIMELINE['width'], 'timeline_resolution_height': TIMELINE['height'], 'timeline_fps': TIMELINE['fps'],
                       'target_runtime_seconds': production.get('target_runtime_s'),
                       'speaker_policy': {**sp, 'mode': P.MODES[P.mode_of(sp)]},
-                      'language_config': {'expected_field_speech_languages': production.get('field_speech_languages') or ['en'], 'final_vo_language': production.get('narration_language') or 'en'},
+                      'language_config': language_config(production),
                       'script_mode': 'SCRIPTED', 'script_beats': beats, 'process_stages': production.get('process_stages') or [],
                       'brand_and_safety_rules': production.get('brand_and_safety_rules') or [], 'learned_client_rules': production.get('learned_client_rules') or [],
                       'client_profile': client_profile(brief.get('client_card') or {})}   # design/50 D

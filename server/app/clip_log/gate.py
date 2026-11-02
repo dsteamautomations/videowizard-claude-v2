@@ -139,6 +139,8 @@ def summary_of(reviewed, clip):
     return {'contract_version': CONTRACT, 'status': reviewed['status'], 'clip': {k: clip.get(k) for k in ('id', 'name', 'duration_s')},
             'descriptive_name': log.get('descriptive_name'), 'sub_clips': len(subs), 'by_eligibility': by_elig, 'by_grade': by_grade,
             'speech_present': any((s['people_and_speaker_analysis'] or {}).get('speech_translation_block') for s in subs),
+            'languages': list(dict.fromkeys(b['spoken_language'] for b in ((s['people_and_speaker_analysis'] or {}).get('speech_translation_block') for s in subs)
+                                            if b and b.get('spoken_language'))),   # design/139 R5: what the analysis heard, in order
             'risk_flags': sum(len(s.get('risk_flags') or []) for s in subs), 'excluded_sub_clips': len(reviewed.get('excluded_sub_clips') or []),
             'gaps': len(reviewed.get('gaps') or []), 'identity_errors': reviewed.get('identity_errors') or [],
             'summary_card': log.get('summary_card_lines') or []}

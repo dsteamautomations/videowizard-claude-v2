@@ -27,12 +27,11 @@ def test_i2_the_images_help_carries_no_change_history_label():
     assert 'design/' not in line.split('help=')[1]
 
 
-def test_b1_nobody_speaks_in_the_footage_is_an_answer():
+def test_b1_nobody_speaks_in_the_footage_is_an_answer():   # design/139 R5: new briefs leave the footage languages to the analysis
     out = production_inputs({'field_speech_languages': [], 'narration_language': 'en'})
     assert out['field_speech_languages'] == []
-    with pytest.raises(Refused, match='asked of the operator on every film'):
-        production_inputs({'narration_language': 'en'})
-    with pytest.raises(Refused, match='asked of the operator on every film'):
+    assert 'field_speech_languages' not in production_inputs({'narration_language': 'en'})
+    with pytest.raises(Refused, match='read from the script'):
         production_inputs({'field_speech_languages': ['ta'], 'narration_language': ''})
 
 

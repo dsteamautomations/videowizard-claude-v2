@@ -5,6 +5,7 @@ Outcome classes, defined once:
 Only `retained` records a stage output for the clip. Every phase leaves a local receipt in the spool so a killed
 worker resumes at the last phase and never pays twice."""
 import hashlib
+from collections import Counter
 import json
 import os
 import subprocess
@@ -211,7 +212,15 @@ def status(conn, run, outputs):
     counts = {}
     for u in units:
         counts[u['status']] = counts.get(u['status'], 0) + 1
-    return {'units': units, 'counts': counts, 'cap': global_cap()}   # the cap lets the tool estimate the queue (design/42 6.1)
+    return {'units': units, 'counts': counts, 'cap': global_cap(), 'languages': film_languages(units)}   # the cap lets the tool estimate the queue (design/42 6.1)
+
+
+def film_languages(units):
+    """design/139 R5: the footage languages from the clip records: the one most clips speak first, then up to two others."""
+    heard = [(u.get('summary') or {}).get('languages') or [] for u in units]
+    counts = Counter(l for langs in heard for l in langs)
+    ranked = [l for l, _ in counts.most_common()]
+    return {'main': ranked[0] if ranked else None, 'others': ranked[1:3], 'clips_with_speech': sum(1 for langs in heard if langs)}
 
 
 def _job(conn, run, unit):
