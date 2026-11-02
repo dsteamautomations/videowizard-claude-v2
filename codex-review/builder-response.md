@@ -6,6 +6,9 @@ Facts you could not see, which apply throughout:
 - **Live state (2 Nov 2026):** server 0.80.0, plugin 0.67.0. HyperFrames (the motion drawing route) has been the default for new films since 1 Nov; SVG remains only on films started with `--drawn svg`. The second look now leaves a record on the server (design/129 P4, live since 1 Nov).
 - **VW-12** (the trial film about rat-trap bond walls, started 30 Oct) is a trial run. It will be deleted and never completed. Exceptions kept only for it (`OLD_PROMPT_RUNS`, `OLD_PLAN_RULE_RUNS`) are emptied when it is deleted.
 - **design/131** (leaner picture prompts) is on hold until more image tests. Finding 15 is the one exception; see below.
+- **What VideoWizard is for (SK, 2 Nov; now in CLAUDE.md):** every category of video (documentary and explainer, advertisement and product, training, social, narrative). The films so far are documentaries only because that is what we test with first. A rule is either generic or filed under the category it serves. Never judge a rule "unneeded" because documentaries do not use it; judge whether it is filed under the right category.
+- **The guidebooks (server/library) are being rebuilt** (design/136, direction approved): a section-by-section audit of the 18 guidebooks the picture and video steps read found about 30 % sound rules; the rest is overridden by VideoWizard, tuned to the projects it was copied from, outdated for today's models, or duplicated. The new version files every rule by category. **Do not audit server/library again in this round;** read design/136 and its four audit files if a finding touches them.
+- **All 18 decisions are recorded in design/134**, and they are being built now as one release.
 - **Tests run outside the code** that you could not see are listed under the findings they affect, for example the G07-S4-SH1 timing test of 1 Nov.
 - **Our own review** (design/126) covered every stage up to the first cut, then the visuals stage up to the detailed plan. It stopped before the reference pictures, shot pictures, takes and drawn shots. Most of your findings are in that unreviewed part, which is why our review did not catch them.
 
@@ -72,12 +75,23 @@ Facts you could not see, which apply throughout:
 - **Decision:** yes, with your wording. The operator's tick of open facts stays in the instructions.
 
 ### 15. Whole guidebooks loaded for one section
-- **Decision:** yes, now (SK).
-- **Why:** the builder first proposed parking it with design/131, on hold until image tests. SK decided it is the first step to improvement, because the AI reading only the relevant sections focuses better.
-- **How:** the method goes to SK before anything is built. Sections are pulled by their heading when the step's files are packed; nothing is split into new files; a test per step proves each section is present.
+- **Decision:** yes, as part of the guidebook rebuild (design/135, design/136), not in this release.
+- **Why:** the builder first proposed parking it with design/131. SK decided it is the first step to improvement, because the AI reading only the relevant sections focuses better.
+- **How:** sections are pulled by their heading when a step's files are packed; nothing is split into new files.
+- **What you could not see:** whether the sections are sound. They are not all sound: the two sections a start image and a scene still would keep, the keyframe card and the person table, were copied word for word from public GitHub projects (a race advert and a fashion shop). They carry those projects' rules (an amber ban, a sound field, a handbag field, a 3:4 frame). Trimming alone would have made them a bigger share of what the AI reads, which is why the whole library is being rebuilt.
 
-### 16, 17 and 18
-Not yet decided at the time of writing: drawn-brief scope, the older delivery rebuild command, and the "(design/130)" label in a refusal.
+### 16. The drawn-shot brief gets the whole film's pictures and subject rules
+- **Decision:** yes. Pictures: the shot's own elements plus the style picture. Subject rules: matched against the shot's own words (narration, depicts, purpose), not the whole plan.
+- **What you missed:** the fresh checker's instructions say a rule it cannot see in the frames fails. So a wall rule handed to a lorry drawing is a certain false failure, costing a redo round and possibly a held drawing.
+
+### 17. The older delivery rebuild command still runs and is still recommended
+- **Decision:** yes. Correct the server's next text after the bundle (shorter); refuse `vw delivery resolve --run` by name, pointing to the new way, under the old-ways rule; keep `--check` and `--close` where needed; add a design/35 row.
+- **What you could not see:** the owner's old-ways rule (design/35 and memory). An older way is not left working: it is refused by name, with the new way in the refusal.
+
+### 18. A change label inside a refusal
+- **Decision:** yes.
+- **What you missed:** two more of the same kind: the identical "(design/130)" in the `vw visuals scene` refusal, and "(proposed before design/21)" in an options refusal.
+- **Added:** a test that fails when any refusal or "next" message the server sends contains a design-note label.
 
 ## What to look for in a second round
 
@@ -92,5 +106,9 @@ Each pattern below is behind at least one confirmed finding. Search the whole of
 7. **"Next" messages that point at the wrong step or a retired command** (14, 17).
 8. **Estimates that use different arithmetic from the order that spends the money** (12).
 9. **Text meant for the AI that ends up drawn in a picture** (8): any field fed into `copy`, `exact_text` or the picture checklist.
+10. **Whole-film data handed to a one-shot helper or check** (16): any per-shot brief, prompt form or checklist built from the whole plan, the whole reference set or the whole subject list.
+11. **A retired command still promoted or still working** (17): every command named in a server message, a tool reply or v3.json that v3.json elsewhere calls replaced or retired.
+12. **Internal labels in text the AI reads** (18): design-note numbers, finding numbers ("F11", "N3") or ticket numbers inside messages, added lines or instructions.
+13. **A check that fails what it cannot see** (16): a rule or must line given to a checker for something the picture or frames cannot show.
 
 Keep to the limits of design/133: reading only, the smallest fix, wordings never longer, no enterprise or code-hygiene findings. Leave out anything already decided here or in design/35, design/129 and design/134.
