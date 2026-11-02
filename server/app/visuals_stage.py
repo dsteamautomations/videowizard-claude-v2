@@ -283,7 +283,7 @@ def check(store, run, outputs, document):
     ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
         plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
-                                       drawn_route(run) == 'motion')   # design/89 B4; design/124-b item 13; design/130 §12
+                                       drawn_route(run) == 'motion', not film.older(run))   # design/89 B4; design/124-b item 13; design/130 §12; design/139 R3
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc)}
     r = routes(plan, _fps(session) or 25)
@@ -305,7 +305,7 @@ def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
     plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
-                                                   drawn_route(run) == 'motion'))   # design/130 §12
+                                                   drawn_route(run) == 'motion', not film.older(run)))   # design/130 §12; design/139 R3
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
     direction = ' '.join(str(session['treatment'].get('direction') or '').split())   # design/124 Change 3: a treatment recorded before it has none
     need(not direction or ' '.join(plan['foundation']['treatment'].split()).startswith(direction),
@@ -3368,7 +3368,7 @@ def packet(store, run, outputs, shot_id, session=None, card=None, rules=()):
               'footage_character': {k: (footage_view(session, outputs) or {}).get(k) for k in ('line', 'summary')},   # design/77 L42; design/88: measured, the correction winning
               'provider': {k: generator[k] for k in ('provider', 'model')}}
     prompt['context'] = {**prompt['context'], 'ambient': {'line': scene.get('ambient') or '', 'instruction': AMBIENT_START},
-                         'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {}),   # design/102: in the context, so no take goes stale
+                         'guidance': shot_guidance(shot, prompt['context'].get('footage_neighbours') or {}, category_of(run)),   # design/102: in the context, so no take goes stale
                          'bind_advice': bind_advice(plan, session, shot),   # design/104 D1, D2   # design/101 M5: in the context, so no take goes stale
                          'start_targets': {'lines': start_targets(scene, shot), 'instruction': NOT_YET_START}}   # design/110 F3: in the context, so no take goes stale
     identity = digest({**{k: v for k, v in prompt.items() if k not in ('context', 'footage_character')}, 'scene': note_free_scene(prompt['scene']),   # design/101, 103
@@ -3456,7 +3456,7 @@ def light_warning(scene, kind, prompt):
     return None
 
 
-def shot_guidance(shot, neighbours):
+def shot_guidance(shot, neighbours, category=library.DEFAULT_CATEGORY):
     """design/102 (course batch B): the lines for this shot's pictures and take; a graphic gets none, a close-up no layers, a still no camera line."""
     if shot.get('visual_type') in GRAPHIC_TYPES:
         return []
@@ -3466,8 +3466,9 @@ def shot_guidance(shot, neighbours):
     lines += ['Where a face is hidden or small, carry the action in the hands, shoulders and posture, beat by beat.',   # B2
               'Two or three imperfections at their places in this shot, not copied from the scene. Work leaves traces: tools, offcuts, mortar droppings, '
               'footprints on an active site; signs of use in a finished house.',   # B8
-              'Thirds by default, the centre only on purpose; use leading lines and give a moving subject room ahead. To show a task, a first-person frame '
-              'with the hands in front is an option.']   # B10, B13
+              ('The product may sit centred as the hero; elsewhere thirds, with leading lines and room ahead of a moving subject. '   # design/139 R12: by category
+               if category == 'advertisement-product' else 'Thirds by default, the centre only on purpose; use leading lines and give a moving subject room ahead. ') +
+              'To show a task, a first-person frame with the hands in front is an option.']   # B10, B13
     support = {(s or {}).get('support') for s in neighbours.values()} - {None, 'unknown'}
     if shot.get('visual_type') == 'video' and support:   # B4; design/124 A4 decision 2: steady takes, never handheld movement asked for
         lines.append(('The clips beside this gap are handheld, but the take stays steady: ' if 'handheld' in support else 'The clips beside this gap are steady: ')

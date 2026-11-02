@@ -86,3 +86,13 @@ def test_pictures_and_takes_follow_their_shape():   # design/139 R1
     assert VS.aspect_of(run, [], 'take', {'aspect_ratio': '9:16'}) == '9:16'   # said on the request
     old = {'film': None}
     assert VS.aspect_of(old, brief, 'take', {'aspect_ratio': None}) == '16:9' and VS.aspect_of(old, brief, 'sheet') == '9:16'   # a film from before reads as it did
+
+
+def test_framing_follows_the_category():   # design/139 R12 (SK, 2 Nov 2026, design/138 C14)
+    from app import visuals_stage as VS
+    shot = {'id': 'VS1', 'visual_type': 'video', 'framing': 'medium'}
+    ad = ' '.join(VS.shot_guidance(shot, {}, 'advertisement-product'))
+    doc = ' '.join(VS.shot_guidance(shot, {}, 'documentary-explainer'))
+    assert 'product may sit centred' in ad and 'Thirds by default' not in ad
+    assert 'Thirds by default' in doc and 'centred' not in doc
+    assert ' '.join(VS.shot_guidance(shot, {})) == doc   # the default reading, for a caller that names none

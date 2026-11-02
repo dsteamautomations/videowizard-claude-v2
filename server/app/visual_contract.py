@@ -205,6 +205,7 @@ class DrawnAction(Model):   # design/113 E1: keyed to a second of the shot or a 
     every_s: Num = 0.5           # build: the gap between one shape and the next
     path: list[list[Num]] = Field(default_factory=list, max_length=50)   # move
     seconds: Num = 1             # move, highlight, fade
+    color: str = Field(default='', pattern=r'^(#[0-9A-Fa-f]{6})?$')   # design/139 R3: highlight; chosen per drawing to stand out
 
 
 class SvgScene(Model):   # design/117 P2: the scene is one SVG file (data, never code), uploaded apart from the plan and named here by its hash
@@ -249,7 +250,7 @@ def motion_needs(shot, seconds):
         need(l.strip() and len(l) <= 120, f'{label}: a label is one to 120 characters.')
 
 
-def svg_needs(shot, seconds):
+def svg_needs(shot, seconds, colour_required=True):
     """design/117 P2: a drawn shot names its uploaded scene and keys every action inside the shot; the spec is required when the shot carries figures
     (a claim with a number), and its sizes are checked against the scene's text at render, when the file is read."""
     label = f'shot {shot.id}'
@@ -265,6 +266,8 @@ def svg_needs(shot, seconds):
         if a.word.strip():
             need(' '.join(_tokens(a.word)) in words, f"{label}: action {n}: the word '{a.word}' is not in the narration of {shot.id}.")
         need(a.kind != 'move' or len(a.path) >= 2, f'{label}: action {n}: move needs a path of two points or more.')
+        need(a.kind != 'highlight' or a.color or not colour_required, f'{label}: action {n}: a highlight names its colour (highlight_color, as color "#RRGGBB"): '
+                                                                      'one that stands out against the background and everything else in the frame, the brand colours where they do (design/139 R3).')
 
 
 class WarningAnswer(Model):   # design/124 Change 7: the answer to one warning of the check, kept out of the purpose and out of every picture request
@@ -600,7 +603,7 @@ def timing_warnings(gap_id, shots, timing, fps):
     return out
 
 
-def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False):   # design/130: labels_drawn on a motion film
+def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False, colour_required=True):   # design/130: labels_drawn on a motion film
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
     plan = Plan.model_validate(document)
     spec_warnings = []   # design/124 C2
@@ -782,7 +785,7 @@ def validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limi
                             if any(d.status == 'unknown' for d in spec.dimensions):
                                 need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
                     if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
-                        svg_needs(shot, seconds)
+                        svg_needs(shot, seconds, colour_required)
                         motion_needs(shot, seconds)   # design/130
                     for n, st in enumerate(shot.states, 1):
                         if st.hold_s > STATE_MAX_S + 0.04:

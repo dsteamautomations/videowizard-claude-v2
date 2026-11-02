@@ -21,7 +21,7 @@ SVG = '''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/
 ACTIONS = [{'kind': 'appear', 'ids': ['title'], 'at_s': 0},
            {'kind': 'build', 'ids': ['wall'], 'at_s': 0.5, 'every_s': 0.5},
            {'kind': 'move', 'ids': ['flame'], 'at_s': 2, 'path': [[1000, 500], [1000, 400]], 'seconds': 1},
-           {'kind': 'highlight', 'ids': ['c3'], 'at_s': 2.5, 'seconds': 1},
+           {'kind': 'highlight', 'ids': ['c3'], 'at_s': 2.5, 'seconds': 1, 'color': '#1E6FD9'},
            {'kind': 'fade', 'ids': ['arrow'], 'at_s': 3, 'seconds': 0.5}]
 
 REFS = {'comp-1': {'status': 'approved', 'kind': 'component', 'key': 'run-1/visuals/references/comp-1.png'}}

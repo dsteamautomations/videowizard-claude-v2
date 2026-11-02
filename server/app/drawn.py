@@ -81,7 +81,7 @@ def states(actions, cues, fps, n_frames, ids, kids):
         starts.append((int(round(t * f)), act, members))
     frames = []
     for n in range(n_frames):
-        st = {i: {'visible': i not in waits, 'alpha': 1.0, 'dx': 0.0, 'dy': 0.0, 'highlight': 0.0} for i in ids}
+        st = {i: {'visible': i not in waits, 'alpha': 1.0, 'dx': 0.0, 'dy': 0.0, 'highlight': 0.0, 'hl': HIGHLIGHT} for i in ids}
         for f0, act, members in starts:
             k = act['kind']
             for j, i in enumerate(members):
@@ -99,6 +99,7 @@ def states(actions, cues, fps, n_frames, ids, kids):
                 elif k == 'highlight' and n >= f0:
                     span = max(int(round(float(act.get('seconds') or 1) * f)), 1)
                     st[i]['highlight'] = 1.0 if n - f0 < span else 0.0
+                    st[i]['hl'] = act.get('color') or HIGHLIGHT   # design/139 R3: the drawing's colour; a film from before keeps the yellow
                 elif k == 'move' and n >= f0 and len(act.get('path') or []) >= 2:
                     span = max(int(round(float(act.get('seconds') or 1) * f)), 1)
                     u = min((n - f0) / span, 1.0)
@@ -122,10 +123,10 @@ SET_STATE = '''(state) => {
     el.style.visibility = s.visible ? 'visible' : 'hidden';
     el.style.opacity = String(s.alpha);
     el.setAttribute('transform', ((s.dx || s.dy) ? `translate(${s.dx} ${s.dy}) ` : '') + el.dataset.t0);
-    el.style.filter = s.highlight ? 'drop-shadow(0 0 6px %(hl)s) drop-shadow(0 0 14px %(hl)s)' : '';
+    el.style.filter = s.highlight ? `drop-shadow(0 0 6px ${s.hl}) drop-shadow(0 0 14px ${s.hl})` : '';
   }
   return true;
-}''' % {'hl': HIGHLIGHT}
+}'''
 
 MEASURE = '''() => Array.from(document.querySelectorAll('text')).map((el, n) => {
   const b = el.getBoundingClientRect();

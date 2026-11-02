@@ -61,7 +61,7 @@ def test_the_packet_carries_the_guidance_and_its_fingerprint_does_not_change(mon
     store, _ = take_store()
     out = VS.packet(store, RUN, [], 'VS1')
     assert any('midground' in l for l in out['preparation']['context']['guidance'])
-    monkeypatch.setattr(VS, 'shot_guidance', lambda shot, nb: [])
+    monkeypatch.setattr(VS, 'shot_guidance', lambda shot, nb, category=None: [])
     assert VS.packet(take_store()[0], RUN, [], 'VS1')['preparation_digest'] == out['preparation_digest']
 
 
