@@ -15,7 +15,7 @@ from pathlib import Path
 
 from psycopg.types.json import Json, Jsonb
 
-from . import analysis, core, jobs
+from . import analysis, core, film, jobs
 from .config import settings
 from .db import connect
 from .errors import Problem
@@ -106,6 +106,7 @@ def start_policy(policy, production):
 def start(conn, user, run, outputs, policy, again):
     """One job per clip in the media output (minus exclusions). Same inputs → same job reused unless `again`."""
     brief, script, media = _inputs(conn, run, outputs)
+    film.timeline(run)   # design/139 R1: the analysis judges crops against the film's shape, asked after the clips are listed
     policy = start_policy(policy, brief.get('production') or {})
     if policy.get('camera_audio'):   # design/42 6.2: the flag wins; otherwise the answer recorded at media
         policy = {**policy, 'camera_audio_source': 'flag'}

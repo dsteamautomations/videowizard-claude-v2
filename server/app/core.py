@@ -318,6 +318,9 @@ def output(conn, user, run, body):
         unit = None
     if nxt['actor'] == 'operator_decision':
         _needs_decision(nxt)
+    if st['name'] == 'brief':   # design/137: no default category; the brief waits for the operator's choice
+        from . import film
+        film.need_category(run)
     try:
         quote = acceptance_quote(st['name'], body.get('accepted_quote'), user)
         if st['needs_acceptance'] and not quote:

@@ -2629,6 +2629,22 @@ def cmd_pull(a):
     emit({**full, 'workspace': str(workspace(a.code))}, 0, f"Pulled {a.code}; files are listed in the manifest (downloads arrive with storage).")
 
 
+def cmd_film(a):
+    """design/137, design/139: the film's category, shape, colours and font, each recorded with the operator's words. With no value, show what is recorded,
+    the clip count with the shape and rate recommendation, and the choices."""
+    m = active()
+    if not a.value:
+        emit(call('GET', f"/api/runs/{m['run_id']}/film"))
+        return
+    if not (a.quote or '').strip():
+        emit({'action': 'refused', 'message': "Ask the operator, then pass their own words with --quote."}, 2)
+    value = ' '.join(a.value)
+    body = {'key': a.key, 'value': value, 'quote': a.quote}
+    if a.key == 'shape':
+        body.update(video=a.video, fps=a.fps)
+    emit(write(f"/api/runs/{m['run_id']}/film", body))
+
+
 def cmd_close(a):
     m = active()
     missing = [f['name'] for f in m['files'] if f['action'] == 'upload' and not f.get('receipt')]
@@ -2760,6 +2776,14 @@ def build_parser():
     s.add_argument('--camera', action='store_true', help='download: bring the low-resolution camera copies too (left out by default, design/115)'); s.set_defaults(fn=cmd_delivery)
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
+    for key, helptext in (('category', "the film's video category, read from the script and confirmed by the operator (design/137)"),
+                          ('shape', "the film's shape, then the AI video shape, from the clip count (design/139 R1); with no value: the count and the recommendation"),
+                          ('colours', 'the colours the operator prefers when the client card has none, or "no preference" (design/139 R3)'),
+                          ('font', 'the drawing font, Noto Sans recommended (design/139 R13)')):
+        s = sub.add_parser(key, help=helptext); s.add_argument('value', nargs='*'); s.add_argument('--quote')
+        if key == 'shape':
+            s.add_argument('--video', choices=['horizontal', 'vertical']); s.add_argument('--fps', type=int)
+        s.set_defaults(fn=cmd_film, key=key)
     return p
 
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from . import analysis_jobs, auth, connect, core, elevenlabs, files, jobs, visuals_stage, voices, web, worker
+from . import analysis_jobs, auth, connect, core, elevenlabs, film, files, jobs, library, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -970,6 +970,30 @@ def _analysis_run(conn, user, run_id, stage_check=True):
         if nxt['stage'] != 'analysis':
             raise Problem(409, 'NOT_ALLOWED', f"The next step is {nxt['stage']!r}, not 'analysis'.", next=nxt)
     return run
+
+
+class FilmChoice(Write):   # design/137, design/139: one choice with the operator's words
+    key: Literal['category', 'shape', 'colours', 'font']
+    value: str = Field(min_length=1, max_length=300)
+    quote: str = Field(min_length=1, max_length=2000)
+    video: str | None = None
+    fps: int | None = None
+
+
+@app.get('/api/runs/{run_id}/film')
+def get_film(run_id: UUID, user=User, conn=DB):
+    """The film's choices, and the clip count with the shape and rate recommendation once the clips are listed (design/139 R1)."""
+    run = core.load_run(conn, user, run_id)
+    media = next((o for o in core.current_outputs(conn, run['id']) if o['stage'] == 'media' and o['unit'] is None), None)
+    return Response({'film': film.choices(run), 'older': film.older(run), 'recommendation': film.recommend((media or {}).get('summary', {}).get('clips') or []) if media else None,
+                     'categories': list(library.CATEGORIES), 'fonts': list(film.FONTS)})
+
+
+@app.post('/api/runs/{run_id}/film')
+def post_film(run_id: UUID, body: FilmChoice, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id, lock=True)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, {'film': film.record(conn, user, run, body.key, body.value, body.quote, body.video, body.fps)}))
+    return Response(resp, status_code=status)
 
 
 @app.post('/api/runs/{run_id}/analysis/start', status_code=201)

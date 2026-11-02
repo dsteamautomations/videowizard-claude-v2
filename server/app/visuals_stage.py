@@ -19,7 +19,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import apify, core, image_check, jobs, keys, library, video_generators
+from . import apify, core, film, image_check, jobs, keys, library, video_generators
 from . import footage as FM   # design/88
 from .config import settings
 from .errors import Problem
@@ -266,16 +266,16 @@ def library_version_of(session):
     return session.get('library_version') or library.latest()
 
 
-def category_of(session):
-    """design/136: the film's video category; documentary-explainer until a film records its own, and for an unknown name."""
-    c = (session or {}).get('video_category')
-    return c if c in library.CATEGORIES else library.DEFAULT_CATEGORY
+def category_of(run):
+    """design/137: the film's video category as the operator confirmed it; a film started before design/139 reads documentary-explainer
+    (the older way, kept until it closes); a new film without one is refused, naming `vw category`."""
+    return film.need_category(run)
 
 
 def library_pack(store, run, outputs):
     """design/68 L3: every step's library files with their text, for the plugin to write once per step; design/136: by the film's category."""
     session = session_of(store, run, outputs)
-    return library.steps(library_version_of(session), category_of(session))
+    return library.steps(library_version_of(session), category_of(run))
 
 
 def check(store, run, outputs, document):

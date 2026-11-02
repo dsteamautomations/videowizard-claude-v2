@@ -1,6 +1,9 @@
 """design/136 (SK, 2 Nov 2026): the guidebooks filed by video category. A step reads each file's general part plus the film's own category part;
 "Not available yet" parts are never read. VideoWizard serves every category; documentary-explainer is the default until a film records its own."""
+import pytest
+
 from app import library, visuals_stage as VS
+from app.errors import Problem
 
 TEXT = """# A guide
 
@@ -43,8 +46,10 @@ def test_a_file_without_category_parts_is_read_whole():
 def test_the_categories_and_the_default():
     assert library.CATEGORIES == ('documentary-explainer', 'advertisement-product', 'training-education', 'social-ugc', 'narrative-story')
     assert library.DEFAULT_CATEGORY == 'documentary-explainer'
-    assert VS.category_of({}) == 'documentary-explainer' and VS.category_of({'video_category': 'social-ugc'}) == 'social-ugc'
-    assert VS.category_of({'video_category': 'cooking'}) == 'documentary-explainer'   # an unknown name falls back, never an empty read
+    assert VS.category_of({'film': None}) == 'documentary-explainer'   # design/137: a film from before keeps the documentary guidebooks
+    assert VS.category_of({'film': {'category': {'value': 'social-ugc'}}}) == 'social-ugc'
+    with pytest.raises(Problem):
+        VS.category_of({'film': {}})   # a new film is never assumed
 
 
 def test_the_pack_reads_by_category(monkeypatch):
