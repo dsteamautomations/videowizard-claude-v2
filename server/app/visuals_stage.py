@@ -3524,7 +3524,37 @@ def take_prompt_fields(run, plan, shot, fps, duration):
                 need(False, f"shot {shot.get('id')}: beat {b.get('id')} cannot be timed ({exc.__class__.__name__}); fix the plan's beat.")
     timeline.sort(key=lambda t: t['start_s'])   # stable: subjects keep their order when beats start together
     end = [str(c.get('what') or '').strip().rstrip('.') for c in shot.get('changes') or [] if str(c.get('what') or '').strip()]
+    end += end_places(plan, shot)   # design/149 B9 (SK, 3 Nov 2026): where every subject and prop is when the take ends; nothing in the frame vanishes
     return {'prompt_version': 2, **({'timeline': timeline} if timeline else {}), **({'end_state': end} if end else {})}
+
+
+def end_places(plan, shot):
+    """design/149 B9: one line per subject (its end position against its landmark, its pose) and per prop (in hand, set down where, carried out by whom)."""
+    names = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or []}
+    marks = {}
+    for g in plan.get('gaps') or []:
+        for sc in list(g.get('scenes') or []) + [x for c in g.get('choices') or [] for x in c.get('scenes') or []]:
+            if any(sh.get('id') == shot.get('id') for sh in sc.get('shots') or []):
+                marks = {l['id']: l.get('description') or l['id'] for l in sc.get('landmarks') or []}
+    def place(pos):
+        if not pos:
+            return ''
+        where = f"{str(pos.get('relation') or '').strip()} {marks.get(pos.get('landmark_id'), pos.get('landmark_id') or '')}".strip()
+        amount = pos.get('amount')
+        return where + (f", {amount:g} {pos.get('unit') or ''}".rstrip() if isinstance(amount, (int, float)) and amount else '')
+    out = []
+    for s in shot.get('subjects') or []:
+        end = s.get('end') or {}
+        bits = [b for b in (place(end.get('position')), str(end.get('pose') or '').strip()) if b]
+        if bits:   # a plan that gives no end (an older fixture, a held-only sketch) adds no line
+            out.append(f"{names.get(s['element_id'], s['element_id'])}: " + ', '.join(bits))
+    for p in shot.get('props') or []:
+        e = p.get('end') or {}
+        how = {'in_hand': f"still in the hand of {names.get(p.get('holder'), p.get('holder'))}", 'set_down': 'set down ' + place(e.get('position')),
+               'carried_out': 'carried out: ' + str(e.get('cause') or '').strip()}.get(e.get('where'), '')
+        if how:
+            out.append(f"{names.get(p['element_id'], p['element_id'])}: {how}")
+    return out
 
 
 def take_prompt_warnings(plan, shot, motion_prompt, timeline_sent=True):

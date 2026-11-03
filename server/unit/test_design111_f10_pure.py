@@ -48,7 +48,7 @@ def test_a_repeating_material_needs_its_spec_with_sourced_sizes_a_laying_a_patte
     assert out['elements'][1]['material_spec']['laid'] == 'on edge, header ends to the camera' and out['elements'][1]['material_spec']['not_this'] == []
     with pytest.raises(ValueError, match='BRICK is a repeating material: give its material_spec'):
         check(doc_with({**BRICK, 'material_spec': None}))
-    with pytest.raises(ValueError, match='repeating material: give its material_spec'):
+    with pytest.raises(ValueError, match=r'`repeating` is retired \(design/149\)'):   # design/149 B3 (SK): the flag is gone; kind material says it
         check(doc_with({**BRICK, 'kind': 'object', 'repeating': True, 'material_spec': None}))
     bad = copy.deepcopy(BRICK)
     bad['material_spec']['dimensions'][0].pop('source')

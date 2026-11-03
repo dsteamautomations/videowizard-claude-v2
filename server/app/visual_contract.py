@@ -46,7 +46,6 @@ class Element(Model):
     requirements: str = Field(min_length=1, max_length=4000)
     required_views: list[str] = Field(default_factory=list, max_length=20)
     size: list['Dimension'] = Field(default_factory=list, max_length=20)   # design/103 A5: real size, each with its source and status, never invented
-    repeating: bool = False   # design/111 F10: built from repeated units (bricks, tiles, blocks, planks, pavers); a kind 'material' always is
     material_spec: 'MaterialSpec | None' = None   # design/111 F10
     description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (build, age, skin, hair, posture, garment types and how worn), in every prompt
     signs_of_use: list['SignOfUse'] = Field(default_factory=list, max_length=30)   # design/111 F18: a place's traces of use, two written per shot
@@ -471,6 +470,67 @@ NEGATED = re.compile(r'(?:\bno|\bwithout|\bempty of|\bbefore the)\s+(?:\w+\s+)?$
 CROWD = 3   # design/124-b decision (a): up to three background people are named; more are a crowd
 
 
+OUTFIT_GARMENTS = re.compile(r'\b(shirt|kurta|t-?shirt|blouse|saree|sari|dupatta|salwar|kameez|dress|frock|skirt|trousers?|pants|jeans|shorts|lungi|dhoti|veshti|mundu|'
+                             r'jacket|coat|vest|waistcoat|sweater|cardigan|hoodie|apron|overalls?|uniform|cap|hat|helmet|turban|scarf|towel|sandals?|slippers?|chappals?|'
+                             r'shoes?|boots?|gloves?|belt|tie|suit|gown|robe)\b', re.I)   # design/149 B2: garments, not their parts (a sleeve in a framing note is not a garment)
+OUTFIT_COLOURS = re.compile(r'\b(white|black|grey|gray|red|blue|green|yellow|orange|brown|beige|cream|khaki|navy|maroon|pink|purple|violet|olive|tan|teal|'
+                            r'turquoise|saffron|mustard|rust|ochre|indigo|golden?|silver|dark|light|pale|faded|bright|striped|checked|plain|printed)\b', re.I)
+
+
+def outfit_key(text):
+    """design/149 B2: the garments and colours an outfit line names; empty when it names none of the listed words."""
+    words = re.findall(r'[A-Za-z-]+', str(text or '').lower())
+    return tuple(w for w in words if OUTFIT_GARMENTS.fullmatch(w) or OUTFIT_COLOURS.fullmatch(w))
+
+
+def same_outfit(a, b):
+    """The same clothes when the garment and colour words match as sets; when either line names none, the words themselves must match (strict where unsure)."""
+    ka, kb = outfit_key(a), outfit_key(b)
+    if ka and kb:
+        return set(ka) == set(kb)
+    return str(a or '').strip().lower() == str(b or '').strip().lower()
+
+
+STATED_FIGURE = re.compile(r'(\d+(?:[.,]\d+)?)\s*(kg\s*/\s*cm\s*[²2]|n\s*/\s*mm\s*[²2]|mpa|kn|kg|mm|cm|m|km|%|percent|per\s*cent|storeys?|stories|floors?|litres?|liters?|l|tonnes?|tons?|hours?|days?|years?)\b', re.I)
+
+
+def _unit_key(u):
+    u = re.sub(r'\s+', '', str(u or '').lower()).replace('²', '2')
+    return {'percent': '%', 'storey': 'storeys', 'story': 'storeys', 'stories': 'storeys', 'floor': 'floors', 'liter': 'l', 'litre': 'l', 'liters': 'l', 'litres': 'l',
+            'ton': 'tonnes', 'tons': 'tonnes', 'tonne': 'tonnes'}.get(u, u)
+
+
+def _stated_figure_needs(shot, spec):
+    """design/149 B6 (SK, 3 Nov 2026): a figure the shot's narration or claims state, in a unit a spec dimension carries, is confirmed from the script; marking it unknown is refused."""
+    stated = {}
+    for m in STATED_FIGURE.finditer(' '.join([shot.narration] + list(shot.claims))):
+        stated.setdefault(_unit_key(m.group(2)), m.group(0).strip())
+    for d in spec.dimensions:
+        if d.status == 'unknown' and _unit_key(d.unit) in stated:
+            need(False, f"shot {shot.id}: the narration states {stated[_unit_key(d.unit)]}: the spec's {d.part} {d.measure} is confirmed from the script, not unknown.")
+
+
+CONTAINER = re.compile(r'\b(?:in|inside|into|from|out of)\s+(?:a|an|the|his|her|their)\s+([a-z][a-z-]+)\b', re.I)   # design/149 B9: "in the basket", "from a pan"
+SCENERY = {'yard', 'room', 'kitchen', 'house', 'field', 'street', 'lane', 'site', 'shed', 'workshop', 'corner', 'middle', 'centre', 'center', 'background', 'foreground', 'frame',
+           'shade', 'sun', 'light', 'distance', 'air', 'ground', 'floor', 'doorway', 'door', 'window', 'wall', 'hand', 'hands', 'arms', 'lap'}   # places and the body: not containers
+
+
+def container_warnings(shot, elements, landmarks):
+    """design/149 B9: a start position that reads 'in the basket' names a thing that carries another; when no element of the shot and no landmark of the scene is that thing, a warning."""
+    known = ' '.join([e.id + ' ' + e.name for e in elements if e.id in shot.element_ids] + [l.id + ' ' + l.description for l in landmarks]).lower()
+    out, seen = [], set()
+    starts = [s.start.position.relation for s in shot.subjects] + [p.start.relation for p in shot.props]
+    for text in starts:
+        for m in CONTAINER.finditer(str(text or '')):
+            noun = m.group(1).lower()
+            if noun in SCENERY or noun in seen or noun.rstrip('s') in known or noun in known:
+                continue
+            seen.add(noun)
+            out.append({'shot_id': shot.id, 'kind': 'container_unnamed', 'message': f"shot {shot.id}: '{m.group(0)}': the {noun} carries it: name it as a prop with its end "
+                                                                                     f"(set down where, or carried out by whom), or say it is scenery"})
+    return out
+
+
 def technique_words(text):
     """design/111 F14: the techniques a beat's words name, in order of appearance, each once."""
     found = []
@@ -674,6 +734,9 @@ def validate_plan(*args, **kwargs):
 
 def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False, new_film=False):   # design/130: labels_drawn on a motion film
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
+    flagged = [str(e.get('id') or '?') for e in (document.get('elements') or []) if isinstance(e, dict) and 'repeating' in e]   # design/149 B3 (design/35: the retired way, refused by name)
+    if flagged:
+        _raise_all([f"`repeating` is retired (design/149): a thing built from identical units is `kind: material`; remove the flag from {', '.join(flagged)}."])
     try:
         plan = Plan.model_validate(document)
     except ValidationError as exc:   # design/148 A4: one line per object, in the tool's voice
@@ -684,7 +747,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
         try:
             _dimension_needs(f'element {e.id}', e.size)
             need(not e.speaker or e.kind == 'person', f'element {e.id}: speaker marks a real person speaking to camera; {e.id} is a {e.kind}.')   # design/124-b decision (c)
-            if e.kind == 'material' or e.repeating:   # design/111 F10: one measured spec per repeating material
+            if e.kind == 'material':   # design/111 F10: one measured spec per repeating material; design/149 B3: the kind says it, `repeating` is retired
                 need(e.material_spec is not None, f'element {e.id} is a repeating material: give its material_spec (unit sizes with sources, laid, joint, pattern, proportions), made like a drawing spec, never typed by the operator.')
                 need(not e.size, f'element {e.id}: its sizes live in its material_spec, not in size.')
                 _dimension_needs(f'material spec of {e.id}', e.material_spec.dimensions, research=False)
@@ -740,7 +803,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                     for pid in sorted({eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'person'}):   # design/111 F16: the fixed layer and this scene's colours
                         need(next(e.description.strip() for e in plan.elements if e.id == pid), f'{pid} is a person: give description (build, age, skin, hair, posture, garment types and how worn), the fixed layer every prompt carries.')
                         need((scene.outfit.get(pid) or '').strip(), f'scene {scene.id} shows {pid}: give outfit[{pid}], the garment colours of this scene.')
-                        if pid in last_outfit and last_outfit[pid].strip().lower() != scene.outfit[pid].strip().lower():
+                        if pid in last_outfit and not same_outfit(last_outfit[pid], scene.outfit[pid]):   # design/149 B2: the garments and colours, not the sentence
                             need(scene.time_jump.strip(), f'scene {scene.id} changes the colours of {pid} ({last_outfit[pid]} -> {scene.outfit[pid]}): give time_jump, the script\'s words for the time that passed, or keep the colours.')
                         last_outfit[pid] = scene.outfit[pid]
                     for pid in scene.outfit:
@@ -856,6 +919,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                                      'its sources, and so does a chart or a timeline that carries figures; a title or a label alone needs none: say so in production_method'})   # design/124 A4 item 16
                             else:
                                 spec = shot.drawing_spec
+                                _stated_figure_needs(shot, spec)   # design/149 B6 (SK): a figure the film states is confirmed from the script, never unknown
                                 _dimension_needs(f'shot {shot.id}', spec.dimensions, research=False)
                                 warnings += _research_warning(f'shot {shot.id}', spec, shot_id=shot.id)   # design/111 F19; design/124 C2: refused at approval
                                 section = 'section' in (shot.depicts + ' ' + shot.purpose + ' ' + shot.title).lower()   # F19: a wall section defaults to cutaway
@@ -977,12 +1041,14 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                             for s in shot.subjects:
                                 for b in s.beats:
                                     for tech in technique_words(b.action + ' ' + b.done):
-                                        need(tech in names_, f"shot {shot.id}: the technique '{tech}' (beat {b.id}: {b.action}) is not an element: add it (kind technique, id {tech.upper()}) so it joins the reference round and gets its own picture.")
-                        if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and SIZE_WORDS.search(' '.join(shot.claims + shot.descriptors)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message; design/124-b item 6: a graphic shows size by its figures
+                                        if tech not in names_:   # design/149 B5 (SK): the film's techniques are named once at plan-base; a stray verb warns, never refuses
+                                            warnings.append({'shot_id': shot.id, 'kind': 'technique_unnamed', 'message': f"shot {shot.id}: the technique '{tech}' (beat {b.id}: {b.action}) is not among the film's techniques: "
+                                                             f"add it (kind technique, id {tech.upper()}) so it gets its own reference picture, or say why this film needs none for it"})
+                        if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and SIZE_WORDS.search(' '.join(shot.claims)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message; design/124-b item 6: a graphic shows size by its figures; design/149 B4 (SK): a size word in descriptors describes
                             subj = shot.subjects[0].element_id if shot.subjects else shot.element_ids[0]
                             el = next((e for e in plan.elements if e.id == subj), None)
                             sized_ = bool(el) and any(d.value is not None for d in (el.size or []) + list((el.material_spec.dimensions if el.material_spec else [])))
-                            need(sized_, f"shot {shot.id}: its claim or descriptor is about size ({SIZE_WORDS.search(' '.join(shot.claims + shot.descriptors)).group(0)}): give the subject a size value and name compare_to, a thing in frame to read it against.")
+                            need(sized_, f"shot {shot.id}: its claim is about size ({SIZE_WORDS.search(' '.join(shot.claims)).group(0)}): give the subject a size value and name compare_to, a thing in frame to read it against.")
                             need(shot.compare_to.strip(), f'shot {shot.id}: size is the message: name compare_to, the thing in frame the size of {subj} is read against.')
                             need(shot.compare_to in shot.element_ids and shot.compare_to != subj, f'shot {shot.id}: compare_to names an element in frame other than the subject ({shot.compare_to} is not).')
                         if shot.visual_type == 'video' and shot.subjects:   # design/111 F8: three fixed things of the place, from the landmarks, never an element (a shot with an action: it gets an end or a take)
@@ -996,6 +1062,8 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                             if shot.changes and all(re.search(r'\b(look|looks|gaze|glance|expression|eyes|smile)\b', ch.what, re.I) for ch in shot.changes):   # F7's planning rule
                                 warnings.append({'shot_id': shot.id, 'kind': 'look_only', 'message': f'shot {shot.id}: its only change is a look or an expression, a weak point of the picture models; prefer a '
                                                  'profile, a view from behind or the hands in close, so the shot does not depend on it'})
+                        if shot.visual_type == 'video':   # design/149 B9 (SK): nothing in the frame vanishes; a container that brings a thing is a named prop
+                            warnings += container_warnings(shot, plan.elements, scene.landmarks)
                         if shot.visual_type == 'video':   # design/110 F5: every held thing is a prop with a holder and an end
                             held = {h for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for h in stt.holding}
                             props = {p.element_id: p for p in shot.props}
@@ -1269,7 +1337,8 @@ WARNING_PLAIN = {
 }
 WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missing', 'carries_over_missing', 'changes_missing', 'claims_missing', 'depicts_missing',
                      'element_size_missing', 'end_state', 'evidence_missing', 'facts_missing', 'footage_identity', 'frozen_share', 'light_missing', 'min_s_missing',
-                     'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'spec_unresearched', 'state_changed', 'style_missing')
+                     'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'spec_unresearched', 'state_changed', 'style_missing',
+                     'technique_unnamed', 'container_unnamed')   # design/149 B5, B9
 
 
 def answer_warnings(plan, warnings):

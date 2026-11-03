@@ -168,6 +168,8 @@ def test_size_words_skip_graphics_and_drop_light_less_fewer_short():
     d = plan([{**pshot('IM1', 0, 100, 'image'), 'descriptors': ['a light, airy room', 'a short walk']}, pshot('IM2', 100, 1000, 'image')])
     check(d)
     d['gaps'][0]['scenes'][0]['shots'][0]['descriptors'] = ['a smaller block']
+    check(d)   # design/149 B4 (SK, 3 Nov 2026): a size word in descriptors describes; only a claim in `claims` is checked
+    d['gaps'][0]['scenes'][0]['shots'][0]['claims'] = ['a smaller block']
     with pytest.raises(ValueError, match='about size'):
         check(d)
     dg = plan([{**pshot('DG1', 0, 100, 'diagram'), 'claims': ['a much bigger saving'], 'depicts': 'two piles'}, pshot('IM2', 100, 1000, 'image')])

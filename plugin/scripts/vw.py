@@ -1508,7 +1508,7 @@ VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose'
 _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
-    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps'},
+    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
@@ -1593,7 +1593,7 @@ def _swap_ids(value, ids):
     return ids.get(value, value) if isinstance(value, str) else value
 
 
-def plan_join(ws, base_rel, gaps_rel):
+def plan_join(ws, base_rel, gaps_rel, rebuild=False):
     """design/124 Change 9: out/plan-base.json (the shared parts; its gaps the film's gap ids in order) and one file per helper in the gaps folder
     (a gap, or {"gaps": [...]}, each with its "new_elements") joined into out/visual-plan.json: the gaps in film order, the new things merged once by name.
     Returns (payload, code, line) for emit."""
@@ -1604,6 +1604,12 @@ def plan_join(ws, base_rel, gaps_rel):
     folder = ws / gaps_rel
     if not order or not folder.is_dir():
         return {'action': 'refused', 'message': f"The base lists no gaps, or {gaps_rel} is not a folder."}, 2, None
+    plan_file = ws / 'out' / 'visual-plan.json'   # design/149 B7 (SK): the gap files are the master; a joined plan edited after the last join is never overwritten in silence
+    if plan_file.exists() and not rebuild:
+        newest_gap = max((f.stat().st_mtime for f in folder.glob('*.json')), default=0.0)
+        if plan_file.stat().st_mtime > newest_gap:
+            return {'action': 'refused', 'message': 'out/visual-plan.json was edited after the last join; put the edits into the gap files under ' + gaps_rel
+                                                    + ' and join again, or `vw visuals plan-join --rebuild` to drop them.'}, 2, None
     elements = list(base.get('elements') or [])
     by_name = {str(e.get('name') or '').strip().lower(): e['id'] for e in elements}
     found, added = {}, []   # design/148 A2: the helpers' new things, to name the ones still to complete
@@ -1695,7 +1701,7 @@ def cmd_visuals(a):
         out = write(base + '/treatment', {'accept': acc, 'send_back': back, 'notes': a.notes or '', 'quote': a.quote or ''})
         emit(out, 0, out.get('next') or '')
     if a.what == 'plan-join':   # design/124 Change 9: the helpers' gaps joined into one plan, nothing sent
-        emit(*plan_join(ws, getattr(a, 'base', None), (a.gaps or [None])[0]))
+        emit(*plan_join(ws, getattr(a, 'base', None), (a.gaps or [None])[0], bool(getattr(a, 'rebuild', False))))
     if a.what == 'treatment':   # design/65 B6: the treatment as a record
         out = write(base + '/treatment', {'document': _json_file(m, a.file), 'quote': a.quote or ''})
         t = out.get('totals') or {}
@@ -2856,6 +2862,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base'):   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
+    s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')
     s.add_argument('--golden', action='store_true', help="image: the element's golden picture (design/111 F11)"); s.add_argument('--region', help='image: an edit\'s region left,top,width,height (design/111 F11)'); s.add_argument('--end-region', dest='end_region', help='image: the end\'s region, written with the start')
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)

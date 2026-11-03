@@ -22,8 +22,7 @@ def test_a_technique_in_the_beats_must_be_an_element_and_a_technique_element_joi
     sh = rich()
     sh['subjects'][0]['beats'][0].update(action='points the joints of the course', done='pointed the joints of the course')
     d = doc_with(sh, pshot('VS2', 500, 1000, 'video'))
-    with pytest.raises(ValueError, match="technique 'pointing' .* is not an element"):
-        check(d)
+    assert [w for w in check(d)[1] if w['kind'] == 'technique_unnamed' and "'pointing'" in w['message']]   # design/149 B5 (SK, 3 Nov 2026): a warning, no longer a refusal
     d['elements'].append({'id': 'POINTING', 'name': 'Pointing', 'kind': 'technique', 'identity': 'representative', 'requirements': 'the joint struck flush with a pointing trowel'})
     out, _ = check(d)
     assert out['elements'][-1]['kind'] == 'technique'
