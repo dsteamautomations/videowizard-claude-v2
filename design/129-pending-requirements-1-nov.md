@@ -239,4 +239,4 @@ Regular. Server 0.78.2, plugin 0.65.1, minimum tool 0.65.1 (the guard fix and th
 | PK9 | The deploy script's restart order (the server stays down while the workers drain; the 2 Nov outage) | SK ("Not now", 2 Nov) | |
 | PK10 | Empty OLD_PROMPT_RUNS and OLD_PLAN_RULE_RUNS once VW-12 is deleted | VW-12 deleted | |
 | PK11 | Review of Codex's round 2 findings (codex-review/process-findings.md, committed 21713c2) | SK's time | |
-| PK12 | Defect 46's server message (commit bb7e3d5) is not on the VM yet: the 3 Nov hotfix deploy stopped because gcloud on the PC needs signing in again. The plugin part is deployed. Run `./scripts/deploy-server.sh --server-only` once SK signs in | SK's gcloud sign-in | |
+| PK12 | Defect 46's server message: deployed 3 Nov after SK signed in to gcloud (main 1ed7a2d on the VM) | done | done |
