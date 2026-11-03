@@ -41,3 +41,14 @@ def test_the_scenes_shape_is_in_the_package():
     from app.stage2 import package as P
     shape = P.SCENES_SHAPE
     assert 'pauses' in shape and 'dropped_chapters' in shape and shape['scenes'][0]['process_stages'] and 'pauses' not in shape['scenes'][0]
+
+
+def test_a_scene_without_first_word_id_is_told_the_key_and_where_the_ids_are():   # defect 46 (VW-18): "starts at unknown word None" named nothing
+    words = [{'id': 'W00001', 'text': 'As', 'start_s': 0, 'end_s': 0.2}]
+    with pytest.raises(ValueError) as e:
+        NR.validate_scenes(words, [{'first_word': 'W00001', 'title': 'x', 'process_stages': []}])
+    msg = str(e.value)
+    assert 'first_word_id' in msg and 'W00001' in msg and 'words-' in msg and 'shapes.json' in msg
+    with pytest.raises(ValueError) as e:
+        NR.validate_scenes(words, [{'first_word_id': 'W09999', 'title': 'x'}])
+    assert 'W09999' in str(e.value) and 'words-' in str(e.value)
