@@ -15,7 +15,8 @@ WRITE_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
 READ_TOOLS = ('Read', 'Glob', 'Grep')
 FILE_TOOLS = ('SendUserFile', 'mcp__ccd_host__reveal_path')   # design/49 V5: show a run file to the operator
 ALWAYS = ('AskUserQuestion', 'TodoWrite', 'TodoRead', 'ToolSearch',
-          'mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_view__show_pane')
+          'mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_view__show_pane',
+          'SubagentHandback')   # design/148 A3 (SK, 3 Nov 2026): the plugin's own helpers report back; a message to a helper stays blocked
 WEB_TOOLS = ('WebSearch', 'WebFetch')
 WEB_MINUTES = 10   # design/48 O.1: one recorded yes covers the search and the fetches on that subject for ten minutes
 WEB_BLOCKED = ("Blocked: a web search needs the operator's yes. Say to them: 'I am deviating from the usual procedure. I want to search the web for X, "

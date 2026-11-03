@@ -285,7 +285,7 @@ def check(store, run, outputs, document):
         plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
                                        drawn_route(run) == 'motion', not film.older(run))   # design/89 B4; design/124-b item 13; design/130 §12; design/139 R3
     except (ValueError, KeyError, TypeError) as exc:
-        return {'status': 'rejected', 'error': str(exc)}
+        return {'status': 'rejected', 'error': str(exc), 'errors': list(getattr(exc, 'errors', None) or [str(exc)])}   # design/148 A1: every item's first failure, as a list too
     r = routes(plan, _fps(session) or 25)
     pr = prices()
     planned = round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * pr['video_inr_per_s'], 2)   # design/134 12: r['video_take_seconds']   # design/65 B7: the cost against the cap, before anything is paid

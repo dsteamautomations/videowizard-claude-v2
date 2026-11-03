@@ -78,6 +78,8 @@ if __name__ == '__main__':
         prompt = d134(prompt, parts)
         from d139_wording_v3 import apply_visuals as d139   # design/139: SK's design/138 answers
         prompt = d139(prompt, parts)
+        from d148_wording_v3 import apply_visuals as d148   # design/148 A2, A3: the join's list, the helper's file as proof, the check's full list
+        d148(parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

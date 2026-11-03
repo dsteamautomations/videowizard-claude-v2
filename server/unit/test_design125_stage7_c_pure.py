@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 V2 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v2.json').read_text(encoding='utf-8'))['stages']}
 V3 = {s['name']: s for s in json.loads((ROOT / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages']}
-BEFORE = {'options': 1792, 'master': 478, 'first_cut': 53, 'analysis': 328, 'visuals': 10515}   # words read by the assistant; design/127 added round 2 (B-roll), alternatives and the shot answers (SK); design/130 added section 11, the HyperFrames route and its fact check, 261 words (SK approved design/130), and §12 the motion default, 27 words (SK, 1 Nov)
+BEFORE = {'options': 1792, 'master': 478, 'first_cut': 53, 'analysis': 328, 'visuals': 10536}   # words read by the assistant; design/127 added round 2 (B-roll), alternatives and the shot answers (SK); design/130 added section 11, the HyperFrames route and its fact check, 261 words (SK approved design/130), and §12 the motion default, 27 words (SK, 1 Nov); design/148 A3 the helper's file as proof, 21 words (SK, 3 Nov)
 
 
 def texts(stage):

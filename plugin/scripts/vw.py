@@ -1606,7 +1606,7 @@ def plan_join(ws, base_rel, gaps_rel):
         return {'action': 'refused', 'message': f"The base lists no gaps, or {gaps_rel} is not a folder."}, 2, None
     elements = list(base.get('elements') or [])
     by_name = {str(e.get('name') or '').strip().lower(): e['id'] for e in elements}
-    found = {}
+    found, added = {}, []   # design/148 A2: the helpers' new things, to name the ones still to complete
     for path in sorted(folder.glob('*.json')):
         part = _read_json(ws, path.relative_to(ws).as_posix(), 'The gap file')
         gaps = part['gaps'] if isinstance(part.get('gaps'), list) else [part]
@@ -1620,6 +1620,7 @@ def plan_join(ws, base_rel, gaps_rel):
             if any(x['id'] == e['id'] for x in elements):
                 return {'action': 'refused', 'message': f"{path.name}: new thing {e['id']} ({e.get('name')}) has the id of another thing; give it its own id."}, 2, None
             elements.append(e)
+            added.append(e)
             by_name[name] = e['id']
         for g in gaps:
             gid = g.get('gap_id')
@@ -1635,8 +1636,10 @@ def plan_join(ws, base_rel, gaps_rel):
     plan = {**base, 'elements': elements, 'gaps': [{**olds.get(gid, {}), **found[gid][1]} for gid in order]}
     (ws / 'out').mkdir(exist_ok=True)
     (ws / 'out' / 'visual-plan.json').write_text(json.dumps(plan, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
-    return ({'file': 'out/visual-plan.json', 'gaps': order, 'elements': len(elements)}, 0,
-            f"Joined {len(order)} gaps into out/visual-plan.json ({len(elements)} things). Now `vw visuals check --file out/visual-plan.json`.")
+    incomplete = [e['id'] for e in added if not all(e.get(k) for k in ('kind', 'identity', 'requirements'))]   # design/148 A2: a helper's new thing is id and name; the check wants the rest
+    todo = f" {len(incomplete)} new thing{'s' if len(incomplete) != 1 else ''} need{'' if len(incomplete) != 1 else 's'} kind, identity and requirements before check: {', '.join(incomplete)}." if incomplete else ''
+    return ({'file': 'out/visual-plan.json', 'gaps': order, 'elements': len(elements), 'incomplete': incomplete}, 0,
+            f"Joined {len(order)} gaps into out/visual-plan.json ({len(elements)} things).{todo} Now `vw visuals check --file out/visual-plan.json`.")
 
 
 def cmd_visuals(a):

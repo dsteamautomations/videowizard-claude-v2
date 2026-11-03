@@ -12,4 +12,4 @@ Read out/plan-base.json (the shared parts: foundation, elements, graphic style, 
 
 Write one file in out/plan-gaps/ (a gap, or {"gaps": [...]}), named after your first gap; never another helper's gaps, never any other file. Things not among the elements go in `new_elements` (id and name), never invented.
 
-The main assistant joins the files (`vw visuals plan-join`) and runs the check; a gap it sends back to you is revised the same way.
+The main assistant joins the files (`vw visuals plan-join`) and runs the check; a gap it sends back to you is revised the same way. Write your file before your closing report: the file is the proof you finished when the report does not arrive.
