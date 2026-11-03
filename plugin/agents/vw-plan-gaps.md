@@ -22,6 +22,7 @@ Before you write, every shot and scene carries (the check refuses or warns witho
 - a size the film asserts goes in `claims`, with the subject's size value and `compare_to` (a thing in frame); a size word in `descriptors` or a beat only describes.
 - the film's techniques are the technique elements of plan-base.json; a beat verb outside them is warned: answer why no reference picture is needed, or ask the main assistant to add the technique.
 - `return_of` names an earlier shot's exact id (case included), with `differs_by`.
+- a size with status `proposed` (recalled from a named standard, awaiting the operator) never reaches the check: it is the main assistant's to ask and record; a size confirmed on the operator's word alone shapes a drawing and is never written on screen as a number.
 - every subject's `end` (its position against a landmark, its pose) and every prop's end.
 
 Nothing in the frame vanishes: everything in the shot at its start is accounted for at its end, still there at a stated place or gone by a stated action of someone; anything that moves or is moved is a named subject or prop of the shot.

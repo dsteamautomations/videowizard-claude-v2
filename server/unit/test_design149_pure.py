@@ -138,3 +138,31 @@ def test_the_take_prompt_ends_with_where_every_subject_and_prop_is():
     assert any(e.startswith('Pointing trowel: set down on the top course of the table, 2 bricks') for e in end), end   # the prop's end
     text = motion_text({'motion_prompt': 'm', 'subject_reconciliation': {}, 'continuity_notes': '', 'duration_seconds': 20, **f})
     assert 'By the end and until the last frame:' in text and 'Pointing trowel: set down' in text
+
+
+# ---------- B10 ----------
+
+def dim(status, source, value=190):
+    return {'part': 'brick', 'measure': 'length', 'value': value, 'unit': 'mm', 'source': source, 'status': status}
+
+
+def test_a_proposed_size_never_passes_the_check():
+    d = plan([pshot('IM1', 0, 1000, 'image')])
+    d['elements'][0]['size'] = [dim('proposed', 'recalled: IS 1077, to confirm')]
+    with pytest.raises(ValueError, match=r'element E1: brick length is proposed \(recalled: IS 1077, to confirm\): put it to the operator in the missing-facts list'):
+        check(d)
+    d['elements'][0]['size'] = [dim('confirmed', 'the operator confirmed IS 1077')]
+    check(d)
+
+
+def test_a_size_confirmed_on_the_operators_word_shapes_a_drawing_but_is_never_written_on_screen():
+    sh = {**pshot('DR1', 0, 100, 'drawn'), 'narration': 'the brick is laid on edge', 'depicts': 'the brick on edge',
+          'drawing_spec': {'dimensions': [dim('confirmed', 'the operator confirmed IS 1077 (modular brick)')], 'proportions': ['about 2 : 1 : 1'], 'relationships': [], 'view': 'side', 'view_reason': 'the edge reads from the side'},
+          'scene_motion': {'sha256': 'a' * 64, 'labels': ['brick on edge'], 'cues': []}}
+    d = plan([sh, pshot('IM2', 100, 1000, 'image')])
+    check(d)   # it shapes the drawing: no number on screen
+    sh['scene_motion']['labels'] = ['190 mm']
+    with pytest.raises(ValueError, match=r"brick length 190 mm is confirmed on the operator's word from a recalled standard .* and is written on screen"):
+        check(d)
+    sh['drawing_spec']['dimensions'][0]['source'] = 'IS 1077:1992, checked on the web with the run\'s yes'
+    check(d)   # a real source: the number may be read

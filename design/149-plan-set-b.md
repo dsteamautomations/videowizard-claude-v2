@@ -67,8 +67,10 @@ Terms used throughout: **writer** = the main assistant (writes `plan-base.json`)
 ## Built, 3 Nov 2026
 Server 0.89.0, plugin 0.75.0; not deployed (deploys on hold). Tests: `server/unit/test_design149_pure.py` (8), `plugin/tests/test_design149.py` (3); the full server unit suite 1146 passed; plugin 416 passed with the four pre-existing failures. Three older tests moved to the new rules, each marked with SK's answer: design/111 F10 (`repeating` now refused by name), design/124-b item 6 (a size word in descriptors describes), design/111 F14 (the technique verb warns). B9c: `end_places` in `visuals_stage.py` adds one line per subject and prop to the take prompt's end state only where the plan gives an end, so design/128's held-only prompt stays byte for byte.
 
-## B10, held for SK's wording
-A size unknown from the script may be proposed from a named standard or maker figure (status `proposed`, source "recalled: <standard>, to confirm"), offered in the B1 list with its alternatives and the footage measure first; confirmed by the operator it may shape a drawing; a figure written on screen as a number needs the script, the client's document or a web check; client-specific sizes are never proposed from recall. Not built.
+## B10. A size proposed from a named standard (SK approved, 3 Nov; built)
+A size unknown from the script may be proposed from a named standard or maker figure: status `proposed`, source "recalled: <standard>, to confirm", put to the operator in the B1 list beside its alternatives and the footage measure (run first where footage shows the thing). On the operator's word it is `confirmed`, source "the operator confirmed <standard>", and may shape the drawing. A figure written on screen as a number needs the script, the client's document or a web check. A client's own thing is never proposed from recall.
+**Checker.** `Dimension.status` gains `proposed`; a `proposed` dimension is refused at `check` (answered before the plan is checked); a `confirmed` dimension whose source begins "the operator confirmed" and whose value appears in a drawn shot's on-screen labels (`scene_motion.labels`) is refused. **Text:** one sentence in part-plan (80 words) and one line in the brief. **Limit:** on-screen figures are known only for drawn shots with a HyperFrames scene (the labels list); a painted still carries no label list, so there the rule is the writer's.
+Tests: two in `test_design149_pure.py`.
 
 ## Not covered
 - Database tests (Docker): nothing here touches the database.

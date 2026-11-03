@@ -127,7 +127,7 @@ class Dimension(Model):   # design/89 D1, D3
     value: float | int | None = None
     unit: str = Field(default='', max_length=40)
     source: str = Field(default='', max_length=1000)   # the client's material, the footage (clip and time), a standard's URL, an approved picture
-    status: Literal['confirmed', 'measured', 'unknown']
+    status: Literal['confirmed', 'measured', 'unknown', 'proposed']   # design/149 B10: proposed = recalled from a named standard, awaiting the operator's word; never past the check
     tried: str = Field(default='', max_length=1000)   # design/106 D3: for an unknown size, the sources tried and why each failed
 
 
@@ -408,6 +408,8 @@ def _dimension_needs(label, dims, research=True):
     """design/106 D3, D6: an unknown size names what was tried and carries no number; a known one names its source.
     research=False (design/124 C2): a spec's tried sources are checked at spec approval (spec_research_needs), after the picture search."""
     for d in dims:
+        need(d.status != 'proposed', f'{label}: {d.part} {d.measure} is proposed ({d.source or "no source named"}): put it to the operator in the missing-facts list and record their answer '
+                                     '(confirmed, source "the operator confirmed <standard>"; or unknown) before the check.')   # design/149 B10 (SK, 3 Nov 2026)
         need(not research or d.status != 'unknown' or d.tried.strip(), f'{label}: {d.part} {d.measure} is unknown: record the sources tried and why each failed (tried): '
              'the client material, `measure` on footage frames, a standard or a maker figure, an approved picture.')
         need(d.status != 'unknown' or d.value is None, f'{label}: {d.part} {d.measure} is unknown; an unknown number is never invented: leave its value empty.')
@@ -498,6 +500,19 @@ def _unit_key(u):
     u = re.sub(r'\s+', '', str(u or '').lower()).replace('²', '2')
     return {'percent': '%', 'storey': 'storeys', 'story': 'storeys', 'stories': 'storeys', 'floor': 'floors', 'liter': 'l', 'litre': 'l', 'liters': 'l', 'litres': 'l',
             'ton': 'tonnes', 'tons': 'tonnes', 'tonne': 'tonnes'}.get(u, u)
+
+
+RECALLED = 'the operator confirmed'   # design/149 B10: the source prefix of a size the operator confirmed from a recalled standard
+
+
+def _recalled_on_screen_needs(shot):
+    """design/149 B10 (SK, 3 Nov 2026): a size confirmed on the operator's word from a recalled standard may shape a drawing; written on screen as a number it needs
+    the script, the client's document or a web check. The labels are the texts the viewer reads (MotionScene.labels)."""
+    labels = ' '.join((shot.scene_motion.labels if shot.scene_motion else []) or [])
+    for d in (shot.drawing_spec.dimensions if shot.drawing_spec else []):
+        if d.status == 'confirmed' and d.source.strip().lower().startswith(RECALLED) and d.value is not None and re.search(r'(?<![\d.])' + re.escape(f'{d.value:g}') + r'(?![\d])', labels):
+            need(False, f"shot {shot.id}: {d.part} {d.measure} {d.value:g} {d.unit} is confirmed on the operator's word from a recalled standard ({d.source}) and is written on screen: "
+                        "a figure the viewer reads needs the script, the client's document or a web check as its source; or take the number off the drawing.")
 
 
 def _stated_figure_needs(shot, spec):
@@ -932,6 +947,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                 if any(d.status == 'unknown' for d in spec.dimensions):
                                     need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
                         if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
+                            _recalled_on_screen_needs(shot)   # design/149 B10: a figure confirmed on the operator's word alone shapes the drawing, never a label
                             svg_needs(shot, seconds, new_film)
                             motion_needs(shot, seconds)   # design/130
                         for n, st in enumerate(shot.states, 1):

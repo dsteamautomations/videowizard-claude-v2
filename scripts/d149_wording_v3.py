@@ -1,6 +1,6 @@
 """design/149 Set B (SK, 3 Nov 2026): the plan step's rules in instruction version 3, one exact replacement each. B1 the missing facts before the helpers,
 asked with choices and reasons; B2 the clean outfit line; B4 a size claim in `claims`; B5 the techniques named at plan-base, a stray verb warned;
-B6 a figure the film states is never unknown; B7 the gap files as master; B9 nothing in the frame vanishes.
+B6 a figure the film states is never unknown; B7 the gap files as master; B9 nothing in the frame vanishes; B10 a size proposed from a named standard, confirmed by the operator, never on screen.
 Applied after design/148's in c1_split_v3.py --check; writes v3.json when run alone."""
 import json
 from pathlib import Path
@@ -33,6 +33,11 @@ PLAN = [
      "anything that moves or is moved is a named subject or prop of the shot, the container that brings a thing included (warned as container_unnamed)."),
     ('B6', 'Refused: an unknown with a value, an illustrative drawing not labelled',
      "Refused: an unknown with a value, a figure the shot's narration or claims state marked unknown (it is confirmed from the script), an illustrative drawing not labelled"),
+    ('B10', "Every person, object and animal has its real `size` (client material, `measure` on footage frames, a maker's sheet; else unknown, never invented; warned when missing)",
+     "Every person, object and animal has its real `size` (client material, `measure` on footage frames, a maker's sheet; else unknown, never invented; warned when missing; "
+     "a generic, standardised thing's size may be proposed from a named standard or maker figure, status `proposed`, source \"recalled: <standard>, to confirm\", put to the "
+     "operator in the missing-facts list beside its alternatives and the footage measure, and recorded on their word as confirmed, source \"the operator confirmed <standard>\": "
+     "it may shape the drawing, never a number written on screen (that needs the script, the client's document or a web check); a client's own thing is never proposed from recall)"),
     ('B7', 'fix what it names or send the gap back to its helper.',
      'fix what it names in the gap file (its helper for a judgement, you for a field or a spelling), join again, check again; out/visual-plan.json is never edited by '
      'hand (the join refuses to overwrite one that was; `--rebuild` drops the edits).'),
