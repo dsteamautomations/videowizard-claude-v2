@@ -92,3 +92,9 @@ def test_the_media_instruction_asks_the_camera_only_when_prepare_says_the_file_h
     d = json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
     m = next(s for s in d['stages'] if s['name'] == 'media')
     assert 'camera_unknown_note' in m['steps'][1] and '--shot-on' in m['steps'][1] and 'never ask when the files say it' in m['steps'][1] and '--shot-on' in m['steps'][2]
+
+
+def test_the_shoot_teams_two_cameras_classify_as_mirrorless_and_cinema():   # SK, 3 Nov 2026: Raj's Fujifilm X-T4, Pandi/DS's Sony FX30
+    export = {'id': 'x', 'name': 'C0032_02881492.mp4', 'codec': 'h264'}
+    assert F.camera_of(export, said="Raj's footage: Fujifilm X-T4")[0] == 'mirrorless'
+    assert F.camera_of(export, said='Pandi/DS footage: Sony FX30 (ILME-FX30), Tamron 17-70mm f/2.8 Di III-A VC RXD, Sony E 50mm F1.8 OSS')[0] == 'cinema'

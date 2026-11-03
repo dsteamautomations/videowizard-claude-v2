@@ -64,7 +64,7 @@ def test_prepare_keeps_name_order_reports_size_and_stores_stat(ws):
     lines = out['listing'].split('\n')
     assert len(lines) == 7 and lines[0].startswith('a.mp4 · ') and ' s · ' in lines[0] and lines[0].endswith(' MB · sound') and lines[1].endswith(' MB · no sound')
     assert lines[6].startswith('6 clips · ') and lines[6].endswith(' MB')
-    assert len(json.dumps(out)) < 4000
+    assert len(json.dumps(out)) < 4300   # ticket 8's guard against bloat; raised from 4000 for design/146's camera note (one line, the two preset cameras)
 
 
 def test_prepare_prints_no_footage_line_and_record_stores_no_footage_character(ws):
@@ -215,7 +215,7 @@ def test_media_prompt_and_steps_are_v2():
 def test_prepare_names_the_clips_with_no_camera_and_who_exported_them(ws):
     clip(ws / 'in' / 'C0032.mp4')
     out = media_prepare(ws, PROC, prior)
-    assert 'No camera information in 1 clip' in out['camera_unknown_note'] and 'C0032.mp4' in out['camera_unknown_note'] and 'shot-on' in out['camera_unknown_note'] and 'Lavf' not in out['camera_unknown_note']   # ffmpeg's own tag is no exporter
+    assert 'No camera in 1 clip' in out['camera_unknown_note'] and 'C0032.mp4' in out['camera_unknown_note'] and 'shot-on' in out['camera_unknown_note'] and 'Lavf' not in out['camera_unknown_note']   # ffmpeg's own tag is no exporter
     assert json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))[0]['encoder'].startswith('Lavf')
 
 
@@ -226,3 +226,15 @@ def test_record_asks_the_camera_once_when_a_clip_has_none_and_keeps_the_answer(w
         media_record(ws, PROC, prior, fake_upload([]), copies='copies', camera_audio='excluded', note='n')
     res = media_record(ws, PROC, prior, fake_upload([]), copies='copies', camera_audio='excluded', note='n', shot_on='Sony FX3, one camera')
     assert res['summary']['shot_on'] == 'Sony FX3, one camera' and res['summary']['clips'][0]['encoder'].startswith('Lavf')
+
+
+def test_the_shoot_teams_cameras_are_offered_as_choices_and_a_choice_expands_to_the_full_words(ws):   # SK, 3 Nov 2026
+    from stages_av import CAMERA_PRESETS, shot_on_words
+    assert shot_on_words('raj') == CAMERA_PRESETS['raj'] and 'Fujifilm X-T4' in CAMERA_PRESETS['raj']
+    assert shot_on_words('Pandi') == CAMERA_PRESETS['pandi'] and 'Sony FX30' in CAMERA_PRESETS['pandi'] and 'Tamron 17-70' in CAMERA_PRESETS['pandi']
+    assert shot_on_words('Canon R6, one body') == 'Canon R6, one body'
+    clip(ws / 'in' / 'C0032.mp4')
+    out = media_prepare(ws, PROC, prior)
+    assert "Raj's footage" in out['camera_unknown_note'] and 'Pandi/DS footage' in out['camera_unknown_note']
+    res = media_record(ws, PROC, prior, fake_upload([]), copies='copies', camera_audio='excluded', note='n', shot_on='pandi')
+    assert res['summary']['shot_on'] == CAMERA_PRESETS['pandi']

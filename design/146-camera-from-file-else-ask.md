@@ -28,3 +28,7 @@ The retired `--camera <class>` flag of design/126 stays refused by name; the new
 - A wrong answer is taken as given, like the other media answers.
 - VW-18 itself: its media is recorded; the camera can still be corrected on the visuals page.
 - Not deployed (SK confirms deploys).
+
+## The shoot team's cameras as ready choices (SK, 3 Nov 2026)
+
+SK gave the two cameras the shoot team uses, so nobody types them each time. The media note offers them, and the assistant asks with the question tool: **Raj's footage** (Fujifilm X-T4), **Pandi/DS footage** (Sony FX30, ILME-FX30, with the Tamron 17-70 mm f/2.8 and the Sony E 50 mm f/1.8), or **another camera**. `--shot-on raj` or `--shot-on pandi` records the full words; any other words are recorded as given. The presets live in `plugin/scripts/stages_av.py` (`CAMERA_PRESETS`); a new camera is one line there. The server classifies them as today: the X-T4 a mirrorless camera, the FX30 a cinema camera.

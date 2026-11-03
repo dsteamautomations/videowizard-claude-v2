@@ -54,6 +54,18 @@ def relink_fields(data):
             'original_name': tags.get('original_filename') or tags.get('original_name') or ''}
 
 
+CAMERA_PRESETS = {   # SK, 3 Nov 2026: the shoot team's cameras, offered as choices so nobody types them each time; a key or the full words both record the full words
+    'raj': "Raj's footage: Fujifilm X-T4",
+    'pandi': "Pandi/DS footage: Sony FX30 (ILME-FX30), Tamron 17-70mm f/2.8 Di III-A VC RXD, Sony E 50mm F1.8 OSS (SEL50F18)",
+}
+
+
+def shot_on_words(answer):
+    """The operator's camera answer: a preset key (raj, pandi) becomes its full words; anything else is their words as given."""
+    words = ' '.join(str(answer or '').split())
+    return CAMERA_PRESETS.get(words.lower().strip('.: '), words)
+
+
 def camera_unknown(clips):
     """design/146 (SK, 3 Nov 2026): the clips whose file carries no camera maker and whose name settles nothing; asked of the operator once, at record."""
     import re
@@ -68,7 +80,8 @@ def camera_unknown_note(clips):
     few = ', '.join(names[:3]) + (f' +{len(names) - 3}' if len(names) > 3 else '')
     exporters = sorted({str(c.get('encoder')) for c in clips if c['name'] in names and c.get('encoder') and not str(c['encoder']).lower().startswith('lavf')})
     by = f" (exported by {', '.join(exporters)})" if exporters else ''
-    return f'No camera information in {len(names)} clip(s){by}: {few}. Ask once which camera shot them; record their words with `--shot-on`.'
+    offer = ', '.join(f"{k} ({v.split(':')[0]}, {v.split(': ', 1)[1].split(' (')[0].split(',')[0]})" for k, v in CAMERA_PRESETS.items())
+    return f'No camera in {len(names)} clip(s){by}: {few}. Ask once which camera: {offer}, or another; `--shot-on <key|words>`.'
 
 
 def copies_note(clips):
@@ -218,7 +231,7 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
     summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr',
                                                 'codec', 'pix_fmt', 'bit_rate', 'make', 'model', 'encoder', 'start_timecode', 'reel', 'original_name')} for c in clips],   # design/88 F1; design/107 §6; design/146
                'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1),
-               'camera_audio': camera_audio, 'camera_audio_note': note or '', 'copies': copies, 'shot_on': ' '.join(str(shot_on or '').split()) or None, **stamps(ws, 'media')}   # design/41 5.1; design/146
+               'camera_audio': camera_audio, 'camera_audio_note': note or '', 'copies': copies, 'shot_on': shot_on_words(shot_on) or None, **stamps(ws, 'media')}   # design/41 5.1; design/146
     return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}
 
 
