@@ -58,6 +58,8 @@ def test_repeating_is_refused_by_name_and_a_material_is_its_kind():
     d['elements'].append({'id': 'BRICK', 'name': 'Red brick', 'kind': 'object', 'identity': 'representative', 'requirements': 'r', 'repeating': True})
     with pytest.raises(ValueError, match=r'`repeating` is retired \(design/149\).*BRICK'):
         check(d)
+    d['elements'][-1]['repeating'] = False   # a plan the server stored before design/149: every element carries repeating false (model_dump); the fetched plan must still pass
+    check(d)
     d['elements'][-1].pop('repeating')
     check(d)   # an object with no spec is fine
     d['elements'][-1]['kind'] = 'material'

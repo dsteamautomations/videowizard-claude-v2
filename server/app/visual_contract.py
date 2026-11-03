@@ -527,7 +527,8 @@ def _stated_figure_needs(shot, spec):
 
 CONTAINER = re.compile(r'\b(?:in|inside|into|from|out of)\s+(?:a|an|the|his|her|their)\s+([a-z][a-z-]+)\b', re.I)   # design/149 B9: "in the basket", "from a pan"
 SCENERY = {'yard', 'room', 'kitchen', 'house', 'field', 'street', 'lane', 'site', 'shed', 'workshop', 'corner', 'middle', 'centre', 'center', 'background', 'foreground', 'frame',
-           'shade', 'sun', 'light', 'distance', 'air', 'ground', 'floor', 'doorway', 'door', 'window', 'wall', 'hand', 'hands', 'arms', 'lap'}   # places and the body: not containers
+           'shade', 'sun', 'light', 'distance', 'air', 'ground', 'floor', 'doorway', 'door', 'window', 'wall', 'hand', 'hands', 'arm', 'arms', 'lap', 'left', 'right',
+           'palm', 'fist', 'grip', 'shoulder', 'crook', 'elbow'}   # places and the body ("in his left", "in the crook of her arm"): not containers; VW-18's plan read against it before the deploy
 
 
 def container_warnings(shot, elements, landmarks):
@@ -749,9 +750,11 @@ def validate_plan(*args, **kwargs):
 
 def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_limit=FROZEN_SHARE, footage=True, drawn_in_run=True, labels_drawn=False, new_film=False):   # design/130: labels_drawn on a motion film
     """footage: the film has footage (design/124-b item 13: without it, no warning advises a frame from the footage)."""
-    flagged = [str(e.get('id') or '?') for e in (document.get('elements') or []) if isinstance(e, dict) and 'repeating' in e]   # design/149 B3 (design/35: the retired way, refused by name)
+    flagged = [str(e.get('id') or '?') for e in (document.get('elements') or []) if isinstance(e, dict) and e.get('repeating')]   # design/149 B3 (design/35: the retired way, refused by name)
     if flagged:
         _raise_all([f"`repeating` is retired (design/149): a thing built from identical units is `kind: material`; remove the flag from {', '.join(flagged)}."])
+    if any(isinstance(e, dict) and 'repeating' in e for e in document.get('elements') or []):   # a plan the server stored before design/149 carries `repeating: false` on every element (model_dump): dropped, never refused
+        document = {**document, 'elements': [{k: v for k, v in e.items() if k != 'repeating'} if isinstance(e, dict) else e for e in document['elements']]}
     try:
         plan = Plan.model_validate(document)
     except ValidationError as exc:   # design/148 A4: one line per object, in the tool's voice
