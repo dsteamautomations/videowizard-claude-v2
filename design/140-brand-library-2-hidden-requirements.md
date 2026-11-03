@@ -215,3 +215,8 @@ Status: for SK's review, 2 Nov 2026. No code written. Part 1 (`140-brand-library
 - **Q3 (where the library sits):** **After the second look.** This film's own clips are placed and rechecked exactly as today; one new round then proposes library clips for the remaining blanks and as swaps.
 - **Q4 (matching):** **From the stored description and the free stills, no paid call.** Proposals are labelled `library` with the description as evidence; the operator's yes is the check.
 - **Q5 (excluded clips):** **Yes, when studied.** An excluded clip with a description can be marked; one whose study failed cannot.
+- **Q6 (how proposals appear):** **The mapping as proposed.** A gap proposal is a shot marked `library` (Keep takes it, Reject leaves the blank); a swap shows the library clip as the shot with the current clip as its alternative (Reject brings the current clip back). The review page and `vw master decide` as they are.
+- **Q7 (backfill):** **Start empty.** The library fills from each client's next film; a backfill of a chosen client can be asked for later as its own task.
+- **Q8 (unmarking):** **Any team member on that client's films, with their words.** A film that already placed the clip keeps it.
+
+All eight answered (3 Nov 2026). The build list follows in design/147.
