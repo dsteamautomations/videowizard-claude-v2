@@ -238,3 +238,11 @@ def test_the_shoot_teams_cameras_are_offered_as_choices_and_a_choice_expands_to_
     assert "Raj's footage" in out['camera_unknown_note'] and 'Pandi/DS footage' in out['camera_unknown_note']
     res = media_record(ws, PROC, prior, fake_upload([]), copies='copies', camera_audio='excluded', note='n', shot_on='pandi')
     assert res['summary']['shot_on'] == CAMERA_PRESETS['pandi']
+
+
+def test_prepare_lists_the_files_the_clients_library_already_holds(ws):   # design/147 L2
+    clip(ws / 'in' / 'C1.mp4')
+    sha = file_sha256(ws / 'in' / 'C1.mp4')
+    out = media_prepare(ws, PROC, prior, known=lambda shas: {sha: {'name': 'yard.mp4', 'films': ['VW-12'], 'generic': True}} if sha in shas else {})
+    assert 'C1.mp4 = yard.mp4 (from VW-12)' in out['repeats'] and '--duplicates' in out['repeats']
+    assert media_prepare(ws, PROC, prior)['repeats'] == '' and media_prepare(ws, PROC, prior, known=lambda shas: 1 / 0)['repeats'] == ''   # no lookup, or a failed one: never a block

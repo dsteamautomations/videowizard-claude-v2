@@ -92,3 +92,33 @@ def test_unmark_needs_the_name_and_the_words():
     with pytest.raises(Problem) as e:
         B.unmark(Conn(), USER, RUN, 'C1.mp4', 'wrong, it shows the MD')   # the fake conn finds no row
     assert e.value.status == 404
+
+
+# ---------- L2: repeats caught before the paid study ----------
+
+class RowsConn(Conn):
+    def __init__(self, rows):
+        super().__init__()
+        self.rows = rows
+
+    def execute(self, sql, args=()):
+        self.sql.append((sql, args))
+        rows = self.rows if 'from vw2_library' in sql else []
+        return type('R', (), {'fetchone': lambda s: rows[0] if rows else None, 'fetchall': lambda s: rows})()
+
+
+def test_repeats_are_found_by_file_and_by_look_and_never_for_an_older_film(monkeypatch):
+    lib = [{'sha256': 'a' * 64, 'name': 'yard.mp4', 'films': ['VW-12'], 'generic': True, 'fingerprint': [0b1111]}]
+    monkeypatch.setattr(B, 'fingerprint', lambda store, run, clip, ffmpeg='ffmpeg': [0b1110] if clip['name'] == 'C2.mp4' else [0xFFFF0000FFFF0000])   # C3 is far from every library frame
+    clips = [{'id': 'a1', 'name': 'C1.mp4', 'sha256': 'a' * 64}, {'id': 'b2', 'name': 'C2.mp4', 'sha256': 'b' * 64}, {'id': 'c3', 'name': 'C3.mp4', 'sha256': 'c' * 64}]
+    found = B.repeats(RowsConn(lib), None, RUN, clips)
+    assert [(f['name'], f['kind']) for f in found] == [('C1.mp4', 'the same file'), ('C2.mp4', 'looks the same')]
+    assert B.repeats(RowsConn(lib), None, OLD, clips) == [] and B.repeats(RowsConn(lib), None, {**RUN, 'client_id': None}, clips) == []
+
+
+def test_the_operator_decides_once_keep_or_skip():
+    found = [{'clip_id': 'a1', 'name': 'C1.mp4', 'library_name': 'yard.mp4', 'films': ['VW-12'], 'kind': 'the same file'}]
+    with pytest.raises(Problem) as e:
+        B.duplicates_decision(found, None)
+    assert 'already holds 1' in e.value.message and '--duplicates keep|skip' in e.value.message and e.value.extra['repeats'] == found
+    assert B.duplicates_decision(found, 'keep') == [] and B.duplicates_decision(found, 'skip') == ['a1'] and B.duplicates_decision([], None) == []

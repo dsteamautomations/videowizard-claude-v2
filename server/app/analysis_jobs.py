@@ -119,6 +119,15 @@ def start(conn, user, run, outputs, policy, again):
     procedure = core._stage(core.stage_table(run['procedure_version']), analysis.STAGE)
     excluded = set(policy.get('exclude') or [])
     clips = [c for c in media['summary']['clips'] if c['id'] not in excluded and c['name'] not in excluded]
+    if not again and not {o['unit'] for o in outputs if o['stage'] == 'analysis'}:   # design/147 L2: repeats caught before the first paid request
+        from . import brandlib
+        found = brandlib.repeats(conn, storage(), run, clips, settings().FFMPEG_EXECUTABLE)
+        skipped = brandlib.duplicates_decision(found, policy.get('duplicates'))
+        if skipped:
+            excluded |= set(skipped)
+            clips = [c for c in clips if c['id'] not in excluded]
+            conn.execute("update vw2_runs set film = coalesce(film, '{}'::jsonb) || jsonb_build_object('library_skipped', %s::jsonb) where id=%s",
+                         (Jsonb([f for f in found if f['clip_id'] in skipped]), run['id']))
     if not clips:
         raise Problem(422, 'ANALYSIS_POLICY', 'Every clip is excluded; nothing to analyse.')
     open_jobs = conn.execute("select unit from vw2_jobs where run_id=%s and stage='analysis' and status in ('queued','running','submission_unknown','storage_pending')",

@@ -185,6 +185,7 @@ class AnalysisStart(Write):
     film_type: str = ''
     exclude: list[str] = []
     again: bool = False
+    duplicates: Literal['keep', 'skip'] | None = None   # design/147 L2: the operator's one answer on clips the library already holds
 
 
 class Note(Write):
@@ -1072,6 +1073,17 @@ def get_library(run_id: UUID, user=User, conn=DB):
                      'client_generic': [{'name': r['name'], 'films': r['films'], 'descriptive_name': (r['description'] or {}).get('descriptive_name')} for r in rows]})
 
 
+class Shas(Write):
+    shas: list[str] = Field(max_length=500)
+
+
+@app.post('/api/runs/{run_id}/library/known')
+def post_library_known(run_id: UUID, body: Shas, user=User, conn=DB):
+    """design/147 L2: at media prepare, the batch's files the client's library already holds exactly."""
+    run = core.load_run(conn, user, run_id)
+    return Response({'known': brandlib.known(conn, run.get('client_id'), body.shas) if run.get('film') is not None else {}})
+
+
 @app.post('/api/runs/{run_id}/library/mark')
 def post_library_mark(run_id: UUID, body: LibraryMark, user=User, conn=DB):
     run = core.load_run(conn, user, run_id, lock=True)
@@ -1115,7 +1127,7 @@ def post_film(run_id: UUID, body: FilmChoice, user=User, conn=DB):
 def analysis_start(run_id: UUID, body: AnalysisStart, user=User, conn=DB):
     run = _analysis_run(conn, user, run_id)
     outputs = core.current_outputs(conn, run['id'])
-    policy = {'camera_audio': body.camera_audio, 'understand_audio': body.understand_audio, 'film_type': body.film_type, 'exclude': body.exclude}
+    policy = {'camera_audio': body.camera_audio, 'understand_audio': body.understand_audio, 'film_type': body.film_type, 'exclude': body.exclude, 'duplicates': body.duplicates}
     status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (201, analysis_jobs.start(conn, user, run, outputs, policy, body.again)))
     return Response(resp, status_code=status)
 

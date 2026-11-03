@@ -976,7 +976,8 @@ def cmd_stage(a):
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
                 {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}} if a.stage == 'brief' else \
-                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else {}
+                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else \
+                {'known': lambda shas: (write(f"/api/runs/{m['run_id']}/library/known", {'shas': shas}) or {}).get('known') or {}} if a.stage == 'media' else {}   # design/147 L2
             emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
@@ -1325,7 +1326,7 @@ def cmd_analysis(a):
     m = active()
     run = m['run_id']
     if a.what == 'start':   # design/42 6.2: camera audio comes from the media stage unless given; the film type is optional
-        body = {'understand_audio': a.understand_audio != 'no', 'exclude': a.exclude or [], 'again': a.again,
+        body = {'understand_audio': a.understand_audio != 'no', 'exclude': a.exclude or [], 'again': a.again, 'duplicates': getattr(a, 'duplicates', None),   # design/147 L2
                 **({'camera_audio': a.camera_audio} if a.camera_audio else {}), **({'film_type': a.film_type} if a.film_type else {})}
         out = write(f'/api/runs/{run}/analysis/start', body)
         source = 'from the media stage' if out.get('camera_audio_source') == 'media' else 'as given'
@@ -2837,7 +2838,7 @@ def build_parser():
     s = sub.add_parser('analysis'); s.add_argument('what', choices=['start', 'status', 'show', 'retry', 'recover', 'resolve', 'exclude', 'policy'])
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='optional since design/42: the media stage\'s answer is used when absent'); s.add_argument('--understand-audio', choices=['yes', 'no'], default='yes'); s.add_argument('--film-type')
     s.add_argument('--wait', type=float, default=0, help='status: seconds to wait inside the tool, polling every 15 s (design/42 6.1)')
-    s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.add_argument('--waive', action='append'); s.set_defaults(fn=cmd_analysis)
+    s.add_argument('--exclude', action='append'); s.add_argument('--again', action='store_true'); s.add_argument('--duplicates', choices=['keep', 'skip'], help="start: the operator's one answer on clips the client's library already holds (design/147)"); s.add_argument('--unit'); s.add_argument('--note'); s.add_argument('--show-speaker-video', action='store_const', const=True, default=None); s.add_argument('--waive', action='append'); s.set_defaults(fn=cmd_analysis)
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',

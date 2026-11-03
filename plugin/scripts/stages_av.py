@@ -66,6 +66,18 @@ def shot_on_words(answer):
     return CAMERA_PRESETS.get(words.lower().strip('.: '), words)
 
 
+def library_repeats(clips, known):
+    """design/147 L2: the files of this batch the client's library already holds (the same sha256), each with the film it came with; '' when none or no lookup."""
+    if not known:
+        return ''
+    try:
+        found = known([c['sha256'] for c in clips]) or {}
+    except Exception:   # noqa: BLE001  the lookup is help, never a block
+        return ''
+    hits = [f"{c['name']} = {found[c['sha256']]['name']} (from {', '.join(map(str, found[c['sha256']].get('films') or []))})" for c in clips if c['sha256'] in found]
+    return ('The client\'s library already holds ' + '; '.join(hits) + '. Tell the operator; at analysis start they decide once: keep or skip (`--duplicates`).') if hits else ''
+
+
 def camera_unknown(clips):
     """design/146 (SK, 3 Nov 2026): the clips whose file carries no camera maker and whose name settles nothing; asked of the operator once, at record."""
     import re
@@ -148,7 +160,7 @@ def _inspect(p):
     return {'path': p, 'size': st.st_size, 'mtime': st.st_mtime, 'sha': file_sha256(p), 'meta': probe(p)}
 
 
-def media_prepare(ws, procedure, prior):
+def media_prepare(ws, procedure, prior, known=None):   # known: design/147 L2, the server's lookup of files the client's library holds
     files = sorted(p for p in (ws / 'in').iterdir() if p.is_file() and p.suffix.lower() in VIDEO_SUFFIXES)
     if not files:
         raise Refused(f"Put the source clips in {ws / 'in'} (mp4/mov/mkv/webm…), then run prepare again.")
@@ -191,6 +203,7 @@ def media_prepare(ws, procedure, prior):
             'duplicates_skipped': skipped, 'prepared_at': stamp(ws, 'media'), 'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
             'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'copies_note': copies_note(clips),   # design/107 §6
             'camera_unknown_note': camera_unknown_note(clips),   # design/146 (the count is in the note; the answer stays under the size cap)
+            'repeats': library_repeats(clips, known),   # design/147 L2: files the client's library already holds, exactly
             'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then ask the camera sound, then record. Do not ask what the footage is: it is measured at visuals. The upload reports when it is done.'}
 
 

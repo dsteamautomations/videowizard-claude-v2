@@ -142,6 +142,45 @@ def generic_rows(conn, client_id, contract=None):
     return [dict(r) for r in rows if not contract or r['contract'] == contract]
 
 
+BITS_CLIP = 8   # ponytail: of 64, a frame of a moving clip against a library clip's sampled frames; tune on real footage (design/140 C4)
+
+
+def repeats(conn, store, run, clips, ffmpeg='ffmpeg'):
+    """design/147 L2 (SK: before the study): the batch's clips that the client's library already holds, exactly (sha256) or by look (frame fingerprints),
+    each with the library file and the film it came with. Nothing for a film started before the library, or a run with no client."""
+    if (run or {}).get('film') is None or not run.get('client_id'):
+        return []
+    found = []
+    exact = known(conn, run['client_id'], [c['sha256'] for c in clips])
+    rows = [dict(r) for r in conn.execute('select name, films, fingerprint, sha256 from vw2_library where client_id=%s and fingerprint is not null', (run['client_id'],)).fetchall()]
+    from . import lookalike
+    for c in clips:
+        if c['sha256'] in exact:
+            e = exact[c['sha256']]
+            found.append({'clip_id': c['id'], 'name': c['name'], 'library_name': e['name'], 'films': e['films'], 'kind': 'the same file'})
+            continue
+        if not rows:
+            continue
+        fp = fingerprint(store, run, c, ffmpeg) or []
+        for r in rows:
+            if r['sha256'] != c['sha256'] and any(lookalike.distance(a, b) <= BITS_CLIP for a in fp for b in r['fingerprint'] or []):
+                found.append({'clip_id': c['id'], 'name': c['name'], 'library_name': r['name'], 'films': r['films'], 'kind': 'looks the same'})
+                break
+    return found
+
+
+def duplicates_decision(found, choice):
+    """The operator decides once for the list: keep (analyse anyway) or skip (left out of this film's batch, offered from the library instead)."""
+    if not found:
+        return []
+    if choice not in ('keep', 'skip'):
+        lines = '; '.join(f"{f['name']} is {f['kind']} as {f['library_name']} (from {', '.join(map(str, f['films'] or []))})" for f in found)
+        raise Problem(409, 'LIBRARY_REPEATS', f'The client\'s library already holds {len(found)} of these clips: {lines}. Ask the operator once: analyse them anyway, '
+                                              'or skip them (left out of this film, offered from the library in the library round)? Then `vw analysis start --duplicates keep|skip`.',
+                      repeats=found)
+    return [f['clip_id'] for f in found] if choice == 'skip' else []
+
+
 def known(conn, client_id, shas):
     """L2: the client's library rows whose file is exactly one of these (sha256), with the film it came with."""
     if not client_id or not shas:
