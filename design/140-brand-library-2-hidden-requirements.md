@@ -207,3 +207,7 @@ Status: for SK's review, 2 Nov 2026. No code written. Part 1 (`140-brand-library
 - **Merging two clients' libraries in the directory.** A manual job if it ever happens.
 - **The web page for the marking question.** Part 1 says existing UI, which today is the chat question tool. A page is not proposed.
 - **Server tests.** These need Docker with `postgres:17`; the test plan follows SK's approval of this list.
+
+## 11. SK's answers (3 Nov 2026)
+
+- **Q1 (images):** **Video first.** This change marks, stores and proposes video clips; images follow as a later change on the same library.
