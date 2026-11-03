@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response as RawResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from . import analysis_jobs, auth, connect, core, elevenlabs, film, files, jobs, library, runlog, visuals_stage, voices, web, worker
+from . import analysis_jobs, auth, brandlib, connect, core, elevenlabs, film, files, jobs, library, runlog, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -1049,6 +1049,42 @@ def post_log(run_id: UUID, body: LogEntry, user=User, conn=DB):
 def get_log(run_id: UUID, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
     return Response({'markdown': runlog.markdown(run.get('code') or str(run['id']), runlog.rows(conn, run['id']))})
+
+
+class LibraryMark(Write):   # design/147 L1
+    generic: list[str] = []
+    quote: str = Field(min_length=1, max_length=2000)
+
+
+class LibraryOne(Write):
+    name: str = Field(min_length=1, max_length=300)
+    quote: str = Field(min_length=1, max_length=2000)
+    generic: bool = False
+
+
+@app.get('/api/runs/{run_id}/library')
+def get_library(run_id: UUID, user=User, conn=DB):
+    """design/147: the studied clips with their short descriptions (for the shortlist), the answer recorded, and the client's generic rows so far."""
+    run = core.load_run(conn, user, run_id)
+    outputs = core.current_outputs(conn, run['id'])
+    rows = brandlib.generic_rows(conn, run.get('client_id'))
+    return Response({'candidates': brandlib.candidates(conn, run, outputs), 'answer': brandlib.asked(run), 'test': brandlib.GENERIC_TEST,
+                     'client_generic': [{'name': r['name'], 'films': r['films'], 'descriptive_name': (r['description'] or {}).get('descriptive_name')} for r in rows]})
+
+
+@app.post('/api/runs/{run_id}/library/mark')
+def post_library_mark(run_id: UUID, body: LibraryMark, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id, lock=True)
+    outputs = core.current_outputs(conn, run['id'])
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, brandlib.mark(conn, storage(), user, run, outputs, body.generic, body.quote, settings().FFMPEG_EXECUTABLE)))
+    return Response(resp, status_code=status)
+
+
+@app.post('/api/runs/{run_id}/library/unmark')
+def post_library_unmark(run_id: UUID, body: LibraryOne, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id, lock=True)
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, brandlib.unmark(conn, user, run, body.name, body.quote, body.generic)))
+    return Response(resp, status_code=status)
 
 
 class FilmChoice(Write):   # design/137, design/139: one choice with the operator's words

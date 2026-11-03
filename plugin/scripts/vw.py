@@ -2705,6 +2705,24 @@ def cmd_log(a):
     emit(write(f"/api/runs/{m['run_id']}/log", {'text': text, 'about': a.about or '', 'rule': a.rule or '', 'kind': a.kind}))
 
 
+def cmd_library(a):
+    """design/147: the brand-generic library. `vw library` shows the studied clips with their short descriptions (shortlist from these, never the full log),
+    the test for generic, and what the client already has. `vw library mark --generic "C1.mp4, C2.mp4" --quote` records the operator's answer (none is an
+    answer: --generic ""); `vw library unmark --clip <name> --quote` and `vw library remark --clip <name> --quote` by any team member on the client."""
+    m = active()
+    if a.what == 'show':
+        emit(call('GET', f"/api/runs/{m['run_id']}/library"), 0, 'Shortlist from the descriptions, ask the operator which to mark (none is an answer, Other for files you did not suggest), then `vw library mark`.')
+    if not (a.quote or '').strip():
+        emit({'action': 'refused', 'message': "Pass the operator's own words with --quote."}, 2)
+    if a.what == 'mark':
+        names = [n.strip() for n in (a.generic or '').replace(';', ',').split(',') if n.strip()]
+        out = write(f"/api/runs/{m['run_id']}/library/mark", {'generic': names, 'quote': a.quote})
+        emit(out, 0, f"Library answer recorded: {len(out.get('generic') or [])} marked brand-generic, {out.get('stored', 0)} clips stored for the client." + (f" ({out['skipped']})" if out.get('skipped') else ''))
+    if not a.clip:
+        emit({'action': 'refused', 'message': f'vw library {a.what} --clip <name> --quote "<their words>"'}, 2)
+    emit(write(f"/api/runs/{m['run_id']}/library/unmark", {'name': a.clip, 'quote': a.quote, 'generic': a.what == 'remark'}))
+
+
 IMAGE_KINDS = 'keyframe for a start or end picture, isolated, sheet, state, style or component'   # the server's kinds (main.py ImageRequest)
 
 
@@ -2861,6 +2879,8 @@ def build_parser():
     s = sub.add_parser('log', help="the run's decision log (design/142): add an entry, or --show the whole log"); s.add_argument('text', nargs='*')
     s.add_argument('--about'); s.add_argument('--rule'); s.add_argument('--kind', default='decision', choices=['decision', 'workaround', 'choice', 'blank', 'no_rule'])
     s.add_argument('--show', action='store_true'); s.set_defaults(fn=cmd_log)
+    s = sub.add_parser('library', help='the brand-generic library (design/147): show, mark, unmark, remark'); s.add_argument('what', choices=['show', 'mark', 'unmark', 'remark'])
+    s.add_argument('--generic', help='mark: the clip names to mark brand-generic, comma-separated; empty for none'); s.add_argument('--clip'); s.add_argument('--quote'); s.set_defaults(fn=cmd_library)
     for key, helptext in (('category', "the film's video category, read from the script and confirmed by the operator (design/137)"),
                           ('shape', "the film's shape, then the AI video shape, from the clip count (design/139 R1); with no value: the count and the recommendation"),
                           ('colours', 'the colours the operator prefers when the client card has none, or "no preference" (design/139 R3)'),

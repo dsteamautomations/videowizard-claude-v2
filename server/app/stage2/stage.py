@@ -126,6 +126,8 @@ def learned_rules(conn, run):
 
 
 def prepare(conn, store, user, run, outputs):
+    from .. import brandlib
+    brandlib.need_marked(run)   # design/147 L1: a new film's first cut waits for the brand-generic answer; films from before skip it
     procedure = core._stage(core.stage_table(run['procedure_version']), 'options')
     brief_o, script_o, voice_o, media_o = (_output(outputs, s) for s in ('brief', 'script', 'voice', 'media'))
     brief, _ = _file(store, brief_o, 'brief.json')
