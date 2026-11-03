@@ -82,6 +82,8 @@ if __name__ == '__main__':
         d148(parts)
         from d149_wording_v3 import apply_visuals as d149   # design/149 Set B: the plan step's rules (B1, B2, B4, B5, B6, B7, B9)
         prompt = d149(prompt, parts)
+        from d150_wording_v3 import apply_visuals as d150   # design/150 Set C: the treatment's limits and the one-clip rule in the text
+        d150(parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))
