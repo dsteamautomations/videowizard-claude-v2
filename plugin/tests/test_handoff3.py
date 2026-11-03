@@ -39,7 +39,7 @@ def test_record_keeps_the_operators_answer_on_originals_or_copies(tmp_path):
     (ws / 'out').mkdir()
     clip = {'id': 'c1', 'name': 'C1.mp4', 'sha256': 'a' * 64, 'bytes': 3, 'duration_s': 1.0, 'has_audio': False, 'fps': '25/1', 'start_timecode': '', 'reel': '', 'original_name': ''}
     (ws / 'work' / 'media-clips.json').write_text(json.dumps([clip]), encoding='utf-8')
-    out = AV.media_record(ws, {}, None, lambda stage, path, sha, size: {'name': 'C1.mp4'}, camera_audio='allowed', copies='copies')
+    out = AV.media_record(ws, {}, None, lambda stage, path, sha, size: {'name': 'C1.mp4'}, camera_audio='allowed', copies='copies', shot_on='Sony FX3')   # design/146
     assert out['summary']['copies'] == 'copies' and out['summary']['clips'][0]['start_timecode'] == '' and 'reel' in out['summary']['clips'][0]
     with pytest.raises(AV.Refused, match='originals or copies'):
         AV.media_record(ws, {}, None, lambda *a: {}, camera_audio='allowed')

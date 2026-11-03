@@ -26,8 +26,28 @@ def _pro(clip):
     return (clip.get('codec') or '').lower().startswith(PRO_CODECS) or ten_bit or (clip.get('bit_rate') or 0) >= 50_000_000
 
 
-def camera_of(clip):
-    """(value, evidence): the maker and model tags, else the file name; otherwise 'unknown', with the file details as evidence (design/139 R11)."""
+CINEMA_MODELS = ('fx3', 'fx6', 'fx9', 'fx30', 'venice', 'burano', 'c70', 'c80', 'c300', 'c400', 'c500', 'eos c', 'komodo', 'raptor', 'alexa', 'pocket', 'ursa', 'pyxis', 'eva1')   # design/146
+
+
+def said_camera(words):
+    """design/146 (SK, 3 Nov 2026): the operator's answer at media, classified like a maker tag; no known maker means their words as given."""
+    low = ' '.join(str(words or '').split()).lower()
+    if not low:
+        return None
+    if any(m in low for m in CINEMA_MAKERS) or any(m in low for m in CINEMA_MODELS):
+        return 'cinema'
+    if any(m in low for m in PHONE_MAKERS) or 'iphone' in low or 'pixel' in low:
+        return 'phone'
+    if 'dji' in low or 'drone' in low:
+        return 'drone'
+    if any(m in low for m in CAMERA_MAKERS):
+        return 'mirrorless'
+    return ' '.join(str(words).split())
+
+
+def camera_of(clip, said=None):
+    """(value, evidence): the maker and model tags, else a file name that names a camera, else the operator's answer at media (design/146); otherwise
+    'unknown', with who exported the file and its details as evidence (design/139 R11)."""
     make, model = str(clip.get('make') or '').strip(), str(clip.get('model') or '').strip()
     tag = ' '.join(x for x in (make, model) if x)
     low = make.lower()
@@ -41,10 +61,16 @@ def camera_of(clip):
         if any(m in low for m in CAMERA_MAKERS):
             return ('cinema' if _pro(clip) and (clip.get('bit_rate') or 0) >= 100_000_000 else 'mirrorless'), tag
     for pattern, who, value in NAME_HINTS:
-        if re.match(pattern, clip.get('name') or '', re.I):
+        if re.match(pattern, clip.get('name') or '', re.I) and value != 'unknown':
             return value, f"file name {clip.get('name')} ({who})"
+    if said_camera(said):
+        return said_camera(said), f"the operator said: {' '.join(str(said).split())}"
+    exported = f"; exported by {clip['encoder']}" if clip.get('encoder') and not str(clip['encoder']).lower().startswith('lavf') else ''
+    for pattern, who, value in NAME_HINTS:
+        if re.match(pattern, clip.get('name') or '', re.I):
+            return value, f"file name {clip.get('name')} ({who}){exported}"
     if clip.get('codec') or clip.get('bit_rate'):   # design/139 R11, Q3 (SK, 2 Nov 2026): never a phone or a professional camera guessed from the codec
-        return 'unknown', f"no maker tag or known file name; file details {clip.get('codec') or '?'}, {clip.get('pix_fmt') or '?'}, {(clip.get('bit_rate') or 0) / 1e6:.0f} Mbit/s"
+        return 'unknown', f"no maker tag or known file name{exported}; file details {clip.get('codec') or '?'}, {clip.get('pix_fmt') or '?'}, {(clip.get('bit_rate') or 0) / 1e6:.0f} Mbit/s"
     return 'unknown', 'no maker tag, name pattern or codec on record'
 
 
@@ -73,8 +99,8 @@ def look_of(clip, log):
     return 'natural', f"contrast {contrast or 'not analysed'}, transfer {transfer or 'untagged'}"
 
 
-def per_clip(clip, log):
-    camera, ce = camera_of(clip)
+def per_clip(clip, log, said=None):
+    camera, ce = camera_of(clip, said)
     support, se = support_of((log or {}).get('sub_clips'), camera)
     look, le = look_of(clip, log)
     return {'name': clip.get('name'), 'camera': camera, 'support': support, 'look': look, 'evidence': {'camera': ce, 'support': se, 'look': le}}
@@ -90,9 +116,9 @@ def _field(values, unknown_votes=False):
     return (top if n * 3 >= sum(counts.values()) * 2 else 'mixed'), dict(counts.most_common())
 
 
-def measure(clips, logs):
-    """clips: the media record's clips; logs: {clip_id: clip log}. Returns {'per_clip', 'summary'}."""
-    rows = {c['id']: per_clip(c, (logs or {}).get(c['id'])) for c in clips or [] if c.get('id')}
+def measure(clips, logs, said=None):
+    """clips: the media record's clips; logs: {clip_id: clip log}; said: the operator's camera answer at media (design/146). Returns {'per_clip', 'summary'}."""
+    rows = {c['id']: per_clip(c, (logs or {}).get(c['id']), said) for c in clips or [] if c.get('id')}
     summary = {}
     for f in ('camera', 'support', 'look'):
         summary[f], summary[f + '_counts'] = _field([r[f] for r in rows.values()], f == 'camera')

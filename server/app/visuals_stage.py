@@ -125,7 +125,7 @@ def prepare(conn, store, user, run, outputs):
                 else:   # design/125: the version-1 evidence contract is retired
                     raise Problem(409, 'RETIRED', f"Clip {o['unit']}: the version-1 evidence contract is retired; analysis uses the clip log (clip-log-v1).")
     media = next((o for o in outputs if o['stage'] == 'media' and o['unit'] is None), None)   # design/88: measured, not asked
-    session['footage_measured'] = FM.measure(((media or {}).get('summary') or {}).get('clips') or [], logs)
+    session['footage_measured'] = FM.measure(((media or {}).get('summary') or {}).get('clips') or [], logs, ((media or {}).get('summary') or {}).get('shot_on'))   # design/146
     session['clip_safe_zoom'] = {cid: float(log.get('max_safe_zoom_limit') or 1.0) for cid, log in logs.items()}   # design/89 H4: how far a reuse may be cropped
     session['footage'] = FM.apply_correction(session['footage_measured'], session.get('footage_correction'))
     session['gap_neighbours'] = gap_neighbours(store, outputs)   # F3: the clip before and after each gap

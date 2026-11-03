@@ -74,11 +74,11 @@ def test_prepare_prints_no_footage_line_and_record_stores_no_footage_character(w
     out = media_prepare(ws, PROC, prior)
     assert 'footage_guess' not in out and 'looks like' not in json.dumps(out) and 'Do not ask what the footage is' in out['message']
     assert not hasattr(stages_av, 'footage_guess')
-    res = media_record(ws, PROC, prior, fake_upload([]), copies='originals', camera_audio='allowed', note='ok')
+    res = media_record(ws, PROC, prior, fake_upload([]), copies='originals', camera_audio='allowed', note='ok', shot_on='test camera')
     assert 'footage_character' not in res['summary']
     assert {'codec', 'pix_fmt', 'bit_rate', 'make', 'model'} <= set(res['summary']['clips'][0])   # design/88 F1: what the server measures from
     with pytest.raises(TypeError):
-        media_record(ws, PROC, prior, fake_upload([]), copies='originals', camera_audio='allowed', footage={'camera': 'cinema'})
+        media_record(ws, PROC, prior, fake_upload([]), copies='originals', camera_audio='allowed', footage={'camera': 'cinema'}, shot_on='test camera')
     steps = ' '.join(PROC['steps'])
     assert '--camera cinema' not in steps and '--look' not in steps and 'Do not ask what the footage is' in steps
 
@@ -142,13 +142,13 @@ def test_record_stores_the_sound_answer_and_reports_progress(ws):
     clip(ws / 'in' / 'b.mp4', tone=500)
     media_prepare(ws, PROC, prior)
     calls, progress = [], []
-    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='site noise only', progress=lambda k, n, name, size: progress.append((k, n, name)))
+    res = media_record(ws, PROC, prior, fake_upload(calls), copies='originals', camera_audio='allowed', note='site noise only', progress=lambda k, n, name, size: progress.append((k, n, name)), shot_on='test camera')
     s = res['summary']
     assert s['camera_audio'] == 'allowed' and s['camera_audio_note'] == 'site noise only' and len(s['clips']) == 2
     assert sorted(calls) == ['a.mp4', 'b.mp4'] and sorted(progress) == [(1, 2, 'a.mp4'), (2, 2, 'b.mp4')] or sorted(progress) == [(1, 2, 'b.mp4'), (2, 2, 'a.mp4')]
     assert [k for k, _, _ in sorted(progress)] == [1, 2]
     with pytest.raises(Refused, match='camera sound'):   # design/125 M1: the answer is required
-        media_record(ws, PROC, prior, fake_upload([]), copies='originals')
+        media_record(ws, PROC, prior, fake_upload([]), copies='originals', shot_on='test camera')
 
 
 def test_record_refuses_a_clip_changed_since_prepare(ws):
@@ -159,15 +159,15 @@ def test_record_refuses_a_clip_changed_since_prepare(ws):
     time.sleep(0.02)
     (ws / 'in' / 'b.mp4').write_bytes(data[:-1] + bytes([data[-1] ^ 1]))   # same size, different bytes, new mtime
     with pytest.raises(Refused) as exc:
-        media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals')
+        media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals', shot_on='test camera')
     assert 'changed since prepare' in str(exc.value) and 'b.mp4' in str(exc.value) and 'a.mp4' not in str(exc.value)
     media_prepare(ws, PROC, prior)
     os.utime(ws / 'in' / 'a.mp4')   # touched: same bytes, new mtime; prepare again is seconds
     with pytest.raises(Refused) as exc:
-        media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals')
+        media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals', shot_on='test camera')
     assert 'a.mp4' in str(exc.value)
     media_prepare(ws, PROC, prior)
-    assert media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals')['summary']['clips']
+    assert media_record(ws, PROC, prior, fake_upload([]), camera_audio='excluded', copies='originals', shot_on='test camera')['summary']['clips']
 
 
 def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, capsys):
@@ -186,14 +186,14 @@ def test_cmd_stage_prints_progress_lines_and_passes_the_flags(ws, monkeypatch, c
         posted.update(body)
         return {'id': 'out-1', 'stage': 'media', 'files': body['files'], 'summary': body['summary'], 'next': {'stage': 'analysis', 'paid': 'gemini-3.8-flash'}}
     monkeypatch.setattr(vw, 'write', write)
-    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound', copies='originals')   # design/107 §6
+    a = argparse.Namespace(stage='media', step='record', quote='yes these clips', title=None, file=None, take_over=False, camera_audio='excluded', note='no usable sound', copies='originals', shot_on='Sony FX3')   # design/107 §6; design/146
     with pytest.raises(SystemExit) as exc:
         vw.cmd_stage(a)
     out, err = capsys.readouterr()
     assert exc.value.code == 0, err
     assert 'uploaded 1/2 ' in err and 'uploaded 2/2 ' in err and '(0 MB)' in err and 'Recorded media. Next: analysis.' in err
     assert posted['summary']['camera_audio'] == 'excluded' and posted['summary']['camera_audio_note'] == 'no usable sound' and len(posted['summary']['clips']) == 2 and posted['summary']['copies'] == 'originals'
-    assert 'footage_character' not in posted['summary']   # design/126 ME1
+    assert 'footage_character' not in posted['summary'] and posted['summary']['shot_on'] == 'Sony FX3'   # design/126 ME1; design/146
     shown = json.loads(out)   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
     assert shown['id'] == 'out-1' and shown['next']['stage'] == 'analysis' and shown['clips_recorded'] == 2 and 'total_mb' in shown
     assert 'clips' not in shown['summary'] and shown['summary']['camera_audio'] == 'excluded' and isinstance(shown['files'], str) and '3 file' in shown['files']   # out/media.json and the two clips
@@ -208,3 +208,21 @@ def test_media_prompt_and_steps_are_v2():
     assert '--camera-audio' in steps and 'total MB' in steps and 'reports when the upload is done' in steps and 'changed since prepare' in steps
     assert 'one line per clip' in steps and 'work/media-clips.json' in steps   # design/57
     assert 'in the foreground' in steps and 'at least 30 minutes' in steps and 'never as a background command' in steps   # design/59 L16
+
+
+# ---------- design/146 (SK, 3 Nov 2026): the camera is pulled from the file, and asked once only when the file has none ----------
+
+def test_prepare_names_the_clips_with_no_camera_and_who_exported_them(ws):
+    clip(ws / 'in' / 'C0032.mp4')
+    out = media_prepare(ws, PROC, prior)
+    assert 'No camera information in 1 clip' in out['camera_unknown_note'] and 'C0032.mp4' in out['camera_unknown_note'] and 'shot-on' in out['camera_unknown_note'] and 'Lavf' not in out['camera_unknown_note']   # ffmpeg's own tag is no exporter
+    assert json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))[0]['encoder'].startswith('Lavf')
+
+
+def test_record_asks_the_camera_once_when_a_clip_has_none_and_keeps_the_answer(ws):
+    clip(ws / 'in' / 'C0032.mp4')
+    media_prepare(ws, PROC, prior)
+    with pytest.raises(Refused, match='shot-on'):
+        media_record(ws, PROC, prior, fake_upload([]), copies='copies', camera_audio='excluded', note='n')
+    res = media_record(ws, PROC, prior, fake_upload([]), copies='copies', camera_audio='excluded', note='n', shot_on='Sony FX3, one camera')
+    assert res['summary']['shot_on'] == 'Sony FX3, one camera' and res['summary']['clips'][0]['encoder'].startswith('Lavf')

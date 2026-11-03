@@ -982,7 +982,7 @@ def cmd_stage(a):
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
                 print(f'uploaded {k}/{n} {name} ({size / 1e6:.0f} MB)', file=sys.stderr, flush=True)
             result = record(ws, procedure, prior, lambda stage, path, sha, size: upload_file(m, stage, path, sha, size),
-                            camera_audio=a.camera_audio, note=a.note, progress=progress, copies=getattr(a, 'copies', None))   # design/107 §6
+                            camera_audio=a.camera_audio, note=a.note, progress=progress, copies=getattr(a, 'copies', None), shot_on=getattr(a, 'shot_on', None))   # design/107 §6; design/146
         elif a.stage == 'voice':
             job = None
             if a.job:   # design/52 D: the record from a kept narration, fetched for the operator to listen to
@@ -2799,6 +2799,7 @@ def build_parser():
     for f in ('--camera', '--support', '--look', '--footage-note'):   # design/126 ME1: refused by name; the footage is measured at visuals
         s.add_argument(f, help=argparse.SUPPRESS)
     s.add_argument('--copies', choices=['originals', 'copies'], help='media record: are these the camera originals, or copies made by an editor (design/107)')
+    s.add_argument('--shot-on', help="media record: the operator's words on which camera shot the clips whose file carries no maker (design/146); asked only when prepare lists camera_unknown")
     s.add_argument('--job', help='voice record: the kept narration the operator listened to (design/52 D)')
     s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_stage)
     s = sub.add_parser('upload'); s.add_argument('--stage', required=True); s.add_argument('--file', required=True); s.set_defaults(fn=cmd_upload)

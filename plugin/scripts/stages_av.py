@@ -54,6 +54,23 @@ def relink_fields(data):
             'original_name': tags.get('original_filename') or tags.get('original_name') or ''}
 
 
+def camera_unknown(clips):
+    """design/146 (SK, 3 Nov 2026): the clips whose file carries no camera maker and whose name settles nothing; asked of the operator once, at record."""
+    import re
+    settled = (r'^DJI_', r'^MVI_', r'^DSC_?\d', r'^P\d{7}', r'^(PXL|IMG|VID)_?\d')   # the server's file-name hints that name a camera
+    return [c['name'] for c in clips if not c.get('make') and not any(re.match(p, c['name'], re.I) for p in settled)]
+
+
+def camera_unknown_note(clips):
+    names = camera_unknown(clips)
+    if not names:
+        return ''
+    few = ', '.join(names[:3]) + (f' +{len(names) - 3}' if len(names) > 3 else '')
+    exporters = sorted({str(c.get('encoder')) for c in clips if c['name'] in names and c.get('encoder') and not str(c['encoder']).lower().startswith('lavf')})
+    by = f" (exported by {', '.join(exporters)})" if exporters else ''
+    return f'No camera information in {len(names)} clip(s){by}: {few}. Ask once which camera shot them; record their words with `--shot-on`.'
+
+
 def copies_note(clips):
     """design/107 §6: copies that lost what relinking needs, named once; '' when every clip has a timecode and the frame rates agree."""
     from fractions import Fraction
@@ -93,7 +110,8 @@ def probe(path):
             'is_variable_frame_rate': bool(v.get('r_frame_rate') and v.get('avg_frame_rate') and v['r_frame_rate'] != v['avg_frame_rate']),
             'color_transfer': v.get('color_transfer'), 'has_audio': bool(audio),
             'audio_channels': audio[0].get('channels') if audio else 0, 'audio_sample_rate_hz': int(audio[0]['sample_rate']) if audio and audio[0].get('sample_rate') else None,
-            'creation_time': (data['format'].get('tags') or {}).get('creation_time'), **dict(zip(('make', 'model'), maker_of(data))), **relink_fields(data)}   # design/107 §6
+            'creation_time': (data['format'].get('tags') or {}).get('creation_time'), 'encoder': (data['format'].get('tags') or {}).get('encoder'),   # design/146: who exported a tagless file
+            **dict(zip(('make', 'model'), maker_of(data))), **relink_fields(data)}   # design/107 §6
 
 
 def to_cfr(src, dst, fps):
@@ -159,10 +177,11 @@ def media_prepare(ws, procedure, prior):
     return {'prompt': procedure.get('prompt') or '', 'clips': shown, 'listing': '\n'.join(lines), 'detail_file': 'work/media-clips.json',
             'duplicates_skipped': skipped, 'prepared_at': stamp(ws, 'media'), 'total_bytes': total_bytes, 'total_mb': round(total_bytes / 1e6),
             'output_file': 'out/media.json', 'steps': procedure.get('steps') or [], 'copies_note': copies_note(clips),   # design/107 §6
+            'camera_unknown_note': camera_unknown_note(clips),   # design/146 (the count is in the note; the answer stays under the size cap)
             'message': f'{len(clips)} clips, {round(total_bytes / 1e6)} MB; show the operator the listing and confirm it, then ask the camera sound, then record. Do not ask what the footage is: it is measured at visuals. The upload reports when it is done.'}
 
 
-def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, copies=None):   # design/126 ME1: the footage is measured at visuals, not answered here
+def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, progress=None, copies=None, shot_on=None):   # design/126 ME1: the footage is measured at visuals, not answered here
     if copies not in ('originals', 'copies'):   # design/107 §6: asked once, recorded
         raise Refused('Ask the operator once: are these the camera originals or copies made by an editor? Then `--copies originals` or `--copies copies`.')
     if camera_audio not in ('allowed', 'excluded'):   # design/125 M1: asked once, recorded, like the copies answer
@@ -171,6 +190,8 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
         clips = json.loads((ws / 'work' / 'media-clips.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         raise Refused('Run `vw stage media prepare` before record.')
+    if camera_unknown(clips) and not str(shot_on or '').strip():   # design/146: pulled from the file; asked only when the file has none
+        raise Refused(camera_unknown_note(clips))
     changed = []   # design/41 5.5: the bytes about to go up must be the bytes prepare hashed
     for c in clips:
         if 'source_bytes' not in c:
@@ -195,9 +216,9 @@ def media_record(ws, procedure, prior, upload, camera_audio=None, note=None, pro
         refs = list(pool.map(up, clips))
     (ws / 'out' / 'media.json').write_text(json.dumps({'clips': clips}, indent=1), encoding='utf-8')
     summary = {'clips': [{k: c.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio', 'width', 'height', 'fps', 'rotation_deg', 'audio_channels', 'audio_sample_rate_hz', 'color_transfer', 'creation_time', 'transcoded_from_vfr',
-                                                'codec', 'pix_fmt', 'bit_rate', 'make', 'model', 'start_timecode', 'reel', 'original_name')} for c in clips],   # design/88 F1; design/107 §6
+                                                'codec', 'pix_fmt', 'bit_rate', 'make', 'model', 'encoder', 'start_timecode', 'reel', 'original_name')} for c in clips],   # design/88 F1; design/107 §6; design/146
                'units': {'analysis': [c['id'] for c in clips]}, 'total_duration_s': round(sum(c['duration_s'] for c in clips), 1),
-               'camera_audio': camera_audio, 'camera_audio_note': note or '', 'copies': copies, **stamps(ws, 'media')}   # design/41 5.1
+               'camera_audio': camera_audio, 'camera_audio_note': note or '', 'copies': copies, 'shot_on': ' '.join(str(shot_on or '').split()) or None, **stamps(ws, 'media')}   # design/41 5.1; design/146
     return {'files': ['out/media.json'], 'stored': refs, 'summary': summary, 'retain': True, 'upload': True}
 
 

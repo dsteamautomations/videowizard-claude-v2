@@ -48,7 +48,7 @@ def test_m1_the_camera_sound_answer_is_required(tmp_path):
     ws = media_ws(tmp_path)
     with pytest.raises(AV.Refused, match='may the camera sound be used in the film'):
         AV.media_record(ws, {}, None, lambda *a: {}, copies='copies')
-    out = AV.media_record(ws, {}, None, lambda stage, path, sha, size: {'name': 'C1.mp4'}, camera_audio='excluded', note='not in the film', copies='copies')
+    out = AV.media_record(ws, {}, None, lambda stage, path, sha, size: {'name': 'C1.mp4'}, camera_audio='excluded', note='not in the film', copies='copies', shot_on='Sony FX3')   # design/146
     assert out['summary']['camera_audio'] == 'excluded'
 
 

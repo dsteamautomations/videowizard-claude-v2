@@ -60,3 +60,35 @@ def test_the_operators_correction_wins_field_by_field_and_the_measurement_is_kep
     assert all(r['camera'] == 'cinema' for r in c['per_clip'].values()) and m['per_clip']['b']['camera'] == 'drone'   # the measurement untouched
     assert c['summary']['corrected']['quote'] == 'professional camera, handheld, natural' and F.line(c['summary']).endswith('(your correction)')
     assert F.apply_correction(m, None)['summary'] == m['summary']
+
+
+# ---------- design/146 (SK, 3 Nov 2026): the operator's camera answer for clips whose file carries none ----------
+
+def test_the_operators_camera_answer_fills_a_tagless_clip_and_a_tag_still_wins():
+    export = {'id': 'x', 'name': 'C0032_02881492.mp4', 'codec': 'h264', 'pix_fmt': 'yuv420p', 'bit_rate': 5_680_943, 'encoder': 'Blackmagic Design DaVinci Resolve Studio'}
+    assert F.camera_of(export, said='Sony FX3') == ('cinema', 'the operator said: Sony FX3')
+    assert F.camera_of(export, said='Sony A7 IV') == ('mirrorless', 'the operator said: Sony A7 IV')
+    assert F.camera_of(export, said='iPhone 15 Pro')[0] == 'phone' and F.camera_of(export, said='DJI Mini 4')[0] == 'drone'
+    assert F.camera_of(export, said='Panasonic GH5')[0] == 'mirrorless'
+    assert F.camera_of(export, said='a Zhiyun something') == ('a Zhiyun something', 'the operator said: a Zhiyun something')   # no known maker: their words, as given
+    assert F.camera_of(export) == ('unknown', 'file name C0032_02881492.mp4 (Sony, mirrorless or cinema: not classified); exported by Blackmagic Design DaVinci Resolve Studio')
+    assert F.camera_of({**export, 'name': 'clip.mp4'}) == ('unknown', 'no maker tag or known file name; exported by Blackmagic Design DaVinci Resolve Studio; file details h264, yuv420p, 6 Mbit/s')
+    assert F.camera_of({**export, 'make': 'Apple', 'model': 'iPhone 13'}, said='Sony FX3') == ('phone', 'Apple iPhone 13')   # the file's own tag wins
+    assert F.camera_of({'id': 'd', 'name': 'DJI_0001.MP4'}, said='Sony FX3')[0] == 'drone'   # a name that names a camera wins over the answer
+
+
+def test_measure_takes_the_answer_from_the_media_record():
+    clips = [{'id': 'a', 'name': 'C0032.mp4', 'codec': 'h264'}, {'id': 'b', 'name': 'IMG_0001.MOV', 'codec': 'hevc'}]
+    out = F.measure(clips, {}, said='Sony FX3')
+    assert out['per_clip']['a']['camera'] == 'cinema' and out['per_clip']['b']['camera'] == 'phone' and out['summary']['camera'] == 'mixed'
+    assert F.measure(clips[:1], {}, said=None)['summary']['camera'] == 'unknown'
+    assert F.line(F.measure(clips[:1], {}, said='Sony FX3')['summary']).startswith('Your footage: cinema camera')
+    assert 'Zhiyun thing' in F.line(F.measure(clips[:1], {}, said='Zhiyun thing')['summary'])
+
+
+def test_the_media_instruction_asks_the_camera_only_when_prepare_says_the_file_has_none():   # design/146
+    import json
+    from pathlib import Path
+    d = json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+    m = next(s for s in d['stages'] if s['name'] == 'media')
+    assert 'camera_unknown_note' in m['steps'][1] and '--shot-on' in m['steps'][1] and 'never ask when the files say it' in m['steps'][1] and '--shot-on' in m['steps'][2]
