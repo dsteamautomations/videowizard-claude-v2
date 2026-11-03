@@ -259,10 +259,20 @@ def _stored_file(request, code, key, vw2_session):
         return login_redirect(request)
     with db_connect() as conn:
         run = _run_by_code(conn, user, code)
+        allowed = own_key(run['id'], key) or client_key(conn, run, key)   # design/147 L3: a library clip of another film of the same client plays here
     store = storage()
-    if not own_key(run['id'], key) or not store.exists(key):
+    if not allowed or not store.exists(key):
         raise Problem(404, 'FILE_MISSING', 'No such file on this run.')
     return file_redirect(store.signed_download(key))
+
+
+def client_key(conn, run, key):
+    """design/147 L3: a media file of another film of the same client (a library clip): its run must share this run's client; media only."""
+    parts = key.split('/')
+    if not run.get('client_id') or len(parts) < 3 or parts[1] != 'media' or '\\' in key or any(seg in ('', '.', '..') for seg in parts):
+        return False
+    row = conn.execute('select client_id from vw2_runs where id::text=%s', (parts[0],)).fetchone()
+    return bool(row and row['client_id'] == run['client_id'])
 
 
 def own_key(run_id, key):

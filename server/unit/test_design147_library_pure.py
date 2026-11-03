@@ -122,3 +122,27 @@ def test_the_operator_decides_once_keep_or_skip():
         B.duplicates_decision(found, None)
     assert 'already holds 1' in e.value.message and '--duplicates keep|skip' in e.value.message and e.value.extra['repeats'] == found
     assert B.duplicates_decision(found, 'keep') == [] and B.duplicates_decision(found, 'skip') == ['a1'] and B.duplicates_decision([], None) == []
+
+
+# ---------- L3: library clips readable from their source film ----------
+
+def test_a_library_clip_reads_from_its_source_film_and_the_package_lists_it():
+    from app.stage2 import stage as S
+    from app.stage3 import delivery as D
+    assert S.clip_key({'id': 'r1'}, {'name': 'C1.mp4'}) == 'r1/media/C1.mp4'
+    assert S.clip_key({'id': 'r1'}, {'name': 'yard.mp4', 'key': 'r0/media/yard.mp4'}) == 'r0/media/yard.mp4'
+    media_o = {'summary': {'clips': [{'id': 'a1', 'name': 'C1.mp4'}]}}
+    pk = {'clips': {'a1': {'id': 'a1', 'name': 'C1.mp4'}, 'L9': {'id': 'L9', 'name': 'yard.mp4', 'key': 'r0/media/yard.mp4', 'library_from': 'VW-12'}}}
+    assert set(D.all_clips(media_o, pk)) == {'a1', 'L9'} and D.all_clips(media_o, {})['a1']['name'] == 'C1.mp4'
+
+
+def test_the_page_serves_a_same_client_library_clip_and_refuses_another_clients():
+    from app import web
+    class C:
+        def __init__(self, client): self.client = client
+        def execute(self, sql, args): return type('R', (), {'fetchone': lambda s: {'client_id': self.client} if args[0] == 'r0' else None})()
+    run = {'id': 'r1', 'client_id': 'NARDEP'}
+    assert web.client_key(C('NARDEP'), run, 'r0/media/yard.mp4') is True
+    assert web.client_key(C('OTHER'), run, 'r0/media/yard.mp4') is False
+    assert web.client_key(C('NARDEP'), run, 'r0/stage2/session.json') is False   # media only
+    assert web.client_key(C('NARDEP'), run, 'r0/media/../x.mp4') is False and web.client_key(C('NARDEP'), {**run, 'client_id': None}, 'r0/media/yard.mp4') is False

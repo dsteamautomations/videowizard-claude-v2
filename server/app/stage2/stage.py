@@ -114,6 +114,11 @@ def cut_log(run, doc, version):
     return [{**e, 'run_id': run['id'], 'stage': 'options', 'rule': f'options v{version} (design/142 R2)', 'by_kind': 'assistant', 'by_name': '', 'quote': '', 'request_id': None} for e in out]
 
 
+def clip_key(run, clip):
+    """design/147 L3: where a clip's media is: a library clip carries the key of its source film; this film's own clips live under the run."""
+    return clip.get('key') or f"{run['id']}/media/{clip['name']}"
+
+
 def need_scenes(approved):
     """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph."""
     if not approved:
@@ -414,7 +419,7 @@ def stills(store, user, run, sub_clip_id, in_frame, out_frame, step_s):
     rows = []
     with tempfile.TemporaryDirectory(prefix='vw2-stills-') as folder:
         original = Path(folder) / 'original.mp4'
-        original.write_bytes(store.get(f"{run['id']}/media/{clip['name']}"))
+        original.write_bytes(store.get(clip_key(run, clip)))
         for i, t in enumerate(still_times(a, z, float(step_s), fps), 1):
             out = Path(folder) / f'S{i}.png'
             subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{t:.6f}', '-i', str(original), '-frames:v', '1', str(out)], check=True, capture_output=True, timeout=120)
@@ -437,7 +442,7 @@ def frames(store, user, run, sub_clip_id, edge):
     rows = []
     with tempfile.TemporaryDirectory(prefix='vw2-frames-') as folder:
         original = Path(folder) / 'original.mp4'
-        original.write_bytes(store.get(f"{run['id']}/media/{clip['name']}"))
+        original.write_bytes(store.get(clip_key(run, clip)))
         for i, t in enumerate(times):
             out = Path(folder) / f'F{i + 1}.png'
             subprocess.run(['ffmpeg', '-y', '-v', 'error', '-ss', f'{t:.6f}', '-i', str(original), '-frames:v', '1', str(out)], check=True, capture_output=True, timeout=120)

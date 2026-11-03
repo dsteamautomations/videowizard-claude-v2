@@ -25,6 +25,12 @@ def srt_time(seconds):
     return f'{h:02d}:{m:02d}:{s:02d},{ms:03d}'
 
 
+def all_clips(media_o, pk):
+    """design/147 L3: this film's own clips, and the library clips the first cut placed (they carry key and library_from in the package)."""
+    own = {c['id']: c for c in media_o['summary']['clips']}
+    return {**own, **{cid: c for cid, c in ((pk or {}).get('clips') or {}).items() if c.get('library_from')}}
+
+
 def srt_of(beats, sentences=None, fps=25):
     """design/19 A7: one cue per sentence on the timeline (shifted by every pause before it); falls back to one per beat."""
     lines = []
@@ -218,10 +224,11 @@ def bundle(conn, store, user, run, outputs):
         if ev['kind'] == 'event':
             row = next(r for r in pk['sub_clips'] if r['sub_clip_id'] == ev['sub_clip_id'])
             used_clips[row['clip_id']] = row['clip_name']
-    clips = {c['id']: c for c in media_o['summary']['clips']}
+    clips = all_clips(media_o, pk)
     for cid, name in used_clips.items():
         c = clips[cid]
-        files.append({'role': 'original', 'name': layout('original', name), 'key': f"{run['id']}/media/{name}", 'sha256': c['sha256'], 'bytes': c['bytes']})
+        files.append({'role': 'original', 'name': layout('original', name), 'key': S2.clip_key(run, c), 'sha256': c['sha256'], 'bytes': c.get('bytes'),
+                      **({'source_film': c['library_from']} if c.get('library_from') else {})})   # design/147 L3: a library original names its film
     fills = fill_names(assembly)   # review 27 Oct: the rendered fills, by the name assembly gave them
     for f in asm_o['files']:
         if f['name'].startswith('normalised/'):
@@ -288,7 +295,7 @@ def bundle_early(conn, store, user, run, outputs, session):
     s2 = S2.session_of(store, run)
     pk = S2._package(store, s2)
     fps = pk['timeline']['fps']
-    clips = {c['id']: c for c in media_o['summary']['clips']}
+    clips = all_clips(media_o, pk)
     events, ai_files = E.events_of(plan, pk, outputs, clips)
     files = []
     for f in voice_o['files']:
@@ -297,7 +304,8 @@ def bundle_early(conn, store, user, run, outputs, session):
     used = [e['clip_id'] for e in events if e.get('clip_id')]
     for cid in dict.fromkeys(used):
         c = clips[cid]
-        files.append({'role': 'original', 'name': layout('original', c['name']), 'key': f"{run['id']}/media/{c['name']}", 'sha256': c['sha256'], 'bytes': c['bytes']})
+        files.append({'role': 'original', 'name': layout('original', c['name']), 'key': S2.clip_key(run, c), 'sha256': c['sha256'], 'bytes': c.get('bytes'),
+                      **({'source_film': c['library_from']} if c.get('library_from') else {})})   # design/147 L3
     for f in ai_files:
         files.append({'role': 'ai', 'name': layout('ai', f['name']), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
     mf = next(x for x in master_o['files'] if x['name'] == f"master-v{master_o['summary']['version']}.json")
