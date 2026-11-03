@@ -211,3 +211,4 @@ Status: for SK's review, 2 Nov 2026. No code written. Part 1 (`140-brand-library
 ## 11. SK's answers (3 Nov 2026)
 
 - **Q1 (images):** **Video first.** This change marks, stores and proposes video clips; images follow as a later change on the same library.
+- **Q2 (duplicates):** **Before the study.** At media prepare, an exact match (sha256) and a near match by frame fingerprint are listed against the library file each matches; the operator decides per clip to skip it (its library row serves, no new paid study) or keep it. The description is compared after the study only as a second opinion.
