@@ -212,3 +212,6 @@ Status: for SK's review, 2 Nov 2026. No code written. Part 1 (`140-brand-library
 
 - **Q1 (images):** **Video first.** This change marks, stores and proposes video clips; images follow as a later change on the same library.
 - **Q2 (duplicates):** **Before the study.** At media prepare, an exact match (sha256) and a near match by frame fingerprint are listed against the library file each matches; the operator decides per clip to skip it (its library row serves, no new paid study) or keep it. The description is compared after the study only as a second opinion.
+- **Q3 (where the library sits):** **After the second look.** This film's own clips are placed and rechecked exactly as today; one new round then proposes library clips for the remaining blanks and as swaps.
+- **Q4 (matching):** **From the stored description and the free stills, no paid call.** Proposals are labelled `library` with the description as evidence; the operator's yes is the check.
+- **Q5 (excluded clips):** **Yes, when studied.** An excluded clip with a description can be marked; one whose study failed cannot.
