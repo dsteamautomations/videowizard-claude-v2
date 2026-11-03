@@ -71,7 +71,7 @@ async def plugin_version_gate(request, call_next):
 @app.middleware('http')
 async def decision_log(request, call_next):
     """design/142 R1: every write under /api/runs/{run}/ and every refusal is one entry of the run's decision log, written on its own connection."""
-    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE') or not runlog.PATH.match(request.url.path):
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE') or not (runlog.PATH.match(request.url.path) or runlog.PAGE.match(request.url.path)):
         return await call_next(request)
     body = {}
     if 'json' in (request.headers.get('content-type') or ''):

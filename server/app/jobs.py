@@ -91,10 +91,30 @@ def claim(conn, provider):
 
 
 def finish(conn, job_id, status, *, result=None, error=None, cost=None, retry_in=None):
-    conn.execute('''update vw2_jobs set status=%s, result=coalesce(%s, result), error=%s, cost=coalesce(%s, cost),
-                    lease_until=%s, updated_at=now() where id=%s''',
-                 (status, Jsonb(result) if result is not None else None, error, Jsonb(cost) if cost is not None else None,
-                  datetime.now(timezone.utc) + timedelta(minutes=retry_in) if retry_in else None, job_id))
+    row = conn.execute('''update vw2_jobs set status=%s, result=coalesce(%s, result), error=%s, cost=coalesce(%s, cost),
+                    lease_until=%s, updated_at=now() where id=%s returning run_id, stage, unit, request''',
+                       (status, Jsonb(result) if result is not None else None, error, Jsonb(cost) if cost is not None else None,
+                        datetime.now(timezone.utc) + timedelta(minutes=retry_in) if retry_in else None, job_id)).fetchone()
+    if row and not retry_in and status not in ('queued', 'running', 'storage_pending') and not (row['stage'] == 'analysis' and status == 'retained'):
+        from . import runlog   # design/145 L2: every background result is an entry (a kept clip is logged at record, with its details)
+        runlog.write(conn, job_entry(row, status, result, error))
+
+
+def job_entry(row, status, result, error):
+    req, res = row.get('request') or {}, result or {}
+    ref = req.get('reference') or {}
+    name = ref.get('name') or req.get('name') or (req.get('clip') or {}).get('name') or req.get('shot_id') or row.get('unit') or ''
+    facts = []
+    check = res.get('check') if isinstance(res.get('check'), dict) else None
+    if check:
+        facts.append(f"check {check.get('verdict') or ''}" + (f": {', '.join(map(str, check.get('failed') or []))}" if check.get('failed') else ''))
+    if isinstance(res.get('marks'), list):
+        facts.append(f"{len(res['marks'])} marks from the read")
+    if res.get('duration_s'):
+        facts.append(f"{float(res['duration_s']):.1f} s")
+    text = f"{req.get('kind') or row['stage']} job {status}" + (f"; {'; '.join(facts)}" if facts else '') + (f"; error: {str(error)[:500]}" if error else '')
+    return {'run_id': row['run_id'], 'stage': row['stage'], 'kind': 'result', 'about': f"{ref.get('kind') or req.get('kind') or ''} {name}".strip(), 'rule': '',
+            'entry': text, 'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None}
 
 
 def record_file(conn, run_id, stage, key, name, sha256, bytes_, mime):

@@ -337,10 +337,34 @@ def propose(conn, store, user, run, outputs, document):
         if not gap or rv.get('digest') != gap_digest(plan, gap):
             session['revisions'].pop(gid)
     save_session(store, run, session)
+    from . import runlog
+    for e in plan_log(run, plan, version):   # design/145 L3
+        runlog.write(conn, e)
     return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']]}
 
 
 # ---------- design/65 B7: the cap ----------
+
+ROUTE_WORDS = {'footage': 'footage', 'still': 'still', 'video': 'AI video', 'graphic_sequence': 'graphic sequence', 'drawn': 'drawn'}
+
+
+def plan_log(run, plan, version):
+    """design/145 L3: the plan's own reasons in the run's log, one entry per gap: the choice taken, each shot's route and purpose."""
+    out = []
+    for gap in plan.get('gaps') or []:
+        chosen = {'choice_id': gap.get('recommended_choice')} if gap.get('choices') else None
+        shots = [sh for sc in chosen_scenes(gap, chosen) for sh in sc.get('shots') or []]
+        said = '; '.join(f"{sh['id']} {ROUTE_WORDS.get(route_of(sh), route_of(sh))}: {_short_text(sh.get('purpose'))}" for sh in shots)
+        head = f"choice {gap.get('recommended_choice')} of {len(gap['choices'])}" + (f" ({gap['choice_reason']})" if gap.get('choice_reason') else '') + '; ' if gap.get('choices') else ''
+        out.append({'run_id': run['id'], 'stage': 'visuals', 'kind': 'choice', 'about': f"gap {gap.get('gap_id')}", 'rule': f'visual plan v{version}',
+                    'entry': head + said, 'by_kind': 'assistant', 'by_name': '', 'quote': '', 'request_id': None})
+    return out
+
+
+def _short_text(text, n=160):
+    t = ' '.join(str(text or '').split())
+    return t if len(t) <= n else t[:n - 1] + '…'
+
 
 def prices():
     s = settings()

@@ -6,13 +6,16 @@ import re
 
 from .errors import Problem
 
-ABOUT_KEYS = ('unit', 'stage', 'beat_id', 'shot_id', 'gap_id', 'element_id', 'reference_id', 'sub_clip_id', 'clip_id', 'job_id', 'voice_id', 'slide_no', 'key', 'value', 'kind')
+ABOUT_KEYS = ('unit', 'stage', 'beat_id', 'shot_id', 'shot', 'gap_id', 'gap', 'element_id', 'reference_id', 'ref', 'sub_clip_id', 'clip_id', 'job_id', 'job', 'voice_id', 'voice_ids',
+              'slide_no', 'slide', 'decision', 'key', 'value', 'kind')
 WORD_KEYS = ('quote', 'accepted_quote', 'confirm_quote', 'note', 'notes', 'reason')
 PATH = re.compile(r'^/api/runs/([0-9a-f-]{36})/([a-z_-]+)(?:/(.*))?$')
+PAGE = re.compile(r'^/runs/([A-Za-z0-9_-]+)/(visuals|review|voices2)/act$')   # design/145 L1: the pages' buttons
+PAGE_STAGE = {'visuals': 'visuals', 'review': 'master', 'voices2': 'voice'}
 FILM_STAGE = {'category': 'brief', 'shape': 'media', 'colours': 'visuals', 'font': 'visuals'}   # design/139: where each choice is asked
 SEGMENT_STAGE = {'voice': 'voice', 'analysis': 'analysis', 'options': 'options', 'master': 'master', 'visuals': 'visuals', 'motion': 'visuals', 'assembly': 'assembly',
                  'delivery': 'delivery', 'files': 'media'}
-SKIP = {'log'}   # the assistant's entries are written by their own endpoint
+SKIP = {'log', 'files'}   # the assistant's entries are written by their own endpoint; design/145 L4: upload signs and receipts (the media record says it)
 log = logging.getLogger('vw2.runlog')
 
 
@@ -26,21 +29,28 @@ def stage_of(segment, body):
         return str(body.get('stage') or '')
     if segment == 'film':
         return FILM_STAGE.get(body.get('key'), '')
-    return SEGMENT_STAGE.get(segment, segment)
+    return SEGMENT_STAGE.get(segment, 'run')   # design/145 L4: a step outside a stage (a defect, a claim) is the run's
 
 
 def entry_from(path, body, status, response):
-    """The entry for one write under /api/runs/{run}/, or None for paths that are not a run's step."""
+    """The entry for one write under /api/runs/{run}/ or one page button (/runs/<code>/<page>/act), or None for paths that are not a run's step."""
+    body, response = body if isinstance(body, dict) else {}, response if isinstance(response, dict) else {}
+    page = PAGE.match(path or '')
+    if page:   # design/145 L1: the run is found by its code when the entry is written
+        stage = 'options' if page.group(2) == 'review' and body.get('action') == 'record' else PAGE_STAGE[page.group(2)]
+        return _entry(None, stage, f"{page.group(2)} page: {body.get('action') or 'action'}", body, status, response, run_code=page.group(1))
     m = PATH.match(path or '')
     if not m or m.group(2) in SKIP:
         return None
-    body, response = body if isinstance(body, dict) else {}, response if isinstance(response, dict) else {}
     run_id, segment, rest = m.group(1), m.group(2), m.group(3) or ''
+    return _entry(run_id, stage_of(segment, body), f"{segment}{('/' + rest) if rest else ''}", body, status, response)
+
+
+def _entry(run_id, stage, step, body, status, response, run_code=None):
     about = ', '.join(f'{k} {_short(body[k], 80)}' for k in ABOUT_KEYS if body.get(k) not in (None, '', [], {}) and k != 'stage')
     words = next((_short(body[k], 1000) for k in WORD_KEYS if str(body.get(k) or '').strip()), '')
-    step = f"{segment}{('/' + rest) if rest else ''}"
-    entry = {'run_id': run_id, 'stage': stage_of(segment, body), 'about': about, 'quote': words, 'request_id': body.get('request_id'),
-             'by_kind': 'operator' if words else 'assistant', 'by_name': ''}
+    entry = {'run_id': run_id, 'stage': stage, 'about': about, 'quote': words, 'request_id': body.get('request_id'),
+             'by_kind': 'operator' if words or run_code else 'assistant', 'by_name': '', **({'run_code': run_code} if run_code else {})}
     if status >= 400:
         return {**entry, 'kind': 'refusal', 'rule': str(response.get('code') or status), 'entry': f"{step} refused: {_short(response.get('message') or '', 1500)}"}
     if response.get('status') == 'rejected' or response.get('act_on'):
@@ -60,6 +70,11 @@ def assistant_entry(run_id, stage, body):
 
 
 def write(conn, e):
+    if not e.get('run_id') and e.get('run_code'):   # design/145 L1: a page names its run by code
+        row = conn.execute('select id from vw2_runs where code=%s', (e['run_code'],)).fetchone()
+        if not row:
+            return
+        e = {**e, 'run_id': row['id']}
     conn.execute('insert into vw2_log(run_id, stage, kind, about, rule, entry, by_kind, by_name, quote, request_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) '
                  'on conflict do nothing', (e['run_id'], e['stage'], e['kind'], e['about'], e['rule'], e['entry'], e['by_kind'], e['by_name'], e['quote'], e.get('request_id')))
 
