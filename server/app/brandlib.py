@@ -181,6 +181,70 @@ def duplicates_decision(found, choice):
     return [f['clip_id'] for f in found] if choice == 'skip' else []
 
 
+PROPOSE_RULE = ('Propose only where it serves the words: a gap proposal is a footage shot with match "library", evidence from the description, and a note '
+                '{kind: "library", question: why it fits}; a swap puts the library clip as the shot with the current clip as its alternative and preferred_because '
+                'the reason it serves the words better. Every server rule applies unchanged; nothing is placed without the operator\'s yes on the review page.')
+
+
+def library_round(conn, store, run, outputs, session, save_package):
+    """design/147 L4 (Q3, Q4, Q6): after the second look, the client's generic clips this film can use: each re-checked for eligibility and crops under this
+    film's policy and shape (the solver, no paid call), this batch's own files and the proposals the operator rejected left out, added to the package as
+    rows marked library so the check, the stills, the render and the package read them. Returns the candidates with their descriptions."""
+    from .clip_log import solver
+    from .stage2 import package as P
+    if (run or {}).get('film') is None:
+        return {'candidates': [], 'note': 'a film started before the library: no library round'}
+    if not run.get('client_id'):
+        return {'candidates': [], 'note': 'no client on this run: no library'}
+    pk = session_package(store, session)
+    own = {c.get('sha256') for c in (session['package'].get('clips') or {}).values()}
+    skipped = {f.get('name') for f in (run['film'] or {}).get('library_skipped') or []}
+    rejected = set(session.get('library_rejected') or [])
+    rows = [r for r in generic_rows(conn, run['client_id'], 'clip-log-v1')] + [dict(r) for r in conn.execute(
+        'select * from vw2_library where client_id=%s and not generic and not missing and name = any(%s)', (run['client_id'], sorted(skipped))).fetchall()] if skipped else \
+        generic_rows(conn, run['client_id'], 'clip-log-v1')
+    policy, timeline = session['package'].get('policy') or {}, session['package'].get('timeline') or {}
+    fps = timeline.get('fps') or 25
+    pk['sub_clips'] = [r for r in pk['sub_clips'] if not r.get('library')]
+    pk['cards'] = [c for c in pk.get('cards') or [] if not c.get('library')]
+    candidates, seen = [], set()
+    for r in rows:
+        if r['sha256'] in own or r['sha256'] in seen or not r.get('evidence_key'):
+            continue
+        seen.add(r['sha256'])
+        if not store.exists(r['media_key']):
+            conn.execute('update vw2_library set missing=true, updated_at=now() where id=%s', (r['id'],))
+            continue
+        try:
+            log = json.loads(store.get(r['evidence_key']).decode('utf-8')).get('log') or {}
+        except Exception:   # noqa: BLE001
+            continue
+        film_from = (r.get('films') or ['?'])[0]
+        clip = {'id': r['sha256'][:16], 'name': r['name'], 'sha256': r['sha256'], **(r.get('clip') or {}), 'key': r['media_key'], 'library_from': film_from}
+        solver.solve(log, policy, clip, timeline)
+        d = r.get('description') or {}
+        for sub in log.get('sub_clips') or []:
+            if not str(sub['stage15']['visual_eligibility']).startswith('ELIGIBLE'):
+                continue
+            row = P.sub_clip_row(clip, log, sub, fps)
+            if row['sub_clip_id'] in rejected:
+                continue
+            row.update(primary_fits=[], secondary_fits=[], fit_kinds={}, library=True, library_from=film_from)   # its beat fits named another film
+            pk['sub_clips'].append(row)
+            candidates.append({k: row.get(k) for k in ('sub_clip_id', 'clip_name', 'duration_s', 'in_frame', 'out_frame', 'in_s', 'out_s', 'native_shot_size', 'eligibility', 'landmarks')}
+                              | {'library_from': film_from, 'descriptive_name': d.get('descriptive_name'), 'overview': d.get('overview'), 'entities': d.get('entities') or [],
+                                 'card': d.get('card') or [], 'generic': bool(r.get('generic'))})
+        pk['cards'].append({'clip_id': clip['id'], 'clip_name': clip['name'], 'descriptive_name': d.get('descriptive_name'), 'lines': d.get('card') or [], 'library': True})
+        session['package'].setdefault('clips', {})[clip['id']] = clip
+    save_package(pk)   # the package digest is left as prepare set it: the library adds rows, it is not a re-prepare
+    return {'candidates': candidates, 'rejected_before': sorted(rejected), 'rule': PROPOSE_RULE,
+            'note': '' if candidates else 'the client\'s library has nothing this film can use yet'}
+
+
+def session_package(store, session):
+    return json.loads(store.get(session['package']['key']).decode('utf-8'))
+
+
 def known(conn, client_id, shas):
     """L2: the client's library rows whose file is exactly one of these (sha256), with the film it came with."""
     if not client_id or not shas:

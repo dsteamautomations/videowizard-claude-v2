@@ -146,3 +146,96 @@ def test_the_page_serves_a_same_client_library_clip_and_refuses_another_clients(
     assert web.client_key(C('OTHER'), run, 'r0/media/yard.mp4') is False
     assert web.client_key(C('NARDEP'), run, 'r0/stage2/session.json') is False   # media only
     assert web.client_key(C('NARDEP'), run, 'r0/media/../x.mp4') is False and web.client_key(C('NARDEP'), {**run, 'client_id': None}, 'r0/media/yard.mp4') is False
+
+
+# ---------- L4: the library round ----------
+
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / 'tests'))
+from clip_log_fixture import synthetic_log   # noqa: E402
+
+TL = {'width': 1920, 'height': 1080, 'fps': 25}
+POLICY = {'allow_speaker_audio': False, 'show_speaker_video': False}
+
+
+class LibStore:
+    def __init__(self):
+        self.files = {'pk': json.dumps({'sub_clips': [{'sub_clip_id': 'a1:S', 'clip_id': 'a1'}], 'cards': []}).encode(),
+                      'r0/media/yard.mp4': b'x', 'r0/analysis/b.evidence.json': json.dumps({'log': synthetic_log('YARD', 'yard.mp4', 25.0, 50)}).encode(),
+                      'r0/analysis/g.evidence.json': json.dumps({'log': synthetic_log('GONE', 'gone.mp4', 25.0, 50)}).encode()}
+
+    def exists(self, k):
+        return k in self.files
+
+    def get(self, k):
+        return self.files[k]
+
+
+def lib_rows():
+    base = {'films': ['VW-12'], 'generic': True, 'contract': 'clip-log-v1', 'clip': {'duration_s': 2.0, 'width': 1920, 'height': 1080, 'fps': '25/1'},
+            'description': {'descriptive_name': 'the yard', 'overview': 'The yard from the gate.', 'entities': ['plinth'], 'card': ['1 OVERVIEW: yard']}, 'missing': False}
+    return [{**base, 'id': 1, 'sha256': 'b' * 64, 'name': 'yard.mp4', 'media_key': 'r0/media/yard.mp4', 'evidence_key': 'r0/analysis/b.evidence.json'},
+            {**base, 'id': 2, 'sha256': 'a' * 64, 'name': 'C1.mp4', 'media_key': 'r0/media/C1.mp4', 'evidence_key': 'r0/analysis/a.evidence.json'},   # this batch's own file
+            {**base, 'id': 3, 'sha256': 'g' * 64, 'name': 'gone.mp4', 'media_key': 'r0/media/gone.mp4', 'evidence_key': 'r0/analysis/g.evidence.json'}]   # media deleted
+
+
+def session_for():
+    return {'package': {'key': 'pk', 'clips': {'a1': {'id': 'a1', 'name': 'C1.mp4', 'sha256': 'a' * 64}}, 'policy': POLICY, 'timeline': TL}}
+
+
+def test_the_library_round_offers_the_clients_generic_clips_this_film_can_use():
+    conn, store, session = RowsConn(lib_rows()), LibStore(), session_for()
+    saved = {}
+    out = B.library_round(conn, store, RUN, [], session, lambda pk: saved.update(pk))
+    names = {c['clip_name'] for c in out['candidates']}
+    assert names == {'yard.mp4'} and out['candidates'][0]['library_from'] == 'VW-12' and out['candidates'][0]['overview'] == 'The yard from the gate.'
+    assert out['candidates'][0]['eligibility'].startswith('ELIGIBLE') and out['note'] == ''
+    lib_rows_in_pk = [r for r in saved['sub_clips'] if r.get('library')]
+    assert lib_rows_in_pk and all(r['library_from'] == 'VW-12' and r['primary_fits'] == [] for r in lib_rows_in_pk) and saved['sub_clips'][0]['sub_clip_id'] == 'a1:S'
+    clip = session['package']['clips']['b' * 16]
+    assert clip['key'] == 'r0/media/yard.mp4' and clip['library_from'] == 'VW-12'
+    assert any('missing=true' in s for s, a in conn.sql)   # gone.mp4's media is gone: marked, never proposed
+
+
+def test_a_rejected_proposal_is_not_offered_again_and_older_films_have_no_round():
+    conn, store, session = RowsConn(lib_rows()), LibStore(), session_for()
+    first = B.library_round(conn, store, RUN, [], session, lambda pk: None)['candidates']
+    session['library_rejected'] = [first[0]['sub_clip_id']]
+    again = B.library_round(RowsConn(lib_rows()), LibStore(), RUN, [], session, lambda pk: None)
+    assert first[0]['sub_clip_id'] not in {c['sub_clip_id'] for c in again['candidates']} and again['rejected_before'] == [first[0]['sub_clip_id']]
+    assert B.library_round(conn, store, OLD, [], session_for(), lambda pk: None) == {'candidates': [], 'note': 'a film started before the library: no library round'}
+    assert 'no client' in B.library_round(conn, store, {**RUN, 'client_id': None}, [], session_for(), lambda pk: None)['note']
+
+
+def test_the_check_takes_match_library_only_on_a_library_row_and_the_note_kind_exists():
+    from app.stage2 import slides as SL, validator as V
+    assert 'library' in SL.NOTE_KINDS
+    row = {'eligibility': 'ELIGIBLE', 'client_safe': True, 'risk_flags': [], 'in_frame': 0, 'out_frame': 500, 'source_fps': '25', 'min_hold_s': 1.0, 'action_peak': None, 'library': True}
+    ev = {'source_in_frame': 0, 'source_out_frame': 100, 'match': 'library', 'evidence': 'the yard, as the words say', 'crop': 'full'}
+    refusals = []
+    V._piece('T', ev, row, {}, refusals)
+    assert refusals == []
+    V._piece('T', ev, {**row, 'library': False}, {}, refusals)
+    assert refusals and 'not this batch' in refusals[0]
+
+
+def test_slides_name_the_source_film_and_a_rejected_library_shot_is_remembered():
+    from app.stage2 import slides as SL, stage as S
+    from test_design127_review_pure import FakeConn, RUN as R127, USER as U127, film, saved, session_store
+    doc, pk = film()
+    pk['sub_clips'].append({'sub_clip_id': 'L1:S', 'clip_id': 'L1', 'clip_name': 'yard.mp4', 'in_frame': 0, 'out_frame': 200, 'source_fps': '25', 'min_hold_s': 1.0,
+                            'action_peak': None, 'sfx_cues': [], 'library': True, 'library_from': 'VW-12'})
+    doc['options'][2]['events'] = [{'sub_clip_id': 'L1:S', 'source_in_frame': 0, 'source_out_frame': 100, 'timeline_frames': 100, 'match': 'library', 'evidence': 'x',
+                                    'note': {'kind': 'library', 'question': 'the yard fits the words'}}]
+    sl = SL.slides(doc, pk, 25)
+    shot = next(s for s in sl if s['type'] == 'shot' and s.get('library'))
+    assert shot['library'] == 'VW-12' and shot['sub_clip_id'] == 'L1:S'
+    store = session_store()
+    sess = saved(store)
+    sess['versions'][0]['slides'] = sl
+    store.files['run-1/stage2/session.json'] = json.dumps(sess).encode('utf-8')
+    store.files['run-1/stage2/options-v1.json'] = json.dumps({'document': doc, 'package_digest': 'pk1'}).encode('utf-8')
+    store.files['p'] = json.dumps(pk).encode('utf-8')
+    S.decide(FakeConn({}), store, U127, R127, shot['no'], 'REJECT', '', None)
+    assert saved(store)['library_rejected'] == ['L1:S']

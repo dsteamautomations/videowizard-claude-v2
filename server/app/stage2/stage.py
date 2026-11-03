@@ -119,6 +119,15 @@ def clip_key(run, clip):
     return clip.get('key') or f"{run['id']}/media/{clip['name']}"
 
 
+def library(conn, store, user, run, outputs):
+    """design/147 L4: the library round, after the second look; one flow for the tool and a page."""
+    from .. import brandlib
+    session = session_of(store, run)
+    out = brandlib.library_round(conn, store, run, outputs, session, lambda pk: save_json(store, key(run, 'package.json'), pk))
+    save_session(store, run, session)
+    return out
+
+
 def need_scenes(approved):
     """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph."""
     if not approved:
@@ -651,7 +660,7 @@ def _slide_rows(sl, decisions, fps):
         lab = str(s['no'])
         d = decisions.get(lab)
         needs, why = needs_answer(s, sl, decisions)
-        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'note', 'of', 'ai_only', 'intent', 'marker_reasons')},
+        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'library', 'note', 'of', 'ai_only', 'intent', 'marker_reasons')},
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows
@@ -778,6 +787,8 @@ def decide(conn, store, user, run, slide_no, action, note, edit):
         record_options(conn, store, user, run, f'Approved by answering the review slides: first answer #{lab} {action}' + (f' — {note.strip()}' if str(note or '').strip() else ''),
                        {'how': 'first_answer', 'slide': lab})
         session = session_of(store, run)
+    if action == 'REJECT' and s.get('library') and s.get('sub_clip_id'):   # design/147 L4 (E9): a rejected library proposal is not offered again on this film
+        session['library_rejected'] = sorted(set(session.get('library_rejected') or []) | {s['sub_clip_id']})
     session['decisions'][lab] = {'action': action, 'type': s['type'], **({'edit': edit} if action == 'TRIM' else {}),
                                  'note': note or '', 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     session['master'] = None

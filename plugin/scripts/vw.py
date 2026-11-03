@@ -2353,6 +2353,14 @@ def cmd_options(a):
         emit({'row': row, 'card': next((c for c in pk.get('cards') or [] if c.get('clip_id') == row.get('clip_id')), None)}, 0, f'{a.sub}: the full row and its clip card.')
     if a.what == 'show':
         emit(call('GET', f'{base}/{a.option}'))
+    if a.what == 'library':   # design/147 L4: after the second look
+        out = write(base + '/library', {})
+        path = workspace(m['code']) / 'work' / 'options' / 'library.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rows_file(path, out.get('candidates') or [])
+        emit({'candidates': len(out.get('candidates') or []), 'file': 'work/options/library.json', 'note': out.get('note'), 'rejected_before': out.get('rejected_before')}, 0,
+             (f"{len(out['candidates'])} library clip(s) this film can use, in work/options/library.json (free stills: `vw options frames --sub S`). {out['rule']} Then `vw options check` and `propose`."
+              if out.get('candidates') else f"No library round: {out.get('note')}."))
     if a.what == 'second-look':
         second_look(m, [x.strip() for x in (getattr(a, 'scene', None) or '').split(',') if x.strip()])
     if a.what == 'join-second-look':
@@ -2855,7 +2863,7 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.set_defaults(fn=cmd_motion)
-    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
+    s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'library', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film', '--scene'):   # design/142 R6: --scene BEAT_02,BEAT_07 for the second look again
         s.add_argument(flag)
     s.add_argument('--wait', type=int, default=0, help='seconds to wait inside the tool for the film (status)')

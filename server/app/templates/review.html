@@ -106,7 +106,7 @@ function cue(slide){const c=data&&data.cues?data.cues[slide]:null;return Array.i
 function row(s,can){
   const c=cue(s.slide);
   const off=!s.needs_answer&&s.why;
-  let info='<div><div class="t">'+(s.b_roll?'<span class="broll">B-roll</span>':'')+esc(s.title)+(s.type==='ai'?' · made with AI':'')+'</div>';
+  let info='<div><div class="t">'+(s.b_roll?'<span class="broll">B-roll</span>':'')+(s.library?'<span class="broll">library · from '+esc(s.library)+'</span>':'')+esc(s.title)+(s.type==='ai'?' · made with AI':'')+'</div>';
   if(s.clip){info+='<div class="ds">'+esc(s.clip)+'</div>';}
   if(s.words){info+='<div class="words">“'+esc(s.words)+'”</div>';}
   if(s.type==='alternative'){info+='<div class="ds">the same words as '+esc(s.of)+'</div>';}

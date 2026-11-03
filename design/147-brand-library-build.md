@@ -54,3 +54,19 @@ Added here:
 3. Library clips readable from their source film (readers, file route, delivery).
 4. The library round: candidates, the package rows, proposals, the check, the slides and page.
 5. Instructions, tests across, versions (server 0.87.0, plugin 0.73.0), commit. No deploy.
+
+## Build record (3 Nov 2026, after SK's "Approve, start build")
+
+Built, tested and pushed; **not deployed** (SK confirms). Server 0.87.0, plugin 0.73.0; migration `013_brand_library.sql` runs at the next server start. Ships with design/146 (the camera at media), also undeployed.
+
+| Step | What |
+| --- | --- |
+| L1 | `vw2_library`; `brandlib.candidates / mark / unmark / generic_rows`; `GET /library`, `POST /library/mark`, `/library/unmark`; the first cut's gate (`need_marked`, new films only); `vw library show|mark|unmark|remark` |
+| L2 | `brandlib.repeats` (the same file by sha256 at media prepare through `/library/known`; the same look by frame fingerprint at analysis start, `BITS_CLIP = 8`); `duplicates_decision` (one answer, keep or skip, `vw analysis start --duplicates`); skipped clips kept on the run for the library round |
+| L3 | `stage2.clip_key`; the stills and frames read a library clip from its source film; `web.client_key` lets a same-client media key play; `delivery.all_clips` and `source_film` on library originals |
+| L4 | `brandlib.library_round` (generic rows re-solved under this film's policy and shape, this batch's files and rejected proposals left out, missing media marked, rows added to the package marked `library`); `POST /options/library`, `vw options library`; the check takes `match: library` on a library row; note kind `library`; slides carry `library` (the source film) and `sub_clip_id`; the review page badge; a REJECT on a library shot remembered (`library_rejected`) |
+| L5 | v3: three short pointers (the analysis and options texts keep their word budget; the tool's answers carry the how); `vw.md` the full guidance; `scripts/d147_wording_v3.py` |
+
+**Tests:** server unit 1130 passed (the library's 14 in `test_design147_library_pure.py`); plugin 410 passed with the 4 known failures; the instruction split check and the word-budget guard pass.
+
+**Not covered:** no film has run through the library yet (the first is the first new film of a client with a second film); the review page badge seen only as code; the fingerprint threshold (`BITS_CLIP`) untuned on real repeats; the docker suite not run.

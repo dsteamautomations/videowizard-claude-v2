@@ -8,7 +8,7 @@ only before a scene and before an alternative; footage carries a strip with its 
 import textwrap
 import unicodedata
 
-NOTE_KINDS = ('reuse', 'check_by_eye', 'poor_quality', 'join', 'other')
+NOTE_KINDS = ('reuse', 'check_by_eye', 'poor_quality', 'join', 'other', 'library')   # design/147 L4: a library proposal's why
 WRAP = 58   # characters per line at the card font size
 COLOURS = ('#1D9E75', '#7F77DD', '#D85A30', '#378ADD', '#BA7517', '#D4537E', '#639922', '#5F5E5A')   # one per scene, in turn
 
@@ -88,7 +88,8 @@ def slides(doc, pk, fps):
             row = rows.get(ev.get('sub_clip_id')) or {'clip_id': '', 'clip_name': ev.get('sub_clip_id', '')}
             b_roll = ev.get('match') == 'b_roll'
             what = clip_name(row, cards)
-            out.append({**common, 'no': label, 'type': 'shot', 'title': name, 'clip': what, 'b_roll': b_roll,
+            out.append({**common, 'no': label, 'type': 'shot', 'title': name, 'clip': what, 'b_roll': b_roll, 'sub_clip_id': ev.get('sub_clip_id'),
+                        'library': row.get('library_from') if ev.get('match') == 'library' else None,   # design/147 L4: a library proposal names its film
                         'note': ev.get('note') if isinstance(ev.get('note'), dict) else None,
                         'marker_reasons': {k: v for k, v in (ev.get('marker_reasons') or {}).items() if str(v or '').strip()} or None,   # design/142 R4: shown to the operator
                         'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it',
@@ -96,7 +97,8 @@ def slides(doc, pk, fps):
             for m, alt in enumerate(ev.get('alternatives') or [], 1):
                 arow = rows.get(alt.get('sub_clip_id')) or {'clip_id': '', 'clip_name': alt.get('sub_clip_id', '')}
                 aname = f'{name} · Alternative {m}'
-                out.append({**common, 'no': f'{label}A{m}', 'type': 'alternative', 'title': aname, 'of': label, 'alt_index': m - 1, 'clip': clip_name(arow, cards),
+                out.append({**common, 'no': f'{label}A{m}', 'type': 'alternative', 'title': aname, 'of': label, 'alt_index': m - 1, 'clip': clip_name(arow, cards), 'sub_clip_id': alt.get('sub_clip_id'),
+                            'library': arow.get('library_from') if alt.get('match') == 'library' else None,
                             'b_roll': alt.get('match') == 'b_roll', 'hint': f'another clip for Shot {i}; open when Shot {i} is rejected; keep at most one',
                             'lines': [aname, clip_name(arow, cards), f'Time: {_seconds(k, fps)}', f'Words: the same as Shot {i}']})
     return out

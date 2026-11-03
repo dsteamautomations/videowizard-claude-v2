@@ -1621,6 +1621,11 @@ def options_frames(run_id: UUID, body: FramesBody, user=User, conn=DB):
     return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.frames(storage(), user, run, body.sub_clip_id, body.edge))
 
 
+@app.post('/api/runs/{run_id}/options/library')
+def options_library(run_id: UUID, body: Write, user=User, conn=DB):
+    return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.library(conn, storage(), user, run, outputs))
+
+
 @app.post('/api/runs/{run_id}/options/stills')
 def options_stills(run_id: UUID, body: StillsBody, user=User, conn=DB):
     return _s2(conn, user, run_id, 'options', body, lambda run, outputs: stage2.stills(storage(), user, run, body.sub_clip_id, body.in_frame, body.out_frame, body.step_s))

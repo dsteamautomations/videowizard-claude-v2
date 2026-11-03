@@ -34,8 +34,10 @@ def _piece(tag, ev, row, policy, refusals, flags=None):
         refusals.append(f'{tag}: G10/Q8 sub-clip is not eligible or not client-safe ({row["eligibility"]}, risk flags {row["risk_flags"]})')
     if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
         refusals.append(f'{tag}: Q1 speaker on screen while show_speaker_video is false')
-    if ev.get('match') not in ('direct', 'b_roll') or not str(ev.get('evidence') or '').strip():
-        refusals.append(f'{tag}: match (direct or b_roll) and evidence (the log fields that show it matches the words) are required')
+    if ev.get('match') not in ('direct', 'b_roll', 'library') or not str(ev.get('evidence') or '').strip():   # design/147 L4: a library proposal
+        refusals.append(f'{tag}: match (direct, b_roll or library) and evidence (the log fields that show it matches the words) are required')
+    if ev.get('match') == 'library' and not row.get('library'):
+        refusals.append(f'{tag}: match library is for a clip of the client\'s library (`vw options library`), not this batch')
     a, z = ev.get('source_in_frame'), ev.get('source_out_frame')
     if not (isinstance(a, int) and isinstance(z, int) and row['in_frame'] <= a < z <= row['out_frame']):
         refusals.append(f"{tag}: G1 source frames {a}-{z} must lie inside the usable window {row['in_frame']}-{row['out_frame']}")
