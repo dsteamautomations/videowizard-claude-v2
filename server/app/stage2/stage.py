@@ -321,7 +321,7 @@ def propose(conn, store, user, run, doc):
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
             **V.answer_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
-            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of') if s.get(k) is not None} | {'seconds': round(s['frames'] / fps, 2)} for s in slides],
+            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of') if s.get(k) is not None} | {'seconds': round(s['frames'] / timeline(run)['fps'], 2)} for s in slides],   # defect 47
             **({'advice': round_advice(version)} if round_advice(version) else {}),
             'next': PROPOSE_NEXT}
 
