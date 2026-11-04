@@ -522,7 +522,7 @@ function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.
   if(refs.some(r=>r.status==='approved'))return ['dec','pictures approved, sheet to make'];
   if(refs.some(r=>r.status==='candidate'))return ['dec','pictures to approve'];
   const hits=((data.element_matches||{})[e.id]||[]).length;return hits?['','seen in the footage']:['err','needs a picture'];}
-function roundOpen(){const rd=data&&data.round;return rd&&(rd.pass===1||rd.pass===2)?rd:null;}
+function roundOpen(){const rd=data&&data.round;return rd&&(rd.pass===1||rd.pass===2||rd.pass==='making')?rd:null;}   // design/151: 'making' while the sets are made
 // the panel (design/80 S2): the selected picture large, its facts, and the controls for that picture alone
 function panel(){return (selPic&&selPic.ref?versionTabs(selPic.ref):selPic&&selPic.take?takeTabs(selPic.take):'')+panelBody();}   // design/129 UX1: the newest version in front, the older ones in tabs
 function panelBody(){
@@ -654,12 +654,58 @@ function strips(sids){return sids.map(searchOf).filter(Boolean).map(s=>'<div cla
   (s.results.some(x=>String(x.download||'').startsWith('failed'))?' · <span class="err">a picture marked “will not download” cannot be used; tick another</span>':'')+'</div>'+(s.results.length?'<div class="strip">'+s.results.map(x=>resultCard(s,x)).join('')+'</div>':'<div class="ds">No picture came back for these words.'+(roundOpen()&&stage()==='visuals'?' <button data-a="supply-open" data-el="'+esc(s.element_id)+'">Add your own picture</button>':'')+'</div>')).join('');}   // design/126 U6: opens the box in the panel
 function roundWaiting(rd){   // design/121 changes 1, 6: what keeps Done locked, by name
   const out=[];Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid], sids=sidsOf(r);
-    if(rd.pass===1){if(verdictOf(eid,r)==='search'&&!sids.length)out.push(eid);}
+    if(rd.pass===1){if(!rd.kept&&verdictOf(eid,r)==='search'&&!sids.length)out.push(eid);}
     else if(r.verdict==='search'&&!ignoredEls[eid]&&!(r.picked&&r.picked.length)&&!sids.some(sid=>(picks[sid]||[]).length))out.push(eid);});
   return out;}
-function verdictOf(eid,r){const v=document.querySelector('input[name="v-'+eid+'"]:checked');if(v)return v.value;if(r.verdict&&r.verdict!=='search')return r.verdict;
+function verdictOf(eid,r){const v=document.querySelector('input[name="v-'+eid+'"]:checked');if(v)return v.value;if(r.verdict&&r.verdict!=='search')return r.verdict;if(data.round&&data.round.kept)return 'approve';
   const fr=(r.frames&&r.frames.length)||(data.references||[]).some(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));return fr&&!sidsOf(r).length?'approve':'search';}
+const goldenTick={};   // design/151 Q2: the operator's tick per thing, the golden picture of its set
+function keptVerdict(eid){const v=document.querySelector('input[name="v-'+eid+'"]:checked');return v?v.value:'';}
+function keptWords(eid){return (($('w-'+eid)||{}).value||'').trim();}
+function keptWaiting(rd){   // design/151: what keeps Done locked on the one-shot pass, by name
+  const out=[], kinds={};(data.elements||[]).forEach(e=>kinds[e.id]=e.kind);
+  Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid];if(r.ignored)return;const v=keptVerdict(eid);
+    if(!v||(v==='yes'&&kinds[eid]!=='person'&&!goldenTick[eid])||(v==='correct'&&!keptWords(eid)))out.push(eid);});
+  return out;}
+function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while every set is made silently; pass 2 every set in one shot: Yes, No or Correct it, the golden tick on a thing
+  const d=data, refs={};(d.references||[]).forEach(r=>refs[r.id]=r);
+  const byId={};(d.elements||[]).forEach(e=>byId[e.id]=e);
+  const ids=Object.keys(rd.elements);
+  let left;
+  if(rd.pass===1){
+    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, v=verdictOf(eid,r);
+      let frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
+      if(!frames.length)frames=(d.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));
+      return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span>'+usedIn(eid)+
+        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?'Use the footage picture':(e.kind==='person'?'Make the character sheet':'Make its pictures'))+'</label>'+
+        '<label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
+        (frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'"><img src="'+esc(thumbOf(f.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(f.id)+'"><div class="cap">from your footage</div></div>').join('')+'</div>':'<div class="ds">Not in your footage: the assistant makes its pictures from real photographs.</div>')+'</div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 1 of 2:</b> for each thing, use the picture from your footage, or ignore it. Done makes every picture at once; you judge them all together on step 2.</p>'+rows;
+  }else if(rd.pass==='making'){
+    const rows=ids.filter(eid=>!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, set=(r.set||[]).map(i=>refs[i]).filter(Boolean), st=set.length?set[0].status:'';
+      return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge '+(st==='candidate'?'ok':st==='failed'?'err':'dec')+'">'+esc(r.error?'not made':st==='candidate'?'ready':st==='failed'?'failed':'being made')+'</span>'+(r.error?'<div class="ds err">'+esc(r.error)+'</div>':'')+'</div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>The pictures are being made.</b> This page refreshes itself; when every set is back, you judge them all together.</p>'+rows;
+  }else{
+    const rows=ids.filter(eid=>!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, set=(r.set||[]).map(i=>refs[i]).filter(x=>x&&x.status!=='rejected'), thing=e.kind!=='person', v=keptVerdict(eid)||r.verdict||'';
+      const pics=set.map((x,i)=>'<div class="pic '+(isSel('ref',x.id)?'sel':'')+'" data-item="'+esc(x.id)+'">'+(thing?'<span class="tick '+(goldenTick[eid]===x.id?'on':'')+'" data-golden="'+esc(eid)+':'+esc(x.id)+'" title="tick the golden picture: the one every shot starts from">'+(goldenTick[eid]===x.id?'★':'')+'</span>':'')+
+        '<img src="'+esc(thumbOf(x.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(x.id)+'"><div class="cap">'+(thing?'picture '+(x.set_n||i+1):['','full length','working pose','face'][x.set_n]||('picture '+(x.set_n||i+1)))+'</div></div>').join('');
+      const notes=set.length&&set[0].notes?'<details><summary class="ds" style="cursor:pointer">the model\'s notes and sources</summary><div class="ds" style="white-space:pre-wrap">'+esc(set[0].notes)+'</div>'+((set[0].sources||[]).map(s=>'<div class="ds"><a href="'+esc(s.url||'')+'" target="_blank" rel="noopener">'+esc(s.title||s.url||'')+'</a></div>').join(''))+'</details>':'';
+      return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+(r.round>1?' · round '+r.round:'')+'</span>'+
+        (set.length?'<div class="strip">'+pics+'</div>'+notes:'<div class="ds err">No picture came back'+(r.error?': '+esc(r.error):'')+'. Say No or Correct it to make it again.</div>')+
+        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="yes" '+(v==='yes'?'checked':'')+(set.length?'':' disabled')+'> Yes</label><label><input type="radio" name="v-'+esc(eid)+'" value="no" '+(v==='no'?'checked':'')+'> No</label><label><input type="radio" name="v-'+esc(eid)+'" value="correct" '+(v==='correct'?'checked':'')+'> Correct it</label></div>'+
+        '<textarea class="pnote keep" id="w-'+esc(eid)+'" placeholder="'+(thing?'what to correct, or why not (needed for Correct it)':'what to correct about this person')+'">'+esc(($('w-'+eid)||{}).value||'')+'</textarea></div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 2 of 2:</b> every set at once. For each: Yes (tick the golden picture first, the one every shot starts from), No, or Correct it with your words; Done records all of them, and the No and Correct it ones are made again.</p>'+rows;
+  }
+  $('s-references').innerHTML=split(left);
+  const root=$('s-references');
+  wireGrid(root,()=>{renderKeptRound(rd);});
+  root.querySelectorAll('[data-golden]').forEach(t=>t.addEventListener('click',ev=>{ev.stopPropagation();const [eid,rid]=t.dataset.golden.split(':');goldenTick[eid]=goldenTick[eid]===rid?'':rid;renderKeptRound(rd);footer();}));
+  root.querySelectorAll('input[type=radio]').forEach(x=>x.addEventListener('change',()=>{renderKeptRound(rd);footer();}));
+  root.querySelectorAll('textarea[id^="w-"]').forEach(x=>x.addEventListener('input',()=>footer()));
+  root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
+}
 function renderRound(rd){   // design/79: every element at once; pass 1 the frames and a search per thing (design/121), pass 2 the searched things' pictures
+  if(rd.kept){renderKeptRound(rd);return;}   // design/151
   const d=data, refs={};(d.references||[]).forEach(r=>refs[r.id]=r);
   const els=d.elements||[], byId={};els.forEach(e=>byId[e.id]=e);
   const ids=Object.keys(rd.elements);
@@ -715,7 +761,8 @@ function renderReferences(){
   const webFold=searchBox+(saved?'<details><summary class="ds" style="cursor:pointer">show all ('+s.results.length+' search results)</summary>'+web+'</details>':web);
   const sheets=refs.filter(r=>r.kind==='sheet'), sheet=sheets.filter(r=>r.status!=='rejected').pop();   // design/106 R2: a sheet, waiting or approved, comes first
   if(sheet){const byId={};refs.forEach(r=>byId[r.id]=r);const from=(sheet.parents||[]).map(id=>byId[id]).filter(Boolean);
-    body+='<h3>Reference sheet · '+esc(e.id)+'</h3><div class="strip">'+refCard(sheet,'',true)+'</div>'+(sheet.sources_changed?'<div class="ds err">sources changed: a picture was added after this sheet; the assistant makes a new sheet, this one stays until it is approved.</div>':'')+(from.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="strip">'+from.map(r=>refCard(r,'',true)).join('')+'</div>':'')+
+    const shown=sheet.set?sheets.filter(r=>r.set===sheet.set&&r.status!=='rejected'):[sheet];   // design/151: a set's pictures together, the golden one badged
+    body+='<h3>Reference sheet · '+esc(e.id)+(sheet.set?' · the set':'')+'</h3><div class="strip">'+shown.map(r=>refCard(r,'',true)).join('')+'</div>'+(sheet.sources_changed?'<div class="ds err">sources changed: a picture was added after this sheet; the assistant makes a new sheet, this one stays until it is approved.</div>':'')+(from.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="strip">'+from.map(r=>refCard(r,'',true)).join('')+'</div>':'')+
       '<details><summary class="ds" style="cursor:pointer">all sources ('+frames.length+')</summary>'+src+'</details>'+
       searchBox+'<details><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results)</summary>'+web+'</details>';}
   else body+=src+webFold+'<h3>Reference sheet · '+esc(e.id)+'</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">No sheet yet: the assistant generates it from the pictures above once they are approved.</div>');
@@ -857,11 +904,17 @@ function footer(){
     const n=Object.keys(selGaps).length;
     tray.innerHTML='<span>'+(n?n+' gap'+(n>1?'s':'')+' ticked:':'Tick gaps above, then:')+'</span>'+box;
     act_.innerHTML='<button class="go" data-a="accept-selected" '+(n?'':'disabled')+'>Accept</button> <button data-a="revise-selected" '+(n?'':'disabled')+'>Revise</button>';
+  }else if(step==='references'&&roundOpen()&&roundOpen().kept&&roundOpen().pass!==1){   // design/151: the one-shot step
+    const rd=roundOpen();
+    if(rd.pass==='making'){tray.innerHTML='<span>The pictures are being made; nothing to do yet.</span>';act_.innerHTML='';}
+    else{const wait=keptWaiting(rd), lock=wait.length?' disabled title="every thing needs its answer first"':'';
+      tray.innerHTML=(wait.length?'<span class="err"><b>'+wait.length+'</b> still need'+(wait.length>1?'':'s')+' an answer (or a golden tick, or the words for Correct it): '+esc(wait.join(', '))+'</span>':'<span>Done records every verdict; the No and Correct it ones are made again.</span>')+box;
+      act_.innerHTML='<button class="go" data-a="round-sets"'+lock+'>Done</button>';}
   }else if(step==='references'&&roundOpen()){   // design/79: one words box and Done for the whole pass
     const rd=roundOpen();
     const wait=roundWaiting(rd), lock=wait.length?' disabled title="every thing needs its answer first"':'';   // design/121 changes 1, 6: Done stays locked, naming what waits
     const waitLine=wait.length?'<span class="err"><b>'+wait.length+'</b> thing'+(wait.length>1?'s':'')+' '+(rd.pass===1?'not searched yet':wait.length>1?'still need an answer':'still needs an answer')+': '+esc(wait.join(', '))+'</span>':'';
-    if(rd.pass===1){const n=Object.keys(rd.elements).length;tray.innerHTML=waitLine||'<span>Done approves the footage pictures you chose; the searched things go to pass 2.</span>';act_.innerHTML=confirmPicks&&!wait.length?'<span>Done with '+n+' element'+(n>1?'s':'')+'?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-done">Finish</button>':'<button class="go" data-a="round-done"'+lock+'>Done ('+n+' element'+(n>1?'s':'')+')</button>';}   // design/110 rule 0: Done asks first
+    if(rd.pass===1){const n=Object.keys(rd.elements).length;tray.innerHTML=waitLine||'<span>'+(rd.kept?'Done approves the footage pictures you chose and makes every picture at once.':'Done approves the footage pictures you chose; the searched things go to pass 2.')+'</span>';act_.innerHTML=confirmPicks&&!wait.length?'<span>Done with '+n+' element'+(n>1?'s':'')+'?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-done">Finish</button>':'<button class="go" data-a="round-done"'+lock+'>Done ('+n+' element'+(n>1?'s':'')+')</button>';}   // design/110 rule 0: Done asks first
     else{const sids=Object.values(rd.elements).flatMap(sidsOf), n=sids.reduce((k,sid)=>k+((picks[sid]||[]).length),0), kept=($('words')||{}).value||'';
       const notes=sids.reduce((k,sid)=>k+((picks[sid]||[]).filter(p=>String(p.note||'').trim()).length),0);   // design/106 N2, N3
       tray.innerHTML=waitLine+(n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'<span>Tick the pictures to use.</span>')+'<span class="ds">Picture notes go under each ticked picture.</span><textarea class="words" id="words" placeholder="words for the whole pass (optional)"></textarea>';
@@ -937,6 +990,10 @@ async function click(b){
     confirmPicks=false;
     const verdicts={};Object.keys(rd.elements).forEach(eid=>{verdicts[eid]={verdict:verdictOf(eid,rd.elements[eid])};});   // design/121 change 6: Done runs no search
     await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the footage pictures you chose are approved; the searched things are on pass 2.');return;}
+  if(a==='round-sets'){const rd=roundOpen();if(!rd)return;   // design/151
+    const verdicts={};Object.keys(rd.elements).forEach(eid=>{if(rd.elements[eid].ignored)return;verdicts[eid]={verdict:keptVerdict(eid),words:keptWords(eid),golden:goldenTick[eid]||''};});
+    const j=await send({action:'round-sets',verdicts:verdicts,quote:q},'Recorded: the sets you said Yes to are approved; the others are being made again.');
+    if(j){Object.keys(goldenTick).forEach(k=>delete goldenTick[k]);}return;}
   if(a==='ignore'){const el=b.dataset.el;if(ignoredEls[el])delete ignoredEls[el];else ignoredEls[el]=true;renderStep();footer();return;}   // design/121 change 1: one click, no typing
   if(a==='supply-open'){selectPic({supply:b.dataset.el});return;}   // design/126 U6
   if(a==='round-search'){roundSearch(b.dataset.el);return;}   // design/121 change 6: not through act(): several searches run at once
@@ -970,7 +1027,7 @@ function railCards(){   // one card per thing to look at on this step, in film o
     if(!d.plan_digest||!els.length)return cards;
     (rd?Object.keys(rd.elements):els.map(e=>e.id)).forEach(eid=>{const e=els.find(x=>x.id===eid)||{id:eid,name:'',kind:''};
       const refs=(d.references||[]).filter(r=>r.element_id===eid&&r.url&&r.status!=='rejected'), pic=refs.find(r=>r.kind==='sheet'&&r.status==='approved')||refs.find(r=>r.status==='approved')||refs[0];
-      card({unit:eid,title:eid+(e.name?' · '+e.name:''),sub:e.kind||'',thumb:pic?pic.url:'',badge:rd?['dec',rd.pass===1?'pass 1':'pass 2']:elState(e),wait:waitIn('references',eid).length>0,busy:!!searching[eid]});});}
+      card({unit:eid,title:eid+(e.name?' · '+e.name:''),sub:e.kind||'',thumb:pic?pic.url:'',badge:rd?['dec',rd.pass===1?(rd.kept?'step 1':'pass 1'):rd.pass==='making'?'being made':rd.kept?'your verdict':'pass 2']:elState(e),wait:waitIn('references',eid).length>0,busy:!!searching[eid]});});}
   else if(step==='pictures'){const shots=shotsOn(false), st=d.graphic_style, srefs=(d.references||[]).filter(r=>r.kind==='style');
     if(!shots.length)return cards;card({unit:'',title:'All shots',sub:shots.length+' shot'+(shots.length===1?'':'s')});
     if(st||srefs.length){const s0=latestOf(srefs.filter(r=>r.status!=='rejected'))||latestOf(srefs);

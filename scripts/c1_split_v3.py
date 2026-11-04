@@ -84,6 +84,8 @@ if __name__ == '__main__':
         prompt = d149(prompt, parts)
         from d150_wording_v3 import apply_visuals as d150   # design/150 Set C: the treatment's limits and the one-clip rule in the text
         d150(parts)
+        from d151_wording_v3 import apply_visuals as d151   # design/151: the kept reference round
+        d151(parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

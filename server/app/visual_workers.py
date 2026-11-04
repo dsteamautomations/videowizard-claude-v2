@@ -61,6 +61,9 @@ def _openai(path, **kw):
 GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'   # design/120
 
 
+SET_MAX = 4   # design/151: a set is two to four separate pictures; more are cut
+
+
 class _Answer:
     """A response-shaped object for the common path: OpenAI's {data: [{b64_json}], usage} made from Gemini's answer, or an error with the model's words."""
 
@@ -85,7 +88,9 @@ def _gemini_image(req, parents):
         parts += [{'text': f'Image {k}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(png).decode('ascii')}}]
     parts.append({'text': req['prompt']})
     payload = {'contents': [{'role': 'user', 'parts': parts}],
-               'generationConfig': {'responseModalities': ['IMAGE'], 'imageConfig': {'aspectRatio': size.get('aspect') or '16:9', 'imageSize': str(size.get('tier') or settings().GEMINI_IMAGE_SIZE).upper()}}}
+               'generationConfig': {'responseModalities': ['TEXT', 'IMAGE'] if req.get('search') else ['IMAGE'], 'imageConfig': {'aspectRatio': size.get('aspect') or '16:9', 'imageSize': str(size.get('tier') or settings().GEMINI_IMAGE_SIZE).upper()}}}
+    if req.get('search'):   # design/151: the kept method takes its facts from real photographs: Google Search on (the search tool needs TEXT among the modalities)
+        payload['tools'] = [{'google_search': {}}]
     r = None
     for idx, key in tries:
         r = httpx.post(GEMINI_URL.format(model=req['model']), headers={'x-goog-api-key': key, 'Content-Type': 'application/json'}, json=payload, timeout=300)
@@ -104,14 +109,22 @@ def _gemini_image(req, parents):
     body = r.json()
     cands = body.get('candidates') or []
     parts_out = ((cands[0].get('content') or {}).get('parts') or []) if cands else []
-    image = next((p['inlineData'] for p in parts_out if isinstance(p, dict) and p.get('inlineData')), None)
-    if not image:
-        words = ' '.join(str(p.get('text') or '') for p in parts_out if isinstance(p, dict)).strip() or (body.get('promptFeedback') or {}).get('blockReason') or 'no image in the answer'
+    images = [p['inlineData'] for p in parts_out if isinstance(p, dict) and p.get('inlineData')]
+    words = ' '.join(str(p.get('text') or '') for p in parts_out if isinstance(p, dict)).strip()
+    if not images:
+        words = words or (body.get('promptFeedback') or {}).get('blockReason') or 'no image in the answer'
         out = _Answer(400, {'error': {'type': 'no_image', 'message': words}}, words)
         out.key_index = idx
         return out
+    if not req.get('set'):   # one picture, as before design/151
+        images = images[:1]
+    elif len(images) > SET_MAX:
+        words = f'{len(images)} pictures came back; the first {SET_MAX} are kept. ' + words
+        images = images[:SET_MAX]
     usage = body.get('usageMetadata') or {}
-    out = _Answer(200, {'data': [{'b64_json': image['data']}], 'usage': {'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')}})
+    sources = [{'url': c['web'].get('uri'), 'title': c['web'].get('title')} for c in ((cands[0].get('groundingMetadata') or {}).get('groundingChunks') or []) if isinstance(c, dict) and c.get('web')] if cands else []
+    out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')},
+                        **({'notes': words, 'sources': sources} if req.get('set') else {})})
     out.key_index = idx
     return out
 
@@ -186,13 +199,26 @@ def process_image(job):
         k = f"{job['run_id']}/visuals/references/{ref['id']}.png"
         store.put(k, png, 'image/png')
         sha = hashlib.sha256(png).hexdigest()
+        extra = []
+        for n, item in enumerate(body['data'][1:], 2):   # design/151: the other pictures of a set, each its own file
+            more = base64.b64decode(item['b64_json'])
+            with Image.open(BytesIO(more)) as im:
+                w2, h2 = im.size
+                if im.format != 'PNG':
+                    out = BytesIO()
+                    im.convert('RGB').save(out, format='PNG')
+                    more = out.getvalue()
+            k2 = f"{job['run_id']}/visuals/references/{ref['id']}-{n}.png"
+            store.put(k2, more, 'image/png')
+            extra.append({'key': k2, 'sha256': hashlib.sha256(more).hexdigest(), 'bytes': len(more), 'width': w2, 'height': h2})
         usage = body.get('usage') or {}
         if req.get('provider') == 'gemini':   # design/120: priced flat per picture plus its inputs
             cost = {'provider': 'gemini', 'model': req['model'], 'tier': str((req.get('size') or {}).get('tier') if isinstance(req.get('size'), dict) else '') or settings().GEMINI_IMAGE_SIZE,
-                    'inputs': len(req.get('parents') or []), 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
+                    'inputs': len(req.get('parents') or []), 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens'), **({'pictures': 1 + len(extra)} if req.get('set') else {})}
         else:
             cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
         return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
+                            **({'extra': extra, 'notes': body.get('notes') or '', 'sources': body.get('sources') or []} if req.get('set') else {}),   # design/151
                             **({'key_index': r.key_index} if getattr(r, 'key_index', None) is not None else {}),   # design/114: which key, never the key
                             **({'edit': edit} if edit else {})}, None, cost, None
     except (Problem, OSError, ValueError, KeyError, TypeError, httpx.RequestError) as exc:
@@ -268,6 +294,8 @@ def apply_image_result(conn, run_id, ref, status, result, error, cost):
     if status == 'retained':
         ref.update(status='candidate', key=result['key'], sha256=result['sha256'], bytes=result['bytes'], width=result['width'], height=result['height'], **({'edit': result['edit']} if result.get('edit') else {}))
         ref['generation'] = {**ref.get('generation', {}), 'cost': cost, 'revised_prompt': result.get('revised_prompt')}
+        if 'notes' in result:   # design/151: the model's four notes and the pages it consulted, shown under the set
+            ref.update(notes=result.get('notes') or '', sources=result.get('sources') or [])
         jobs.record_file(conn, run_id, 'visuals', result['key'], Path(result['key']).name, result['sha256'], result['bytes'], 'image/png')
         return True
     if status in ('rejected', 'failed'):
@@ -290,6 +318,10 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
     ref = session['references'].get(job['request']['reference']['id'])
     due = False
     if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
+        for n, x in enumerate((result or {}).get('extra') or [], 2):   # design/151: the set's other pictures are sibling candidates (set, set_n); the check runs on the first
+            sid = f"{ref['id']}-{n}"
+            session['references'][sid] = {**{k_: v for k_, v in ref.items() if k_ not in ('check_pending', 'check')}, 'id': sid, 'name': f"{ref.get('name') or ref['id']}-{n}", 'set_n': n, **x}
+            jobs.record_file(conn, job['run_id'], 'visuals', x['key'], Path(x['key']).name, x['sha256'], x['bytes'], 'image/png')
         if status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
             ref['check_pending'] = due = True   # design/92: checked after this transaction, with no lock held (check_image)
         store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')

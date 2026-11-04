@@ -111,3 +111,25 @@ Each rule below is checked against the build before a deploy; a contradiction st
 
 ## 11. Older ways (design/35)
 Retired on new films: the Search verdict and pass 2 of the round, `vw visuals search` and `pick` in the round, the labelled-views sheet line, the separate golden call, web-pick notes and the watermark line. Kept until the last film started before this release is closed: all of them, by `film` NULL.
+
+## 12. Build record (4 Nov 2026, after SK's "Approve, start build")
+
+Built, tested and pushed; **not deployed** (SK's explicit yes first). Server 0.90.0, plugin 0.76.0 (the minimum plugin stays 0.70.0: an older plugin still runs the round through the page; `vw visuals round --sets` needs the new one).
+
+| Piece | What |
+| --- | --- |
+| Worker | `_gemini_image`: a set request carries `tools: [{google_search: {}}]` and `responseModalities: [TEXT, IMAGE]`; every image part kept (at most four, more noted), the text parts as the notes, the grounding chunks as the sources; `process_image` stores the other pictures as `<id>-2.png` …; the cost counts the pictures; `finalize_image` makes sibling candidate rows (`set`, `set_n`) and keeps the notes on the first |
+| Prompts | `KEPT_PREAMBLE`, `KEPT_SET_LINE`, `KEPT_NOTES` verbatim from the kept file; `thing_prompt` (subject block, the frame's job line, the cosmetics from the plan's appearance and the scenes' place, the notes; a block that says how is refused); `person_prompt` (description, role, outfits, place, the why line, one "Not P2: …" line per other person, the three poses); `traits` and `distinct_people` (alike pairs refused by name) |
+| Round | `round_start`: on a new film with no older references the round is kept (`session.refs = 'kept'`), each row carries `prompt`; `round_done`: approve or ignore (search refused by name), the frames approved, then `_queue_sets` makes every set through `generate_image` (its gates, the cap once for up to four pictures each; a refused element recorded on its row, the cap stops the rest); pass `making` until every set is back (`_round_pass`); `round_sets`: Yes (a thing needs its golden tick, Q2; a person's golden is picture 1), No or Correct it (words required for Correct it; the set rejected, made again with "The operator's correction: …", never from a rejected picture); complete when nothing is made again |
+| generate_image | a kept set: a thing from its approved frame (Q1), Gemini only, the kept lines on the check (no labels); a person from words, no parents; measure before the set (Q6); `--golden` refused; a start image takes the person's face close-up with the full-length front (`with_faces`, Q3) |
+| Retired on a kept film, refused by name | `search`, `pick`, `round_picks`, the golden call, the labelled-views line, the stale-sheet mark on a later picture; films with older references untouched (the old tests pass unchanged) |
+| Plan | `script_people_warnings` (Q4): a word the shot's words act with (helpers, supervisor, workers …) with no person element and no groups entry is a warning, technical, answered like any |
+| Page | `renderKeptRound`: step 1 the frames (use or ignore), 'being made' while the sets are made, step 2 every set with the golden tick (★), the notes and sources folded, Yes / No / Correct it with a words box, one Done; after the round the set shown together |
+| Plugin | `vw visuals round --file` rows take `prompt`; `--verdicts` (approve or ignore); `--sets out/round-sets.json`; the status line says 'the sets are being made' |
+| Instructions | `scripts/d151_wording_v3.py` (hooked into `c1_split_v3.py --check`): the picture-search part says the kept round; the later part says what shots bind and names the older way; `vw.md` the same |
+
+**Tests:** `server/unit/test_design151_refs_pure.py` (19), server unit 1170 passed, plugin 416 passed with the 4 known failures; the split check and the word budget pass.
+
+**Contradiction check (section 6), before any deploy:** 1 held (a person's set from words, `parents: []`; a speaker refused first). 2 resolved (no sheet_block, no labelled-views lines on a set). 3 held (the measure gate covers a set). 4 replaced on kept films (golden = the tick), kept on older ones. 5 held (the composed prompt passes `check_prompt` in the tests). 6 held (a re-made set has the frame only). 7 held (a set call sends at most one picture; a shot adds one face per person). 8 held (no world line on a sheet). 9 held (`kept` set only on a new film's first round; older films' tests unchanged). 10 held (10 916 words). 11 held (the cosmetics come from the plan). 12 held (the page's Done calls `round_done` and `round_sets`).
+
+**Not covered:** the live call (the count of pictures one API call returns, the search tool on the model id in `.env`) is a VM test before the first film uses it; the check (`image_check`) runs on the set's first picture only; the page seen as code, not in a browser; a person's set on OpenAI films (not refused: the person prompt has no search); the docker suite.

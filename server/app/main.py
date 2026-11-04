@@ -383,6 +383,11 @@ class RoundPicks(Write):
     quote: str = ''   # design/99 C6
 
 
+class RoundSets(Write):   # design/151: the one-shot verdicts on the sets
+    verdicts: dict[str, dict[str, Any]]
+    quote: str = ''
+
+
 class GeneratorBody(Write):
     shot_id: str
     provider: str
@@ -1450,12 +1455,17 @@ def visuals_pick(run_id: UUID, body: PickBody, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round', status_code=201)
 def visuals_round(run_id: UUID, body: RoundStart, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_start(storage(), user, run, outputs, body.elements), 201)   # design/79
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_start(storage(), user, run, outputs, body.elements, conn=conn), 201)   # design/79; design/151
 
 
 @app.post('/api/runs/{run_id}/visuals/round/done')
 def visuals_round_done(run_id: UUID, body: RoundDone, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote))   # design/121 change 6: no search at Done
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn))   # design/121 change 6: no search at Done; design/151
+
+
+@app.post('/api/runs/{run_id}/visuals/round/sets')
+def visuals_round_sets(run_id: UUID, body: RoundSets, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_sets(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn))   # design/151
 
 
 @app.post('/api/runs/{run_id}/visuals/round/picks')

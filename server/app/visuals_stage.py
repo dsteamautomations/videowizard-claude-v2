@@ -26,6 +26,7 @@ from .errors import Problem
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
+from .visual_contract import script_people_warnings   # design/151 Q4 (re-exported for the tool)
 from .visual_contract import GAZE_CAMERA, take_seconds, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
@@ -399,7 +400,7 @@ def image_cost_inr(cost, pr):
     c = cost or {}
     if c.get('provider') == 'gemini':
         s = settings()
-        usd = (s.GEMINI_IMAGE_USD_4K if str(c.get('tier') or '').upper() == '4K' else s.GEMINI_IMAGE_USD) + int(c.get('inputs') or 0) * s.GEMINI_IMAGE_INPUT_USD
+        usd = (s.GEMINI_IMAGE_USD_4K if str(c.get('tier') or '').upper() == '4K' else s.GEMINI_IMAGE_USD) * int(c.get('pictures') or 1) + int(c.get('inputs') or 0) * s.GEMINI_IMAGE_INPUT_USD   # design/151: a set's pictures
         return usd * pr.get('usd_inr', 88.0)
     if not c.get('output_tokens'):
         return pr['image_inr']
@@ -638,7 +639,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
     plan = current_plan(store, session) if session.get('current') else None
     refs = {}
     for r in session['references'].values():
-        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height', 'check_pending')}   # design/92: being checked
+        refs[r['id']] = {k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'width', 'height', 'check_pending', 'set', 'set_n', 'notes', 'sources')}   # design/92: being checked; design/151: the set
         refs[r['id']]['note'] = (r.get('source') or {}).get('note') or ''   # design/73
         refs[r['id']]['from_thumbnail'] = bool((r.get('source') or {}).get('from_thumbnail'))   # design/100 S2
         refs[r['id']]['sources_changed'] = bool(r.get('sources_changed'))   # design/110
@@ -1356,6 +1357,114 @@ def not_this_line(session, plan, element_id, shot=None, scene=None):
 REGION_MAX = 1 / 3   # an edit changes one region, about a third of the frame at most
 
 
+KEPT_PREAMBLE = ("I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: "
+                 "the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images "
+                 "for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\n"
+                 "One rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, "
+                 "and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly "
+                 "as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time "
+                 "on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.")   # design/151: the kept prompt, version 6 (SK, 4 Nov 2026), verbatim
+KEPT_SET_LINE = ("If one picture cannot show the subject fully, make a set of two to four pictures of the same one subject on the same site, consistent with each other in every detail, each adding a view the "
+                 "others lack. Deliver each picture as a separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.")
+KEPT_NOTES = ("With the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings "
+              "you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.")
+KEPT_COSMETICS = ("Cosmetic requirements, which do not touch the technical content:\n- The place reads as {place}; the film's look: {look}.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n"
+                  "- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.")
+KEPT_FRAME_LINE = "Image 1 is the approved footage frame of {name}: take the thing itself from it (its exact form, material and wear); what the frame does not show, take from the real photographs."
+HOW_WORDS = re.compile(r'\b(step by step|how to|how it is done|procedure)\b', re.I)
+PERSON_SET = ("Make a set of three separate pictures of this one person: 1, a full-length front view standing at ease; 2, a full-length three-quarter view in a working pose of their trade; 3, a close-up of the face. "
+              "Deliver each as a separate output image at full size, never a collage, grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; "
+              "no text, numbers or captions inside any picture.")   # design/151 part 2; design/124 decision 5: from words, never from a picture of a real person
+KEPT_THING_LINES = [{'check': 'one way only', 'weight': 'must', 'pass_when': 'every detail belongs to one consistent way of working; nothing from a second method is mixed in'},
+                    {'check': 'the subject fills the frame', 'weight': 'must', 'pass_when': 'the subject is the picture; the setting is only a soft hint at the edges'},
+                    {'check': 'nothing floats', 'weight': 'must', 'pass_when': 'nothing floats or stands where it could not stand on a real site'},
+                    {'check': 'no person', 'weight': 'must', 'pass_when': 'no person, no hands, no face anywhere in the frame'},
+                    {'check': 'no text', 'weight': 'must', 'pass_when': 'no caption, number, label, logo or watermark anywhere in the picture'}]
+PERSON_SET_LINES = [{'check': 'one person', 'weight': 'must', 'pass_when': 'one person alone, no second person and nothing else in the frame'},
+                    {'check': 'plain ground', 'weight': 'must', 'pass_when': 'plain neutral ground, no setting'},
+                    {'check': 'no text', 'weight': 'must', 'pass_when': 'no caption, number or label anywhere in the picture'}]
+SET_MAX = 4   # the picture AI returns up to four pictures for one request (visual_workers.SET_MAX)
+TRAIT_WORDS = (('40s', r'\b(forty|fort(y|ies)|4\d)\b'), ('20s', r'\b(twenty|twenties|2\d)\b'), ('30s', r'\b(thirty|thirties|3\d)\b'), ('50s', r'\b(fifty|fifties|5\d)\b'), ('60s', r'\b(sixty|sixties|6\d)\b'),
+               ('teens', r'\b(teen\w*|1\d)\b'), ('lean', r'\b(lean|slim|wiry|thin(?! (moustache|beard)))\b'), ('stocky', r'\b(stocky|heavy|broad|plump|stout)\b'), ('tall', r'\btall\b'), ('short', r'\bshort(?!\w| hair| grey| black| white| cropped)\b'),
+               ('short hair', r'\bshort( \w+)? hair\b'), ('long hair', r'\blong( \w+)? hair\b'), ('cropped', r'\bcropped\b'), ('bald', r'\bbald\w*\b'), ('grey', r'\b(grey|gray|white)( hair|-haired)?\b'),
+               ('beard', r'\bbeard\w*\b'), ('moustache', r'\bmo?ustache\b'), ('clean-shaven', r'\bclean-shaven\b'), ('glasses', r'\b(glasses|spectacles)\b'))
+
+
+def traits(text):
+    """design/151: the compared traits of a person's description, as words: age band, build, hair, face; two people alike on all of them are refused."""
+    text = str(text or '')
+    return frozenset(name for name, rx in TRAIT_WORDS if re.search(rx, text, re.I))
+
+
+def distinct_people(plan):
+    """design/151 part 2: every pair of people differs on at least one compared trait, side workers included; alike pairs are refused by name before any payment."""
+    people = [e for e in plan.get('elements') or [] if e.get('kind') == 'person']
+    for i, a in enumerate(people):
+        for b in people[i + 1:]:
+            need(traits(a.get('description')) != traits(b.get('description')),
+                 f"{a['id']} and {b['id']} are alike on every compared trait (age, build, hair, face): change one description so they can be told apart, side workers included.")
+
+
+def _place_look(plan):
+    scenes = [sc for gap in plan.get('gaps') or [] for sc in (gap.get('scenes') or [])]
+    place = next((str(sc.get('location_time') or '').strip() for sc in scenes if str(sc.get('location_time') or '').strip()), 'the place the plan describes')
+    return place, str((plan.get('foundation') or {}).get('appearance') or '').strip() or 'as the footage'
+
+
+def thing_prompt(plan, run, session, element, subject, frame=False):
+    """design/151 part 3: the kept method's prompt for a thing: the preamble and the set line verbatim, the writer's subject block (what, never how), the
+    cosmetics from the plan (Q7), the frame's job line when the thing has one (Q1), the four notes."""
+    subject = ' '.join(str(subject or '').split())
+    need(subject, 'Give the subject block: what the picture must represent, the subject and its frame, nobody in the picture.')
+    m = HOW_WORDS.search(subject)
+    if m:
+        need(False, f'The subject block describes how the work is done ({m.group(0)!r} …): the kept method takes that from real photographs; say only what the picture must represent.')
+    place, look = _place_look(plan)
+    parts = [KEPT_PREAMBLE, KEPT_SET_LINE, 'What the picture must represent: ' + subject.rstrip('.') + '.']
+    if frame:
+        parts.append(KEPT_FRAME_LINE.format(name=element.get('name') or element['id']))
+    parts += [KEPT_COSMETICS.format(place=place, look=look), KEPT_NOTES]
+    return '\n\n'.join(parts)
+
+
+def person_prompt(plan, run, element, why=''):
+    """design/151 part 2: a person's character sheet from the plan's words: who they are, their fixed look, their garments, the place, the writer's why line,
+    one line against every other person so they stay apart, then the three poses as separate pictures."""
+    others = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] != element['id']]
+    outfits = list(dict.fromkeys(str((sc.get('outfit') or {}).get(element['id']) or '').strip() for gap in plan.get('gaps') or [] for sc in (gap.get('scenes') or [])))
+    outfits = [o for o in outfits if o]
+    place, look = _place_look(plan)
+    lines = [f"Character sheet of {element.get('name') or element['id']} ({element['id']}), a person in this film.",
+             f"Who they are: {str(element.get('requirements') or '').strip().rstrip('.')}.",
+             f"Fixed look: {str(element.get('description') or '').strip().rstrip('.')}.",
+             *(["Garments: " + '; '.join(outfits) + '.'] if outfits else []),
+             f"Place: {place}; the film's look: {look}."]
+    why = ' '.join(str(why or '').split())
+    if why:
+        lines.append(f"Why: {why.rstrip('.')}.")
+    lines += [f"Not {o['id']} ({o.get('name') or o['id']}): {str(o.get('description') or '').strip().rstrip('.')}." for o in others]
+    lines.append(PERSON_SET)
+    return '\n'.join(lines)
+
+
+def with_faces(session, parents, people):
+    """design/151 Q3: a person's full-length front (picture 1 of the set, the golden) brings the face close-up (picture 3) into a shot's prompt by default;
+    the other poses go in by name. Returns the parents and the job lines of the pictures added."""
+    parents, lines = list(parents), []
+    for p in list(parents):
+        if p and p.get('kind') == 'sheet' and p.get('set') and int(p.get('set_n') or 1) == 1 and p.get('element_id') in people:
+            face = session['references'].get(f"{p['set']}-3")
+            if face and face.get('status') == 'approved' and all(q['id'] != face['id'] for q in parents if q):
+                parents.append(face)
+                lines.append(f"Image {len(parents)} is the face of {p['element_id']} ({people[p['element_id']]}): take the face from it, nothing else.")
+    return parents, lines
+
+
+def kept(session):
+    """design/151: this film's references are made the kept way (set at its first round on a new film); an older film keeps the search, the picks and the sheet from words."""
+    return (session or {}).get('refs') == 'kept'
+
+
 def golden_of(session, element_id):
     return (session.get('golden') or {}).get(element_id)
 
@@ -1364,6 +1473,8 @@ def golden_due(session, plan):
     """The elements whose golden picture the assistant writes now: a non-person, non-graphic element with an approved sheet (and an approved material spec when it has one),
     no golden picture yet and none being made."""
     out = []
+    if kept(session):   # design/151: the golden picture is the ticked picture of the set; no separate call
+        return out
     for e in plan.get('elements') or []:
         if e.get('kind') in ('person', 'graphic') or e['id'] == STYLE or golden_of(session, e['id']):
             continue
@@ -1382,6 +1493,8 @@ def sheet_due(session, plan):
     """design/119 rule 2: the elements whose reference sheet the assistant writes now: an element (not the style) with an approved source (a frame, a
     supplied or a web picture) and no sheet approved, candidate or being made."""
     out = []
+    if kept(session):   # design/151: the round makes every set; nothing is written per element
+        return out
     for e in plan.get('elements') or []:
         if e['id'] == STYLE:
             continue
@@ -1934,7 +2047,7 @@ def _store_reference(store, run, session, ref_id, png, meta):
     row = {**meta, 'id': ref_id, 'key': k, 'sha256': hashlib.sha256(png).hexdigest(), 'bytes': len(png), 'status': 'candidate', 'approval': None,
            'created_at': datetime.now(timezone.utc).isoformat()}
     session['references'][ref_id] = row
-    if meta.get('kind') in ('frame', 'supplied', 'web', 'isolated'):   # design/110: a sheet made before this picture is stale; the old one stays approved until the new one is
+    if meta.get('kind') in ('frame', 'supplied', 'web', 'isolated') and not kept(session):   # design/110: a sheet made before this picture is stale; the old one stays approved until the new one is (design/151: a set is judged on the page, never re-made from a later picture)
         for r in session['references'].values():
             if r.get('kind') == 'sheet' and r.get('element_id') == meta.get('element_id') and r.get('status') != 'rejected':
                 r['sources_changed'] = True
@@ -2098,9 +2211,10 @@ def search(store, user, run, outputs, element_id, keywords, quote, source='', fo
     """design/73 R3: a Google Images search for an element, on the operator's yes; design/121: with a source word a stock search beside it, every picture
     downloaded at once; in an open round the thing's row takes the new searches (pass 1 and pass 2 alike), so Done counts them."""
     need(2 <= len(str(keywords or '').split()) <= 12, 'Keywords are two to twelve words: the thing and its place or trade, nothing else (Google Images is not Google search).')
+    session = session_of(store, run, outputs)
+    need(not kept(session), 'retired on this film (the kept method): references are made by the kept method (the round makes every set from real photographs); no Google Images search on this film.')
     if found is None:
         found = search_rows(store, run, keywords, source)
-    session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     src = ' '.join(str(source or '').split())
     rd = session.get('round') or {}
@@ -2126,6 +2240,7 @@ def search(store, user, run, outputs, element_id, keywords, quote, source='', fo
 def pick(store, user, run, outputs, search_id, picks, quote):
     """design/73 R4: the ticked pictures, in the order ticked, each with its note, become web references of the element with their source."""
     session = session_of(store, run, outputs)
+    need(not kept(session), 'retired on this film (the kept method): references are made by the kept method; there are no web picks on this film.')
     plan = guarded(lambda: current_plan(store, session))
     out = _pick_into(store, session, user, run, plan, search_id, picks, quote)
     save_session(store, run, session)
@@ -2204,12 +2319,18 @@ def _pick_into(store, session, user, run, plan, search_id, picks, quote, fetched
 
 # ---------- design/79: the reference round, every element at once, two passes on one page ----------
 
-def round_start(store, user, run, outputs, elements):
-    """The assistant's one-shot preparation: for each element its grabbed footage frames and the keywords it would search; the page shows them all."""
+def round_start(store, user, run, outputs, elements, conn=None):
+    """The assistant's one-shot preparation: for each element its grabbed footage frames and the keywords it would search; the page shows them all.
+    design/151: on a new film (from design/139 on) with no older references the round is the kept one: each row carries its prompt (a thing's subject
+    block, a person's why line); pass 1 shows the frames; Done makes every set silently; the sets are judged in one shot."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     kinds = {e['id']: e['kind'] for e in plan['elements']}
     need(isinstance(elements, list) and elements, 'The round lists the elements: [{element_id, frames, keywords}].')
+    kept_ = kept(session) or (not film.older(run) and not any(r.get('kind') in ('sheet', 'web') for r in session['references'].values()))
+    if kept_:
+        session['refs'] = 'kept'
+        distinct_people(plan)
     rows = {}
     for row in elements:
         eid = (row or {}).get('element_id')
@@ -2222,9 +2343,111 @@ def round_start(store, user, run, outputs, elements):
         if not frames:   # the element's footage frames already grabbed count, whether or not the row names them
             frames = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
         rows[eid] = {'frames': frames, 'keywords': str((row or {}).get('keywords') or '').strip(), 'verdict': None, 'search_id': None, 'error': None}
-    session['round'] = {'pass': 1, 'at': datetime.now(timezone.utc).isoformat(), 'by': user['id'], 'elements': rows, 'quote': None}
+        if kept_:
+            prompt = ' '.join(str((row or {}).get('prompt') or '').split())
+            need(prompt, f'{eid}: give its prompt (the subject block of a thing: what the picture must represent; the why line of a person).')
+            rows[eid].update(prompt=prompt, corrections=[], set=None, round=0)
+    session['round'] = {'pass': 1, 'at': datetime.now(timezone.utc).isoformat(), 'by': user['id'], 'elements': rows, 'quote': None, **({'kept': True} if kept_ else {})}
     save_session(store, run, session)
-    return {'pass': 1, 'elements': len(rows)}
+    return {'pass': 1, 'elements': len(rows), **({'kept': True} if kept_ else {})}
+
+
+def _set_rows(session, eid, set_id, statuses=('candidate',)):
+    return [r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == eid and r.get('set') == set_id and r.get('status') in statuses]
+
+
+def _round_pass(session, rd):
+    """design/151: a kept round at 'making' is at pass 2 once no set of it is still being made."""
+    if not rd or rd.get('pass') != 'making':
+        return (rd or {}).get('pass')
+    making = any(_set_rows(session, eid, r.get('set'), ('generating',)) for eid, r in rd['elements'].items() if r.get('set') and not r.get('ignored'))
+    return 'making' if making else 2
+
+
+def _queue_sets(conn, store, user, run, outputs, eids):
+    """design/151: one set per element, silently, through generate_image (its gates, the cap, the log); an element refused is recorded on its row and the
+    rest go on; the cap stops the lot. Returns (queued, errors)."""
+    queued, errors = [], {}
+    for eid in eids:
+        session = session_of(store, run, outputs)
+        row = session['round']['elements'][eid]
+        plan = guarded(lambda: current_plan(store, session))
+        element = next(e for e in plan['elements'] if e['id'] == eid)
+        n = int(row.get('round') or 0) + 1
+        prompt = row['prompt'] + ''.join(f"\nThe operator's correction: {c.rstrip('.')}." for c in row.get('corrections') or [])
+        body = {'element_id': eid, 'kind': 'sheet', 'name': f'set-{eid}-r{n}', 'subject': element.get('name') or eid, 'prompt': prompt, 'parents': [],
+                'request_id': str(uuid.uuid5(uuid.NAMESPACE_OID, f"{run['id']}-set-{eid}-{n}"))}
+        try:
+            out = generate_image(conn, store, user, run, outputs, body)
+        except (Problem, ValueError) as exc:
+            errors[eid] = getattr(exc, 'message', None) or str(exc)
+            if getattr(exc, 'code', '') == 'VISUALS_CAP':
+                for rest in eids[eids.index(eid) + 1:]:
+                    errors[rest] = errors[eid]
+                break
+            continue
+        session = session_of(store, run, outputs)
+        session['round']['elements'][eid].update(set=out['reference_id'], round=n, error=None)
+        save_session(store, run, session)
+        queued.append(eid)
+    if errors:
+        session = session_of(store, run, outputs)
+        for eid, msg in errors.items():
+            session['round']['elements'][eid]['error'] = msg
+        save_session(store, run, session)
+    return queued, errors
+
+
+def round_sets(store, user, run, outputs, verdicts, quote, conn=None):
+    """design/151: the one-shot verdicts on the sets: Yes (the set approved; a thing's golden picture is the ticked one, Q2; a person's is picture 1),
+    No or Correct it (the set rejected with the words; made again, the correction in the prompt, never from a rejected picture). Complete when every
+    element is approved or ignored; 'making' while any set is made again."""
+    session = session_of(store, run, outputs)
+    rd = session.get('round')
+    need(rd and rd.get('kept') and _round_pass(session, rd) == 2, 'No reference round is waiting for its sets.')
+    quote = said(quote, 'Sets done', user)
+    verdicts = verdicts or {}
+    plan = guarded(lambda: current_plan(store, session))
+    kinds = {e['id']: e['kind'] for e in plan['elements']}
+    active = [eid for eid, r in rd['elements'].items() if not r.get('ignored')]
+    for eid in active:
+        r, v = rd['elements'][eid], verdicts.get(eid) or {}
+        need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
+        rows = _set_rows(session, eid, r.get('set'))
+        if v['verdict'] == 'yes':
+            need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no or correct it to make it again.")
+            if kinds.get(eid) != 'person':
+                need(v.get('golden'), f'{eid}: tick the golden picture of its set, the one every shot of {eid} starts from.')
+                need(any(x['id'] == v['golden'] for x in rows), f"{eid}: {v.get('golden')} is not a picture of its set.")
+        if v['verdict'] == 'correct':
+            need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
+    stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
+    again = []
+    for eid in active:
+        r, v = rd['elements'][eid], verdicts[eid]
+        rows = _set_rows(session, eid, r.get('set'))
+        r['verdict'] = v['verdict']
+        if v['verdict'] == 'yes':
+            for x in rows:
+                x.update(status='approved', approval={**stamp, 'sha256': x.get('sha256')})
+                _feedback_image(session, run, user, x, 'pass', quote, '')
+            session.setdefault('golden', {})[eid] = v['golden'] if kinds.get(eid) != 'person' else min(rows, key=lambda x: int(x.get('set_n') or 1))['id']
+            continue
+        words = ' '.join(str(v.get('words') or '').split())
+        for x in rows:
+            x.update(status='rejected', rejection={**stamp, 'notes': words})
+            _feedback_image(session, run, user, x, 'reject', quote, words)
+        if words:
+            r.setdefault('corrections', []).append(words)
+        again.append(eid)
+    rd['quote'] = quote
+    save_session(store, run, session)
+    queued, errors = _queue_sets(conn, store, user, run, outputs, again) if again else ([], {})
+    session = session_of(store, run, outputs)
+    rd = session['round']
+    rd['pass'] = 'making' if queued else 'complete'
+    save_session(store, run, session)
+    return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'approved': [eid for eid in active if verdicts[eid]['verdict'] == 'yes']}
 
 
 def _sids(row):
@@ -2232,9 +2455,10 @@ def _sids(row):
     return list(row.get('search_ids') or ([row['search_id']] if row.get('search_id') else []))
 
 
-def round_done(store, user, run, outputs, verdicts, quote):
+def round_done(store, user, run, outputs, verdicts, quote, conn=None):
     """Pass 1 answered: the chosen frames approved with the words; design/121 change 6: every thing set to Google was searched with its own button
-    (Done runs no search and waits, naming them); Ignore this needs nothing. Pass 2 for the searched things."""
+    (Done runs no search and waits, naming them); Ignore this needs nothing. Pass 2 for the searched things.
+    design/151, a kept round: approve or ignore only (the search is retired by name); then every set is made silently and the round is 'making'."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
     need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
@@ -2245,8 +2469,12 @@ def round_done(store, user, run, outputs, verdicts, quote):
         if not row['frames']:   # a round posted without naming the frames: the element's grabbed frames count (as round_start does now)
             row['frames'] = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
         v = verdicts.get(eid) or {}
+        if rd.get('kept'):
+            need(v.get('verdict') != 'search', f'{eid}: the Google Images search is retired on this film (the kept method); the set is made from real photographs by the kept method: approve the footage picture or ignore.')
+            need(v.get('verdict') in ('approve', 'ignore'), f'{eid}: a verdict is required: approve the footage picture (or the element, when it has none), or ignore.')
+            continue
         need(v.get('verdict') in ('approve', 'search', 'ignore'), f'{eid}: a verdict is required: approve the footage picture, search, or ignore.')
-        if v['verdict'] == 'approve':
+        if v['verdict'] == 'approve' and not rd.get('kept'):
             need(row['frames'], f'{eid} has no frame to approve: search instead, or ignore it.')
         if v['verdict'] == 'search' and not _sids(row):
             waiting.append(eid)
@@ -2262,6 +2490,15 @@ def round_done(store, user, run, outputs, verdicts, quote):
                     r.update(status='approved', approval={**stamp, 'sha256': r['sha256']})
                     _feedback_image(session, run, user, r, 'pass', quote, '')
     rd['quote'] = quote
+    if rd.get('kept'):   # design/151: every set made now, silently; the operator judges them in one shot
+        save_session(store, run, session)
+        todo = [eid for eid, r in rd['elements'].items() if not r.get('ignored')]
+        queued, errors = _queue_sets(conn, store, user, run, outputs, todo)
+        session = session_of(store, run, outputs)
+        rd = session['round']
+        rd['pass'] = 'making' if queued else ('complete' if not todo else 1)
+        save_session(store, run, session)
+        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'cost_inr': round(len(queued) * image_price_inr(run) * SET_MAX, 2)}
     searched = [eid for eid, r in rd['elements'].items() if r['verdict'] == 'search']
     rd['pass'] = 2 if searched else 'complete'
     save_session(store, run, session)
@@ -2274,6 +2511,7 @@ def round_picks(store, user, run, outputs, picks, quote, ignore=()):
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     rd = session.get('round')
+    need(not (rd or {}).get('kept'), 'retired on this film (the kept method): this round has no picks; answer its sets (`vw visuals round --sets`, or the page).')
     need(rd and rd.get('pass') == 2, 'No reference round is waiting for its second pass.')
     quote = said(quote, 'Pass 2 done', user)   # design/99 C6
     picks, ignore = picks or {}, set(ignore or ())
@@ -2315,8 +2553,10 @@ def _round_view(session):
     if not rd:
         return None
     searches = session.get('searches') or {}
-    return {**rd, 'elements': {eid: {**r, 'search_ids': _sids(r), 'picked': [n for sid in _sids(r) for n in (searches.get(sid) or {}).get('picked') or []] if _sids(r) else None}
-                               for eid, r in rd['elements'].items()}}
+    sets = lambda eid, r: sorted((x['id'] for x in _set_rows(session, eid, r.get('set'), ('generating', 'candidate', 'approved', 'rejected', 'failed'))), key=lambda i: int(session['references'][i].get('set_n') or 1)) if r.get('set') else []
+    return {**rd, 'pass': _round_pass(session, rd), 'kept': bool(rd.get('kept')),
+            'elements': {eid: {**r, 'search_ids': _sids(r), 'picked': [n for sid in _sids(r) for n in (searches.get(sid) or {}).get('picked') or []] if _sids(r) else None, **({'set': sets(eid, r)} if rd.get('kept') else {})}
+                         for eid, r in rd['elements'].items()}}
 
 
 def nothing_fits(store, user, run, outputs, search_id, reason):
@@ -2344,6 +2584,16 @@ def generate_image(conn, store, user, run, outputs, body):
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
     need(not element.get('speaker'), f"{element['id']} is a real person speaking to camera: never an AI picture of them; their other angles come from their own footage.")   # design/124-b decision (c)
+    is_set = body['kind'] == 'sheet' and body['element_id'] != STYLE and kept(session)   # design/151: a reference set by the kept method
+    if is_set:
+        if element['kind'] == 'person':
+            distinct_people(plan)
+            body = {**body, 'prompt': person_prompt(plan, run, element, body['prompt']), 'parents': [], 'set': True}
+        else:
+            need(provider_of(run) == 'gemini', f"{element['id']}: the kept method runs on Gemini's image model with Google Search; this film's picture AI is {provider_of(run)}.")
+            own = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
+            parents_ = list(body.get('parents') or []) or own[:1]   # Q1: a thing the footage shows is made from its approved frame
+            body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_)), 'parents': parents_, 'set': True, 'search': True}
     if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE:
         from .visual_contract import footage_cited
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
@@ -2351,7 +2601,7 @@ def generate_image(conn, store, user, run, outputs, body):
         need(not cited or frames_ok, f"{element['id']}'s fact or size cites the footage ({cited[:80]}): approve a footage frame of {element['id']} (`vw visuals frame --element {element['id']} ...`) "
                                      f"before any picture of it, and mark it identity exact in the plan.")
         unknown = [d for d in element.get('size') or [] if d.get('value') is None]   # design/119 rule 8: measure before the first picture
-        if frames_ok and unknown and body['kind'] != 'sheet':
+        if frames_ok and unknown and (body['kind'] != 'sheet' or is_set):   # design/151 Q6: a set is the golden picture too, so it waits for the measure
             d = unknown[0]
             need(False, f"{element['id']} has a size still unknown ({d.get('part')} {d.get('measure')}) and an approved footage frame {frames_ok[0]['id']}: measure it first "
                         f"(`vw visuals measure --refs {frames_ok[0]['id']} --question ...`), then put the value in the plan with status measured, before its first picture.")
@@ -2364,7 +2614,7 @@ def generate_image(conn, store, user, run, outputs, body):
             body = {**body, 'parents': [style_ref['id']] + list(body.get('parents') or [])}
         block = COMPONENT_BLOCK if provider_of(run) == 'openai' else COMPONENT_BLOCK_GREEN   # design/120: Gemini has no transparent output; the server keys the green out
         body = {**body, 'prompt': with_composed(body['prompt'], block.format(name=element.get('name') or body['element_id']))}
-    if body['kind'] == 'sheet' and body['element_id'] != STYLE:   # design/119 rule 2: the server's lines on a reference sheet
+    if body['kind'] == 'sheet' and body['element_id'] != STYLE and not is_set:   # design/119 rule 2: the server's lines on a reference sheet (not on a kept set: no labels in a picture)
         body = {**body, 'prompt': with_composed(body['prompt'], sheet_block(element))}
     parents = [session['references'].get(p) for p in body.get('parents') or []]
     crops = body.get('crops') or {}   # design/119 rule 1: {parent id: region}; the server crops before the upload
@@ -2382,6 +2632,7 @@ def generate_image(conn, store, user, run, outputs, body):
                         f"or the web is never sent to the picture AI. Leave it out; the person's sheet is written from the person's description (build, age, posture, garments, hair).")
     gold = golden_of(session, body['element_id'])
     if body.get('golden'):   # design/111 F11: the golden picture, written on the server's cue after the sheet (and the spec) are approved
+        need(not kept(session), 'retired on this film (the kept method): the golden picture is the picture of the set the operator ticks (Yes on the References step); no separate golden call on this film.')
         need(body['kind'] == 'isolated' and element['kind'] not in ('person', 'graphic', 'style'), 'A golden picture is a picture of an object, a place, an animal, a material or a process (kind isolated); a person\'s golden picture is its identity sheet.')
         need(not gold, f"{body['element_id']} already has its golden picture ({gold[:8] if gold else ''}); replacing it is the operator's decision (reject it first).")
         need(any(p and p.get('kind') == 'sheet' and p.get('status') == 'approved' and p.get('element_id') == body['element_id'] for p in parents), 'The golden picture is made from the element\'s approved sheet: name it among the parents.')
@@ -2422,6 +2673,10 @@ def generate_image(conn, store, user, run, outputs, body):
     for k, p in enumerate(parents[named_n:], named_n + 1):   # F21: the server names the pictures it added itself (the start's own sheets)
         if p:
             body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} is the approved {p.get('kind') or 'reference'} of {p.get('element_id')}: take identity from it, nothing else.")}
+    if body['kind'] == 'keyframe' and kept(session):   # design/151 Q3
+        parents, lines_ = with_faces(session, parents, people)
+        for line in lines_:
+            body = {**body, 'prompt': with_composed(body['prompt'], line)}
     if parents and not body.get('fix_of'):   # F21: one job line per picture
         missing_ = library.image_names_missing(body['prompt'], len(parents))
         need(not missing_, f"the prompt does not say what Image {', '.join(map(str, missing_))} is for: one job line per picture ('Image k is …: take …').")
@@ -2501,7 +2756,9 @@ def generate_image(conn, store, user, run, outputs, body):
     lines, warns = _graphic_lines(session, plan, body, parents, answer, named)   # design/89 C, D; design/91 N6, N8, N10, N14
     if body['kind'] == 'component':
         lines = list(lines or []) + COMPONENT_LINES
-    if body['kind'] == 'sheet' and body['element_id'] != STYLE:
+    if is_set:   # design/151: the kept method's checks on a thing's set; a person's set alone on plain ground
+        lines = list(lines or []) + (PERSON_SET_LINES if element['kind'] == 'person' else KEPT_THING_LINES)
+    elif body['kind'] == 'sheet' and body['element_id'] != STYLE:
         lines = list(lines or []) + sheet_lines(element)   # design/119 rule 2
         if not body.get('fix_of'):   # design/121 change 4: the operator's note on each source, in the prompt and as a must line
             for k, p in enumerate(parents, 1):
@@ -2574,7 +2831,7 @@ def generate_image(conn, store, user, run, outputs, body):
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
-    check_cap(conn, run, session, image_price_inr(run) * variants, 'one image' if variants == 1 else 'two candidates')   # design/65 B7
+    check_cap(conn, run, session, image_price_inr(run) * variants * (SET_MAX if is_set else 1), 'one image' if variants == 1 else 'a set of up to four' if is_set else 'two candidates')   # design/65 B7; design/151
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):
@@ -2896,13 +3153,14 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     request = {'kind': 'image', 'op': op, 'provider': provider, 'model': model, 'prompt': body['prompt'], 'size': size,
                **({'background': 'transparent'} if body['kind'] == 'component' and provider == 'openai' else {}), **({'chroma_key': True} if body['kind'] == 'component' and provider == 'gemini' else {}),
                'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents],
+               **({'set': True} if body.get('set') else {}), **({'search': True} if body.get('search') else {}),   # design/151
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
                              **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
                              **({'golden_candidate': True} if body.get('golden') else {})},   # design/96 X3; design/106 T1; design/111 F11
                **({'region': body['region']} if body.get('region') else {})}
     row = conn.execute("insert into vw2_jobs(run_id, stage, unit, request, request_id, provider) values (%s,'visuals',%s,%s,%s,%s) returning id",
                        (run['id'], ref_id, Jsonb(request), request_id, 'openai' if provider == 'openai' else 'gemini-image')).fetchone()   # design/120: the job family by provider, last so the older readers of the params keep their places
-    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), 'generation': {k: request[k] for k in ('op', 'provider', 'model', 'prompt', 'size', 'quality', 'parents') + (('background',) if request.get('background') else ()) + (('chroma_key',) if request.get('chroma_key') else ()) + (('region',) if request.get('region') else ())},
+    session['references'][ref_id] = {**request['reference'], 'id': ref_id, 'status': 'generating', 'job_id': str(row['id']), **({'set': ref_id, 'set_n': 1} if body.get('set') else {}), 'generation': {k: request[k] for k in ('op', 'provider', 'model', 'prompt', 'size', 'quality', 'parents') + (('background',) if request.get('background') else ()) + (('chroma_key',) if request.get('chroma_key') else ()) + (('region',) if request.get('region') else ())},
                                      **({'answer': answer} if answer is not None else {}), **({'pending_end': pending_end} if pending_end else {}),
                                      **({'fix_of': body['fix_of']} if body.get('fix_of') else {})}
     return {'reference_id': ref_id, 'job_id': str(row['id']), 'model': request['model'], 'op': op}
@@ -2997,7 +3255,7 @@ def approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn=Non
     row.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': sha256, 'quote': quote})
     if row.get('golden_candidate'):
         session.setdefault('golden', {})[row['element_id']] = ref_id
-    if row.get('kind') == 'sheet':   # a person's identity sheet is its golden picture
+    if row.get('kind') == 'sheet' and row.get('set_n') in (None, 1):   # a person's identity sheet is its golden picture (design/151: picture 1 of the set)
         try:
             kinds_ = {e['id']: e['kind'] for e in current_plan(store, session)['elements']} if session.get('current') else {}
         except (ValueError, Problem):
@@ -4506,7 +4764,7 @@ def status(conn, store, run, outputs, repair=True):
                 entry['shots'].append({'shot_id': s['id'], 'visual_type': s['visual_type'], 'bound': s['id'] in session['bindings'], 'prepared': s['id'] in session['preparations'],
                                        'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
         gaps.append(entry)
-    refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id')}, 'note': (r.get('source') or {}).get('note') or '', 'sources_changed': bool(r.get('sources_changed'))}   # design/106 N4; design/110
+    refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'set', 'set_n', 'notes', 'sources')}, 'note': (r.get('source') or {}).get('note') or '', 'sources_changed': bool(r.get('sources_changed'))}   # design/106 N4; design/110; design/151
             for r in session['references'].values()]
     take_rows = take_jobs(conn, run)
     jobs_ = [{**{k: j[k] for k in ('id', 'unit', 'provider', 'status', 'error', 'cost')}, 'checklist': take_checklist(session, j),   # design/74 L6

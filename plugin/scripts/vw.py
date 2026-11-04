@@ -1510,7 +1510,7 @@ _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
-    'round': {'file', 'verdicts', 'picks', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
     'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
@@ -1757,14 +1757,29 @@ def cmd_visuals(a):
             emit(out, 0, out.get('next') or f"The round is at pass {out.get('pass')} again.")
         if a.verdicts:
             out = write(base + '/round/done', {'verdicts': _json_file(m, a.verdicts), 'quote': a.quote})   # design/121 change 6: approve, search (searched first) or ignore per element; Done runs no search
+            if 'queued' in out:   # design/151: a kept round: the frames approved, every set queued silently
+                errs = out.get('errors') or {}
+                emit(out, 0, f"Step 1 recorded: {len(out.get('queued') or [])} set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
+                     + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) + ' (fix what it names, then `vw visuals round --verdicts` again).' if errs else '')
+                     + ' Then `vw visuals status --wait 900`: the operator judges every set in one shot on the page.')
             emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} searched thing(s) go to pass 2; the round is at pass {out.get('pass')}.")
+        if a.sets:   # design/151: the one-shot verdicts from chat: {element: {verdict: yes|no|correct, words, golden}}
+            out = write(base + '/round/sets', {'verdicts': _json_file(m, a.sets), 'quote': a.quote})
+            errs = out.get('errors') or {}
+            emit(out, 0, f"Sets recorded: {len(out.get('approved') or [])} approved, {len(out.get('queued') or [])} being made again; the round is {out.get('pass')}."
+                 + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else ''))
         if a.picks:
             pk = _json_file(m, a.picks)
             ignore = pk.pop('ignore', []) if isinstance(pk, dict) else []   # design/121 change 1: {"<search id>": [{n, note}], "ignore": ["E2"]}
             out = write(base + '/round/picks', {'picks': pk, 'ignore': ignore, 'quote': a.quote})
             emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks (a person's from words, no picture parents).")   # design/124 decision 5
-        rows = _rows(m, a.file or 'out/reference-round.json', ('element_id', 'keywords'))
+        rows = _rows(m, a.file or 'out/reference-round.json', ('element_id',))   # design/151: a kept round's rows carry `prompt`; an older film's `keywords`
         out = write(base + '/round', {'elements': rows})
+        if out.get('kept'):
+            emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements (the kept method). Give the operator the page link ({visuals_page_url(m['code'])}): "
+                 "step 1 they approve the footage pictures; Done makes every set at once (the server adds the kept preamble, the set line and the four notes to each thing's subject block, and writes each person's sheet from the plan); "
+                 "step 2 they judge every set in one shot (Yes with the golden tick, No, or Correct it). Meanwhile write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps; "
+                 "then `vw visuals status --wait 900`; ask nothing per element.")
         emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements. Give the operator the page link ({visuals_page_url(m['code'])}): they answer every element there in two passes. "
              "While they do, write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps; "
              "then wait with `vw visuals status --wait 900`; ask nothing per element.")
@@ -1959,14 +1974,15 @@ def cmd_visuals(a):
             jobs_ = st.get('jobs') or []
             open_ = [j for j in jobs_ if j.get('status') in VISUALS_OPEN]
             decide = [j for j in jobs_ if j.get('status') in ('failed', 'rejected', 'cancelled', 'submission_unknown')]
-            round_open = (st.get('round') or {}).get('pass') in (1, 2)   # design/79: the operator is answering the round on the page
+            round_open = (st.get('round') or {}).get('pass') in (1, 2, 'making')   # design/79: the operator is answering the round on the page; design/151: or its sets are being made
             if (not open_ and not round_open) or time.monotonic() >= deadline:   # design/106 T5: an old job needing a decision never ends the wait
                 break
             time.sleep(15)
         ready = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') != 'rejected')   # defect 30: a rejected take stays 'ready' as a job
         rejected = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') == 'rejected')
         rd = st.get('round') or {}
-        round_line = f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': read the verdicts and make the sheets') if rd else ''
+        round_line = (f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': the sets are being made, wait' if rd.get('pass') == 'making'
+                                                                        else ': complete; the approved sets are the references' if rd.get('kept') else ': read the verdicts and make the sheets')) if rd else ''   # design/151
         if open_:
             images, takes = sum(1 for j in open_ if j.get('provider') in ('openai', 'gemini-image')), sum(1 for j in open_ if j.get('provider') == 'video')   # design/124 A4 item 20: both picture AIs
             drawn = sum(1 for j in open_ if j.get('provider') == 'drawn')   # W13: a drawing open is named too
@@ -2859,7 +2875,7 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base'):   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base'):   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')

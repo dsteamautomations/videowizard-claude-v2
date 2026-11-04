@@ -62,4 +62,4 @@ def test_u5_keywords_two_to_twelve_words():
     v = V3['visuals']
     every = '\n'.join([v['prompt'], *v['steps'], *(p['text'] for p in v['parts'])])
     assert 'two to six' not in every and 'two-to-six' not in every and 'the six words' not in every
-    assert 'two to twelve words' in every and 'two-to-twelve-word' in every and 'outside the twelve words' in every
+    assert 'two to twelve words' in every   # design/151: the keywords field and the stock-search word are gone from the text with the retired search; the rule stays for an older film

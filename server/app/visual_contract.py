@@ -1172,6 +1172,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
         warnings.append({'kind': 'frozen_share', 'message': f'{frozen:.1f} s of frozen pictures, {share:.0%} of the film: over {frozen_limit:.0%}; give the stills movement, '
                                                           'build the graphics, or say why this film needs them still'})
     warnings.extend(course_warnings(plan, fps, drawn_in_run))   # design/103; design/126 TR1b
+    warnings.extend(script_people_warnings(plan))   # design/151 Q4
     result = plan.model_dump()
     answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
@@ -1268,6 +1269,33 @@ def footage_cited(element, facts):
     return next((s for s in sources if s and FOOTAGE_CITED.search(s)), '')
 
 
+PEOPLE_WORDS = re.compile(r'\b(people|workers|labourers|villagers|onlookers|bystanders|crowd|men|women|children|boys|girls)\b', re.I)   # design/151: the group words that are people
+TRADES = re.compile(r'\b(mason|helper|worker|labourer|carpenter|plumber|welder|painter|electrician|engineer|supervisor|foreman|farmer|driver|cook|nurse|teacher|customer|shopkeeper|technician|mechanic|operator)s?\b', re.I)
+
+
+def script_people_warnings(plan):
+    """design/151 Q4 (SK: warn only): a person the shot's words act with and the plan lacks, one warning per shot and word; a person element whose
+    words carry that trade, or a groups entry of that kind, answers it; answered like any plan warning."""
+    plan = plan.model_dump() if hasattr(plan, 'model_dump') else plan
+    people = ' '.join(f"{e.get('id')} {e.get('name')} {e.get('requirements')} {e.get('description')}".lower() for e in plan.get('elements') or [] if e.get('kind') == 'person')
+    out = []
+    for gap in plan.get('gaps') or []:
+        for scene in all_scenes(gap):
+            for shot in scene.get('shots') or []:
+                text = f"{shot.get('narration') or ''} {shot.get('purpose') or ''}"
+                have = {str(g.get('kind') or '').lower() for g in shot.get('groups') or []}
+                seen = set()
+                for m in sorted(list(PEOPLE_WORDS.finditer(text)) + list(TRADES.finditer(text)), key=lambda m: m.start()):
+                    w = m.group(0).lower()
+                    stem = w[:-1] if w.endswith('s') and not w.endswith('ss') else w
+                    if w in seen or NEGATED.search(text[:m.start()]) or w in have or stem in have or stem in people:
+                        continue
+                    seen.add(w)
+                    out.append({'shot_id': shot['id'], 'kind': 'script_person_missing', 'word': w,
+                                'message': f"shot {shot['id']}: its words act with {w} and the plan has no person element for them: add the element (a worker with a beat is named, with a description) or answer this warning with the reason"})
+    return out
+
+
 def course_warnings(plan, fps, drawn_in_run=True):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
@@ -1357,7 +1385,7 @@ WARNING_PLAIN = {
 WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missing', 'carries_over_missing', 'changes_missing', 'claims_missing', 'depicts_missing',
                      'element_size_missing', 'end_state', 'evidence_missing', 'facts_missing', 'footage_identity', 'frozen_share', 'light_missing', 'min_s_missing',
                      'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'spec_unresearched', 'state_changed', 'style_missing',
-                     'technique_unnamed', 'container_unnamed')   # design/149 B5, B9
+                     'technique_unnamed', 'container_unnamed', 'script_person_missing')   # design/149 B5, B9; design/151 Q4
 
 
 def answer_warnings(plan, warnings):

@@ -21,7 +21,7 @@ ALL_SHEETS = tuple(dict.fromkeys(p for sheets in MODEL_SHEETS.values() for p in 
 VIDEO_FRAME = 'library/playbooks/video-frame.md'
 STEPS = {
     'reference': {'task': 'continuity-kit', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/consistent-character-frames.md'),
-                  'when': 'a generated reference of a person, object or place (`vw visuals image --kind isolated|sheet`); consistent-character-frames for a person'},
+                  'when': 'a generated reference on an older film (`vw visuals image --kind isolated|sheet`); on a kept film (design/151) the round makes every set and the server writes the prompts'},
     'frame': {'task': None, 'playbook': None, 'files': ('library/video/gap-fill.md',), 'when': 'choosing a frame from a clip (`vw visuals frame`): gap-fill section 3; no prompt is written'},
     'still-scene': {'task': 'keyframe', 'playbook': 'video-frame', 'files': (VIDEO_FRAME, GPT, 'library/video/gap-fill.md', 'library/00-method/de-slop.md'),
                     'when': 'an AI still for an image shot (`image --kind keyframe`, then `still`); de-slop for a photographic look'},
