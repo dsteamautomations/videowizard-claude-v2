@@ -113,7 +113,7 @@ def test_the_instructions_and_the_command_text_say_three_pictures_one_per_turn()
 # ---------- hotfix 4 Nov 2026 (VW-18): kept from the first step; a set is a Gemini call on every film ----------
 
 from test_design151_refs_pure import NEW, OLD, KILN, MASON, doc_with, frames_only, _req   # noqa: E402
-from test_visuals_stage_pure import FakeConn, USER, g, saved   # noqa: E402
+from test_visuals_stage_pure import FakeConn, USER, accepted, g, saved   # noqa: E402
 from app.errors import Problem  # noqa: E402
 
 
@@ -158,3 +158,18 @@ def test_the_page_says_the_kept_way_before_the_round():
     html = (Path(VS.__file__).resolve().parent / 'templates' / 'visuals.html').read_text(encoding='utf-8')
     for needle in ("const keptFilm=!!d.kept", "if(data.kept)return ['','waiting for the round']", 'The references are made the kept way', 'No set yet: the assistant posts the reference round'):
         assert needle in html, needle
+
+
+def test_the_status_says_the_round_is_next_on_a_kept_film_until_it_is_posted():
+    doc = doc_with(KILN, MASON)
+    store = frames_only(doc)
+    conn = FakeConn([])
+    assert VS.status(conn, store, NEW, [])['round_due'] is None   # no gap accepted yet: the plan comes first
+    sess = json.loads(store.files[f"{NEW['id']}/visuals/session.json"]); sess['accepted'] = accepted(doc)
+    store.files[f"{NEW['id']}/visuals/session.json"] = json.dumps(sess).encode()
+    st = VS.status(conn, store, NEW, [])
+    assert st['kept'] is True and st['round_due'] and 'vw visuals round --file out/reference-round.json' in st['round_due']
+    VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln'}, {'element_id': 'P1', 'prompt': 'kneels'}], conn=conn)
+    assert VS.status(conn, store, NEW, [])['round_due'] is None
+    store = frames_only(doc)
+    assert VS.status(conn, store, OLD, [])['round_due'] is None   # an older film keeps its own order

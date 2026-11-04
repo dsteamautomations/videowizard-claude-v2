@@ -911,3 +911,9 @@ def test_spec_approves_every_spec_without_words_or_sends_one_correction(harness,
     assert code == 0 and sent[-1] == ('spec-correction', {'shot_id': 'DG1', 'words': 'the cavity is 50 mm'})
     code, out, err = run(args(what='spec', notes='the cavity is 50 mm'), capsys)
     assert code == 2 and '--shot S --notes' in out['message']
+
+
+def test_status_says_the_round_is_next_when_the_server_says_so(harness, monkeypatch, capsys):   # design/151 hotfix, 4 Nov 2026
+    monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {**jobs_answer(), 'round_due': 'the reference round is next, before any picture: `vw visuals elements`', 'waiting': [{'label': 'spec yard_wall', 'link': '/x'}]})
+    code, out, err = run(args(), capsys)
+    assert code == 0 and 'the reference round is next' in err and err.index('round is next') < err.index('waiting for the operator') and 'round_due' in out

@@ -1483,6 +1483,17 @@ def is_kept(session, run):
     return kept(session) or (not film.older(run) and not any(r.get('kind') in ('sheet', 'web') for r in (session or {}).get('references', {}).values()))
 
 
+def round_due(session, plan):
+    """design/151 hotfix (VW-18, 4 Nov 2026): on a kept film with an accepted gap and no round posted, the status says in words that the reference round is next,
+    before any picture; the chat tool prints it in its one line (the specs can be approved meanwhile)."""
+    if not plan or not kept(session) or session.get('round') or not session.get('accepted'):
+        return None
+    if not any(e.get('kind') != 'graphic' and e['id'] != STYLE for e in plan.get('elements') or []):
+        return None
+    return ('the reference round is next, before any picture: `vw visuals elements`, then `vw visuals frame --file out/frames.json` for every element the footage shows, '
+            'then `vw visuals round --file out/reference-round.json` (one row per element: element_id, frames, prompt); the specs can be approved meanwhile')
+
+
 def mark_kept(session, run):
     """Sets the flag when is_kept says so; True when the film is kept (already or now)."""
     if kept(session):
@@ -4814,6 +4825,7 @@ def status(conn, store, run, outputs, repair=True):
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'sheet_due': sheet_due(session, plan) if plan else [],   # design/119 rule 2
             'kept': kept(session),   # design/151 hotfix: the references are made the kept way (no search, no picks, no sheet per element: the round makes every set)
+            'round_due': round_due(session, plan),   # design/151 hotfix: the round is next, said in words
             'image_provider': provider_of(run),   # design/120
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14

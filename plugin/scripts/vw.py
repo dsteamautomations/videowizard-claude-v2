@@ -1547,7 +1547,7 @@ def _short_status(st, shot=None, gap=None):
         eid = r.get('element_id') or '-'
         refs.setdefault(eid, {})
         refs[eid][r.get('status') or '?'] = refs[eid].get(r.get('status') or '?', 0) + 1
-    return {'state': st.get('state'), 'plan_digest': st.get('plan_digest'), 'round': st.get('round'), 'budget': st.get('budget'),
+    return {'state': st.get('state'), 'plan_digest': st.get('plan_digest'), 'round': st.get('round'), **({'round_due': st['round_due']} if st.get('round_due') else {}), 'budget': st.get('budget'),
             'jobs': [{'id': str(j.get('id')), 'shot': j.get('unit'), 'provider': j.get('provider'), 'status': j.get('status'), **({'error': (j.get('error') or '')[:80]} if j.get('error') else {}),
                       **({'marked': [f"{m.get('check')}" + (f" at {m['at_s']} s" if m.get('at_s') is not None else '') for m in j['check_marks']]} if j.get('check_marks') else {})} for j in jobs_],   # design/91 N3
             'references': refs, 'file': 'work/visuals/status.json'}
@@ -1995,7 +1995,8 @@ def cmd_visuals(a):
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
         waiting_line = (f'; {len(wt)} waiting for the operator: ' + '; '.join(f"{w['label']} {server_url()}{w['link']}" for w in wt)) if wt else ''
-        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
+        due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
+        emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':
         if a.ref:
             st = call('GET', base)
