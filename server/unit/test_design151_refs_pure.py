@@ -265,7 +265,7 @@ def test_a_set_call_turns_google_search_on_and_keeps_every_picture_with_the_note
     status, result, error, cost, retry = VW.process_image({'id': 'j1', 'run_id': 'run-1', 'request': req})
     assert status == 'retained', error
     body = sent[0][1]['json']
-    assert body['tools'] == [{'google_search': {}}] and body['generationConfig']['responseModalities'] == ['TEXT', 'IMAGE']
+    assert body['tools'] == VW.SEARCH_TOOLS and body['generationConfig']['responseModalities'] == ['TEXT', 'IMAGE']   # design/151 section 13: web + image search
     assert result['key'] == 'run-1/visuals/references/S1.png' and [x['key'] for x in result['extra']] == ['run-1/visuals/references/S1-2.png', 'run-1/visuals/references/S1-3.png']
     assert all(k in store.files for k in ('run-1/visuals/references/S1.png', 'run-1/visuals/references/S1-2.png', 'run-1/visuals/references/S1-3.png'))
     assert result['notes'].startswith('I searched') and '(4) sources below' in result['notes'] and result['sources'] == [{'url': 'https://example.org/kiln', 'title': 'Clamp kilns'}]
@@ -273,7 +273,7 @@ def test_a_set_call_turns_google_search_on_and_keeps_every_picture_with_the_note
     # a person's set: no search tool, image only
     sent.clear()
     status, result, error, cost, retry = VW.process_image({'id': 'j2', 'run_id': 'run-1', 'request': {**req, 'search': False, 'reference': {'id': 'S2', 'kind': 'sheet', 'element_id': 'P1'}}})
-    assert status == 'retained' and 'tools' not in sent[0][1]['json'] and sent[0][1]['json']['generationConfig']['responseModalities'] == ['IMAGE']
+    assert status == 'retained' and 'tools' not in sent[0][1]['json'] and sent[0][1]['json']['generationConfig']['responseModalities'] == ['TEXT', 'IMAGE']   # section 13: a set's notes need TEXT
     # a single-picture job is unchanged
     monkeypatch.setattr(VW.httpx, 'post', lambda url, **kw: Resp(200, answer(1)))
     status, result, error, cost, retry = VW.process_image({'id': 'j3', 'run_id': 'run-1', 'request': {**req, 'set': False, 'search': False, 'reference': {'id': 'S3', 'kind': 'isolated', 'element_id': 'E2'}}})

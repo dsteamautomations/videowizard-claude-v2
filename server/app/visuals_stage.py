@@ -1364,17 +1364,27 @@ KEPT_PREAMBLE = ("I need a photograph-like image that will be used as a referenc
                  "and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly "
                  "as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time "
                  "on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.")   # design/151: the kept prompt, version 6 (SK, 4 Nov 2026), verbatim
-KEPT_SET_LINE = ("If one picture cannot show the subject fully, make a set of two to four pictures of the same one subject on the same site, consistent with each other in every detail, each adding a view the "
-                 "others lack. Deliver each picture as a separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.")
+KEPT_SET_LINE = ("This is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each "
+                 "picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions "
+                 "inside any picture. Say what each picture adds.")   # design/151 section 13: gemini-nano-banana-2.1 draws one picture per turn
 KEPT_NOTES = ("With the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings "
               "you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.")
 KEPT_COSMETICS = ("Cosmetic requirements, which do not touch the technical content:\n- The place reads as {place}; the film's look: {look}.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n"
                   "- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.")
 KEPT_FRAME_LINE = "Image 1 is the approved footage frame of {name}: take the thing itself from it (its exact form, material and wear); what the frame does not show, take from the real photographs."
 HOW_WORDS = re.compile(r'\b(step by step|how to|how it is done|procedure)\b', re.I)
-PERSON_SET = ("Make a set of three separate pictures of this one person: 1, a full-length front view standing at ease; 2, a full-length three-quarter view in a working pose of their trade; 3, a close-up of the face. "
-              "Deliver each as a separate output image at full size, never a collage, grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; "
+PERSON_SET = ("Make a set of three separate pictures of this one person, one per turn: 1, a full-length front view standing at ease; 2, a full-length three-quarter view in a working pose of their trade; 3, a close-up of the face. "
+              "Deliver each as one separate output image at full size, never a collage, grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; "
               "no text, numbers or captions inside any picture.")   # design/151 part 2; design/124 decision 5: from words, never from a picture of a real person
+THING_VIEWS = ['the whole of {name}, filling the frame', 'a three-quarter view of the same {name}', 'a close-up of the key detail of the same {name}, the part that shows how it is made or used']   # design/151 section 13
+PERSON_VIEWS = ['a full-length front view standing at ease', 'a full-length three-quarter view in a working pose of their trade', 'a close-up of the face']
+
+
+def set_views(element):
+    """design/151 section 13: the views of a set, one per turn, named by the server (a person's three poses; a thing's whole, three-quarter and close-up)."""
+    if element.get('kind') == 'person':
+        return list(PERSON_VIEWS)
+    return [v.format(name=element.get('name') or element.get('id')) for v in THING_VIEWS]
 KEPT_THING_LINES = [{'check': 'one way only', 'weight': 'must', 'pass_when': 'every detail belongs to one consistent way of working; nothing from a second method is mixed in'},
                     {'check': 'the subject fills the frame', 'weight': 'must', 'pass_when': 'the subject is the picture; the setting is only a soft hint at the edges'},
                     {'check': 'nothing floats', 'weight': 'must', 'pass_when': 'nothing floats or stands where it could not stand on a real site'},
@@ -1383,7 +1393,7 @@ KEPT_THING_LINES = [{'check': 'one way only', 'weight': 'must', 'pass_when': 'ev
 PERSON_SET_LINES = [{'check': 'one person', 'weight': 'must', 'pass_when': 'one person alone, no second person and nothing else in the frame'},
                     {'check': 'plain ground', 'weight': 'must', 'pass_when': 'plain neutral ground, no setting'},
                     {'check': 'no text', 'weight': 'must', 'pass_when': 'no caption, number or label anywhere in the picture'}]
-SET_MAX = 4   # the picture AI returns up to four pictures for one request (visual_workers.SET_MAX)
+SET_MAX = 3   # design/151 section 13: a set is three pictures, one per turn (len(THING_VIEWS) == len(PERSON_VIEWS))
 TRAIT_WORDS = (('40s', r'\b(forty|fort(y|ies)|4\d)\b'), ('20s', r'\b(twenty|twenties|2\d)\b'), ('30s', r'\b(thirty|thirties|3\d)\b'), ('50s', r'\b(fifty|fifties|5\d)\b'), ('60s', r'\b(sixty|sixties|6\d)\b'),
                ('teens', r'\b(teen\w*|1\d)\b'), ('lean', r'\b(lean|slim|wiry|thin(?! (moustache|beard)))\b'), ('stocky', r'\b(stocky|heavy|broad|plump|stout)\b'), ('tall', r'\btall\b'), ('short', r'\bshort(?!\w| hair| grey| black| white| cropped)\b'),
                ('short hair', r'\bshort( \w+)? hair\b'), ('long hair', r'\blong( \w+)? hair\b'), ('cropped', r'\bcropped\b'), ('bald', r'\bbald\w*\b'), ('grey', r'\b(grey|gray|white)( hair|-haired)?\b'),
@@ -2588,12 +2598,12 @@ def generate_image(conn, store, user, run, outputs, body):
     if is_set:
         if element['kind'] == 'person':
             distinct_people(plan)
-            body = {**body, 'prompt': person_prompt(plan, run, element, body['prompt']), 'parents': [], 'set': True}
+            body = {**body, 'prompt': person_prompt(plan, run, element, body['prompt']), 'parents': [], 'set': True, 'views': set_views(element)}
         else:
             need(provider_of(run) == 'gemini', f"{element['id']}: the kept method runs on Gemini's image model with Google Search; this film's picture AI is {provider_of(run)}.")
             own = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
             parents_ = list(body.get('parents') or []) or own[:1]   # Q1: a thing the footage shows is made from its approved frame
-            body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_)), 'parents': parents_, 'set': True, 'search': True}
+            body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_)), 'parents': parents_, 'set': True, 'search': True, 'views': set_views(element)}
     if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE:
         from .visual_contract import footage_cited
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
@@ -2831,7 +2841,7 @@ def generate_image(conn, store, user, run, outputs, body):
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
-    check_cap(conn, run, session, image_price_inr(run) * variants * (SET_MAX if is_set else 1), 'one image' if variants == 1 else 'a set of up to four' if is_set else 'two candidates')   # design/65 B7; design/151
+    check_cap(conn, run, session, image_price_inr(run) * variants * (SET_MAX if is_set else 1), 'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):
@@ -3153,7 +3163,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     request = {'kind': 'image', 'op': op, 'provider': provider, 'model': model, 'prompt': body['prompt'], 'size': size,
                **({'background': 'transparent'} if body['kind'] == 'component' and provider == 'openai' else {}), **({'chroma_key': True} if body['kind'] == 'component' and provider == 'gemini' else {}),
                'quality': body.get('quality') or 'high', 'parents': [cropped_parent(store, run, p, (body.get('crops') or {}).get(p['id'])) for p in parents],
-               **({'set': True} if body.get('set') else {}), **({'search': True} if body.get('search') else {}),   # design/151
+               **({'set': True, 'views': list(body.get('views') or [])} if body.get('set') else {}), **({'search': True} if body.get('search') else {}),   # design/151; section 13: the views, one per turn
                'reference': {'id': ref_id, 'element_id': body['element_id'], 'element_kind': element['kind'], 'name': name, 'kind': body['kind'], 'subject': body['subject'],
                              **({'fix_of': body['fix_of']} if body.get('fix_of') else {}), **({'role': body['role']} if body.get('role') else {}),
                              **({'golden_candidate': True} if body.get('golden') else {})},   # design/96 X3; design/106 T1; design/111 F11

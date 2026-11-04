@@ -75,6 +75,93 @@ class _Answer:
         return self._body
 
 
+SEARCH_TOOLS = [{'google_search': {'searchTypes': {'webSearch': {}, 'imageSearch': {}}}}]   # design/151 section 13: SK's AI Studio setting: Google Search + Image Search grounding
+
+
+def _parent_parts(parents):
+    parts = []
+    for k, (pid, png) in enumerate(parents, 1):
+        parts += [{'text': f'Image {k}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(png).decode('ascii')}}]
+    return parts
+
+
+def _gemini_config(req):
+    size = req.get('size') if isinstance(req.get('size'), dict) else {}
+    return {'responseModalities': ['TEXT', 'IMAGE'] if req.get('search') or req.get('set') else ['IMAGE'],   # the search tool and a set's notes need TEXT among the modalities
+            'imageConfig': {'aspectRatio': size.get('aspect') or '16:9', 'imageSize': str(size.get('tier') or settings().GEMINI_IMAGE_SIZE).upper()},
+            **({'thinkingConfig': {'thinkingLevel': 'high'}} if req.get('set') else {})}   # design/151 section 13: thinking HIGH on a set
+
+
+def _gemini_tools(req):
+    return {'tools': SEARCH_TOOLS} if req.get('search') else {}   # design/151: the kept method takes its facts from real photographs
+
+
+def _gemini_post(model, payload, tries):
+    """One request through the key pool (the same cooling as _openai). Returns (response, key index); every key limited: the last answer, so the job requeues (design/82 U3)."""
+    from . import keys
+    r = idx = None
+    for idx, key in tries:
+        r = httpx.post(GEMINI_URL.format(model=model), headers={'x-goog-api-key': key, 'Content-Type': 'application/json'}, json=payload, timeout=300)
+        reason = keys.reason_of(r.status_code)
+        if reason is None:
+            return r, idx
+        keys.cool('gemini', idx, reason)
+    return r, idx
+
+
+def _error(r, idx):
+    out = _Answer(r.status_code, {'error': {'type': 'provider', 'message': r.text[:300]}}, r.text)
+    out.key_index = idx
+    return out
+
+
+def _sources(cand):
+    return [{'url': c['web'].get('uri'), 'title': c['web'].get('title')} for c in ((cand.get('groundingMetadata') or {}).get('groundingChunks') or []) if isinstance(c, dict) and c.get('web')]
+
+
+def _gemini_set(req, parents, tries):
+    """design/151 section 13: the set as a conversation on gemini-nano-banana-2.1, which draws one picture per turn: turn 1 the kept prompt and the first view
+    (the frame as a parent, when there is one), each later turn the model's own answer so far plus the next view. A turn with no picture after the first ends the
+    set with a note naming the missing view; a limit or an outage on any turn answers as that turn did, so the whole set is requeued."""
+    views = list(req['views'])
+    contents = [{'role': 'user', 'parts': _parent_parts(parents) + [{'text': req['prompt'] + f'\n\nImage 1 of {len(views)}: {views[0].rstrip(".")}.'}]}]
+    images, notes, sources, usage_in, usage_out, idx = [], [], [], 0, 0, None
+    for n, view in enumerate(views, 1):
+        if n > 1:
+            contents.append({'role': 'user', 'parts': [{'text': f'Image {n} of {len(views)}: {view.rstrip(".")}.'}]})
+        r, idx = _gemini_post(req['model'], {'contents': contents, 'generationConfig': _gemini_config(req), **_gemini_tools(req)}, tries)
+        if r.status_code >= 400:
+            if n == 1 or r.status_code == 429 or r.status_code >= 500:
+                return _error(r, idx)
+            notes.append(f'picture {n} ({view}) did not come back: HTTP {r.status_code}.')
+            break
+        body = r.json()
+        cands = body.get('candidates') or []
+        cand = cands[0] if cands else {}
+        parts = [p for p in ((cand.get('content') or {}).get('parts') or []) if isinstance(p, dict) and (p.get('inlineData') or p.get('text'))]
+        got = [p['inlineData'] for p in parts if p.get('inlineData')]
+        words = ' '.join(str(p.get('text') or '') for p in parts if p.get('text')).strip()
+        usage = body.get('usageMetadata') or {}
+        usage_in += usage.get('promptTokenCount') or 0
+        usage_out += usage.get('candidatesTokenCount') or 0
+        if not got:
+            words = words or (body.get('promptFeedback') or {}).get('blockReason') or 'no image in the answer'
+            if n == 1:
+                out = _Answer(400, {'error': {'type': 'no_image', 'message': words}}, words)
+                out.key_index = idx
+                return out
+            notes.append(f'picture {n} ({view}) did not come back: {words}')
+            break
+        images.append(got[0])
+        if words:
+            notes.append(words)
+        sources += [x for x in _sources(cand) if x not in sources]
+        contents.append({'role': 'model', 'parts': parts})
+    out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage_in, 'output_tokens': usage_out}, 'notes': ' '.join(notes), 'sources': sources})
+    out.key_index = idx
+    return out
+
+
 def _gemini_image(req, parents):
     """design/120: one picture from Gemini's image model through the key pool (the same cooling as _openai): the prompt and the pictures as parts, the
     aspect and the tier in imageConfig; the first image part comes back as OpenAI's shape so the rest of process_image is shared."""
@@ -82,30 +169,12 @@ def _gemini_image(req, parents):
     tries = keys.each('gemini', settings())
     if not tries:
         raise Problem(503, 'IMAGE_CONFIGURATION', 'Configure VW2_GEMINI_API_KEY on the server.')
-    size = req.get('size') if isinstance(req.get('size'), dict) else {}
-    parts = []
-    for k, (pid, png) in enumerate(parents, 1):
-        parts += [{'text': f'Image {k}.'}, {'inlineData': {'mimeType': 'image/png', 'data': base64.b64encode(png).decode('ascii')}}]
-    parts.append({'text': req['prompt']})
-    payload = {'contents': [{'role': 'user', 'parts': parts}],
-               'generationConfig': {'responseModalities': ['TEXT', 'IMAGE'] if req.get('search') else ['IMAGE'], 'imageConfig': {'aspectRatio': size.get('aspect') or '16:9', 'imageSize': str(size.get('tier') or settings().GEMINI_IMAGE_SIZE).upper()}}}
-    if req.get('search'):   # design/151: the kept method takes its facts from real photographs: Google Search on (the search tool needs TEXT among the modalities)
-        payload['tools'] = [{'google_search': {}}]
-    r = None
-    for idx, key in tries:
-        r = httpx.post(GEMINI_URL.format(model=req['model']), headers={'x-goog-api-key': key, 'Content-Type': 'application/json'}, json=payload, timeout=300)
-        reason = keys.reason_of(r.status_code)
-        if reason is None:
-            break
-        keys.cool('gemini', idx, reason)
-    else:
-        out = _Answer(r.status_code, {'error': {'type': 'provider', 'message': r.text[:300]}}, r.text)   # every key answered a limit: the last answer, so the job requeues (design/82 U3)
-        out.key_index = idx
-        return out
+    if req.get('set') and req.get('views'):   # design/151 section 13: a set is one conversation, one picture per turn
+        return _gemini_set(req, parents, tries)
+    payload = {'contents': [{'role': 'user', 'parts': _parent_parts(parents) + [{'text': req['prompt']}]}], 'generationConfig': _gemini_config(req), **_gemini_tools(req)}
+    r, idx = _gemini_post(req['model'], payload, tries)
     if r.status_code >= 400:
-        out = _Answer(r.status_code, {'error': {'type': 'provider', 'message': r.text[:300]}}, r.text)
-        out.key_index = idx
-        return out
+        return _error(r, idx)
     body = r.json()
     cands = body.get('candidates') or []
     parts_out = ((cands[0].get('content') or {}).get('parts') or []) if cands else []
@@ -122,7 +191,7 @@ def _gemini_image(req, parents):
         words = f'{len(images)} pictures came back; the first {SET_MAX} are kept. ' + words
         images = images[:SET_MAX]
     usage = body.get('usageMetadata') or {}
-    sources = [{'url': c['web'].get('uri'), 'title': c['web'].get('title')} for c in ((cands[0].get('groundingMetadata') or {}).get('groundingChunks') or []) if isinstance(c, dict) and c.get('web')] if cands else []
+    sources = _sources(cands[0]) if cands else []
     out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage.get('promptTokenCount'), 'output_tokens': usage.get('candidatesTokenCount')},
                         **({'notes': words, 'sources': sources} if req.get('set') else {})})
     out.key_index = idx
