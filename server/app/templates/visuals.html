@@ -519,6 +519,7 @@ function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; t
 function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id&&['frame','supplied','web','isolated','sheet','component'].includes(r.kind));   // design/117 P1   // keyframes and states are compositions, not references
   if(refs.some(r=>r.kind==='sheet'&&r.status==='approved'))return ['ok','sheet approved'];
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
+  if(data.kept)return ['','waiting for the round'];   // design/151 hotfix: a kept film's sets are made in the round, never per element
   if(refs.some(r=>r.status==='approved'))return ['dec','pictures approved, sheet to make'];
   if(refs.some(r=>r.status==='candidate'))return ['dec','pictures to approve'];
   const hits=((data.element_matches||{})[e.id]||[]).length;return hits?['','seen in the footage']:['err','needs a picture'];}
@@ -758,15 +759,16 @@ function renderReferences(){
   if(s){web+='<div class="ds"><b>'+esc(s.results.length)+' pictures found for “'+esc(s.keywords)+'”</b>'+(s.picked&&s.picked.length?' · <span class="ok">'+s.picked.length+' saved ✓ (#'+esc(s.picked.join(', #'))+')</span>':'')+(s.nothing_fits?' · <span class="err">nothing fit: '+esc(s.nothing_fits.reason)+'</span>':'')+'. Click a picture to see it large on the right; tick the ones to use, in order (the first tick is Image 1); the note goes in the panel.</div>';
     web+=strips(s.pair||[s.search_id]);}   // design/121 change 5: the plain and the stock search side by side
   const saved=!!(s&&((s.picked&&s.picked.length)||s.nothing_fits));   // design/106 R1: once picks are saved, the unpicked results and the search fold
-  const webFold=searchBox+(saved?'<details><summary class="ds" style="cursor:pointer">show all ('+s.results.length+' search results)</summary>'+web+'</details>':web);
+  const keptFilm=!!d.kept;   // design/151 hotfix: no search box and no sheet per element before the round on a kept film
+  const webFold=keptFilm?'':searchBox+(saved?'<details><summary class="ds" style="cursor:pointer">show all ('+s.results.length+' search results)</summary>'+web+'</details>':web);
   const sheets=refs.filter(r=>r.kind==='sheet'), sheet=sheets.filter(r=>r.status!=='rejected').pop();   // design/106 R2: a sheet, waiting or approved, comes first
   if(sheet){const byId={};refs.forEach(r=>byId[r.id]=r);const from=(sheet.parents||[]).map(id=>byId[id]).filter(Boolean);
     const shown=sheet.set?sheets.filter(r=>r.set===sheet.set&&r.status!=='rejected'):[sheet];   // design/151: a set's pictures together, the golden one badged
     body+='<h3>Reference sheet · '+esc(e.id)+(sheet.set?' · the set':'')+'</h3><div class="strip">'+shown.map(r=>refCard(r,'',true)).join('')+'</div>'+(sheet.sources_changed?'<div class="ds err">sources changed: a picture was added after this sheet; the assistant makes a new sheet, this one stays until it is approved.</div>':'')+(from.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="strip">'+from.map(r=>refCard(r,'',true)).join('')+'</div>':'')+
       '<details><summary class="ds" style="cursor:pointer">all sources ('+frames.length+')</summary>'+src+'</details>'+
-      searchBox+'<details><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results)</summary>'+web+'</details>';}
-  else body+=src+webFold+'<h3>Reference sheet · '+esc(e.id)+'</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">No sheet yet: the assistant generates it from the pictures above once they are approved.</div>');
-  $('s-references').innerHTML=undo+'<p class="ds" style="font-size:17px;margin:14px 0 8px">Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Click any picture to see it large on the right, where Approve and Reject take your words. Nothing is paid from a click.</p>'+split('<div class="two">'+list+'<div>'+body+'</div></div>');
+      (keptFilm?'':searchBox+'<details><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results)</summary>'+web+'</details>');}
+  else body+=src+webFold+'<h3>Reference sheet · '+esc(e.id)+'</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">'+(keptFilm?'No set yet: the assistant posts the reference round; the set is made when you press Done on step 1.':'No sheet yet: the assistant generates it from the pictures above once they are approved.')+'</div>');
+  $('s-references').innerHTML=undo+'<p class="ds" style="font-size:17px;margin:14px 0 8px">'+(keptFilm?'The references are made the kept way: the assistant posts the round; step 1 here approves the footage pictures, Done makes every set from real photographs, step 2 judges the sets in one shot. Click any picture to see it large on the right. Nothing is paid from a click.':'Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Click any picture to see it large on the right, where Approve and Reject take your words. Nothing is paid from a click.')+'</p>'+split('<div class="two">'+list+'<div>'+body+'</div></div>');
   const root=$('s-references');
   root.querySelectorAll('.list a').forEach(a=>a.addEventListener('click',()=>{selEl=a.dataset.el;selPic=null;renderReferences();footer();}));
   root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});

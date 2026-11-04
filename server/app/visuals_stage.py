@@ -107,6 +107,7 @@ def gaps_source(store, outputs):
 
 def prepare(conn, store, user, run, outputs):
     session = session_of(store, run, outputs, create=True)
+    mark_kept(session, run)   # design/151 hotfix: the kept decision from the first step
     session.setdefault('library_version', library.latest())   # design/68 L2: the library a run reads, kept like the procedure version
     procedure = core._stage(core.stage_table(run['procedure_version']), STAGE)
     brief = next((o for o in outputs if o['stage'] == 'brief' and o['unit'] is None), None)
@@ -384,11 +385,11 @@ def provider_of(run):
     return p
 
 
-def image_price_inr(run, tier=None):
+def image_price_inr(run, tier=None, provider=None):
     """design/126 TR2: one picture's price on this film, for every estimate: Nano Banana at its dollar price (4K when the tier is 4K; the
-    configured size when no tier is given) times the rupee rate; GPT Image at the configured rupee figure."""
+    configured size when no tier is given) times the rupee rate; GPT Image at the configured rupee figure. provider: a set's price is Gemini's on every film (design/151 hotfix)."""
     pr = prices()
-    if provider_of(run) == 'gemini':
+    if (provider or provider_of(run)) == 'gemini':
         s = settings()
         usd = s.GEMINI_IMAGE_USD_4K if str(tier or s.GEMINI_IMAGE_SIZE).upper() == '4K' else s.GEMINI_IMAGE_USD
         return usd * pr.get('usd_inr', s.VISUALS_USD_INR)
@@ -721,6 +722,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                           'not_this': list(((session.get('not_this') or {}).get(e['id']) or {}).get('lines') or [])}   # design/111 F10, F12
                          for e in (plan or {}).get('elements') or []],   # design/73: the page's element sections
             'element_matches': element_matches(plan, package.get('world_evidence')) if plan else {}, 'searches': _searches(session), 'round': _round_view(session), 'stock_source': STOCK_SOURCE,
+            'kept': is_kept(session, run),   # design/151 hotfix: the page shows the kept way before the round
             'questions': dict(session.get('questions') or {}),   # design/110 rule 0
             'golden': dict(session.get('golden') or {}),   # design/111 F11
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
@@ -1475,6 +1477,22 @@ def kept(session):
     return (session or {}).get('refs') == 'kept'
 
 
+def is_kept(session, run):
+    """design/151 (hotfix, 4 Nov 2026, VW-18): a new film (from design/139 on) with no older references (no sheet, no web pick) is kept from the start, not only once its round is
+    posted: the page, the next-step lines and the refusals agree before the round. An older film, or one that already made a sheet or picked a web picture, is not."""
+    return kept(session) or (not film.older(run) and not any(r.get('kind') in ('sheet', 'web') for r in (session or {}).get('references', {}).values()))
+
+
+def mark_kept(session, run):
+    """Sets the flag when is_kept says so; True when the film is kept (already or now)."""
+    if kept(session):
+        return True
+    if not is_kept(session, run):
+        return False
+    session['refs'] = 'kept'
+    return True
+
+
 def golden_of(session, element_id):
     return (session.get('golden') or {}).get(element_id)
 
@@ -2222,7 +2240,7 @@ def search(store, user, run, outputs, element_id, keywords, quote, source='', fo
     downloaded at once; in an open round the thing's row takes the new searches (pass 1 and pass 2 alike), so Done counts them."""
     need(2 <= len(str(keywords or '').split()) <= 12, 'Keywords are two to twelve words: the thing and its place or trade, nothing else (Google Images is not Google search).')
     session = session_of(store, run, outputs)
-    need(not kept(session), 'retired on this film (the kept method): references are made by the kept method (the round makes every set from real photographs); no Google Images search on this film.')
+    need(not is_kept(session, run), 'retired on this film (the kept method): references are made by the kept method (the round makes every set from real photographs); no Google Images search on this film.')
     if found is None:
         found = search_rows(store, run, keywords, source)
     plan = guarded(lambda: current_plan(store, session))
@@ -2250,7 +2268,7 @@ def search(store, user, run, outputs, element_id, keywords, quote, source='', fo
 def pick(store, user, run, outputs, search_id, picks, quote):
     """design/73 R4: the ticked pictures, in the order ticked, each with its note, become web references of the element with their source."""
     session = session_of(store, run, outputs)
-    need(not kept(session), 'retired on this film (the kept method): references are made by the kept method; there are no web picks on this film.')
+    need(not is_kept(session, run), 'retired on this film (the kept method): references are made by the kept method; there are no web picks on this film.')
     plan = guarded(lambda: current_plan(store, session))
     out = _pick_into(store, session, user, run, plan, search_id, picks, quote)
     save_session(store, run, session)
@@ -2337,9 +2355,8 @@ def round_start(store, user, run, outputs, elements, conn=None):
     plan = guarded(lambda: current_plan(store, session))
     kinds = {e['id']: e['kind'] for e in plan['elements']}
     need(isinstance(elements, list) and elements, 'The round lists the elements: [{element_id, frames, keywords}].')
-    kept_ = kept(session) or (not film.older(run) and not any(r.get('kind') in ('sheet', 'web') for r in session['references'].values()))
+    kept_ = mark_kept(session, run)
     if kept_:
-        session['refs'] = 'kept'
         distinct_people(plan)
     rows = {}
     for row in elements:
@@ -2508,7 +2525,7 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
         rd = session['round']
         rd['pass'] = 'making' if queued else ('complete' if not todo else 1)
         save_session(store, run, session)
-        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'cost_inr': round(len(queued) * image_price_inr(run) * SET_MAX, 2)}
+        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2)}
     searched = [eid for eid, r in rd['elements'].items() if r['verdict'] == 'search']
     rd['pass'] = 2 if searched else 'complete'
     save_session(store, run, session)
@@ -2594,13 +2611,12 @@ def generate_image(conn, store, user, run, outputs, body):
     need(element, 'Reference must identify an element in the current plan.')
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
     need(not element.get('speaker'), f"{element['id']} is a real person speaking to camera: never an AI picture of them; their other angles come from their own footage.")   # design/124-b decision (c)
-    is_set = body['kind'] == 'sheet' and body['element_id'] != STYLE and kept(session)   # design/151: a reference set by the kept method
+    is_set = body['kind'] == 'sheet' and body['element_id'] != STYLE and mark_kept(session, run)   # design/151: a reference set by the kept method
     if is_set:
         if element['kind'] == 'person':
             distinct_people(plan)
             body = {**body, 'prompt': person_prompt(plan, run, element, body['prompt']), 'parents': [], 'set': True, 'views': set_views(element)}
         else:
-            need(provider_of(run) == 'gemini', f"{element['id']}: the kept method runs on Gemini's image model with Google Search; this film's picture AI is {provider_of(run)}.")
             own = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
             parents_ = list(body.get('parents') or []) or own[:1]   # Q1: a thing the footage shows is made from its approved frame
             body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_)), 'parents': parents_, 'set': True, 'search': True, 'views': set_views(element)}
@@ -2841,7 +2857,7 @@ def generate_image(conn, store, user, run, outputs, body):
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
-    check_cap(conn, run, session, image_price_inr(run) * variants * (SET_MAX if is_set else 1), 'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
+    check_cap(conn, run, session, image_price_inr(run, provider='gemini' if is_set else None) * variants * (SET_MAX if is_set else 1), 'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):
@@ -3153,7 +3169,7 @@ def _queue_image(conn, store, session, run, outputs, element, body, parents, ans
     ref_id = digest({'run': str(run['id']), 'request': request_id})[:32]
     frame = aspect_of(run, outputs, body['kind'])   # design/71 P3, design/139 R1: the size follows the shape the picture is for
     first = parents[0] if parents and parents[0].get('kind') in ('keyframe', 'frame') else None   # an edit of a keyframe or a frame keeps that picture's size when GPT Image accepts it
-    provider = provider_of(run)   # design/120: the run's image model
+    provider = 'gemini' if body.get('set') else provider_of(run)   # design/120: the run's image model; design/151 hotfix: a set is the kept (Gemini) method on every film
     if provider == 'gemini':
         size = {'aspect': frame if frame in ('16:9', '9:16') else '16:9', 'tier': settings().GEMINI_IMAGE_SIZE}
         model = settings().GEMINI_IMAGE_MODEL
@@ -4763,7 +4779,9 @@ def status(conn, store, run, outputs, repair=True):
         session = session_of(store, run, outputs)
     except Problem:
         return {'state': 'not_prepared', 'next': 'prepare'}
-    if reconcile(conn, run, session) and repair:
+    fixed = reconcile(conn, run, session)
+    marked = not kept(session) and mark_kept(session, run)   # design/151 hotfix: a new film is kept before its round
+    if (fixed or marked) and repair:
         save_session(store, run, session)
     plan = current_plan(store, session) if session.get('current') else None
     gaps = []
@@ -4795,6 +4813,7 @@ def status(conn, store, run, outputs, repair=True):
                                for e in (plan or {}).get('elements') or [] if e.get('material_spec')},   # design/111 F10
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'sheet_due': sheet_due(session, plan) if plan else [],   # design/119 rule 2
+            'kept': kept(session),   # design/151 hotfix: the references are made the kept way (no search, no picks, no sheet per element: the round makes every set)
             'image_provider': provider_of(run),   # design/120
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14

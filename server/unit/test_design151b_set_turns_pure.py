@@ -108,3 +108,53 @@ def test_the_instructions_and_the_command_text_say_three_pictures_one_per_turn()
     assert 'three separate pictures, one per turn of one conversation' in search and 'two to four separate pictures' not in search and 'Image Search' in search
     md = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'three separate pictures, one per turn' in md and 'two to four separate pictures' not in md
+
+
+# ---------- hotfix 4 Nov 2026 (VW-18): kept from the first step; a set is a Gemini call on every film ----------
+
+from test_design151_refs_pure import NEW, OLD, KILN, MASON, doc_with, frames_only, _req   # noqa: E402
+from test_visuals_stage_pure import FakeConn, USER, g, saved   # noqa: E402
+from app.errors import Problem  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def prices(monkeypatch):
+    monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0, 'usd_inr': 88.0})
+
+
+def test_a_new_film_is_kept_from_its_status_before_the_round_so_the_old_path_is_closed():
+    doc = doc_with(KILN, MASON)
+    store = frames_only(doc)
+    st = VS.status(FakeConn([]), store, NEW, [])
+    assert st['kept'] is True and saved(store)['refs'] == 'kept' and st['sheet_due'] == [] and st['golden_due'] == []
+    with pytest.raises(Problem, match='retired on this film'):
+        g(lambda: VS.search(store, USER, NEW, [], 'E2', 'brick kiln Tamil Nadu', 'yes'))
+    # an older film, or one with a sheet already, is not
+    store = frames_only(doc)
+    assert VS.status(FakeConn([]), store, OLD, [])['kept'] is False and 'refs' not in saved(store)
+    store = frames_only(doc)
+    s = json.loads(store.files[f"{NEW['id']}/visuals/session.json"])
+    s['references']['S0'] = {'id': 'S0', 'kind': 'sheet', 'element_id': 'E1', 'status': 'approved'}
+    store.files[f"{NEW['id']}/visuals/session.json"] = json.dumps(s).encode()
+    assert VS.is_kept(s, NEW) is False
+
+
+def test_a_set_runs_on_gemini_whatever_the_films_picture_ai(monkeypatch):
+    doc = doc_with(KILN, MASON)
+    store = frames_only(doc)
+    conn = FakeConn([])
+    openai_film = {**NEW, 'image_provider': 'openai'}
+    VS.round_start(store, USER, openai_film, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln during firing'}, {'element_id': 'P1', 'prompt': 'kneels all day'}], conn=conn)
+    out = VS.round_done(store, USER, openai_film, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'approve'}, 'P1': {'verdict': 'approve'}}, 'Yes.', conn=conn)
+    assert out['errors'] == {} and sorted(out['queued']) == ['E1', 'E2', 'P1']
+    req = {_req(p)['reference']['element_id']: _req(p) for p in conn.inserted}
+    assert all(r['provider'] == 'gemini' and r['model'] == VS.settings().GEMINI_IMAGE_MODEL and 'aspect' in r['size'] for r in req.values())
+    assert req['E2']['views'] == VS.set_views(KILN) and req['P1']['views'] == VS.PERSON_VIEWS
+    assert out['cost_inr'] == pytest.approx(3 * VS.image_price_inr(openai_film, provider='gemini') * 3, abs=0.01) and VS.image_price_inr(openai_film) == 20.0
+
+
+def test_the_page_says_the_kept_way_before_the_round():
+    from pathlib import Path
+    html = (Path(VS.__file__).resolve().parent / 'templates' / 'visuals.html').read_text(encoding='utf-8')
+    for needle in ("const keptFilm=!!d.kept", "if(data.kept)return ['','waiting for the round']", 'The references are made the kept way', 'No set yet: the assistant posts the reference round'):
+        assert needle in html, needle
