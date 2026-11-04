@@ -168,7 +168,7 @@ def test_the_status_says_the_round_is_next_on_a_kept_film_until_it_is_posted():
     sess = json.loads(store.files[f"{NEW['id']}/visuals/session.json"]); sess['accepted'] = accepted(doc)
     store.files[f"{NEW['id']}/visuals/session.json"] = json.dumps(sess).encode()
     st = VS.status(conn, store, NEW, [])
-    assert st['kept'] is True and st['round_due'] and 'vw visuals round --file out/reference-round.json' in st['round_due']
+    assert st['kept'] is True and st['round_due'] and 'vw visuals round --file out/reference-round.json' in st['round_due'] and "Gemini's image model" in st['round_due'] and st['set_provider'] == 'gemini'
     VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln'}, {'element_id': 'P1', 'prompt': 'kneels'}], conn=conn)
     assert VS.status(conn, store, NEW, [])['round_due'] is None
     store = frames_only(doc)

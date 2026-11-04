@@ -1491,7 +1491,8 @@ def round_due(session, plan):
     if not any(e.get('kind') != 'graphic' and e['id'] != STYLE for e in plan.get('elements') or []):
         return None
     return ('the reference round is next, before any picture: `vw visuals elements`, then `vw visuals frame --file out/frames.json` for every element the footage shows, '
-            'then `vw visuals round --file out/reference-round.json` (one row per element: element_id, frames, prompt); the specs can be approved meanwhile')
+            "then `vw visuals round --file out/reference-round.json` (one row per element: element_id, frames, prompt); the sets are made on Gemini's image model with Google Search, "
+            "whatever the film's picture AI for the shots; the specs can be approved meanwhile")
 
 
 def mark_kept(session, run):
@@ -4827,6 +4828,7 @@ def status(conn, store, run, outputs, repair=True):
             'kept': kept(session),   # design/151 hotfix: the references are made the kept way (no search, no picks, no sheet per element: the round makes every set)
             'round_due': round_due(session, plan),   # design/151 hotfix: the round is next, said in words
             'image_provider': provider_of(run),   # design/120
+            'set_provider': 'gemini',   # design/151 hotfix: a reference set is the kept (Gemini) method on every film, whatever image_provider says
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12
             'needed_elements': needed_elements(plan) if plan else [],   # design/111 F14
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
