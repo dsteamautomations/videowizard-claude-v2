@@ -91,7 +91,7 @@ Each rule below is checked against the build before a deploy; a contradiction st
 - A reference row of kind `sheet` without `set` (old films) reads everywhere as today.
 
 ## 8. Questions for SK (asked one per message)
-- Q1. A thing with an approved footage frame: is its AI set still made (from the frame, by the kept method), or is the frame enough and no AI picture is made for it?
+- Q1. A thing with an approved footage frame: is its AI set still made (from the frame, by the kept method), or is the frame enough and no AI picture is made for it? **SK, 4 Nov: yes, made from the frame.**
 - Q2. Of a thing's set, which picture is the golden one that shots bind: the first unless the operator ticks another, or always the operator's tick?
 - Q3. A person's set into a shot's prompt: the face close-up and the full-length front by default (the others by name), given Gemini's cap of five character pictures?
 - Q4. A person the script acts with but the plan lacks: a warning on `vw visuals check`, or a refusal until the element is added?
