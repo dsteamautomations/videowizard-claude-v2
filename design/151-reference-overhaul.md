@@ -93,7 +93,7 @@ Each rule below is checked against the build before a deploy; a contradiction st
 ## 8. Questions for SK (asked one per message)
 - Q1. A thing with an approved footage frame: is its AI set still made (from the frame, by the kept method), or is the frame enough and no AI picture is made for it? **SK, 4 Nov: yes, made from the frame.**
 - Q2. Of a thing's set, which picture is the golden one that shots bind: the first unless the operator ticks another, or always the operator's tick? **SK, 4 Nov: always the operator's tick.** Yes on a thing's set needs one ticked picture; Done is refused naming the things without a tick.
-- Q3. A person's set into a shot's prompt: the face close-up and the full-length front by default (the others by name), given Gemini's cap of five character pictures?
+- Q3. A person's set into a shot's prompt: the face close-up and the full-length front by default (the others by name), given Gemini's cap of five character pictures? **SK, 4 Nov: yes, those two.**
 - Q4. A person the script acts with but the plan lacks: a warning on `vw visuals check`, or a refusal until the element is added?
 - Q5. The Google Images search (Apify) and the picks: retired on new films outright, or kept as a fallback the operator can ask for after two rejected rounds?
 - Q6. Measure first: a thing with an approved frame and a size still unknown is refused its set until measured (today a sheet is exempt). Keep the refusal?
