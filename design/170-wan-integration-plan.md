@@ -146,6 +146,33 @@ Total about 10–11 days, in that order so a film can take the environment pictu
 2. The Wan AccessKey: placed by you on the VM in `server/.env` as `VW2_WAN_ACCESS_KEY` (recommended: one runner, one place, same as the Gemini key)?
 3. The credit price in rupees (for the cost record), and the membership's renewal date.
 
+## 8. Second review (SK, 5 Nov: "be thorough and not miss anything"): what the first draft missed
+
+Checked file by file against the code. Each line is now part of the plan.
+
+| # | Missed | Where | What the plan now says |
+|---|---|---|---|
+| R1 | **The operator's chat tool** (`plugin/`): `vw visuals prepare-take` refuses without `--start`; the `generator` command accepts only `google`; the command text and the operator guide say "a take starts from an approved start image" | `plugin/scripts/vw.py` 1908–1916, `plugin/commands/vw.md`, `plugin/operator-CLAUDE.md` | part (iii) includes the plugin: `--start` optional on a `wan` shot, `wan` in the generator parser, the texts; deployed with `deploy-plugin.sh`; **laptops must update** (design/129 rule); the old refusal stays for a `google` shot |
+| R2 | **The visuals page**: the Pictures step lists a video shot's start image and the Takes step shows it beside the take; a `wan` shot has no picture there | `server/app/templates/visuals.html`, `web.py` | the Pictures step shows the shot's bound references and the scene's environment picture for a `wan` shot; the Takes step shows the environment picture where the start image was |
+| R3 | **The instruction text** (version 3): section 6 "Shot images and video", section 7 "Checks after a take" and the video tools part say start and end images; every wording change needs its `scripts/dNNN_wording_v3.py` and `server/unit/test_designNNN_*_pure.py` with the exact anchor sentences | `server/procedures/v3.json`, the parts | part (iii): a wording script `d170_wording_v3.py` and its test; the text states the older way per the old-ways rule ("on a Gemini Omni shot the start image …") |
+| R4 | **The generator choice model** allows only `google` and `higgsfield`; the default is a constant | `video_generators.GeneratorChoice`, `DEFAULT` | `wan` added to the Literal; the default per film: `wan` for films started after the deploy, `google` before (read from the run's start date, no migration) |
+| R5 | **Pricing**: one price per second (`VISUALS_PRICE_VIDEO_INR_PER_S`) feeds the treatment's cost line, the cost cap and the spent record; Wan is priced in credits and the price is not shown before submit | `visuals_stage` 293, 373, 422, 446; `config.py` | a per-provider price: `VISUALS_PRICE_WAN_INR_PER_CREDIT` and a credits-per-second table from the test round (30 credits / 10 s at 720P seen); the cost record stores credits before and after; with several takes in flight the difference is shared, so each take also records the table's estimate and marks which it is |
+| R6 | **The treatment's image count per video gap** (design/124 Note D) counts a start image per shot (+ an end when exact); on Wan it is one environment picture per scene and no shot pictures | `visuals_stage` 506–548 | the count follows the gap's generator |
+| R7 | **The library's guide entries** `start`, `end` point video shots at `image --kind keyframe` | `library.py` 32–35 | a `wan-take` entry; the keyframe entries say "Gemini Omni shots" |
+| R8 | **The glossary** (design/152) lists the reference kinds and the routes | design/152 §3f, §3g | add `environment` to the kinds and `wan` to the generator words when the build lands |
+| R9 | **The old-ways table** (design/35) | design/35 | a row 25: the start/end image of a video shot, kept for `google` shots and stills; retired on `wan` shots by name |
+| R10 | **The 10-image cap**: a shot with three people (two pictures each) + four things + the environment is 11 | `bind`, the Wan text | the server's order of sending: environment first, then each person's full-length picture and face, then each thing's golden picture, then the working poses the shot asked for; beyond 10 the take is refused with the list, and the operator unbinds a reference |
+| R11 | **The CLI reads a `.env` in its working folder above the saved login** | the CLI's precedence rule | the worker runs the CLI with the spool folder of the job as its working folder (no `.env` there), the key in the process environment only, never on the command line |
+| R12 | **The shape**: Wan takes `16:9, 9:16, 1:1, 4:3, 3:4, adaptive`; the film record may hold another AI video shape | `aspect_of`, design/139 | a shape outside the list is refused at prepare-take by name; `adaptive` is never sent |
+| R13 | **Smart duration and the shot's frames**: the plan fixes the shot's frames; a smart take may be shorter or longer | `placement`, `timing_evidence`, the assembly's choices (offset, trim, hold_last) | the record stores `smart_duration`; the take's evidence compares to the shot as today; the assembly's existing choices place it; a take shorter than the shot is flagged like a short Omni take today |
+| R14 | **Which set pictures a person sends** | `with_faces`, the sets | by default picture 1 (full length, neutral) and picture 3 (the face); picture 2 (the working pose) only when the shot's `pose` names that work; stated in the text as "take the pose from the beats, not from the photograph" |
+| R15 | **The take's download name** is built from the prompt's first words with spaces and commas | the CLI's `--save` | the worker reads `savedFiles[].path` and moves the file to `<spool>/<job>/output.mp4` at once; the watermark field must read `without` |
+| R16 | **Node and the CLI on the VM**: nothing in `deploy-server.sh` installs them | `scripts/deploy-server.sh`, design/29 | part (ii): a one-time install step in design/29's VM notes (Node 22 under `/opt/vw2/node`, `npm install --global` with the prefix there, the path in `VW2_WAN_CLI`); `wan update --check` logged at worker start, never run |
+| R17 | **Retention**: a Wan task and its result stay on the account's history for everyone with the key | the account | the receipt stores the `taskId`; nothing else to do; said in the operator text |
+| R18 | **The key's placement is not needed for the tests**: this PC is logged in | | the VM's `server/.env` entry (`VW2_WAN_ACCESS_KEY`) is added by SK at build part (ii), when the worker is deployed; I will say when |
+
+Estimate after the review: **12–14 days** (the plugin, the page, the wording script and the pricing added), still in four deployable parts, (i) first.
+
 ## Not covered
 
 - Wan's terms on one account shared by a team: not checked (the guide says so too).
