@@ -1,0 +1,44 @@
+{
+ "run": "W2a-pointing-7s",
+ "prompt_file": "prompts/pointing.txt",
+ "images": [
+  "pics/technique_pointing__sheet__1__69c64baa.png",
+  "pics/rat_trap_wall_rep__frame____05a1dea3.png",
+  "pics/mason_pointing__sheet__2__f3cd0644.png",
+  "pics/pointing_trowel__sheet__1__94c46edf.png",
+  "pics/mortar_hawk__sheet__1__d462255a.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 7,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 1172,
+ "task_id": "87483f46ac184665bd727ac8058291d4",
+ "status": "succeeded",
+ "seconds": 169,
+ "file": "out/W2a-pointing-7s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "7.000000"
+  }
+ },
+ "credits_after": 878,
+ "cost_credits": 294
+}

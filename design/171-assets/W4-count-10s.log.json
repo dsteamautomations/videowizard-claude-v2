@@ -1,0 +1,42 @@
+{
+ "run": "W4-count-10s",
+ "prompt_file": "prompts/w4-count-10s.txt",
+ "images": [
+  "pics/rat_trap_site__sheet__3__1f6edc69.png",
+  "pics/ref-2-helper.jpg",
+  "pics/ref-6-trowel-pan.jpg"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 10,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 1088,
+ "task_id": "655b85bf58b04fa3ab17ee8c7545d33a",
+ "status": "succeeded",
+ "seconds": 120,
+ "file": "out/W4-count-10s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "10.000000"
+  }
+ },
+ "credits_after": 878,
+ "cost_credits": 210
+}

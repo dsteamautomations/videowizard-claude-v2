@@ -1,0 +1,42 @@
+{
+ "run": "W2b-string-5s",
+ "prompt_file": "prompts/string.txt",
+ "images": [
+  "env/env-string.jpg",
+  "pics/worker_string__sheet__2__dc9e5f80.png",
+  "pics/technique_string_setting__sheet__3__90559b83.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 5,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 1172,
+ "task_id": "4999da95928a4dbba964bf2b17fcc318",
+ "status": "succeeded",
+ "seconds": 178,
+ "file": "out/W2b-string-5s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "5.000000"
+  }
+ },
+ "credits_after": 878,
+ "cost_credits": 294
+}

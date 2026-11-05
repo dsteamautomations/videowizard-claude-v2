@@ -1,0 +1,43 @@
+{
+ "run": "W3-director-30s",
+ "prompt_file": "prompts/w3-director-30s.txt",
+ "images": [
+  "pics/rat_trap_site__sheet__3__1f6edc69.png",
+  "pics/ref-1-mason.jpg",
+  "pics/ref-2-helper.jpg",
+  "pics/ref-6-trowel-pan.jpg"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 30,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 1088,
+ "task_id": "144f3c0718d84c6ab70e74397dad3638",
+ "status": "succeeded",
+ "seconds": 311,
+ "file": "out/W3-director-30s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "30.000000"
+  }
+ },
+ "credits_after": 944,
+ "cost_credits": 144
+}

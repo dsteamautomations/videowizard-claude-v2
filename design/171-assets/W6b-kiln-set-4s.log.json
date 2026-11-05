@@ -1,0 +1,42 @@
+{
+ "run": "W6b-kiln-set-4s",
+ "prompt_file": "prompts/kiln-noenv.txt",
+ "images": [
+  "pics/brick_kiln__sheet__1__306c314b.png",
+  "pics/kiln_workers__sheet__1__e2594ac6.png",
+  "pics/kiln_workers__sheet__3__e2594ac6.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 4,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 1172,
+ "task_id": "c433976da3db451987ca8a368c13a14a",
+ "status": "succeeded",
+ "seconds": 182,
+ "file": "out/W6b-kiln-set-4s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "4.000000"
+  }
+ },
+ "credits_after": 878,
+ "cost_credits": 294
+}
