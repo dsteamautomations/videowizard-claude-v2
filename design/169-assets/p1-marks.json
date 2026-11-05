@@ -1,0 +1,26 @@
+[
+ {
+  "at_s": 0.0,
+  "label": "sweeps the plinth top in short strokes, stepping along it"
+ },
+ {
+  "at_s": 3.8,
+  "label": "lays the broom on the sand"
+ },
+ {
+  "at_s": 4.6,
+  "label": "lifts the bucket off the plinth top"
+ },
+ {
+  "at_s": 5.6,
+  "label": "flicks water by hand across the swept stone, which darkens"
+ },
+ {
+  "at_s": 7.6,
+  "label": "stands with the bucket, the stone wet"
+ },
+ {
+  "at_s": 8.0,
+  "label": "end"
+ }
+]

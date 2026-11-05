@@ -1,0 +1,18 @@
+[
+ {
+  "at_s": 0.3,
+  "label": "pulls the slack string tight"
+ },
+ {
+  "at_s": 1.9,
+  "label": "winds it twice round the near peg"
+ },
+ {
+  "at_s": 3.2,
+  "label": "holds the taut string, sighting to the far peg"
+ },
+ {
+  "at_s": 4.0,
+  "label": "end"
+ }
+]

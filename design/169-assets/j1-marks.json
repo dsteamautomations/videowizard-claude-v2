@@ -1,0 +1,22 @@
+[
+ {
+  "at_s": 0.0,
+  "label": "brings mortar from the pan on the trowel to the raked joint"
+ },
+ {
+  "at_s": 1.6,
+  "label": "presses the mortar into the joint along a hand-length"
+ },
+ {
+  "at_s": 4.0,
+  "label": "draws the trowel back along the joint, striking it flush"
+ },
+ {
+  "at_s": 5.8,
+  "label": "lifts the trowel off the finished joint"
+ },
+ {
+  "at_s": 7.0,
+  "label": "end"
+ }
+]
