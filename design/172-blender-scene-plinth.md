@@ -84,6 +84,14 @@ What to watch: the figure is read a little small and stiff against the real set 
 
 **What this means for the plan (design/170)**: the environment picture stays (it gave the real set); the staging video becomes the way positions and timing are fixed, exactly the place the cartoon (design/161) was meant to take. The cartoon is parked; the Blender blockout is the candidate for that slot, built by a helper from the plan's scene and shot (every number in section 1 came from the plan's landmarks, positions, beats and camera), rendered on the server with Blender in background mode. Next tests: the kiln hand-over (two figures, a pass between them) and the pointing close-up (hands only), then a 30 s three-shot blockout.
 
+## 5. The simplified prompt, SK's second render, and Thinking Mode through the CLI (5 Nov, late)
+
+SK asked for a very simple prompt for Wan's website **agent** option: the references by tag, the length, nothing about hands or steps or seconds (`172-assets/agent-prompt-plinth.txt`), with his second render `plinth_motion.mp4` (a stone-faced plinth, houses and bushes behind, the same 8 s action). He also noted that forcing the right hand makes a man sweeping left to right with his left side to the camera look awkward: the hand is a staging fact and now comes from the video, never from the text.
+
+**Is the website's agent in the CLI?** The CLI (0.0.3) has no agent command. It has **Thinking Mode**, sent as `thinkMode: true` only when a brief file or a URL is attached (`--file`, `--url`). Run A1: the simplified prompt, the render as `@Video1`, the five pictures, `--duration 8`, and the prompt itself attached again as the brief file to turn the switch on. The task record shows `thinkMode: true`; every website task of SK's so far shows false or nothing, so whether the site's agent is this same switch is **still unproven**: one website run with the agent option, then its record read beside A1's, settles it (the fields to compare: `thinkMode`, `createScene`).
+
+**A1's result** (`A1-plinth-agent.strips.png`): the staging of the render second for second (the sweep moving right to 4.5 s, the bend to the bucket at 5 s, the mug, the two throws), the real site and worker from the photographs, 8.0 s. As good as B1 with a quarter of the text. **Cost 118 credits** (444 → 326) against 47 for B1 with the same video and length: Thinking Mode, or the attached file, is billed about 2.5 times more. For the flow that matters: the simple prompt without the brief file is the cheaper path and the test should show whether it loses anything.
+
 ## Not covered
 
 - Only one scene described; the kiln (two people, a hand-over) and the pointing (hands only, close) follow once this one proves itself.

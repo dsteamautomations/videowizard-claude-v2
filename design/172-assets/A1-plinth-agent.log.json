@@ -1,0 +1,46 @@
+{
+ "run": "A1-plinth-agent",
+ "prompt_file": "agent/agent-prompt-plinth.txt",
+ "images": [
+  "env/env-plinth.jpg",
+  "pics/worker_plinth__sheet__1__b41000a4.png",
+  "pics/worker_plinth__sheet__3__b41000a4.png",
+  "pics/technique_plinth_wetting__sheet__3__f42b4b62.png",
+  "pics/water_pot__sheet__1__a7cbc5bb.png"
+ ],
+ "videos": [
+  "blender-in/plinth_motion.mp4"
+ ],
+ "audios": [],
+ "duration": 8,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "file": "out/A1-plinth-agent.mp4",
+ "credits_before": 414,
+ "task_id": "71e035061ca448928126113cb6f656f1",
+ "status": "succeeded",
+ "seconds": 425,
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "8.000000"
+  }
+ },
+ "credits_after": 326,
+ "cost_credits": 88
+}
