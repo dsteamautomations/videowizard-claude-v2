@@ -1,0 +1,46 @@
+{
+ "run": "B2-plinth-blender-smart",
+ "prompt_file": "prompts/b1-plinth-blender.txt",
+ "images": [
+  "env/env-plinth.jpg",
+  "pics/worker_plinth__sheet__1__b41000a4.png",
+  "pics/worker_plinth__sheet__3__b41000a4.png",
+  "pics/technique_plinth_wetting__sheet__3__f42b4b62.png",
+  "pics/water_pot__sheet__1__a7cbc5bb.png"
+ ],
+ "videos": [
+  "blender-in/plinth_blender.mp4"
+ ],
+ "audios": [],
+ "duration": "smart",
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 491,
+ "task_id": "971bdaad58124dd997eb3ac1c74099f7",
+ "status": "succeeded",
+ "seconds": 190,
+ "file": "out/B2-plinth-blender-smart.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "7.967000"
+  }
+ },
+ "credits_after": 401,
+ "cost_credits": 90
+}

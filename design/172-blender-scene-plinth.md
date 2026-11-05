@@ -66,6 +66,24 @@ Blender will not texture the figure from a photograph by itself; that is not nee
 
 The MP4, the five PNG frames, and the .blend file. Then the next test is the one that matters: the Blender MP4 as Wan's `@Video1` (the first 15 s; this shot is 8 s), the photographs as `@Image1…`, and the same take text as design/171's W1a, with the sentence "follow the positions, the facing, the hands and the timing of @Video1 exactly; take the look from the photographs". That run tells us whether a 3D blockout gives the model what the cartoon could not.
 
+## 4. Result (5 Nov, night): the Blender render as Wan's video reference
+
+SK built the scene in Blender from section 1 and sent the render: 8.0 s, 24 fps, 1280×720, no sound, a mannequin figure in green sweeping along the plinth, laying the broom down at 5 s, taking the mug and throwing twice, the wet patches appearing (`172-assets/plinth_blender.mp4`, `plinth_blender.strips.png`). Two Wan runs with it as `@Video1` (`--videos`, `--video-ranges 0:8`), the five photographs as before, the steps and the right hand as in round 2, and one added paragraph: follow the staging video exactly for camera, positions, facing, hands and timing, take nothing of its look (`172-assets/b1-plinth-blender.txt`). One run at an explicit 8 s, one with smart duration.
+
+| Run | Length | What came back |
+|---|---|---|
+| B1, explicit 8 s | 8.0 s | the Blender staging second for second: the worker at the plinth's left end at 0 s, sweeping to the right through 4.5 s, bent at the bucket at 5 s, the broom on the earth at 5.5 s, the mug lifted at 6 s, the throws at 6.5–7.5 s with the water in the air, the end pose at 8 s. The plinth, the stack behind right, the tree left and the bucket where the blockout put them. The look from the photographs: the real worker in his green shirt and checked lungi, the real site behind. |
+| B2, smart duration | 7.97 s | **smart duration chose the video's length**; the same staging and timing; the same look. |
+| W1a, round 1, text only | 8.0 s | for comparison: the order right but the pace the model's own (the sweep over by 3 s, the throws early); see `blender-compare.png`, one frame a second, the four rows one above the other. |
+
+**Verdict: the blockout gives the model what the text could not: the timing and the positions.** For the first time in this round the pace is ours (the sweep lasts to 4.7 s, the throws come at 6.3 s and 7.4 s), the worker stands where the plan put him at every second, and the look still comes from the photographs. The mannequin's plainness did not leak. Smart duration becomes usable with a staging video: it takes the video's length.
+
+What to watch: the figure is read a little small and stiff against the real set pictures (the mannequin's proportions carry over slightly); a better-proportioned figure in Blender, or a line "a man of 1.68 m, normal build", is the next thing to try. The plinth came out as a smooth cement block, as the blockout drew it; the real plinth's dressed-stone face can be put into the blockout as a texture or named in the text.
+
+**Cost**: 95 credits for the two runs (539 → 444), so about 47 a run against 24 for the same shot without a video: the reference video's seconds are billed too (`billingInputVideoDuration` in the task record). About 6 credits a second of output with an 8 s video reference.
+
+**What this means for the plan (design/170)**: the environment picture stays (it gave the real set); the staging video becomes the way positions and timing are fixed, exactly the place the cartoon (design/161) was meant to take. The cartoon is parked; the Blender blockout is the candidate for that slot, built by a helper from the plan's scene and shot (every number in section 1 came from the plan's landmarks, positions, beats and camera), rendered on the server with Blender in background mode. Next tests: the kiln hand-over (two figures, a pass between them) and the pointing close-up (hands only), then a 30 s three-shot blockout.
+
 ## Not covered
 
 - Only one scene described; the kiln (two people, a hand-over) and the pointing (hands only, close) follow once this one proves itself.
