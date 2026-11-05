@@ -1,6 +1,25 @@
-# 161 — Requirements: the animatic branch (visuals steps 5–6, the `video` route) — 5 Nov 2026, for SK's approval
+# 161 — Requirements: the animatic branch (visuals steps 5–6, the `video` route) — 5 Nov 2026, amended after the test round
 
-Status: requirements note, no code. Built on design/153 (scope), 155 (double-check), 156–160 (nine Omni runs on two scenes). Everything decided below was shown by a test; the "why" column names the note.
+Status: requirements note, no code. **Amended 5 Nov evening after design/165–168; SK agreed design/167 §5 (D1–D9) and design/168 (G1–G8, the timing order, E1–E6).** Section 0 lists the amendments; where a later section disagrees with section 0, section 0 wins.
+
+## 0. Amendments from the test round (agreed)
+
+| # | Amendment | Replaces | From |
+|---|---|---|---|
+| A1 | **Input**: the cartoon video + the photographs of what is in the shot + the timecoded prompt. No storyboard frames, no dense frames (off by default; may be tried once for a facial moment, E6). | §3 step 5 as written | 167 D3, 168 §5 |
+| A2 | **The cartoon decides the seconds.** The plan gives the beats in order and the gap's seconds; the helper draws at the measured pace; the server measures the cartoon's cuts and action marks and writes the timecoded prompt from it. A cartoon whose actions run faster than the speed table is refused; actions that do not fit the gap send the plan back for revision. | §3 step 5's "timecoded shot list with counts" | 168 §2 |
+| A3 | **No counts of identical things** anywhere in the plan, the cartoon or the prompt; shots are designed so no count matters (D1); a shot that needs a true count is footage, a still or the drawn route. | D8's state sentence "with counts"; §6's count lines | 165 §2, 167 D1 |
+| A4 | **The drawing rules are the eight generic rules G1–G8** of design/168 §1, with the specific findings as their examples; the check helper's must lines are G1–G8. | D7 as "the drawing rules of design/160" | 168 §1 |
+| A5 | **The emotion rules E1–E6** of design/168 §4: a face shot in every scene; a face never cropped to hide a count; headroom a check line; a facial moment gets a longer, closer, continuous shot with a hold, drawn and named as action plus emotion. | — (new) | 168 §4 |
+| A6 | **Plan checks added**: no count of identical things stated; a thing that changes state must differ in look from what it joins; no cut between a state and its change; a cut must change angle or size clearly; every scene has a face shot. | §3 step 1 | 165, 166, 168 |
+| A7 | **The speed table** (a pair of bricks lifted and set 1.5 s; a barrel from waist height 1.6 s; a step 0.5–0.6 s; a squat 1.0 s; a head turn 0.6–0.8 s; a hand-off round 2.4 s) is a should line measured on the cartoon; it grows by commits. | §3 step 3's "reference speeds" | 167 D5 |
+| A8 | **Prompt rules**: the guide sentence; the state sentence in look terms; fixed positions; each shot with its seconds and its cut named; "the camera does not move"; never camera equipment, never "half-built"; photographs only of what is in the shot. | §3 step 5's text list | 167 D4, 168 G8 |
+| A9 | **Cartoons render at 24 fps**; no change in cost or time (Omni charges by the second). | §3 step 3's "the film's fps" | 168 §3 |
+| A10 | **Build order**: (i) the `one_take` scene flag and the timecoded shot list on takes, which work without a cartoon; (ii) the staging rules into the plan step and the plan checks (A6), the prompt rules (A8); (iii) the animatic: figure library, drawing helper, check helper, Files API upload, the Takes-step card. | §10's two parts | 167 D6 |
+| A11 | **Not pursued**: the frames path; two-video continuity; the canvas; numbers and labels as a fix for counts; WAN and Kling as SK's own side tests. | — | 167 D9 |
+| A12 | **Review practice** for the live check: half-second strips at 480 px or larger before any verdict; SK watches the video. | §8's live check | 167 D8 |
+
+ Built on design/153 (scope), 155 (double-check), 156–160 (nine Omni runs on two scenes). Everything decided below was shown by a test; the "why" column names the note.
 
 ## 1. What changes, in one paragraph
 
