@@ -51,7 +51,7 @@ OUTPUT
 
 ## 2. The sample pictures (sent with this note)
 
-These are the real references of this scene from VW-18, the ones the video model will use for the look. Blender does not need them to build the scene; they are for the assistant (and you) to check that the blockout matches, and they can be loaded as **reference images** (Add > Image > Reference, or as the camera's background image) so the layout can be lined up against the photograph:
+Four pictures, the real references of this scene from VW-18, the ones the video model will use for the look. (Wan's own take of this shot from design/171 is not part of the Blender input; it is only compared with the Blender render afterwards.) Blender does not need them to build the scene; they are for the assistant (and you) to check that the blockout matches, and they can be loaded as **reference images** (Add > Image > Reference, or as the camera's background image) so the layout can be lined up against the photograph:
 
 | File | What it is | Use in Blender |
 |---|---|---|
@@ -59,7 +59,6 @@ These are the real references of this scene from VW-18, the ones the video model
 | `worker_plinth__sheet__1.png` | the worker full length, neutral | the figure's height and colours |
 | `technique_plinth_wetting__sheet__3.png` | the coconut broom on the plinth with the bucket | the broom's and bucket's shape and size against the plinth |
 | `water_pot__sheet__1.png` | the bucket with the mug | the bucket and the mug |
-| `W1a-plinth-8s.strips.png` | Wan's 8 s take of this shot, a frame every half second | what the model did with text alone: compare the Blender timing against it |
 
 Blender will not texture the figure from a photograph by itself; that is not needed. The photographs give the look later, in the video model's call.
 
