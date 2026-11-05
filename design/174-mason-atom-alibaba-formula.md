@@ -56,6 +56,10 @@ The same prompt with `--images <place>,<mason>,<helper>,<tools>` in that order, 
 
 Verdict: Alibaba's formula gave the structure (three shots at their seconds, the references held, the fixed order held, the sound as written) from a short text with no cartoon and no staging video. Two misses of degree: the mason turns to face the camera in the middle shot, and the pan is not emptied: the first is a facing fault the staging video (design/172) fixes, the second is the inventory limit seen all day. Cost 30 credits.
 
+## Revised with the right-handed staging rules (design/175), not run
+
+SK, after M1: every upcoming prompt stages for the right hand. The revision keeps the atom's invariant (the pile on the mason's left, the helper from the left, the camera never crossing the wall) and applies the four rules: the mortar board moves to the mason's **right** on the wall top with its heap facing him, so his trowel hand reaches rightward (rule 1 and 4); the pan is set to the **left of the pile**, so the helper's right hand carries bricks left to right from the pan to the pile (rule 4); every camera is over the actor's right shoulder or past his right side (rule 2); each man's left hand is given a resting place and "the left arm stays still" (rule 3). The text: `174-assets/prompt-mason-alibaba-righthand.txt`.
+
 ## Not covered
 
 - The place picture is VW-18's rat-trap site set, not the morning's scene (which had no place picture): a wall on edge, as SK named it, in place of the three-course plinth wall of the shot list.
