@@ -30,6 +30,23 @@ SK's test after design/165: instead of bricks, five water barrels on a plank ove
 - The destination should not be a heap of the same kind; a row, a hand, a wall top, or a different-looking group.
 - Cuts must change the angle or the size clearly, or the model will not cut.
 
+## The control: the same two scenes as text only (SK's question: is the cartoon the cause?)
+
+SK: check whether the cartoon is the reason, by giving the same activities as a plain prompt; are we asking it to follow too many things at once? Two runs, no cartoon, no frames, the worker's photograph and the scene text only (`166-assets/prompt-t6a-text.txt`, `prompt-t6b-text.txt`; sheets `review-t6at.png`, `review-t6bt.png`, the cartoon-guided run above the text-only run at every half second). 52 s each, 1,400 input tokens.
+
+| | t6at all blue, text only | t6bt blue onto white, text only |
+|---|---|---|
+| Cuts | **3.5 s, as the text asked** (the cartoon-guided run had ignored it) | none |
+| The arrival | the bicycle is already well inside the frame at 0.25 s; no walk-in from off-frame | the same |
+| The unloading | one at a time, never stacked, never back; about four or five on the ground by the end | one at a time; three blue beside the two white by the end |
+| The plank at the end | **three still on it** | **three still on it** |
+| Total | not conserved, as with the cartoon | not conserved; one white barrel drifts towards blue around 6–9 s |
+| Pace | one barrel per 1.5–2 s, as with the cartoon | the same |
+
+**Answer: the cartoon is not the cause.** Without it the model fails the count in the same way: the plank does not empty while the row grows, the pace is its own, and in the two-kind variant a colour even drifts. The cartoon neither overloaded it nor fixed it. What the cartoon did add is visible in the sheets: the walk-in from off-frame at the right second, the stop in the middle, the framing of the two shots; the text-only runs start with the bicycle already in frame and place things where they like. So the division holds exactly as design/165 §1 says: the cartoon buys staging; the count is the model's own limit, cartoon or not.
+
+One odd pair: the text alone produced the cut at 3.5 s and the cartoon-guided run did not. The cartoon's two framings were too alike (design/166 point 4); the text named a cut and got one. Where a cut matters, the prompt should name it and the cartoon should make it unmistakable.
+
 ## Not covered
 
 - One run per variant; judged on half-second sheets; SK has both videos.
