@@ -39,7 +39,23 @@ Realistic documentary live action. 10 seconds, 16:9.
 
 The same prompt with `--images <place>,<mason>,<helper>,<tools>` in that order, `--duration 10 --ratio 16:9 --resolution 720P`, sound on (`--audio-output=true`) since the formula writes the sound into the prompt, or off for a silent take. Not run yet; the pictures and the prompt are in `174-assets/`.
 
+## Result (run M1, 5 Nov night, via the CLI: 10 s, 16:9, 720P, sound on)
+
+`174-assets/M1-mason-alibaba.strips.png`, every half second. 10.03 s, 1280×720, 30 fps, a sound track (site ambience, −22 dB mean).
+
+| Asked | Got |
+|---|---|
+| Shot 1 [0–3.5 s], handheld behind the helper walking to the mason, pan on his head, the mason bent at the wall on the right, the pile to his left | **yes**: the helper from behind with the pan of bricks, the rat-trap wall with its cavities, the mason bent at it on the right with his back to us, the pile on the ground left of him |
+| cut at 3.5 s | **yes** |
+| Shot 2 [3.5–6 s], side-on medium, low from the front right; the helper squats and lowers the pan by the pile; the mason scrapes the board and spreads on the top course | the helper lowers the pan beside the pile, yes; the mason with the **yellow-handled** trowel at the top course, yes; the pile left of him, yes; **but the shot is frontal, not side-on, and the mason faces the camera** instead of keeping his back to it |
+| cut at 6 s | **yes** |
+| Shot 3 [6–10 s], close and low on the pile; bricks from the pan to the pile two at a time until the pan is empty; the trowel at the right edge; he lifts the empty pan and rises | the close low shot, the hands moving bricks from the pan to the pile, the yellow-handled trowel at the right edge, yes; he lifts the pan and rises at 9 s, yes; **but the pan still holds bricks when he lifts it** |
+| Identity: the mason (blue shirt, towel, checked lungi), the helper (white vest, green lungi, pad) | **yes**, both, through all three shots |
+| Only two people; the pile always left of the mason; the camera never crosses the wall | **yes**, all three; the left-to-right order (helper, pile, mason, wall) held in every shot, which is what failed in SK's own first attempt and what the cartoon was drawn to fix |
+| Sound: no voice, site effects, no music | **yes**: ambience and work sounds, no speech, no music |
+
+Verdict: Alibaba's formula gave the structure (three shots at their seconds, the references held, the fixed order held, the sound as written) from a short text with no cartoon and no staging video. Two misses of degree: the mason turns to face the camera in the middle shot, and the pan is not emptied: the first is a facing fault the staging video (design/172) fixes, the second is the inventory limit seen all day. Cost 30 credits.
+
 ## Not covered
 
 - The place picture is VW-18's rat-trap site set, not the morning's scene (which had no place picture): a wall on edge, as SK named it, in place of the three-course plinth wall of the shot list.
-- Not run; SK asked for the prompt and the pictures.

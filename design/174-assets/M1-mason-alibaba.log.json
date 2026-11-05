@@ -1,0 +1,43 @@
+{
+ "run": "M1-mason-alibaba",
+ "prompt_file": "mason/prompt-mason-alibaba.txt",
+ "images": [
+  "mason/rat_trap_site__sheet__3.png",
+  "mason/ref-1-mason.jpg",
+  "mason/ref-2-helper.jpg",
+  "mason/ref-3-tools.jpg"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 10,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "true",
+ "file": "out/M1-mason-alibaba.mp4",
+ "credits_before": 286,
+ "task_id": "b2a3c0a35e1a4e1fbf59444982b766b2",
+ "status": "succeeded",
+ "seconds": 423,
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "10.031000"
+  }
+ },
+ "credits_after": 256,
+ "cost_credits": 30
+}
