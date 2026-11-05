@@ -67,6 +67,20 @@ Retired by name on the Wan route: none yet. Nothing is deleted; the generator ch
 6. **Keys**: `VW2_WAN_ACCESS_KEY` in `server/.env` on the VM (never in git, never in chat; SK places it as a file, as the Gemini key was); the worker exports it as `WAN_ACCESS_KEY` for the CLI's process only. Node 22+ and `@wan-ai/cli` installed on the VM under the service user; the install's skill sync is irrelevant there.
 7. **Concurrency**: the worker keeps at most 8 Wan takes in flight (one shared account); a 4007/50000/100101 answer is a wait, not a failure.
 
+### 2c. The Wan take text and the tagging (SK, 5 Nov: "have you considered that")
+
+The server writes the whole text (`wan_text`), in this order; the assistant supplies only the motion prompt and continuity, as today:
+
+1. **The references by name, in the order the files are passed**: "the mason (@Image1); his face (@Image2); the helper (@Image3); the pointing trowel and the iron mortar pan (@Image4); the place, this scene with nobody in it (@Image5)". The list is built from the shot's bindings, so a number can never drift from a file; `--dry-run` before every submit confirms each tag resolved, else the take is refused before any credit is spent.
+2. **One line per reference on what to take from it**: identity, hair and clothes from a person's picture; surface, colour and wear from a thing's; layout, light and air from the place's. Where a photograph's pose must not carry over, the line frees it ("his hands are empty; nothing on his head").
+3. **The place**, one sentence from the scene's layout, light and air.
+4. **Fixed positions and facing** against the landmarks: today's heading, gaze, fixed and tool lines, unchanged.
+5. **The beats with their seconds** from the plan's timeline (design/128). With smart duration, the seconds stay and the last line reads "then the take ends".
+6. **The camera**: one line, or one line per cut when the shot has angles inside it, each with its second.
+7. **The closing rules**: no counts of identical things (design/165), no camera equipment named, no dialogue, no captions.
+
+Gone from the Wan text: the `<FIRST_FRAME>` tags, "Use Image1 as the starting frame", the single-shot sentence. The person's working-pose picture (set picture 2) is sent only when the shot wants that pose; the full-length neutral picture and the face go by default.
+
 ## 3. The fourth reference: the environment (SK's question "is it already implemented?")
 
 **Partly, not as asked.** Today a scene's surroundings reach the generator three ways:
