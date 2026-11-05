@@ -1775,6 +1775,10 @@ def cmd_visuals(a):
             emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks (a person's from words, no picture parents).")   # design/124 decision 5
         rows = _rows(m, a.file or 'out/reference-round.json', ('element_id',))   # design/151: a kept round's rows carry `prompt`; an older film's `keywords`
         out = write(base + '/round', {'elements': rows})
+        if out.get('merged'):   # hotfix 4 Nov 2026: a re-post after Done makes only the missing sets; the round and its sets stay
+            errs = out.get('errors') or {}
+            emit(out, 0, f"Round kept: {len(out.get('queued') or [])} missing set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
+                 + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '') + ' Then `vw visuals status --wait 900`; the operator judges every set on step 2.')
         if out.get('kept'):
             emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements (the kept method). Give the operator the page link ({visuals_page_url(m['code'])}): "
                  "step 1 they approve the footage pictures; Done makes every set at once (the server adds the kept preamble, the set line and the four notes to each thing's subject block, and writes each person's sheet from the plan); "

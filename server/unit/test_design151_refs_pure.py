@@ -118,13 +118,13 @@ def test_round_done_approves_the_frames_and_queues_every_set_silently(monkeypatc
     VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln during firing'}, {'element_id': 'P1', 'prompt': 'kneels all day'}], conn=conn)
     out = VS.round_done(store, USER, NEW, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'approve'}, 'P1': {'verdict': 'approve'}}, 'Yes, the frame.', conn=conn)
     s = saved(store)
-    assert s['references']['F1']['status'] == 'approved' and out['pass'] == 'making' and sorted(out['queued']) == ['E1', 'E2', 'P1'] and out['cost_inr'] > 0
-    assert len(conn.inserted) == 3
+    assert s['references']['F1']['status'] == 'approved' and out['pass'] == 'making' and sorted(out['queued']) == ['E2', 'P1'] and out['from_footage'] == ['E1'] and out['cost_inr'] > 0
+    assert len(conn.inserted) == 2   # SK 5 Nov 2026: E1's approved footage picture is its reference; no AI set, no money
     made = {r['element_id']: r for r in s['references'].values() if r.get('kind') == 'sheet'}
-    assert made['E1']['status'] == 'generating' and made['E1']['set'] == made['E1']['id'] and made['E1']['set_n'] == 1
+    assert made['E2']['status'] == 'generating' and made['E2']['set'] == made['E2']['id'] and made['E2']['set_n'] == 1
     req = {_req(p)['reference']['element_id']: _req(p) for p in conn.inserted}
     assert req['E2']['set'] is True and req['E2']['search'] is True and req['E2']['prompt'].startswith(VS.KEPT_PREAMBLE) and req['E2']['parents'] == []
-    assert req['E1']['parents'][0]['id'] == 'F1' and 'Image 1' in req['E1']['prompt']   # Q1: a thing the footage shows is made from its approved frame
+    assert 'E1' not in req and s['golden']['E1'] == 'F1' and s['round']['elements']['E1']['from_footage'] is True   # SK 5 Nov 2026 (replaces Q1): the frame is the reference and the golden picture
     assert req['P1']['set'] is True and 'search' not in req['P1'] and VS.PERSON_SET in req['P1']['prompt'] and req['P1']['parents'] == []   # design/124 decision 5 held
     assert [l['check'] for l in made['E2']['server_checklist']] == [l['check'] for l in VS.KEPT_THING_LINES] and 'labelled' not in json.dumps(made['E2']['server_checklist'])
     assert [l['check'] for l in made['P1']['server_checklist']] == [l['check'] for l in VS.PERSON_SET_LINES]
@@ -132,18 +132,18 @@ def test_round_done_approves_the_frames_and_queues_every_set_silently(monkeypatc
     assert VS.golden_due(s, doc) == [] and VS.sheet_due(s, doc) == []   # the round makes the sheets; no separate golden call on a kept film
 
 
-def test_a_thing_with_a_frame_and_an_unmeasured_size_waits_for_the_measure(monkeypatch):
+def test_a_thing_approved_from_its_frame_needs_no_measure_and_no_set(monkeypatch):
     doc = doc_with()
     doc['elements'][0]['size'][0].update(value=None, status='unknown')
     store = frames_only(doc)
     conn = FakeConn([])
     VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}], conn=conn)
     out = VS.round_done(store, USER, NEW, [], {'E1': {'verdict': 'approve'}}, 'yes', conn=conn)
-    assert out['queued'] == [] and 'measure it first' in out['errors']['E1'] and conn.inserted == []   # Q6: nothing silent; the row says why
+    assert out['queued'] == [] and out['errors'] == {} and out['from_footage'] == ['E1'] and conn.inserted == []   # SK 5 Nov 2026: the footage picture is the reference; no set, so no measure before it
 
 
 def with_sets(doc, person=True):
-    """A round at pass 'making' with every set's pictures back: E1 (three pictures), E2 (two), P1 (three)."""
+    """A round at pass 'making' with every set's pictures back: E2 (two pictures), P1 (three); E1 is referenced by its approved frame F1 (SK, 5 Nov 2026)."""
     store = frames_only(doc)
     conn = FakeConn([])
     rows = [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln during firing'}] + ([{'element_id': 'P1', 'prompt': 'kneels'}] if person else [])
@@ -165,33 +165,33 @@ def test_the_one_shot_verdicts_yes_needs_the_golden_tick_on_a_thing_and_approves
     doc = doc_with(KILN, MASON)
     store, conn, s = with_sets(doc)
     assert VS._round_view(s)['pass'] == 2   # every set is back
-    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E1', 'E2', 'P1')}
+    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E2', 'P1')}
     with pytest.raises(Problem, match='E2: tick the golden picture'):
-        g(lambda: VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][1]}, 'E2': {'verdict': 'yes'}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn))
+        g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes'}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn))
     with pytest.raises(Problem, match='P1: a verdict is required'):
-        g(lambda: VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][1]}, 'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}}, 'yes', conn=conn))
-    with pytest.raises(Problem, match='E1: .* not a picture of its set'):
-        g(lambda: VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E2'][0]}, 'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn))
-    out = VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][1]}, 'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}, 'P1': {'verdict': 'yes'}}, 'All good.', conn=conn)
+        g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}}, 'yes', conn=conn))
+    with pytest.raises(Problem, match='E2: .* not a picture of its set'):
+        g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sets['P1'][0]}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn))
+    out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sets['E2'][1]}, 'P1': {'verdict': 'yes'}}, 'All good.', conn=conn)   # E1: from the footage, nothing asked
     s = saved(store)
     assert out['pass'] == 'complete' and s['round']['pass'] == 'complete'
     assert all(s['references'][i]['status'] == 'approved' and s['references'][i]['approval']['quote'] == 'All good.' for eid in sets for i in sets[eid])
-    assert s['golden'] == {'E1': sets['E1'][1], 'E2': sets['E2'][0], 'P1': sets['P1'][0]}   # Q2: the tick; a person's golden is the full-length front (set picture 1)
+    assert s['golden'] == {'E1': 'F1', 'E2': sets['E2'][1], 'P1': sets['P1'][0]}   # Q2: the tick; a person's golden is the full-length front (set picture 1); E1's its frame
     assert s['feedback'][-1]['verdict'] == 'pass'
 
 
 def test_no_and_correct_it_reject_the_set_and_make_the_next_round_from_the_words():
     doc = doc_with(KILN, MASON)
     store, conn, s = with_sets(doc)
-    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E1', 'E2', 'P1')}
+    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E2', 'P1')}
     with pytest.raises(Problem, match='E2: say what to correct'):
-        g(lambda: VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][0]}, 'E2': {'verdict': 'correct'}, 'P1': {'verdict': 'no'}}, 'yes', conn=conn))
+        g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'correct'}, 'P1': {'verdict': 'no'}}, 'yes', conn=conn))
     n0 = len(conn.inserted)
-    out = VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][0]}, 'E2': {'verdict': 'correct', 'words': 'no chimney, the clamp is sealed with mud'}, 'P1': {'verdict': 'no', 'words': 'too young'}}, 'Round 2.', conn=conn)
+    out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'correct', 'words': 'no chimney, the clamp is sealed with mud'}, 'P1': {'verdict': 'no', 'words': 'too young'}}, 'Round 2.', conn=conn)
     s = saved(store)
     assert out['pass'] == 'making' and sorted(out['queued']) == ['E2', 'P1'] and len(conn.inserted) == n0 + 2
     assert all(s['references'][i]['status'] == 'rejected' and s['references'][i]['rejection']['notes'] == 'no chimney, the clamp is sealed with mud' for i in sets['E2'])
-    assert s['golden'] == {'E1': sets['E1'][0]} and s['round']['elements']['E2']['round'] == 2
+    assert s['golden'] == {'E1': 'F1'} and s['round']['elements']['E2']['round'] == 2
     new = [r for r in s['references'].values() if r.get('kind') == 'sheet' and r['status'] == 'generating']
     assert {r['element_id'] for r in new} == {'E2', 'P1'}
     req = [_req(p) for p in conn.inserted[n0:]]
@@ -320,12 +320,12 @@ def test_a_start_image_takes_the_persons_full_length_front_and_the_face_close_up
     doc = doc_with(KILN, MASON)
     doc['gaps'][1]['scenes'][0]['shots'][0]['element_ids'] = ['E1', 'P1']
     store, conn, s = with_sets(doc)
-    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E1', 'E2', 'P1')}
-    VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][0]}, 'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn)
+    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E2', 'P1')}
+    VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn)
     s = saved(store)
     face, front, pose = sets['P1'][2], sets['P1'][0], sets['P1'][1]
-    parents, lines = VS.with_faces(s, [s['references'][front], s['references'][sets['E1'][0]]], {'P1': 'Mason'})
-    assert [p['id'] for p in parents] == [front, sets['E1'][0], face] and lines == ['Image 3 is the face of P1 (Mason): take the face from it, nothing else.']
+    parents, lines = VS.with_faces(s, [s['references'][front], s['references']['F1']], {'P1': 'Mason'})   # E1's golden is its frame
+    assert [p['id'] for p in parents] == [front, 'F1', face] and lines == ['Image 3 is the face of P1 (Mason): take the face from it, nothing else.']
     parents, lines = VS.with_faces(s, [s['references'][front], s['references'][face]], {'P1': 'Mason'})   # the face named already: nothing added twice
     assert [p['id'] for p in parents] == [front, face] and lines == []
     parents, lines = VS.with_faces(s, [s['references'][pose]], {'P1': 'Mason'})   # another pose by name brings nothing by itself
@@ -337,8 +337,8 @@ def test_a_start_image_takes_the_persons_full_length_front_and_the_face_close_up
 def test_the_drawn_brief_and_the_page_payload_carry_the_set_and_its_notes():
     doc = doc_with(KILN)
     store, conn, s = with_sets(doc, person=False)
-    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E1', 'E2')}
-    VS.round_sets(store, USER, NEW, [], {'E1': {'verdict': 'yes', 'golden': sets['E1'][2]}, 'E2': {'verdict': 'yes', 'golden': sets['E2'][1]}}, 'yes', conn=conn)
+    sets = {eid: sorted(r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid) for eid in ('E2',)}
+    VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sets['E2'][1]}}, 'yes', conn=conn)
     s = saved(store)
     shown = [rid for rid, r in VS.brief_pictures(s, {'element_ids': ['E2']})]
     assert set(shown) == set(sets['E2'])

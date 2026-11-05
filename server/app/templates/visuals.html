@@ -518,6 +518,7 @@ function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; t
 }
 function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id&&['frame','supplied','web','isolated','sheet','component'].includes(r.kind));   // design/117 P1   // keyframes and states are compositions, not references
   if(refs.some(r=>r.kind==='sheet'&&r.status==='approved'))return ['ok','sheet approved'];
+  if(data.kept&&refs.some(r=>r.kind==='sheet'&&r.set))return ['dec','set made: judge it on step 2'];   // design/151 hotfix
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
   if(data.kept)return ['','waiting for the round'];   // design/151 hotfix: a kept film's sets are made in the round, never per element
   if(refs.some(r=>r.status==='approved'))return ['dec','pictures approved, sheet to make'];
@@ -565,11 +566,12 @@ function panelBody(){
     return '<div class="pair">'+pair.map(x=>'<div class="'+(x.id===r.id?'hl':'')+'">'+big(x)+'<div class="ds">'+picWord(x)+' · '+esc(x.name)+' · '+esc(x.status)+'</div></div>').join('')+'</div>'+head+why+checklist(r.checklist,r.check)+fixBtn(r)+
       (own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'):'');
   }
-  const placed=placedIn(r.id), srcs=r.kind==='sheet'?(r.parents||[]).map(id=>by[id]).filter(Boolean):[];
+  const placed=placedIn(r.id), srcs=r.kind==='sheet'?(r.parents||[]).map(id=>by[id]).filter(Boolean):[], inSet=!!(r.set&&d.kept);   // design/151 hotfix: a set's picture is judged on step 2 of the round
   const made=srcs.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="srcs">'+srcs.map(x=>big(x)).join('')+'</div>':'', pend=r.kind==='sheet'&&r.status==='candidate';
-  return big(r)+head+why+(pend?made:'')+checklist(r.checklist,r.check)+fixBtn(r)+noteBox(r)+   // design/97 R1: a pending sheet beside its sources
+  return big(r)+head+why+(pend?made:'')+checklist(r.checklist,r.check)+(inSet?'':fixBtn(r))+noteBox(r)+   // design/97 R1: a pending sheet beside its sources
     '<details class="pdet"><summary>Details</summary><div class="ds">'+esc(r.kind)+(r.width?' · '+esc(r.width)+'×'+esc(r.height):'')+(r.note?' · note: '+esc(r.note):'')+(r.from_thumbnail?' · saved from the thumbnail':'')+'</div>'+(pend?'':made)+'</details>'+   // design/100 S4
     (placed?'<div class="ds ok">'+'Approved · in the film at '+filmAt(placed)+' ('+esc(placed.shot_id)+')</div>'+(can&&!placed.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(placed.shot_id)+'">Remove</button>'):'')   // design/97 A5
+     :inSet&&r.status==='candidate'?'<div class="ds" style="margin-top:8px">Picture '+esc(r.set_n||1)+' of the set of '+esc(r.element_id)+': judge the whole set on step 2 of the reference round (Yes, No or Correct it), not here.</div>'
      :own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'+
        (r.status==='approved'&&sh&&sh.route==='still'?'<button data-a="still" data-shot="'+esc(sh.shot_id)+'" data-ref="'+esc(r.id)+'">Use for the shot</button>':'')):'');   // design/80 S6: the words sit with the button
 }
@@ -665,7 +667,7 @@ function keptVerdict(eid){const v=document.querySelector('input[name="v-'+eid+'"
 function keptWords(eid){return (($('w-'+eid)||{}).value||'').trim();}
 function keptWaiting(rd){   // design/151: what keeps Done locked on the one-shot pass, by name
   const out=[], kinds={};(data.elements||[]).forEach(e=>kinds[e.id]=e.kind);
-  Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid];if(r.ignored)return;const v=keptVerdict(eid);
+  Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid];if(r.ignored||r.from_footage)return;const v=keptVerdict(eid);
     if(!v||(v==='yes'&&kinds[eid]!=='person'&&!goldenTick[eid])||(v==='correct'&&!keptWords(eid)))out.push(eid);});
   return out;}
 function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while every set is made silently; pass 2 every set in one shot: Yes, No or Correct it, the golden tick on a thing
@@ -678,16 +680,18 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
       let frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
       if(!frames.length)frames=(d.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));
       return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span>'+usedIn(eid)+
-        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?'Use the footage picture':(e.kind==='person'?'Make the character sheet':'Make its pictures'))+'</label>'+
+        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?(e.kind==='person'?'Use the footage picture for the description (the sheet is still made)':'Use the footage picture (no AI picture is made)'):(e.kind==='person'?'Make the character sheet':'Make its pictures'))+'</label>'+
         '<label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
         (frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'"><img src="'+esc(thumbOf(f.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(f.id)+'"><div class="cap">from your footage</div></div>').join('')+'</div>':'<div class="ds">Not in your footage: the assistant makes its pictures from real photographs.</div>')+'</div>';}).join('');
     left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 1 of 2:</b> for each thing, use the picture from your footage, or ignore it. Done makes every picture at once; you judge them all together on step 2.</p>'+rows;
   }else if(rd.pass==='making'){
     const rows=ids.filter(eid=>!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, set=(r.set||[]).map(i=>refs[i]).filter(Boolean), st=set.length?set[0].status:'';
+      if(r.from_footage)return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge ok">from your footage</span></div>';   // SK 5 Nov: no AI picture for it
       return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge '+(st==='candidate'?'ok':st==='failed'?'err':'dec')+'">'+esc(r.error?'not made':st==='candidate'?'ready':st==='failed'?'failed':'being made')+'</span>'+(r.error?'<div class="ds err">'+esc(r.error)+'</div>':'')+'</div>';}).join('');
     left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>The pictures are being made.</b> This page refreshes itself; when every set is back, you judge them all together.</p>'+rows;
   }else{
     const rows=ids.filter(eid=>!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, set=(r.set||[]).map(i=>refs[i]).filter(x=>x&&x.status!=='rejected'), thing=e.kind!=='person', v=keptVerdict(eid)||r.verdict||'';
+      if(r.from_footage){const g=refs[(d.golden||{})[eid]];return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span> <span class="badge ok">from your footage</span>'+(g?'<div class="strip"><div class="pic on" data-item="'+esc(g.id)+'"><img src="'+esc(thumbOf(g.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(g.id)+'"><div class="cap">the golden picture, from your footage</div></div></div>':'')+'</div>';}   // SK 5 Nov
       const pics=set.map((x,i)=>'<div class="pic '+(isSel('ref',x.id)?'sel':'')+'" data-item="'+esc(x.id)+'">'+(thing?'<span class="tick '+(goldenTick[eid]===x.id?'on':'')+'" data-golden="'+esc(eid)+':'+esc(x.id)+'" title="tick the golden picture: the one every shot starts from">'+(goldenTick[eid]===x.id?'★':'')+'</span>':'')+
         '<img src="'+esc(thumbOf(x.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(x.id)+'"><div class="cap">'+(thing?'picture '+(x.set_n||i+1):['','full length','working pose','face'][x.set_n]||('picture '+(x.set_n||i+1)))+'</div></div>').join('');
       const notes=set.length&&set[0].notes?'<details><summary class="ds" style="cursor:pointer">the model\'s notes and sources</summary><div class="ds" style="white-space:pre-wrap">'+esc(set[0].notes)+'</div>'+((set[0].sources||[]).map(s=>'<div class="ds"><a href="'+esc(s.url||'')+'" target="_blank" rel="noopener">'+esc(s.title||s.url||'')+'</a></div>').join(''))+'</details>':'';
@@ -993,7 +997,7 @@ async function click(b){
     const verdicts={};Object.keys(rd.elements).forEach(eid=>{verdicts[eid]={verdict:verdictOf(eid,rd.elements[eid])};});   // design/121 change 6: Done runs no search
     await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the footage pictures you chose are approved; the searched things are on pass 2.');return;}
   if(a==='round-sets'){const rd=roundOpen();if(!rd)return;   // design/151
-    const verdicts={};Object.keys(rd.elements).forEach(eid=>{if(rd.elements[eid].ignored)return;verdicts[eid]={verdict:keptVerdict(eid),words:keptWords(eid),golden:goldenTick[eid]||''};});
+    const verdicts={};Object.keys(rd.elements).forEach(eid=>{if(rd.elements[eid].ignored||rd.elements[eid].from_footage)return;verdicts[eid]={verdict:keptVerdict(eid),words:keptWords(eid),golden:goldenTick[eid]||''};});
     const j=await send({action:'round-sets',verdicts:verdicts,quote:q},'Recorded: the sets you said Yes to are approved; the others are being made again.');
     if(j){Object.keys(goldenTick).forEach(k=>delete goldenTick[k]);}return;}
   if(a==='ignore'){const el=b.dataset.el;if(ignoredEls[el])delete ignoredEls[el];else ignoredEls[el]=true;renderStep();footer();return;}   // design/121 change 1: one click, no typing

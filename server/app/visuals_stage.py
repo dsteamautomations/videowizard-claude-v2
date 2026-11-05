@@ -1906,6 +1906,9 @@ def waiting(session, plan, code, take_rows):
             continue
         if r.get('kind') == 'style':
             add(-1, 'Graphic style · style sheet', 'pictures', STYLE, r['id'])
+        elif r.get('kind') == 'sheet' and r.get('set') and kept(session):   # design/151 hotfix (VW-18): a set's pictures are judged together on step 2, never one by one
+            if _round_pass(session, session.get('round')) == 2:
+                add(-1, 'Reference round · step 2: judge every set', 'references', '', 'round')
         elif r.get('kind') in ('frame', 'supplied', 'web', 'isolated', 'sheet'):
             add(-1, f"Reference sheet · {r['element_id']}" if r['kind'] == 'sheet' else f"Reference · {r['element_id']} · {r['kind']}", 'references', r['element_id'], r['id'])
         elif sh and route_of(sh) == 'still':
@@ -2370,6 +2373,9 @@ def round_start(store, user, run, outputs, elements, conn=None):
     kept_ = mark_kept(session, run)
     if kept_:
         distinct_people(plan)
+    old = session.get('round') or {}
+    if kept_ and old.get('kept') and old.get('pass') != 1:   # hotfix 4 Nov 2026 (VW-18): a re-post after Done never wipes the round and its sets
+        return _round_merge(conn, store, user, run, outputs, session, plan, kinds, elements)
     rows = {}
     for row in elements:
         eid = (row or {}).get('element_id')
@@ -2389,6 +2395,63 @@ def round_start(store, user, run, outputs, elements, conn=None):
     session['round'] = {'pass': 1, 'at': datetime.now(timezone.utc).isoformat(), 'by': user['id'], 'elements': rows, 'quote': None, **({'kept': True} if kept_ else {})}
     save_session(store, run, session)
     return {'pass': 1, 'elements': len(rows), **({'kept': True} if kept_ else {})}
+
+
+def _from_footage(session, plan, rd):
+    """SK, 5 Nov 2026 (VW-18): a thing the operator approved from the footage keeps that picture as its reference; no AI set is made, no money spent. Its golden
+    picture is the first approved frame of its row. A person's footage picture serves the description only (design/124 decision 5), so a person still gets the sheet."""
+    kinds = {e['id']: e.get('kind') for e in plan.get('elements') or []}
+    out = []
+    for eid, row in rd['elements'].items():
+        if row.get('ignored') or kinds.get(eid) == 'person' or row.get('set'):
+            continue
+        approved = [fid for fid in row.get('frames') or [] if (session['references'].get(fid) or {}).get('status') == 'approved']
+        if not approved:
+            continue
+        row.update(from_footage=True, verdict='approve', error=None)
+        session.setdefault('golden', {})[eid] = approved[0]
+        out.append(eid)
+    return out
+
+
+def _round_merge(conn, store, user, run, outputs, session, plan, kinds, elements):
+    """design/151 hotfix (VW-18, 4 Nov 2026): a kept round past step 1 keeps its sets when the assistant posts rows again; the rows name the elements whose set
+    was not made (refused before the call, or failed): their prompt and frames are replaced, the error cleared, and the set is made at once. An element that has
+    its set is refused by name: the operator judges it on step 2 (No or Correct it makes it again). Returns what round_done returns, plus the elements merged."""
+    rd = session['round']
+    merged = []
+    for row in elements:
+        eid = (row or {}).get('element_id')
+        need(eid in kinds, f'Unknown element {eid}.')
+        need(kinds[eid] != 'graphic', f'{eid} is a graphic: drawn from the plan, never referenced.')
+        cur = rd['elements'].get(eid) or {}
+        has = cur.get('set') and _set_rows(session, eid, cur['set'], ('generating', 'candidate', 'approved'))
+        need(not has, f"{eid} has its set already: the round is past step 1, so judge it on step 2 (No or Correct it makes it again); a new round file never replaces a set.")
+        need(not cur.get('from_footage'), f"{eid} is referenced by its approved footage picture: no AI set is made for it.")
+        prompt = ' '.join(str((row or {}).get('prompt') or '').split())
+        need(prompt, f'{eid}: give its prompt (the subject block of a thing: what the picture must represent; the why line of a person).')
+        frames = list((row or {}).get('frames') or [])
+        for fid in frames:
+            r = session['references'].get(fid)
+            need(r and r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved'), f'{fid} is not a footage frame of {eid}.')
+        if not frames:
+            frames = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
+        rd['elements'][eid] = {**cur, 'frames': frames, 'keywords': '', 'prompt': prompt, 'corrections': list(cur.get('corrections') or []), 'set': None, 'round': int(cur.get('round') or 0),
+                              'verdict': 'approve', 'ignored': False, 'search_id': None, 'error': None}
+        merged.append(eid)
+    for eid in merged:
+        for fid in rd['elements'][eid]['frames']:
+            r = session['references'][fid]
+            if r.get('status') == 'candidate':
+                r['status'] = 'approved'
+    save_session(store, run, session)
+    queued, errors = _queue_sets(conn, store, user, run, outputs, merged)
+    session = session_of(store, run, outputs)
+    rd = session['round']
+    rd['pass'] = 'making' if queued else rd['pass']
+    save_session(store, run, session)
+    return {'pass': _round_pass(session, rd), 'kept': True, 'merged': merged, 'queued': queued, 'errors': errors, 'elements': len(rd['elements']),
+            'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2)}
 
 
 def _set_rows(session, eid, set_id, statuses=('candidate',)):
@@ -2448,7 +2511,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None):
     verdicts = verdicts or {}
     plan = guarded(lambda: current_plan(store, session))
     kinds = {e['id']: e['kind'] for e in plan['elements']}
-    active = [eid for eid, r in rd['elements'].items() if not r.get('ignored')]
+    active = [eid for eid, r in rd['elements'].items() if not r.get('ignored') and not r.get('from_footage')]   # a footage element was done at step 1
     for eid in active:
         r, v = rd['elements'][eid], verdicts.get(eid) or {}
         need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
@@ -2530,14 +2593,15 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
                     _feedback_image(session, run, user, r, 'pass', quote, '')
     rd['quote'] = quote
     if rd.get('kept'):   # design/151: every set made now, silently; the operator judges them in one shot
+        from_footage = _from_footage(session, guarded(lambda: current_plan(store, session)), rd)   # SK, 5 Nov 2026: an approved footage picture is the reference; no AI set is made for it
         save_session(store, run, session)
-        todo = [eid for eid, r in rd['elements'].items() if not r.get('ignored')]
+        todo = [eid for eid, r in rd['elements'].items() if not r.get('ignored') and eid not in from_footage]
         queued, errors = _queue_sets(conn, store, user, run, outputs, todo)
         session = session_of(store, run, outputs)
         rd = session['round']
-        rd['pass'] = 'making' if queued else ('complete' if not todo else 1)
+        rd['pass'] = 'making' if queued else ('complete' if not todo else 2)   # every set refused before the call: step 2 shows them (No or Correct it makes them again)
         save_session(store, run, session)
-        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2)}
+        return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'from_footage': from_footage, 'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2)}
     searched = [eid for eid, r in rd['elements'].items() if r['verdict'] == 'search']
     rd['pass'] = 2 if searched else 'complete'
     save_session(store, run, session)

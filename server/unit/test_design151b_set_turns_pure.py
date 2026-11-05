@@ -146,11 +146,11 @@ def test_a_set_runs_on_gemini_whatever_the_films_picture_ai(monkeypatch):
     openai_film = {**NEW, 'image_provider': 'openai'}
     VS.round_start(store, USER, openai_film, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln during firing'}, {'element_id': 'P1', 'prompt': 'kneels all day'}], conn=conn)
     out = VS.round_done(store, USER, openai_film, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'approve'}, 'P1': {'verdict': 'approve'}}, 'Yes.', conn=conn)
-    assert out['errors'] == {} and sorted(out['queued']) == ['E1', 'E2', 'P1']
+    assert out['errors'] == {} and sorted(out['queued']) == ['E2', 'P1'] and out['from_footage'] == ['E1']
     req = {_req(p)['reference']['element_id']: _req(p) for p in conn.inserted}
     assert all(r['provider'] == 'gemini' and r['model'] == VS.settings().GEMINI_IMAGE_MODEL and 'aspect' in r['size'] for r in req.values())
     assert req['E2']['views'] == VS.set_views(KILN) and req['P1']['views'] == VS.PERSON_VIEWS
-    assert out['cost_inr'] == pytest.approx(3 * VS.image_price_inr(openai_film, provider='gemini') * 3, abs=0.01) and VS.image_price_inr(openai_film) == 20.0
+    assert out['cost_inr'] == pytest.approx(2 * VS.image_price_inr(openai_film, provider='gemini') * 3, abs=0.01) and VS.image_price_inr(openai_film) == 20.0
 
 
 def test_the_page_says_the_kept_way_before_the_round():
@@ -173,3 +173,88 @@ def test_the_status_says_the_round_is_next_on_a_kept_film_until_it_is_posted():
     assert VS.status(conn, store, NEW, [])['round_due'] is None
     store = frames_only(doc)
     assert VS.status(conn, store, OLD, [])['round_due'] is None   # an older film keeps its own order
+
+
+# ---------- hotfix 4 Nov 2026 (VW-18): a re-post after Done merges; a set is judged on step 2, never picture by picture ----------
+
+from test_design151_refs_pure import with_sets  # noqa: E402
+
+
+def test_a_round_posted_again_after_done_keeps_the_sets_and_makes_only_the_missing_ones():
+    doc = doc_with(KILN, MASON)
+    store, conn, s = with_sets(doc)
+    # E2's set was refused before the call (say: measure first): no rows, an error on its row
+    for rid in [r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == 'E2']:
+        del s['references'][rid]
+    s['round']['elements']['E2'].update(set=None, error='E2: measure first')
+    store.files[f"{NEW['id']}/visuals/session.json"] = json.dumps(s).encode()
+    n0 = len(conn.inserted)
+    with pytest.raises(Problem, match='P1 has its set already'):
+        g(lambda: VS.round_start(store, USER, NEW, [], [{'element_id': 'P1', 'prompt': 'the mason again'}], conn=conn))
+    with pytest.raises(Problem, match='E1 is referenced by its approved footage picture'):
+        g(lambda: VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'prompt': 'the plinth again'}], conn=conn))
+    out = VS.round_start(store, USER, NEW, [], [{'element_id': 'E2', 'prompt': 'the kiln, measured: 3 m high'}], conn=conn)
+    s2 = saved(store)
+    assert out['merged'] == ['E2'] and out['queued'] == ['E2'] and out['errors'] == {} and out['pass'] == 'making' and len(conn.inserted) == n0 + 1
+    assert s2['round']['elements']['E1']['from_footage'] and s2['round']['elements']['P1']['set']   # untouched
+    assert s2['round']['elements']['E2']['prompt'] == 'the kiln, measured: 3 m high' and s2['round']['elements']['E2']['error'] is None and s2['round']['elements']['E2']['set']
+    assert sum(1 for r in s2['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == 'P1') == 3   # P1's pictures still there
+    assert 'merged' not in VS.round_start(frames_only(doc), USER, NEW, [], [{'element_id': 'E1', 'prompt': 'x'}], conn=FakeConn([]))   # a first post is a fresh round
+
+
+def test_a_kept_set_waits_as_one_step_2_item_not_picture_by_picture():
+    doc = doc_with(KILN, MASON)
+    store, conn, s = with_sets(doc)
+    items = VS.waiting(s, doc, 'VW-20', [])
+    labels = [i['label'] for i in items]
+    assert labels.count('Reference round · step 2: judge every set') == 1 and not any(l.startswith('Reference sheet') for l in labels)
+    assert next(i for i in items if i['label'].startswith('Reference round'))['link'] == '/runs/VW-20/visuals#references//round'
+
+
+def test_the_page_judges_a_set_on_step_2_only():
+    from pathlib import Path
+    html = (Path(VS.__file__).resolve().parent / 'templates' / 'visuals.html').read_text(encoding='utf-8')
+    for needle in ("inSet=!!(r.set&&d.kept)", "(inSet?'':fixBtn(r))", 'judge the whole set on step 2 of the reference round', "['dec','set made: judge it on step 2']"):
+        assert needle in html, needle
+
+
+# ---------- SK, 5 Nov 2026 (VW-18): an approved footage picture is the reference; no AI set is made for it ----------
+
+def test_a_thing_approved_from_the_footage_gets_no_ai_set_and_its_frame_is_the_golden_picture():
+    doc = doc_with(KILN, MASON)
+    store = frames_only(doc)
+    conn = FakeConn([])
+    VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln'}, {'element_id': 'P1', 'prompt': 'kneels'}], conn=conn)
+    out = VS.round_done(store, USER, NEW, [], {'E1': {'verdict': 'approve'}, 'E2': {'verdict': 'approve'}, 'P1': {'verdict': 'approve'}}, 'Yes.', conn=conn)
+    s = saved(store)
+    assert out['from_footage'] == ['E1'] and sorted(out['queued']) == ['E2', 'P1'] and len(conn.inserted) == 2   # E1: no job, no money
+    assert s['round']['elements']['E1']['from_footage'] is True and s['round']['elements']['E1']['set'] is None and s['golden']['E1'] == 'F1'
+    assert not any(r.get('kind') == 'sheet' and r['element_id'] == 'E1' for r in s['references'].values())
+    # step 2 asks nothing for E1; the round completes without a verdict on it
+    for r in s['references'].values():
+        if r.get('kind') == 'sheet':
+            r.update(status='candidate', sha256='sha-' + r['id'])
+    store.files[f"{NEW['id']}/visuals/session.json"] = json.dumps(s).encode()
+    sets = {eid: [r['id'] for r in s['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == eid] for eid in ('E2', 'P1')}
+    out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sets['E2'][0]}, 'P1': {'verdict': 'yes'}}, 'yes', conn=conn)
+    assert out['pass'] == 'complete' and sorted(out['approved']) == ['E2', 'P1']
+    with pytest.raises(Problem, match='E1 is referenced by its approved footage picture'):
+        g(lambda: VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'prompt': 'again'}], conn=conn))
+
+
+def test_the_page_shows_a_footage_element_done_and_asks_no_verdict_for_it():
+    from pathlib import Path
+    html = (Path(VS.__file__).resolve().parent / 'templates' / 'visuals.html').read_text(encoding='utf-8')
+    for needle in ('Use the footage picture (no AI picture is made)', "if(r.from_footage)return", 'the golden picture, from your footage', "if(rd.elements[eid].ignored||rd.elements[eid].from_footage)return", "if(r.ignored||r.from_footage)return"):
+        assert needle in html, needle
+
+
+def test_the_instructions_say_a_footage_picture_needs_no_ai_set():
+    from pathlib import Path
+    root = Path(VS.__file__).resolve().parents[2]
+    v3 = json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
+    parts = {p['name']: p['text'] for p in next(s for s in v3['stages'] if s['name'] == 'visuals')['parts']}
+    assert 'a thing with an approved footage picture gets no AI set' in parts['picture-search'] and 'is made from it' not in parts['picture-search']
+    assert "a thing's approved footage picture, else the ticked picture of its set" in parts['later']
+    md = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert 'gets no AI set' in md and 'is made from it' not in md
