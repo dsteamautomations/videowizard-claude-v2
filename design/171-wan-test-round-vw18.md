@@ -59,6 +59,17 @@ Balance 1,202 → 944: **258 credits**. The eight runs: 8+8+7+5+30+10+4+4 = 76 s
 
 Wan 3.0 Omni through the CLI does what design/170 asks on real plan text: identity from the sets, the place from one environment picture, the action in the written order, the length as asked up to 30 s, cuts where named. Its limits are the same as Omni's (pace is its own; counts drift) and one more (a reference's contents leak). The experiment continues as SK set it: more scenarios on this script before anything is integrated. Next scenarios worth their credits: a scene with three people; a 9:16 film; a take with a line of dialogue (`--audios`); a wide scene of a place with no set picture; a second run of the pointing shot with a correct wall picture.
 
+## 7. Two more 30 s sequences on VW-18's own scenes (SK: "can you try that")
+
+| Run | Sequence | Pictures | Result |
+|---|---|---|---|
+| W7 | the plinth gap as three shots: wide sweep and first throw (0–10), close at the top's level on the water (10–20), low at the corner on the string (20–30) | both environment pictures (the plinth from above, the corner low), the worker, his face, the broom, the bucket | 30.0 s; **cuts at 10 and 20 s** (ffmpeg found the first at 9.97); every beat in order: sweep with dust, broom down, mug, the arc; the sheet of water on the top with drops off the edge, the mug lowered; the line slack, drawn, wound at the peg and left taut along the edge. Same worker in all three. |
+| W8 | the kiln as three shots: wide hand-over (0–10), close on the hands at the stack (10–20), a slow pan along the drying rows settling on the chimney (20–30) | environment picture, the two workers, their faces | 30.0 s; cuts at 10 and 20 s; the hand-over, the pair squared on the stack, the pan ending with the chimney at the left. **One invention: flames glowing in the firing trench from 23 s** although the scene says smoke and no flame; the text named the trench and the heat shimmer and said nothing about fire. |
+
+Cost 90 credits each (3 a second); 5 minutes each. Balance after: see the logs.
+
+What this adds to section 3: a real gap's shots can be written as one 30 s sequence and Wan keeps the cuts at the second and the person across the angles (three for three now, W3, W7, W8). Two environment pictures of one place (two camera positions) can go in one call and each serves its shot. The invention in W8 is the kind the take check (design/91 N3) catches: the check's "what must not appear" line gets the scene's exclusions ("no flame") word for word, as the light line does today.
+
 ## Not covered
 
 - The assembly was not run on these takes (no run holds them); the probe facts are in the logs.

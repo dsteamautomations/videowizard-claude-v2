@@ -1,0 +1,42 @@
+{
+ "run": "W8-kiln-30s",
+ "prompt_file": "prompts/w8-kiln-30s.txt",
+ "images": [
+  "env/env-kiln.jpg",
+  "pics/kiln_workers__sheet__1__e2594ac6.png",
+  "pics/kiln_workers__sheet__3__e2594ac6.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 30,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 854,
+ "task_id": "ae540de9c0704f03b3b45fafc28f666a",
+ "status": "succeeded",
+ "seconds": 311,
+ "file": "out/W8-kiln-30s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "30.000000"
+  }
+ },
+ "credits_after": 764,
+ "cost_credits": 90
+}

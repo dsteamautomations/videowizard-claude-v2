@@ -1,0 +1,45 @@
+{
+ "run": "W7-plinth-30s",
+ "prompt_file": "prompts/w7-plinth-30s.txt",
+ "images": [
+  "env/env-plinth.jpg",
+  "env/env-string.jpg",
+  "pics/worker_plinth__sheet__1__b41000a4.png",
+  "pics/worker_plinth__sheet__3__b41000a4.png",
+  "pics/technique_plinth_wetting__sheet__3__f42b4b62.png",
+  "pics/water_pot__sheet__1__a7cbc5bb.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": 30,
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 944,
+ "task_id": "0c12880538504fb5908a2447f9844999",
+ "status": "succeeded",
+ "seconds": 461,
+ "file": "out/W7-plinth-30s.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "30.000000"
+  }
+ },
+ "credits_after": 764,
+ "cost_credits": 180
+}
