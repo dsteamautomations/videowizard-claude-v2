@@ -1,0 +1,42 @@
+{
+ "run": "R2-string",
+ "prompt_file": "prompts/r2-string.txt",
+ "images": [
+  "env/env-string.jpg",
+  "pics/worker_string__sheet__2__dc9e5f80.png",
+  "pics/technique_string_setting__sheet__3__90559b83.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": "smart",
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 674,
+ "task_id": "de901facda2a46dda6c78b3472a88b33",
+ "status": "succeeded",
+ "seconds": 274,
+ "file": "out/R2-string.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "10.000000"
+  }
+ },
+ "credits_after": 464,
+ "cost_credits": 210
+}

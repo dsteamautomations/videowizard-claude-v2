@@ -1,0 +1,42 @@
+{
+ "run": "R2-kiln",
+ "prompt_file": "prompts/r2-kiln.txt",
+ "images": [
+  "env/env-kiln.jpg",
+  "pics/kiln_workers__sheet__1__e2594ac6.png",
+  "pics/kiln_workers__sheet__3__e2594ac6.png"
+ ],
+ "videos": [],
+ "audios": [],
+ "duration": "smart",
+ "ratio": "16:9",
+ "resolution": "720P",
+ "audio_output": "false",
+ "credits_before": 494,
+ "task_id": "834defae77f844a889db6c8f371c78b2",
+ "status": "succeeded",
+ "seconds": 215,
+ "file": "out/R2-kiln.mp4",
+ "watermark": "without",
+ "probe": {
+  "programs": [],
+  "stream_groups": [],
+  "streams": [
+   {
+    "codec_type": "video",
+    "width": 1280,
+    "height": 720,
+    "avg_frame_rate": "30/1"
+   },
+   {
+    "codec_type": "audio",
+    "avg_frame_rate": "0/0"
+   }
+  ],
+  "format": {
+   "duration": "15.000000"
+  }
+ },
+ "credits_after": 314,
+ "cost_credits": 180
+}

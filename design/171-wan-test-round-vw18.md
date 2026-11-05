@@ -70,6 +70,27 @@ Cost 90 credits each (3 a second); 5 minutes each. Balance after: see the logs.
 
 What this adds to section 3: a real gap's shots can be written as one 30 s sequence and Wan keeps the cuts at the second and the person across the angles (three for three now, W3, W7, W8). Two environment pictures of one place (two camera positions) can go in one call and each serves its shot. The invention in W8 is the kind the take check (design/91 N3) catches: the check's "what must not appear" line gets the scene's exclusions ("no flame") word for word, as the light line does today.
 
+## 8. Round 2 (SK, 5 Nov night): steps instead of seconds, the right hand, smart duration
+
+SK's three changes after reviewing the prompts: (1) every action with the right hand; (2) `--smart-duration=true`; (3) the action written as a numbered series of steps, every timeline reference removed. The same five single-shot scenes, the same pictures, the prompts `171-assets/r2-*.txt`.
+
+| Run | Plan length | Length the model chose | Steps in order | Right hand | Notes |
+|---|---|---|---|---|---|
+| R2-plinth | 8.2 s | **20 s** | all seven, in order: sweep along, broom down, mug out, two throws, the top wet, the standing end | yes: broom and mug in the right hand | slow, with idle stretches (standing 7.5–8.5 s, fumbling at the bucket 9.5–11.5 s); the same man and place throughout |
+| R2-string | 4.6 s | **10 s** | all five: slack, drawn taut, wound twice, plucked, hands off, the line taut | yes: the right hand draws and winds, the left on the peg | no idle; the watch on the left wrist |
+| R2-pointing | 6.8 s | **15 s** | all five: load from the hawk, press in, work along, strike back, lift off | yes: trowel in the right hand, hawk in the left throughout | the wall still flat-laid (the reference picture, as in round 1); a slow start, the hands enter at 1 s |
+| R2-kiln | 4.0 s | **15 s** | the five, then **an extra repeat** (the first worker bends and lifts again at 10–12 s) | mostly: the lift is two-handed, the pass and the set right-handed | 3 s idle at the start; **no flame** this time (the place line now says "smoke only, no flame") |
+| R2-count | 10 s | **15 s** | one brick at a time, in order, the pan empty at the end, five on the wall | yes | **the pan held two bricks at the start, not five**; the total drifted 2 → 5 as in round 1 |
+
+Cost: 75 s of video = 225 credits (3 a second), about double the round-1 cost of the same five shots.
+
+What this says:
+1. **Steps without seconds hold the order** as well as the timeline did: five for five, every step present and in sequence. The seconds were never needed for the order.
+2. **The right hand is honoured** wherever a hand is visible, with a line before the steps and "with his right hand" on each step.
+3. **Smart duration without seconds makes long takes**: 10–20 s for 4–8 s shots, two to three times the plan's length, with idle stretches and, once, a repeated action. The model fills the time it gives itself. With the seconds in the text (round 1, W1b) it chose the text's last second. So: steps for the order, and either an explicit `--duration` from the plan or one line "the whole shot lasts N seconds", else the take runs long and costs double.
+4. **The invention problem is fixable in the text**: "smoke only, no flame" removed the flames of W8.
+5. **Counts drift regardless** of the prompt's form (round 1: 3 → 5; round 2: 2 → 5).
+
 ## Not covered
 
 - The assembly was not run on these takes (no run holds them); the probe facts are in the logs.
