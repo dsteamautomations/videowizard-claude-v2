@@ -58,6 +58,10 @@ All on `main`, all design notes and assets, **no code** in `server/` or `plugin/
 - **The right hand forced by text** made a left-to-right sweep look awkward (SK): the hand is a staging fact; now the rules of design/175 and the staging video decide it.
 - **The cartoon method** (29 Omni runs, design/153–169): controlled staging but not counts; parked by SK on 5 Nov evening in favour of Wan.
 
+## 6 Nov addendum (for the new thread)
+
+SK, 6 Nov morning: two developments. (1) **Seedance 2.0 and Seedance 2.0 Flash** gave better results; they are reached **through OpenRouter** (ids, prices and a key still to come). (2) **Gemini Omni 1.2 Flash** (`gemini-omni-1.2-flash`, GA 5 Nov; 1.1 routes to it from 3 Dec) with 3–15 s video, up to 6 reference images, 15 s clip editing, extension to 30 s, 1080p/4K upscaled, control tags deprecated. SK's next test: **rerun yesterday's cartoon-edit cases on 1.2** to see whether character and activity consistency improved, then the agreed shortcut (counts off camera, multi-angle, close-ups). Everything for it is in **design/176** (the facts, the plan O1–O3, and §4 the failure pack: ten failing cases with their cartoons, photographs, prompts and 1.1 outputs in `176-assets/`). The Wan work above stands as it was; nothing changed there.
+
 ## Next steps
 
 1. **Read SK's agent-mode task** once he makes one in the website's chat canvas: `wan task list --page-size 5 --media-type video --output json`, compare `createScene`, `thinkMode`, `finalPrompt` with run A1 (`71e03506`). Decide whether the CLI reaches it (brief file) or not.

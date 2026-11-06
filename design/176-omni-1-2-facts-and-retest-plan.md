@@ -44,9 +44,38 @@ Rerun yesterday's mason test on 1.2 with the same inputs, so the only variable i
 
 Tooling: `omni_test.py` needs the model name, `response_format.duration`, and `resolution` as options (three lines). Runs go on the VM as yesterday (the key is there; SK's gcloud login is fresh). Review on half-second strips at 480 px (design/167 D8). Each run about ₹90 at 10 s; 1.2 is said to be 30% cheaper.
 
-Seedance 2.0 and 2.0 Flash: not reachable from here until SK names the service and the exact model names; they are not Gemini models.
+Seedance 2.0 and 2.0 Flash: **accessed through OpenRouter** (SK, 6 Nov; the marketplace of design/173's screenshot). Their OpenRouter model ids and prices are read from OpenRouter's model list before any run; an OpenRouter key is needed on the VM or this PC (not yet placed). They run through OpenRouter's API, not Google's, so the runner gets a second transport.
+
+## 4. The failure pack: what Omni 1.1 got wrong, with the exact inputs, so 1.2 is judged on the same cases
+
+Everything below is in `176-assets/`: the cartoons that went in (`cartoons/`), the three mason photographs and the two park stills (`photographs/`), the prompts as sent (`prompts/`), four Omni 1.1 outputs to compare against (`omni-1.1-outputs/`), the shot list (`mason-shot-list.md`) and the runner (`omni_test.py`, model name to change). Every output's half-second strips are in the original `15x-assets` folders.
+
+| Case | Note | Inputs (as sent to 1.1) | What 1.1 got wrong | What 1.2 must do better |
+|---|---|---|---|---|
+| **F1 park, cartoon edited** | 156 (runs A1, A2) | `cartoons/park-cartoon-156.mp4` + the two park stills + `prompts/156-A-park-edit.txt`; 10 s, edit | cuts drifted 0.2–1.3 s, the last cut missing or late; **one tumbler instead of two** in the close-up; the yawn half-raised | cuts within 0.1 s of the cartoon; two tumblers held through the close-up |
+| **F2 mason, frames path** | 157/158 (M1, M2) | ten cartoon frames + 3 photographs + `prompts/157-frames.txt` | **bricks went back into the pan** (M1); **the hands reached into the empty pan again and again** (M2): activity consistency lost in shot 3 | one direction of transfer; an empty pan stays empty; no idle reaching |
+| **F3 mason, video path, first try** | 158 (V1, V2) | `cartoons/mason-cartoon-157.mp4` + 3 photographs + `prompts/158-video.txt` | the pan's inside read as **grey mortar** (V1); **an invented wide shot at 9.33 s** (V2); filler at the end; the wall taller than drawn | the pan stays a pan; no invented cut; the closing seconds hold the drawn action |
+| **F4 mason, colour tags** | 159 (CF frames, CV video) | `cartoons/mason-cartoon-c-159-colour-tags.mp4` + 3 photographs + `prompts/159-video-colour-tags.txt` | frames: **a blue-purple tint leaked onto a brick**, an invented cut at 8.75 s, **the mason behind the wall in shot 2**; video: the mason **faced the camera and turned in a split second at 1–2 s**, **the mortar thrown at the foot of the wall** at 4 s (SK's findings) | facing held from the first frame; the trowel's mortar lands on the course; nothing leaks from the tags |
+| **F5 mason, facing and contact** | 160 (DV, DVF) | `cartoons/mason-cartoon-d-160-facing-contact.mp4` + 3 photographs + `prompts/160-video-facing.txt` (DVF: + 12 dense frames) | DV was the cleanest of nine, but **the pile lost bricks between the walking shot and the close shot** (SK); DVF: **the pan emptied by 7 s, lifted at 7.5 s, set down, lifted again at 9.5 s**; the wall "under construction" at 7–8 s and the pan tilting in mid-air | the pile's size the same across the cut; the pan lifted once, at its second |
+| **F6 mason, numbers and labels** | 162 (EVF) | `cartoons/mason-cartoon-e-162-numbers-labels.mp4` + 12 frames + 3 photographs + `prompts/162-video-numbers-labels.txt` | **the pan arrived empty at the cut to the close shot**; the six bricks never reached the pile: the state was lost at the cut | the pan's six bricks survive the cut and arrive on the pile |
+| **F7 mason, no cut** | 163 (video), 164 (twenty frames) | `cartoons/mason-cartoon-f-163-no-cut-24fps.mp4` + 13 frames + 3 photographs + `prompts/163-video-no-cut.txt` | continuity held for the first time, but **two or three bricks still in the pan when it was lifted** (pace the model's own, about 1.2–1.5 s a pair against the drawn 0.9); 164: the push-in became a cut | the pan empty at the lift; the push-in stays a move |
+| **F8 new bricks on an old heap** | 165 T2 | the T2 cartoon (regenerate with `165-assets/tests4.py`) + 3 photographs + `prompts/165-t2-new-on-old.txt` | tracking held (new stayed visibly new), but **the push-in became a cut at 5.6 s** and **the pan still held two or three new bricks at the lift** | the move stays a move; the pan empty |
+| **F9 the pan's own count** | 165 T5 (t5f, t5v) | the T5 cartoon + the helper's photograph (+ the tools photograph, wrongly) + `prompts/165-t5-pan-count.txt` | **the pan started at about four, not six**; the running total loose; **a tripod drawn into the scene** from "the camera on a tripod"; **a trowel and a mortar board pulled in** by the tools photograph | the start count six; the total exact; no equipment from words; nothing from a photograph not in the shot (send only the helper's) |
+| **F10 five barrels** | 166 (t6a; t6at text only) | the T6a cartoon + the worker's photograph + `prompts/166-t6a-barrels.txt` | **the plank did not empty while the row grew**: the total not conserved; the cartoon's cut at 3.5 s ignored; the same drift without the cartoon (text only) | the plank empties as the row grows to five |
+
+What held on 1.1 and must not regress on 1.2 (the same cases): identity from two or three photographs in every run; the cartoon's framing, cuts and seconds on the video path (within 0.1 s); the fixed left-to-right order through three angles; one object passed hand to hand (165 T3); SK's staging of hands and one brick with the heap's edges out of frame (165 T4); the barrels' direction and no stacking (166).
+
+**The rerun protocol per case**: the same files, the same prompt text, `model = gemini-omni-1.2-flash`, `response_format.duration` set to the cartoon's length (10 s; 6 s for T1, 8 s for T3), 720p, one run, judged on half-second strips at 480 px beside the cartoon and beside the 1.1 output. Then the same case with the agreed shortcut (design/167 D1) where the case was a count: wide to establish, tight on hands and one object, a face shot, the heap's edges out of frame.
+
+## 5. Double-check of this note (SK: "go through everything once")
+
+- The documents: all seventeen notes 153–169 listed in §1 with their assets; the cartoons, the outputs and the photographs copied into `176-assets` (29 MB); the prompts of every failing case copied under their note numbers. The T1–T6 cartoons were not kept as files; `165-assets/tests4.py` regenerates them.
+- Omni 1.2's facts (§2) come from Google's own guide, changelog, models, pricing and rate-limit pages read on 6 Nov and from the API's model record (`thinking: true`, 131,072 input tokens, 65,536 output tokens, generateContent). Three limits that matter and were easy to miss: reference videos ≤3 s and only on new videos; first-and-last-frame runs capped at 10 s; the control tags deprecated.
+- Seedance: via OpenRouter (§3); nothing read yet.
+- The runner's three changes (§3): the model name, `duration`, `resolution`; the Files API upload and the polling are unchanged from 1.1.
 
 ## Not covered
 
 - No run yet; this note gathers and plans.
+- Seedance via OpenRouter: model ids, prices and an API key still to come.
 - Google's page was read whole except its code samples, which repeat the REST shape our runner already uses.
