@@ -59,10 +59,11 @@ def main():
     p.add_argument('run'); p.add_argument('--video'); p.add_argument('--images', default=''); p.add_argument('--refs', default='')
     p.add_argument('--prompt', required=True); p.add_argument('--task'); p.add_argument('--out', default='/tmp/anim-test/out')
     p.add_argument('--resolution', default='720p')
+    p.add_argument('--model', default=MODEL); p.add_argument('--duration', help='whole seconds, e.g. 10 (Omni 1.2: 3-15)')
     a = p.parse_args()
     out = os.path.join(a.out, a.run); os.makedirs(out, exist_ok=True)
     h = {'x-goog-api-key': key(), 'Api-Revision': '2026-05-20'}
-    client = httpx.Client(timeout=120)
+    client = httpx.Client(timeout=120, follow_redirects=True)
     parts = []
     t0 = time.time()
     if a.video:
@@ -73,8 +74,10 @@ def main():
     for f in [x for x in a.refs.split(',') if x]:
         parts.append(img(f))
     parts.append({'type': 'text', 'text': open(a.prompt, encoding='utf-8').read().strip()})
-    body = {'model': MODEL, 'background': True, 'store': True, 'input': parts,
+    body = {'model': a.model, 'background': True, 'store': True, 'input': parts,
             'response_format': {'type': 'video', 'aspect_ratio': '16:9', 'resolution': a.resolution}}
+    if a.duration:
+        body['response_format']['duration'] = f'{int(a.duration)}s'
     if a.task:
         body['generation_config'] = {'video_config': {'task': a.task}}
     json.dump({**body, 'input': [{k: (v if k != 'data' else f'<{len(v)} b64>') for k, v in q.items()} for q in parts]}, open(os.path.join(out, 'request.json'), 'w'), indent=1)

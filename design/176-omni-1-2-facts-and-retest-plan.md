@@ -74,6 +74,38 @@ What held on 1.1 and must not regress on 1.2 (the same cases): identity from two
 - Seedance: via OpenRouter (§3); nothing read yet.
 - The runner's three changes (§3): the model name, `duration`, `resolution`; the Files API upload and the polling are unchanged from 1.1.
 
+## 6. The rerun regrouped by safe and not safe (SK, 6 Nov)
+
+SK: "not safe" means the kinds of shot Omni 1.1 kept getting wrong, which we agreed to stop asking for; "safe" means the shortcut we moved to (design/167 sections 1, 2 and D1). The rerun tests both: whether 1.2 fixes the not-safe ones, and whether it keeps the safe ones. Same inputs as sent to 1.1, `gemini-omni-1.2-flash`, 720p, duration set to the cartoon's length. The pack (exact inputs in send order, 1.1's output beside them, every picture checked against the size in its 1.1 request) is outside git at `../omni-1.2-rerun-pack/`, 148 MB.
+
+**Not safe** (design/167 section 2): ten runs.
+
+| # | 1.1 run | Failure it tests | 167 item |
+|---|---|---|---|
+| N01 | 156 A1 | one tumbler instead of two after the cut; cut drift | 2.3, 1.3 |
+| N02 | 158 V2 | empty seconds filled; an invented wide shot at 9.33 s; pan read as mortar | 2.5, 2.7 |
+| N03 | 159 CV | the mason's split-second turn at 1-2 s; mortar thrown at the wall's foot | 1.2, 1.5 |
+| N04 | 160 DV | the pile loses bricks across the cut | 2.1, 2.3 |
+| N05 | 162 EVF | the pan arrives empty after the cut | 2.3 |
+| N06 | 163 FVF | bricks still in the pan at the lift; the model's own pace | 2.1, 2.4 |
+| N07 | 165 T2 | the push-in read as a cut; bricks left at the lift | 2.6, 2.1 |
+| N08 | 165 T5 (video only) | the pan starts at four, not six; a tripod from words; tools from a photograph | 2.1, 3.5, 3.6 |
+| N09 | 166 t6a | the plank does not empty as the row grows to five | 2.1 |
+| N10 | 166 t6at (text only) | the same, without a cartoon: the model's own count | 2.2 |
+
+**Safe** (design/167 section 1 and D1): four runs, as a regression check.
+
+| # | 1.1 run | What held on 1.1 | 167 item |
+|---|---|---|---|
+| S1 | 165 T4 (t4v) | SK's staging: wide, then tight on hands and one object, nothing to count | 1.11 |
+| S2 | 165 T3 | one brick passed hand to hand three times | 1.7 |
+| S3 | 165 T1 | two bricks onto three, one at a time | 1.8 |
+| S4 | 166 t6b | new blue drums beside old white ones keep the transfer legible | 1.9 |
+
+**Left out**: the frames-only runs (157 M1/M2, 159 CF, 164 G20), since D9 retired that path; and the frames variants of N04 and N08 (160 DVF, 165 t5f), which only added dense frames (167 item 3.3). The two T4 tasks that ended "failed" with no reason are an API refusal, not an output mistake, and are not part of this test.
+
+**Runner**: `176-assets/omni_test.py` gains `--model` and `--duration`, and follows redirects for a video delivered by link. Cost about 14 runs at roughly Rs 63 each (Rs 90 on 1.1, 30% lower), about Rs 880.
+
 ## Not covered
 
 - No run yet; this note gathers and plans.
