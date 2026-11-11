@@ -202,13 +202,13 @@ def test_a_round_posted_again_after_done_keeps_the_sets_and_makes_only_the_missi
     assert 'merged' not in VS.round_start(frames_only(doc), USER, NEW, [], [{'element_id': 'E1', 'prompt': 'x'}], conn=FakeConn([]))   # a first post is a fresh round
 
 
-def test_a_kept_set_waits_as_one_step_2_item_not_picture_by_picture():
+def test_a_kept_set_waits_as_one_step_2_item_not_picture_by_picture():   # UI change, 11 Nov 2026 (X1, X2): one item per set, on its element's card (was one item for all sets, on no card)
     doc = doc_with(KILN, MASON)
     store, conn, s = with_sets(doc)
     items = VS.waiting(s, doc, 'VW-20', [])
     labels = [i['label'] for i in items]
-    assert labels.count('Reference round · step 2: judge every set') == 1 and not any(l.startswith('Reference sheet') for l in labels)
-    assert next(i for i in items if i['label'].startswith('Reference round'))['link'] == '/runs/VW-20/visuals#references//round'
+    assert labels == ['Set to judge · E2', 'Set to judge · P1'] and not any(l.startswith('Reference sheet') for l in labels)
+    assert items[0]['link'] == '/runs/VW-20/visuals#references/E2/set'
 
 
 def test_the_page_judges_a_set_on_step_2_only():

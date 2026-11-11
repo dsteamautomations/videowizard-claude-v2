@@ -104,11 +104,11 @@ def test_every_spec_of_the_run_is_approved_in_one_call():
     assert VS.approve_specs(store, USER, RUN, [], '')['approved'] == []   # nothing left to approve
 
 
-def test_the_operator_waits_on_one_spec_item_not_one_per_shot():
+def test_a_spec_waits_on_the_card_of_its_own_shot():   # UI change, 11 Nov 2026 (R7, R8): was one item "Drawing specs · N to approve" on no card; one approval for all stays (approve_specs)
     doc, sess = graphic_session()
     doc['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec'] = spec()
     items = [i for i in VS.waiting(sess, doc, 'VW-9', []) if 'spec' in i['label'].lower()]
-    assert len(items) == 1 and items[0]['label'] == 'Drawing specs · 1 to approve' and items[0]['link'].endswith('#pictures/specs/specs')
+    assert len(items) == 1 and items[0]['label'] == 'Drawing spec to approve · DG1' and items[0]['link'].endswith('#pictures/DG1/spec')
 
 
 # ---------- D1: research first; the page and chat ----------

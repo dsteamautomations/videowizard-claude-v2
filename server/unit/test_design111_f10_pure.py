@@ -107,7 +107,7 @@ def test_the_material_spec_is_approved_once_corrected_through_rule_0_and_shown_e
     store = material_store()
     st = VS.status(FakeConn([]), store, RUN, [], repair=False)
     assert st['material_specs'] == {'BRICK': {'approved': False, 'correction': None}}
-    assert any(w['label'] == 'Material specs · 1 to approve' and w['step'] == 'references' for w in st['waiting'])
+    assert any(w['label'] == 'Material spec to approve · BRICK' and w['step'] == 'references' and w['group'] == 'BRICK' for w in st['waiting'])   # UI change, 11 Nov 2026: one item per material, on its card
     view = VS.page_view(FakeConn([]), store, RUN, [], 'VW-9', False)
     el = next(e for e in view['elements'] if e['id'] == 'BRICK')
     assert el['material_spec']['approved'] is False and el['material_spec']['table'][0]['size'] == '190 mm' and el['material_spec']['sentence'].startswith('Material spec, Red brick')
@@ -121,7 +121,7 @@ def test_the_material_spec_is_approved_once_corrected_through_rule_0_and_shown_e
     out = VS.approve_spec(store, USER, RUN, [], 'element:BRICK', '')
     assert out['element_id'] == 'BRICK' and saved(store)['spec_approvals']['element:BRICK']['digest'] == VS.spec_digest(BRICK_SPEC)
     st = VS.status(FakeConn([]), store, RUN, [], repair=False)
-    assert st['material_specs']['BRICK']['approved'] is True and not any('Material specs' in w['label'] for w in st['waiting'])
+    assert st['material_specs']['BRICK']['approved'] is True and not any('Material spec' in w['label'] for w in st['waiting'])
     assert VS.approve_specs(store, USER, RUN, [], '')['approved'] == []
     with pytest.raises(Problem, match='no material spec'):
         g(lambda: VS.approve_spec(store, USER, RUN, [], 'element:E1', ''))
