@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from . import auth, connect, core
 from .config import settings
 from .db import connect as db_connect
-from .errors import Problem
+from .errors import Problem, UNEXPECTED
 from .files import file_redirect
 
 router = APIRouter()
@@ -382,7 +382,7 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
     return await run_in_threadpool(_visuals_act, code, vw2_session, body)
 
 
-PAGE_FAILED = 'That could not be done; nothing was changed. The builder has been told what failed.'
+PAGE_FAILED = UNEXPECTED
 
 
 def _page_call(fn, action):

@@ -7,6 +7,7 @@ a gap's output is recorded when every shot in it has a selected take or a local 
 import base64
 import hashlib
 import json
+import logging
 import re
 import subprocess
 import tempfile
@@ -22,7 +23,7 @@ from psycopg.types.json import Jsonb
 from . import apify, core, film, image_check, jobs, keys, library, video_generators
 from . import footage as FM   # design/88
 from .config import settings
-from .errors import Problem
+from .errors import Problem, UNEXPECTED
 from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
@@ -47,10 +48,15 @@ def fail(message):
 
 
 def guarded(fn):
+    """A refusal written for the operator (need: a ValueError) arrives as written. design/177: anything unexpected (a missing key, a wrong type) goes to
+    the server log with its trace and reaches the chat tool as the page's one plain sentence (web._page_call), never as a bare key name."""
     try:
         return fn()
-    except (ValueError, KeyError, TypeError, ZeroDivisionError) as exc:
+    except ValueError as exc:
         fail(exc)
+    except (KeyError, TypeError, ZeroDivisionError):
+        logging.getLogger('vw2.visuals').exception('a visuals call failed')
+        raise Problem(500, 'VISUALS_FAILED', UNEXPECTED)
 
 
 def key(run, name):

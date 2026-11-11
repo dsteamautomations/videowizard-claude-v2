@@ -388,6 +388,26 @@ class RoundSets(Write):   # design/151: the one-shot verdicts on the sets
     quote: str = ''
 
 
+class RoundAnswer(Write):   # design/177: one answer of step 2, stored (the page's set_answer)
+    element_id: str
+    verdict: Literal['yes', 'no', 'correct'] | None = None
+    golden: str | None = None
+    words: str = ''
+
+
+class RoundAside(Write):   # design/177: a set never made, set aside at step 2, or brought back
+    element_id: str
+    words: str = ''
+    back: bool = False
+
+
+class OwnPicture(Write):   # design/177: the operator's own picture of an element (the page's supply): a file or an https link
+    element_id: str
+    content_base64: str = ''
+    url: str = ''
+    name: str = ''
+
+
 class GeneratorBody(Write):
     shot_id: str
     provider: str
@@ -1385,6 +1405,11 @@ def visuals_approve(run_id: UUID, ref_id: str, body: ReferenceApprove, user=User
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote, conn))
 
 
+@app.post('/api/runs/{run_id}/visuals/references/{ref_id}/reapprove')
+def visuals_reapprove(run_id: UUID, ref_id: str, body: ReferenceApprove, user=User, conn=DB):   # design/177: `vw visuals approve --ref R --again`
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.reapprove_reference(storage(), user, run, outputs, ref_id, body.sha256, body.quote, conn))
+
+
 @app.post('/api/runs/{run_id}/visuals/bind')
 def visuals_bind(run_id: UUID, body: BindBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.bind(storage(), user, run, outputs, body.shot_id, body.references, body.subject_selectors, body.quote))
@@ -1466,6 +1491,28 @@ def visuals_round_done(run_id: UUID, body: RoundDone, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/round/sets')
 def visuals_round_sets(run_id: UUID, body: RoundSets, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_sets(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn))   # design/151
+
+
+@app.post('/api/runs/{run_id}/visuals/round/answer')
+def visuals_round_answer(run_id: UUID, body: RoundAnswer, user=User, conn=DB):   # design/177: `vw visuals round --answer`
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words))
+
+
+@app.post('/api/runs/{run_id}/visuals/round/make')
+def visuals_round_make(run_id: UUID, body: NotThis, user=User, conn=DB):   # design/177: `vw visuals round --make` (the body is one element id)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_make(conn, storage(), user, run, outputs, body.element_id))
+
+
+@app.post('/api/runs/{run_id}/visuals/round/aside')
+def visuals_round_aside(run_id: UUID, body: RoundAside, user=User, conn=DB):   # design/177: `vw visuals round --aside` and `--back`
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_aside(storage(), user, run, outputs, body.element_id, body.words, body.back))
+
+
+@app.post('/api/runs/{run_id}/visuals/own', status_code=201)
+def visuals_own(run_id: UUID, body: OwnPicture, user=User, conn=DB):   # design/177: `vw visuals own`
+    import base64 as b64
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.supply_own(conn, storage(), user, run, outputs, body.element_id,
+                         content=b64.b64decode(body.content_base64) if body.content_base64 else None, url=body.url, name=body.name), 201)
 
 
 @app.post('/api/runs/{run_id}/visuals/round/picks')
