@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:57:55.668941+00:00",
+   "at": "2026-11-11T10:18:24.391592+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -193,14 +193,16 @@
   },
   "waiting": [
    {
-    "label": "Reference · E1 · frame",
+    "label": "Picture to answer · E1 · frame",
+    "kind": "picture to answer",
     "step": "references",
     "group": "E1",
     "item": "F1",
     "link": "/runs/VW-20/visuals#references/E1/F1"
    },
    {
-    "label": "Material specs · 1 to approve",
+    "label": "Material spec to approve · BRICK",
+    "kind": "material spec to approve",
     "step": "references",
     "group": "BRICK",
     "item": "specs",

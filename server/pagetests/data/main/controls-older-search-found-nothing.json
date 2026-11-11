@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:59:36.823690+00:00",
+   "at": "2026-11-11T10:20:05.192898+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -110,29 +110,16 @@
   },
   "searches": [
    {
-    "at": "2026-11-11T08:59:36.836306+00:00",
-    "by": "u1",
-    "element_id": "E2",
-    "keywords": "unfindable kiln words",
-    "pair": [
-     "1daf296b566e"
-    ],
-    "picked": [],
-    "quote": "Search again.",
-    "search_id": "1daf296b566e",
-    "results": []
-   },
-   {
-    "at": "2026-11-11T08:59:36.833780+00:00",
+    "at": "2026-11-11T10:20:05.200382+00:00",
     "by": "u1",
     "element_id": "E2",
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "2ec8ec492e12"
+     "88915d1214e3"
     ],
     "picked": [],
     "quote": "Yes, search for the kiln.",
-    "search_id": "2ec8ec492e12",
+    "search_id": "88915d1214e3",
     "results": [
      {
       "download": "picture",
@@ -168,10 +155,23 @@
       "width": 800
      }
     ]
+   },
+   {
+    "at": "2026-11-11T10:20:05.201469+00:00",
+    "by": "u1",
+    "element_id": "E2",
+    "keywords": "unfindable kiln words",
+    "pair": [
+     "c79d7f9bfaed"
+    ],
+    "picked": [],
+    "quote": "Search again.",
+    "search_id": "c79d7f9bfaed",
+    "results": []
    }
   ],
   "round": {
-   "at": "2026-11-11T08:59:36.824723+00:00",
+   "at": "2026-11-11T10:20:05.193858+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -190,9 +190,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "unfindable kiln words",
-     "search_id": "1daf296b566e",
+     "search_id": "c79d7f9bfaed",
      "search_ids": [
-      "1daf296b566e"
+      "c79d7f9bfaed"
      ],
      "source": "",
      "verdict": "search",
@@ -214,7 +214,8 @@
   },
   "waiting": [
    {
-    "label": "Reference · E1 · frame",
+    "label": "Picture to answer · E1 · frame",
+    "kind": "picture to answer",
     "step": "references",
     "group": "E1",
     "item": "F1",

@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:57:55.644182+00:00",
+   "at": "2026-11-11T10:18:24.379028+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -110,19 +110,19 @@
   },
   "searches": [
    {
-    "at": "2026-11-11T08:57:55.647699+00:00",
+    "at": "2026-11-11T10:18:24.384577+00:00",
     "by": "u1",
     "element_id": "E2",
     "failed": [],
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "39ad3534f358"
+     "1ea97a64014d"
     ],
     "picked": [
      1
     ],
     "quote": "Yes, search for the kiln.",
-    "search_id": "39ad3534f358",
+    "search_id": "1ea97a64014d",
     "results": [
      {
       "download": "picture",
@@ -161,7 +161,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-11T08:57:55.644182+00:00",
+   "at": "2026-11-11T10:18:24.379028+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -181,9 +181,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "39ad3534f358",
+     "search_id": "1ea97a64014d",
      "search_ids": [
-      "39ad3534f358"
+      "1ea97a64014d"
      ],
      "source": "",
      "verdict": "search",
@@ -324,7 +324,7 @@
   ],
   "references": [
    {
-    "id": "67ac82449aa78234264015ea688f4e58",
+    "id": "6994b3c3ddd93486c8d90a33a584a686",
     "name": "web-E2-1",
     "kind": "web",
     "element_id": "E2",
@@ -345,12 +345,12 @@
     "from_golden": null,
     "edit": null,
     "shot_id": null,
-    "url": "/runs/VW-9/file/run-1/visuals/references/67ac82449aa78234264015ea688f4e58.png",
+    "url": "/runs/VW-9/file/run-1/visuals/references/6994b3c3ddd93486c8d90a33a584a686.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T08:57:55.649701+00:00",
+     "at": "2026-11-11T10:18:24.385580+00:00",
      "quote": "This one, colour only."
     },
     "rejection": null,
@@ -390,7 +390,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T08:57:55.648698+00:00",
+     "at": "2026-11-11T10:18:24.384577+00:00",
      "quote": "Yes: the first frame."
     },
     "rejection": null,

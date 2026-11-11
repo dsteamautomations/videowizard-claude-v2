@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:59:36.840815+00:00",
+   "at": "2026-11-11T10:20:05.204388+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -84,15 +84,7 @@
    "specs": 0,
    "warning": null
   },
-  "waiting": [
-   {
-    "label": "Reference · E1 · frame",
-    "step": "references",
-    "group": "E1",
-    "item": "F1",
-    "link": "/runs/VW-20/visuals#references/E1/F1"
-   }
-  ],
+  "waiting": [],
   "gaps": [
    {
     "gap_id": "G1",

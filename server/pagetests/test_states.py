@@ -24,6 +24,7 @@ LANDED = '''() => {
 PICTURES = '''async () => {
   const imgs = [...document.querySelectorAll('#app img')];
   await Promise.all(imgs.map(i => { i.loading = 'eager'; return i.decode().catch(() => {}); }));
+  await new Promise(r => setTimeout(r, 100));   // a picture forced to load here fails its decode() before the browser delivers its error event: the page gets the moment any browser gives it to put its placeholder
   return imgs.filter(i => getComputedStyle(i).display !== 'none' && !(i.complete && i.naturalWidth > 0)).map(i => i.getAttribute('src') || '(no address)');
 }'''
 

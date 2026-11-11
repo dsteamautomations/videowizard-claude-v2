@@ -148,7 +148,8 @@ def test_the_round_complete(open_page, _id):
 @ident('J7')
 def test_takes_with_a_shot_filled_by_a_supplied_file(open_page, _id):
     put = open_page('takes-shot-filled-with-supplied-movie', patch=supplied)
-    assert put.header_count() == 0 and not counts_wrong(put)
+    tabs = put.tab_counts()   # the supplied file fills G2's only shot, so G2 is ready to record: that is the one thing that waits (N3: a gap ready to record is counted), and nothing waits on Takes
+    assert tabs['takes'] == 0 and put.header_count() == tabs['record'] == 1 and not counts_wrong(put)
     put.open_tab('takes')
     assert rail(put, 'VS1').locator('.badge').inner_text().lower() == 'done', f'the left list says "{rail(put, "VS1").locator(".badge").inner_text()}"'
     rail(put, 'VS1').click()

@@ -89,13 +89,16 @@ def test_golden_tick(open_page, _id):
     show(put, 'BRICK')
     ticks = card(put, 'BRICK').locator('[data-golden]')
     on = lambda: [t.get_attribute('data-golden').split(':')[1] for t in card(put, 'BRICK').locator('[data-golden].on').all()]
-    ticks.nth(1).click()
-    assert on() == [set_of(put, 'BRICK')[1]] and card(put, 'BRICK').locator('[data-golden].on').inner_text() == '★'
+    pics = set_of(put, 'BRICK')
+    ticks.nth(1).click()   # R2 (the UI change of 11 Nov 2026): a labelled control, not a bare tick showing a star
+    chosen = card(put, 'BRICK').locator('[data-golden].on')
+    assert on() == [pics[1]] and chosen.inner_text() == 'Use this as the starting picture' and chosen.get_attribute('aria-pressed') == 'true'
     ticks.nth(2).click()
-    assert on() == [set_of(put, 'BRICK')[2]], 'a second tick did not replace the first'
+    assert on() == [pics[2]], 'a second tick did not replace the first'
     ticks.nth(2).click()
     assert on() == []
-    no_post(put)
+    put.wait_posts(3)   # R13: every change is stored as it is made (before: nothing was sent until Done)
+    assert [(b['action'], b['element_id'], b['verdict'], b['golden']) for b in put.posts] == [('set_answer', 'BRICK', None, pics[1]), ('set_answer', 'BRICK', None, pics[2]), ('set_answer', 'BRICK', None, None)]
 
 
 @ident('C-3.5-63')
@@ -118,10 +121,11 @@ def test_yes_no_correct_radios(open_page, _id):
     for v in ('yes', 'no', 'correct'):
         verdict(put, 'E2', v)
         assert put.page.locator('input[name="v-E2"]:checked').get_attribute('value') == v
-    no_post(put)
+    put.wait_posts(3)   # R13 (the UI change of 11 Nov 2026): each answer is stored as it is made (before: nothing was sent until Done)
+    assert [(b['action'], b['element_id'], b['verdict']) for b in put.posts] == [('set_answer', 'E2', 'yes'), ('set_answer', 'E2', 'no'), ('set_answer', 'E2', 'correct')]
     empty = open_page('refs-step2-some-sets-not-made')
-    show(empty, 'BRICK')
-    assert empty.page.is_disabled('input[name="v-BRICK"][value="yes"]') and empty.page.is_enabled('input[name="v-BRICK"][value="no"]')
+    show(empty, 'BRICK')   # R17: a set that was not made is not answered with No to get it made (retired): it has no Yes / No / Correct it, it offers Make it now
+    assert card(empty, 'BRICK').locator('input[type=radio]').count() == 0 and card(empty, 'BRICK').locator('button[data-a="set-make"][data-el="BRICK"]').count() == 1
 
 
 @ident('C-3.5-65')
@@ -167,7 +171,7 @@ def test_from_your_footage_card(open_page, _id):
 def test_step2_done(open_page, _id):
     put = open_page('refs-step2-all-sets-back')
     done = put.page.locator('#action button[data-a="round-sets"]')
-    assert done.is_disabled() and done.get_attribute('title') == 'every thing needs its answer first'
+    assert done.is_enabled() and 'need an answer' in put.text('#tray span.err')   # R15 (the UI change of 11 Nov 2026): Done is not locked by an unanswered card; its confirmation counts them (before: disabled until every card had its answer)
     want = {}
     for eid in to_judge(put):
         if eid == 'BRICK':
@@ -181,11 +185,14 @@ def test_step2_done(open_page, _id):
         else:
             verdict(put, eid, 'no')
             want[eid] = {'verdict': 'no', 'words': '', 'golden': ''}
-    assert done.is_enabled(), f'Done is locked though every card is answered: {put.text("#tray")}'
+    assert done.is_enabled() and put.page.locator('#tray span.err').count() == 0, f'a card is still named as unanswered though every card is answered: {put.text("#tray")}'
     put.page.fill('#words', 'Pass one.')
-    done.click()
-    put.wait_posts(1)
-    assert put.posts and put.posts[-1] == {'action': 'round-sets', 'verdicts': want, 'quote': 'Pass one.'}
+    done.click()   # R15: the first press asks, with the counts, and records nothing (before: one click recorded the round)
+    put.page.wait_for_timeout(150)
+    assert not [b for b in put.posts if b['action'] == 'round-sets'] and '1 approved · 2 made again (paid) · 0 unanswered' in put.text('#done-confirm')
+    put.click('#done-confirm button[data-a="round-sets"]')
+    put.wait_posts(len(put.posts) + 1)
+    assert put.posts[-1] == {'action': 'round-sets', 'verdicts': want, 'quote': 'Pass one.'}
 
 
 # ---------- 3.6 a round open on an older film ----------

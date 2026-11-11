@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:59:36.845845+00:00",
+   "at": "2026-11-11T10:20:05.207382+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -182,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T08:59:36.845845+00:00",
+   "at": "2026-11-11T10:20:05.207382+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -196,7 +196,15 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": {
+      "kind": "spec",
+      "element_id": "BRICK",
+      "text": "the material spec of Red brick is not approved"
+     },
+     "settled": null,
+     "problem": null
     },
     "E1": {
      "corrections": [],
@@ -211,7 +219,8 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null
     },
     "E2": {
      "corrections": [],
@@ -224,7 +233,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     },
     "P1": {
      "corrections": [],
@@ -237,7 +250,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     }
    },
    "kept": true,
@@ -255,7 +272,8 @@
   },
   "waiting": [
    {
-    "label": "Material specs · 1 to approve",
+    "label": "Material spec to approve · BRICK",
+    "kind": "material spec to approve",
     "step": "references",
     "group": "BRICK",
     "item": "specs",
@@ -406,7 +424,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T08:59:36.846847+00:00",
+     "at": "2026-11-11T10:20:05.208388+00:00",
      "quote": "Yes."
     },
     "rejection": null,

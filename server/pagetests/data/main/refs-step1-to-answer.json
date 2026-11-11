@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:57:33.308393+00:00",
+   "at": "2026-11-11T10:17:59.110382+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -182,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T08:57:33.308393+00:00",
+   "at": "2026-11-11T10:17:59.110382+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -196,7 +196,15 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": {
+      "kind": "spec",
+      "element_id": "BRICK",
+      "text": "the material spec of Red brick is not approved"
+     },
+     "settled": null,
+     "problem": null
     },
     "E1": {
      "corrections": [],
@@ -211,7 +219,8 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null
     },
     "E2": {
      "corrections": [],
@@ -224,7 +233,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     },
     "P1": {
      "corrections": [],
@@ -237,7 +250,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     }
    },
    "kept": true,
@@ -255,14 +272,16 @@
   },
   "waiting": [
    {
-    "label": "Reference · E1 · frame",
+    "label": "Picture to answer · E1 · frame",
+    "kind": "picture to answer",
     "step": "references",
     "group": "E1",
     "item": "F1",
     "link": "/runs/VW-20/visuals#references/E1/F1"
    },
    {
-    "label": "Material specs · 1 to approve",
+    "label": "Material spec to approve · BRICK",
+    "kind": "material spec to approve",
     "step": "references",
     "group": "BRICK",
     "item": "specs",

@@ -96,7 +96,7 @@ def sets_back(store, counts=None):
             continue
         r.update(status='candidate', sha256='sha-' + r['id'], key=f"run-1/visuals/references/{r['id']}.png", notes='(1) one method chosen', sources=[{'url': 'https://example.org/kiln', 'title': 'kiln'}])
         for k in range(2, (counts or {}).get(r['element_id'], 3) + 1):
-            s['references'][f"{r['id']}-{k}"] = {**r, 'id': f"{r['id']}-{k}", 'set_n': k, 'sha256': f"sha-{r['id']}-{k}"}
+            s['references'][f"{r['id']}-{k}"] = {**r, 'id': f"{r['id']}-{k}", 'set_n': k, 'sha256': f"sha-{r['id']}-{k}", 'key': f"run-1/visuals/references/{r['id']}-{k}.png"}   # its own file, as the image worker stores each picture of a set (visual_workers: the set's extra pictures)
     VS.save_session(store, NEW, s)
     return s
 

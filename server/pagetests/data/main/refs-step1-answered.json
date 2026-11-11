@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:57:33.311294+00:00",
+   "at": "2026-11-11T10:17:59.113382+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running bond or standard stretcher bond",
-     "no bricks laid flat on bed instead of on edge",
-     "no standard red modular brick dimensions",
-     "no yellow, brown, or multi-colored brick faces",
-     "no recessed, raked, or flush mortar joints",
-     "no mortar joints thicker or thinner than 10 mm",
-     "no weathered, tumbled, or heavily textured surfaces",
-     "no all-header or all-stretcher wall patterns",
-     "no bricks lacking the 190 mm by 90 mm face proportion",
-     "no weep holes, wall ties, or metal expansion joints",
-     "no painted, glazed, or whitewashed brick finish",
-     "no vertical stack bond alignment"
+     "no running bond (stretcher bond) layout",
+     "no standard flat laying (bricks laid on bed, not on edge)",
+     "no all-stretcher faces facing the camera",
+     "no brown, yellow, or multi-tonal brick color",
+     "no standard modular brick dimensions (215 mm x 65 mm)",
+     "no flush, recessed, or colored decorative mortar joints",
+     "no mortar joints thinner or thicker than 10 mm",
+     "no smooth, glazed, or painted brick surfaces",
+     "no weathered, chipped, or reclaimed brick textures",
+     "no English bond or Flemish bond pattern",
+     "no square-faced or elongated roman brick proportions",
+     "no integrated ties, weep holes, or mortar-less dry stacking"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T08:57:37.065214+00:00",
+   "at": "2026-11-11T10:18:03.307267+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -209,7 +209,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     },
     "E1": {
      "corrections": [],
@@ -224,7 +228,8 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null
     },
     "E2": {
      "corrections": [],
@@ -237,7 +242,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     },
     "P1": {
      "corrections": [],
@@ -250,7 +259,11 @@
      "set": [],
      "verdict": null,
      "search_ids": [],
-     "picked": null
+     "picked": null,
+     "answer": null,
+     "cause": null,
+     "settled": null,
+     "problem": null
     }
    },
    "kept": true,
@@ -411,7 +424,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T08:57:37.065214+00:00",
+     "at": "2026-11-11T10:18:03.307267+00:00",
      "quote": "Yes."
     },
     "rejection": null,
