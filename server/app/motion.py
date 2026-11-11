@@ -149,7 +149,11 @@ def prepare(folder, files, gsap, fonts, refs, sidecar):
         p = folder / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(data)
-    (folder / 'index.motion.json').write_text(json.dumps(sidecar), encoding='utf-8')
+    spec = folder / 'index.motion.json'   # M1 (11 Nov 2026): HyperFrames calls a spec with no assertions invalid, so the file exists only when it holds a cue
+    if (sidecar or {}).get('assertions'):
+        spec.write_text(json.dumps(sidecar), encoding='utf-8')
+    else:
+        spec.unlink(missing_ok=True)
     return folder
 
 

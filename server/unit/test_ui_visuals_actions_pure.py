@@ -122,7 +122,7 @@ def test_an_answer_is_refused_in_plain_words_outside_step_2_or_for_an_element_wi
     with pytest.raises(Problem, match='not at step 2'):
         g(lambda: VS.set_answer(one, USER, NEW, [], 'E2', 'yes', None, ''))
     VS.round_done(one, USER, NEW, [], {'E2': {'verdict': 'approve'}}, 'yes', conn=FakeConn([]))   # the sets are being made
-    with pytest.raises(Problem, match='not at step 2'):
+    with pytest.raises(Problem, match='E2: its set is being made'):
         g(lambda: VS.set_answer(one, USER, NEW, [], 'E2', 'yes', None, ''))
     none = frames_only(doc_with(KILN, MASON))   # no round at all
     with pytest.raises(Problem, match='not at step 2'):
@@ -673,9 +673,9 @@ def test_an_upload_that_is_not_a_picture_or_too_large_is_refused_and_nothing_is_
 def test_a_second_upload_is_added_and_the_first_stays_and_an_upload_while_the_sets_are_made_is_kept():
     store, conn = frames_only(doc_with(KILN, MASON)), FakeConn([])
     VS.round_start(store, USER, NEW, [], STEP1, conn=conn)
-    first = own(store, conn, 'E2', name='one.png')   # at step 1
     VS.round_done(store, USER, NEW, [], {r['element_id']: {'verdict': 'approve'} for r in STEP1}, 'yes', conn=conn)
     assert view(store, conn)['round']['pass'] == 'making'
+    first = own(store, conn, 'E2', name='one.png')   # while its set is being made (an upload at step 1 stops the set: F2, test_round_faults_pure)
     second = own(store, conn, 'E2', (200, 9, 9), name='two.png')   # while its set is being made
     mine = [r for r in view(store, conn)['references'] if r['kind'] == 'supplied' and r['element_id'] == 'E2']
     assert sorted(r['id'] for r in mine) == sorted([first['id'], second['id']]) and all(r['status'] == 'approved' and r['url'] for r in mine)

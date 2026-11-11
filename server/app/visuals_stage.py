@@ -738,7 +738,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
             'golden': dict(session.get('golden') or {}),   # design/111 F11
             'illustrative': illustrative_share(plan) if plan else {'illustrative': [], 'specs': 0, 'warning': None},   # design/111 F19
             'waiting': waiting(session, plan, code, take_rows, _set_budget(run, session, sp)),   # design/97 W1, W3
-            'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
+            'gaps': gaps, 'references': list(refs.values()), 'budget': {**sp, 'set_inr': round(image_price_inr(run, provider='gemini') * SET_MAX, 2), 'cap_inr': cap_of(session), 'left_inr': round(cap_of(session) - sp['spent_inr'], 2)}}
 
 
 SIZE_NAMES = {'EWS': 'Extreme wide', 'WS': 'Wide', 'MWS': 'Medium wide', 'MS': 'Medium', 'MCU': 'Medium close-up', 'CU': 'Close-up', 'ECU': 'Extreme close-up'}
@@ -1890,6 +1890,11 @@ def own_picture_refused(kind):
     return "A person's reference is made from the description; an uploaded photo is not used for people." if kind == 'person' and not OWN_PICTURE_FOR_PEOPLE else None
 
 
+def _own_pictures(session, element_id):
+    """The operator's own approved pictures of an element, oldest first."""
+    return [r['id'] for r in session['references'].values() if r.get('kind') == 'supplied' and r.get('status') == 'approved' and r.get('element_id') == element_id]
+
+
 def _own_golden(session, element_id, ref_id):
     """U19: an approved picture of the operator's own for this element: it may be chosen as the starting picture like a picture of the set."""
     r = session['references'].get(ref_id) or {}
@@ -1932,6 +1937,13 @@ def supply_own(conn, store, user, run, outputs, element_id, content=None, url=''
     r.update(status='approved', approval={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'sha256': r['sha256'], 'quote': 'Added by the operator on the page'})
     if url:
         r.setdefault('source', {})['url'] = url
+    rd = session.get('round') or {}
+    slot = (rd.get('elements') or {}).get(element_id)
+    if (rd.get('kept') and rd.get('pass') in (2, 'making') and slot and element.get('kind') != 'person' and not slot.get('ignored') and not slot.get('from_footage')
+            and not _set_rows(session, element_id, slot.get('set'), ('generating', 'candidate', 'approved'))):   # F2, E3: its set was not made; the own picture is its reference and nothing waits on it
+        slot.update(from_footage=True, own=True, verdict='approve', error=None)
+        slot.pop('answer', None)
+        session.setdefault('golden', {})[element_id] = row['id']
     save_session(store, run, session)
     return {**r, 'next': f"Your picture is saved and approved for {element_id}" + ('; its sheet is marked "sources changed": the assistant makes a new one.' if any(
         x.get('kind') == 'sheet' and x.get('sources_changed') and x.get('element_id') == element_id for x in session['references'].values()) else '.')}
@@ -1973,7 +1985,7 @@ def waiting(session, plan, code, take_rows, budget=None):
             add(sh['start_frame'], f"Still · {sh['id']}{title(sh)}", 'pictures', sh['id'], r['id'], 'picture to answer')
         elif sh and route_of(sh) == 'video':
             add(sh['start_frame'], f"{'Start and end' if sh.get('end_state_exact') else 'Start image'} · {sh['id']}{title(sh)}", 'takes', sh['id'], r['id'], 'picture to answer')   # design/124 A4 item 23
-    if rd_pass == 2:   # one item per set, on its element's card; a set with a whole stored answer waits for Done only
+    if rd_pass in (2, 'making'):   # F3: a ready set is answered while another is being made. One item per set, on its element's card; a set with a whole stored answer waits for Done only
         for eid, row in rd['elements'].items():
             if row.get('ignored') or row.get('from_footage') or eid not in kinds:
                 continue
@@ -2471,9 +2483,11 @@ def _from_footage(session, plan, rd):
         if row.get('ignored') or kinds.get(eid) == 'person' or row.get('set'):
             continue
         approved = [fid for fid in row.get('frames') or [] if (session['references'].get(fid) or {}).get('status') == 'approved']
-        if not approved:
+        mine = [] if approved else _own_pictures(session, eid)   # F2 (11 Nov 2026): an approved own picture is the reference, as a footage picture is
+        if not approved and not mine:
             continue
-        row.update(from_footage=True, verdict='approve', error=None)
+        row.update(from_footage=True, verdict='approve', error=None, **({'own': True} if mine else {}))
+        approved = approved or mine
         session.setdefault('golden', {})[eid] = approved[0]
         out.append(eid)
     return out
@@ -2578,6 +2592,10 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     judge (every other set approved, the rest set aside) completes."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
+    making = [eid for eid, r in ((rd or {}).get('elements') or {}).items() if r.get('set') and not r.get('ignored') and _set_rows(session, eid, r.get('set'), ('generating',))] if rd and rd.get('kept') and rd.get('pass') == 'making' else []
+    if making:   # F3, E12: Done waits for the sets still being made, and says which
+        names = {e['id']: e.get('name') or e['id'] for e in guarded(lambda: current_plan(store, session))['elements']}
+        need(False, f"{len(making)} set{' is' if len(making) == 1 else 's are'} still being made: {', '.join(names.get(e, e) for e in making)}. Done is offered when {'it is' if len(making) == 1 else 'they are'} back.")
     need(rd and rd.get('kept') and _round_pass(session, rd) == 2, 'No reference round is waiting for its sets.')
     quote = said(quote, 'Sets done', user)
     verdicts = dict(verdicts or {})
@@ -2661,11 +2679,11 @@ def _answered(session, kinds, eid, row):
     return a if whole else None
 
 
-def _round_row(session, element_id, where):
+def _round_row(session, element_id, where, answering=False):
     """The row of one element in a kept round that is at `where`; refused in plain words otherwise."""
     rd = session.get('round')
     step = _round_pass(session, rd) if rd and rd.get('kept') else None
-    need(step in where, 'The reference round is not at step 2: there is no set to answer now.' if where == (2,) else 'The reference round is not at the step where its sets are made: there is nothing to make now.')
+    need(step in where, 'The reference round is not at step 2: there is no set to answer now.' if answering or where == (2,) else 'The reference round is not at the step where its sets are made: there is nothing to make now.')
     row = rd['elements'].get(element_id)
     need(row, f'{element_id} is not in the reference round.')
     need(not row.get('ignored'), f'{element_id} was set to Ignore at step 1: it has no set.')
@@ -2677,9 +2695,10 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
     """R13: one answer of step 2, stored as it is made and not recorded until Done: the starting picture, Yes / No / Correct it, the words. It is sent whole
     at every change, so the later writer wins. An answer whose starting picture belongs to a set made again since is discarded, not stored."""
     session = session_of(store, run, outputs)
-    row = _round_row(session, element_id, (2,))
+    row = _round_row(session, element_id, (2, 'making'), answering=True)
     need(verdict in (None, 'yes', 'no', 'correct'), f'{element_id}: the answer is Yes, No or Correct it.')
     rows = _set_rows(session, element_id, row.get('set'))
+    need(rows or not _set_rows(session, element_id, row.get('set'), ('generating',)), f'{element_id}: its set is being made: there is nothing to answer yet.')
     need(rows, f'{element_id}: its set is approved already; it needs no answer.' if _set_rows(session, element_id, row.get('set'), ('approved',)) else f'{element_id}: its set was not made: there is nothing to answer yet.')
     plan = guarded(lambda: current_plan(store, session))
     kind = next((e.get('kind') for e in plan['elements'] if e['id'] == element_id), None)
@@ -2692,6 +2711,18 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
     row['answer'] = {'verdict': verdict, 'golden': golden, 'words': str(words or '').strip(), 'set': row.get('set'), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     save_session(store, run, session)
     return {'element_id': element_id, 'stored': True, 'answer': _answer_of(row)[0]}
+
+
+def _fail_words(error):
+    """F4, E13: why a picture's call failed, in one plain sentence for the card; the full text stays in the log."""
+    e = str(error or '').lower()
+    if 'returned no picture' in e:
+        return 'The model returned no picture.'
+    if 'rejected the request' in e or 'refused' in e:
+        return 'The picture service refused the request.'
+    if 'timeout' in e or 'timed out' in e:
+        return 'The picture service did not answer in time.'
+    return 'The picture could not be made.'
 
 
 def _plain(text):
@@ -2919,6 +2950,9 @@ def _set_state(session, plan, step, eid, row, budget):
         return out
     cause = set_cause(session, plan, eid, budget)
     error = str(row.get('error') or '')
+    failed = _set_rows(session, eid, row.get('set'), ('failed',))
+    if not error and failed and not cause:   # F4: the call itself failed; its reason is on the set's picture, said in one plain sentence
+        return {**out, 'cause': None, 'settled': None, 'problem': _fail_words(failed[-1].get('error')), **({'spec_changed': True} if changed else {})}
     was = 'spec' if 'material spec of' in error else 'cap' if "on this film's visuals" in error else 'size' if 'size still unknown' in error else 'other' if error else None
     return {**out, 'cause': cause, 'settled': None if cause else {'spec': 'spec approved', 'size': 'size measured', 'cap': 'spend cap raised'}.get(was),
             'problem': _plain(error) if was == 'other' and not cause else None, **({'spec_changed': True} if changed else {})}

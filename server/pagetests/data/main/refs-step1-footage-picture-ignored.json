@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T13:32:15.373271+00:00",
+   "at": "2026-11-11T16:37:07.984351+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -171,20 +171,7 @@
      "approved": true,
      "correction": null
     },
-    "not_this": [
-     "no standard running bond",
-     "no bricks laid flat on bed",
-     "no all-stretcher courses",
-     "no all-header courses",
-     "no standard modular 215 mm or 8-inch brick lengths",
-     "no flush or raked joint variation other than specified 10 mm",
-     "no orange, brown, or multi-tone color variations",
-     "no textured, wirecut, or reclaimed tumbled surfaces",
-     "no stacked bond alignment",
-     "no queen closers, wall ties, or shelf angles visible",
-     "no thin veneer or faux brick tile proportions",
-     "no long faces laid taller than wide"
-    ]
+    "not_this": []
    }
   ],
   "element_matches": {
@@ -195,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T13:32:19.084404+00:00",
+   "at": "2026-11-11T16:37:07.985348+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -428,7 +415,7 @@
      "notes": "",
      "quote": "Rejected by SK",
      "by": "u1",
-     "at": "2026-11-11T13:32:19.084913+00:00"
+     "at": "2026-11-11T16:37:07.986350+00:00"
     },
     "checklist": null,
     "check": null,
@@ -450,6 +437,7 @@
     "video_inr_per_s": 8.0,
     "usd_inr": 88.0
    },
+   "set_inr": 35.38,
    "cap_inr": 5000.0,
    "left_inr": 5000.0
   }

@@ -245,7 +245,7 @@ def test_a_thing_approved_from_the_footage_gets_no_ai_set_and_its_frame_is_the_g
 def test_the_page_shows_a_footage_element_done_and_asks_no_verdict_for_it():
     from pathlib import Path
     html = (Path(VS.__file__).resolve().parent / 'templates' / 'visuals.html').read_text(encoding='utf-8')
-    for needle in ('Use the footage picture (no AI picture is made)', "if(r.from_footage)return", 'the golden picture, from your footage', "!r.ignored&&!r.from_footage"):   # UI change, 11 Nov 2026: one function (judged) names the sets that ask for an answer, for Done and for what keeps waiting
+    for needle in ('Use the footage picture (no AI picture is made)', "if(r.from_footage){", 'the golden picture, from your footage', "!r.ignored&&!r.from_footage"):   # UI change, 11 Nov 2026: one function (judged) names the sets that ask for an answer, for Done and for what keeps waiting
         assert needle in html, needle
 
 

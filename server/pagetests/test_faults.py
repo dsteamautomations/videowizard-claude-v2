@@ -117,7 +117,7 @@ def test_done_is_not_hit_by_accident(open_page, _id):
     put.page.locator('button[data-a="round-sets"]').first.click()
     put.page.wait_for_timeout(200)
     assert not last_of(put, 'round-sets'), 'one click on Done recorded the whole round and started the paid remakes'
-    assert re.search(r'\d+ approved .*\d+ made again \(paid\).*\d+ unanswered', put.text('#done-confirm'))
+    assert re.search(r'\d+ approved .*\d+ made again \(paid.*\d+ unanswered', put.text('#done-confirm'))
 
 
 @ident('U12')

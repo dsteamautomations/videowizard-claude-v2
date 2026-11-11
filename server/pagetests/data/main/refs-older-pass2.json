@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T13:29:57.508370+00:00",
+   "at": "2026-11-11T16:37:06.635042+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -110,16 +110,16 @@
   },
   "searches": [
    {
-    "at": "2026-11-11T13:29:57.516927+00:00",
+    "at": "2026-11-11T16:37:06.639026+00:00",
     "by": "u1",
     "element_id": "E2",
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "9baf0a093cd0"
+     "920566dc00b4"
     ],
     "picked": [],
     "quote": "Yes, search for the kiln.",
-    "search_id": "9baf0a093cd0",
+    "search_id": "920566dc00b4",
     "results": [
      {
       "download": "picture",
@@ -158,7 +158,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-11T13:29:57.509365+00:00",
+   "at": "2026-11-11T16:37:06.636042+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -178,9 +178,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "9baf0a093cd0",
+     "search_id": "920566dc00b4",
      "search_ids": [
-      "9baf0a093cd0"
+      "920566dc00b4"
      ],
      "source": "",
      "verdict": "search",
@@ -346,7 +346,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T13:29:57.516927+00:00",
+     "at": "2026-11-11T16:37:06.639026+00:00",
      "quote": "Yes: the first frame."
     },
     "rejection": null,
@@ -370,6 +370,7 @@
     "video_inr_per_s": 8.0,
     "usd_inr": 88.0
    },
+   "set_inr": 35.38,
    "cap_inr": 5000.0,
    "left_inr": 5000.0
   }

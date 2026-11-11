@@ -299,7 +299,7 @@ function missing(eid,a){   // E6: what an answer still lacks; '' when it is whol
 function answerOf(eid){const rd=roundOpen(), r=rd&&rd.elements[eid];if(!ans[eid])ans[eid]={verdict:'',golden:'',words:'',set:r?setKey(r):'',state:'typing'};return ans[eid];}
 function syncAnswers(){   // the server's stored answer wins, except over one being typed or not saved; an answer made on a set made again since is dropped
   const rd=roundOpen();
-  if(!rd||!rd.kept||rd.pass!==2){[ans,stale,notRec].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));confirmSets=false;return;}
+  if(!rd||!rd.kept||(rd.pass!==2&&rd.pass!=='making')){[ans,stale,notRec].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));confirmSets=false;return;}
   Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid], key=setKey(r), sv=r.answer, a=ans[eid];
     if(r.answer_discarded&&!a)stale[eid]=true;
     if(a&&a.set!==key){delete ans[eid];delete notRec[eid];stale[eid]=true;return;}
@@ -583,6 +583,7 @@ function noteBox(r){   // design/106 N4: a saved picture's note, editable until 
   return '<textarea id="ref-note" class="pnote keep" placeholder="note for the sheet: keep … / avoid …">'+esc(r.note||'')+'</textarea><div class="btns"><button data-a="save-note" data-ref="'+esc(r.id)+'">Save the note</button></div>';}
 function supplyBox(eid,label){return '<div class="search"><input type="file" id="up-'+esc(eid)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(eid)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(eid)+'">'+(label||'Add your own picture')+'</button></div>';}
 function ownAllowed(e){return e.kind!=='person'||OWN_FOR_PEOPLE;}   // U19: the one condition on the page: things and places only for now
+function ownRef(eid,kind){return kind!=='person'&&(data.references||[]).some(r=>r.kind==='supplied'&&r.element_id===eid&&r.status==='approved');}   // F2: an approved own picture of a thing or a place is its reference
 function ownPics(eid){return (data.references||[]).filter(r=>r.kind==='supplied'&&r.element_id===eid&&r.url&&(r.status==='approved'||r.status==='rejected'));}
 function goldBtn(eid,rid,gold){return '<button class="gold'+(gold?' on':'')+'" data-golden="'+esc(eid)+':'+esc(rid)+'" aria-pressed="'+(gold?'true':'false')+'" title="the golden picture: the one every shot of this thing starts from">Use this as the starting picture</button>';}   // R2
 function minePic(x,eid,gold,pick){   // U19: one picture of the operator's own on a card, labelled; chosen as the starting picture like a picture of the set; removed and used again (U17)
@@ -638,7 +639,8 @@ function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; t
 }
 function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.id&&['frame','supplied','web','isolated','sheet','component'].includes(r.kind));   // design/117 P1   // keyframes and states are compositions, not references
   if(refs.some(r=>r.kind==='sheet'&&r.status==='approved'))return ['ok','sheet approved'];
-  if(data.kept&&refs.some(r=>r.kind==='sheet'&&r.set))return ['dec','set made: judge it on step 2'];   // design/151 hotfix
+  const rr=((data.round||{}).elements||{})[e.id]||{};if(rr.aside)return ['','set aside'];if(rr.own)return ['ok','your picture'];   // F5: the end state is true
+  if(data.kept&&refs.some(r=>r.kind==='sheet'&&r.set&&['candidate','generating'].includes(r.status)))return ['dec','set made: judge it on step 2'];   // design/151 hotfix
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
   if(data.kept&&refs.some(r=>r.kind==='frame'&&r.status==='approved'&&r.id===(data.golden||{})[e.id]))return ['ok','from your footage'];   // N8: its approved footage picture is its reference; no set is made
   if(data.kept)return ['','waiting for the round'];   // design/151 hotfix: a kept film's sets are made in the round, never per element
@@ -801,21 +803,22 @@ function thumb(x){return x.url?'<img src="'+esc(thumbOf(x.url))+'" loading="lazy
 function frameStrip(frames,can){   // R3: a footage picture is answered on its card, one pair of buttons per picture
   return '<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(f.status==='rejected'?' off':'')+(isSel('ref',f.id)?' sel':'')+'" data-item="'+esc(f.id)+'">'+thumb(f)+'<div class="cap">from your footage</div><div class="pst '+(f.status==='approved'?'ok':'')+'">'+pstate(f)+'</div>'+
     (can?'<div class="btns" style="margin:0 6px 6px">'+verdictBtns(f,{approve:'Use this picture',reject:'Ignore'})+'</div>':'')+'</div>').join('')+'</div>'+psum(frames.map(f=>pstate(f)));}   // U17: an ignored picture offers Use this picture, a used one Ignore
-function notMade(eid,r,can){   // R17, R18, E15: a set that was not made says its present reason; the operator is never asked for a No to get it made. Follow-up fix 4: Make it now only where nothing stands in its way or the cause is settled on this page (a spec to approve; the cap shows it switched off); fix 3: Set aside beside it
+function notMade(eid,r,can){const el=(data.elements||[]).find(x=>x.id===eid);   // R17, R18, E15: a set that was not made says its present reason; the operator is never asked for a No to get it made. Follow-up fix 4: Make it now only where nothing stands in its way or the cause is settled on this page (a spec to approve; the cap shows it switched off); fix 3: Set aside beside it
   const c=r.cause, why=c?c.text:r.settled?r.settled+': it can be made now':r.problem||'', m=c&&c.kind==='spec'&&c.element_id!==eid?(data.elements||[]).find(x=>x.id===c.element_id):null, mine=!c||c.kind==='cap'||(c.kind==='spec'&&!c.pending);
   return '<div class="ds err" style="margin-top:6px">The set was not made'+(why?': '+esc(plain(why)):'')+'.'+(c&&c.kind==='spec'&&!c.pending?' Approve the spec, then press Make it now.':mine?'':' Nothing on this page settles it; once it is settled, Make it now is offered here. Or set it aside: nothing is then made for it in this round.')+'</div>'+
-    (can?'<div class="btns">'+(mine?'<button class="go" data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button>':'')+'<button data-a="set-aside" data-el="'+esc(eid)+'" title="ignored for this round, as Ignore at step 1; your words at the foot are kept with it (optional)">Set aside</button></div>':'')+(m?materialBox(m):'');}
+    (can?'<div class="btns">'+(mine?'<button class="go" data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button>':'')+'<button data-a="set-aside" data-el="'+esc(eid)+'" title="ignored for this round, as Ignore at step 1; your words at the foot are kept with it (optional)">Set aside</button></div>':'')+(can&&mine&&el&&ownAllowed(el)?ownBox(el,can):'')+(m?materialBox(m):'');}   // F4: Upload my own picture beside Make it now and Set aside
 function asideBody(eid,r,can){   // E13: ignored at step 1; follow-up fix 3: set aside at step 2, with Bring back while the round is open
   if(!r.aside)return ' <span class="badge">ignored</span><div class="ds">Set to Ignore at step 1: no picture is made for it.</div>';
   return ' <span class="badge">set aside</span><div class="ds">Set aside at step 2'+(r.aside.words?': “'+esc(r.aside.words)+'”':'')+'. Nothing is made for it in this round; nothing waits on it.</div>'+(can?'<div class="btns"><button data-a="set-back" data-el="'+esc(eid)+'">Bring back</button></div>':'');}
 function step1Counts(rd){   // follow-up fix 8: what Done at step 1 will do, in numbers, as step 2's confirmation
-  const kind={}, not=[], price=((data.budget||{}).prices||{}).image_inr, p=(n,w)=>n+' '+w+(n===1?'':'s');let used=0, ign=0, make=0, els=0;(data.elements||[]).forEach(e=>kind[e.id]=e.kind);
+  const kind={}, not=[], price=(data.budget||{}).set_inr, p=(n,w)=>n+' '+w+(n===1?'':'s');let used=0, ign=0, make=0, els=0, own=0;(data.elements||[]).forEach(e=>kind[e.id]=e.kind);
   Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid], f=framesOf(eid,r).length, rej=(data.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&x.status==='rejected').length;
     if(verdictOf(eid,r)==='ignore'){els++;ign+=f+rej;return;}
     used+=f;ign+=rej;
     if(f&&kind[eid]!=='person')return;   // its footage picture is its reference: no set is made
+    if(ownRef(eid,kind[eid])){own++;return;}   // F2: so is the operator's own approved picture
     if(r.cause)not.push(nameOf(eid)+' ('+plain(r.cause.text)+')');else make++;});
-  return '<div><b>Finish step 1?</b></div><div style="margin:6px 0">'+p(used,'footage picture')+' used · '+ign+' ignored · '+p(make,'set')+' will be made'+(make?' (paid'+(price?', about '+inr(make*3*price):'')+')':'')+' · '+not.length+' will not be made</div>'+
+  return '<div><b>Finish step 1?</b></div><div style="margin:6px 0">'+p(used,'footage picture')+' used · '+(own?p(own,'own picture')+' used · ':'')+ign+' ignored · '+p(make,'set')+' will be made'+(make?' (paid'+(price>0?', about '+inr(make*price):'')+')':'')+' · '+not.length+' will not be made</div>'+
     (not.length?'<div class="ds err">Not made until settled: '+esc(not.join('; '))+'</div>':'')+(els?'<div class="ds">'+p(els,'thing')+' set to Ignore: nothing is made for '+(els>1?'them':'it')+'.</div>':'');}
 function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while every set is made silently; pass 2 every set in one shot: Yes, No or Correct it, the starting picture on a thing
   const d=data, refs=refsById(), can=stage()==='visuals';
@@ -833,22 +836,17 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
     const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);
       const v=verdictOf(eid,r), frames=framesOf(eid,r), all=framesAll(eid,r);
       return head(eid,e)+usedIn(eid)+
-        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?(e.kind==='person'?'Use the footage picture for the description (the sheet is still made)':'Use the footage picture (no AI picture is made)'):(e.kind==='person'?'Make the character sheet':'Make its pictures'))+'</label>'+
+        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?(e.kind==='person'?'Use the footage picture for the description (the sheet is still made)':'Use the footage picture (no AI picture is made)'):(e.kind==='person'?'Make the character sheet':ownRef(eid,e.kind)?'Use your picture (no AI picture is made)':'Make its pictures'))+'</label>'+
         '<label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
-        (all.length?frameStrip(all,can):'')+(frames.length?'':'<div class="ds">'+(all.length?'Its footage picture is ignored':'Not in your footage')+': the assistant makes its pictures from real photographs.</div>')+ownBlock(e,can)+materialBox(e)+qBox(eid)+'</div>';}).join('');
+        (all.length?frameStrip(all,can):'')+(frames.length?'':ownRef(eid,e.kind)?'<div class="ds">Your picture is its reference: no AI picture is made for it.</div>':'<div class="ds">'+(all.length?'Its footage picture is ignored':'Not in your footage')+': the assistant makes its pictures from real photographs.</div>')+ownBlock(e,can)+materialBox(e)+qBox(eid)+'</div>';}).join('');
     left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 1 of 2:</b> for each thing, use the picture from your footage, or ignore it. Done makes every picture at once; you judge them all together on step 2.</p>'+notmade+rows;
-  }else if(rd.pass==='making'){
-    const rows=ids.filter(eid=>!rd.elements[eid]||!rd.elements[eid].ignored||rd.elements[eid].aside).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);if(r.aside)return head(eid,e,r)+asideBody(eid,r,can)+'</div>';
-      const set=setPics(r), st=set.length?set[0].status:'', bad=!!(r.cause||r.error)&&!set.some(x=>x.status==='generating'||x.status==='candidate'||x.status==='approved');
-      if(r.from_footage)return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(e.name||eid)+'</span> <span class="ds">'+esc(eid)+'</span> <span class="badge ok">from your footage</span></div>';   // SK 5 Nov: no AI picture for it
-      return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(e.name||eid)+'</span> <span class="ds">'+esc(eid)+'</span> <span class="badge '+(bad||st==='failed'?'err':st==='candidate'?'ok':'dec')+'">'+(bad?'not made':st==='candidate'?'ready':st==='failed'?'failed':'being made')+'</span>'+(bad?notMade(eid,r,can)+(r.cause&&r.cause.kind==='spec'?materialBox(e):''):'')+'</div>';}).join('');
-    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>The pictures are being made.</b> This page refreshes itself; when every set is back, you judge them all together.</p>'+rows;
   }else{
     const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);
       const thing=e.kind!=='person', a=ans[eid]||{}, v=a.verdict||'', tail=materialBox(e)+qBox(eid);
       if(r.ignored)return head(eid,e,r)+asideBody(eid,r,can)+'</div>';   // E13; follow-up fix 3
-      if(r.from_footage){const g=refs[(d.golden||{})[eid]];return head(eid,e,r)+' <span class="badge ok">from your footage</span>'+(g?'<div class="strip"><div class="pic on" data-item="'+esc(g.id)+'">'+thumb(g)+'<div class="cap">the golden picture, from your footage</div><div class="pst ok">approved</div></div></div>'+psum(['approved']):'')+tail+'</div>';}   // SK 5 Nov
+      if(r.from_footage){const g=refs[(d.golden||{})[eid]];return head(eid,e,r)+' <span class="badge ok">'+(r.own?'your picture':'from your footage')+'</span>'+(g?'<div class="strip"><div class="pic on" data-item="'+esc(g.id)+'">'+thumb(g)+'<div class="cap">'+(r.own?'your picture: its reference, no AI picture is made':'the golden picture, from your footage')+'</div><div class="pst ok">approved</div></div></div>'+psum(['approved']):'')+tail+'</div>';}   // SK 5 Nov
       const all=setPics(r), set=all.filter(x=>(x.status==='candidate'||x.status==='approved')&&x.url), done=settled(r);
+      if(!set.length&&all.some(x=>x.status==='generating'))return head(eid,e,r)+' <span class="badge dec">being made</span><div class="ds">Its set is being made; it comes back here. Nothing to do for it yet.</div>'+tail+'</div>';   // F3: only this card waits
       if(!set.length)return head(eid,e,r)+' <span class="badge err">not made</span>'+notMade(eid,r,can)+tail+'</div>';
       const pics=all.map((x,i)=>{const n=x.set_n||i+1, name=thing?'picture '+n:(['','full length','working pose','face'][x.set_n]||('picture '+n)), gold=(done?(d.golden||{})[eid]:a.golden)===x.id;
         if(!set.includes(x))return '<div class="pic off"><div class="ph">'+esc(name)+' failed: it was not made</div></div>';   // N6: never an empty picture with its own control
@@ -862,7 +860,7 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
       return body+(thing?'':'<div class="ds">For a person the full-length front picture is taken automatically as the starting picture.</div>')+
         '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="yes" '+(v==='yes'?'checked':'')+'> Yes</label><label><input type="radio" name="v-'+esc(eid)+'" value="no" '+(v==='no'?'checked':'')+'> No</label><label><input type="radio" name="v-'+esc(eid)+'" value="correct" '+(v==='correct'?'checked':'')+'> Correct it</label></div>'+
         '<textarea class="pnote" id="w-'+esc(eid)+'" placeholder="'+(thing?'what to correct, or why not (needed for Correct it)':'what to correct about this person')+'">'+esc(a.words||'')+'</textarea><div data-astate="'+esc(eid)+'">'+answerLine(eid)+'</div>'+tail+'</div>';}).join('');
-    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 2 of 2:</b> every set at once. For each: Yes (choose the starting picture first, the one every shot starts from), No, or Correct it with your words. Each answer is stored as you make it; Done records them, and the No and Correct it ones are made again.</p>'+rows;
+    left=(rd.pass==='making'?'<p class="ds" style="font-size:17px;margin:14px 0 0"><b>Some pictures are being made.</b> This page refreshes itself; answer the sets that are ready meanwhile.</p>':'')+'<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 2 of 2:</b> every set at once. For each: Yes (choose the starting picture first, the one every shot starts from), No, or Correct it with your words. Each answer is stored as you make it; Done records them, and the No and Correct it ones are made again.</p>'+rows;
   }
   $('s-references').innerHTML=split(left);
   const root=$('s-references');
@@ -1095,12 +1093,13 @@ function footerBody(){
     act_.innerHTML='<button class="go" data-a="accept-selected" '+(n?'':'disabled')+'>Accept</button> <button data-a="revise-selected" '+(n?'':'disabled')+'>Revise</button>';
   }else if(step==='references'&&roundOpen()&&roundOpen().kept&&roundOpen().pass!==1){   // design/151: the one-shot step
     const rd=roundOpen();
-    if(rd.pass==='making'){tray.innerHTML='<span>The pictures are being made; nothing to do yet.</span>';act_.innerHTML='';}
+    if(rd.pass==='making'){const mk=Object.keys(rd.elements).filter(eid=>{const r=rd.elements[eid], st=setPics(r);return !r.ignored&&st.some(x=>x.status==='generating')&&!st.some(x=>x.status==='candidate');}).map(nameOf), why=(mk.length===1?'1 set is':mk.length+' sets are')+' still being made: '+mk.join(', ')+'. Done is offered when '+(mk.length===1?'it is':'they are')+' back.';   // F3: Done stays, switched off, with the reason
+      tray.innerHTML='<span id="tmaking">'+esc(why)+'</span>'+box;act_.innerHTML='<button class="go" data-a="round-sets" disabled title="'+esc(why)+'">Done</button>';}
     else{const held=capHit()?doneCounts(rd).again:0, c=doneCounts(rd), dc=$('done-confirm'), close=!(c.yes+c.again)&&closable(rd);   // R15: Done is not locked by an unanswered card; it asks once, with the counts, away from the words box
       tray.innerHTML='<span id="twait"></span>'+box;trayNote();
       act_.innerHTML=confirmSets?'':'<button class="go" data-a="round-sets">Done</button>';   // follow-up fix 2: the cap switches off only what costs money; a Yes is recorded
       if(confirmSets){dc.hidden=false;
-        dc.innerHTML='<div><b>Record these answers?</b></div><div style="margin:6px 0">'+c.yes+' approved · '+(c.again-held)+' made again (paid) · '+c.un+' unanswered</div>'+
+        dc.innerHTML='<div><b>Record these answers?</b></div><div style="margin:6px 0">'+c.yes+' approved · '+(c.again-held)+' made again (paid'+((d.budget||{}).set_inr>0&&c.again-held?', about '+inr((c.again-held)*d.budget.set_inr):'')+') · '+c.un+' unanswered</div>'+
           (held?'<div class="ds err">The '+held+' set'+(held>1?'s':'')+' to be made again will not be made: the spend cap of '+inr((d.budget||{}).cap_inr)+' is reached. '+(held>1?'They stay':'It stays')+' answered and waiting until the cap is raised.</div>':c.again?'<div class="ds">Each set made again is paid for.</div>':'')+(c.un?'<div class="ds">The unanswered sets stay on this step: answer them, then press Done again.</div>':'')+(close?'<div class="ds">Nothing is left to judge: Finish closes the round.</div>':c.yes+c.again?'':'<div class="ds err">No set has a whole answer yet: there is nothing to record.</div>')+
           '<div class="btns" style="margin-top:8px"><button data-a="round-picks-back">Back</button><button class="go" data-a="round-sets"'+(c.yes+c.again||close?'':' disabled')+'>Finish</button></div>';
         dc.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));}}
@@ -1231,9 +1230,9 @@ function shotsOn(video){const out=[];(data.gaps||[]).filter(g=>g.accepted).forEa
 function keptCard(o,eid,r,rd){   // a thing's card in a kept round: ignored (E13), from the footage, approved earlier (R16), its answer at once (R14), a set that was not made
   if(rd.pass===1){if(verdictOf(eid,r)==='ignore'){o.wait=false;o.badge=['','ignored'];}return;}
   if(r.ignored){o.wait=false;o.badge=['',r.aside?'set aside':'ignored'];return;}
-  if(r.from_footage){if(!o.wait)o.badge=['ok','from your footage'];return;}
+  if(r.from_footage){if(!o.wait)o.badge=['ok',r.own?'your picture':'from your footage'];return;}
   const set=setPics(r), live=set.some(x=>['candidate','approved','generating'].includes(x.status));
-  if(rd.pass!==2){if(!o.wait)o.badge=!live&&(r.cause||r.error)?['err','not made']:['dec','being made'];return;}
+  if(set.some(x=>x.status==='generating')&&!set.some(x=>x.status==='candidate')){if(!o.wait)o.badge=['dec','being made'];return;}   // F3: only the card whose set is being made says so
   if(settled(r)){if(!o.wait)o.badge=['ok','approved'];return;}
   if(!set.some(x=>x.status==='candidate')){if(!o.wait)o.badge=['err','not made'];return;}   // not made: its spec, or Make it now, waits as the server says
   const a=ans[eid], m=missing(eid,a), rest=waitIn('references',eid).filter(w=>w.item!=='set');

@@ -70,9 +70,10 @@ def test_step1_done(open_page, _id):
 
 @ident('C-3.5-61')
 def test_making_has_no_control(open_page, _id):
-    put = open_page('refs-sets-being-made', clock=True)
-    assert put.page.locator('#s-references input, #s-references button, #s-references textarea, #s-references [data-golden]').count() == 0
-    assert put.page.locator('#action button').count() == 0 and put.text('#tray') == 'The pictures are being made; nothing to do yet.'
+    put = open_page('refs-sets-being-made', clock=True)   # every set is being made. Faults 1 to 4 (11 Nov 2026), F3: no card asks anything; Done stays, switched off, with the reason
+    assert put.page.locator('#s-references input[type=radio], #s-references [data-golden], #s-references button[data-a="set-make"], #s-references button[data-a="set-aside"]').count() == 0
+    done = put.page.locator('#action button')
+    assert done.count() == 1 and done.first.is_disabled() and 'still being made: ' in put.text('#tray')
     assert 'being made' in put.section_text()
     n = put.data_gets
     put.page.clock.fast_forward(15500)
@@ -189,7 +190,7 @@ def test_step2_done(open_page, _id):
     put.page.fill('#words', 'Pass one.')
     done.click()   # R15: the first press asks, with the counts, and records nothing (before: one click recorded the round)
     put.page.wait_for_timeout(150)
-    assert not [b for b in put.posts if b['action'] == 'round-sets'] and '1 approved · 2 made again (paid) · 0 unanswered' in put.text('#done-confirm')
+    assert not [b for b in put.posts if b['action'] == 'round-sets'] and '1 approved · 2 made again (paid, about ₹71) · 0 unanswered' in put.text('#done-confirm')
     put.click('#done-confirm button[data-a="round-sets"]')
     put.wait_posts(len(put.posts) + 1)
     assert put.posts[-1] == {'action': 'round-sets', 'verdicts': want, 'quote': 'Pass one.'}

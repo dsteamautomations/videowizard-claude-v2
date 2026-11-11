@@ -179,13 +179,13 @@ def test_the_confirmation_before_done_at_step_1_carries_the_counts(open_page, _i
     box = confirm(put, 'round-done')
     text = ' '.join(box.inner_text().split())
     assert box.is_visible() and '1 footage picture used' in text and '0 ignored' in text, f'the confirmation of step 1 says: "{text}"'
-    assert '2 sets will be made' in text and 'paid' in text and '₹120' in text, f'the sets and their cost are not said: "{text}"'
+    assert '2 sets will be made' in text and 'paid' in text and '₹71' in text, f'the sets and their cost are not said: "{text}"'
     assert '1 will not be made' in text and 'Red brick' in text and 'is not approved' in text and not IDS.search(text), f'what will not be made is not said: "{text}"'
     assert not put.posts
     put.click('button[data-a="round-picks-back"]')
     verdict(put, 'P1', 'ignore')
     text = ' '.join(confirm(put, 'round-done').inner_text().split())
-    assert '1 set will be made' in text and '₹60' in text and '1 thing set to Ignore' in text, f'after Ignore on the mason: "{text}"'
+    assert '1 set will be made' in text and '₹35' in text and '1 thing set to Ignore' in text, f'after Ignore on the mason: "{text}"'
 
 
 @ident('F09')

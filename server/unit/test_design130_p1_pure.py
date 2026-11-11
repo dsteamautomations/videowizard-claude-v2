@@ -114,7 +114,7 @@ def test_the_sidecar_puts_each_cue_on_its_selector_and_a_missing_selector_is_nam
 def test_prepare_places_the_server_files_beside_the_project(tmp_path):
     M.prepare(tmp_path, unpack(project()), gsap=b'gsap!', fonts={'NotoSans-Variable.ttf': b'font'}, refs={'comp-1': b'png'}, sidecar={'assertions': []})
     assert (tmp_path / 'assets/vendor/gsap.min.js').read_bytes() == b'gsap!' and (tmp_path / 'assets/fonts/NotoSans-Variable.ttf').read_bytes() == b'font'
-    assert (tmp_path / 'assets/ref/comp-1.png').read_bytes() == b'png' and json.loads((tmp_path / 'index.motion.json').read_text()) == {'assertions': []}
+    assert (tmp_path / 'assets/ref/comp-1.png').read_bytes() == b'png' and not (tmp_path / 'index.motion.json').exists()   # M1, 11 Nov 2026: no cue, no timing file
     assert (tmp_path / 'compositions/wall.html').read_text(encoding='utf-8') == WALL
 
 
@@ -237,7 +237,7 @@ def worker_fakes(monkeypatch, store, tmp_path, frames=100, check_ok=True):
 
     def check(folder):
         calls['check'] += 1
-        assert (Path(folder) / 'assets/vendor/gsap.min.js').exists() and (Path(folder) / 'index.motion.json').exists()
+        assert (Path(folder) / 'assets/vendor/gsap.min.js').exists()   # M1: the timing file is there only with a cue
         return {'ok': check_ok, 'errors': [] if check_ok else [{'code': 'motion_appears_late', 'message': '#label appears at 2.1 s, after 1.44 s', 'fix': 'start it earlier'}], 'warnings': []}
 
     def render(folder, fps, out):

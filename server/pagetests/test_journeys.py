@@ -32,7 +32,7 @@ def test_step_one_answer_the_pictures_approve_the_specs_done(open_page, _id):
     put.serve('refs-sets-being-made')
     press_done(put, 'round-done')
     assert last_of(put, 'round-done') == {'action': 'round-done', 'verdicts': {e: {'verdict': 'approve'} for e in ('BRICK', 'E1', 'E2', 'P1')}, 'quote': ''}
-    assert put.bar()[0] == 'ok' and 'pass 2' not in put.bar()[1] and 'The pictures are being made.' in put.section_text()
+    assert put.bar()[0] == 'ok' and 'pass 2' not in put.bar()[1] and 'Some pictures are being made.' in put.section_text()
     clean(put)
 
 
@@ -74,7 +74,7 @@ def test_step_two_judge_every_set_and_done(open_page, _id):
     put.page.fill('#words', 'Pass one.')
     put.page.locator('button[data-a="round-sets"]').first.click()
     text = put.text('#done-confirm')
-    assert re.search(rf'\b{len(want) - 1} approved\b', text) and re.search(r'\b1 made again \(paid\)', text) and re.search(r'\b0 unanswered\b', text), f'the confirmation reads "{text}"'
+    assert re.search(rf'\b{len(want) - 1} approved\b', text) and re.search(r'\b1 made again \(paid', text) and re.search(r'\b0 unanswered\b', text), f'the confirmation reads "{text}"'
     put.serve('refs-step2-second-pass' if 'E1' not in want else 'refs-sets-being-made')
     put.click('#done-confirm button[data-a="round-sets"]')
     put.wait_posts(len(put.posts) + 1)

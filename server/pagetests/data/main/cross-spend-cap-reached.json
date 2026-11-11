@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T13:31:06.030504+00:00",
+   "at": "2026-11-11T16:37:07.112016+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -171,20 +171,7 @@
      "approved": true,
      "correction": null
     },
-    "not_this": [
-     "no running bond or stretcher bond pattern",
-     "no standard flat bedding orientation",
-     "no brown, grey, or yellow brick colour",
-     "no thin or flush raked mortar joints",
-     "no standard 215 mm by 65 mm metric brick dimensions",
-     "no weathered, chipped, or reclaimed brick texture",
-     "no pure header bond or Flemish bond",
-     "no recessed or dark contrasting mortar",
-     "no square or irregular face proportions",
-     "no glazed, painted, or textured finish",
-     "no missing alternating header pattern",
-     "no embedded ties, weep holes, or metal fittings"
-    ]
+    "not_this": []
    }
   ],
   "element_matches": {
@@ -195,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T13:31:09.790389+00:00",
+   "at": "2026-11-11T16:37:07.114029+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -444,7 +431,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T13:31:09.791389+00:00",
+     "at": "2026-11-11T16:37:07.115041+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -468,6 +455,7 @@
     "video_inr_per_s": 8.0,
     "usd_inr": 88.0
    },
+   "set_inr": 35.38,
    "cap_inr": 100.0,
    "left_inr": -20.0
   }

@@ -231,7 +231,7 @@ def test_done_asks_once_with_the_counts(open_page, _id):
     put.page.wait_for_timeout(200)
     assert not last_of(put, 'round-sets'), 'Done recorded at the first press, with no confirmation'
     text = put.text('#done-confirm')
-    assert re.search(r'\b1 approved\b', text) and re.search(r'\b1 made again \(paid\)', text) and re.search(rf'\b{len(judged) - 2} unanswered\b', text), f'the confirmation reads "{text}"'
+    assert re.search(r'\b1 approved\b', text) and re.search(r'\b1 made again \(paid', text) and re.search(rf'\b{len(judged) - 2} unanswered\b', text), f'the confirmation reads "{text}"'
     put.click('#done-confirm button[data-a="round-picks-back"]')
     assert not put.visible('#done-confirm') and len([b for b in put.posts[n:] if b['action'] == 'round-sets']) == 0
 

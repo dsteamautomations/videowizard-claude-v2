@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T13:31:42.629471+00:00",
+   "at": "2026-11-11T16:37:07.834373+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -171,20 +171,7 @@
      "approved": true,
      "correction": null
     },
-    "not_this": [
-     "no running bond or stretcher bond layout",
-     "no flat-laid orientation",
-     "no standard red colour variation",
-     "no uniform-length bricks without alternating headers",
-     "no weathered, textured, or reclaimed surface finish",
-     "no standard two-to-one stretcher aspect ratio",
-     "no recessed or flush raked mortar joints",
-     "no mortar joints thicker or thinner than 10 mm",
-     "no grey, yellow, brown, or painted brick colour",
-     "no standard imperial or modern modular brick dimensions",
-     "no missing header ends facing the camera",
-     "no wall ties, weep holes, or visible fittings"
-    ]
+    "not_this": []
    }
   ],
   "element_matches": {
@@ -195,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T13:31:42.630471+00:00",
+   "at": "2026-11-11T16:37:07.835375+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -241,7 +228,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T13:31:42.638483+00:00",
+      "at": "2026-11-11T16:37:07.839389+00:00",
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -263,7 +250,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T13:31:42.640501+00:00",
+      "at": "2026-11-11T16:37:07.840392+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -550,7 +537,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T13:31:42.630471+00:00",
+     "at": "2026-11-11T16:37:07.835375+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -700,6 +687,7 @@
     "video_inr_per_s": 8.0,
     "usd_inr": 88.0
    },
+   "set_inr": 35.38,
    "cap_inr": 5000.0,
    "left_inr": 5000.0
   }

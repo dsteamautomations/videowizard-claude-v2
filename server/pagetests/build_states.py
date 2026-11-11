@@ -686,6 +686,55 @@ def _():
     return store, conn, NEW
 
 
+# Faults 1 to 4 of the VW-20 test run (11 Nov 2026): a set that failed in the call, one set made again while the others wait, an own picture as the reference
+def brick_failed(error='OpenAI rejected the request (HTTP 400).'):
+    """Step 2 where the brick's set failed in the call: the kiln's and the mason's sets are back."""
+    _, store, conn = step1()
+    VS.round_done(store, USER, NEW, [], APPROVE(ROWS), 'Yes, the frame.', conn=conn)
+    edit(store, lambda x: [r.update(status='failed', error=error) for r in x['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == 'BRICK'])
+    return store, conn, sets_back(store, {'E2': 2})
+
+
+@state('refs-step2-set-failed-in-call', 'references')
+def _():
+    store, conn, _s = brick_failed()
+    return store, conn, NEW
+
+
+@state('refs-step2-one-set-being-made', 'references')
+def _():
+    store, conn, s = brick_failed('The model returned no picture: no image in the answer')
+    VS.set_answer(store, USER, NEW, [], 'E2', 'yes', sheets(s, 'E2')[0], '')   # answered before; the mason is not answered yet
+    VS.set_make(conn, store, USER, NEW, [], 'BRICK')   # Make it now: only the brick is being made
+    return store, conn, NEW
+
+
+@state('refs-step2-own-picture-on-failed-set', 'references')
+def _():
+    store, conn, _s = brick_failed()
+    VS.supply_own(conn, store, USER, NEW, [], 'BRICK', content=own_png(), name='my-brick.png')
+    return store, conn, NEW
+
+
+@state('refs-second-pass-being-made', 'references')
+def _():
+    _, store, conn, s = step2()
+    VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': sheets(s, 'E2')[0]}, 'P1': {'verdict': 'yes'}, 'BRICK': {'verdict': 'no', 'words': 'too dark'}}, 'These.', conn=conn, partial=True)
+    return store, conn, NEW
+
+
+@state('refs-round-complete-own-picture-and-set-aside', 'references')
+def _():
+    _, store, conn = step1()
+    VS.supply_own(conn, store, USER, NEW, [], 'E2', content=own_png(), name='my-kiln.png')   # at step 1: no set is made for the kiln
+    VS.round_done(store, USER, NEW, [], APPROVE(ROWS), 'Yes, the frame.', conn=conn)
+    edit(store, lambda x: [r.update(status='failed', error='OpenAI rejected the request (HTTP 400).') for r in x['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == 'BRICK'])
+    sets_back(store)
+    VS.set_aside(store, USER, NEW, [], 'BRICK', '')
+    VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes'}}, 'Yes.', conn=conn, partial=True)
+    return store, conn, NEW
+
+
 @state('pictures-picture-rejected', 'pictures')
 def _():
     _, store, conn = complete()
