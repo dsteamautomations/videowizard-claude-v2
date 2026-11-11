@@ -2526,8 +2526,9 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     """design/151: the one-shot verdicts on the sets: Yes (the set approved; a thing's golden picture is the ticked one, Q2; a person's is picture 1),
     No or Correct it (the set rejected with the words; made again, the correction in the prompt, never from a rejected picture). Complete when every
     element is approved or ignored; 'making' while any set is made again.
-    UI change, 11 Nov 2026 (R13, R15): a whole answer stored with set_answer stands where Done sends no verdict. partial (the page): the sets
-    with no answer are left as they are and the round stays on step 2 for them; without it (the chat tool) every set needs its verdict, as before."""
+    UI change, 11 Nov 2026 (R13, R15): without partial (the chat tool) every set needs its verdict, as before, and a whole answer stored with
+    set_answer stands where the call sends none. partial (the page): the page sends the stored answers the operator saw in its confirmation; exactly
+    those are recorded, every other set is left as it is (a stored answer too) and the round stays on step 2 for them."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
     need(rd and rd.get('kept') and _round_pass(session, rd) == 2, 'No reference round is waiting for its sets.')
@@ -2538,7 +2539,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     # hotfix 2, 11 Nov 2026 (VW-19): a set approved in an earlier pass is settled; it needs no verdict again (its pictures are approved, no longer candidates)
     settled = {eid for eid, r in rd['elements'].items() if r.get('verdict') == 'yes' and _set_rows(session, eid, r.get('set'), ('approved',))}
     active = [eid for eid, r in rd['elements'].items() if not r.get('ignored') and not r.get('from_footage') and eid not in settled]   # a footage element was done at step 1
-    for eid in active:
+    for eid in active if not partial else []:
         if not (verdicts.get(eid) or {}).get('verdict') and _answered(session, kinds, eid, rd['elements'][eid]):
             verdicts[eid] = _answered(session, kinds, eid, rd['elements'][eid])
     unanswered = [eid for eid in active if not (verdicts.get(eid) or {}).get('verdict')] if partial else []
@@ -2657,7 +2658,7 @@ def set_cause(session, plan, element_id, budget=None):
         return None
     for m in materials_of(plan, element_id):
         if correction_pending(session, material_key(m['id']), m['material_spec']):
-            return {'kind': 'spec', 'element_id': m['id'], 'text': f"the material spec of {m.get('name') or m['id']} was corrected: the assistant revises it, then you approve it"}
+            return {'kind': 'spec', 'element_id': m['id'], 'pending': True, 'text': f"the material spec of {m.get('name') or m['id']} was corrected: the assistant revises it, then you approve it"}
         if not material_approved(session, m):
             return {'kind': 'spec', 'element_id': m['id'], 'text': f"the material spec of {m.get('name') or m['id']} is not approved"}
     unknown = [d for d in element.get('size') or [] if d.get('value') is None]

@@ -157,12 +157,13 @@ def test_done_from_the_chat_tool_still_needs_every_verdict_and_the_page_may_reco
     pic = sheets(s, 'E2')[0]
     with pytest.raises(Problem, match='P1: a verdict is required'):
         g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': pic}}, 'yes', conn=conn))
-    VS.set_answer(store, USER, NEW, [], 'P1', 'yes', None, '')
-    VS.set_answer(store, USER, NEW, [], 'P1', None, None, '')   # taken back: unanswered again
+    VS.set_answer(store, USER, NEW, [], 'P1', 'no', None, '')   # stored from another tab: this page's confirmation did not count it, so its Done does not record it
     out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': pic}}, 'These for now.', conn=conn, partial=True)
     s = saved(store)
     assert out['approved'] == ['E2'] and out['unanswered'] == ['P1'] and out['pass'] == 2 and VS._round_view(s)['pass'] == 2
-    assert all(s['references'][i]['status'] == 'candidate' for i in sheets(s, 'P1'))   # the unanswered set still waits
+    assert all(s['references'][i]['status'] == 'candidate' for i in sheets(s, 'P1')) and s['round']['elements']['P1']['answer']['verdict'] == 'no'   # the set still waits, its stored answer kept
+    with pytest.raises(Problem, match='nothing to record'):
+        g(lambda: VS.round_sets(store, USER, NEW, [], {}, 'Nothing.', conn=conn, partial=True))
     out = VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes'}}, 'And the mason.', conn=conn, partial=True)
     assert out['pass'] == 'complete'
 

@@ -186,6 +186,15 @@ main:has(> .v2.ux1){flex:1;min-height:0;max-width:none;width:100%;box-sizing:bor
 .v2 .vtabs button.new{color:var(--ok)}
 .v2 .vold{margin:6px 0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--err) 12%,var(--bg));color:var(--err);font-size:15px}
 @media (max-width:1280px){.v2.ux1 .split{grid-template-columns:1fr;height:auto}.v2.ux1 #stage>section:has(>.split){height:auto}.v2.ux1 .split>div:first-child{overflow:visible}}
+/* UI change, 11 Nov 2026 (videobuilder-v4/phase2/ui/requirements-and-test-plan.md): a thumbnail's state (R20), the labelled starting-picture control (R2), the placeholder of a missing picture (E16), Done's confirmation (R15), a failed connection (R24) */
+.v2 .pst{padding:0 6px 4px;font-size:14px;color:var(--muted)}.v2 .pst.ok{color:var(--ok)}.v2 .pst.err{color:var(--err)}
+.v2 .pic button.gold{display:block;width:calc(100% - 12px);white-space:normal;font-size:14px;border-radius:8px;line-height:1.2}
+.v2 .pic button.gold.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.v2 .ph{display:flex;align-items:center;justify-content:center;min-height:90px;padding:6px;background:var(--z);color:var(--muted);font-size:14px;text-align:center}
+.v2 .status.net{background:color-mix(in srgb,#e0a326 14%,var(--bg));color:var(--err);border-color:var(--err);border-style:dashed}
+.v2 #done-confirm{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:8;width:min(560px,90vw);background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:17px}
+.v2 #done-confirm[hidden]{display:none}
+.v2.ux1 .rcard .badge{white-space:normal}
 </style>
 <div class="v2 ux1" id="app" data-code="{{ run.code }}">
 <div class="top">
@@ -212,6 +221,7 @@ main:has(> .v2.ux1){flex:1;min-height:0;max-width:none;width:100%;box-sizing:bor
 <div class="foot"><div class="in">
 <div class="player" id="player" hidden><span id="pl-name" class="ds">nothing playing</span><video id="pl" controls preload="metadata"></video></div>
 <div class="row"><div class="tray" id="tray"></div><span id="action"></span></div>
+<div id="done-confirm" hidden></div>
 </div></div>
 </div>
 <script>
@@ -227,20 +237,77 @@ let confirmPicks=false;   // design/106 N3: Done asked once, then Finish
 let data=null, timer=null, inflight=false, step=null, selEl=null, selPic=null, gapFilter='', selGaps={}, view=null, wi=-1, hashDone=false, rejOpen=null, closed={};   // design/99: the reject reason open after a reject; panels the operator closed   // selPic: {sid,n} a search result, {ref} a reference (design/80)
 const picks={};   // search id -> [{n, note}] in the order ticked (design/73)
 const searching={}, ignoredEls={};   // design/121: the things whose search is running; the things answered Ignore this on pass 2
+// UI change, 11 Nov 2026 (R13, R14): the answers of step 2, held here and stored on the server at every change; set: the set the answer was made on; state: typing, saving, saved or failed
+const ans={}, stale={}, notRec={}, v1={};   // stale: a stored answer discarded because its set was made again; notRec: the card a refused Done names; v1: step 1's Ignore this, kept across a redraw (E13)
+let saveChain=Promise.resolve(), confirmSets=false, doneBusy=false, sending='', clearWords=false, lastErr='';
+const VW={yes:'Yes',no:'No',correct:'Correct it'}, SHORT={'material spec to approve':'spec to approve','drawing spec to approve':'spec to approve'};
+function plain(t){   // R19: no tool command and no internal picture id reaches the operator
+  const s=String(t==null?'':t).replace(/\s*\((?:or\s+)?`[^`]*`\)/g,'').replace(/,?\s*(?:\b(?:or|with)\s+)?`[^`]*`/g,'');
+  return s.replace(/\b[0-9a-f]{10,}(?:-\d+)?\b/g,id=>{const r=((data&&data.references)||[]).find(x=>x.id===id);return r&&r.set_n?'picture '+r.set_n+' of '+(r.element_id||'its set'):r&&r.name?r.name:'that picture';});}
 function remember(k,v){try{localStorage.setItem('vz:'+code+':'+k,v);}catch(e){}}
 function recall(k){try{return localStorage.getItem('vz:'+code+':'+k);}catch(e){return null;}}
 const said=[];   // design/129 UX1: the last five messages, from the bar's History
-function msg(t,err,busy,kind){const f=$('fmsg');if(kind!=='dec')msgAt=Date.now();f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');const k=kind||(err?'err':(busy?'info':'ok'));f.className='status '+k;   // UX1: blue working, green done, red refused, amber waiting
+function msg(t,err,busy,kind){const f=$('fmsg');t=plain(t);if(kind!=='dec')msgAt=Date.now();f.innerHTML=(busy?'<span class="spin"></span>':'')+esc(t||'');const k=kind==='warn'?'dec':(kind||(err?'err':(busy?'info':'ok')));f.className='status '+k;   // UX1: blue working, green done, red refused, amber waiting; R24: net, a failed connection; warn: amber, kept in History
   if(t&&kind!=='dec'){said.unshift([k,new Date().toTimeString().slice(0,5)+'  '+t]);said.length=Math.min(said.length,5);}}
 function needWords(id,text){const e=$(id);if(e){e.classList.add('need-words');e.focus();e.addEventListener('input',()=>e.classList.remove('need-words'),{once:true});}msg(text||'Your words are required: type them in the box at the foot first.',true);}   // design/74 L31
 async function act(body){
   if(inflight){throw new Error('Still recording the last action; try again in a moment.');}
   inflight=true;
-  try{const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let j=null;try{j=await r.json();}catch(e){j=null;}
+  try{let r;try{r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
+    catch(e){const x=new Error('The server could not be reached: nothing was recorded. Check the connection and try again.');x.net=true;throw x;}   // R24: not a refusal
+    let j=null;try{j=await r.json();}catch(e){j=null;}
     if(!r.ok){throw new Error((j&&j.message)||('The server answered '+r.status+'.'));}return j;}
   finally{inflight=false;}
 }
-async function send(body,okText){msg('Recording…',false,true);try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}msg((j&&j.next)||okText||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}catch(err){msg(err.message,true);highlightNamed(err.message,document);return null;}}
+async function send(body,okText,onOk){msg('Recording…',false,true);lastErr='';try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}if(onOk)onOk(j);if(body.quote||body.reason)clearWords=true;msg((j&&j.next)||okText||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}
+  catch(err){lastErr=err.net?'':err.message;msg(err.message,true,false,err.net?'net':undefined);highlightNamed(err.message,document);return null;}}
+// ---------- R13: one answer of step 2, stored as it is made ----------
+function setKey(r){return String(r.round||0)+':'+(((r.set||[])[0])||'');}
+function setPics(r){const by=refsById();return ((r&&r.set)||[]).map(i=>by[i]).filter(x=>x&&x.status!=='rejected');}
+function settled(r){const p=setPics(r).filter(x=>x.status!=='failed');return r.verdict==='yes'&&p.length>0&&p.every(x=>x.status==='approved');}   // R16: approved in an earlier pass; it asks nothing
+function judged(rd){return Object.keys(rd.elements).filter(eid=>{const r=rd.elements[eid];return !r.ignored&&!r.from_footage&&!settled(r)&&setPics(r).some(x=>x.status==='candidate');});}   // the sets that ask for an answer now
+function missing(eid,a){   // E6: what an answer still lacks; '' when it is whole
+  if(!a||!a.verdict)return 'no answer yet';
+  if(a.state==='failed')return 'not saved';
+  if(a.verdict==='yes'&&(((data.elements||[]).find(e=>e.id===eid)||{}).kind!=='person')&&!a.golden)return 'choose the starting picture';
+  if(a.verdict==='correct'&&!String(a.words||'').trim())return 'say what to correct';
+  return '';}
+function answerOf(eid){const rd=roundOpen(), r=rd&&rd.elements[eid];if(!ans[eid])ans[eid]={verdict:'',golden:'',words:'',set:r?setKey(r):'',state:'typing'};return ans[eid];}
+function syncAnswers(){   // the server's stored answer wins, except over one being typed or not saved; an answer made on a set made again since is dropped
+  const rd=roundOpen();
+  if(!rd||!rd.kept||rd.pass!==2){[ans,stale,notRec].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));confirmSets=false;return;}
+  Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid], key=setKey(r), sv=r.answer, a=ans[eid];
+    if(r.answer_discarded&&!a)stale[eid]=true;
+    if(a&&a.set!==key){delete ans[eid];delete notRec[eid];stale[eid]=true;return;}
+    if(sv&&!(a&&a.state!=='saved'))ans[eid]={verdict:sv.verdict||'',golden:sv.golden||'',words:sv.words||'',set:key,state:'saved'};});}
+function storeAnswer(eid){   // sent whole at every change, one after the other, so the later answer is the stored one
+  const a=ans[eid];if(!a)return;a.state='saving';delete stale[eid];delete notRec[eid];confirmSets=false;
+  const person=((data.elements||[]).find(e=>e.id===eid)||{}).kind==='person';
+  const body={action:'set_answer',element_id:eid,verdict:a.verdict||null,golden:(a.verdict==='no'||person)?null:(a.golden||null),words:String(a.words||'').trim()};
+  saveChain=saveChain.then(async()=>{let ok=false,j=null,why='';
+    try{const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});try{j=await r.json();}catch(e){j=null;}
+      ok=r.ok;if(!ok)why=(j&&j.message)||('The server answered '+r.status+'.');}catch(e){ok=false;}
+    if(ans[eid]!==a)return;   // the round moved on meanwhile
+    if(ok&&j&&j.discarded){delete ans[eid];stale[eid]=true;}
+    else if(a.state==='saving'){a.state=ok?'saved':'failed';a.why=why;}
+    if(!ok)msg(eid+': not saved, try again'+(why?': '+why:' (the server could not be reached).'),true,false,why?undefined:'net');   // E9
+    paintAnswers();});}
+function answerLine(eid){   // under a card's answer: what it lacks, that it is stored and not recorded yet, or that it was not saved
+  const a=ans[eid];let h='';
+  if(stale[eid])h+='<div class="ds err">made again since; judge the new set</div>';
+  if(notRec[eid])h+='<div class="ds err">not recorded: '+esc(plain(notRec[eid]))+'</div>';   // R24, E8
+  if(a&&a.state==='failed')h+='<div class="ds err">not saved, try again'+(a.why?': '+esc(plain(a.why)):'')+' <button data-a="set-answer-retry" data-el="'+esc(eid)+'">Try again</button></div>';
+  else if(a&&a.verdict){const m=missing(eid,a);h+=m?'<div class="ds err">'+esc(m)+'</div>':'<div class="ds ok">'+VW[a.verdict]+' · not recorded yet: Done records it</div>';}
+  return h;}
+function paintAnswers(){   // after an answer changed or was stored: the card's line, the left list, the foot; never a redraw of the card (a words box being typed in keeps its place)
+  document.querySelectorAll('#s-references [data-astate]').forEach(d=>{const h=answerLine(d.dataset.astate);if(d._html===undefined)d._html=d.innerHTML;if(d._html===h)return;d.innerHTML=h;d._html=h;d.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));});
+  renderRail();trayNote();lockAll();}
+function trayNote(){const t=$('twait'), rd=roundOpen();if(!t||!rd)return;const wait=keptWaiting(rd);
+  t.className=wait.length?'err':'';
+  t.innerHTML=wait.length?'<b>'+wait.length+'</b> still need'+(wait.length>1?'':'s')+' an answer (or a starting picture, or the words for Correct it): '+esc(wait.join(', ')):'Every set has its answer. Done records them; the No and Correct it ones are made again.';}
+function capHit(){const b=(data&&data.budget)||{};return (b.cap_inr>0&&b.spent_inr>=b.cap_inr)||Object.values((data&&data.round&&data.round.elements)||{}).some(r=>r.cause&&r.cause.kind==='cap');}   // E15
+function readOnly(){return !!(data&&(data.busy||(data.run&&data.run.open_defects&&data.run.open_defects.length)));}   // E19, E20
+function lockAll(){if(!readOnly())return;document.querySelectorAll('#app button[data-a],#app input[type=radio],#app [data-golden]').forEach(e=>{e.disabled=true;});}   // no button pretends to work
 const KW_TEXT='Two to twelve words to search for: the thing and its place or trade.';   // design/126 U5 (SK, 31 Oct: 2 to 12 words; the stock site's name is outside the count)
 function kwOk(kw){const n=String(kw||'').split(/\s+/).filter(Boolean).length;return n>=2&&n<=12;}
 async function roundSearch(eid){   // design/121 change 6: a thing's own search; not through act(), so the operator goes on to the next thing while it runs
@@ -257,7 +324,7 @@ async function roundSearch(eid){   // design/121 change 6: a thing's own search;
 async function load(){
   let r;
   try{r=await fetch(base+'/data',{cache:'no-store'});}catch(e){msg('The server is not reachable; trying again in 15 s.',true);schedule(15000);return;}
-  if(r.status===401){location.href='/login?next='+encodeURIComponent(base);return;}
+  if(r.status===401){location.href='/login?next='+encodeURIComponent(base+location.hash);return;}   // E10: back to the same card
   if(!r.ok){msg('The page could not load ('+r.status+').',true);schedule(15000);return;}
   data=await r.json();render();
   if(!hashDone){hashDone=true;applyHash();}   // design/97 W1: a link opens its item
@@ -274,41 +341,53 @@ function autoStep(){const d=data;if(!d||d.state!=='prepared')return 'treatment';
   const els=(d.elements||[]).filter(e=>e.kind!=='graphic');
   if(roundOpen()||els.some(e=>!(d.references||[]).some(r=>r.element_id===e.id&&r.kind==='sheet'&&r.status==='approved')))return 'references';
   if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>!['video','drawn'].includes(s.route)&&!s.asset)))return 'pictures';
-  if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>['video','drawn'].includes(s.route)&&!s.takes.some(k=>k.selected))))return 'takes';
+  if(d.gaps.some(g=>g.accepted&&!g.recorded&&g.shots.some(s=>['video','drawn'].includes(s.route)&&!s.asset&&!s.takes.some(k=>k.selected))))return 'takes';   // R21: a shot filled with a supplied file is done
   return 'record';}
 function unsavedTicks(){return Object.values(picks).reduce((k,l)=>k+((l||[]).length),0);}   // design/99 C5
 window.addEventListener('beforeunload',ev=>{if(unsavedTicks()){ev.preventDefault();ev.returnValue='';}});
 document.addEventListener('click',ev=>{const c=ev.target.closest('[data-rchip]');if(!c)return;const w=$('rwhy');if(w)w.value=(w.value?w.value+'; ':'')+c.dataset.rchip;});   // design/99 C3: a chip adds to the reason
-function go(s){if(step==='references'&&s!=='references'&&unsavedTicks()&&!confirm(unsavedTicks()+' ticked pictures are not saved. Leave anyway?'))return;step=s;confirmPicks=false;remember('step',s);render();window.scrollTo(0,0);}   // review 27 Oct: Done is asked again after a step change
+function go(s){if(step==='references'&&s!=='references'&&unsavedTicks()&&!confirm(unsavedTicks()+' ticked pictures are not saved. Leave anyway?'))return;confirmSets=false;clearWords=true;step=s;confirmPicks=false;remember('step',s);render();window.scrollTo(0,0);}   // review 27 Oct: Done is asked again after a step change
 // ---------- frame ----------
 function frame(){
   const d=data;
-  const wt=(d&&d.waiting)||[], per={};wt.forEach(w=>{per[w.step]=(per[w.step]||0)+1;});   // design/97 W3
+  const wc=waitCards(), per={};wc.forEach(w=>{per[w.step]=(per[w.step]||0)+1;});   // design/97 W3; R6: the header, the tabs and the left list count the same cards
   $('steps').innerHTML=STEPS.map(([k,l])=>'<a data-s="'+k+'" class="'+(k===step?'on':'')+'">'+l+(per[k]?' · '+per[k]+' waiting':'')+'</a>').join('<span class="ds">›</span>');
   $('steps').querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>go(a.dataset.s)));
-  if(!d||d.state!=='prepared'){$('line').textContent='The visuals stage has not started: the assistant runs vw visuals prepare.';return;}
+  if(!d||d.state!=='prepared'){$('line').textContent='The visuals stage has not started: the assistant prepares it.';return;}
   const b=d.budget||{}, over=b.spent_inr>b.cap_inr, pct=b.cap_inr?Math.min(100,Math.round(100*b.spent_inr/b.cap_inr)):0;
-  const meter='<span class="meter">spend '+inr(b.spent_inr)+' of '+inr(b.cap_inr)+' <span class="bar"><i class="'+(over?'over':'')+'" style="width:'+pct+'%"></i></span>'+(b.images?' images: '+(b.images-(b.fixes||0))+' requested + '+(b.fixes||0)+' fixes':'')+'</span>';   // design/96 X3
+  const meter='<span class="meter">spend '+inr(b.spent_inr)+' of '+inr(b.cap_inr)+' <span class="bar"><i class="'+(over?'over':'')+'" style="width:'+pct+'%"></i></span>'+(b.images?' images: '+(b.images-(b.fixes||0))+' requested + '+(b.fixes||0)+' fixes':'')+(capHit()?' <span class="err">spend cap reached: no picture is made until the cap is raised</span>':'')+'</span>';   // design/96 X3; E15
   const t=d.treatment, dr=d.treatment_draft, at=autoStep();
   let line=stage()!=='visuals'?'The run is at <strong>'+esc(d.run.stage)+'</strong>.':(dr?(t?'<strong>New treatment draft</strong>: it replaces the approved one; read it and approve it at the foot':'<strong>Treatment drafted</strong>: read it and approve it at the foot'):(!t?'The assistant is preparing the treatment':'<strong>'+esc(STEPS.find(x=>x[0]===at)[1])+'</strong> is the step the run is at'));
   if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open; nothing can be recorded until it is fixed</span>';}
-  const wn=(d.waiting||[]).length;
+  if(d.busy){line+=' · <span class="err">read-only: the run is being written elsewhere just now; this page looks again in a few seconds</span>';}   // E19
+  const wn=wc.length;
   $('line').innerHTML=line+meter+(d.illustrative&&d.illustrative.warning?' · <span class="err">'+esc(d.illustrative.warning)+'</span>':'')+(wn?' · <a id="wcount" style="cursor:pointer"><b>'+wn+'</b> waiting for your verdict</a> <button id="wnext">Next waiting</button>':'');   // design/97 W3
-  if($('wcount'))$('wcount').addEventListener('click',()=>{const l=$('wlist');l.hidden=!l.hidden;l.innerHTML=(d.waiting||[]).map(w=>'<a href="'+esc(w.link)+'">'+esc(w.label)+'</a>').join('');});
-  if($('wnext'))$('wnext').addEventListener('click',()=>{const w=d.waiting||[];if(!w.length)return;wi=(wi+1)%w.length;const h=w[wi].link.split('#')[1];if(location.hash==='#'+h)applyHash();else location.hash=h;});
+  const list=()=>{$('wlist').innerHTML=wc.map(w=>'<a href="'+esc(base+'#'+w.hash)+'">'+esc(w.label)+'</a>').join('');};if(!$('wlist').hidden)list();
+  if($('wcount'))$('wcount').addEventListener('click',()=>{const l=$('wlist');l.hidden=!l.hidden;list();});
+  if($('wnext'))$('wnext').addEventListener('click',()=>{if(!wc.length)return;wi=(wi+1)%wc.length;const h=wc[wi].hash;if(decodeURIComponent(location.hash)==='#'+decodeURIComponent(h))applyHash();else location.hash=h;});
 }
-function applyHash(){   // design/97 W1: #step/group/item opens the step, the item in the panel, scrolls to it and outlines it
+function waitCards(){   // R6, R9: every card that waits for the operator, on every step, in the server's order where it gives one; the one list behind every count and Next waiting
+  const out=[];if(!data||data.state!=='prepared')return out;
+  STEPS.forEach(([k])=>{const cs=railCards(k).filter(c=>c.wait&&c.unit), at=c=>{const i=(data.waiting||[]).findIndex(w=>w.step===k&&w.group===c.unit);return i<0?1e6:i;};
+    cs.map((c,i)=>[at(c),i,c]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).forEach(x=>{const w0=(data.waiting||[]).find(w=>w.step===k&&w.group===x[2].unit);out.push({step:k,unit:x[2].unit,hash:w0?w0.link.split('#')[1]:k+'/'+encodeURIComponent(x[2].unit),label:x[2].wlabel||x[2].title});});});   // the server's own link where it gives one
+  return out;}
+function applyHash(){   // design/97 W1: #step/card/item opens the step and the card, with the item in the panel when it is a picture or a take; R5: a link, Next waiting and a click on the card open the same
   const h=decodeURIComponent(location.hash.slice(1));if(!h||!data||data.state!=='prepared')return;
   const [st,grp,item]=h.split('/');if(!STEPS.some(x=>x[0]===st))return;
-  const refs=data.references||[];step=st;remember('step',st);
-  selPic=item&&refs.some(r=>r.id===item)?{ref:item}:(st==='takes'&&item&&!['spec','reuse'].includes(item)?{take:item}:null);
-  if(st==='references'&&grp)selEl=grp;
-  if(grp)selUnit[st]=grp;   // design/129 UX1: the link's group is the rail's card
-  render();
-  const el=document.querySelector('[data-item="'+(item||'')+'"]')||document.getElementById('card-'+grp);
+  if(step!==st){step=st;remember('step',st);confirmPicks=false;confirmSets=false;}
+  selectUnit(grp||'',true,item||'');
+}
+function outline(u,item){   // R8, R9: what waits on the card is in view and outlined, with its control
+  const sec=$('s-'+step);$('action').classList.remove('hl');if(!sec||!u)return;
+  const byId=id=>{const e=document.getElementById(id);return e&&sec.contains(e)?e:null;}, card=byId('card-'+u)||[...sec.querySelectorAll('[data-unit]')].find(e=>e.dataset.unit===u)||null;
+  const mine=railCards().find(c=>c.unit===u), it=item||(mine&&mine.wait?((waitIn(step,u)[0]||{}).item||'card'):'');
+  if(!it)return;
+  let el=it==='specs'?byId('card-mspec-'+u):[...sec.querySelectorAll('[data-item]')].find(e=>e.dataset.item===it)||null;
+  const known=['card','set','make','round','line','gap','spec','specs','reuse'].includes(it)||!!el||(selPic&&(selPic.ref===it||selPic.take===it))||!!(data.questions||{})[it];
+  if(!el||!el.querySelector('button,input,textarea,select'))el=el&&$('panel')&&$('panel').querySelector('button[data-a]')?el:(card||el);   // a picture with no control of its own: its card holds the answer
   if(el){el.scrollIntoView({block:'center'});el.classList.add('hl');}
-  const w=(data.waiting||[]).find(x=>x.link.endsWith('#'+h));
-  if(item&&!['spec','reuse'].includes(item)&&!document.querySelector('[data-item="'+item+'"]'))msg('That item is no longer waiting: '+(w?w.label:h)+'.',true);
+  if(step==='record'&&el)$('action').classList.add('hl');   // the Record button answers a gap that is ready
+  if(item&&!known)msg('That link is to something already answered or no longer here; this is its card.',false,false,'info');   // R9: never a red line for a link
 }
 window.addEventListener('hashchange',applyHash);
 // ---------- treatment ----------
@@ -520,6 +599,7 @@ function elState(e){const refs=(data.references||[]).filter(r=>r.element_id===e.
   if(refs.some(r=>r.kind==='sheet'&&r.status==='approved'))return ['ok','sheet approved'];
   if(data.kept&&refs.some(r=>r.kind==='sheet'&&r.set))return ['dec','set made: judge it on step 2'];   // design/151 hotfix
   if(refs.some(r=>r.kind==='sheet'))return ['dec','sheet to approve'];
+  if(data.kept&&refs.some(r=>r.kind==='frame'&&r.status==='approved'&&r.id===(data.golden||{})[e.id]))return ['ok','from your footage'];   // N8: its approved footage picture is its reference; no set is made
   if(data.kept)return ['','waiting for the round'];   // design/151 hotfix: a kept film's sets are made in the round, never per element
   if(refs.some(r=>r.status==='approved'))return ['dec','pictures approved, sheet to make'];
   if(refs.some(r=>r.status==='candidate'))return ['dec','pictures to approve'];
@@ -567,11 +647,13 @@ function panelBody(){
       (own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'):'');
   }
   const placed=placedIn(r.id), srcs=r.kind==='sheet'?(r.parents||[]).map(id=>by[id]).filter(Boolean):[], inSet=!!(r.set&&d.kept);   // design/151 hotfix: a set's picture is judged on step 2 of the round
+  const rk=roundOpen()&&roundOpen().kept?roundOpen():null, onCard=!!rk&&rk.pass===1&&r.kind==='frame'&&!!rk.elements[r.element_id];   // R1, R3: while the round is open a set's picture and a footage picture are decided on the card, in one place; this panel is for looking
   const made=srcs.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="srcs">'+srcs.map(x=>big(x)).join('')+'</div>':'', pend=r.kind==='sheet'&&r.status==='candidate';
   return big(r)+head+why+(pend?made:'')+checklist(r.checklist,r.check)+(inSet?'':fixBtn(r))+noteBox(r)+   // design/97 R1: a pending sheet beside its sources
     '<details class="pdet"><summary>Details</summary><div class="ds">'+esc(r.kind)+(r.width?' · '+esc(r.width)+'×'+esc(r.height):'')+(r.note?' · note: '+esc(r.note):'')+(r.from_thumbnail?' · saved from the thumbnail':'')+'</div>'+(pend?'':made)+'</details>'+   // design/100 S4
     (placed?'<div class="ds ok">'+'Approved · in the film at '+filmAt(placed)+' ('+esc(placed.shot_id)+')</div>'+(can&&!placed.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(placed.shot_id)+'">Remove</button>'):'')   // design/97 A5
-     :inSet&&r.status==='candidate'?'<div class="ds" style="margin-top:8px">Picture '+esc(r.set_n||1)+' of the set of '+esc(r.element_id)+': judge the whole set on step 2 of the reference round (Yes, No or Correct it), not here.</div>'
+     :inSet&&(r.status==='candidate'||rk)?'<div class="ds" style="margin-top:8px">Picture '+esc(r.set_n||1)+' of the set of '+esc(r.element_id)+': judge the whole set on step 2 of the reference round (Yes, No or Correct it), not here.</div>'
+     :onCard?'<div class="ds" style="margin-top:8px">Answer this picture on its card: Use this picture, or Ignore.</div>'
      :own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'+
        (r.status==='approved'&&sh&&sh.route==='still'?'<button data-a="still" data-shot="'+esc(sh.shot_id)+'" data-ref="'+esc(r.id)+'">Use for the shot</button>':'')):'');   // design/80 S6: the words sit with the button
 }
@@ -627,6 +709,7 @@ function drawViewer(){const v=$('viewer');
   window.addEventListener('mouseup',()=>{drag=null;},{once:true});
   v.querySelectorAll('#vw-panel button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
   if(r.sid){const side=$('vw-panel');side.querySelectorAll('img[data-sview]').forEach(i=>i.remove());wireSearchPanel(side,moveViewer,drawViewer);}   // design/126 U4: the picture is on the stage; tick, note and Save beside it
+  lockAll();
 }
 document.addEventListener('keydown',ev=>{   // S4: arrows move within the row, Escape clears the panel; design/97 V1: the viewer's keys first
   if(view&&!/^(TEXTAREA|INPUT)$/.test((ev.target||{}).tagName)){if(ev.key==='Escape')closeViewer();if(ev.key==='ArrowLeft')moveViewer(-1);if(ev.key==='ArrowRight')moveViewer(1);if(ev.key==='+'||ev.key==='=')zoomViewer(1.25);if(ev.key==='-')zoomViewer(0.8);return;}
@@ -660,54 +743,83 @@ function roundWaiting(rd){   // design/121 changes 1, 6: what keeps Done locked,
     if(rd.pass===1){if(!rd.kept&&verdictOf(eid,r)==='search'&&!sids.length)out.push(eid);}
     else if(r.verdict==='search'&&!ignoredEls[eid]&&!(r.picked&&r.picked.length)&&!sids.some(sid=>(picks[sid]||[]).length))out.push(eid);});
   return out;}
-function verdictOf(eid,r){const v=document.querySelector('input[name="v-'+eid+'"]:checked');if(v)return v.value;if(r.verdict&&r.verdict!=='search')return r.verdict;if(data.round&&data.round.kept)return 'approve';
+function verdictOf(eid,r){if(v1[eid])return v1[eid];const v=document.querySelector('input[name="v-'+eid+'"]:checked');if(v)return v.value;if(r.verdict&&r.verdict!=='search')return r.verdict;if(data.round&&data.round.kept)return 'approve';
   const fr=(r.frames&&r.frames.length)||(data.references||[]).some(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));return fr&&!sidsOf(r).length?'approve':'search';}
-const goldenTick={};   // design/151 Q2: the operator's tick per thing, the golden picture of its set
-function keptVerdict(eid){const v=document.querySelector('input[name="v-'+eid+'"]:checked');return v?v.value:'';}
-function keptWords(eid){return (($('w-'+eid)||{}).value||'').trim();}
-function keptWaiting(rd){   // design/151: what keeps Done locked on the one-shot pass, by name
-  const out=[], kinds={};(data.elements||[]).forEach(e=>kinds[e.id]=e.kind);
-  Object.keys(rd.elements).forEach(eid=>{const r=rd.elements[eid];if(r.ignored||r.from_footage)return;const v=keptVerdict(eid);
-    if(!v||(v==='yes'&&kinds[eid]!=='person'&&!goldenTick[eid])||(v==='correct'&&!keptWords(eid)))out.push(eid);});
-  return out;}
-function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while every set is made silently; pass 2 every set in one shot: Yes, No or Correct it, the golden tick on a thing
-  const d=data, refs={};(d.references||[]).forEach(r=>refs[r.id]=r);
+const goldenTick={};   // design/151 Q2: the operator's tick per thing, the golden picture of its set; since the UI change of 11 Nov 2026 it lives in ans[eid].golden, stored on the server (R13)
+function keptVerdict(eid){return (ans[eid]||{}).verdict||'';}
+function keptWords(eid){return String((ans[eid]||{}).words||'').trim();}
+function keptWaiting(rd){return judged(rd).filter(eid=>missing(eid,ans[eid]));}   // design/151: the sets with no whole answer yet, by name; R15: Done counts them, it is not locked by them
+function framesOf(eid,r){const by=refsById();let f=((r&&r.frames)||[]).map(i=>by[i]).filter(x=>x&&x.status!=='rejected');
+  if(!f.length)f=(data.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));return f;}
+function pstate(x,eid){const a=eid?ans[eid]:null;return x.status==='approved'?'approved':x.status==='rejected'?'rejected':(a&&a.verdict&&!missing(eid,a)?VW[a.verdict]+', not recorded yet':'not answered');}   // R20: every thumbnail says its state
+function psum(labels){const n={};labels.forEach(l=>{n[l]=(n[l]||0)+1;});return Object.keys(n).length?'<div class="ds psum">'+Object.keys(n).map(l=>n[l]+' '+esc(l)).join(', ')+'</div>':'';}   // R20: "2 approved, 1 rejected"
+function thumb(x){return x.url?'<img src="'+esc(thumbOf(x.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(x.id)+'">':'<div class="ph">picture not available</div>';}
+function frameStrip(frames,can){   // R3: a footage picture is answered on its card, one pair of buttons per picture
+  return '<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'" data-item="'+esc(f.id)+'">'+thumb(f)+'<div class="cap">from your footage</div><div class="pst '+(f.status==='approved'?'ok':'')+'">'+pstate(f)+'</div>'+
+    (can?'<div class="btns" style="margin:0 6px 6px">'+(f.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(f.id)+'" data-sha="'+esc(f.sha256)+'">Use this picture</button>':'')+'<button data-a="reject" data-ref="'+esc(f.id)+'">Ignore</button></div>':'')+'</div>').join('')+'</div>'+psum(frames.map(f=>pstate(f)));}
+function notMade(eid,r,can){   // R17, R18, E15: a set that was not made says its present reason and offers Make it now; the operator is never asked for a No to get it made
+  const c=r.cause, why=c?c.text:r.settled?r.settled+': it can be made now':r.problem||'', m=c&&c.kind==='spec'&&c.element_id!==eid?(data.elements||[]).find(x=>x.id===c.element_id):null;
+  return '<div class="ds err" style="margin-top:6px">The set was not made'+(why?': '+esc(plain(why)):'')+'.</div>'+
+    (can?'<div class="btns"><button class="go" data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button></div>':'')+(m?materialBox(m):'');}
+function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while every set is made silently; pass 2 every set in one shot: Yes, No or Correct it, the starting picture on a thing
+  const d=data, refs=refsById(), can=stage()==='visuals';
   const byId={};(d.elements||[]).forEach(e=>byId[e.id]=e);
   const ids=Object.keys(rd.elements);
+  (d.waiting||[]).forEach(w=>{if(w.step==='references'&&w.group&&!ids.includes(w.group)&&byId[w.group])ids.push(w.group);});   // a thing outside the round with something waiting keeps its card
+  const head=(eid,e,r)=>'<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+(r&&r.round>1?' · round '+r.round:'')+'</span>';
+  const outside=(eid,e)=>head(eid,e)+' <span class="badge">not in this round</span>'+usedIn(eid)+(framesOf(eid).length?frameStrip(framesOf(eid),can):'')+materialBox(e)+qBox(eid)+'</div>';
   let left;
   if(rd.pass===1){
-    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, v=verdictOf(eid,r);
-      let frames=(r.frames||[]).map(f=>refs[f]).filter(Boolean);
-      if(!frames.length)frames=(d.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));
-      return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span>'+usedIn(eid)+
+    const nm=ids.filter(eid=>rd.elements[eid]&&rd.elements[eid].cause&&verdictOf(eid,rd.elements[eid])!=='ignore');   // R12: what Done will not make, and why, with the control that settles it
+    const notmade=nm.length?'<div class="card" id="notmade" style="border-color:var(--err)"><b>'+nm.length+' will not be made</b> when you press Done, until '+(nm.length>1?'their causes are':'its cause is')+' settled:'+
+      nm.map(eid=>{const c=rd.elements[eid].cause;return '<div class="ds" data-notmade="'+esc(eid)+'" style="margin-top:4px"><b>'+esc(eid)+'</b>: '+esc(c.text)+
+        (c.kind==='spec'&&!c.pending&&can?' <button data-a="approve-spec" data-shot="element:'+esc(c.element_id)+'">Approve the material spec</button>':'')+'</div>';}).join('')+'</div>':'';
+    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);
+      const v=verdictOf(eid,r), frames=framesOf(eid,r);
+      return head(eid,e)+usedIn(eid)+
         '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?(e.kind==='person'?'Use the footage picture for the description (the sheet is still made)':'Use the footage picture (no AI picture is made)'):(e.kind==='person'?'Make the character sheet':'Make its pictures'))+'</label>'+
         '<label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
-        (frames.length?'<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'"><img src="'+esc(thumbOf(f.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(f.id)+'"><div class="cap">from your footage</div></div>').join('')+'</div>':'<div class="ds">Not in your footage: the assistant makes its pictures from real photographs.</div>')+'</div>';}).join('');
-    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 1 of 2:</b> for each thing, use the picture from your footage, or ignore it. Done makes every picture at once; you judge them all together on step 2.</p>'+rows;
+        (frames.length?frameStrip(frames,can):'<div class="ds">Not in your footage: the assistant makes its pictures from real photographs.</div>')+materialBox(e)+qBox(eid)+'</div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 1 of 2:</b> for each thing, use the picture from your footage, or ignore it. Done makes every picture at once; you judge them all together on step 2.</p>'+notmade+rows;
   }else if(rd.pass==='making'){
-    const rows=ids.filter(eid=>!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:''}, set=(r.set||[]).map(i=>refs[i]).filter(Boolean), st=set.length?set[0].status:'';
-      if(r.from_footage)return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge ok">from your footage</span></div>';   // SK 5 Nov: no AI picture for it
-      return '<div class="card"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge '+(st==='candidate'?'ok':st==='failed'?'err':'dec')+'">'+esc(r.error?'not made':st==='candidate'?'ready':st==='failed'?'failed':'being made')+'</span>'+(r.error?'<div class="ds err">'+esc(r.error)+'</div>':'')+'</div>';}).join('');
+    const rows=ids.filter(eid=>!rd.elements[eid]||!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);
+      const set=setPics(r), st=set.length?set[0].status:'', bad=!!(r.cause||r.error)&&!set.some(x=>x.status==='generating'||x.status==='candidate'||x.status==='approved');
+      if(r.from_footage)return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge ok">from your footage</span></div>';   // SK 5 Nov: no AI picture for it
+      return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+'</span> <span class="badge '+(bad||st==='failed'?'err':st==='candidate'?'ok':'dec')+'">'+(bad?'not made':st==='candidate'?'ready':st==='failed'?'failed':'being made')+'</span>'+(bad?notMade(eid,r,can)+(r.cause&&r.cause.kind==='spec'?materialBox(e):''):'')+'</div>';}).join('');
     left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>The pictures are being made.</b> This page refreshes itself; when every set is back, you judge them all together.</p>'+rows;
   }else{
-    const rows=ids.filter(eid=>!rd.elements[eid].ignored).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''}, set=(r.set||[]).map(i=>refs[i]).filter(x=>x&&x.status!=='rejected'), thing=e.kind!=='person', v=keptVerdict(eid)||r.verdict||'';
-      if(r.from_footage){const g=refs[(d.golden||{})[eid]];return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+'</span> <span class="badge ok">from your footage</span>'+(g?'<div class="strip"><div class="pic on" data-item="'+esc(g.id)+'"><img src="'+esc(thumbOf(g.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(g.id)+'"><div class="cap">the golden picture, from your footage</div></div></div>':'')+'</div>';}   // SK 5 Nov
-      const pics=set.map((x,i)=>'<div class="pic '+(isSel('ref',x.id)?'sel':'')+'" data-item="'+esc(x.id)+'">'+(thing?'<span class="tick '+(goldenTick[eid]===x.id?'on':'')+'" data-golden="'+esc(eid)+':'+esc(x.id)+'" title="tick the golden picture: the one every shot starts from">'+(goldenTick[eid]===x.id?'★':'')+'</span>':'')+
-        '<img src="'+esc(thumbOf(x.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(x.id)+'"><div class="cap">'+(thing?'picture '+(x.set_n||i+1):['','full length','working pose','face'][x.set_n]||('picture '+(x.set_n||i+1)))+'</div></div>').join('');
-      const notes=set.length&&set[0].notes?'<details><summary class="ds" style="cursor:pointer">the model\'s notes and sources</summary><div class="ds" style="white-space:pre-wrap">'+esc(set[0].notes)+'</div>'+((set[0].sources||[]).map(s=>'<div class="ds"><a href="'+esc(s.url||'')+'" target="_blank" rel="noopener">'+esc(s.title||s.url||'')+'</a></div>').join(''))+'</details>':'';
-      return '<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(eid)+'</span> <span class="ds">'+esc(e.name)+' · '+esc(e.kind)+(r.round>1?' · round '+r.round:'')+'</span>'+
-        (set.length?'<div class="strip">'+pics+'</div>'+notes:'<div class="ds err">No picture came back'+(r.error?': '+esc(r.error):'')+'. Say No or Correct it to make it again.</div>')+
-        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="yes" '+(v==='yes'?'checked':'')+(set.length?'':' disabled')+'> Yes</label><label><input type="radio" name="v-'+esc(eid)+'" value="no" '+(v==='no'?'checked':'')+'> No</label><label><input type="radio" name="v-'+esc(eid)+'" value="correct" '+(v==='correct'?'checked':'')+'> Correct it</label></div>'+
-        '<textarea class="pnote keep" id="w-'+esc(eid)+'" placeholder="'+(thing?'what to correct, or why not (needed for Correct it)':'what to correct about this person')+'">'+esc(($('w-'+eid)||{}).value||'')+'</textarea></div>';}).join('');
-    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 2 of 2:</b> every set at once. For each: Yes (tick the golden picture first, the one every shot starts from), No, or Correct it with your words; Done records all of them, and the No and Correct it ones are made again.</p>'+rows;
+    const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);
+      const thing=e.kind!=='person', a=ans[eid]||{}, v=a.verdict||'', tail=materialBox(e)+qBox(eid);
+      if(r.ignored)return head(eid,e,r)+' <span class="badge">ignored</span><div class="ds">Set to Ignore at step 1: no picture is made for it.</div></div>';   // E13
+      if(r.from_footage){const g=refs[(d.golden||{})[eid]];return head(eid,e,r)+' <span class="badge ok">from your footage</span>'+(g?'<div class="strip"><div class="pic on" data-item="'+esc(g.id)+'">'+thumb(g)+'<div class="cap">the golden picture, from your footage</div><div class="pst ok">approved</div></div></div>'+psum(['approved']):'')+tail+'</div>';}   // SK 5 Nov
+      const all=setPics(r), set=all.filter(x=>(x.status==='candidate'||x.status==='approved')&&x.url), done=settled(r);
+      if(!set.length)return head(eid,e,r)+' <span class="badge err">not made</span>'+notMade(eid,r,can)+tail+'</div>';
+      const pics=all.map((x,i)=>{const n=x.set_n||i+1, name=thing?'picture '+n:(['','full length','working pose','face'][x.set_n]||('picture '+n)), gold=(done?(d.golden||{})[eid]:a.golden)===x.id;
+        if(!set.includes(x))return '<div class="pic off"><div class="ph">'+esc(name)+' failed: it was not made</div></div>';   // N6: never an empty picture with its own control
+        return '<div class="pic '+(isSel('ref',x.id)?'sel':'')+(gold?' on':'')+'" data-item="'+esc(x.id)+'">'+thumb(x)+'<div class="cap">'+esc(name)+(gold&&done?' · the starting picture':'')+'</div><div class="pst '+(x.status==='approved'?'ok':'')+'">'+pstate(x,eid)+'</div>'+
+          (thing&&!done?'<button class="gold'+(gold?' on':'')+'" data-golden="'+esc(eid)+':'+esc(x.id)+'" aria-pressed="'+(gold?'true':'false')+'" title="the golden picture: the one every shot of this thing starts from">Use this as the starting picture</button>':'')+'</div>';}).join('');   // R2
+      const notes=all[0].notes?'<details><summary class="ds" style="cursor:pointer">the model\'s notes and sources</summary><div class="ds" style="white-space:pre-wrap">'+esc(all[0].notes)+'</div>'+((all[0].sources||[]).map(s=>'<div class="ds"><a href="'+esc(s.url||'')+'" target="_blank" rel="noopener">'+esc(s.title||s.url||'')+'</a></div>').join(''))+'</details>':'';
+      const body=head(eid,e,r)+(done?' <span class="badge ok">approved</span>':'')+'<div class="strip">'+pics+'</div>'+psum(all.map(x=>set.includes(x)?pstate(x,eid):'failed'))+notes+
+        (r.spec_changed?'<div class="ds err" style="margin-top:6px">the spec changed after this set was made'+(r.cause?': '+esc(r.cause.text):'')+'. Make the set again with the spec as it is now, or judge this one.</div>'+(can?'<div class="btns"><button data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button></div>':''):'');   // E14
+      if(done)return body+tail+'</div>';   // R16: approved in an earlier pass; it asks nothing
+      return body+(thing?'':'<div class="ds">For a person the full-length front picture is taken automatically as the starting picture.</div>')+
+        '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="yes" '+(v==='yes'?'checked':'')+'> Yes</label><label><input type="radio" name="v-'+esc(eid)+'" value="no" '+(v==='no'?'checked':'')+'> No</label><label><input type="radio" name="v-'+esc(eid)+'" value="correct" '+(v==='correct'?'checked':'')+'> Correct it</label></div>'+
+        '<textarea class="pnote" id="w-'+esc(eid)+'" placeholder="'+(thing?'what to correct, or why not (needed for Correct it)':'what to correct about this person')+'">'+esc(a.words||'')+'</textarea><div data-astate="'+esc(eid)+'">'+answerLine(eid)+'</div>'+tail+'</div>';}).join('');
+    left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 2 of 2:</b> every set at once. For each: Yes (choose the starting picture first, the one every shot starts from), No, or Correct it with your words. Each answer is stored as you make it; Done records them, and the No and Correct it ones are made again.</p>'+rows;
   }
   $('s-references').innerHTML=split(left);
   const root=$('s-references');
   wireGrid(root,()=>{renderKeptRound(rd);});
-  root.querySelectorAll('[data-golden]').forEach(t=>t.addEventListener('click',ev=>{ev.stopPropagation();const [eid,rid]=t.dataset.golden.split(':');goldenTick[eid]=goldenTick[eid]===rid?'':rid;renderKeptRound(rd);footer();}));
-  root.querySelectorAll('input[type=radio]').forEach(x=>x.addEventListener('change',()=>{renderKeptRound(rd);footer();}));
-  root.querySelectorAll('textarea[id^="w-"]').forEach(x=>x.addEventListener('input',()=>footer()));
+  const again=()=>{renderKeptRound(rd);paintAnswers();footer();};
+  root.querySelectorAll('[data-golden]').forEach(t=>t.addEventListener('click',ev=>{ev.stopPropagation();const [eid,rid]=t.dataset.golden.split(':'), a=answerOf(eid);a.golden=a.golden===rid?'':rid;storeAnswer(eid);again();}));
+  root.querySelectorAll('input[type=radio]').forEach(x=>x.addEventListener('change',()=>{const eid=x.name.slice(2);
+    if(rd.pass===1){v1[eid]=x.value;render();return;}   // E13: Ignore this shows at once in the left list and the counts
+    answerOf(eid).verdict=x.value;storeAnswer(eid);again();}));
+  root.querySelectorAll('textarea[id^="w-"]').forEach(x=>{const eid=x.id.slice(2);
+    x.addEventListener('input',()=>{const a=answerOf(eid);a.words=x.value;if(a.state==='saved')a.state='typing';confirmSets=false;paintAnswers();});
+    x.addEventListener('change',()=>{answerOf(eid).words=x.value;storeAnswer(eid);paintAnswers();});});   // R13: stored when the words box is left
   root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
+  lockAll();
 }
 function renderRound(rd){   // design/79: every element at once; pass 1 the frames and a search per thing (design/121), pass 2 the searched things' pictures
   if(rd.kept){renderKeptRound(rd);return;}   // design/151
@@ -740,7 +852,7 @@ function renderRound(rd){   // design/79: every element at once; pass 1 the fram
   $('s-references').querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
 }
 function renderReferences(){
-  const d=data, can=stage()==='visuals'&&!!d.treatment&&!!d.plan_digest;
+  const d=data, can=stage()==='visuals'&&!!d.treatment&&!!d.plan_digest, foldOpen=!!document.querySelector('#s-references details[data-fold="web"][open]');   // W3: a tick inside the fold redraws the view; the fold stays open
   const els=(d.elements||[]).filter(e=>e.kind!=='graphic');
   if(!can||!els.length){$('s-references').innerHTML='<div class="empty">'+(d.plan_digest?'No element to reference yet.':'The plan comes first; the elements are its people, objects and places.')+'</div>';return;}
   const rd=roundOpen();
@@ -764,13 +876,13 @@ function renderReferences(){
     web+=strips(s.pair||[s.search_id]);}   // design/121 change 5: the plain and the stock search side by side
   const saved=!!(s&&((s.picked&&s.picked.length)||s.nothing_fits));   // design/106 R1: once picks are saved, the unpicked results and the search fold
   const keptFilm=!!d.kept;   // design/151 hotfix: no search box and no sheet per element before the round on a kept film
-  const webFold=keptFilm?'':searchBox+(saved?'<details><summary class="ds" style="cursor:pointer">show all ('+s.results.length+' search results)</summary>'+web+'</details>':web);
+  const webFold=keptFilm?'':searchBox+(saved?'<details data-fold="web"'+(foldOpen?' open':'')+'><summary class="ds" style="cursor:pointer">show all ('+s.results.length+' search results)</summary>'+web+'</details>':web);
   const sheets=refs.filter(r=>r.kind==='sheet'), sheet=sheets.filter(r=>r.status!=='rejected').pop();   // design/106 R2: a sheet, waiting or approved, comes first
   if(sheet){const byId={};refs.forEach(r=>byId[r.id]=r);const from=(sheet.parents||[]).map(id=>byId[id]).filter(Boolean);
     const shown=sheet.set?sheets.filter(r=>r.set===sheet.set&&r.status!=='rejected'):[sheet];   // design/151: a set's pictures together, the golden one badged
     body+='<h3>Reference sheet · '+esc(e.id)+(sheet.set?' · the set':'')+'</h3><div class="strip">'+shown.map(r=>refCard(r,'',true)).join('')+'</div>'+(sheet.sources_changed?'<div class="ds err">sources changed: a picture was added after this sheet; the assistant makes a new sheet, this one stays until it is approved.</div>':'')+(from.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="strip">'+from.map(r=>refCard(r,'',true)).join('')+'</div>':'')+
       '<details><summary class="ds" style="cursor:pointer">all sources ('+frames.length+')</summary>'+src+'</details>'+
-      (keptFilm?'':searchBox+'<details><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results)</summary>'+web+'</details>');}
+      (keptFilm?'':searchBox+'<details data-fold="web"'+(foldOpen?' open':'')+'><summary class="ds" style="cursor:pointer">show all ('+(s?s.results.length:0)+' search results)</summary>'+web+'</details>');}
   else body+=src+webFold+'<h3>Reference sheet · '+esc(e.id)+'</h3>'+(sheets.length?'<div class="strip">'+sheets.map(r=>refCard(r,'',true)).join('')+'</div>':'<div class="ds">'+(keptFilm?'No set yet: the assistant posts the reference round; the set is made when you press Done on step 1.':'No sheet yet: the assistant generates it from the pictures above once they are approved.')+'</div>');
   $('s-references').innerHTML=undo+'<p class="ds" style="font-size:17px;margin:14px 0 8px">'+(keptFilm?'The references are made the kept way: the assistant posts the round; step 1 here approves the footage pictures, Done makes every set from real photographs, step 2 judges the sets in one shot. Click any picture to see it large on the right. Nothing is paid from a click.':'Footage first; then a picture from the web for what the footage lacks; the assistant generates one reference sheet per element from the ticked pictures. Click any picture to see it large on the right, where Approve and Reject take your words. Nothing is paid from a click.')+'</p>'+split('<div class="two">'+list+'<div>'+body+'</div></div>');
   const root=$('s-references');
@@ -790,7 +902,7 @@ function wireChips(){
 function renderPictures(){
   const d=data, can=stage()==='visuals'&&!!d.treatment;
   const gaps=d.gaps.filter(g=>g.accepted&&g.shots.some(s=>!['video','drawn'].includes(s.route)));
-  if(!gaps.length){$('s-pictures').innerHTML='<div class="empty">No still or graphic shot in an accepted gap yet.</div>';return;}
+  if(!gaps.length){$('s-pictures').innerHTML='<div class="empty">No still or graphic shot in an accepted gap yet.</div>'+specsBlock();$('s-pictures').querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));return;}   // U4: an older link to the specs still finds them
   const shown=gaps.filter(g=>!gapFilter||g.gap_id===gapFilter);
   let h='<div class="tabs"><button data-g="" class="'+(gapFilter?'':'on')+'">All gaps</button>'+gaps.map(g=>'<button data-g="'+esc(g.gap_id)+'" class="'+(gapFilter===g.gap_id?'on':'')+'">'+esc(g.gap_id)+'</button>').join('')+'</div>';
   h+=styleCard()+specsBlock();
@@ -833,18 +945,21 @@ function renderPictures(){
 }
 // ---------- takes ----------
 function play(url,name){const pl=$('pl');$('player').hidden=false;pl.src=url;$('pl-name').textContent=name;pl.play().catch(()=>{});}
+function supplied(s){return !!(s.asset&&(s.asset.kind==='movie'||s.asset.kind==='still'));}   // a file of the operator's own (`asset`), not a take
 function takeRejected(k){return !!(k.reviews&&k.reviews.length&&k.reviews[k.reviews.length-1].decision==='rejected');}   // defect 30: the job stays 'ready'; its latest review says rejected
 function shotState(s){   // design/86 K3: whose turn it is on this shot, and how long to wait
   const d=data, kf=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'&&r.status!=='rejected'&&r.status!=='failed');
   const ids=new Set(kf.map(r=>r.id)), isStart=r=>{if(r.role)return r.role==='start';return !(r.parents||[]).some(p=>ids.has(p));};   // design/106 T1
   const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected&&!takeRejected(k));
+  if(supplied(s)){const a=s.asset, slot=(s.end_frame-s.start_frame)/(Number(d.fps)||25), short=a.kind==='still'||(a.duration_s!=null&&Number(a.duration_s)<slot-0.04);   // R21: who supplied it, with which words; E17: what assembly does with a still or a short file
+    return ['ok',(a.by?'Supplied by '+a.by:'Filled with a supplied file')+(a.quote?': “'+a.quote+'”':'')+(a.kind==='still'?' · a still picture':a.duration_s!=null?' · '+a.duration_s+' s':'')+(short?' · assembly holds the last frame':'')+'.'];}
   if(s.route==='drawn'){   // design/113 E3: a drawing has no start or end image; it is rendered, free, and judged here
     if(s.takes.some(k=>k.selected))return ['ok','Drawing approved.'];
     if(ready&&s.takes.some(k=>k.status==='ready'&&!takeRejected(k)&&k.check&&(k.check.must_failed||[]).length))return ['you','Held: a line still failed after the server\'s passes. Look at the sheet; select the drawing with your reason, or reject it.'];   // design/117 answer 1
     if(ready)return ['you','Your turn: look at the sheet and the drawing; select it, or reject it with what to change.'];
     if(open)return ['wait','Rendering the drawing, a few seconds. The page refreshes itself.'];
     if(s.takes.some(takeRejected))return ['assistant','Rejected: the assistant revises the scene and renders again, free. Nothing to do here.'];
-    return ['assistant','Waiting for the assistant to render the drawing (vw visuals draw). Nothing to do here.'];
+    return ['assistant','Waiting for the assistant to render the drawing. Nothing to do here.'];   // R19: no tool command on the page
   }
   if(s.takes.some(k=>k.selected))return ['ok','Take selected.'];
   if(s.asset&&s.asset.kind==='clip')return ['ok','Filled with a stretch of '+(s.asset.name||'a clip')+'.'];   // design/89 B3
@@ -879,8 +994,10 @@ function renderTakes(){
       const latest=['start','end'].flatMap(role=>{const of=live.filter(r=>picWord(r)===role+' image');const cands=of.filter(r=>r.status==='candidate');return cands.length>1?cands:of.slice(-1);}), older=pair.filter(r=>!latest.includes(r));   // review 27 Oct: two start candidates (design/86 K4) both in view
       const card=r=>refCard({...r,name:picWord(r)+' · '+r.name},'',true);
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The pictures: click a picture to see it large, approve or reject it.</div><div class="strip">'+latest.map(card).join('')+'</div>'+(older.length?'<details class="chkd"><summary class="ds">'+older.length+' earlier picture'+(older.length>1?'s':'')+'</summary><div class="strip">'+older.map(card).join('')+'</div></details>':'')+pairPlan(s);}
+      if(supplied(s)){sh+=s.asset.kind==='movie'?'<div class="btns"><button class="ic" data-play="'+esc(s.asset.url)+'" data-name="'+esc(s.shot_id)+' · supplied file">▶</button><span class="ds">the supplied file · in the film at '+filmAt(s)+'</span></div>'
+        :'<div class="strip"><div class="pic on"><img src="'+esc(thumbOf(s.asset.url))+'" loading="lazy" decoding="async" alt=""><div class="cap">the supplied still · in the film at '+filmAt(s)+'</div></div></div>';}   // R21, E17
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:17px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+reviewsOf(k)+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
-      else{sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
+      else if(!supplied(s)){sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
       h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
     });
   });
@@ -899,7 +1016,13 @@ function renderRecord(){
   $('s-record').innerHTML='<p class="ds" style="font-size:17px;margin:14px 0 4px">A gap is recorded when every shot has its picture, its sequence or a selected take. Your words at the foot, then Record.</p><table><thead><tr><th>Gap</th><th>Shots</th><th>State</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 // ---------- the footer: the words and the step's action ----------
-function footer(){
+function doneCounts(rd){let yes=0,again=0;const j=judged(rd);j.forEach(eid=>{const a=ans[eid];if(!missing(eid,a)){if(a.verdict==='yes')yes++;else again++;}});return {yes:yes,again:again,un:j.length-yes-again};}   // R15
+function footer(){   // N5: the words typed at the foot survive a redraw; cleared once an action used them or the step changed
+  const typed=clearWords?'':((($('words')||{}).value)||''), dc=$('done-confirm');clearWords=false;dc.hidden=true;dc.innerHTML='';
+  footerBody();
+  const w=$('words');if(w&&typed&&!w.value)w.value=typed;
+  lockAll();}
+function footerBody(){
   const d=data, tray=$('tray'), act_=$('action'), can=d&&d.state==='prepared'&&stage()==='visuals';
   const box='<textarea class="words" id="words" placeholder="your words"></textarea>';
   if(!can){tray.innerHTML='<span>'+(d&&d.run?'The run is at '+esc(d.run.stage)+'.':'')+'</span>';act_.innerHTML='';return;}
@@ -913,14 +1036,20 @@ function footer(){
   }else if(step==='references'&&roundOpen()&&roundOpen().kept&&roundOpen().pass!==1){   // design/151: the one-shot step
     const rd=roundOpen();
     if(rd.pass==='making'){tray.innerHTML='<span>The pictures are being made; nothing to do yet.</span>';act_.innerHTML='';}
-    else{const wait=keptWaiting(rd), lock=wait.length?' disabled title="every thing needs its answer first"':'';
-      tray.innerHTML=(wait.length?'<span class="err"><b>'+wait.length+'</b> still need'+(wait.length>1?'':'s')+' an answer (or a golden tick, or the words for Correct it): '+esc(wait.join(', '))+'</span>':'<span>Done records every verdict; the No and Correct it ones are made again.</span>')+box;
-      act_.innerHTML='<button class="go" data-a="round-sets"'+lock+'>Done</button>';}
+    else{const cap=capHit(), c=doneCounts(rd), dc=$('done-confirm');   // R15: Done is not locked by an unanswered card; it asks once, with the counts, away from the words box
+      tray.innerHTML='<span id="twait"></span>'+box;trayNote();
+      act_.innerHTML=confirmSets?'':'<button class="go" data-a="round-sets"'+(cap?' disabled title="the spend cap is reached: nothing can be made again"':'')+'>Done</button>';
+      if(confirmSets){dc.hidden=false;
+        dc.innerHTML='<div><b>Record these answers?</b></div><div style="margin:6px 0">'+c.yes+' approved · '+c.again+' made again (paid) · '+c.un+' unanswered</div>'+
+          (c.again?'<div class="ds">Each set made again is paid for.</div>':'')+(c.un?'<div class="ds">The unanswered sets stay on this step: answer them, then press Done again.</div>':'')+(c.yes+c.again?'':'<div class="ds err">No set has a whole answer yet: there is nothing to record.</div>')+
+          '<div class="btns" style="margin-top:8px"><button data-a="round-picks-back">Back</button><button class="go" data-a="round-sets"'+(c.yes+c.again?'':' disabled')+'>Finish</button></div>';
+        dc.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));}}
   }else if(step==='references'&&roundOpen()){   // design/79: one words box and Done for the whole pass
     const rd=roundOpen();
     const wait=roundWaiting(rd), lock=wait.length?' disabled title="every thing needs its answer first"':'';   // design/121 changes 1, 6: Done stays locked, naming what waits
     const waitLine=wait.length?'<span class="err"><b>'+wait.length+'</b> thing'+(wait.length>1?'s':'')+' '+(rd.pass===1?'not searched yet':wait.length>1?'still need an answer':'still needs an answer')+': '+esc(wait.join(', '))+'</span>':'';
-    if(rd.pass===1){const n=Object.keys(rd.elements).length;tray.innerHTML=waitLine||'<span>'+(rd.kept?'Done approves the footage pictures you chose and makes every picture at once.':'Done approves the footage pictures you chose; the searched things go to pass 2.')+'</span>';act_.innerHTML=confirmPicks&&!wait.length?'<span>Done with '+n+' element'+(n>1?'s':'')+'?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-done">Finish</button>':'<button class="go" data-a="round-done"'+lock+'>Done ('+n+' element'+(n>1?'s':'')+')</button>';}   // design/110 rule 0: Done asks first
+    if(rd.pass===1){const n=Object.keys(rd.elements).length, nm=rd.kept?document.querySelectorAll('#notmade [data-notmade]').length:0, cap=rd.kept&&capHit()?' disabled title="the spend cap is reached: no picture can be made"':'';   // R12, E15
+      tray.innerHTML=waitLine||'<span'+(nm?' class="err"':'')+'>'+(nm?'<b>'+nm+'</b> will not be made (listed above the cards, with what settles each); Done makes the others.':rd.kept?'Done approves the footage pictures you chose and makes every picture at once.':'Done approves the footage pictures you chose; the searched things go to pass 2.')+'</span>';act_.innerHTML=confirmPicks&&!wait.length?'<span>Done with '+n+' element'+(n>1?'s':'')+'?</span> <button data-a="round-picks-back">Back</button> <button class="go" data-a="round-done">Finish</button>':'<button class="go" data-a="round-done"'+(cap||lock)+'>Done ('+n+' element'+(n>1?'s':'')+')</button>';}   // design/110 rule 0: Done asks first
     else{const sids=Object.values(rd.elements).flatMap(sidsOf), n=sids.reduce((k,sid)=>k+((picks[sid]||[]).length),0), kept=($('words')||{}).value||'';
       const notes=sids.reduce((k,sid)=>k+((picks[sid]||[]).filter(p=>String(p.note||'').trim()).length),0);   // design/106 N2, N3
       tray.innerHTML=waitLine+(n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'<span>Tick the pictures to use.</span>')+'<span class="ds">Picture notes go under each ticked picture.</span><textarea class="words" id="words" placeholder="words for the whole pass (optional)"></textarea>';
@@ -929,7 +1058,7 @@ function footer(){
         :'<button class="go" data-a="round-picks"'+lock+'>Done</button> <button data-a="round-undo">Undo Done (back to pass 1)</button>';wireChips();}
   }else if(step==='references'){
     const s=selEl?latestSearch(selEl):null, sids=s?(s.pair||[s.search_id]):[], n=sids.reduce((k,sid)=>k+(picks[sid]||[]).length,0);   // design/121 change 5: both searches
-    tray.innerHTML='<span>'+esc(selEl||'')+':</span>'+(s&&n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'');   // design/99 C5
+    tray.innerHTML='<span>'+esc(selEl||'')+':</span>'+(s&&n?'<span><b>'+n+'</b> ticked · not saved yet</span>'+tickChips(sids):'')+(s?box:'');   // design/99 C5; R23: Nothing fits has its words box
     act_.innerHTML=(s?(n?'<button class="go" data-a="pick" data-search="'+esc(sids.join(','))+'">'+'Save '+n+' picture'+(n>1?'s':'')+'</button> <button data-a="clear-ticks" data-search="'+esc(sids.join(','))+'">Clear</button> ':'')+'<button data-a="nothing-fits" data-search="'+esc(s.search_id)+'">Nothing fits</button>':'<span class="why">type keywords above and press Search</span>');wireChips();
   }else if(step==='pictures'||step==='takes'){   // design/97 P2: a picture's words go in the panel beside it
     tray.innerHTML='<span>Click a picture or a take: it opens beside the list with its buttons; × or Esc closes it.</span>';act_.innerHTML='';   // design/99 C1, C2
@@ -943,7 +1072,10 @@ function footer(){
 // ---------- the clicks: every button calls the server function the vw tool calls ----------
 async function click(b){
   const a=b.dataset.a, q=words();
+  if(inflight&&a===sending&&['round-done','round-picks','record','treatment'].includes(a))return;sending=a;   // E7, N7: a second press of Done while the first is being recorded shows nothing and sends nothing
   const need=(text)=>{needWords($('pwords')?'pwords':'words',text);};   // design/97 P1
+  if(a==='set-make'){await send({action:'set_make',element_id:b.dataset.el},'The set is being made; it comes back on this step.');return;}   // R17: the same server function for the page and the chat tool (visuals_stage.set_make)
+  if(a==='set-answer-retry'){storeAnswer(b.dataset.el);paintAnswers();return;}   // E9
   if(a==='select'){await send({action:'select',gap_id:b.dataset.gap,choice_id:b.dataset.choice},'Choice recorded.');return;}
   if(a==='t-accept'){await send({action:'treatment',accept:[b.dataset.line],quote:q},b.dataset.line+' accepted.');return;}   // design/124 Change 6: the click is the verdict; the words at the foot are kept when given
   if(a==='t-back'){const id=b.dataset.line,w=(($('tn-'+id)||{}).value||'').trim();if(!w){needWords('tn-'+id,'Say what to change in this line, then Send back.');return;}
@@ -995,15 +1127,23 @@ async function click(b){
     if(!confirmPicks){confirmPicks=true;footer();return;}   // design/110 rule 0: Done asks first
     confirmPicks=false;
     const verdicts={};Object.keys(rd.elements).forEach(eid=>{verdicts[eid]={verdict:verdictOf(eid,rd.elements[eid])};});   // design/121 change 6: Done runs no search
-    await send({action:'round-done',verdicts:verdicts,quote:q},'Pass 1 done: the footage pictures you chose are approved; the searched things are on pass 2.');return;}
-  if(a==='round-sets'){const rd=roundOpen();if(!rd)return;   // design/151
-    const verdicts={};Object.keys(rd.elements).forEach(eid=>{if(rd.elements[eid].ignored||rd.elements[eid].from_footage)return;verdicts[eid]={verdict:keptVerdict(eid),words:keptWords(eid),golden:goldenTick[eid]||''};});
-    const j=await send({action:'round-sets',verdicts:verdicts,quote:q},'Recorded: the sets you said Yes to are approved; the others are being made again.');
-    if(j){Object.keys(goldenTick).forEach(k=>delete goldenTick[k]);}return;}
+    const j=await send({action:'round-done',verdicts:verdicts,quote:q},rd.kept?'Step 1 done: the footage pictures you chose are approved; every other picture is being made.':'Pass 1 done: the footage pictures you chose are approved; the searched things are on pass 2.');   // R22: a kept film has no pass 2
+    if(j&&rd.kept){Object.keys(v1).forEach(k=>delete v1[k]);const bad=Object.keys(j.errors||{}), now=(data.round&&data.round.elements)||{};   // U5: what was not made is said, by name, with its present reason
+      if(bad.length)msg('Step 1 done. Not made: '+bad.map(k=>k+' ('+(((now[k]||{}).cause||{}).text||plain(j.errors[k]))+')').join('; ')+'. Open its card to settle it, then press Make it now.',false,false,'warn');}
+    return;}
+  if(a==='round-sets'){const rd=roundOpen();if(!rd||doneBusy)return;   // design/151; R15: the first press asks, with the counts; Finish records
+    if(!confirmSets){confirmSets=true;footer();return;}
+    doneBusy=true;
+    try{await saveChain;   // every answer is stored before Done records them
+      const verdicts={};judged(rd).forEach(eid=>{const x=ans[eid];if(!missing(eid,x))verdicts[eid]={verdict:x.verdict,words:keptWords(eid),golden:x.golden||''};});   // only whole, stored answers; the others stay on this step
+      const j=await send({action:'round-sets',verdicts:verdicts,quote:q},'Recorded: the sets you said Yes to are approved; the others are being made again.',()=>{confirmSets=false;[ans,stale,notRec,goldenTick].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));});
+      if(!j){confirmSets=false;const m=/^([^:\s]+):/.exec(lastErr);if(m&&rd.elements[m[1]])notRec[m[1]]=lastErr;renderStep();footer();}}   // R24, E8: the answers stay; the card the refusal names says nothing was recorded
+    finally{doneBusy=false;}
+    return;}
   if(a==='ignore'){const el=b.dataset.el;if(ignoredEls[el])delete ignoredEls[el];else ignoredEls[el]=true;renderStep();footer();return;}   // design/121 change 1: one click, no typing
   if(a==='supply-open'){selectPic({supply:b.dataset.el});return;}   // design/126 U6
   if(a==='round-search'){roundSearch(b.dataset.el);return;}   // design/121 change 6: not through act(): several searches run at once
-  if(a==='round-picks-back'){confirmPicks=false;footer();return;}   // design/106 N3
+  if(a==='round-picks-back'){confirmPicks=false;confirmSets=false;footer();return;}   // design/106 N3
   if(a==='round-picks'){const rd=roundOpen();if(!rd)return;
     if(!confirmPicks){confirmPicks=true;footer();return;}   // design/106 N3: Done shows the summary first
     confirmPicks=false;
@@ -1017,69 +1157,96 @@ let selUnit={}, railFilter='all', msgAt=0;   // selUnit: the chosen card per ste
 function waitIn(st,unit){return (data.waiting||[]).filter(w=>w.step===st&&w.group===unit);}
 function latestOf(list){return list&&list.length?list[list.length-1]:null;}
 function shotsOn(video){const out=[];(data.gaps||[]).filter(g=>g.accepted).forEach(g=>g.shots.filter(s=>['video','drawn'].includes(s.route)===video).forEach(s=>out.push({...s,gap:g})));return out;}
-function railCards(){   // one card per thing to look at on this step, in film order
-  const d=data, cards=[], card=o=>cards.push(Object.assign({group:'',sub:'',thumb:'',badge:['',''],wait:false,busy:false},o));
+function keptCard(o,eid,r,rd){   // a thing's card in a kept round: ignored (E13), from the footage, approved earlier (R16), its answer at once (R14), a set that was not made
+  if(rd.pass===1){if(verdictOf(eid,r)==='ignore'){o.wait=false;o.badge=['','ignored'];}return;}
+  if(r.ignored){o.wait=false;o.badge=['','ignored'];return;}
+  if(r.from_footage){if(!o.wait)o.badge=['ok','from your footage'];return;}
+  const set=setPics(r), live=set.some(x=>['candidate','approved','generating'].includes(x.status));
+  if(rd.pass!==2){if(!o.wait)o.badge=!live&&(r.cause||r.error)?['err','not made']:['dec','being made'];return;}
+  if(settled(r)){if(!o.wait)o.badge=['ok','approved'];return;}
+  if(!set.some(x=>x.status==='candidate')){if(!o.wait)o.badge=['err','not made'];return;}   // not made: its spec, or Make it now, waits as the server says
+  const a=ans[eid], m=missing(eid,a), rest=waitIn('references',eid).filter(w=>w.item!=='set');
+  if(!m&&!rest.length){o.wait=false;o.badge=['ok',VW[a.verdict]+' · not recorded yet'];const g=a.verdict==='yes'&&set.find(x=>x.id===a.golden);if(g)o.thumb=g.url;return;}
+  if(!m){o.wait=true;o.wlabel=rest.map(w=>w.label).join(' + ');o.badge=['dec',[...new Set(rest.map(w=>SHORT[w.kind]||w.kind))].join(', ')];return;}
+  o.wait=true;o.wlabel=o.wlabel||('Set to judge · '+eid);
+  o.badge=a&&a.state==='failed'?['err',VW[a.verdict]+' · not saved']:a&&a.verdict?['dec',m]:['dec',(o.kinds||'').includes('set to judge')?o.kinds:'set to judge'];}
+function railCards(st){   // one card per thing to look at on a step, in film order (st: the step; the open one when not given). R6: a card's wait is the one truth behind the header, the tabs and Next waiting
+  st=st||step;
+  const d=data, cards=[], card=o=>cards.push(Object.assign({group:'',sub:'',thumb:'',badge:['',''],wait:false,busy:false,wlabel:''},o));
+  const served=u=>{const ws=waitIn(st,u);return {wait:ws.length>0,wlabel:ws.map(w=>w.label).join(' + '),kinds:[...new Set(ws.map(w=>SHORT[w.kind]||w.kind||'waits for you'))].join(', ')};};   // R7, R8: what waits on the card, named by its kind
   if(!d||d.state!=='prepared')return cards;
-  if(step==='treatment'){const dr=d.treatment_draft, tr=dr||d.treatment;if(!tr)return cards;const line=id=>dr&&dr.lines&&dr.lines[id];
+  if(st==='treatment'){const dr=d.treatment_draft, tr=dr||d.treatment;if(!tr)return cards;const line=id=>dr&&dr.lines&&dr.lines[id];
     const lb=id=>{const l=line(id);return !dr?['ok','approved']:!l?['','']:l.state==='accepted'?['ok','accepted']:l.state==='sent_back'?['dec','sent back']:['dec','to accept'];}, open=id=>!!(line(id)&&line(id).state!=='accepted');
     card({unit:'',title:'The whole treatment',sub:(tr.gaps||[]).length+' gaps',badge:dr?['dec','draft']:['ok','approved']});
-    if(tr.direction)card({unit:'direction',title:'Direction',badge:lb('direction'),wait:open('direction')});
+    if(tr.direction)card({unit:'direction',title:'Direction',badge:lb('direction'),wait:open('direction'),wlabel:'Treatment line to accept · Direction'});
     const by={};(tr.gaps||[]).forEach(e=>by[e.gap_id]=e);
-    d.gaps.forEach(g=>{const e=by[g.gap_id]||{};card({unit:g.gap_id,title:g.gap_id,sub:(e.routes||[]).map(r=>ROUTE[r]||r).join(', ')+(e.seconds!=null?' · '+e.seconds+' s':''),badge:lb(g.gap_id),wait:open(g.gap_id)});});}
-  else if(step==='plan'){if(!d.plan_digest)return cards;card({unit:'',title:'All gaps',sub:d.gaps.length+' gaps'});
+    d.gaps.forEach(g=>{const e=by[g.gap_id]||{};card({unit:g.gap_id,title:g.gap_id,sub:(e.routes||[]).map(r=>ROUTE[r]||r).join(', ')+(e.seconds!=null?' · '+e.seconds+' s':''),badge:lb(g.gap_id),wait:open(g.gap_id),wlabel:'Treatment line to accept · '+g.gap_id});});}
+  else if(st==='plan'){if(!d.plan_digest)return cards;card({unit:'',title:'All gaps',sub:d.gaps.length+' gaps'});
     d.gaps.forEach(g=>card({unit:g.gap_id,title:g.gap_id,sub:fmt(g.start_frame)+' – '+fmt(g.end_frame)+' · '+g.shots.length+' shot'+(g.shots.length===1?'':'s'),
-      badge:g.recorded?['ok','recorded']:g.revise?['dec','under revision']:g.accepted?['ok','accepted']:['dec','to accept'],wait:!g.recorded&&!g.accepted&&!g.revise&&!!g.shots.length}));}
-  else if(step==='references'){const els=(d.elements||[]).filter(e=>e.kind!=='graphic'), rd=roundOpen();
+      badge:g.recorded?['ok','recorded']:g.revise?['dec','under revision']:g.accepted?['ok','accepted']:['dec','to accept'],wait:!g.recorded&&!g.accepted&&!g.revise&&!!g.shots.length,wlabel:'Gap to accept · '+g.gap_id}));}
+  else if(st==='references'){const els=(d.elements||[]).filter(e=>e.kind!=='graphic'), rd=roundOpen();
     if(!d.plan_digest||!els.length)return cards;
-    (rd?Object.keys(rd.elements):els.map(e=>e.id)).forEach(eid=>{const e=els.find(x=>x.id===eid)||{id:eid,name:'',kind:''};
+    const ids=rd?Object.keys(rd.elements):els.map(e=>e.id);
+    if(rd)(d.waiting||[]).forEach(w=>{if(w.step==='references'&&w.group&&!ids.includes(w.group)&&els.some(e=>e.id===w.group))ids.push(w.group);});   // a thing outside the round with something waiting keeps its card
+    ids.forEach(eid=>{const e=els.find(x=>x.id===eid)||{id:eid,name:'',kind:''}, w=served(eid);
       const refs=(d.references||[]).filter(r=>r.element_id===eid&&r.url&&r.status!=='rejected'), pic=refs.find(r=>r.kind==='sheet'&&r.status==='approved')||refs.find(r=>r.status==='approved')||refs[0];
-      card({unit:eid,title:eid+(e.name?' · '+e.name:''),sub:e.kind||'',thumb:pic?pic.url:'',badge:rd?['dec',rd.pass===1?(rd.kept?'step 1':'pass 1'):rd.pass==='making'?'being made':rd.kept?'your verdict':'pass 2']:elState(e),wait:waitIn('references',eid).length>0,busy:!!searching[eid]});});}
-  else if(step==='pictures'){const shots=shotsOn(false), st=d.graphic_style, srefs=(d.references||[]).filter(r=>r.kind==='style');
+      const o=Object.assign({unit:eid,title:eid+(e.name?' · '+e.name:''),sub:e.kind||'',thumb:pic?pic.url:'',busy:!!searching[eid],
+        badge:w.wait?['dec',w.kinds]:rd?['dec',rd.pass===1?(rd.kept?'step 1':'pass 1'):rd.pass==='making'?'being made':rd.kept?'your verdict':'pass 2']:elState(e)},w);
+      if(rd&&rd.kept&&rd.elements[eid])keptCard(o,eid,rd.elements[eid],rd);
+      card(o);});}
+  else if(st==='pictures'){const shots=shotsOn(false), gs=d.graphic_style, srefs=(d.references||[]).filter(r=>r.kind==='style');
     if(!shots.length)return cards;card({unit:'',title:'All shots',sub:shots.length+' shot'+(shots.length===1?'':'s')});
-    if(st||srefs.length){const s0=latestOf(srefs.filter(r=>r.status!=='rejected'))||latestOf(srefs);
-      card({unit:'_STYLE',title:'The graphic style',thumb:s0&&s0.url,badge:srefs.some(r=>r.status==='approved')?['ok','approved']:srefs.length?['dec','to approve']:['','no sheet yet'],wait:waitIn('pictures','_STYLE').length>0});}
-    if(specsBlock())card({unit:'specs',title:'Drawing specs to approve',badge:['dec','to approve'],wait:true});
+    if(gs||srefs.length){const s0=latestOf(srefs.filter(r=>r.status!=='rejected'))||latestOf(srefs);
+      card(Object.assign({unit:'_STYLE',title:'The graphic style',thumb:s0&&s0.url,badge:srefs.some(r=>r.status==='approved')?['ok','approved']:srefs.length?['dec','to approve']:['','no sheet yet']},served('_STYLE')));}
+    if(shots.some(s=>s.spec&&!s.spec.approved))card({unit:'specs',title:'Drawing specs: approve all',badge:['dec','to approve']});   // N2: each spec waits on its own shot's card; this card approves them in one click
     shots.forEach(s=>{const mine=(d.references||[]).filter(r=>r.shot_id===s.shot_id&&['keyframe','state'].includes(r.kind)), live=mine.filter(r=>r.status!=='rejected'&&r.status!=='failed');
-      const w=waitIn('pictures',s.shot_id).length>0, gen=mine.some(r=>r.status==='generating'), a=s.asset;
+      const w=served(s.shot_id), gen=mine.some(r=>r.status==='generating'), a=s.asset;
       const th=(a&&(a.url||(a.states&&a.states[0]&&a.states[0].url)))||(latestOf(live.filter(r=>r.url))||{}).url||'';
-      card({unit:s.shot_id,group:s.gap.gap_id,title:s.shot_id+' · '+typeOf(s),sub:secs(s.end_frame-s.start_frame)+' · '+fmt(s.start_frame),thumb:th,wait:w,busy:gen,
-        badge:a?['ok',a.kind==='clip'?'clip placed':'approved']:w?['dec','your verdict']:gen?['','being made']:live.length?['dec','to look at']:mine.some(r=>r.status==='failed')?['err','failed']:['','no picture yet']});});}
-  else if(step==='takes'){const shots=shotsOn(true);if(!shots.length)return cards;card({unit:'',title:'All shots',sub:shots.length+' shot'+(shots.length===1?'':'s')});
-    shots.forEach(s=>{const st=shotState(s), kf=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'&&r.url&&r.status!=='rejected'&&r.status!=='failed');
-      card({unit:s.shot_id,group:s.gap.gap_id,title:s.shot_id+' · '+typeOf(s),sub:secs(s.end_frame-s.start_frame)+' · '+fmt(s.start_frame),thumb:((kf.find(r=>picWord(r)==='start image')||kf[0])||{}).url||'',
-        badge:{you:['dec','your turn'],wait:['','being made'],assistant:['','with the assistant'],ok:['ok','done']}[st[0]]||['',''],wait:st[0]==='you',busy:st[0]==='wait'});});}
-  else if(step==='record'){const ready=readyGaps();card({unit:'',title:'All gaps',sub:ready.length+' ready to record'});
-    d.gaps.forEach(g=>card({unit:g.gap_id,title:g.gap_id,sub:g.shots.length+' shot'+(g.shots.length===1?'':'s'),badge:g.recorded?['ok','recorded']:ready.includes(g)?['dec','ready to record']:g.accepted?['','in progress']:['','not accepted'],wait:ready.includes(g)}));}
+      card(Object.assign({unit:s.shot_id,group:s.gap.gap_id,title:s.shot_id+' · '+typeOf(s),sub:secs(s.end_frame-s.start_frame)+' · '+fmt(s.start_frame),thumb:th,busy:gen,
+        badge:w.wait?['dec',w.kinds]:a?['ok',a.kind==='clip'?'clip placed':'approved']:gen?['','being made']:live.length?['dec','to look at']:mine.some(r=>r.status==='failed')?['err','failed']:['','no picture yet']},w));});}
+  else if(st==='takes'){const shots=shotsOn(true);if(!shots.length)return cards;card({unit:'',title:'All shots',sub:shots.length+' shot'+(shots.length===1?'':'s')});
+    shots.forEach(s=>{const ss=shotState(s), kf=(d.references||[]).filter(r=>ownPic(r,s)&&r.kind==='keyframe'&&r.url&&r.status!=='rejected'&&r.status!=='failed'), w=served(s.shot_id);
+      card(Object.assign({unit:s.shot_id,group:s.gap.gap_id,title:s.shot_id+' · '+typeOf(s),sub:secs(s.end_frame-s.start_frame)+' · '+fmt(s.start_frame),thumb:(supplied(s)&&s.asset.kind==='still'?s.asset.url:'')||((kf.find(r=>picWord(r)==='start image')||kf[0])||{}).url||'',
+        badge:w.wait?['dec',w.kinds]:({you:['dec','your turn'],wait:['','being made'],assistant:['','with the assistant'],ok:['ok','done']}[ss[0]]||['','']),busy:ss[0]==='wait'},w));});}
+  else if(st==='record'){const ready=readyGaps();card({unit:'',title:'All gaps',sub:ready.length+' ready to record'});
+    d.gaps.forEach(g=>card({unit:g.gap_id,title:g.gap_id,sub:g.shots.length+' shot'+(g.shots.length===1?'':'s'),badge:g.recorded?['ok','recorded']:ready.includes(g)?['dec','ready to record']:g.accepted?['','in progress']:['','not accepted'],wait:ready.includes(g),wlabel:'Gap ready to record · '+g.gap_id}));}
+  if(stage()!=='visuals')cards.forEach(c=>{c.wait=false;});   // the run has moved on: nothing here waits
   return cards;}
 function chosenUnit(){return step==='references'&&!roundOpen()?(selEl||''):(selUnit[step]||'');}
+function put(el,html){if(el._html!==html||!el.firstChild){el.innerHTML=html;el._html=html;}}   // nothing is redrawn that did not change: a click that lands while an answer is being stored is not lost
 function renderRail(scroll){const box=$('rcards');if(!box)return;const all=railCards(), nw=all.filter(c=>c.wait).length, gaps=[...new Set(all.map(c=>c.group).filter(Boolean))];
   if(railFilter!=='all'&&railFilter!=='wait'&&!gaps.includes(railFilter))railFilter='all';
-  $('rfil').innerHTML='<button data-rf="all" class="'+(railFilter==='all'?'on':'')+'">All</button><button data-rf="wait" class="'+(railFilter==='wait'?'on':'')+'">● Waiting for me ('+nw+')</button>'+
-    (gaps.length?'<select id="rf-gap"><option value="">a gap…</option>'+gaps.map(g=>'<option '+(railFilter===g?'selected':'')+'>'+esc(g)+'</option>').join('')+'</select>':'');
+  put($('rfil'),'<button data-rf="all" class="'+(railFilter==='all'?'on':'')+'">All</button><button data-rf="wait" class="'+(railFilter==='wait'?'on':'')+'">● Waiting for me ('+nw+')</button>'+
+    (gaps.length?'<select id="rf-gap"><option value="">a gap…</option>'+gaps.map(g=>'<option '+(railFilter===g?'selected':'')+'>'+esc(g)+'</option>').join('')+'</select>':''));
   const u=chosenUnit();let h='',g=null;
   all.filter(c=>railFilter==='all'||(railFilter==='wait'?c.wait:c.group===railFilter)).forEach(c=>{if(c.group&&c.group!==g){g=c.group;h+='<div class="rgrp">'+esc(g)+'</div>';}
     h+='<button class="rcard'+(c.unit===u?' on':'')+'" data-unit-card="'+esc(c.unit)+'" title="'+esc(c.title)+'">'+(c.thumb?'<div class="th"><img src="'+esc(thumbOf(c.thumb))+'" alt="" loading="lazy" decoding="async"></div>':c.busy?'<div class="th none"><span class="spin"></span></div>':'')+
-      (c.wait?'<span class="wdot" title="waits for you"></span>':'')+'<div class="t1">'+esc(c.title)+'</div><div class="t2"><span>'+(c.badge[1]?'<span class="badge '+c.badge[0]+'">'+(c.busy?'<span class="spin"></span>':'')+esc(c.badge[1])+'</span>':'')+'</span><span>'+esc(c.sub)+'</span></div></button>';});
-  box.innerHTML=h||'<div class="ds" style="padding:12px 4px">'+(railFilter==='wait'?'Nothing waits for you on this step.':'Nothing on this step yet.')+'</div>';
+      (c.wait?'<span class="wdot" title="waits for you'+(c.wlabel?': '+esc(c.wlabel):'')+'"></span>':'')+'<div class="t1">'+esc(c.title)+'</div><div class="t2"><span>'+(c.badge[1]?'<span class="badge '+c.badge[0]+'">'+(c.busy?'<span class="spin"></span>':'')+esc(c.badge[1])+'</span>':'')+'</span><span>'+esc(c.sub)+'</span></div></button>';});
+  put(box,h||'<div class="ds" style="padding:12px 4px">'+(railFilter==='wait'?'Nothing waits for you on this step.':'Nothing on this step yet.')+'</div>');
   if(scroll){const on=box.querySelector('.rcard.on');if(on)on.scrollIntoView({block:'nearest'});}}
 function focusUnit(){   // the stage shows the chosen card only; '' shows the whole step, as before UX1
   const sec=$('s-'+step);if(!sec)return;const u=selUnit[step]||'', gapOf=x=>{const s=shotOf(x);return s?s.gap.gap_id:x;};
   sec.querySelectorAll('[data-unit]').forEach(e=>{e.hidden=!!u&&e.dataset.unit!==u;});
   sec.querySelectorAll('[data-unit-gap]').forEach(e=>{e.hidden=!!u&&gapOf(u)!==e.dataset.unitGap;});
   sec.querySelectorAll('[data-unit-all]').forEach(e=>{e.hidden=!!u;});}
-function defaultPic(u){   // the card's newest picture or take in front: what waits first, then what is in the film, then the latest made
-  const refs=data.references||[], has=id=>refs.some(r=>r.id===id);if(!u)return null;
-  const w=waitIn(step,u)[0];if(w&&w.item&&!['spec','specs','reuse'].includes(w.item))return has(w.item)?{ref:w.item}:(step==='takes'?{take:w.item}:null);
+function defaultPic(u){   // the card's picture or take in front: what waits first (a picture or a take: a question, a spec or a reuse is neither, W2), then what is in the film, then the latest made
+  const refs=data.references||[], has=id=>refs.some(r=>r.id===id), take=id=>(data.gaps||[]).some(g=>g.shots.some(s=>(s.takes||[]).some(k=>k.job_id===id)));if(!u)return null;
+  const w=waitIn(step,u).find(x=>has(x.item)||take(x.item));if(w)return has(w.item)?{ref:w.item}:{take:w.item};
   if(u==='_STYLE'){const s=latestOf(refs.filter(r=>r.kind==='style'&&r.status!=='rejected'));return s?{ref:s.id}:null;}
+  if(step==='references'){const rd=roundOpen(), r=rd&&rd.kept&&rd.elements[u];if(!r)return null;   // R4: the selected card's own picture, or none
+    if(rd.pass===1){const f=framesOf(u,r).find(x=>x.url);return f?{ref:f.id}:null;}
+    if(r.from_footage){const g=(data.golden||{})[u];return has(g)?{ref:g}:null;}
+    const set=setPics(r).filter(x=>x.url&&x.status!=='failed'), g=set.find(x=>x.id===(ans[u]||{}).golden)||set[0];return g?{ref:g.id}:null;}
   const s=shotOf(u);if(!s)return null;
   if(step==='takes'){const k=latestOf(s.takes||[]);if(k)return {take:k.job_id};}
   if(s.asset&&s.asset.reference_id)return {ref:s.asset.reference_id};
   const mine=refs.filter(r=>r.shot_id===u&&['keyframe','state'].includes(r.kind)&&r.status!=='failed'), r=latestOf(mine.filter(x=>x.status!=='rejected'))||latestOf(mine);return r?{ref:r.id}:null;}
-function selectUnit(u,scroll){selUnit[step]=u;rejOpen=null;
-  if(step==='references'&&!roundOpen()){if(u&&u!==selEl){selEl=u;selPic=null;}}
-  else if(step==='pictures'||step==='takes')selPic=defaultPic(u);
-  try{history.replaceState(null,'',location.pathname+location.search+'#'+step+(u?'/'+encodeURIComponent(u):''));}catch(e){}   // a link opens on this card
-  render();renderRail(scroll);const st=$('stage');if(st)st.scrollTop=0;}
+function selectUnit(u,scroll,item){selUnit[step]=u;rejOpen=null;   // R5: a click on a card, a link and Next waiting open the same thing; R4: the panel follows the card
+  if(step==='references'&&!roundOpen()&&u)selEl=u;
+  selPic=item&&(data.references||[]).some(r=>r.id===item)?{ref:item}:item&&(data.gaps||[]).some(g=>g.shots.some(s=>(s.takes||[]).some(k=>k.job_id===item)))?{take:item}:defaultPic(u);
+  try{history.replaceState(null,'',location.pathname+location.search+'#'+step+(u?'/'+encodeURIComponent(u)+(item?'/'+encodeURIComponent(item):''):''));}catch(e){}   // a link opens on this card
+  render();renderRail(scroll);const stg=$('stage');if(stg)stg.scrollTop=0;
+  outline(u,item);}
 function versionsOf(r){const refs=data.references||[];if(!r)return [];
   if(r.kind==='style')return refs.filter(x=>x.kind==='style');
   if(r.kind!=='keyframe'||!r.shot_id)return [];
@@ -1096,7 +1263,7 @@ function takeTabs(job){let s=null;(data.gaps||[]).forEach(g=>g.shots.forEach(x=>
   const ks=s.takes, last=ks[ks.length-1];
   return '<div class="vtabs">'+ks.slice().reverse().map(k=>'<button data-vtake="'+esc(k.job_id)+'" class="'+(k.job_id===job?'on ':'')+(k===last?'new':'')+'">'+esc('Take '+(ks.indexOf(k)+1)+(k===last?' · new':takeRejected(k)?' · rejected':k.selected?' · selected':' · '+k.status))+'</button>').join('')+'</div>';}
 function idleMsg(){   // amber: what waits for the operator, when no fresh message is on the bar
-  const f=$('fmsg');if(Date.now()-msgAt<30000&&f.textContent)return;const n=((data&&data.waiting)||[]).length;
+  const f=$('fmsg');if(Date.now()-msgAt<30000&&f.textContent)return;const n=waitCards().length;
   if(n)msg(n+' item'+(n>1?'s':'')+' wait for your verdict: press Next waiting at the top, or pick a card with an amber dot.',false,false,'dec');else if(!f.textContent||f.classList.contains('dec')){f.className='status';f.innerHTML='';}}
 document.addEventListener('click',ev=>{const t=ev.target.closest('[data-unit-card],[data-rf],[data-vref],[data-vtake],#mhist-b');if(!t)return;
   if(t.id==='mhist-b'){const h=$('mhist');h.hidden=!h.hidden;h.innerHTML=said.map(x=>'<div class="'+x[0]+'">'+esc(x[1])+'</div>').join('')||'<div>No message yet.</div>';return;}
@@ -1111,22 +1278,31 @@ document.addEventListener('keydown',ev=>{   // ↑ and ↓ move between the card
 (function(){const app=$('app'), g=$('grip');let w=Number(recall('rail'))||260;const set=x=>{w=Math.min(360,Math.max(200,Math.round(x)));app.style.setProperty('--rail',w+'px');};set(w);   // the rail's width, 200 to 360 px, kept on this computer
   g.addEventListener('mousedown',ev=>{ev.preventDefault();g.classList.add('drag');const left=$('rail').getBoundingClientRect().left, mv=e=>set(e.clientX-left), up=()=>{g.classList.remove('drag');document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);remember('rail',w);};
     document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);});})();
-STEPS.forEach(([k])=>new MutationObserver(()=>{if(k===step)focusUnit();}).observe($('s-'+k),{childList:true}));   // every redraw of a step keeps the chosen card
+STEPS.forEach(([k])=>new MutationObserver(()=>{if(k===step){focusUnit();lockAll();}}).observe($('s-'+k),{childList:true}));   // every redraw of a step keeps the chosen card (and, on a run that cannot be written, its buttons off)
 // ---------- render ----------
 function render(){
   if(!step)step=recall('step')||autoStep();
+  if(data&&data.state==='prepared')syncAnswers();   // R13: the stored answers of step 2
   frame();
   const typed={};document.querySelectorAll('textarea.keep').forEach(t=>typed[t.id]=t.value);   // review 27 Oct: a note or correction being typed survives the redraw
   STEPS.forEach(([k])=>{const sec=$('s-'+k);sec.hidden=(k!==step);if(k!==step)sec.innerHTML='';});   // defect 29: one panel at a time, so its buttons are the wired ones
   if(!data||data.state!=='prepared'){STEPS.forEach(([k])=>$('s-'+k).innerHTML='<div class="empty">Nothing to show yet.</div>');footer();if(stage()==='visuals')schedule(60000);return;}
-  if(selUnit[step]===undefined){const c=railCards().find(x=>x.wait&&x.unit);selUnit[step]=c?c.unit:'';if(c&&(step==='pictures'||step==='takes')&&!selPic)selPic=defaultPic(c.unit);}   // design/129 UX1: a step opens on what waits first
+  if(selUnit[step]===undefined){const c=waitCards().find(x=>x.step===step);selUnit[step]=c?c.unit:'';if(c&&(step==='pictures'||step==='takes')&&!selPic)selPic=defaultPic(c.unit);}   // design/129 UX1: a step opens on what waits first
   if(step==='treatment'){renderTreatment();wireFootage();}if(step==='plan')renderPlan();if(step==='references')renderReferences();if(step==='pictures')renderPictures();if(step==='takes')renderTakes();if(step==='record')renderRecord();
   Object.entries(typed).forEach(([id,v])=>{const t=$(id);if(t&&v)t.value=v;});
   footer();
   renderRail();focusUnit();idleMsg();   // design/129 UX1
   const busy=data.references.some(r=>r.status==='generating')||data.gaps.some(g=>g.shots.some(s=>s.takes.some(k=>['queued','running','submitted'].includes(k.status))));
-  if(stage()==='visuals')schedule(busy?15000:60000);   // design/74 L29
+  if(stage()==='visuals')schedule(data.busy?5000:busy?15000:60000);   // design/74 L29; E19: a run being written elsewhere is looked at again in a few seconds
+  lockAll();
 }
+// failure modes: a script error is said in the bar, never silent; E16: a picture whose file is missing gives way to a plain placeholder
+function pageError(){const f=$('fmsg');f.className='status err';f.textContent='the page hit an error; reload';}
+window.addEventListener('error',ev=>{if(!ev.target||ev.target===window)pageError();});
+window.addEventListener('unhandledrejection',pageError);
+document.addEventListener('error',ev=>{const i=ev.target;if(!i||i.tagName!=='IMG'||!i.closest('#app'))return;
+  if(i.getAttribute('onerror')&&!i.dataset.tried){i.dataset.tried='1';return;}   // a search result tries its small copy first
+  i.style.display='none';if(!(i.nextElementSibling&&i.nextElementSibling.classList.contains('ph')))i.insertAdjacentHTML('afterend','<div class="ph">picture not available</div>');},true);
 load();
 })();
 </script>
