@@ -138,7 +138,7 @@ A test's id is its row: `-k C-3.5-62`. `controls.json` lists every row with its 
 | `test_faults.py` | `U01` to `U16`, `X1` to `X7`, `N1` to `N4` | the reported fault is absent: it fails while the fault is in the page |
 | `test_journeys.py` | `J1` to `J7` | the reference round as SK walked it, one pass per test, and Takes with a supplied file |
 
-These tests state the truth of the approved requirements, so most fail on today's page; that is their purpose. Nothing is skipped or
+These tests state the truth of the approved requirements; they failed on the page before the one UI change of 11 Nov 2026 and pass on it. Nothing is skipped or
 marked as an expected failure. Where a requirement needs something that does not exist yet, the test uses the names in **`CONTRACT.md`**
 (two new server actions `set_answer` and `set_make`, a few fields of the data, a few selectors and texts): the page is built to it.
 

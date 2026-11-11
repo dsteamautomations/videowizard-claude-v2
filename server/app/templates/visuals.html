@@ -304,7 +304,7 @@ function paintAnswers(){   // after an answer changed or was stored: the card's 
   renderRail();trayNote();lockAll();}
 function trayNote(){const t=$('twait'), rd=roundOpen();if(!t||!rd)return;const wait=keptWaiting(rd);
   t.className=wait.length?'err':'';
-  t.innerHTML=wait.length?'<b>'+wait.length+'</b> still need'+(wait.length>1?'':'s')+' an answer (or a starting picture, or the words for Correct it): '+esc(wait.join(', ')):'Every set has its answer. Done records them; the No and Correct it ones are made again.';}
+  t.innerHTML=wait.length?'<b>'+wait.length+'</b> still need'+(wait.length>1?'':'s')+' an answer (or a starting picture, or the words for Correct it): '+esc(wait.join(', ')):judged(rd).length?'Every set has its answer. Done records them; the No and Correct it ones are made again.':'No set asks for an answer now.';}
 function capHit(){const b=(data&&data.budget)||{};return (b.cap_inr>0&&b.spent_inr>=b.cap_inr)||Object.values((data&&data.round&&data.round.elements)||{}).some(r=>r.cause&&r.cause.kind==='cap');}   // E15
 function readOnly(){return !!(data&&(data.busy||(data.run&&data.run.open_defects&&data.run.open_defects.length)));}   // E19, E20
 function lockAll(){if(!readOnly())return;document.querySelectorAll('#app button[data-a],#app input[type=radio],#app [data-golden]').forEach(e=>{e.disabled=true;});}   // no button pretends to work
@@ -759,7 +759,7 @@ function frameStrip(frames,can){   // R3: a footage picture is answered on its c
     (can?'<div class="btns" style="margin:0 6px 6px">'+(f.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(f.id)+'" data-sha="'+esc(f.sha256)+'">Use this picture</button>':'')+'<button data-a="reject" data-ref="'+esc(f.id)+'">Ignore</button></div>':'')+'</div>').join('')+'</div>'+psum(frames.map(f=>pstate(f)));}
 function notMade(eid,r,can){   // R17, R18, E15: a set that was not made says its present reason and offers Make it now; the operator is never asked for a No to get it made
   const c=r.cause, why=c?c.text:r.settled?r.settled+': it can be made now':r.problem||'', m=c&&c.kind==='spec'&&c.element_id!==eid?(data.elements||[]).find(x=>x.id===c.element_id):null;
-  return '<div class="ds err" style="margin-top:6px">The set was not made'+(why?': '+esc(plain(why)):'')+'.</div>'+
+  return '<div class="ds err" style="margin-top:6px">The set was not made'+(why?': '+esc(plain(why)):'')+'.'+(c&&c.kind==='spec'&&!c.pending?' Approve the spec, then press Make it now.':'')+'</div>'+
     (can?'<div class="btns"><button class="go" data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button></div>':'')+(m?materialBox(m):'');}
 function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while every set is made silently; pass 2 every set in one shot: Yes, No or Correct it, the starting picture on a thing
   const d=data, refs=refsById(), can=stage()==='visuals';
