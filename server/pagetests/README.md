@@ -87,6 +87,10 @@ because the real writer needs a provider or the database:
 `page_view` reads three things from the database connection, all from `vw2_jobs`: the take jobs, the spend, and the job of a
 picture still "generating". `FakeConn` answers all three; `build_states.py` adds one answer for `vw2_files` (read by `add_asset`).
 
+A builder may return a fourth item, the run's outputs (the media stage's clips, for the clip form). The states named `controls-…`
+exist for one control that appears in no other state; four more edge-case states were added for layer 3. Also set by hand in them:
+`reuse_pending` (the reuse gate writes it) and `footage` (prepare measures the clips).
+
 `data/main` is built with the server code of the working tree; `data/live` with the server code of `ed8dcb9` (the live version).
 The two differ where the server differs: on live the waiting list holds one item per set, a footage-backed element still gets an
 AI set, and a round whose sets were all refused goes back to step 1.
@@ -109,9 +113,46 @@ In `build_states.py` add a function under `@state('<name>', '<tab>')` that retur
 every test in `test_states.py` runs on the new state without further work. If a state cannot be generated, write its payload by
 hand using only fields a generated one has, name the file `handmade-<name>.json`, and list it here.
 
+## Layer 1: every control (`test_controls_*.py`, `controls.json`)
+
+One test per row of the inventory in `videobuilder-v4/phase2/ui/page-facts.md`, section 3: rows 1 to 105 (79 is written 79a there) and
+the five automatic behaviours 106 to 110. Each test opens the state where the control appears, checks that it is there (and absent
+where it must not be), operates it as the operator does and asserts its one effect: the exact request, or the exact change on screen.
+These tests describe today's correct wiring, so they should pass; one that fails is a wiring fault of today's page.
+
+| File | Inventory sections |
+|---|---|
+| `test_controls_frame.py` | 3.1 always on the page, 3.2 the right panel and the viewer, 3.11 what acts without a click |
+| `test_controls_steps.py` | 3.3 Treatment, 3.4 Plan, 3.8 Pictures, 3.9 Takes, 3.10 Record |
+| `test_controls_references.py` | 3.5 a round on a kept film, 3.6 a round on an older film, 3.7 no round open |
+| `test_controls_checklist.py` | the meta-test: every row of `controls.json` has exactly one test, and every test a row |
+
+A test's id is its row: `-k C-3.5-62`. `controls.json` lists every row with its id, its control and its test.
+
+## Layer 3: requirements, edge cases, faults, journeys
+
+| File | Ids | What each test asserts |
+|---|---|---|
+| `test_requirements.py` | `R01` to `R24` | what the approved requirement says the operator sees |
+| `test_edge_cases.py` | `E01` to `E20` | what the approved edge case says must happen |
+| `test_faults.py` | `U01` to `U16`, `X1` to `X7`, `N1` to `N4` | the reported fault is absent: it fails while the fault is in the page |
+| `test_journeys.py` | `J1` to `J7` | the reference round as SK walked it, one pass per test, and Takes with a supplied file |
+
+These tests state the truth of the approved requirements, so most fail on today's page; that is their purpose. Nothing is skipped or
+marked as an expected failure. Where a requirement needs something that does not exist yet, the test uses the names in **`CONTRACT.md`**
+(two new server actions `set_answer` and `set_make`, a few fields of the data, a few selectors and texts): the page is built to it.
+
+`kit.py` holds the helpers these tests share. The one command prints the totals of each layer after layer 2's.
+
+More of the harness, used by these layers: `open_page(..., patch=fn)` changes the payload before the page reads it (a field the
+contract adds and the server does not send yet); `clock=True` puts the page's timers under the test's control
+(`put.page.clock.fast_forward(ms)`); `put.serve(state)` makes the server answer with another state's payload from now on (what it
+would hold after the last action); `put.refresh()` makes the page read its data again; `put.answers[action] = (status, body)` sets
+what the server answers; `put.data_gets` counts the page's reads. A dropped connection, a 401 and a slow answer are made in the test
+with Playwright's own `page.route`.
+
 ## Not covered here
 
-- Layer 1 (one test per control) and layer 3 (the journeys, R1 to R24, E1 to E20 one by one): the next steps of the plan.
 - Real data of VW-19 and VW-18: the states are made from the unit tests' small film (four elements; 58 in the large round).
 - Video playback: a take's file is answered with an empty body.
 - Browsers other than Chromium; widths other than 1920 and 1366.
