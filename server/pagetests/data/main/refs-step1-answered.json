@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T10:17:59.113382+00:00",
+   "at": "2026-11-11T11:33:06.961200+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running bond (stretcher bond) layout",
-     "no standard flat laying (bricks laid on bed, not on edge)",
-     "no all-stretcher faces facing the camera",
-     "no brown, yellow, or multi-tonal brick color",
-     "no standard modular brick dimensions (215 mm x 65 mm)",
-     "no flush, recessed, or colored decorative mortar joints",
-     "no mortar joints thinner or thicker than 10 mm",
-     "no smooth, glazed, or painted brick surfaces",
-     "no weathered, chipped, or reclaimed brick textures",
-     "no English bond or Flemish bond pattern",
-     "no square-faced or elongated roman brick proportions",
-     "no integrated ties, weep holes, or mortar-less dry stacking"
+     "no standard stretcher bond instead of alternating rowlock and shiner",
+     "no bricks laid flat on bed instead of on edge",
+     "no all-header or all-stretcher faces",
+     "no 215 mm by 65 mm standard UK or metric brick proportions",
+     "no flush or recessed raked joints instead of standard 10 mm mortar joints",
+     "no gray, brown, yellow, or multi-colored variegated brickwork",
+     "no heavily weathered, chipped, or reclaimed textured surfaces",
+     "no bricks with width-to-height ratio greater than 3:1",
+     "no stacked vertical bond alignment",
+     "no Flemish bond with flat stretchers instead of edge shiners",
+     "no oversized or non-uniform joint thickness",
+     "no smooth glazed or painted brick finish"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T10:18:03.307267+00:00",
+   "at": "2026-11-11T11:33:11.029792+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -424,7 +424,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:03.307267+00:00",
+     "at": "2026-11-11T11:33:11.029792+00:00",
      "quote": "Yes."
     },
     "rejection": null,

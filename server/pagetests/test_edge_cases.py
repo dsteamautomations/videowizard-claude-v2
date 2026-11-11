@@ -145,7 +145,7 @@ def test_the_server_refuses_done(open_page, _id):
     if fin.count():
         fin.click()
     put.page.wait_for_timeout(200)
-    assert put.red_line() == 'E2: the picture file of its set is gone; make the set again.'
+    assert put.red_line() == 'Clamp kiln: the picture file of its set is gone; make the set again.'   # follow-up fix 5: the name, not the id (the server's refusal names E2)
     assert {e: checked(put, e) for e in said} == {e: a['verdict'] for e, a in said.items()}, 'the answers were lost by the refusal'
     show(put, 'E2')
     assert 'not recorded' in card(put, 'E2').inner_text().lower(), 'the card the refusal names shows nothing'
@@ -215,6 +215,13 @@ def test_an_element_set_to_ignore(open_page, _id):
     two = open_page('refs-step2-element-ignored')
     assert 'ignored' in rail(two, 'P1').inner_text().lower() and rail(two, 'P1').locator('.wdot').count() == 0, f'step 2: the ignored element\'s card says "{" ".join(rail(two, "P1").inner_text().split())}"'
     assert 'P1' not in to_judge(two) and not counts_wrong(two)
+    # follow-up fix 3: no longer step 1 only. A set that was never made is set aside at step 2: shown as set aside, nothing waits on it, and it can be brought back while the round is open
+    three = open_page('refs-step2-set-aside')
+    assert 'set aside' in rail(three, 'E3').inner_text().lower() and rail(three, 'E3').locator('.wdot').count() == 0, 'step 2: the element set aside is not shown as set aside'
+    assert 'E3' not in to_judge(three) and not counts_wrong(three)
+    three.open_tab('references')
+    show(three, 'E3')
+    assert card(three, 'E3').locator('button[data-a="set-back"]').inner_text() == 'Bring back'
 
 
 @ident('E14')
@@ -237,6 +244,7 @@ def test_the_spend_cap_is_reached(open_page, _id):
         assert make.count() >= 1, 'no "Make it now" on the sets the cap refused'
     assert all(b.is_disabled() for b in make.all()), '"Make it now" is live though the cap is reached'
     done = put.page.locator('#action button.go').first
+    assert done.count() and done.is_enabled(), 'follow-up fix 2: Done is off at the cap, so a Yes (which costs nothing) cannot be recorded'   # was: Done disabled at the cap
     if done.count() and done.is_enabled():
         done.click()
         put.page.wait_for_timeout(150)
@@ -286,11 +294,16 @@ def test_long_names_and_long_words(open_page, _id):
 
 @ident('E19')
 def test_a_run_held_by_another_machine(open_page, _id):
+    """Changed by the follow-up (fix 1). The page's data cannot say that another operator's machine holds the run: `busy` only says the run's lock
+    was held at the moment of that read (the chat tool was making a call). So the page says so quietly and every control stays usable.
+    E19 itself is NOT covered until the data carries who holds the run (README, CONTRACT)."""
     put = open_page('cross-run-busy-read-only')
     assert put.payload['busy'] is True
-    assert 'read-only' in put.text('#line').lower(), f'the header does not say the page is read-only: "{put.text("#line")}"'
-    live = [b for b in put.page.locator('#app button[data-a], #app input[type=radio], #app [data-golden]').all() if b.is_visible() and b.is_enabled() and b.get_attribute('aria-disabled') != 'true']
-    assert not live, f'{len(live)} controls still pretend to work'
+    line = put.text('#line').lower()
+    assert 'read-only' not in line and 'the server is busy; the page reads again shortly' in line, f'the header says: "{put.text("#line")}"'
+    assert put.page.locator('#line .err').count() == 0 and put.bar()[0] != 'err', 'a busy answer is shown as an error'
+    dead = [b for b in put.page.locator('#app button[data-a], #app input[type=radio], #app [data-golden]').all() if b.is_visible() and not b.is_enabled()]
+    assert not dead, f'{len(dead)} controls were switched off by a busy answer'
 
 
 @ident('E20')

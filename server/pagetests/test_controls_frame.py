@@ -60,7 +60,8 @@ def test_waiting_count_opens_the_list(open_page, _id):
     assert put.header_count() == n and not put.visible('#wlist')
     put.click('#wcount')
     assert put.visible('#wlist') and put.page.locator('#wlist a').count() == n
-    assert put.page.locator('#wlist a').all_inner_texts() == [w['label'] for w in put.payload['waiting']]
+    names = {e['id']: e['name'] for e in put.payload['elements']}   # follow-up fix 5: the name, not the id (the server's label carries the id; the page shows the name)
+    assert put.page.locator('#wlist a').all_inner_texts() == [w['label'].replace(f"· {w['group']}", f"· {names[w['group']]}") for w in put.payload['waiting']]
     put.click('#wcount')
     assert not put.visible('#wlist')
     none = open_page('refs-round-complete')
@@ -511,7 +512,7 @@ def test_save_a_result(open_page, _id):
     put.page.locator('#p-note').press_sequentially('colour only')
     put.click('#p-save')
     assert only_post(put) == {'action': 'pick', 'search_id': sid, 'picks': [{'n': 1, 'note': 'colour only'}]}
-    assert put.bar() == ('ok', 'Image saved with its note for E2.')
+    assert put.bar() == ('ok', 'Image saved with its note for Clamp kiln.')   # follow-up fix 5: the name, not the id
 
 
 @ident('C-3.2-40')
@@ -538,7 +539,7 @@ def test_add_your_own_picture(open_page, _id):
     put.page.fill('#panel [id="url-E2"]', 'https://example.org/kiln.jpg')
     put.click('#panel button[data-a="supply"]')
     assert only_post(put) == {'action': 'supply', 'element_id': 'E2', 'url': 'https://example.org/kiln.jpg'}
-    assert put.bar() == ('ok', 'Your picture is saved and approved for E2.')
+    assert put.bar() == ('ok', 'Your picture is saved and approved for Clamp kiln.')   # follow-up fix 5: the name, not the id
     f = first_result(open_page)
     f.page.set_input_files('#panel [id="up-E2"]', {'name': 'kiln.png', 'mimeType': 'image/png', 'buffer': b'not really a png'})
     f.click('#panel button[data-a="supply"]')

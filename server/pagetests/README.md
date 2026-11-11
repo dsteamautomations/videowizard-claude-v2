@@ -137,10 +137,16 @@ A test's id is its row: `-k C-3.5-62`. `controls.json` lists every row with its 
 | `test_edge_cases.py` | `E01` to `E20` | what the approved edge case says must happen |
 | `test_faults.py` | `U01` to `U16`, `X1` to `X7`, `N1` to `N4` | the reported fault is absent: it fails while the fault is in the page |
 | `test_journeys.py` | `J1` to `J7` | the reference round as SK walked it, one pass per test, and Takes with a supplied file |
+| `test_followup.py` | `F01` to `F10` | the ten fixes after SK's walk of the page (11 Nov 2026), one test per fix; their server side is in `unit/test_ui_visuals_actions_pure.py` |
 
 These tests state the truth of the approved requirements; they failed on the page before the one UI change of 11 Nov 2026 and pass on it. Nothing is skipped or
 marked as an expected failure. Where a requirement needs something that does not exist yet, the test uses the names in **`CONTRACT.md`**
-(two new server actions `set_answer` and `set_make`, a few fields of the data, a few selectors and texts): the page is built to it.
+(the server actions `set_answer`, `set_make` and `set_aside`, a few fields of the data, a few selectors and texts): the page is built to it.
+
+**E19 is not covered.** The approved edge case is "a run that another operator's machine holds: the page shows it read-only". The page's data cannot say
+that today: its `busy` flag only says the run's lock was held at the moment of that read (for example while the chat tool makes a call). Since the
+follow-up of 11 Nov 2026 the page never turns read-only on `busy`; the test `E19` asserts that quiet behaviour (a line "the server is busy; the page
+reads again shortly", every control usable). E19 proper waits until the data carries who holds the run.
 
 `kit.py` holds the helpers these tests share. The one command prints the totals of each layer after layer 2's.
 
@@ -167,7 +173,7 @@ From `server/`. Open `http://127.0.0.1:8765/` (this PC only). Stop it with Ctrl+
 |---|---|
 | `round-step1` | step 1: three footage pictures to answer, the brick's material spec to approve, people with no footage |
 | `round-step2` | step 2, every set back: the real film's people, places and things (their real pictures when `videobuilder-v4/phase2/refs` is on this PC) |
-| `round-step2-not-made` | step 2 with two sets not made: the brick (approve its spec, then Make it now) and the yard wall (a size not measured: nothing on the page settles it) |
+| `round-step2-not-made` | step 2 with two sets not made: the brick (approve its spec, then Make it now) and the yard wall (a size not measured: nothing on the page settles it, so no Make it now; Set aside, then Bring back) |
 | `round-second-pass` | after a first Done: most sets approved, two made again and waiting |
 | `round-complete` | the round finished |
 | `takes-supplied` | Takes: a shot filled with a supplied file, a take to select, a drawn shot |

@@ -613,6 +613,50 @@ def _():
     return store, conn, NEW
 
 
+# Follow-up, ten fixes (11 Nov 2026)
+WALL = {**R.KILN, 'id': 'E3', 'name': 'Yard wall', 'kind': 'object', 'requirements': 'the wall at the end of the yard',
+        'size': [{'part': 'wall', 'measure': 'height', 'value': None, 'unit': 'mm', 'source': '', 'status': 'unknown', 'tried': 'not in the client material'}]}
+
+
+def wall_not_made():
+    """Step 2 where the wall's set cannot be made: a footage picture of it was approved after its first set, the set was answered No, and the server
+    will not make it again before its height is measured (nothing on the page settles that)."""
+    _, store, conn, _s = step2(els=(R.KILN, R.MASON, BRICK, WALL), rows=ROWS + [{'element_id': 'E3', 'prompt': 'the yard wall'}])
+    edit(store, lambda x: x['references'].update(F9={**S.ref('F9', 'approved'), 'kind': 'frame', 'element_id': 'E3', 'width': 1920, 'height': 1080}))
+    VS.round_sets(store, USER, NEW, [], {'E3': {'verdict': 'no', 'words': 'the wall is too low'}}, 'Again.', conn=conn, partial=True)
+    return store, conn
+
+
+@state('refs-step2-size-not-measured', 'references')
+def _():
+    store, conn = wall_not_made()
+    return store, conn, NEW
+
+
+@state('refs-step2-set-aside', 'references')
+def _():
+    store, conn = wall_not_made()
+    VS.set_aside(store, USER, NEW, [], 'E3', 'we film the wall ourselves')
+    return store, conn, NEW
+
+
+@state('refs-step2-set-aside-rest-approved', 'references')
+def _():
+    store, conn = wall_not_made()
+    s = S.saved(store)
+    VS.round_sets(store, USER, NEW, [], {eid: {'verdict': 'yes', **({} if eid == 'P1' else {'golden': sheets(s, eid)[0]})} for eid in ('E2', 'P1', 'BRICK')}, 'These.', conn=conn, partial=True)
+    VS.set_aside(store, USER, NEW, [], 'E3', '')   # every other set approved, the wall set aside: nothing is left to judge; Done closes the round
+    return store, conn, NEW
+
+
+@state('cross-spend-cap-reached-sets-back', 'references')
+def _():
+    _, store, conn, _s = step2()
+    edit(store, lambda s: s.update(cap_inr=100.0))
+    conn.jobs += [{**S.job('gemini-image'), 'id': f'j-img-{k}'} for k in range(6)]   # every set is back; the spend has passed the cap of 100 since
+    return store, conn, NEW
+
+
 def main():
     out = HERE / 'data' / (args.name or args.rev or 'main')
     out.mkdir(parents=True, exist_ok=True)

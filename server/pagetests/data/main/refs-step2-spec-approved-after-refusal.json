@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T10:20:05.218465+00:00",
+   "at": "2026-11-11T11:35:09.204332+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running bond or stretcher bond",
-     "no flat-laid bricks instead of laid on edge",
-     "no standard red with varied weathering or painted colors",
+     "no standard running bond",
+     "no flat-laid stretcher face orientation",
+     "no English or Flemish header-only rows",
+     "no standard 215 x 65 mm brick proportions",
+     "no grey, yellow, or variegated brick colours",
+     "no rough, wirecut, or heavily textured surfaces",
+     "no flush or raked joints thicker than 10 mm",
+     "no contrasting white or dark black mortar",
      "no missing alternating header-stretcher pattern",
-     "no standard 215 mm or oversized brick lengths",
-     "no bricks with rough, rustic, or tumbled textures",
-     "no modern thin mortar joints or recessed raked joints",
-     "no decorative fittings, vents, or weep holes",
-     "no non-red hues like yellow, brown, or grey brick",
-     "no elongated Roman brick or square tile proportions",
-     "no missing or flush invisible mortar lines",
-     "no English or Flemish bond variants on the flat side"
+     "no square-profile bricks",
+     "no soldier courses or vertical orientations",
+     "no wall ties, weep holes, or metal fittings"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T10:20:05.219449+00:00",
+   "at": "2026-11-11T11:35:09.205352+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -241,7 +241,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T10:20:05.227987+00:00",
+      "at": "2026-11-11T11:35:09.213870+00:00",
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -263,7 +263,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T10:20:05.229501+00:00",
+      "at": "2026-11-11T11:35:09.217408+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -547,7 +547,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:20:05.219449+00:00",
+     "at": "2026-11-11T11:35:09.206343+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

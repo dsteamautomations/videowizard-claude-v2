@@ -13,6 +13,7 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 |---|---|---|---|
 | `set_answer` | `{action: 'set_answer', element_id, verdict, golden, words}` | at every change of a card's answer at step 2: the starting picture chosen or changed, Yes / No / Correct it chosen, the words box left after typing. It always carries the card's whole answer | R13 |
 | `set_make` | `{action: 'set_make', element_id}` | a press of "Make it now" | R17 |
+| `set_aside` | `{action: 'set_aside', element_id, words}` to set aside; `{action: 'set_aside', element_id, back: true}` to bring back | a press of "Set aside" on a set that was never made (the words at the foot go with it, optional); a press of "Bring back" | follow-up fix 3 |
 
 - `verdict`: `'yes'`, `'no'`, `'correct'`, or `null` while only the starting picture is chosen.
 - `golden`: the picture's id, or `null` (a person's set, a No, nothing chosen yet). Never an empty string.
@@ -24,6 +25,7 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | Field | Meaning | Requirement |
 |---|---|---|
 | `round.elements[<id>].answer` | `{verdict, golden, words}`: the stored answer of step 2, not yet recorded by Done; absent or `null` when none | R13, R14, E3, E5, E10 |
+| `round.elements[<id>].aside` | `{by, at, words}` on an element set aside at step 2 (its `ignored` is `true`, as after Ignore at step 1); absent otherwise | follow-up fix 3 |
 | `gaps[].shots[].asset.by` | the name of the person who supplied the file (a supplied movie or still) | R21 |
 | `gaps[].shots[].asset.quote` | the operator's words given with the supplied file | R21 |
 | `gaps[].shots[].asset.duration_s` | the length of a supplied movie, in seconds | E17 |
@@ -39,6 +41,9 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | Material spec while a round is open | `#card-mspec-<element>` (the id of today's box) inside the card `[data-unit="<element>"]`, with today's `button[data-a="approve-spec"][data-shot="element:<element>"]` and `button[data-a="correct-spec"]` | | R11 |
 | What will not be made, before Done at step 1 | `#notmade`, one line per element `[data-notmade="<element>"]` holding the reason and the control that settles it | begins `N will not be made` | R12 |
 | The confirmation of Done at step 2 | `#done-confirm`, shown by the first press of `button[data-a="round-sets"]`, which sends nothing; inside it Finish is `button[data-a="round-sets"]` and Back is `button[data-a="round-picks-back"]` (the names step 1 uses today) | `N approved · N made again (paid) · N unanswered` | R15, E6, E7 |
+| Set aside a set that was never made | `button[data-a="set-aside"][data-el="<element>"]`, beside "Make it now" (or alone where the page cannot settle the cause: a size not measured, a spec under revision); never on a set that was made | `Set aside` | follow-up fixes 3, 4 |
+| Bring back an element set aside | `button[data-a="set-back"][data-el="<element>"]` on its card, while the round is open | `Bring back` | follow-up fix 3 |
+| The confirmation of Done at step 1 (a kept film) | `#done-confirm`, shown by the first press of `button[data-a="round-done"]`; Back and Finish stay in `#action` | `N footage picture(s) used · N ignored · N set(s) will be made (paid, about ₹N) · N will not be made`, then who is not made and why | follow-up fix 8 |
 | Retry a failed save of one answer | `button[data-a="set-answer-retry"][data-el="<element>"]` | `Try again` | E9 |
 
 ## 4. Texts and marks
@@ -60,9 +65,13 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | The card a refused or failed Done names | `not recorded` | R24, E8 |
 | The message bar `#fmsg` | class `err` for a refusal by the server; class `net` for a failed connection | R24 |
 | A shot filled with a supplied file, on Takes | the card's turn line has class `ok` and says `Supplied by <name>`, with the words; a still or a file shorter than its slot adds `assembly holds the last frame`; the left-list badge is `done` | R21, E17 |
-| A run that cannot be written (`busy: true`) | the header says `read-only`; every `button[data-a]` and the Done button are disabled | E19 |
+| The run's lock was held at this read (`busy: true`) | the header says, not in red, `the server is busy; the page reads again shortly`; no control is switched off and nothing says read-only. **E19 (a run another operator's machine holds) is not covered**: the data does not carry who holds the run | follow-up fix 1 (was E19) |
 | A run with an open defect | the header's line of today; every `button[data-a]` is disabled | E20 |
-| The spend cap reached | the header says `spend cap reached` with the spend; `Make it now` and Done are disabled | E15 |
+| The spend cap reached | the header says `spend cap reached` with the spend; `Make it now` is disabled. Done stays usable: its confirmation says `The N set(s) to be made again will not be made: the spend cap of ₹X is reached … answered and waiting`, and Finish records the Yes answers | E15, follow-up fix 2 |
+| An element set aside at step 2 | its card and its left-list card say `set aside`; no `.wdot` | follow-up fix 3 |
+| An element, wherever the operator reads it (the foot line, `#notmade`, the confirmations, a refusal, the waiting list, a card heading) | its name; the id only as small secondary text on a card heading and under the left-list title | follow-up fix 5 |
+| The green line after Done at step 2 | `Recorded: N approved`, then `· N being made again` only when above zero, then `The round is complete.` when it is | follow-up fix 6 |
+| An unexpected failure of an action | the bar says `That could not be done; nothing was changed. The builder has been told what failed.`; never a key name or an exception's text | follow-up fix 9 |
 | A picture whose file is missing | the picture is replaced by an element with class `ph` that says `picture not available` | E16 |
 | A lapsed sign-in | the page goes to `/login?next=<the page's path and its #link>` | E10 |
 | A script error | the bar turns red and says `the page hit an error; reload` | failure modes |

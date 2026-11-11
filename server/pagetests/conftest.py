@@ -298,4 +298,5 @@ def pytest_terminal_summary(terminalreporter):
     line('edge cases passing', [r for r in _results if r['file'] == 'test_edge_cases.py'])
     line('reported faults absent', [r for r in _results if r['file'] == 'test_faults.py'])
     line('journeys walked to the end', [r for r in _results if r['file'] == 'test_journeys.py'])
+    line('follow-up fixes passing', [r for r in _results if r['file'] == 'test_followup.py'])
     tr.write_line(f'results: {OUT / ("results-" + LABEL + ".json")}; screenshots: {OUT / "screens"}')

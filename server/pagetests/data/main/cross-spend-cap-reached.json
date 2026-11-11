@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T10:19:31.863641+00:00",
+   "at": "2026-11-11T11:34:36.177931+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no standard running bond",
-     "no flat stretcher-face orientation",
-     "no all-header or all-stretcher courses",
-     "no standard rectangular 3:1 aspect ratio bricks",
-     "no brown, yellow, or grey brick colouring",
-     "no painted or whitewashed brick finish",
-     "no weathered, chipped, or reclaimed brick texture",
-     "no flush or recessed mortar joints",
-     "no oversized or variable joint thicknesses",
-     "no grey, dark, or tinted mortar",
-     "no weep holes or metal wall ties",
-     "no decorative soldier course bands"
+     "no running bond (stretcher bond) patterns",
+     "no flat-laid orientation (stretcher face upright)",
+     "no standard metric length-to-height ratio (3:1 or 215x65 mm)",
+     "no weathered, tumbled, or reclaimed surface textures",
+     "no brown, orange, buff, or multi-colored brick tones",
+     "no thin or flush-recessed modern mortar joints",
+     "no painted, whitewashed, or glazed surfaces",
+     "no English or Flemish bond with flat stretchers",
+     "no oversized or utility block proportions",
+     "no stack bond alignment",
+     "no weep holes, ties, or expansion joints visible",
+     "no uneven, raked, or colored mortar lines"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T10:19:35.356046+00:00",
+   "at": "2026-11-11T11:34:39.256878+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -443,7 +443,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:19:35.356046+00:00",
+     "at": "2026-11-11T11:34:39.257880+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

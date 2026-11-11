@@ -61,10 +61,10 @@ def test_specs_can_be_seen_and_approved_and_their_links_open(open_page, _id):
 @ident('U05')
 def test_done_at_step_one_says_what_will_not_be_made(open_page, _id):
     put = open_page('refs-step1-to-answer')
-    assert put.visible('#notmade') and 'BRICK' in put.text('#notmade'), 'Done is offered with nothing said about the brick\'s set, whose spec is not approved'
+    assert put.visible('#notmade') and 'Red brick' in put.text('#notmade'), 'Done is offered with nothing said about the brick\'s set, whose spec is not approved'
     put.answers['round-done'] = (200, {'pass': 'making', 'queued': ['E2', 'P1'], 'errors': {'BRICK': 'the material spec of BRICK is not approved'}})
     press_done(put, 'round-done')
-    assert 'BRICK' in put.bar()[1], f'after Done the page says only: "{put.bar()[1]}"'
+    assert 'Red brick' in put.bar()[1] and 'BRICK' not in put.bar()[1], f'after Done the page says only: "{put.bar()[1]}"'
 
 
 @ident('U06')

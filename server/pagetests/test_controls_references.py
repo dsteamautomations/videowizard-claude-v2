@@ -132,7 +132,7 @@ def test_yes_no_correct_radios(open_page, _id):
 def test_correction_words(open_page, _id):
     put = open_page('refs-step2-all-sets-back')
     verdict(put, 'P1', 'correct')
-    assert 'P1' in put.text('#tray span.err').split(':')[-1]
+    assert 'Mason' in put.text('#tray span.err').split(':')[-1]   # follow-up fix 5: the name, not the id
     put.page.locator('[id="w-P1"]').press_sequentially('older, about fifty')
     assert 'P1' not in put.text('#tray span.err').split(':')[-1], 'the words for Correct it were typed and the card is still named as unanswered'
     verdict(put, 'E2', 'no')   # a redraw keeps the words
@@ -204,7 +204,7 @@ def test_older_pass1_radios(open_page, _id):
     assert [x.get_attribute('value') for x in card(put, 'E1').locator('input[name="v-E1"]').all()] == ['approve', 'search', 'ignore']
     assert put.page.locator('input[name="v-E1"]:checked').get_attribute('value') == 'approve' and put.page.locator('[id="kw-E1"]').count() == 0
     verdict(put, 'E1', 'search')
-    assert put.visible('[id="kw-E1"]') and 'E1' in put.text('#tray span.err'), 'Search Google did not open the search words, or Done is not locked until it is searched'
+    assert put.visible('[id="kw-E1"]') and 'Plinth' in put.text('#tray span.err'), 'Search Google did not open the search words, or Done is not locked until it is searched'
     show(put, 'E2')
     assert [x.get_attribute('value') for x in card(put, 'E2').locator('input[name="v-E2"]').all()] == ['search', 'ignore']
     no_post(put)
@@ -271,7 +271,7 @@ def test_ignore_and_undo_ignore(open_page, _id):
     put = open_page('refs-older-pass2')
     show(put, 'E2')
     b = lambda: card(put, 'E2').locator('button[data-a="ignore"]')
-    assert b().inner_text() == 'Ignore this' and 'E2' in put.text('#tray span.err')
+    assert b().inner_text() == 'Ignore this' and 'Clamp kiln' in put.text('#tray span.err')   # follow-up fix 5: the name, not the id
     b().click()
     assert b().inner_text() == 'Undo Ignore' and card(put, 'E2').locator('.badge').inner_text().lower() == 'ignored' and put.page.locator('#tray span.err').count() == 0
     b().click()

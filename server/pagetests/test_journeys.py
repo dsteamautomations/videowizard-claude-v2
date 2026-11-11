@@ -21,7 +21,7 @@ def test_step_one_answer_the_pictures_approve_the_specs_done(open_page, _id):
     assert last_of(put, 'approve') == {'action': 'approve', 'reference_id': 'F1', 'sha256': 'sha-F1'}
     put.serve('refs-step1-picture-answered-spec-waits')
     put.refresh()
-    assert put.visible('#notmade') and 'BRICK' in put.text('#notmade')   # the brick's spec: its set would not be made
+    assert put.visible('#notmade') and 'Red brick' in put.text('#notmade')   # the brick's spec: its set would not be made (follow-up fix 5: by its name)
     show(put, 'BRICK')
     card(put, 'BRICK').locator('button[data-a="approve-spec"][data-shot="element:BRICK"]').click()
     put.wait_posts(2)

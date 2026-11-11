@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T10:18:15.219622+00:00",
+   "at": "2026-11-11T11:33:22.476548+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running or stretcher bond instead of alternating rowlock and shiner bond",
-     "no standard flat stretcher face orientation instead of laid on edge",
-     "no standard 215 x 65 mm brick dimensions instead of 190 x 90 mm",
-     "no brown, yellow, or multi-tone bricks instead of solid red",
-     "no flush or raked thin joints instead of standard 10 mm mortar joints",
-     "no grey weathered or blackened brick surfaces instead of clean red brick",
-     "no all-header or all-stretcher courses instead of alternating faces per course",
-     "no square or irregular face proportions instead of roughly 2:1 ratio",
-     "no rough tumbled or reclaimed textures instead of smooth spec finish",
-     "no missing or uneven mortar joints instead of consistent 10 mm thickness",
-     "no painted or glazed surfaces instead of natural red clay finish",
-     "no visible wall ties, weep holes, or metal lintel fittings"
+     "no running bond (half-overlap stretcher course only)",
+     "no English bond with alternating full stretcher and full header courses",
+     "no flat-laid bricks with standard bed facing up",
+     "no modern thin modular or Roman brick proportions",
+     "no standard metric length of 215 mm or 230 mm",
+     "no recessed, raked, or flush mortar joints",
+     "no oversized or variable joint widths exceeding 10 mm",
+     "no brown, yellow, grey, or multi-tonal brick coloring",
+     "no weathered, tumbled, pitted, or reclaimed wirecut texture",
+     "no wall ties, weep holes, or metal flashing visible",
+     "no soldier courses or stacked vertical orientations",
+     "no Flemish bond with flat beds instead of edge-laid faces"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T10:18:19.640510+00:00",
+   "at": "2026-11-11T11:33:25.890690+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -205,7 +205,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T10:18:19.645802+00:00",
+      "at": "2026-11-11T11:33:25.894644+00:00",
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -248,7 +248,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T10:18:19.649163+00:00",
+      "at": "2026-11-11T11:33:25.899786+00:00",
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -270,7 +270,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T10:18:19.650148+00:00",
+      "at": "2026-11-11T11:33:25.902645+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -455,7 +455,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -500,7 +500,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -540,7 +540,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.640510+00:00",
+     "at": "2026-11-11T11:33:25.890690+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -585,7 +585,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -630,7 +630,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -675,7 +675,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -716,11 +716,11 @@
     "edit": null,
     "shot_id": null,
     "url": "/runs/VW-20/file/run-1/visuals/references/ff1936b3d1d851b7b1a3ae1042a5ecbd.png",
-    "prompt": "I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\nOne rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.\n\nThis is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.\n\nWhat the picture must represent: the fired red brick, one course.\n\nCosmetic requirements, which do not touch the technical content:\n- The place reads as yard, day; the film's look: warm daylight.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.\n\nWith the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.\nNot this (Red brick): no running or stretcher bond instead of alternating rowlock and shiner bond; no standard flat stretcher face orientation instead of laid on edge; no standard 215 x 65 mm brick dimensions instead of 190 x 90 mm; no brown, yellow, or multi-tone bricks instead of solid red; no flush or raked thin joints instead of standard 10 mm mortar joints; no grey weathered or blackened brick surfaces instead of clean red brick; no all-header or all-stretcher courses instead of alternating faces per course; no square or irregular face proportions instead of roughly 2:1 ratio; no rough tumbled or reclaimed textures instead of smooth spec finish; no missing or uneven mortar joints instead of consistent 10 mm thickness; no painted or glazed surfaces instead of natural red clay finish; no visible wall ties, weep holes, or metal lintel fittings.\nMaterial spec, Red brick: brick length 190 mm, brick height 90 mm, joint thickness 10 mm; laid on edge, header ends to the camera; joints 10 mm mortar joints; pattern: one long face alternating with one header per course; proportions: long face a little more than twice as wide as tall.",
+    "prompt": "I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\nOne rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.\n\nThis is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.\n\nWhat the picture must represent: the fired red brick, one course.\n\nCosmetic requirements, which do not touch the technical content:\n- The place reads as yard, day; the film's look: warm daylight.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.\n\nWith the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.\nNot this (Red brick): no running bond (half-overlap stretcher course only); no English bond with alternating full stretcher and full header courses; no flat-laid bricks with standard bed facing up; no modern thin modular or Roman brick proportions; no standard metric length of 215 mm or 230 mm; no recessed, raked, or flush mortar joints; no oversized or variable joint widths exceeding 10 mm; no brown, yellow, grey, or multi-tonal brick coloring; no weathered, tumbled, pitted, or reclaimed wirecut texture; no wall ties, weep holes, or metal flashing visible; no soldier courses or stacked vertical orientations; no Flemish bond with flat beds instead of edge-laid faces.\nMaterial spec, Red brick: brick length 190 mm, brick height 90 mm, joint thickness 10 mm; laid on edge, header ends to the camera; joints 10 mm mortar joints; pattern: one long face alternating with one header per course; proportions: long face a little more than twice as wide as tall.",
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -761,11 +761,11 @@
     "edit": null,
     "shot_id": null,
     "url": "/runs/VW-20/file/run-1/visuals/references/ff1936b3d1d851b7b1a3ae1042a5ecbd-2.png",
-    "prompt": "I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\nOne rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.\n\nThis is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.\n\nWhat the picture must represent: the fired red brick, one course.\n\nCosmetic requirements, which do not touch the technical content:\n- The place reads as yard, day; the film's look: warm daylight.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.\n\nWith the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.\nNot this (Red brick): no running or stretcher bond instead of alternating rowlock and shiner bond; no standard flat stretcher face orientation instead of laid on edge; no standard 215 x 65 mm brick dimensions instead of 190 x 90 mm; no brown, yellow, or multi-tone bricks instead of solid red; no flush or raked thin joints instead of standard 10 mm mortar joints; no grey weathered or blackened brick surfaces instead of clean red brick; no all-header or all-stretcher courses instead of alternating faces per course; no square or irregular face proportions instead of roughly 2:1 ratio; no rough tumbled or reclaimed textures instead of smooth spec finish; no missing or uneven mortar joints instead of consistent 10 mm thickness; no painted or glazed surfaces instead of natural red clay finish; no visible wall ties, weep holes, or metal lintel fittings.\nMaterial spec, Red brick: brick length 190 mm, brick height 90 mm, joint thickness 10 mm; laid on edge, header ends to the camera; joints 10 mm mortar joints; pattern: one long face alternating with one header per course; proportions: long face a little more than twice as wide as tall.",
+    "prompt": "I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\nOne rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.\n\nThis is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.\n\nWhat the picture must represent: the fired red brick, one course.\n\nCosmetic requirements, which do not touch the technical content:\n- The place reads as yard, day; the film's look: warm daylight.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.\n\nWith the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.\nNot this (Red brick): no running bond (half-overlap stretcher course only); no English bond with alternating full stretcher and full header courses; no flat-laid bricks with standard bed facing up; no modern thin modular or Roman brick proportions; no standard metric length of 215 mm or 230 mm; no recessed, raked, or flush mortar joints; no oversized or variable joint widths exceeding 10 mm; no brown, yellow, grey, or multi-tonal brick coloring; no weathered, tumbled, pitted, or reclaimed wirecut texture; no wall ties, weep holes, or metal flashing visible; no soldier courses or stacked vertical orientations; no Flemish bond with flat beds instead of edge-laid faces.\nMaterial spec, Red brick: brick length 190 mm, brick height 90 mm, joint thickness 10 mm; laid on edge, header ends to the camera; joints 10 mm mortar joints; pattern: one long face alternating with one header per course; proportions: long face a little more than twice as wide as tall.",
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -806,11 +806,11 @@
     "edit": null,
     "shot_id": null,
     "url": "/runs/VW-20/file/run-1/visuals/references/ff1936b3d1d851b7b1a3ae1042a5ecbd-3.png",
-    "prompt": "I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\nOne rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.\n\nThis is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.\n\nWhat the picture must represent: the fired red brick, one course.\n\nCosmetic requirements, which do not touch the technical content:\n- The place reads as yard, day; the film's look: warm daylight.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.\n\nWith the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.\nNot this (Red brick): no running or stretcher bond instead of alternating rowlock and shiner bond; no standard flat stretcher face orientation instead of laid on edge; no standard 215 x 65 mm brick dimensions instead of 190 x 90 mm; no brown, yellow, or multi-tone bricks instead of solid red; no flush or raked thin joints instead of standard 10 mm mortar joints; no grey weathered or blackened brick surfaces instead of clean red brick; no all-header or all-stretcher courses instead of alternating faces per course; no square or irregular face proportions instead of roughly 2:1 ratio; no rough tumbled or reclaimed textures instead of smooth spec finish; no missing or uneven mortar joints instead of consistent 10 mm thickness; no painted or glazed surfaces instead of natural red clay finish; no visible wall ties, weep holes, or metal lintel fittings.\nMaterial spec, Red brick: brick length 190 mm, brick height 90 mm, joint thickness 10 mm; laid on edge, header ends to the camera; joints 10 mm mortar joints; pattern: one long face alternating with one header per course; proportions: long face a little more than twice as wide as tall.",
+    "prompt": "I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, technical correctness matters more than anything else: the AI will copy exactly what it sees, including any mistake. So I am not going to describe how the work is done. You will take that entirely from real photographs: search Google Images for real photographs of the subject below, study how it is really done, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.\nOne rule above all: show one way of doing it, as one real photograph would. Real photographs will show you more than one method of doing the same thing. Do not combine them into a single picture, and do not add elements from one method to another. Choose the one method that appears most often in the photographs, or the one most typical of the place I describe, and show only that, exactly as it appears in those photographs, with nothing added. Everything in the picture must be justified by a single, consistent way of working; if two details could not both be true at the same time on one real site, one of them does not belong. Mention the other methods you saw only in your notes, not in the picture.\n\nThis is a set of three pictures of the same one subject on the same site, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside any picture. Say what each picture adds.\n\nWhat the picture must represent: the fired red brick, one course.\n\nCosmetic requirements, which do not touch the technical content:\n- The place reads as yard, day; the film's look: warm daylight.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.\n\nWith the pictures, tell me: (1) the one method you chose and why, and the other methods you saw in the photographs but left out; (2) what you found in the real photographs and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.\nNot this (Red brick): no running bond (half-overlap stretcher course only); no English bond with alternating full stretcher and full header courses; no flat-laid bricks with standard bed facing up; no modern thin modular or Roman brick proportions; no standard metric length of 215 mm or 230 mm; no recessed, raked, or flush mortar joints; no oversized or variable joint widths exceeding 10 mm; no brown, yellow, grey, or multi-tonal brick coloring; no weathered, tumbled, pitted, or reclaimed wirecut texture; no wall ties, weep holes, or metal flashing visible; no soldier courses or stacked vertical orientations; no Flemish bond with flat beds instead of edge-laid faces.\nMaterial spec, Red brick: brick length 190 mm, brick height 90 mm, joint thickness 10 mm; laid on edge, header ends to the camera; joints 10 mm mortar joints; pattern: one long face alternating with one header per course; proportions: long face a little more than twice as wide as tall.",
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T10:18:19.651580+00:00",
+     "at": "2026-11-11T11:33:25.903552+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
