@@ -1520,7 +1520,40 @@ def retired(what):
     emit({'action': 'refused', 'message': RETIRED[what]}, 2)
 
 
-VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'web',
+OWN_PICTURE_MAX = 15 * 1024 * 1024   # design/177: the server's limit for the operator's own picture, said before the file is sent
+ROUND_ONE = ('answer', 'make', 'aside', 'back')   # design/177: the page's step-2 actions on one element
+
+
+def _round_one(a, base):
+    """design/177: one element of the reference round, as the page's buttons do it: an answer of step 2 stored, a set that was not made made now,
+    a never-made set set aside or brought back. Each is one call of the server function the page calls; its refusal is relayed as written."""
+    named = [k for k in ROUND_ONE if getattr(a, k, None)]
+    verdict, golden, words = getattr(a, 'verdict', None), getattr(a, 'golden', None), getattr(a, 'words', None) or ''
+    if len(named) > 1:
+        emit({'action': 'refused', 'message': 'Give one of --answer, --make, --aside, --back in a call (one element each); nothing was sent.'}, 2)
+    if not named:
+        emit({'action': 'refused', 'message': '--verdict, --golden and --words go with --answer <element> (--words also with --aside <element>); nothing was sent.'}, 2)
+    what, eid = named[0], getattr(a, named[0])
+    if what == 'answer':
+        if verdict not in ('yes', 'no', 'correct'):
+            emit({'action': 'refused', 'message': f'Give the answer for {eid}: --verdict yes|no|correct (with --golden <picture id> for the Yes of a thing, --words "…" for Correct it); nothing was sent.'}, 2)
+        if golden is True:
+            emit({'action': 'refused', 'message': 'Name the starting picture: --golden <picture id>; nothing was sent.'}, 2)
+        out = write(base + '/round/answer', {'element_id': eid, 'verdict': verdict, 'golden': golden or None, 'words': words})
+        if not out.get('stored'):
+            emit(out, 0, out.get('next') or f'{eid}: the answer was not stored.')
+        ans = out.get('answer') or {}
+        emit(out, 0, f"Answer stored for {eid}: {ans.get('verdict')}" + (f", starting picture {ans['golden']}" if ans.get('golden') else '') + (' ("%s")' % ans['words'] if ans.get('words') else '')
+             + '. It is not recorded yet: Done on the page records it, or `vw visuals round --sets <file>` (a stored answer stands for an element the file leaves out).')
+    if what == 'make':
+        out = write(base + '/round/make', {'element_id': eid})
+        emit(out, 0, (out.get('next') or f'{eid}: its set is being made.')
+             + (f" (about ₹{out.get('cost_inr') or 0:,.0f}; paid: tell the operator.) Then `vw visuals status --wait 900`." if out.get('queued') else ''))
+    out = write(base + '/round/aside', {'element_id': eid, 'words': words if what == 'aside' else '', 'back': what == 'back'})
+    emit(out, 0, (out.get('next') or ('Set aside.' if what == 'aside' else 'Brought back.')).replace('Bring back returns it', f'`vw visuals round --back {eid}` returns it'))
+
+
+VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
                 'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
@@ -1530,10 +1563,11 @@ _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
-    'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo'}, 'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
-    'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE,
+    'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back'},   # design/177: the page's step-2 actions
+    'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
+    'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
-    'approve': {'file', 'ref', 'sha', 'quote'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
+    'approve': {'file', 'ref', 'sha', 'quote', 'again'}, 'reject': {'ref', 'notes', 'quote'}, 'fix': {'ref'},
     'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
     'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'}, 'draw': {'shot'}, 'font': {'file'}, 'scene': {'shot', 'file', 'download'},   # design/113; design/117
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
@@ -1772,6 +1806,8 @@ def cmd_visuals(a):
         out = write(base + '/not-this', {'element_id': a.element})
         emit(out, 0, (out.get('next') or '') + ' ' + '; '.join(out.get('lines') or []))
     if a.what == 'round':   # design/79: every element at once; the operator answers on the page in two passes
+        if any(getattr(a, k, None) for k in ROUND_ONE + ('verdict', 'golden', 'words')):
+            _round_one(a, base)
         if getattr(a, 'undo', False):   # design/110 rule 0: Done undone until the next step used it
             out = write(base + '/round/undo', {'quote': a.quote or ''})
             emit(out, 0, out.get('next') or f"The round is at pass {out.get('pass')} again.")
@@ -1787,7 +1823,8 @@ def cmd_visuals(a):
             out = write(base + '/round/sets', {'verdicts': _json_file(m, a.sets), 'quote': a.quote})
             errs = out.get('errors') or {}
             emit(out, 0, f"Sets recorded: {len(out.get('approved') or [])} approved, {len(out.get('queued') or [])} being made again; the round is {out.get('pass')}."
-                 + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else ''))
+                 + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '')
+                 + (' Held: ' + '; '.join(f'{k}: {v}' for k, v in out['held'].items()) + '. Tell the operator the spend; the builder changes the cap.' if out.get('held') else ''))   # design/177: a remake the spend cap holds
         if a.picks:
             pk = _json_file(m, a.picks)
             ignore = pk.pop('ignore', []) if isinstance(pk, dict) else []   # design/121 change 1: {"<search id>": [{n, note}], "ignore": ["E2"]}
@@ -1888,6 +1925,29 @@ def cmd_visuals(a):
         out = write(base + '/images', body)
         emit(out, 0, f"Paid image ({out['model']}) queued for reference {out['reference_id']}; tell the operator, then `vw visuals status --wait 300`." +
                      (' Warnings: ' + '; '.join(out['warnings']) if out.get('warnings') else ''))   # design/89 C, D
+    if a.what == 'own':   # design/177: the operator's own picture of an element, stored approved (the page's Upload my own picture); `supply` is the older way: a candidate
+        url = (a.url or '').strip()
+        if not a.element or bool(a.file) == bool(url) or (url and not url.startswith('https://')):
+            emit({'action': 'refused', 'message': 'vw visuals own --element E with the picture: --file <a file in the run folder> or --url https://… (one of the two); nothing was sent.'}, 2)
+        content = ''
+        if a.file:
+            path = (ws / a.file).resolve()
+            if ws.resolve() not in path.parents or not path.is_file():
+                emit({'action': 'refused', 'message': 'The picture must be a file inside the run folder.'}, 2)
+            if path.stat().st_size > OWN_PICTURE_MAX:
+                emit({'action': 'refused', 'message': 'The picture is larger than 15 MB: choose a smaller file.'}, 2)
+            content = __import__('base64').b64encode(path.read_bytes()).decode()
+        out = write(base + '/own', {'element_id': a.element, 'content_base64': content, 'url': url, 'name': a.name or ''})
+        emit(out, 0, (out.get('next') or f'Your picture is saved and approved for {a.element}.')
+             + f" It is picture {out.get('id')}: to start every shot of {a.element} from it, `vw visuals round --answer {a.element} --verdict yes --golden {out.get('id')}` at step 2.")
+    if a.what == 'approve' and getattr(a, 'again', False):   # design/177: a rejected picture approved after all, until a later step used it
+        if a.file or not a.ref:
+            emit({'action': 'refused', 'message': '--again takes one picture: --ref R (its --sha is read from the film when not given); nothing was sent.'}, 2)
+        sha = a.sha or next((r.get('sha256') for r in call('GET', base).get('references') or [] if r.get('id') == a.ref), None)
+        if not sha:
+            emit({'action': 'refused', 'message': f'{a.ref} is not a picture of this film; `vw visuals status` lists them.'}, 2)
+        out = write(f'{base}/references/{a.ref}/reapprove', {'sha256': sha, 'quote': a.quote or ''})
+        emit(out, 0, out.get('next') or f'Approved {a.ref} again.')
     if a.what == 'approve':
         if a.file:   # design/77 L33b: several approvals in one call
             _batch(_rows(m, a.file, ('ref', 'sha')), lambda r: (r['ref'], 'POST', f"{base}/references/{r['ref']}/approve", {'sha256': r['sha'], 'quote': r.get('quote') or ''}), 'ref',
@@ -2907,12 +2967,13 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base'):   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')
-    s.add_argument('--golden', action='store_true', help="image: the element's golden picture (design/111 F11)"); s.add_argument('--region', help='image: an edit\'s region left,top,width,height (design/111 F11)'); s.add_argument('--end-region', dest='end_region', help='image: the end\'s region, written with the start')
+    s.add_argument('--again', action='store_true', help='approve: a rejected picture approved after all (design/177)')
+    s.add_argument('--golden', nargs='?', const=True, default=False, help="image: the element's golden picture (design/111 F11); round --answer: the starting picture's id (design/177)"); s.add_argument('--region', help='image: an edit\'s region left,top,width,height (design/111 F11)'); s.add_argument('--end-region', dest='end_region', help='image: the end\'s region, written with the start')
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
