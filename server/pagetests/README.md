@@ -151,6 +151,43 @@ would hold after the last action); `put.refresh()` makes the page read its data 
 what the server answers; `put.data_gets` counts the page's reads. A dropped connection, a 401 and a slow answer are made in the test
 with Playwright's own `page.route`.
 
+## Walking the page by hand (`walk.py`)
+
+A person tries the page in their own browser, with the application's real server functions behind the buttons and no real server,
+database, network or cost.
+
+```
+"$TEMP/vw2venv/Scripts/python.exe" pagetests/walk.py --port 8765
+```
+
+From `server/`. Open `http://127.0.0.1:8765/` (this PC only). Stop it with Ctrl+C in its window. Nothing is kept: every start, and
+"start this one again" on the list, builds the films afresh.
+
+| Scenario | What it holds |
+|---|---|
+| `round-step1` | step 1: three footage pictures to answer, the brick's material spec to approve, people with no footage |
+| `round-step2` | step 2, every set back: the real film's people, places and things (their real pictures when `videobuilder-v4/phase2/refs` is on this PC) |
+| `round-step2-not-made` | step 2 with two sets not made: the brick (approve its spec, then Make it now) and the yard wall (a size not measured: nothing on the page settles it) |
+| `round-second-pass` | after a first Done: most sets approved, two made again and waiting |
+| `round-complete` | the round finished |
+| `takes-supplied` | Takes: a shot filled with a supplied file, a take to select, a drawn shot |
+| `pictures-specs` | Pictures: a drawing spec waiting on its shot, a candidate picture, an approved one |
+| `large-round` | 58 elements at step 2 |
+| `held-run` | an open defect: every write is refused |
+
+**Real:** the page (`visuals.html`, `base.html`, `style.css`), and `web.py`'s own `visuals_data` and `_visuals_act`, called as they
+are: the table of page actions, the `visuals_stage` functions behind it, `page_view`, the open-defect gate of `core.load_run`,
+`auth.current_user`, the spend and its cap. The films are built as `build_states.py` builds its states, with its helpers.
+
+**Imitated:**
+- the database and the storage: the unit tests' `FakeConn` and `FakeStore`; `walk.py` answers the few more questions `web.py`, `core` and `auth` ask (the run, its defects, its outputs, the session, the lock, one take by its id) and makes `core.next_for` say "visuals";
+- the worker: a queued set comes back about 3 s after the last one was queued, three pictures, as `sets_back` writes them. Takes, drawn shots, single pictures and fixes are not made;
+- the pictures: coloured cards that say what they are; a set's pictures use the real reference picture of that element when there is one, tagged "picture 1 / 2 / 3". A take plays a test film (needs ffmpeg);
+- sign-in: one button, no password ("Sign out" on the list shows the page sending you to sign in and back);
+- the prices: ₹20 a picture, and a set counts as one picture in the spend.
+
+Not imitated: selecting a take (it needs the record the server keeps when it prepares a take; Reject works), Record (it writes the run's outputs to the database), searches of an older film, anything a provider answers.
+
 ## Not covered here
 
 - Real data of VW-19 and VW-18: the states are made from the unit tests' small film (four elements; 58 in the large round).
