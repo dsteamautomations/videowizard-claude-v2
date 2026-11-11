@@ -461,3 +461,234 @@ def test_an_unexpected_error_in_a_page_action_reaches_the_operator_as_a_plain_se
     with pytest.raises(Problem, match='P1: say what to correct'):   # a refusal written for the operator still arrives as written
         web._page_call(lambda: VS.need(False, 'P1: say what to correct.'), 'round-sets')
     assert web._page_call(lambda: {'done': True}, 'approve') == {'done': True}
+
+
+# ---------- Round 3 (11 Nov 2026). U17: a verdict on one picture is changed both ways until a later step used it. U19: the operator's own picture as the starting picture ----------
+
+from test_design151_refs_pure import OLD, png_bytes   # noqa: E402
+from test_visuals_stage_pure import ref   # noqa: E402
+
+STEP1 = [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln during firing'}, {'element_id': 'P1', 'prompt': 'kneels'}]
+NO = {'notes': 'wrong kiln', 'quote': 'No.', 'by': 'u1'}
+
+
+def pic(store, conn, rid):
+    return next(r for r in view(store, conn)['references'] if r['id'] == rid)
+
+
+def test_a_footage_pictures_verdict_is_changed_both_ways_until_step_1_is_done():
+    store, conn = frames_only(doc_with(KILN, MASON)), FakeConn([])
+    VS.round_start(store, USER, NEW, [], STEP1, conn=conn)
+    VS.reject_reference(store, USER, NEW, [], 'F1', 'too dark', '')
+    assert pic(store, conn, 'F1')['status'] == 'rejected' and pic(store, conn, 'F1')['locked'] is None
+    out = g(lambda: VS.reapprove_reference(store, USER, NEW, [], 'F1', 'sha-F1', '', conn))   # reject, then approve
+    r = saved(store)['references']['F1']
+    assert out['status'] == 'approved' and r['status'] == 'approved' and not r.get('rejection') and r['rejections'][0]['notes'] == 'too dark'   # the earlier rejection is kept as history
+    assert pic(store, conn, 'F1')['rejection'] is None and pic(store, conn, 'F1')['locked'] is None
+    VS.reject_reference(store, USER, NEW, [], 'F1', '', '')   # approve, then reject
+    assert saved(store)['references']['F1']['status'] == 'rejected'
+    g(lambda: VS.reapprove_reference(store, USER, NEW, [], 'F1', 'sha-F1', '', conn))
+    with pytest.raises(Problem, match='Only a rejected picture'):
+        g(lambda: VS.reapprove_reference(store, USER, NEW, [], 'F1', 'sha-F1', '', conn))
+    VS.round_done(store, USER, NEW, [], {r['element_id']: {'verdict': 'approve'} for r in STEP1}, 'yes', conn=conn)   # step 1 done: the picture was used
+    lock = pic(store, conn, 'F1')['locked']
+    assert 'Step 1' in lock and 'can no longer be changed here' in lock and '`' not in lock and 'F1' not in lock
+    with pytest.raises(Problem, match='Step 1 of the reference round is done'):
+        g(lambda: VS.reject_reference(store, USER, NEW, [], 'F1', '', ''))
+    assert saved(store)['references']['F1']['status'] == 'approved'
+
+
+def test_a_footage_picture_ignored_at_step_1_is_not_approved_after_done():
+    store, conn = frames_only(doc_with(KILN, MASON)), FakeConn([])
+    VS.round_start(store, USER, NEW, [], STEP1, conn=conn)
+    VS.reject_reference(store, USER, NEW, [], 'F1', '', '')
+    VS.round_done(store, USER, NEW, [], {r['element_id']: {'verdict': 'approve'} for r in STEP1}, 'yes', conn=conn)
+    with pytest.raises(Problem, match='Step 1 of the reference round is done'):
+        g(lambda: VS.reapprove_reference(store, USER, NEW, [], 'F1', 'sha-F1', '', conn))
+    assert saved(store)['references']['F1']['status'] == 'rejected' and 'ignored' in pic(store, conn, 'F1')['locked']
+    s = saved(store)   # a footage picture grabbed and approved after step 1 was not answered there: it can still be rejected (it may be what stands in a set's way)
+    s['references']['F9'] = {**ref('F9', 'approved'), 'kind': 'frame', 'element_id': 'E2'}
+    VS.save_session(store, NEW, s)
+    assert pic(store, conn, 'F9')['locked'] is None
+    assert VS.reject_reference(store, USER, NEW, [], 'F9', '', '')['status'] == 'rejected'
+
+
+def test_a_picture_a_sheet_was_made_from_is_not_changed_until_the_sheet_is_rejected():
+    web = lambda rid, status, **o: {**ref(rid, status), 'kind': 'web', 'element_id': 'E2', **o}
+    store, conn = new_store(doc_with(KILN), {'W1': web('W1', 'approved'), 'W2': web('W2', 'rejected', rejection=dict(NO)),
+                                             'S1': {**ref('S1'), 'kind': 'sheet', 'element_id': 'E2', 'generation': {'op': 'generate', 'parents': [{'id': 'W1'}]}}}), FakeConn([])
+    assert 'A sheet was made from this picture' in VS.verdict_lock(saved(store), saved(store)['references']['W1'])
+    with pytest.raises(Problem, match='A sheet was made from this picture; it can no longer be changed here'):
+        g(lambda: VS.reject_reference(store, USER, OLD, [], 'W1', '', ''))
+    with pytest.raises(Problem, match='A sheet was made after this picture was rejected'):
+        g(lambda: VS.reapprove_reference(store, USER, OLD, [], 'W2', 'sha-W2', '', conn))
+    assert saved(store)['references']['W2']['status'] == 'rejected' and saved(store)['references']['W2']['rejection']['notes'] == 'wrong kiln'   # refused: nothing changed
+    VS.reject_reference(store, USER, OLD, [], 'S1', 'not this kiln', '')   # the sheet rejected: its sources can be changed again
+    VS.reject_reference(store, USER, OLD, [], 'W1', '', '')
+    assert g(lambda: VS.reapprove_reference(store, USER, OLD, [], 'W2', 'sha-W2', '', conn))['status'] == 'approved'
+
+
+def test_a_placed_picture_and_a_rejected_one_with_another_in_its_place_are_locked():
+    doc = doc_with(KILN)
+    store, conn = new_store(doc, {'K0': {**ref('K0', 'rejected'), 'shot_id': 'IM1', 'rejection': dict(NO)}, 'K1': {**ref('K1'), 'shot_id': 'IM1'}}, accepted=accepted(doc)), FakeConn([])
+    with pytest.raises(Problem, match='Another picture stands in its place now'):
+        g(lambda: VS.reapprove_reference(store, USER, OLD, [], 'K0', 'sha-K0', '', conn))
+    assert g(lambda: VS.approve_reference(store, USER, OLD, [], 'K1', 'sha-K1', 'Yes.', conn))['placed'] == 'IM1'
+    assert 'placed in shot IM1' in pic(store, conn, 'K1')['locked']
+    with pytest.raises(Problem, match='placed in shot IM1'):
+        g(lambda: VS.reject_reference(store, USER, OLD, [], 'K1', '', ''))
+    VS.unplace(store, USER, OLD, [], 'IM1', 'out')
+    assert pic(store, conn, 'K1')['locked'] is None
+    VS.reject_reference(store, USER, OLD, [], 'K1', '', '')   # nothing stands in K0's place now
+    assert g(lambda: VS.reapprove_reference(store, USER, OLD, [], 'K0', 'sha-K0', '', conn))['status'] == 'approved'
+
+
+def test_a_refused_second_approval_leaves_the_picture_rejected():
+    store, conn = new_store(doc_with(KILN), {'G1': {**ref('G1', 'rejected'), 'kind': 'isolated', 'element_id': 'E2', 'golden_candidate': True, 'rejection': dict(NO)}}), FakeConn([])
+    with pytest.raises(Problem, match='cannot be the golden picture'):   # design/111 F11 stands: a picture rejected before is never golden
+        g(lambda: VS.reapprove_reference(store, USER, OLD, [], 'G1', 'sha-G1', '', conn))
+    r = saved(store)['references']['G1']
+    assert r['status'] == 'rejected' and r['rejection']['notes'] == 'wrong kiln' and not saved(store).get('golden')
+    with pytest.raises(Problem, match='exact stored image'):
+        g(lambda: VS.reapprove_reference(store, USER, OLD, [], 'G1', 'not-its-hash', '', conn))
+    assert saved(store)['references']['G1']['status'] == 'rejected'
+
+
+def test_a_set_picture_is_never_approved_on_its_own_after_its_set_was_answered_no():
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'no', 'words': ''}}, 'Again.', conn=conn, partial=True)
+    old = sheets(saved(store), 'E2', 'rejected')[0]
+    with pytest.raises(Problem, match='judged as a whole'):
+        g(lambda: VS.reapprove_reference(store, USER, NEW, [], old, 'sha-' + old, '', conn))
+
+
+def test_a_takes_verdict_is_changed_both_ways_by_the_functions_of_today():
+    """U17, takes: nothing new on the server: a rejected take is selected (the page sends its note with Select), a selected take is rejected."""
+    import test_design117_p4_pure as P4
+    store = P4.svg_store()
+    out = VS.render_drawn(FakeConn([]), store, USER, P4.RUN, [], {'shot_id': 'DR1'})
+    prep = saved(store)['preparations']['DR1']
+    row = {'id': 'j1', 'unit': 'DR1', 'run_id': 'run-1', 'provider': 'drawn', 'status': 'ready', 'error': None, 'request': {'kind': 'drawn', 'request_key': prep['key'], 'preparation_id': out['preparation_id']},
+           'result': {'key': 'run-1/visuals/drawn/j1.mp4', 'sha256': 'd' * 64, 'bytes': 9, 'evidence': {'duration_seconds': 4.0, 'timing_matches_placement': True, 'issues': []}}}
+
+    class Conn(FakeConn):
+        def execute(self, sql, params=()):
+            return type('R', (), {'fetchone': lambda _: row})() if 'from vw2_jobs where id=' in sql else super().execute(sql, params)
+    VS.review_take(Conn([]), store, USER, P4.RUN, [], 'j1', 'rejected', 'the arrow is late', '', '')
+    assert saved(store)['reviews']['j1'][-1]['decision'] == 'rejected'
+    assert VS.select_take(Conn([]), store, USER, P4.RUN, [], 'j1', '', 'approved on the visuals page')['job_id'] == 'j1'   # reject, then select
+    VS.review_take(Conn([]), store, USER, P4.RUN, [], 'j1', 'rejected', '', '', '')   # select, then reject
+    assert 'DR1' not in saved(store)['selections'] and saved(store)['reviews']['j1'][-1]['decision'] == 'rejected'
+
+
+def test_a_set_answer_is_changed_as_often_as_wanted_until_done_records_it():
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    first = sheets(s, 'E2')[0]
+    for v, gold, words in (('yes', first, ''), ('no', None, ''), ('correct', None, 'a taller kiln'), ('yes', first, '')):
+        VS.set_answer(store, USER, NEW, [], 'E2', v, gold, words)
+        assert view(store, conn)['round']['elements']['E2']['answer'] == {'verdict': v, 'golden': gold, 'words': words}
+    assert saved(store)['references'][first]['status'] == 'candidate'
+    VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': first}}, 'This.', conn=conn, partial=True)
+    with pytest.raises(Problem, match='approved already'):
+        g(lambda: VS.set_answer(store, USER, NEW, [], 'E2', 'no', None, ''))
+
+
+def own(store, conn, eid, colour=(9, 9, 9), name='mine.png'):
+    return g(lambda: VS.supply_own(conn, store, USER, NEW, [], eid, content=png_bytes(64, 48, colour), name=name))
+
+
+def test_an_own_picture_of_the_element_is_accepted_as_its_starting_picture():
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    mine = own(store, conn, 'E2')
+    assert mine['kind'] == 'supplied' and mine['status'] == 'approved' and mine['element_id'] == 'E2'
+    out = VS.set_answer(store, USER, NEW, [], 'E2', 'yes', mine['id'], '')
+    assert out['stored'] is True and out['answer']['golden'] == mine['id']
+    assert not [i for i in view(store, conn)['waiting'] if i['group'] == 'E2']   # a whole answer: it waits for Done only
+    out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': mine['id']}}, 'Mine.', conn=conn, partial=True)
+    s = saved(store)
+    assert out['approved'] == ['E2'] and s['golden']['E2'] == mine['id'] and len(sheets(s, 'E2', 'approved')) == 2   # Done records it as the golden picture
+    lock = pic(store, conn, mine['id'])['locked']
+    assert 'starting picture' in lock and 'can no longer be changed here' in lock
+    with pytest.raises(Problem, match='starting picture'):
+        g(lambda: VS.reject_reference(store, USER, NEW, [], mine['id'], '', ''))
+
+
+def test_the_chat_tools_done_takes_a_stored_answer_with_an_own_picture():
+    store, conn, s = with_sets(doc_with(KILN), person=False)
+    mine = own(store, conn, 'E2')
+    VS.set_answer(store, USER, NEW, [], 'E2', 'yes', mine['id'], '')
+    out = VS.round_sets(store, USER, NEW, [], {}, 'Done.', conn=conn)   # not partial: the stored answer stands
+    assert out['pass'] == 'complete' and saved(store)['golden']['E2'] == mine['id']
+
+
+def test_another_elements_own_picture_is_refused_as_the_starting_picture():
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    other = own(store, conn, 'E1')
+    with pytest.raises(Problem, match='E2: the starting picture chosen is a picture of another element'):
+        g(lambda: VS.set_answer(store, USER, NEW, [], 'E2', 'yes', other['id'], ''))
+    assert saved(store)['round']['elements']['E2'].get('answer') is None
+    with pytest.raises(Problem, match='E2: the starting picture chosen is a picture of another element'):
+        g(lambda: VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': other['id']}}, 'This.', conn=conn, partial=True))
+    assert not sheets(saved(store), 'E2', 'approved')
+
+
+PEOPLE = "A person's reference is made from the description; an uploaded photo is not used for people."
+
+
+def test_an_uploaded_photo_is_not_used_for_a_person_until_the_one_condition_is_switched(monkeypatch):
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    n = len(saved(store)['references'])
+    with pytest.raises(Problem) as e:
+        own(store, conn, 'P1')
+    assert e.value.message == PEOPLE and len(saved(store)['references']) == n
+    monkeypatch.setattr(VS, 'OWN_PICTURE_FOR_PEOPLE', True)   # the one line, switched
+    photo = own(store, conn, 'P1')
+    assert VS.set_answer(store, USER, NEW, [], 'P1', 'yes', photo['id'], '')['answer']['golden'] == photo['id']
+    monkeypatch.setattr(VS, 'OWN_PICTURE_FOR_PEOPLE', False)
+    for call in (lambda: VS.set_answer(store, USER, NEW, [], 'P1', 'yes', photo['id'], ''),
+                 lambda: VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes', 'golden': photo['id']}}, 'This.', conn=conn, partial=True)):
+        with pytest.raises(Problem) as e:
+            g(call)
+        assert e.value.message == PEOPLE
+    out = VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes'}}, 'This.', conn=conn, partial=True)   # as before: the full-length front picture
+    assert out['approved'] == ['P1'] and saved(store)['golden']['P1'] == min(sheets(saved(store), 'P1', 'approved'))
+    monkeypatch.setattr(VS, 'OWN_PICTURE_FOR_PEOPLE', True)
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    photo = own(store, conn, 'P1')
+    VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes', 'golden': photo['id']}}, 'This.', conn=conn, partial=True)
+    assert saved(store)['golden']['P1'] == photo['id']
+
+
+def test_an_upload_that_is_not_a_picture_or_too_large_is_refused_and_nothing_is_saved():
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    n = len(saved(store)['references'])
+    for content, words in ((b'these are words, not a picture', 'not a picture'), (b'\0' * (15 * 1024 * 1024 + 1), 'larger than 15 MB'),
+                           (png_bytes(6001, 4001, (1, 1, 1)), '24 megapixels')):
+        with pytest.raises(Problem) as e:
+            g(lambda: VS.supply_own(conn, store, USER, NEW, [], 'E2', content=content, name='x'))
+        assert words in e.value.message and '`' not in e.value.message
+        assert len(saved(store)['references']) == n   # nothing shown as saved
+
+
+def test_a_second_upload_is_added_and_the_first_stays_and_an_upload_while_the_sets_are_made_is_kept():
+    store, conn = frames_only(doc_with(KILN, MASON)), FakeConn([])
+    VS.round_start(store, USER, NEW, [], STEP1, conn=conn)
+    first = own(store, conn, 'E2', name='one.png')   # at step 1
+    VS.round_done(store, USER, NEW, [], {r['element_id']: {'verdict': 'approve'} for r in STEP1}, 'yes', conn=conn)
+    assert view(store, conn)['round']['pass'] == 'making'
+    second = own(store, conn, 'E2', (200, 9, 9), name='two.png')   # while its set is being made
+    mine = [r for r in view(store, conn)['references'] if r['kind'] == 'supplied' and r['element_id'] == 'E2']
+    assert sorted(r['id'] for r in mine) == sorted([first['id'], second['id']]) and all(r['status'] == 'approved' and r['url'] for r in mine)
+    assert view(store, conn)['round']['pass'] == 'making' and sheets(saved(store), 'E2', 'generating')   # the set being made is untouched
+    back(store)
+    assert VS.set_answer(store, USER, NEW, [], 'E2', 'yes', first['id'], '')['stored'] is True   # either can be chosen at step 2
+
+
+def test_removing_an_own_picture_clears_a_stored_answer_that_chose_it():
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    mine = own(store, conn, 'E2')
+    VS.set_answer(store, USER, NEW, [], 'E2', 'yes', mine['id'], '')
+    VS.reject_reference(store, USER, NEW, [], mine['id'], '', '')
+    assert view(store, conn)['round']['elements']['E2']['answer'] == {'verdict': 'yes', 'golden': None, 'words': ''}
+    assert [i['kind'] for i in view(store, conn)['waiting'] if i['group'] == 'E2'] == ['set to judge']   # it asks for its starting picture again
+    assert g(lambda: VS.reapprove_reference(store, USER, NEW, [], mine['id'], mine['sha256'], '', conn))['status'] == 'approved'

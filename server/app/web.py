@@ -434,6 +434,7 @@ def _visuals_act(code, vw2_session, body):
             'set_make': lambda: V.set_make(conn, store, user, run, outputs, body['element_id']),   # R17: a set that was not made, made now
             'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote, list(body.get('ignore') or [])),   # design/121 change 1
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
+            'reapprove': lambda: V.reapprove_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),   # U17: a rejected picture approved after all, until a later step used it
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote, {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop'), body.get('move')),

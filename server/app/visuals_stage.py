@@ -649,6 +649,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
         first = ((r.get('generation') or {}).get('parents') or [{}])[0].get('id')
         refs[r['id']]['from_golden'] = (first == gold_) if gold_ and r.get('kind') in ('keyframe', 'isolated') and r.get('role') != 'end' and not r.get('golden_candidate') and r['id'] != gold_ else None
         refs[r['id']]['edit'] = r.get('edit')
+        refs[r['id']]['locked'] = verdict_lock(session, r)   # U17
         refs[r['id']]['shot_id'] = made_for(session, r)   # design/94 R1.3: listed only under its own shot
         refs[r['id']].update(url=url(r.get('key')), prompt=(r.get('generation') or {}).get('prompt'), parents=[p.get('id') for p in (r.get('generation') or {}).get('parents') or []],
                              approval={k: (r.get('approval') or {}).get(k) for k in ('by', 'at', 'quote')} if r.get('approval') else None,
@@ -1871,6 +1872,31 @@ def round_undo(store, user, run, outputs, quote):
     return {'pass': to, 'next': f'Done undone: the round is at pass {to} again; nothing already saved was removed.'}
 
 
+OWN_PICTURE_FOR_PEOPLE = False   # U19 (SK, 11 Nov 2026): not ruled yet whether an uploaded photo of a real person may be used; True switches it on (the page's line: OWN_FOR_PEOPLE in visuals.html)
+OWN_PICTURE_MAX = 15 * 1024 * 1024
+
+
+def own_picture_refused(kind):
+    """U19: the one condition. Why an uploaded picture is not taken for an element of this kind, or None."""
+    return "A person's reference is made from the description; an uploaded photo is not used for people." if kind == 'person' and not OWN_PICTURE_FOR_PEOPLE else None
+
+
+def _own_golden(session, element_id, ref_id):
+    """U19: an approved picture of the operator's own for this element: it may be chosen as the starting picture like a picture of the set."""
+    r = session['references'].get(ref_id) or {}
+    return r.get('kind') == 'supplied' and r.get('status') == 'approved' and r.get('element_id') == element_id
+
+
+def _golden_ok(session, kind, element_id, golden, rows):
+    """U19: the starting picture chosen at step 2 is a picture of the set, or the operator's own picture of the same element; refused in plain words for
+    another element's picture and for a person's uploaded photo. False: neither (a set made again since)."""
+    r = session['references'].get(golden) or {}
+    if r.get('kind') == 'supplied':
+        need(r.get('element_id') == element_id, f"{element_id}: the starting picture chosen is a picture of another element; choose one of its own.")
+        need(not own_picture_refused(kind), own_picture_refused(kind))
+    return any(x['id'] == golden for x in rows) or _own_golden(session, element_id, golden)
+
+
 def supply_own(conn, store, user, run, outputs, element_id, content=None, url='', name=''):
     """design/110 rule 0 (Revathi's addition): the operator's own picture from the page, a file or an https link, stored as an approved reference of the element."""
     session = session_of(store, run, outputs)
@@ -1879,8 +1905,17 @@ def supply_own(conn, store, user, run, outputs, element_id, content=None, url=''
     need(element, f'{element_id} is not an element of the plan.')
     url = str(url or '').strip()
     need(content or url.startswith('https://'), 'Give a file or an https link to the picture.')
+    if kept(session):   # U19: the round's upload; an older film keeps design/110 as it was
+        need(not own_picture_refused(element.get('kind')), own_picture_refused(element.get('kind')))
     if not content:
         content = fetch_image(url)
+    need(len(content) <= OWN_PICTURE_MAX, 'The picture is larger than 15 MB: choose a smaller file.')
+    try:
+        image_bytes(content)   # ponytail: decoded once here to refuse in plain words and again in add_reference; one decode if uploads ever get slow
+    except ValueError:
+        raise
+    except Exception:   # not an image at all (Pillow's own errors)
+        need(False, 'That file is not a picture this page can read: use a PNG, JPEG or WebP image.')
     body = {'request_id': str(uuid.uuid4()), 'element_id': element_id, 'name': str(name or '').strip() or f'own-{element_id}', 'kind': 'supplied', 'subject': element['name']}
     row = add_reference(conn, store, user, run, outputs, body, content)
     session = session_of(store, run, outputs)
@@ -2558,7 +2593,8 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no or correct it to make it again.")
             if kinds.get(eid) != 'person':
                 need(v.get('golden'), f'{eid}: tick the golden picture of its set, the one every shot of {eid} starts from.')
-                need(any(x['id'] == v['golden'] for x in rows), f"{eid}: the starting picture chosen is not a picture of its set now (the set was made again since): choose it again.")   # R19: no picture id in a message
+            if v.get('golden') and (kinds.get(eid) != 'person' or (session['references'].get(v['golden']) or {}).get('kind') == 'supplied'):   # U19: or the operator's own picture of this element
+                need(_golden_ok(session, kinds.get(eid), eid, v['golden'], rows), f"{eid}: the starting picture chosen is not a picture of its set now (the set was made again since): choose it again.")   # R19: no picture id in a message
         if v['verdict'] == 'correct':
             need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
@@ -2576,7 +2612,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             for x in rows:
                 x.update(status='approved', approval={**stamp, 'sha256': x.get('sha256')})
                 _feedback_image(session, run, user, x, 'pass', quote, '')
-            session.setdefault('golden', {})[eid] = v['golden'] if kinds.get(eid) != 'person' else min(rows, key=lambda x: int(x.get('set_n') or 1))['id']
+            session.setdefault('golden', {})[eid] = v['golden'] if kinds.get(eid) != 'person' or _own_golden(session, eid, v.get('golden')) else min(rows, key=lambda x: int(x.get('set_n') or 1))['id']
             continue
         words = ' '.join(str(v.get('words') or '').split())
         for x in rows:
@@ -2612,7 +2648,7 @@ def _answered(session, kinds, eid, row):
     """The stored answer when it is a whole one: No; Yes (with the starting picture on a thing); Correct it with its words. Else None."""
     a = _answer_of(row)[0] or {}
     v = a.get('verdict')
-    whole = v == 'no' or (v == 'correct' and a.get('words')) or (v == 'yes' and (kinds.get(eid) == 'person' or any(x['id'] == a.get('golden') for x in _set_rows(session, eid, row.get('set')))))
+    whole = v == 'no' or (v == 'correct' and a.get('words')) or (v == 'yes' and (kinds.get(eid) == 'person' or any(x['id'] == a.get('golden') for x in _set_rows(session, eid, row.get('set'))) or _own_golden(session, eid, a.get('golden'))))
     return a if whole else None
 
 
@@ -2637,9 +2673,10 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
     rows = _set_rows(session, element_id, row.get('set'))
     need(rows, f'{element_id}: its set is approved already; it needs no answer.' if _set_rows(session, element_id, row.get('set'), ('approved',)) else f'{element_id}: its set was not made: there is nothing to answer yet.')
     plan = guarded(lambda: current_plan(store, session))
-    person = any(e['id'] == element_id and e.get('kind') == 'person' for e in plan['elements'])
-    golden = None if person else (golden or None)   # a person's full-length front picture is taken by the server
-    if golden and not any(x['id'] == golden for x in rows):
+    kind = next((e.get('kind') for e in plan['elements'] if e['id'] == element_id), None)
+    supplied = (session['references'].get(golden or '') or {}).get('kind') == 'supplied'   # U19: the operator's own picture
+    golden = (golden or None) if kind != 'person' or supplied else None   # a person's full-length front picture is taken by the server
+    if golden and not _golden_ok(session, kind, element_id, golden, rows):
         row.pop('answer', None)
         save_session(store, run, session)
         return {'element_id': element_id, 'stored': False, 'discarded': True, 'next': f'{element_id}: made again since; judge the new set.'}
@@ -3701,7 +3738,12 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
         save_session(store, run, session)
         return {**row, 'next': _rejected_next(store, session, row)}
     need(row and row['status'] in ('candidate', 'approved'), f"Reference {ref_id} is not a candidate or approved picture (it is {(row or {}).get('status') or 'unknown'}); only those can be rejected.")
+    need(not verdict_lock(session, row), verdict_lock(session, row))   # U17: not once a later step used it
     quote = said(words, 'Rejected', user)   # design/99 C3: the reason is optional
+    if row.get('kind') == 'supplied':   # U19: a stored answer of step 2 that chose it asks for its starting picture again
+        for r in ((session.get('round') or {}).get('elements') or {}).values():
+            if (r.get('answer') or {}).get('golden') == ref_id:
+                r['answer']['golden'] = None
     row.update(status='rejected', rejection={'notes': reason, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()})
     _feedback_image(session, run, user, row, 'reject', quote, row['rejection']['notes'])
     try:   # design/111 F12: the rejection's words join the element's not-this list at once
@@ -3710,6 +3752,76 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
         pass
     save_session(store, run, session)
     return {**row, 'next': _rejected_next(store, session, row)}   # design/97 A4
+
+
+def _slot(session, row):
+    """The place a made picture stands in: its kind, its shot (or its element), and for a start or an end image which of the two; for a state the picture it follows."""
+    parents = [p.get('id') for p in (row.get('generation') or {}).get('parents') or []]
+    part = None
+    if row.get('kind') == 'keyframe':
+        part = 'end' if row.get('role') == 'end' or (not row.get('role') and any((session['references'].get(p) or {}).get('kind') == 'keyframe' for p in parents)) else 'start'
+    elif row.get('kind') == 'state':
+        part = parents[0] if parents else None
+    return row.get('kind'), made_for(session, row) or row.get('element_id'), part
+
+
+def verdict_lock(session, row):
+    """U17 (SK, 11 Nov 2026): a verdict on one picture is changed both ways (approved to rejected, rejected to approved) until a later step has used it.
+    Returns why it can no longer be changed, in the operator's words, or None. Used: a footage picture answered at step 1 of a kept round, once that step is done; an approved
+    picture placed in a shot, or one a sheet was made from, or the operator's own picture recorded as a starting picture; a rejected picture of a set
+    (a set is judged as a whole), a rejected source once the element has a sheet, a rejected made picture while another one stands in its place.
+    Not locked, as before: a start image an end image or a take was made from."""
+    rid, eid, kind, status, refs = row['id'], row.get('element_id'), row.get('kind'), row.get('status'), session['references']
+    if status not in ('approved', 'rejected'):
+        return None
+    here = 'it can no longer be changed here'
+    live = lambda x: x.get('status') not in ('rejected', 'failed')
+    rd = session.get('round') or {}
+    if kind == 'frame' and rd.get('kept') and rd.get('pass') != 1 and rid in (((rd.get('elements') or {}).get(eid) or {}).get('frames') or []):   # answered at step 1; a frame grabbed later is not
+        return f"Step 1 of the reference round is done with this picture {'used' if status == 'approved' else 'ignored'}; {here}."
+    if status == 'approved':
+        shot = next((sid for sid, a in (session.get('assets') or {}).items() if a.get('reference_id') == rid or any(st.get('reference_id') == rid for st in a.get('states') or [])), None)
+        if shot:
+            return f'This picture is placed in shot {shot}; take it out of the shot first.'
+        if any(x.get('kind') == 'sheet' and live(x) and any(p.get('id') == rid for p in (x.get('generation') or {}).get('parents') or []) for x in refs.values()):
+            return f'A sheet was made from this picture; {here}.'
+        if kind == 'supplied' and golden_of(session, eid) == rid:
+            return f'This picture is recorded as the starting picture; {here}.'
+        return None
+    if kind == 'sheet' and row.get('set') and kept(session):
+        return 'This picture was answered with its set on step 2 of the reference round: a set is judged as a whole.'
+    if kind in ('frame', 'web', 'supplied'):
+        if not kept(session) and any(x.get('kind') == 'sheet' and x.get('element_id') == eid and live(x) for x in refs.values()):
+            return f'A sheet was made after this picture was rejected; {here}.'
+        return None
+    if any(x['id'] != rid and live(x) and _slot(session, x) == _slot(session, row) for x in refs.values()):   # ponytail: any live picture of the same place, older or newer (a made picture carries no time); reject that one first
+        return f'Another picture stands in its place now; {here} while that one stands.'
+    return None
+
+
+def reapprove_reference(store, user, run, outputs, ref_id, sha256, quote, conn=None):
+    """U17: a rejected picture approved after all, until a later step used it (verdict_lock). It goes through approve_reference, with every gate of an
+    approval; refused there, it stays rejected as it was. Its earlier rejection is kept as history (`rejections`). The older way, kept: approve_reference
+    itself still refuses a rejected picture (design/74 L7); this function is the only way back."""
+    session = session_of(store, run, outputs)
+    row = session['references'].get(ref_id)
+    need(row and row.get('status') == 'rejected', 'Only a rejected picture is approved again this way.')
+    need(not verdict_lock(session, row), verdict_lock(session, row))
+    row['status'] = 'candidate'
+    save_session(store, run, session)
+    try:
+        out = approve_reference(store, user, run, outputs, ref_id, sha256, quote, conn)
+    except Exception:
+        session = session_of(store, run, outputs)
+        session['references'][ref_id]['status'] = 'rejected'
+        save_session(store, run, session)
+        raise
+    session = session_of(store, run, outputs)
+    r = session['references'][ref_id]
+    if r.get('rejection'):
+        r.setdefault('rejections', []).append(r.pop('rejection'))
+    save_session(store, run, session)
+    return {**out, 'rejection': None}
 
 
 def _rejected_next(store, session, row):
