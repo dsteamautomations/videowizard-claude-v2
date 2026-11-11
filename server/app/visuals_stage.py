@@ -2517,7 +2517,9 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None):
     verdicts = verdicts or {}
     plan = guarded(lambda: current_plan(store, session))
     kinds = {e['id']: e['kind'] for e in plan['elements']}
-    active = [eid for eid, r in rd['elements'].items() if not r.get('ignored') and not r.get('from_footage')]   # a footage element was done at step 1
+    # hotfix 2, 11 Nov 2026 (VW-19): a set approved in an earlier pass is settled; it needs no verdict again (its pictures are approved, no longer candidates)
+    settled = {eid for eid, r in rd['elements'].items() if r.get('verdict') == 'yes' and _set_rows(session, eid, r.get('set'), ('approved',))}
+    active = [eid for eid, r in rd['elements'].items() if not r.get('ignored') and not r.get('from_footage') and eid not in settled]   # a footage element was done at step 1
     for eid in active:
         r, v = rd['elements'][eid], verdicts.get(eid) or {}
         need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
