@@ -1,0 +1,772 @@
+[
+ {
+  "id": "C-3.1-01",
+  "section": "3.1",
+  "row": "1",
+  "control": "Tab links (six)",
+  "test": "test_controls_frame.py::test_tab_links"
+ },
+ {
+  "id": "C-3.1-02",
+  "section": "3.1",
+  "row": "2",
+  "control": "\"N waiting for your verdict\" (opens the waiting list)",
+  "test": "test_controls_frame.py::test_waiting_count_opens_the_list"
+ },
+ {
+  "id": "C-3.1-03",
+  "section": "3.1",
+  "row": "3",
+  "control": "Waiting list links",
+  "test": "test_controls_frame.py::test_waiting_list_link"
+ },
+ {
+  "id": "C-3.1-04",
+  "section": "3.1",
+  "row": "4",
+  "control": "Next waiting",
+  "test": "test_controls_frame.py::test_next_waiting"
+ },
+ {
+  "id": "C-3.1-05",
+  "section": "3.1",
+  "row": "5",
+  "control": "History",
+  "test": "test_controls_frame.py::test_history"
+ },
+ {
+  "id": "C-3.1-06",
+  "section": "3.1",
+  "row": "6",
+  "control": "Rail filter \"All\"",
+  "test": "test_controls_frame.py::test_rail_filter_all"
+ },
+ {
+  "id": "C-3.1-07",
+  "section": "3.1",
+  "row": "7",
+  "control": "Rail filter \"Waiting for me (n)\"",
+  "test": "test_controls_frame.py::test_rail_filter_waiting_for_me"
+ },
+ {
+  "id": "C-3.1-08",
+  "section": "3.1",
+  "row": "8",
+  "control": "Rail filter \"a gap…\"",
+  "test": "test_controls_frame.py::test_rail_filter_by_gap"
+ },
+ {
+  "id": "C-3.1-09",
+  "section": "3.1",
+  "row": "9",
+  "control": "Rail card",
+  "test": "test_controls_frame.py::test_rail_card"
+ },
+ {
+  "id": "C-3.1-10",
+  "section": "3.1",
+  "row": "10",
+  "control": "Grip (drag)",
+  "test": "test_controls_frame.py::test_grip_drag"
+ },
+ {
+  "id": "C-3.1-11",
+  "section": "3.1",
+  "row": "11",
+  "control": "Keys up and down",
+  "test": "test_controls_frame.py::test_keys_up_and_down"
+ },
+ {
+  "id": "C-3.1-12",
+  "section": "3.1",
+  "row": "12",
+  "control": "Key Esc",
+  "test": "test_controls_frame.py::test_key_escape_closes_the_panel"
+ },
+ {
+  "id": "C-3.1-13",
+  "section": "3.1",
+  "row": "13",
+  "control": "Header links, Sign out, Theme",
+  "test": "test_controls_frame.py::test_header_links_sign_out_theme"
+ },
+ {
+  "id": "C-3.1-14",
+  "section": "3.1",
+  "row": "14",
+  "control": "Docked video player",
+  "test": "test_controls_frame.py::test_docked_player"
+ },
+ {
+  "id": "C-3.2-15",
+  "section": "3.2",
+  "row": "15",
+  "control": "Panel: close",
+  "test": "test_controls_frame.py::test_panel_close"
+ },
+ {
+  "id": "C-3.2-16",
+  "section": "3.2",
+  "row": "16",
+  "control": "Panel: large picture (opens the viewer)",
+  "test": "test_controls_frame.py::test_large_picture_opens_the_viewer"
+ },
+ {
+  "id": "C-3.2-17",
+  "section": "3.2",
+  "row": "17",
+  "control": "Panel: version tabs",
+  "test": "test_controls_frame.py::test_version_tabs"
+ },
+ {
+  "id": "C-3.2-18",
+  "section": "3.2",
+  "row": "18",
+  "control": "Panel: take tabs",
+  "test": "test_controls_frame.py::test_take_tabs"
+ },
+ {
+  "id": "C-3.2-19",
+  "section": "3.2",
+  "row": "19",
+  "control": "Panel: Approve",
+  "test": "test_controls_frame.py::test_approve"
+ },
+ {
+  "id": "C-3.2-20",
+  "section": "3.2",
+  "row": "20",
+  "control": "Panel: Reject",
+  "test": "test_controls_frame.py::test_reject"
+ },
+ {
+  "id": "C-3.2-21",
+  "section": "3.2",
+  "row": "21",
+  "control": "Panel: Use for the shot",
+  "test": "test_controls_frame.py::test_use_for_the_shot"
+ },
+ {
+  "id": "C-3.2-22",
+  "section": "3.2",
+  "row": "22",
+  "control": "Panel: Remove",
+  "test": "test_controls_frame.py::test_remove"
+ },
+ {
+  "id": "C-3.2-23",
+  "section": "3.2",
+  "row": "23",
+  "control": "Panel: Approve the sequence",
+  "test": "test_controls_frame.py::test_approve_the_sequence"
+ },
+ {
+  "id": "C-3.2-24",
+  "section": "3.2",
+  "row": "24",
+  "control": "Panel: Try a fix",
+  "test": "test_controls_frame.py::test_try_a_fix"
+ },
+ {
+  "id": "C-3.2-25",
+  "section": "3.2",
+  "row": "25",
+  "control": "Panel: note box and Save the note",
+  "test": "test_controls_frame.py::test_note_and_save_the_note"
+ },
+ {
+  "id": "C-3.2-26",
+  "section": "3.2",
+  "row": "26",
+  "control": "Panel: reason chips",
+  "test": "test_controls_frame.py::test_reason_chips"
+ },
+ {
+  "id": "C-3.2-27",
+  "section": "3.2",
+  "row": "27",
+  "control": "Panel: reason text",
+  "test": "test_controls_frame.py::test_reason_text"
+ },
+ {
+  "id": "C-3.2-28",
+  "section": "3.2",
+  "row": "28",
+  "control": "Panel: Save the reason",
+  "test": "test_controls_frame.py::test_save_the_reason"
+ },
+ {
+  "id": "C-3.2-29",
+  "section": "3.2",
+  "row": "29",
+  "control": "Panel: Skip",
+  "test": "test_controls_frame.py::test_skip_the_reason"
+ },
+ {
+  "id": "C-3.2-30",
+  "section": "3.2",
+  "row": "30",
+  "control": "Panel: question answers",
+  "test": "test_controls_frame.py::test_question_answers_in_the_panel"
+ },
+ {
+  "id": "C-3.2-31",
+  "section": "3.2",
+  "row": "31",
+  "control": "Panel: Select (take)",
+  "test": "test_controls_frame.py::test_select_a_take"
+ },
+ {
+  "id": "C-3.2-32",
+  "section": "3.2",
+  "row": "32",
+  "control": "Panel: Reject (take)",
+  "test": "test_controls_frame.py::test_reject_a_take"
+ },
+ {
+  "id": "C-3.2-33",
+  "section": "3.2",
+  "row": "33",
+  "control": "Panel: take video",
+  "test": "test_controls_frame.py::test_take_video"
+ },
+ {
+  "id": "C-3.2-34",
+  "section": "3.2",
+  "row": "34",
+  "control": "Panel: folds",
+  "test": "test_controls_frame.py::test_panel_folds"
+ },
+ {
+  "id": "C-3.2-35",
+  "section": "3.2",
+  "row": "35",
+  "control": "Panel: Previous / Next",
+  "test": "test_controls_frame.py::test_previous_and_next"
+ },
+ {
+  "id": "C-3.2-36",
+  "section": "3.2",
+  "row": "36",
+  "control": "Panel: Tick as Image n / Untick",
+  "test": "test_controls_frame.py::test_tick_as_image"
+ },
+ {
+  "id": "C-3.2-37",
+  "section": "3.2",
+  "row": "37",
+  "control": "Panel: picture note",
+  "test": "test_controls_frame.py::test_picture_note"
+ },
+ {
+  "id": "C-3.2-38",
+  "section": "3.2",
+  "row": "38",
+  "control": "Panel: note chips",
+  "test": "test_controls_frame.py::test_note_chips"
+ },
+ {
+  "id": "C-3.2-39",
+  "section": "3.2",
+  "row": "39",
+  "control": "Panel: Save (a search result)",
+  "test": "test_controls_frame.py::test_save_a_result"
+ },
+ {
+  "id": "C-3.2-40",
+  "section": "3.2",
+  "row": "40",
+  "control": "Panel: \"source\" link",
+  "test": "test_controls_frame.py::test_source_link"
+ },
+ {
+  "id": "C-3.2-41",
+  "section": "3.2",
+  "row": "41",
+  "control": "Panel: search result large picture",
+  "test": "test_controls_frame.py::test_search_result_large_picture"
+ },
+ {
+  "id": "C-3.2-42",
+  "section": "3.2",
+  "row": "42",
+  "control": "Own picture: file, link, Add your own picture",
+  "test": "test_controls_frame.py::test_add_your_own_picture"
+ },
+ {
+  "id": "C-3.2-43",
+  "section": "3.2",
+  "row": "43",
+  "control": "Viewer: previous, next, zoom out, zoom in, Close",
+  "test": "test_controls_frame.py::test_viewer_buttons"
+ },
+ {
+  "id": "C-3.2-44",
+  "section": "3.2",
+  "row": "44",
+  "control": "Viewer: wheel zoom, drag to pan",
+  "test": "test_controls_frame.py::test_viewer_wheel_and_drag"
+ },
+ {
+  "id": "C-3.2-45",
+  "section": "3.2",
+  "row": "45",
+  "control": "Viewer: keys Esc, left, right, +, -",
+  "test": "test_controls_frame.py::test_viewer_keys"
+ },
+ {
+  "id": "C-3.2-46",
+  "section": "3.2",
+  "row": "46",
+  "control": "The panel's buttons inside the viewer",
+  "test": "test_controls_frame.py::test_panel_buttons_inside_the_viewer"
+ },
+ {
+  "id": "C-3.2-47",
+  "section": "3.2",
+  "row": "47",
+  "control": "Keys left and right over search results",
+  "test": "test_controls_frame.py::test_keys_left_and_right_over_results"
+ },
+ {
+  "id": "C-3.3-48",
+  "section": "3.3",
+  "row": "48",
+  "control": "Treatment: Correct this",
+  "test": "test_controls_steps.py::test_correct_this"
+ },
+ {
+  "id": "C-3.3-49",
+  "section": "3.3",
+  "row": "49",
+  "control": "Treatment: camera, support, look, words, Save the correction",
+  "test": "test_controls_steps.py::test_save_the_footage_correction"
+ },
+ {
+  "id": "C-3.3-50",
+  "section": "3.3",
+  "row": "50",
+  "control": "Treatment: Accept (a line)",
+  "test": "test_controls_steps.py::test_accept_a_line"
+ },
+ {
+  "id": "C-3.3-51",
+  "section": "3.3",
+  "row": "51",
+  "control": "Treatment: Send back and its text",
+  "test": "test_controls_steps.py::test_send_back_a_line"
+ },
+ {
+  "id": "C-3.3-52",
+  "section": "3.3",
+  "row": "52",
+  "control": "Treatment: words box and Approve the treatment",
+  "test": "test_controls_steps.py::test_approve_the_treatment"
+ },
+ {
+  "id": "C-3.4-53",
+  "section": "3.4",
+  "row": "53",
+  "control": "Plan: gap tick box",
+  "test": "test_controls_steps.py::test_gap_tick_box"
+ },
+ {
+  "id": "C-3.4-54",
+  "section": "3.4",
+  "row": "54",
+  "control": "Plan: choice buttons",
+  "test": "test_controls_steps.py::test_choice_buttons"
+ },
+ {
+  "id": "C-3.4-55",
+  "section": "3.4",
+  "row": "55",
+  "control": "Plan: \"N shots\" fold",
+  "test": "test_controls_steps.py::test_shots_fold"
+ },
+ {
+  "id": "C-3.4-56",
+  "section": "3.4",
+  "row": "56",
+  "control": "Plan: words box and Accept",
+  "test": "test_controls_steps.py::test_accept_the_ticked_gaps"
+ },
+ {
+  "id": "C-3.4-57",
+  "section": "3.4",
+  "row": "57",
+  "control": "Plan: Revise",
+  "test": "test_controls_steps.py::test_revise_the_ticked_gaps"
+ },
+ {
+  "id": "C-3.5-58",
+  "section": "3.5",
+  "row": "58",
+  "control": "Kept round, step 1: radios (use the footage picture / make its pictures, Ignore this)",
+  "test": "test_controls_references.py::test_step1_radios"
+ },
+ {
+  "id": "C-3.5-59",
+  "section": "3.5",
+  "row": "59",
+  "control": "Kept round, step 1: footage thumbnail",
+  "test": "test_controls_references.py::test_footage_thumbnail"
+ },
+ {
+  "id": "C-3.5-60",
+  "section": "3.5",
+  "row": "60",
+  "control": "Kept round, step 1: Done, then Back / Finish",
+  "test": "test_controls_references.py::test_step1_done"
+ },
+ {
+  "id": "C-3.5-61",
+  "section": "3.5",
+  "row": "61",
+  "control": "Kept round, sets being made: no control, the page reloads itself",
+  "test": "test_controls_references.py::test_making_has_no_control"
+ },
+ {
+  "id": "C-3.5-62",
+  "section": "3.5",
+  "row": "62",
+  "control": "Kept round, step 2: golden tick",
+  "test": "test_controls_references.py::test_golden_tick"
+ },
+ {
+  "id": "C-3.5-63",
+  "section": "3.5",
+  "row": "63",
+  "control": "Kept round, step 2: set thumbnail",
+  "test": "test_controls_references.py::test_set_thumbnail"
+ },
+ {
+  "id": "C-3.5-64",
+  "section": "3.5",
+  "row": "64",
+  "control": "Kept round, step 2: radios Yes / No / Correct it",
+  "test": "test_controls_references.py::test_yes_no_correct_radios"
+ },
+ {
+  "id": "C-3.5-65",
+  "section": "3.5",
+  "row": "65",
+  "control": "Kept round, step 2: correction words",
+  "test": "test_controls_references.py::test_correction_words"
+ },
+ {
+  "id": "C-3.5-66",
+  "section": "3.5",
+  "row": "66",
+  "control": "Kept round, step 2: the model's notes and sources fold",
+  "test": "test_controls_references.py::test_notes_and_sources_fold"
+ },
+ {
+  "id": "C-3.5-67",
+  "section": "3.5",
+  "row": "67",
+  "control": "Kept round: \"from your footage\" thumbnail (main only)",
+  "test": "test_controls_references.py::test_from_your_footage_card"
+ },
+ {
+  "id": "C-3.5-68",
+  "section": "3.5",
+  "row": "68",
+  "control": "Kept round, step 2: words box and Done",
+  "test": "test_controls_references.py::test_step2_done"
+ },
+ {
+  "id": "C-3.6-69",
+  "section": "3.6",
+  "row": "69",
+  "control": "Older round, pass 1: radios",
+  "test": "test_controls_references.py::test_older_pass1_radios"
+ },
+ {
+  "id": "C-3.6-70",
+  "section": "3.6",
+  "row": "70",
+  "control": "Older round: search words, stock site, Search",
+  "test": "test_controls_references.py::test_older_search"
+ },
+ {
+  "id": "C-3.6-71",
+  "section": "3.6",
+  "row": "71",
+  "control": "Older round: result tick",
+  "test": "test_controls_references.py::test_result_tick"
+ },
+ {
+  "id": "C-3.6-72",
+  "section": "3.6",
+  "row": "72",
+  "control": "Older round: result thumbnail",
+  "test": "test_controls_references.py::test_result_thumbnail"
+ },
+ {
+  "id": "C-3.6-73",
+  "section": "3.6",
+  "row": "73",
+  "control": "Older round: note under a ticked result",
+  "test": "test_controls_references.py::test_note_under_a_ticked_result"
+ },
+ {
+  "id": "C-3.6-74",
+  "section": "3.6",
+  "row": "74",
+  "control": "Older round: Add your own picture (opens the box)",
+  "test": "test_controls_references.py::test_add_your_own_picture_opens_the_box"
+ },
+ {
+  "id": "C-3.6-75",
+  "section": "3.6",
+  "row": "75",
+  "control": "Older round, pass 2: Ignore this / Undo Ignore",
+  "test": "test_controls_references.py::test_ignore_and_undo_ignore"
+ },
+ {
+  "id": "C-3.6-76",
+  "section": "3.6",
+  "row": "76",
+  "control": "Older round, pass 2: tick chips and their x",
+  "test": "test_controls_references.py::test_tick_chips"
+ },
+ {
+  "id": "C-3.6-77",
+  "section": "3.6",
+  "row": "77",
+  "control": "Older round, pass 2: words box and Done, then Back / Finish",
+  "test": "test_controls_references.py::test_older_pass2_done"
+ },
+ {
+  "id": "C-3.6-78",
+  "section": "3.6",
+  "row": "78",
+  "control": "Older round, pass 2: Undo Done (back to pass 1)",
+  "test": "test_controls_references.py::test_undo_done_back_to_pass1"
+ },
+ {
+  "id": "C-3.7-79a",
+  "section": "3.7",
+  "row": "79a",
+  "control": "No round: element list (hidden by CSS)",
+  "test": "test_controls_references.py::test_element_list_is_hidden"
+ },
+ {
+  "id": "C-3.7-80",
+  "section": "3.7",
+  "row": "80",
+  "control": "No round: Undo Done (reopen pass 2)",
+  "test": "test_controls_references.py::test_undo_done_reopen"
+ },
+ {
+  "id": "C-3.7-81",
+  "section": "3.7",
+  "row": "81",
+  "control": "No round: Approve the material spec",
+  "test": "test_controls_references.py::test_approve_the_material_spec"
+ },
+ {
+  "id": "C-3.7-82",
+  "section": "3.7",
+  "row": "82",
+  "control": "No round: correction text and Send the correction",
+  "test": "test_controls_references.py::test_correct_the_material_spec"
+ },
+ {
+  "id": "C-3.7-83",
+  "section": "3.7",
+  "row": "83",
+  "control": "No round: thumbnails",
+  "test": "test_controls_references.py::test_element_view_thumbnails"
+ },
+ {
+  "id": "C-3.7-84",
+  "section": "3.7",
+  "row": "84",
+  "control": "No round: search words, stock site, Search / Search again",
+  "test": "test_controls_references.py::test_element_view_search"
+ },
+ {
+  "id": "C-3.7-85",
+  "section": "3.7",
+  "row": "85",
+  "control": "No round: folds",
+  "test": "test_controls_references.py::test_element_view_folds"
+ },
+ {
+  "id": "C-3.7-86",
+  "section": "3.7",
+  "row": "86",
+  "control": "No round: Save N pictures",
+  "test": "test_controls_references.py::test_save_n_pictures"
+ },
+ {
+  "id": "C-3.7-87",
+  "section": "3.7",
+  "row": "87",
+  "control": "No round: Clear",
+  "test": "test_controls_references.py::test_clear_the_ticks"
+ },
+ {
+  "id": "C-3.7-88",
+  "section": "3.7",
+  "row": "88",
+  "control": "No round: Nothing fits",
+  "test": "test_controls_references.py::test_nothing_fits"
+ },
+ {
+  "id": "C-3.8-89",
+  "section": "3.8",
+  "row": "89",
+  "control": "Pictures: gap filter buttons (hidden by CSS)",
+  "test": "test_controls_steps.py::test_gap_filter_buttons_are_hidden"
+ },
+ {
+  "id": "C-3.8-90",
+  "section": "3.8",
+  "row": "90",
+  "control": "Pictures: Approve all specs",
+  "test": "test_controls_steps.py::test_approve_all_specs"
+ },
+ {
+  "id": "C-3.8-91",
+  "section": "3.8",
+  "row": "91",
+  "control": "Pictures: thumbnails",
+  "test": "test_controls_steps.py::test_picture_thumbnails"
+ },
+ {
+  "id": "C-3.8-92",
+  "section": "3.8",
+  "row": "92",
+  "control": "Pictures: Remove (a clip)",
+  "test": "test_controls_steps.py::test_remove_a_clip"
+ },
+ {
+  "id": "C-3.8-93",
+  "section": "3.8",
+  "row": "93",
+  "control": "Pictures: loose picture, Reject / Use for the shot",
+  "test": "test_controls_steps.py::test_loose_picture"
+ },
+ {
+  "id": "C-3.8-94",
+  "section": "3.8",
+  "row": "94",
+  "control": "Pictures: folds",
+  "test": "test_controls_steps.py::test_picture_folds"
+ },
+ {
+  "id": "C-3.8-95",
+  "section": "3.8",
+  "row": "95",
+  "control": "Pictures: Approve the spec",
+  "test": "test_controls_steps.py::test_approve_the_spec"
+ },
+ {
+  "id": "C-3.8-96",
+  "section": "3.8",
+  "row": "96",
+  "control": "Pictures: correction text and Send the correction",
+  "test": "test_controls_steps.py::test_correct_the_spec"
+ },
+ {
+  "id": "C-3.8-97",
+  "section": "3.8",
+  "row": "97",
+  "control": "Pictures: frames list, question, Measure",
+  "test": "test_controls_steps.py::test_measure"
+ },
+ {
+  "id": "C-3.8-98",
+  "section": "3.8",
+  "row": "98",
+  "control": "Pictures: clip, from second, reuse fields, words, Use this stretch",
+  "test": "test_controls_steps.py::test_use_a_stretch_of_a_clip"
+ },
+ {
+  "id": "C-3.8-99",
+  "section": "3.8",
+  "row": "99",
+  "control": "Pictures: reuse words and Approve the reuse",
+  "test": "test_controls_steps.py::test_approve_the_reuse"
+ },
+ {
+  "id": "C-3.8-100",
+  "section": "3.8",
+  "row": "100",
+  "control": "Pictures: question answers on the card",
+  "test": "test_controls_steps.py::test_question_answers_on_the_card"
+ },
+ {
+  "id": "C-3.9-101",
+  "section": "3.9",
+  "row": "101",
+  "control": "Takes: start / end image thumbnails, \"N earlier pictures\" fold",
+  "test": "test_controls_steps.py::test_start_image_thumbnails_and_earlier_pictures"
+ },
+ {
+  "id": "C-3.9-102",
+  "section": "3.9",
+  "row": "102",
+  "control": "Takes: take row",
+  "test": "test_controls_steps.py::test_take_row"
+ },
+ {
+  "id": "C-3.9-103",
+  "section": "3.9",
+  "row": "103",
+  "control": "Takes: Play",
+  "test": "test_controls_steps.py::test_play"
+ },
+ {
+  "id": "C-3.9-104",
+  "section": "3.9",
+  "row": "104",
+  "control": "Takes: spec, clip, reuse and question controls",
+  "test": "test_controls_steps.py::test_spec_clip_reuse_and_question_on_a_take_card"
+ },
+ {
+  "id": "C-3.10-105",
+  "section": "3.10",
+  "row": "105",
+  "control": "Record: words box and Record N gaps",
+  "test": "test_controls_steps.py::test_record_the_gaps"
+ },
+ {
+  "id": "C-3.11-106",
+  "section": "3.11",
+  "row": "106",
+  "control": "Automatic: timer (15 s while something is made, else 60 s)",
+  "test": "test_controls_frame.py::test_timer"
+ },
+ {
+  "id": "C-3.11-107",
+  "section": "3.11",
+  "row": "107",
+  "control": "Automatic: return to the browser tab",
+  "test": "test_controls_frame.py::test_return_to_the_browser_tab"
+ },
+ {
+  "id": "C-3.11-108",
+  "section": "3.11",
+  "row": "108",
+  "control": "Automatic: hash change",
+  "test": "test_controls_frame.py::test_hash_change"
+ },
+ {
+  "id": "C-3.11-109",
+  "section": "3.11",
+  "row": "109",
+  "control": "Automatic: leaving the page with unsaved search ticks",
+  "test": "test_controls_frame.py::test_leaving_with_unsaved_ticks"
+ },
+ {
+  "id": "C-3.11-110",
+  "section": "3.11",
+  "row": "110",
+  "control": "Automatic: 401 from the data",
+  "test": "test_controls_frame.py::test_lapsed_sign_in"
+ }
+]
