@@ -195,6 +195,12 @@ main:has(> .v2.ux1){flex:1;min-height:0;max-width:none;width:100%;box-sizing:bor
 .v2 #done-confirm{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:8;width:min(560px,90vw);background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:17px}
 .v2 #done-confirm[hidden]{display:none}
 .v2.ux1 .rcard .badge{white-space:normal}
+/* Round 3, 11 Nov 2026 (reference-page-ui-issues.md U17 to U19): the pressed button shows it is working and a refusal is said beside it (U18); the line where a verdict can no longer be changed (U17); the operator's own picture on a card (U19) */
+.v2 button.busy::after{content:' …'}
+.v2 .near{font-size:15px;margin:4px 0;color:var(--err);flex-basis:100%}
+.v2 #action .near{display:inline-block;margin:0 0 0 10px;max-width:520px;vertical-align:middle;white-space:normal}
+.v2 .lockd{font-size:15px;color:var(--muted);margin:4px 6px}
+.v2 .own{margin-top:8px}
 </style>
 <div class="v2 ux1" id="app" data-code="{{ run.code }}">
 <div class="top">
@@ -240,6 +246,8 @@ const searching={}, ignoredEls={};   // design/121: the things whose search is r
 // UI change, 11 Nov 2026 (R13, R14): the answers of step 2, held here and stored on the server at every change; set: the set the answer was made on; state: typing, saving, saved or failed
 const ans={}, stale={}, notRec={}, v1={};   // stale: a stored answer discarded because its set was made again; notRec: the card a refused Done names; v1: step 1's Ignore this, kept across a redraw (E13)
 let saveChain=Promise.resolve(), confirmSets=false, doneBusy=false, sending='', clearWords=false, lastErr='';
+let pressed=null;   // U18: the button whose action is running or was last refused: {el, sel: the same button after a redraw, err: [text, kind], live: its click is still being handled}
+const OWN_FOR_PEOPLE=false, OWN_MAX=15*1024*1024;   // U19: an uploaded photo of a real person is not used until SK rules on it: true switches it on (the server's line: OWN_PICTURE_FOR_PEOPLE in visuals_stage.py)
 const VW={yes:'Yes',no:'No',correct:'Correct it'}, SHORT={'material spec to approve':'spec to approve','drawing spec to approve':'spec to approve'};
 const FAILED='That could not be done; nothing was changed. The builder has been told what failed.';   // follow-up fix 9: never a bare key name or an exception's text
 const rx=s=>s.replace(/[^\w-]/g,'\\$&');
@@ -260,16 +268,23 @@ function msg(t,err,busy,kind){const f=$('fmsg');t=plain(t);if(kind!=='dec')msgAt
 function needWords(id,text){const e=$(id);if(e){e.classList.add('need-words');e.focus();e.addEventListener('input',()=>e.classList.remove('need-words'),{once:true});}msg(text||'Your words are required: type them in the box at the foot first.',true);}   // design/74 L31
 async function act(body){
   if(inflight){throw new Error('Still recording the last action; try again in a moment.');}
-  inflight=true;
+  inflight=true;const pb=pressed&&pressed.live&&pressed.el.isConnected?pressed.el:null;if(pb){pb.disabled=true;pb.classList.add('busy');}   // U18: the button pressed shows it is working
   try{let r;try{r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
     catch(e){const x=new Error('The server could not be reached: nothing was recorded. Check the connection and try again.');x.net=true;throw x;}   // R24: not a refusal
     let j=null;try{j=await r.json();}catch(e){j=null;}
     if(!r.ok){throw new Error((j&&j.message)||('The server answered '+r.status+'.'));}return j;}
-  finally{inflight=false;}
+  finally{inflight=false;if(pb){pb.disabled=false;pb.classList.remove('busy');}}
 }
-async function send(body,okText,onOk){msg('Recording…',false,true);lastErr='';try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}if(onOk)onOk(j);if(body.quote||body.reason)clearWords=true;msg((j&&j.next)||(typeof okText==='function'?okText(j):okText)||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}
+function unpress(){pressed=null;document.querySelectorAll('#app .near').forEach(e=>e.remove());}
+function showNear(){   // U18: a refusal or a failure is said beside the button that was pressed (the same button after a redraw), until the next action or a redraw of its card
+  document.querySelectorAll('#app .near,#app .saving').forEach(e=>e.remove());if(!pressed||!pressed.err)return;
+  const b=pressed.el.isConnected?pressed.el:document.querySelector('#app '+pressed.sel);if(!b)return;
+  (b.closest('.btns,.search')||b).insertAdjacentHTML('afterend','<div class="near '+pressed.err[1]+'" role="alert">'+esc(plain(pressed.err[0]))+'</div>');}
+function nearErr(t,kind){if(pressed&&pressed.live)pressed.err=[t,kind||'err'];showNear();}
+function refuse(t){msg(t,true);nearErr(t);}   // a refusal the page itself can tell, before anything is sent
+async function send(body,okText,onOk){if(pressed&&!pressed.live)unpress();msg('Recording…',false,true);lastErr='';try{const j=await act(body);if(view){view=null;$('viewer').hidden=true;}if(onOk)onOk(j);if(body.quote||body.reason)clearWords=true;msg((j&&j.next)||(typeof okText==='function'?okText(j):okText)||'Recorded.');if(j&&j.view){data=j.view;render();}else{await load();}return j;}
   catch(err){if(err instanceof TypeError||err instanceof ReferenceError||err instanceof RangeError){pageError();return null;}   // a script error, never its text
-    lastErr=err.net?'':err.message;msg(err.message,true,false,err.net?'net':undefined);highlightNamed(err.message,document);return null;}}
+    lastErr=err.net?'':err.message;msg(err.message,true,false,err.net?'net':undefined);highlightNamed(err.message,document);nearErr(err.message,err.net?'net':'err');return null;}}
 // ---------- R13: one answer of step 2, stored as it is made ----------
 function setKey(r){return String(r.round||0)+':'+(((r.set||[])[0])||'');}
 function setPics(r){const by=refsById();return ((r&&r.set)||[]).map(i=>by[i]).filter(x=>x&&x.status!=='rejected');}
@@ -291,7 +306,7 @@ function syncAnswers(){   // the server's stored answer wins, except over one be
     if(sv&&!(a&&a.state!=='saved'))ans[eid]={verdict:sv.verdict||'',golden:sv.golden||'',words:sv.words||'',set:key,state:'saved'};});}
 function storeAnswer(eid){   // sent whole at every change, one after the other, so the later answer is the stored one
   const a=ans[eid];if(!a)return;a.state='saving';delete stale[eid];delete notRec[eid];confirmSets=false;
-  const person=((data.elements||[]).find(e=>e.id===eid)||{}).kind==='person';
+  const person=((data.elements||[]).find(e=>e.id===eid)||{}).kind==='person'&&!ownPics(eid).some(x=>x.id===a.golden);   // U19: a person's set takes its first picture; an own picture, where allowed, is sent
   const body={action:'set_answer',element_id:eid,verdict:a.verdict||null,golden:(a.verdict==='no'||person)?null:(a.golden||null),words:String(a.words||'').trim()};
   saveChain=saveChain.then(async()=>{let ok=false,j=null,why='';
     try{const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});try{j=await r.json();}catch(e){j=null;}
@@ -356,7 +371,8 @@ function autoStep(){const d=data;if(!d||d.state!=='prepared')return 'treatment';
 function unsavedTicks(){return Object.values(picks).reduce((k,l)=>k+((l||[]).length),0);}   // design/99 C5
 window.addEventListener('beforeunload',ev=>{if(unsavedTicks()){ev.preventDefault();ev.returnValue='';}});
 document.addEventListener('click',ev=>{const c=ev.target.closest('[data-rchip]');if(!c)return;const w=$('rwhy');if(w)w.value=(w.value?w.value+'; ':'')+c.dataset.rchip;});   // design/99 C3: a chip adds to the reason
-function go(s){if(step==='references'&&s!=='references'&&unsavedTicks()&&!confirm(unsavedTicks()+' ticked pictures are not saved. Leave anyway?'))return;confirmSets=false;clearWords=true;step=s;confirmPicks=false;remember('step',s);render();window.scrollTo(0,0);}   // review 27 Oct: Done is asked again after a step change
+function go(s){if(step==='references'&&s!=='references'&&unsavedTicks()&&!confirm(unsavedTicks()+' ticked pictures are not saved. Leave anyway?'))return;confirmSets=false;clearWords=true;if(s!==step){step=s;rejOpen=null;selPic=selUnit[s]?defaultPic(selUnit[s]):null;}step=s;confirmPicks=false;remember('step',s);render();setHash(chosenUnit());window.scrollTo(0,0);}   // U14: the panel never shows another tab's picture; the address names the tab shown
+function setHash(u,item){try{history.replaceState(null,'',location.pathname+location.search+'#'+step+(u?'/'+encodeURIComponent(u)+(item?'/'+encodeURIComponent(item):''):''));}catch(e){}}   // review 27 Oct: Done is asked again after a step change
 // ---------- frame ----------
 function frame(){
   const d=data;
@@ -565,7 +581,18 @@ function noteBox(r){   // design/106 N4: a saved picture's note, editable until 
   if(!['web','frame','supplied','isolated'].includes(r.kind)||r.status==='rejected'||stage()!=='visuals')return '';
   if((data.references||[]).some(x=>x.kind==='sheet'&&x.element_id===r.element_id&&x.status!=='rejected'))return r.note?'<div class="ds">Note: '+esc(r.note)+'</div>':'';
   return '<textarea id="ref-note" class="pnote keep" placeholder="note for the sheet: keep … / avoid …">'+esc(r.note||'')+'</textarea><div class="btns"><button data-a="save-note" data-ref="'+esc(r.id)+'">Save the note</button></div>';}
-function supplyBox(eid){return '<div class="search"><input type="file" id="up-'+esc(eid)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(eid)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(eid)+'">Add your own picture</button></div>';}   // design/110; design/126 U6: also in the round's panel
+function supplyBox(eid,label){return '<div class="search"><input type="file" id="up-'+esc(eid)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(eid)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(eid)+'">'+(label||'Add your own picture')+'</button></div>';}
+function ownAllowed(e){return e.kind!=='person'||OWN_FOR_PEOPLE;}   // U19: the one condition on the page: things and places only for now
+function ownPics(eid){return (data.references||[]).filter(r=>r.kind==='supplied'&&r.element_id===eid&&r.url&&(r.status==='approved'||r.status==='rejected'));}
+function goldBtn(eid,rid,gold){return '<button class="gold'+(gold?' on':'')+'" data-golden="'+esc(eid)+':'+esc(rid)+'" aria-pressed="'+(gold?'true':'false')+'" title="the golden picture: the one every shot of this thing starts from">Use this as the starting picture</button>';}   // R2
+function minePic(x,eid,gold,pick){   // U19: one picture of the operator's own on a card, labelled; chosen as the starting picture like a picture of the set; removed and used again (U17)
+  return '<div class="pic '+(isSel('ref',x.id)?'sel':'')+(gold?' on':'')+(x.status==='rejected'?' off':'')+'" data-item="'+esc(x.id)+'" data-own-pic="'+esc(eid)+'">'+thumb(x)+'<div class="cap">your picture'+(gold&&!pick?' · the starting picture':'')+'</div><div class="pst '+(x.status==='approved'?'ok':'')+'">'+pstate(x)+'</div>'+
+    (pick&&x.status==='approved'?goldBtn(eid,x.id,gold):'')+'<div class="btns" style="margin:0 6px 6px">'+verdictBtns(x,{plain:true,approve:'Use it again',reject:'Remove'})+'</div></div>';}
+function ownBox(e,can){   // U19: "Upload my own picture" on the card of a thing or a place: a file or an https link
+  if(!can)return '';
+  return ownAllowed(e)?'<div class="own" data-own="'+esc(e.id)+'">'+supplyBox(e.id,'Upload my own picture')+'<div class="ds">Your own picture of it, when none of these fits: a PNG, JPEG or WebP file up to 15 MB, or a link.</div></div>'
+    :'<div class="ds own" data-own-no="'+esc(e.id)+'">A person\'s reference is made from the description; an uploaded photo is not used for people.</div>';}
+function ownBlock(e,can){const m=ownAllowed(e)?ownPics(e.id):[];return (m.length?'<div class="strip">'+m.map(x=>minePic(x,e.id,false,false)).join('')+'</div>':'')+ownBox(e,can);}   // step 1: shown and kept for step 2   // design/110; design/126 U6: also in the round's panel
 function usedIn(eid){   // design/126 U7: each plan shot that shows the thing, with the narration words under it (film frames, as the gap's timing) and its one-line purpose
   const out=[];(data.gaps||[]).forEach(g=>(g.shots||[]).forEach(s=>{if(!(s.element_ids||[]).includes(eid))return;
     const w=((g.timing&&g.timing.words)||[]).filter(x=>x.start_frame>=s.start_frame&&x.start_frame<s.end_frame).map(x=>x.text).join(' ');
@@ -587,15 +614,19 @@ function reasonBox(kind,id){return '<div class="rsn act"><div class="ds"><b>What
   '<input id="rwhy" class="pnote" placeholder="a short note"><div class="btns"><button class="go" data-a="'+kind+'-why" data-id="'+esc(id)+'">Save the reason</button><button data-a="reason-skip">Skip</button></div></div>';}   // design/99 C3
 function fixBtn(r){return stage()==='visuals'&&r.status==='candidate'&&!r.fix_of&&!r.fix_queued&&r.check&&(r.check.must_failed||[]).length?'<div class="btns" style="margin:0 6px 6px"><button data-a="fix" data-ref="'+esc(r.id)+'">Try a fix (₹'+esc(fixPrice())+')</button></div>':'';}
 function highlightNamed(text,root){(root||document).querySelectorAll('.pic[data-name]').forEach(p=>{if(p.dataset.name&&String(text||'').includes('('+p.dataset.name+')'))p.classList.add('hl');});}   // design/97 L4
-function savingCard(id){const c=document.querySelector('[data-item="'+id+'"] .cap');if(c)c.insertAdjacentHTML('beforebegin','<span class="badge" style="margin:4px 6px 0">'+'saving…'+'</span>');}   // design/99 C7
+function savingCard(id){const c=document.querySelector('[data-item="'+id+'"] .cap');if(c)c.insertAdjacentHTML('beforebegin','<span class="badge saving" style="margin:4px 6px 0">'+'saving…'+'</span>');}   // design/99 C7
+function verdictBtns(r,o){   // U17: what one picture offers by its state, in one place: a rejected one Approve, an approved one Reject, until a later step used it (the server's `locked`, then one plain line)
+  o=o||{};if(stage()!=='visuals'||!['candidate','approved','rejected'].includes(r.status))return '';
+  if(r.locked&&r.status!=='candidate')return '<div class="ds lockd" data-locked="'+esc(r.id)+'">'+esc(plain(r.locked))+'</div>';
+  const ap='<button'+(o.plain?'':' class="go"')+' data-a="'+(r.status==='rejected'?'reapprove':'approve')+'" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">'+(o.approve||'Approve')+'</button>', rj='<button data-a="reject" data-ref="'+esc(r.id)+'">'+(o.reject||'Reject')+'</button>';
+  return (r.status!=='approved'&&!o.noApprove?ap:'')+(r.status!=='rejected'?rj:'');}
 function fixPrice(){return ((data.budget||{}).prices||{}).image_inr||4;}   // design/96 X1: the cost shown before the click
 function refCard(r,sel,inPanel,noApprove){   // inPanel: the References step, where the picture opens beside the grid and Approve and Reject live in the panel (design/80 S1)
   const rejected=r.status==='rejected', can=stage()==='visuals';
-  const reject=!inPanel&&(r.status==='candidate'||r.status==='approved')&&can?'<div class="btns" style="margin:0 6px 6px"><button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button></div>':'';   // design/74 L7
-  const approve=!inPanel&&!noApprove&&(r.status==='candidate'&&can)?'<div class="btns" style="margin:0 6px 6px"><button data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button></div>':'';
+  const vb=inPanel?'':verdictBtns(r,{plain:true,noApprove:noApprove&&r.status==='candidate'}), verdict=vb?'<div class="btns" style="margin:0 6px 6px">'+vb+'</div>':'';   // design/74 L7; U17: both ways
   const state='<span class="badge '+(r.status==='approved'?'ok':rejected?'err':r.status==='candidate'?'dec':'')+'" style="margin:4px 6px 0">'+esc({approved:'Approved ✓',rejected:'Rejected',candidate:'to approve',generating:'being made',failed:'failed'}[r.status]||r.status)+'</span>';   // design/79 Q2; design/99 C7
   return '<div class="pic '+(r.status==='approved'?'on':'')+(rejected?' off':'')+(isSel('ref',r.id)?' sel':'')+'" data-item="'+esc(r.id)+'" data-name="'+esc(r.name)+'">'+(r.url?'<img src="'+esc(thumbOf(r.url))+'" alt="" loading="lazy" decoding="async" data-ref="'+esc(r.id)+'">':'<div style="height:90px;display:flex;align-items:center;justify-content:center" class="ds">'+esc(r.status)+'</div>')+
-    state+(r.golden?'<span class="badge ok" style="margin:4px 6px 0">golden</span>':'')+(r.from_golden===false?'<span class="badge err" style="margin:4px 6px 0" title="design/111 F11: every picture of the element is an edit of its golden picture">not from the golden picture</span>':'')+(isWaiting(r.id)?'<span class="badge waitb" style="margin:4px 6px 0">waiting for you</span>':'')+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.from_thumbnail?'<div class="ds" style="margin:0 6px 4px">saved from the thumbnail: check it</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+fixBtn(r)+(rejected?'':(sel||'')+approve+reject)+'</div>';
+    state+(r.golden?'<span class="badge ok" style="margin:4px 6px 0">golden</span>':'')+(r.from_golden===false?'<span class="badge err" style="margin:4px 6px 0" title="design/111 F11: every picture of the element is an edit of its golden picture">not from the golden picture</span>':'')+(isWaiting(r.id)?'<span class="badge waitb" style="margin:4px 6px 0">waiting for you</span>':'')+'<div class="cap" title="'+esc(r.name)+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'">'+(r.shot_id?esc(r.shot_id)+(shotTitle(r.shot_id)?' · '+esc(shotTitle(r.shot_id)):'')+' · ':esc(r.name)+' · ')+esc(r.kind)+(r.shot_id?' · '+esc(r.name):'')+(rejected&&r.rejection?' · '+esc(r.rejection.notes):'')+'</div>'+checklist(r.checklist,r.check)+(r.check_pending&&!r.check?'<div class="ds" style="margin:0 6px 4px">being checked…</div>':'')+(r.from_thumbnail?'<div class="ds" style="margin:0 6px 4px">saved from the thumbnail: check it</div>':'')+(r.fix_of?'<div class="ds" style="margin:0 6px 4px">'+'fix of '+esc((((data.references||[]).find(x=>x.id===r.fix_of))||{}).name||r.fix_of)+(r.fix_for?' · for \''+esc(r.fix_for)+'\'':'')+' · ₹'+esc(fixPrice())+'</div>':'')+fixBtn(r)+(rejected?'':(sel||''))+verdict+'</div>';
 }
 function resultCard(s,r){   // design/80 S1: thumbnail, order number, caption; the note and the chips are in the panel
   const p=pickOf(s.search_id,r.n), idx=p?(picks[s.search_id].indexOf(p)+1):0, kept=(s.picked||[]).includes(r.n);
@@ -638,7 +669,9 @@ function panelBody(){
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
     if(!k)return '<div class="empty">That take is gone.</div>';
     return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+(k.sheet_url?'<img class="sheet" src="'+esc(k.sheet_url)+'" alt="every frame of the drawing, the time under each">':'')+checklist(k.checklist)+takeCheck(k.check)+drawnPasses(k.check)+factCheck(k.fact_check)+
-      (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>'):'');
+      (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>')
+        :can&&k.status==='ready'?(s.gap.recorded?'<div class="ds lockd">The gap is recorded; this take can no longer be changed here.</div>'   // U17: an answered take offers the opposite verdict only (a rejected one Select, a selected one Reject), until its gap is recorded
+          :actBox(k.selected?'<button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>':'<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button>')):'');
   }
   const by=refsById(), r=by[selPic.ref];
   if(!r)return '<div class="empty">That picture is gone.</div>';
@@ -649,22 +682,22 @@ function panelBody(){
     const done=sh.asset&&sh.asset.kind==='sequence', complete=states.length===n&&states.every(x=>!x.check_pending);
     return '<div class="pair">'+states.map((x,i)=>'<div class="'+(x.id===r.id?'hl':'')+'">'+big(x)+'<div class="ds">state '+(i+1)+' of '+n+stepMark(x)+'</div></div>').join('')+'</div>'+head+why+(sh.state_problem?'<div class="err">'+esc(sh.state_problem)+'</div>':'')+checklist(r.checklist,r.check)+fixBtn(r)+
       (done?'<div class="ds ok">'+'Approved · in the film at '+filmAt(sh)+'</div>'+(can&&!sh.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(sh.shot_id)+'">Remove</button>'):'')
-       :can?actBox((complete?'<button class="go" data-a="sequence" data-shot="'+esc(sh.shot_id)+'">Approve the sequence</button>':(r.status==='candidate'&&idx?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">'+'Approve state '+idx+'</button>':'')+'<span class="ds">'+(n-states.length)+' state(s) still to make</span>')+(own&&idx?'<button data-a="reject" data-ref="'+esc(r.id)+'">'+'Reject state '+idx+'</button>':'')):'');
+       :can?actBox((complete?'<button class="go" data-a="sequence" data-shot="'+esc(sh.shot_id)+'">Approve the sequence</button>':(r.status==='candidate'&&idx?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">'+'Approve state '+idx+'</button>':'')+'<span class="ds">'+(n-states.length)+' state(s) still to make</span>')+(own&&idx?'<button data-a="reject" data-ref="'+esc(r.id)+'">'+'Reject state '+idx+'</button>':'')+(r.status==='rejected'?verdictBtns(r):'')):'');
   }
   if(sh&&sh.route==='video'&&r.kind==='keyframe'){   // design/97 V2: the start and end images side by side
     const pair=(d.references||[]).filter(x=>x.shot_id===sh.shot_id&&x.kind==='keyframe'&&x.status!=='rejected'&&x.status!=='failed');
     return '<div class="pair">'+pair.map(x=>'<div class="'+(x.id===r.id?'hl':'')+'">'+big(x)+'<div class="ds">'+picWord(x)+' · '+esc(x.name)+' · '+esc(x.status)+'</div></div>').join('')+'</div>'+head+why+checklist(r.checklist,r.check)+fixBtn(r)+
-      (own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'):'');
+      (verdictBtns(r)?actBox(verdictBtns(r)):'');
   }
   const placed=placedIn(r.id), srcs=r.kind==='sheet'?(r.parents||[]).map(id=>by[id]).filter(Boolean):[], inSet=!!(r.set&&d.kept);   // design/151 hotfix: a set's picture is judged on step 2 of the round
-  const rk=roundOpen()&&roundOpen().kept?roundOpen():null, onCard=!!rk&&rk.pass===1&&r.kind==='frame'&&!!rk.elements[r.element_id];   // R1, R3: while the round is open a set's picture and a footage picture are decided on the card, in one place; this panel is for looking
+  const rk=roundOpen()&&roundOpen().kept?roundOpen():null, onCard=!!rk&&!!rk.elements[r.element_id]&&((rk.pass===1&&r.kind==='frame')||r.kind==='supplied'), vb=verdictBtns(r);   // R1, R3: while the round is open a set's picture and a footage picture are decided on the card, in one place; this panel is for looking
   const made=srcs.length?'<div class="ds" style="margin-top:6px">Made from:</div><div class="srcs">'+srcs.map(x=>big(x)).join('')+'</div>':'', pend=r.kind==='sheet'&&r.status==='candidate';
   return big(r)+head+why+(pend?made:'')+checklist(r.checklist,r.check)+(inSet?'':fixBtn(r))+noteBox(r)+   // design/97 R1: a pending sheet beside its sources
     '<details class="pdet"><summary>Details</summary><div class="ds">'+esc(r.kind)+(r.width?' · '+esc(r.width)+'×'+esc(r.height):'')+(r.note?' · note: '+esc(r.note):'')+(r.from_thumbnail?' · saved from the thumbnail':'')+'</div>'+(pend?'':made)+'</details>'+   // design/100 S4
     (placed?'<div class="ds ok">'+'Approved · in the film at '+filmAt(placed)+' ('+esc(placed.shot_id)+')</div>'+(can&&!placed.gap.recorded?actBox('<button data-a="unplace" data-shot="'+esc(placed.shot_id)+'">Remove</button>'):'')   // design/97 A5
      :inSet&&(r.status==='candidate'||rk)?'<div class="ds" style="margin-top:8px">Picture '+esc(r.set_n||1)+' of the set of '+esc(r.element_id)+': judge the whole set on step 2 of the reference round (Yes, No or Correct it), not here.</div>'
-     :onCard?'<div class="ds" style="margin-top:8px">Answer this picture on its card: Use this picture, or Ignore.</div>'
-     :own?actBox((r.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(r.id)+'" data-sha="'+esc(r.sha256)+'">Approve</button>':'')+'<button data-a="reject" data-ref="'+esc(r.id)+'">Reject</button>'+
+     :onCard?'<div class="ds" style="margin-top:8px">Answer this picture on its card'+(r.kind==='supplied'?'.':': Use this picture, or Ignore.')+'</div>'
+     :vb?actBox(vb+
        (r.status==='approved'&&sh&&sh.route==='still'?'<button data-a="still" data-shot="'+esc(sh.shot_id)+'" data-ref="'+esc(r.id)+'">Use for the shot</button>':'')):'');   // design/80 S6: the words sit with the button
 }
 function renderStep(){const f={references:renderReferences,pictures:renderPictures,takes:renderTakes}[step];if(f)f();renderRail();}
@@ -759,14 +792,15 @@ const goldenTick={};   // design/151 Q2: the operator's tick per thing, the gold
 function keptVerdict(eid){return (ans[eid]||{}).verdict||'';}
 function keptWords(eid){return String((ans[eid]||{}).words||'').trim();}
 function keptWaiting(rd){return judged(rd).filter(eid=>missing(eid,ans[eid]));}   // design/151: the sets with no whole answer yet, by name; R15: Done counts them, it is not locked by them
+function framesAll(eid,r){return framesOf(eid,r).concat((data.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&x.status==='rejected'));}   // U17: an ignored footage picture stays on its card, so it can be used after all
 function framesOf(eid,r){const by=refsById();let f=((r&&r.frames)||[]).map(i=>by[i]).filter(x=>x&&x.status!=='rejected');
   if(!f.length)f=(data.references||[]).filter(x=>x.element_id===eid&&x.kind==='frame'&&(x.status==='candidate'||x.status==='approved'));return f;}
 function pstate(x,eid){const a=eid?ans[eid]:null;return x.status==='approved'?'approved':x.status==='rejected'?'rejected':(a&&a.verdict&&!missing(eid,a)?VW[a.verdict]+', not recorded yet':'not answered');}   // R20: every thumbnail says its state
 function psum(labels){const n={};labels.forEach(l=>{n[l]=(n[l]||0)+1;});return Object.keys(n).length?'<div class="ds psum">'+Object.keys(n).map(l=>n[l]+' '+esc(l)).join(', ')+'</div>':'';}   // R20: "2 approved, 1 rejected"
 function thumb(x){return x.url?'<img src="'+esc(thumbOf(x.url))+'" loading="lazy" decoding="async" alt="" data-ref="'+esc(x.id)+'">':'<div class="ph">picture not available</div>';}
 function frameStrip(frames,can){   // R3: a footage picture is answered on its card, one pair of buttons per picture
-  return '<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(isSel('ref',f.id)?' sel':'')+'" data-item="'+esc(f.id)+'">'+thumb(f)+'<div class="cap">from your footage</div><div class="pst '+(f.status==='approved'?'ok':'')+'">'+pstate(f)+'</div>'+
-    (can?'<div class="btns" style="margin:0 6px 6px">'+(f.status==='candidate'?'<button class="go" data-a="approve" data-ref="'+esc(f.id)+'" data-sha="'+esc(f.sha256)+'">Use this picture</button>':'')+'<button data-a="reject" data-ref="'+esc(f.id)+'">Ignore</button></div>':'')+'</div>').join('')+'</div>'+psum(frames.map(f=>pstate(f)));}
+  return '<div class="strip">'+frames.map(f=>'<div class="pic '+(f.status==='approved'?'on':'')+(f.status==='rejected'?' off':'')+(isSel('ref',f.id)?' sel':'')+'" data-item="'+esc(f.id)+'">'+thumb(f)+'<div class="cap">from your footage</div><div class="pst '+(f.status==='approved'?'ok':'')+'">'+pstate(f)+'</div>'+
+    (can?'<div class="btns" style="margin:0 6px 6px">'+verdictBtns(f,{approve:'Use this picture',reject:'Ignore'})+'</div>':'')+'</div>').join('')+'</div>'+psum(frames.map(f=>pstate(f)));}   // U17: an ignored picture offers Use this picture, a used one Ignore
 function notMade(eid,r,can){   // R17, R18, E15: a set that was not made says its present reason; the operator is never asked for a No to get it made. Follow-up fix 4: Make it now only where nothing stands in its way or the cause is settled on this page (a spec to approve; the cap shows it switched off); fix 3: Set aside beside it
   const c=r.cause, why=c?c.text:r.settled?r.settled+': it can be made now':r.problem||'', m=c&&c.kind==='spec'&&c.element_id!==eid?(data.elements||[]).find(x=>x.id===c.element_id):null, mine=!c||c.kind==='cap'||(c.kind==='spec'&&!c.pending);
   return '<div class="ds err" style="margin-top:6px">The set was not made'+(why?': '+esc(plain(why)):'')+'.'+(c&&c.kind==='spec'&&!c.pending?' Approve the spec, then press Make it now.':mine?'':' Nothing on this page settles it; once it is settled, Make it now is offered here. Or set it aside: nothing is then made for it in this round.')+'</div>'+
@@ -789,7 +823,7 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
   const ids=Object.keys(rd.elements);
   (d.waiting||[]).forEach(w=>{if(w.step==='references'&&w.group&&!ids.includes(w.group)&&byId[w.group])ids.push(w.group);});   // a thing outside the round with something waiting keeps its card
   const head=(eid,e,r)=>'<div class="card" data-unit="'+esc(eid)+'"><span class="nm">'+esc(e.name||eid)+'</span> <span class="ds">'+esc(eid)+' · '+esc(e.kind)+(r&&r.round>1?' · round '+r.round:'')+'</span>';
-  const outside=(eid,e)=>head(eid,e)+' <span class="badge">not in this round</span>'+usedIn(eid)+(framesOf(eid).length?frameStrip(framesOf(eid),can):'')+materialBox(e)+qBox(eid)+'</div>';
+  const outside=(eid,e)=>head(eid,e)+' <span class="badge">not in this round</span>'+usedIn(eid)+(framesAll(eid).length?frameStrip(framesAll(eid),can):'')+materialBox(e)+qBox(eid)+'</div>';
   let left;
   if(rd.pass===1){
     const nm=ids.filter(eid=>rd.elements[eid]&&rd.elements[eid].cause&&verdictOf(eid,rd.elements[eid])!=='ignore');   // R12: what Done will not make, and why, with the control that settles it
@@ -797,11 +831,11 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
       nm.map(eid=>{const c=rd.elements[eid].cause;return '<div class="ds" data-notmade="'+esc(eid)+'" style="margin-top:4px"><b>'+esc(nameOf(eid))+'</b>: '+esc(c.text)+
         (c.kind==='spec'&&!c.pending&&can?' <button data-a="approve-spec" data-shot="element:'+esc(c.element_id)+'">Approve the material spec</button>':'')+'</div>';}).join('')+'</div>':'';
     const rows=ids.map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);
-      const v=verdictOf(eid,r), frames=framesOf(eid,r);
+      const v=verdictOf(eid,r), frames=framesOf(eid,r), all=framesAll(eid,r);
       return head(eid,e)+usedIn(eid)+
         '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="approve" '+(v!=='ignore'?'checked':'')+'> '+(frames.length?(e.kind==='person'?'Use the footage picture for the description (the sheet is still made)':'Use the footage picture (no AI picture is made)'):(e.kind==='person'?'Make the character sheet':'Make its pictures'))+'</label>'+
         '<label><input type="radio" name="v-'+esc(eid)+'" value="ignore" '+(v==='ignore'?'checked':'')+'> Ignore this</label></div>'+
-        (frames.length?frameStrip(frames,can):'<div class="ds">Not in your footage: the assistant makes its pictures from real photographs.</div>')+materialBox(e)+qBox(eid)+'</div>';}).join('');
+        (all.length?frameStrip(all,can):'')+(frames.length?'':'<div class="ds">'+(all.length?'Its footage picture is ignored':'Not in your footage')+': the assistant makes its pictures from real photographs.</div>')+ownBlock(e,can)+materialBox(e)+qBox(eid)+'</div>';}).join('');
     left='<p class="ds" style="font-size:17px;margin:14px 0 8px"><b>Reference round, step 1 of 2:</b> for each thing, use the picture from your footage, or ignore it. Done makes every picture at once; you judge them all together on step 2.</p>'+notmade+rows;
   }else if(rd.pass==='making'){
     const rows=ids.filter(eid=>!rd.elements[eid]||!rd.elements[eid].ignored||rd.elements[eid].aside).map(eid=>{const r=rd.elements[eid], e=byId[eid]||{id:eid,name:'',kind:''};if(!r)return outside(eid,e);if(r.aside)return head(eid,e,r)+asideBody(eid,r,can)+'</div>';
@@ -819,9 +853,10 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
       const pics=all.map((x,i)=>{const n=x.set_n||i+1, name=thing?'picture '+n:(['','full length','working pose','face'][x.set_n]||('picture '+n)), gold=(done?(d.golden||{})[eid]:a.golden)===x.id;
         if(!set.includes(x))return '<div class="pic off"><div class="ph">'+esc(name)+' failed: it was not made</div></div>';   // N6: never an empty picture with its own control
         return '<div class="pic '+(isSel('ref',x.id)?'sel':'')+(gold?' on':'')+'" data-item="'+esc(x.id)+'">'+thumb(x)+'<div class="cap">'+esc(name)+(gold&&done?' · the starting picture':'')+'</div><div class="pst '+(x.status==='approved'?'ok':'')+'">'+pstate(x,eid)+'</div>'+
-          (thing&&!done?'<button class="gold'+(gold?' on':'')+'" data-golden="'+esc(eid)+':'+esc(x.id)+'" aria-pressed="'+(gold?'true':'false')+'" title="the golden picture: the one every shot of this thing starts from">Use this as the starting picture</button>':'')+'</div>';}).join('');   // R2
+          (thing&&!done?goldBtn(eid,x.id,gold):'')+'</div>';}).join('')+
+        (ownAllowed(e)?ownPics(eid).map(x=>minePic(x,eid,(done?(d.golden||{})[eid]:a.golden)===x.id,!done)).join(''):'');   // R2; U19: the operator's own pictures beside the set's
       const notes=all[0].notes?'<details><summary class="ds" style="cursor:pointer">the model\'s notes and sources</summary><div class="ds" style="white-space:pre-wrap">'+esc(all[0].notes)+'</div>'+((all[0].sources||[]).map(s=>'<div class="ds"><a href="'+esc(s.url||'')+'" target="_blank" rel="noopener">'+esc(s.title||s.url||'')+'</a></div>').join(''))+'</details>':'';
-      const body=head(eid,e,r)+(done?' <span class="badge ok">approved</span>':'')+'<div class="strip">'+pics+'</div>'+psum(all.map(x=>set.includes(x)?pstate(x,eid):'failed'))+notes+
+      const body=head(eid,e,r)+(done?' <span class="badge ok">approved</span>':'')+'<div class="strip">'+pics+'</div>'+psum(all.map(x=>set.includes(x)?pstate(x,eid):'failed'))+notes+(done?'':ownBox(e,can))+
         (r.spec_changed?'<div class="ds err" style="margin-top:6px">the spec changed after this set was made'+(r.cause?': '+esc(r.cause.text):'')+'. Make the set again with the spec as it is now, or judge this one.</div>'+(can?'<div class="btns"><button data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button></div>':''):'');   // E14
       if(done)return body+tail+'</div>';   // R16: approved in an earlier pass; it asks nothing
       return body+(thing?'':'<div class="ds">For a person the full-length front picture is taken automatically as the starting picture.</div>')+
@@ -1096,7 +1131,10 @@ function footerBody(){
   act_.querySelectorAll('button[data-a]').forEach(b=>b.addEventListener('click',()=>click(b)));
 }
 // ---------- the clicks: every button calls the server function the vw tool calls ----------
-async function click(b){
+async function click(b){   // U18: the one click handler: the button pressed is remembered, so the request function marks it working and a refusal lands beside it
+  unpress();const p=pressed={el:b,sel:'button'+[...b.attributes].filter(x=>x.name.startsWith('data-')).map(x=>'['+x.name+'="'+CSS.escape(x.value)+'"]').join(''),err:null,live:true};
+  try{await doClick(b);}finally{p.live=false;if(pressed===p)showNear();}}
+async function doClick(b){
   const a=b.dataset.a, q=words();
   if(inflight&&a===sending&&['round-done','round-picks','record','treatment'].includes(a))return;sending=a;   // E7, N7: a second press of Done while the first is being recorded shows nothing and sends nothing
   const need=(text)=>{needWords($('pwords')?'pwords':'words',text);};   // design/97 P1
@@ -1111,9 +1149,9 @@ async function click(b){
   if(a==='treatment'){if(!q){need();return;}await send({action:'treatment',quote:q},'Treatment recorded: the assistant writes the plan.');return;}
   if(a==='accept-selected'){if(!q){need('Your yes for these gaps is required.');return;}const ids=Object.keys(selGaps);if(!ids.length){msg('Tick a gap first.',true);return;}const j=await send({action:'accept',gap_ids:ids,quote:q},ids.length+' gap(s) accepted.');if(j)selGaps={};return;}
   if(a==='revise-selected'){if(!q){need('Say what to change in the box, then Revise.');return;}const ids=Object.keys(selGaps);if(!ids.length){msg('Tick a gap first.',true);return;}for(const gid of ids){const j=await send({action:'revise',gap_id:gid,notes:q,quote:q},gid+' sent back for revision.');if(!j)return;}selGaps={};return;}
-  if(a==='approve'||a==='reject'){savingCard(b.dataset.ref);   // design/99 C2, C3: one click; the reason, optional, after it
-    const j=await send(a==='approve'?{action:'approve',reference_id:b.dataset.ref,sha256:b.dataset.sha}:{action:'reject',reference_id:b.dataset.ref},a==='approve'?'Picture approved.':data.kept&&((data.references||[]).find(r=>r.id===b.dataset.ref)||{}).kind==='frame'?"The picture is ignored. The element's set will be made from its description.":'Picture rejected; the next one starts from the approved picture.');   // follow-up fix 7: a kept film has no search
-    if(j&&a==='reject'){rejOpen=b.dataset.ref;selPic={ref:b.dataset.ref};renderStep();}
+  if(a==='approve'||a==='reject'||a==='reapprove'){savingCard(b.dataset.ref);const was=(data.references||[]).find(r=>r.id===b.dataset.ref)||{};   // design/99 C2, C3: one click; the reason, optional, after it; U17: reapprove, a rejected picture approved after all (visuals_stage.reapprove_reference)
+    const j=await send(a==='reapprove'?{action:'reapprove',reference_id:b.dataset.ref,sha256:b.dataset.sha}:a==='approve'?{action:'approve',reference_id:b.dataset.ref,sha256:b.dataset.sha}:{action:'reject',reference_id:b.dataset.ref},a!=='reject'?'Picture approved.':data.kept&&((data.references||[]).find(r=>r.id===b.dataset.ref)||{}).kind==='frame'?"The picture is ignored. The element's set will be made from its description.":'Picture rejected; the next one starts from the approved picture.');   // follow-up fix 7: a kept film has no search
+    if(j&&a==='reject'&&was.kind!=='supplied'){rejOpen=b.dataset.ref;selPic={ref:b.dataset.ref};renderStep();}
     return;}   // design/95 F3, design/97 A4: the server's next line says where it went
   if(a==='still'){savingCard(b.dataset.ref);await send({action:'still',shot_id:b.dataset.shot,reference_id:b.dataset.ref,...reuseOf(b.dataset.shot)},'Picture held for the shot.');return;}
   if(a==='reject-why'||a==='reject-take-why'){const w=(($('rwhy')||{}).value||'').trim();if(!w){rejOpen=null;renderStep();return;}const id=b.dataset.id;rejOpen=null;
@@ -1132,10 +1170,15 @@ async function click(b){
     for(const sid of sids){const list=picks[sid];const j=await send({action:'pick',search_id:sid,picks:list},list.length+' picture'+(list.length>1?'s':'')+' saved as references for '+(selEl||'the element')+'; the assistant makes the sheet from them.');if(!j)return;delete picks[sid];if(j.failed&&j.failed.length)msg(j.failed.length+' picture(s) could not be downloaded: '+j.failed.map(f=>f.n+' ('+(f.site||'')+')').join(', ')+'; the rest are kept.',true);}return;}
   if(a==='answer'){await send({action:'answer',item:b.dataset.item,answer:b.dataset.answer},'Answer recorded.');return;}   // design/110 rule 0
   if(a==='round-undo'){await send({action:'round-undo',quote:q},'Done undone: the pass is open again.');return;}
-  if(a==='supply'){const el=b.dataset.el, f=($('up-'+el)||{}).files, u=(($('url-'+el)||{}).value||'').trim();   // design/110: the operator's own picture
-    if(f&&f.length){const fr=new FileReader();fr.onload=async()=>{await send({action:'supply',element_id:el,name:f[0].name,content_base64:String(fr.result).split(',')[1]},'Your picture is saved and approved for '+el+'.');};fr.readAsDataURL(f[0]);return;}
-    if(!u){msg('Choose a file or paste an https link first.',true);return;}
-    await send({action:'supply',element_id:el,url:u},'Your picture is saved and approved for '+el+'.');return;}
+  if(a==='supply'){const el=b.dataset.el, f=($('up-'+el)||{}).files, u=(($('url-'+el)||{}).value||'').trim(), ok='Your picture is saved and approved for '+el+'.';   // design/110: the operator's own picture; U19: on a set's card too
+    if(f&&f.length){const x=f[0];   // refused here, before anything is sent, where the page can tell
+      if(!/^image\/(png|jpeg|webp)$/.test(x.type)){refuse('That file is not a PNG, JPEG or WebP picture: choose another.');return;}
+      if(x.size>OWN_MAX){refuse('That file is larger than 15 MB: choose a smaller picture.');return;}
+      const d64=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]||'');fr.onerror=()=>res(null);fr.readAsDataURL(x);});
+      if(d64===null){refuse('That file could not be read: choose it again.');return;}
+      await send({action:'supply',element_id:el,name:x.name,content_base64:d64},ok);return;}
+    if(!u){refuse('Choose a file or paste an https link first.');return;}
+    await send({action:'supply',element_id:el,url:u},ok);return;}
   if(a==='nothing-fits'){if(!q){need('Say in one line why nothing fits; it goes on the "not this" list.');return;}await send({action:'nothing-fits',search_id:b.dataset.search,reason:q},'Noted for the "not this" list. Type new words and press Search again, or add your own picture.');return;}   // design/121 change 1
   if(a==='approve-spec'){await send({action:'approve-spec',shot_id:b.dataset.shot,quote:''},'Drawing spec approved.');return;}   // design/106 D4: no words for a click
   if(a==='save-note'){await send({action:'note',reference_id:b.dataset.ref,note:(($('ref-note')||{}).value||'').trim()},'Note saved.');return;}   // design/106 N4
@@ -1194,7 +1237,7 @@ function keptCard(o,eid,r,rd){   // a thing's card in a kept round: ignored (E13
   if(settled(r)){if(!o.wait)o.badge=['ok','approved'];return;}
   if(!set.some(x=>x.status==='candidate')){if(!o.wait)o.badge=['err','not made'];return;}   // not made: its spec, or Make it now, waits as the server says
   const a=ans[eid], m=missing(eid,a), rest=waitIn('references',eid).filter(w=>w.item!=='set');
-  if(!m&&!rest.length){o.wait=false;o.badge=['ok',VW[a.verdict]+' · not recorded yet'];const g=a.verdict==='yes'&&set.find(x=>x.id===a.golden);if(g)o.thumb=g.url;return;}
+  if(!m&&!rest.length){o.wait=false;o.badge=['ok',VW[a.verdict]+' · not recorded yet'];const g=a.verdict==='yes'&&(set.find(x=>x.id===a.golden)||ownPics(eid).find(x=>x.id===a.golden));if(g)o.thumb=g.url;return;}
   if(!m){o.wait=true;o.wlabel=rest.map(w=>w.label).join(' + ');o.badge=['dec',[...new Set(rest.map(w=>SHORT[w.kind]||w.kind))].join(', ')];return;}
   o.wait=true;o.wlabel=o.wlabel||('Set to judge · '+nameOf(eid));
   o.badge=a&&a.state==='failed'?['err',VW[a.verdict]+' · not saved']:a&&a.verdict?['dec',m]:['dec',(o.kinds||'').includes('set to judge')?o.kinds:'set to judge'];}
@@ -1272,7 +1315,7 @@ function defaultPic(u){   // the card's picture or take in front: what waits fir
 function selectUnit(u,scroll,item){selUnit[step]=u;rejOpen=null;   // R5: a click on a card, a link and Next waiting open the same thing; R4: the panel follows the card
   if(step==='references'&&!roundOpen()&&u)selEl=u;
   selPic=item&&(data.references||[]).some(r=>r.id===item)?{ref:item}:item&&(data.gaps||[]).some(g=>g.shots.some(s=>(s.takes||[]).some(k=>k.job_id===item)))?{take:item}:defaultPic(u);
-  try{history.replaceState(null,'',location.pathname+location.search+'#'+step+(u?'/'+encodeURIComponent(u)+(item?'/'+encodeURIComponent(item):''):''));}catch(e){}   // a link opens on this card
+  setHash(u,item);   // a link opens on this card
   render();renderRail(scroll);const stg=$('stage');if(stg)stg.scrollTop=0;
   outline(u,item);}
 function versionsOf(r){const refs=data.references||[];if(!r)return [];
