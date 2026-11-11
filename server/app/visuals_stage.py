@@ -2528,7 +2528,10 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     element is approved or ignored; 'making' while any set is made again.
     UI change, 11 Nov 2026 (R13, R15): without partial (the chat tool) every set needs its verdict, as before, and a whole answer stored with
     set_answer stands where the call sends none. partial (the page): the page sends the stored answers the operator saw in its confirmation; exactly
-    those are recorded, every other set is left as it is (a stored answer too) and the round stays on step 2 for them."""
+    those are recorded, every other set is left as it is (a stored answer too) and the round stays on step 2 for them.
+    Follow-up, 11 Nov 2026: at the spend cap a Yes is still recorded (it costs nothing); a No or Correct it whose remake the cap does not allow is
+    held: its set and its whole answer stay as they are, stored, and wait (returned in `held` with the reason). A round where nothing is left to
+    judge (every other set approved, the rest set aside) completes."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
     need(rd and rd.get('kept') and _round_pass(session, rd) == 2, 'No reference round is waiting for its sets.')
@@ -2544,7 +2547,9 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             verdicts[eid] = _answered(session, kinds, eid, rd['elements'][eid])
     unanswered = [eid for eid in active if not (verdicts.get(eid) or {}).get('verdict')] if partial else []
     active = [eid for eid in active if eid not in unanswered]
-    need(active or not partial, 'No set has an answer yet: there is nothing to record.')
+    need(active or not unanswered, 'No set has an answer yet: there is nothing to record.')
+    budget = _set_budget(run, session, visuals_spend(conn, run)) if conn is not None else None
+    room = int((budget[1] - budget[0] + 1e-9) // budget[2]) if budget and budget[2] > 0 else None   # how many sets the cap still allows
     for eid in active:
         r, v = rd['elements'][eid], verdicts.get(eid) or {}
         need(v.get('verdict') in ('yes', 'no', 'correct'), f'{eid}: a verdict is required: yes, no, or correct it.')
@@ -2557,10 +2562,14 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
         if v['verdict'] == 'correct':
             need(str(v.get('words') or '').strip(), f'{eid}: say what to correct.')
     stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote}
-    again = []
+    again, held = [], {}
     for eid in active:
         r, v = rd['elements'][eid], verdicts[eid]
         rows = _set_rows(session, eid, r.get('set'))
+        if v['verdict'] != 'yes' and room is not None and len(again) >= room:   # the cap: nothing is rejected and nothing queued; the answer waits, stored
+            r['answer'] = {'verdict': v['verdict'], 'golden': None, 'words': ' '.join(str(v.get('words') or '').split()), 'set': r.get('set'), 'by': user['id'], 'at': stamp['at']}
+            held[eid] = f'the spend cap of ₹{budget[1]:,.0f} is reached (₹{budget[0]:,.0f} spent): the set is not made again; its answer is kept and waits'
+            continue
         r['verdict'] = v['verdict']
         r.pop('answer', None)   # recorded: nothing stored is left behind
         if v['verdict'] == 'yes':
@@ -2581,10 +2590,10 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     queued, errors = _queue_sets(conn, store, user, run, outputs, again) if again else ([], {})
     session = session_of(store, run, outputs)
     rd = session['round']
-    left = unanswered + [eid for eid in again if eid not in queued]   # still on step 2: the sets with no answer yet, and a set that could not be made again (the page offers Make it now)
+    left = unanswered + [eid for eid in again if eid not in queued] + list(held)   # still on step 2: the sets with no answer yet, a set that could not be made again (the page offers Make it now), a remake the cap holds
     rd['pass'] = 'making' if queued else (2 if left else 'complete')
     save_session(store, run, session)
-    return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'approved': [eid for eid in active if verdicts[eid]['verdict'] == 'yes'], **({'unanswered': unanswered} if partial else {})}
+    return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'approved': [eid for eid in active if verdicts[eid]['verdict'] == 'yes'], 'held': held, **({'unanswered': unanswered} if partial else {})}
 
 
 # ---------- UI change, 11 Nov 2026: one answer of step 2 stored as it is made (R13); one set that was not made, made now (R17, R18) ----------
@@ -2664,7 +2673,7 @@ def set_cause(session, plan, element_id, budget=None):
     unknown = [d for d in element.get('size') or [] if d.get('value') is None]
     if unknown and element.get('kind') not in ('person', 'graphic', 'style') and any(
             r.get('kind') == 'frame' and r.get('element_id') == element_id and r.get('status') == 'approved' for r in session['references'].values()):   # design/119 rule 8, design/151 Q6
-        return {'kind': 'size', 'element_id': element_id, 'text': f"a size of {element.get('name') or element_id} is not measured yet ({unknown[0].get('part')} {unknown[0].get('measure')}): the assistant measures it from your footage picture"}
+        return {'kind': 'size', 'element_id': element_id, 'text': f"a size of {element.get('name') or element_id} is not measured yet ({unknown[0].get('part')} {unknown[0].get('measure')}): the assistant measures it from the approved footage picture"}
     if budget and budget[0] + budget[2] > budget[1] + 1e-9:
         return {'kind': 'cap', 'element_id': element_id, 'text': f'the spend cap is reached: ₹{budget[0]:,.0f} spent of ₹{budget[1]:,.0f}'}
     return None
@@ -2706,6 +2715,33 @@ def set_make(conn, store, user, run, outputs, element_id):
     session['round']['pass'] = 'making'
     save_session(store, run, session)
     return {'element_id': element_id, 'queued': True, 'pass': 'making', 'cost_inr': round(image_price_inr(run, provider='gemini') * SET_MAX, 2), 'next': f'{element_id}: its set is being made; it comes back on step 2.'}
+
+
+def set_aside(store, user, run, outputs, element_id, words='', back=False):
+    """Follow-up, 11 Nov 2026: a set that was never made (its cause cannot be settled, or the operator does not want it) is set aside at step 2: the
+    element is ignored for this round exactly as Ignore at step 1 does (ignored: true), with who, when and the words. back: it returns to the round,
+    while the round is open. A set that was made is answered with No or Correct it, never set aside."""
+    session = session_of(store, run, outputs)
+    rd = session.get('round')
+    need(rd and rd.get('kept') and _round_pass(session, rd) in (2, 'making'), 'The reference round is not open at its sets: nothing can be set aside or brought back now.')
+    row = rd['elements'].get(element_id)
+    need(row, f'{element_id} is not in the reference round.')
+    if back:
+        need(row.get('aside'), f'{element_id} was not set aside at step 2: there is nothing to bring back.')
+        row['ignored'] = False
+        row.pop('aside')
+        save_session(store, run, session)
+        return {'element_id': element_id, 'aside': False, 'next': f'{element_id} is back in the round.'}
+    need(not row.get('aside'), f'{element_id} is set aside already.')
+    need(not row.get('ignored'), f'{element_id} was set to Ignore at step 1: it has no set.')
+    need(not row.get('from_footage'), f'{element_id} is referenced by its footage picture: it has no set.')
+    need(not _set_rows(session, element_id, row.get('set'), ('generating', 'candidate', 'approved')),
+         f'{element_id} has its set: answer it with No or Correct it; only a set that was never made can be set aside.')
+    row['ignored'] = True
+    row['aside'] = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'words': ' '.join(str(words or '').split())}
+    row.pop('answer', None)
+    save_session(store, run, session)
+    return {'element_id': element_id, 'aside': True, 'next': f'{element_id} is set aside for this round: nothing is made for it. Bring back returns it while the round is open.'}
 
 
 def _sids(row):
@@ -3678,6 +3714,8 @@ def reject_reference(store, user, run, outputs, ref_id, notes, quote):
 
 def _rejected_next(store, session, row):
     """design/124 A4 item 12: what follows a rejection, by kind: a web pick or a frame waits for the operator's words; a generated picture is made again."""
+    if row.get('kind') == 'frame' and kept(session):   # follow-up, 11 Nov 2026: a kept film has no search
+        return "The picture is ignored. The element's set will be made from its description."
     if row.get('kind') in ('web', 'frame', 'supplied'):
         return "Rejected: the next search or frame comes from the operator's words, or Ignore this; nothing is searched or made without them."
     word = _picture_word(store, session, row)

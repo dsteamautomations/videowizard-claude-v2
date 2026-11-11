@@ -351,3 +351,113 @@ def test_a_drawing_spec_waits_on_the_card_of_its_own_shot_on_the_tab_that_shows_
     assert [(i['kind'], i['step'], i['group'], i['label']) for i in items] == [('drawing spec to approve', 'pictures', 'IM1', 'Drawing spec to approve · IM1'),
                                                                                ('drawing spec to approve', 'takes', 'DR1', 'Drawing spec to approve · DR1')]
     assert items[0]['link'] == '/runs/VW-20/visuals#pictures/IM1/spec'
+
+
+
+# ---------- Follow-up, ten fixes (11 Nov 2026): the cap at Done (2), a set set aside at step 2 (3), the kept wording for an ignored footage picture (7), no bare key name to the operator (9) ----------
+
+def wall_round():
+    """Step 2 where the kiln's set did not come back and cannot be made: a size is not measured (a footage picture of it was approved since). The mason's set is back."""
+    doc = doc_with({**KILN, 'size': [{'part': 'kiln', 'measure': 'height', 'value': None, 'unit': 'm', 'source': '', 'status': 'unknown'}]}, MASON)
+    store, conn = frames_only(doc), FakeConn([])
+    VS.round_start(store, USER, NEW, [], [{'element_id': 'E2', 'prompt': 'the kiln during firing'}, {'element_id': 'P1', 'prompt': 'kneels all day'}], conn=conn)
+    VS.round_done(store, USER, NEW, [], {'E2': {'verdict': 'approve'}, 'P1': {'verdict': 'approve'}}, 'yes', conn=conn)
+    s = back(store)
+    for r in s['references'].values():
+        if r.get('kind') == 'sheet' and r['element_id'] == 'E2':
+            r['status'] = 'failed'
+    s['references']['F2'] = {**s['references']['F1'], 'id': 'F2', 'element_id': 'E2', 'status': 'approved'}
+    VS.save_session(store, NEW, s)
+    return store, conn
+
+
+def test_a_set_never_made_is_set_aside_at_step_2_and_counts_as_nothing_waiting():
+    store, conn = wall_round()
+    assert view(store, conn)['round']['elements']['E2']['cause']['kind'] == 'size'
+    out = VS.set_aside(store, USER, NEW, [], 'E2', 'we film it ourselves')
+    row = view(store, conn)['round']['elements']['E2']
+    assert out['aside'] is True and row['ignored'] is True and row['aside']['words'] == 'we film it ourselves' and row['aside']['by'] == USER['id']
+    assert not row.get('cause') and not [i for i in view(store, conn)['waiting'] if i['group'] == 'E2']
+    assert '`' not in out['next'] and 'vw ' not in out['next']
+
+
+def test_a_set_that_was_made_or_an_element_outside_the_round_cannot_be_set_aside():
+    store, conn = wall_round()
+    for eid, words in (('P1', 'P1 has its set'), ('ZZ', 'ZZ is not in the reference round')):
+        with pytest.raises(Problem, match=words):
+            g(lambda: VS.set_aside(store, USER, NEW, [], eid))
+    assert not saved(store)['round']['elements']['P1'].get('ignored')
+    one = frames_only(doc_with(KILN))
+    VS.round_start(one, USER, NEW, [], [{'element_id': 'E2', 'prompt': 'the kiln'}], conn=FakeConn([]))
+    with pytest.raises(Problem, match='nothing can be set aside'):   # step 1 has its own Ignore
+        g(lambda: VS.set_aside(one, USER, NEW, [], 'E2'))
+
+
+def test_a_set_aside_element_is_brought_back_while_the_round_is_open():
+    store, conn = wall_round()
+    with pytest.raises(Problem, match='E2 was not set aside'):
+        g(lambda: VS.set_aside(store, USER, NEW, [], 'E2', back=True))
+    VS.set_aside(store, USER, NEW, [], 'E2')
+    with pytest.raises(Problem, match='E2 is set aside already'):
+        g(lambda: VS.set_aside(store, USER, NEW, [], 'E2'))
+    out = VS.set_aside(store, USER, NEW, [], 'E2', back=True)
+    row = view(store, conn)['round']['elements']['E2']
+    assert out['aside'] is False and not row['ignored'] and 'aside' not in row and row['cause']['kind'] == 'size'
+
+
+def test_the_round_completes_when_one_set_is_set_aside_and_every_other_set_is_approved():
+    store, conn = wall_round()
+    VS.set_aside(store, USER, NEW, [], 'E2')
+    out = VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes'}}, 'The mason.', conn=conn, partial=True)
+    assert out['pass'] == 'complete' and out['approved'] == ['P1']
+    with pytest.raises(Problem, match='nothing can be set aside'):   # the round is closed: nothing is brought back
+        g(lambda: VS.set_aside(store, USER, NEW, [], 'E2', back=True))
+    # the other order: the mason approved first, the kiln set aside afterwards; the page's Done then closes the round with nothing left to judge
+    store, conn = wall_round()
+    assert VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes'}}, 'The mason.', conn=conn, partial=True)['pass'] == 2
+    VS.set_aside(store, USER, NEW, [], 'E2')
+    assert VS.round_sets(store, USER, NEW, [], {}, 'That is all.', conn=conn, partial=True)['pass'] == 'complete'
+
+
+@pytest.mark.parametrize('partial', [True, False])
+def test_done_at_the_spend_cap_records_the_approvals_and_holds_the_remakes_with_their_answers(partial):
+    store, conn, s = with_sets(doc_with(KILN, MASON))
+    pic = sheets(s, 'E2')[0]
+    s['cap_inr'] = 100.0
+    VS.save_session(store, NEW, s)
+    conn.jobs += [{**job('gemini-image'), 'id': f'j-{k}'} for k in range(6)]   # over the cap
+    n = len(conn.inserted)
+    out = VS.round_sets(store, USER, NEW, [], {'E2': {'verdict': 'yes', 'golden': pic}, 'P1': {'verdict': 'correct', 'words': 'older, about fifty'}}, 'These.', conn=conn, partial=partial)
+    s = saved(store)
+    assert out['approved'] == ['E2'] and len(sheets(s, 'E2', 'approved')) == 2 and s['golden']['E2'] == pic   # a Yes costs nothing
+    assert out['queued'] == [] and len(conn.inserted) == n and out['pass'] == 2
+    assert list(out['held']) == ['P1'] and 'spend cap' in out['held']['P1'] and '₹100' in out['held']['P1'] and '`' not in out['held']['P1']
+    row = s['round']['elements']['P1']
+    assert len(sheets(s, 'P1')) == 3 and row['answer']['verdict'] == 'correct' and row['answer']['words'] == 'older, about fifty'   # nothing lost: the set and its answer wait
+    assert not row.get('corrections') and not [i for i in view(store, conn)['waiting'] if i['group'] == 'P1']   # answered: it does not ask again
+    s['cap_inr'] = 100000.0   # the cap raised: Done records the kept answer and the set is made again
+    VS.save_session(store, NEW, s)
+    out = VS.round_sets(store, USER, NEW, [], {} if not partial else {'P1': {'verdict': 'correct', 'words': 'older, about fifty'}}, 'Now.', conn=conn, partial=partial)
+    assert out['queued'] == ['P1'] and out['pass'] == 'making' and not out['held'] and saved(store)['round']['elements']['P1']['corrections'] == ['older, about fifty']
+
+
+def test_ignoring_a_footage_picture_on_a_kept_film_is_answered_in_the_kept_methods_words():
+    store, conn = frames_only(doc_with(KILN)), FakeConn([])
+    VS.round_start(store, USER, NEW, [], [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}], conn=conn)
+    out = VS.reject_reference(store, USER, NEW, [], 'F1', '', '')
+    assert 'search' not in out['next'].lower() and "operator's words" not in out['next']
+    assert 'ignored' in out['next'] and 'made from its description' in out['next']
+
+
+def test_an_unexpected_error_in_a_page_action_reaches_the_operator_as_a_plain_sentence(caplog):
+    from app import web
+
+    def boom():
+        raise KeyError('request_key')
+    with pytest.raises(Problem) as e:
+        web._page_call(boom, 'select-take')
+    assert e.value.message == 'That could not be done; nothing was changed. The builder has been told what failed.'
+    assert 'request_key' not in e.value.message and 'request_key' in caplog.text   # the real text goes to the server log
+    with pytest.raises(Problem, match='P1: say what to correct'):   # a refusal written for the operator still arrives as written
+        web._page_call(lambda: VS.need(False, 'P1: say what to correct.'), 'round-sets')
+    assert web._page_call(lambda: {'done': True}, 'approve') == {'done': True}
