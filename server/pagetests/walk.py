@@ -41,6 +41,8 @@ from app.errors import Problem   # noqa: E402
 VS, S, R, USER, NEW = B.VS, B.S, B.R, B.USER, B.NEW
 REFS = B.REPO.parent / 'videobuilder-v4' / 'phase2' / 'refs'   # the real film's reference pictures, when this PC has them
 TOKEN = 'walk'
+RUN = {**NEW, 'film': {**NEW['film'], 'category': {'value': 'documentary-explainer'}}}   # a real film has its category recorded; a take's preparation reads it
+BRIEF = [{'stage': 'brief', 'unit': None, 'summary': {'production': {'industry': 'other'}, 'audience': 'general'}}]   # and the brief's industry and audience
 LOCK = threading.RLock()   # one request (or one turn of the worker) at a time
 FILMS, NOW = {}, []        # the scenarios' films; NOW[0]: the film of the request being answered
 WORKER_S = 3.0
@@ -90,7 +92,7 @@ class Film:
         conn.__class__, conn.film = Conn, self
         self.store, self.conn, self.outputs, self.seen = store, conn, rest[0] if rest else [], {}
         self.defects = [45] if name == 'held-run' else []
-        self.run = {**NEW, 'code': name, 'title': SCENARIOS[name][0], 'status': 'open', 'owner_id': USER['id'], 'client_id': None}
+        self.run = {**RUN, 'code': name, 'title': SCENARIOS[name][0], 'status': 'open', 'owner_id': USER['id'], 'client_id': None}
 
 
 def worker():
@@ -191,14 +193,28 @@ def complete():
 
 def takes():
     g1 = [S.shot('DR1', 0, 500, 'drawn', element_ids=['E1'], depicts='the plinth in section')]
-    g2 = [S.shot('VS1', 900, 1025, 'video', element_ids=['E1']), S.shot('VS2', 1025, 1150, 'video', element_ids=['E1'])]
+    g2 = [S.shot('VS1', 900, 1025, 'video', element_ids=['E1']), S.shot('VS2', 1025, 1150, 'video', element_ids=['E1'], subjects=[])]
     _, store, conn = B.complete(g1=g1, g2=g2)
     conn.files = {'run-1/uploads/wall-pour.mp4': {'key': 'run-1/uploads/wall-pour.mp4', 'sha256': 'sha-movie', 'bytes': 1000}}
     VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/wall-pour.mp4', 'sha-movie', 1000, 'movie', 'My own shot of the pour.')
-    B.edit(store, lambda s: s['references'].update(K1=B.keyframe('K1', 'VS2', 'approved', role='start')))
-    conn.jobs += [B.take('job-take-1', 'VS2', request={'duration_seconds': 5}),
-                  B.take('job-draw-1', 'DR1', provider='drawn', result={'key': 'run-1/visuals/takes/job-draw-1.mp4', 'sha256': 's', 'sheet_key': 'run-1/visuals/takes/job-draw-1.sheet.png', 'evidence': {'duration_seconds': 20.0, 'timing_matches_placement': True}})]
-    return store, conn
+    B.edit(store, lambda s: (s['references'].update(K1=B.keyframe('K1', 'VS2', 'approved', role='start')), s['references']['F1'].update(element_kind='object')))
+    # the ready take's preparation record, written by the real functions (bind, prepare_take); its job row as submit_take writes it: Select and Reject run the real select_take
+    VS.bind(store, USER, RUN, BRIEF, 'VS2', {'E1': ['F1']}, {})
+    VS.prepare_take(store, USER, RUN, BRIEF, {'shot_id': 'VS2', 'motion_prompt': 'water is poured along the top of the wall', 'subject_reconciliation': {}, 'start_image': 'K1',
+                                              'continuity_notes': 'the wall and the yard light stay'})
+    prep = S.saved(store)['preparations']['VS2']
+    made = json.loads(store.get(prep['key']))
+    # the drawing's record, as render_drawn writes it, with the fields select_take reads (its scene, font and cues need an uploaded SVG: not imitated)
+    drawn = {'kind': 'drawn', 'shot_id': 'DR1', 'plan_digest': VS.digest(VS.current_plan(store, S.saved(store)))}
+    dkey = VS.key(RUN, f'takes/{VS.digest(drawn)}.drawn.json')
+    VS.save_json(store, dkey, drawn)
+    B.edit(store, lambda s: s['preparations'].update(DR1={'preparation_id': VS.digest(drawn), 'key': dkey, 'drawn': True}))
+    result = lambda jid, s, **more: {'key': f'run-1/visuals/takes/{jid}.mp4', 'sha256': 's-' + jid, 'bytes': 1000, 'evidence': {'duration_seconds': s, 'timing_matches_placement': True}, **more}
+    conn.jobs += [B.take('job-take-1', 'VS2', request={'kind': 'take', 'preparation_id': prep['preparation_id'], 'request_key': prep['key'], 'provider': made['provider'], 'model': made['model'], 'duration_seconds': made['duration_seconds']},
+                         result=result('job-take-1', 5.0)),
+                  B.take('job-draw-1', 'DR1', provider='drawn', request={'kind': 'drawn', 'request_key': dkey, 'preparation_id': VS.digest(drawn), 'shot_id': 'DR1', 'frames': 500, 'duration_seconds': 20.0},
+                         result=result('job-draw-1', 20.0, sheet_key='run-1/visuals/takes/job-draw-1.sheet.png'))]
+    return store, conn, BRIEF
 
 
 def specs():
@@ -220,7 +236,7 @@ SCENARIOS = {   # name: (title, what to try, builder)
     'round-step2-not-made': ('Step 2 with two sets that were not made', 'Read the reason on the brick and on the yard wall. The brick: approve its material spec, then "Make it now". The wall waits for a size the assistant measures; nothing on the page settles it (and nothing here does), so it offers no "Make it now": set it aside, then bring it back.', not_made),
     'round-second-pass': ('Step 2, second pass', 'Some sets were approved by the first Done; the father and the water hose were made again and wait for an answer.', second_pass),
     'round-complete': ('The round finished', 'Nothing waits; look at what was approved.', complete),
-    'takes-supplied': ('Takes: a supplied file, a take to select, a drawn shot', 'Open Takes: one shot is filled with a file you supplied, one take is ready (Reject works; Select is refused here: the helpers cannot make the record the real server keeps when it prepares a take), one shot is drawn.', takes),
+    'takes-supplied': ('Takes: a supplied file, a take to select, a drawn shot', 'Open Takes: one shot is filled with a file you supplied, one take is ready and one shot is drawn: Select or Reject each, then change your mind (a rejected one can be selected, a selected one rejected).', takes),
     'pictures-specs': ('Pictures: a drawing spec, a candidate, an approved picture', 'Open Pictures: approve or correct the drawing spec waiting on its shot, approve or reject the candidate picture.', specs),
     'large-round': ('A large round: 58 elements at step 2', 'Scroll, filter "Waiting for me", press Next waiting, answer a few and press Done.', large),
     'held-run': ('A run held by an open defect', 'Every button that writes is refused with the defect\'s message; reading still works.', step2),
@@ -370,6 +386,8 @@ class Handler(BaseHTTPRequestHandler):
             key = '/'.join(rest[1:])
             if key.endswith('.mp4'):
                 return self.out(200, clip(), 'video/mp4')
+            if key in film.store.files:   # a picture the operator uploaded on the page: the stored file itself
+                return self.out(200, film.store.files[key], 'image/png')
             what = picture_of(film, key)
             return lambda: picture(*what, rest[0] == 'thumb')
         return self.out(404, 'Not found.', 'text/plain')

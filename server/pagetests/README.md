@@ -138,6 +138,7 @@ A test's id is its row: `-k C-3.5-62`. `controls.json` lists every row with its 
 | `test_faults.py` | `U01` to `U16`, `X1` to `X7`, `N1` to `N4` | the reported fault is absent: it fails while the fault is in the page |
 | `test_journeys.py` | `J1` to `J7` | the reference round as SK walked it, one pass per test, and Takes with a supplied file |
 | `test_followup.py` | `F01` to `F10` | the ten fixes after SK's walk of the page (11 Nov 2026), one test per fix; their server side is in `unit/test_ui_visuals_actions_pure.py` |
+| `test_round3.py` | `U17-…`, `U19-…`, `U18-…`, `U14-tabs` | round 3 (11 Nov 2026): a verdict on one picture changed both ways, the operator's own picture on a card, a refusal said beside the button pressed, a tab switch and the right panel; server side in the same unit file |
 
 These tests state the truth of the approved requirements; they failed on the page before the one UI change of 11 Nov 2026 and pass on it. Nothing is skipped or
 marked as an expected failure. Where a requirement needs something that does not exist yet, the test uses the names in **`CONTRACT.md`**
@@ -176,7 +177,7 @@ From `server/`. Open `http://127.0.0.1:8765/` (this PC only). Stop it with Ctrl+
 | `round-step2-not-made` | step 2 with two sets not made: the brick (approve its spec, then Make it now) and the yard wall (a size not measured: nothing on the page settles it, so no Make it now; Set aside, then Bring back) |
 | `round-second-pass` | after a first Done: most sets approved, two made again and waiting |
 | `round-complete` | the round finished |
-| `takes-supplied` | Takes: a shot filled with a supplied file, a take to select, a drawn shot |
+| `takes-supplied` | Takes: a shot filled with a supplied file, a take and a drawing to select or reject (both ways) |
 | `pictures-specs` | Pictures: a drawing spec waiting on its shot, a candidate picture, an approved one |
 | `large-round` | 58 elements at step 2 |
 | `held-run` | an open defect: every write is refused |
@@ -192,7 +193,9 @@ are: the table of page actions, the `visuals_stage` functions behind it, `page_v
 - sign-in: one button, no password ("Sign out" on the list shows the page sending you to sign in and back);
 - the prices: ₹20 a picture, and a set counts as one picture in the spend.
 
-Not imitated: selecting a take (it needs the record the server keeps when it prepares a take; Reject works), Record (it writes the run's outputs to the database), searches of an older film, anything a provider answers.
+Selecting a take works since round 3: the ready take of `takes-supplied` is bound and prepared with the real `bind` and `prepare_take`, so it has the record the server keeps (its job row is written as `submit_take` writes it), and the drawing has the record `render_drawn` writes, with the fields `select_take` reads. The films carry a category and a brief (industry, audience), which a take's preparation reads.
+
+Not imitated: Record (it writes the run's outputs to the database), searches of an older film, anything a provider answers, the rendering of a drawing (its scene, font and cues).
 
 ## Not covered here
 

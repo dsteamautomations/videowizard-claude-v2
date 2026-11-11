@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T11:34:36.177931+00:00",
+   "at": "2026-11-11T13:31:06.030504+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running bond (stretcher bond) patterns",
-     "no flat-laid orientation (stretcher face upright)",
-     "no standard metric length-to-height ratio (3:1 or 215x65 mm)",
-     "no weathered, tumbled, or reclaimed surface textures",
-     "no brown, orange, buff, or multi-colored brick tones",
-     "no thin or flush-recessed modern mortar joints",
-     "no painted, whitewashed, or glazed surfaces",
-     "no English or Flemish bond with flat stretchers",
-     "no oversized or utility block proportions",
-     "no stack bond alignment",
-     "no weep holes, ties, or expansion joints visible",
-     "no uneven, raked, or colored mortar lines"
+     "no running bond or stretcher bond pattern",
+     "no standard flat bedding orientation",
+     "no brown, grey, or yellow brick colour",
+     "no thin or flush raked mortar joints",
+     "no standard 215 mm by 65 mm metric brick dimensions",
+     "no weathered, chipped, or reclaimed brick texture",
+     "no pure header bond or Flemish bond",
+     "no recessed or dark contrasting mortar",
+     "no square or irregular face proportions",
+     "no glazed, painted, or textured finish",
+     "no missing alternating header pattern",
+     "no embedded ties, weep holes, or metal fittings"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T11:34:39.256878+00:00",
+   "at": "2026-11-11T13:31:09.790389+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -437,13 +437,14 @@
     "golden": true,
     "from_golden": null,
     "edit": null,
+    "locked": "Step 1 of the reference round is done with this picture used; it can no longer be changed here.",
     "shot_id": null,
     "url": "/runs/VW-20/file/run-1/visuals/references/F1.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T11:34:39.257880+00:00",
+     "at": "2026-11-11T13:31:09.791389+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

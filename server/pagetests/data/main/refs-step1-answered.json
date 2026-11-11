@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T11:33:06.961200+00:00",
+   "at": "2026-11-11T13:29:32.606785+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no standard stretcher bond instead of alternating rowlock and shiner",
-     "no bricks laid flat on bed instead of on edge",
-     "no all-header or all-stretcher faces",
-     "no 215 mm by 65 mm standard UK or metric brick proportions",
-     "no flush or recessed raked joints instead of standard 10 mm mortar joints",
-     "no gray, brown, yellow, or multi-colored variegated brickwork",
-     "no heavily weathered, chipped, or reclaimed textured surfaces",
-     "no bricks with width-to-height ratio greater than 3:1",
-     "no stacked vertical bond alignment",
-     "no Flemish bond with flat stretchers instead of edge shiners",
-     "no oversized or non-uniform joint thickness",
-     "no smooth glazed or painted brick finish"
+     "no running bond (stretcher bond) instead of alternating bond",
+     "no standard flat laying instead of bricks laid on edge",
+     "no stretchers-only display without alternating headers facing front",
+     "no imperial or modern modular proportions of 3:1 instead of 2.1:1",
+     "no oversized or irregular mortared joints instead of 10 mm",
+     "no grey, yellow, brown, or weathered brick instead of red brick",
+     "no recessed, flush, or missing mortar joints instead of standard 10 mm beds",
+     "no rough, reclaimed, or tumbled texture instead of uniform crisp faces",
+     "no decorative Flemish or English bond with full-depth alternating rows",
+     "no weep holes, wall ties, or metal fittings shown on the surface",
+     "no painted, glazed, or whitewashed brick finish",
+     "no soldier courses or vertical stacks instead of horizontal courses"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T11:33:11.029792+00:00",
+   "at": "2026-11-11T13:29:37.108323+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -418,13 +418,14 @@
     "golden": false,
     "from_golden": null,
     "edit": null,
+    "locked": null,
     "shot_id": null,
     "url": "/runs/VW-20/file/run-1/visuals/references/F1.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T11:33:11.029792+00:00",
+     "at": "2026-11-11T13:29:37.108323+00:00",
      "quote": "Yes."
     },
     "rejection": null,

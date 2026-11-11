@@ -657,6 +657,43 @@ def _():
     return store, conn, NEW
 
 
+# Round 3 (11 Nov 2026): a verdict changed both ways (U17), the operator's own picture (U19)
+def own_png(colour=(120, 80, 40)):
+    from PIL import Image
+    png = io.BytesIO()
+    Image.new('RGB', (64, 48), colour).save(png, format='PNG')
+    return png.getvalue()
+
+
+@state('refs-step1-footage-picture-ignored', 'references')
+def _():
+    _, store, conn = step1()
+    VS.reject_reference(store, USER, NEW, [], 'F1', '', '')   # Ignore on the footage picture: it stays on its card and offers Use this picture
+    return store, conn, NEW
+
+
+@state('refs-step1-own-picture', 'references')
+def _():
+    _, store, conn = step1()
+    VS.supply_own(conn, store, USER, NEW, [], 'E2', content=own_png(), name='my-kiln.png')
+    return store, conn, NEW
+
+
+@state('refs-step2-own-picture', 'references')
+def _():
+    _, store, conn, _s = step2()
+    VS.supply_own(conn, store, USER, NEW, [], 'E2', content=own_png(), name='my-kiln.png')   # beside the set's pictures; it can be chosen as the starting picture
+    return store, conn, NEW
+
+
+@state('pictures-picture-rejected', 'pictures')
+def _():
+    _, store, conn = complete()
+    edit(store, lambda s: s['references'].update(K1=keyframe('K1', 'IM1')))
+    VS.reject_reference(store, USER, NEW, [], 'K1', 'the mark reads 320 mm', '')   # nothing else stands in its place: it can be approved after all
+    return store, conn, NEW
+
+
 def main():
     out = HERE / 'data' / (args.name or args.rev or 'main')
     out.mkdir(parents=True, exist_ok=True)

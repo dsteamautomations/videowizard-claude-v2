@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T11:35:09.194182+00:00",
+   "at": "2026-11-11T13:31:42.622434+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -182,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T11:35:09.194182+00:00",
+   "at": "2026-11-11T13:31:42.622434+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -418,13 +418,14 @@
     "golden": false,
     "from_golden": null,
     "edit": null,
+    "locked": null,
     "shot_id": null,
     "url": "/runs/VW-20/file/run-1/visuals/references/F1.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T11:35:09.195193+00:00",
+     "at": "2026-11-11T13:31:42.622434+00:00",
      "quote": "Yes."
     },
     "rejection": null,

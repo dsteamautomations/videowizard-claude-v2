@@ -422,10 +422,10 @@ def test_select_a_take(open_page, _id):
     put.click('tr[data-take="job-take-1"]')
     put.click('#panel button[data-a="select-take"]')
     assert only_post(put) == {'action': 'select-take', 'job_id': 'job-take-1'}
-    for state in ('takes-selected', 'takes-rejected', 'takes-being-made'):
+    for state, offered in (('takes-selected', ['reject-take']), ('takes-rejected', ['select-take']), ('takes-being-made', [])):   # round 3, U17: the opposite verdict stays on offer; never the verdict the take already has
         other = open_page(state)
         other.click('tr[data-take="job-take-1"]')
-        assert other.page.locator('#panel button[data-a="select-take"], #panel button[data-a="reject-take"]').count() == 0, f'{state}: the take still offers Select or Reject'
+        assert [b.get_attribute('data-a') for b in other.page.locator('#panel button[data-a="select-take"], #panel button[data-a="reject-take"]').all()] == offered, f'{state}: the take offers the wrong verdicts'
 
 
 @ident('C-3.2-32')
@@ -681,7 +681,7 @@ def test_lapsed_sign_in(open_page, _id):
     put.page.route('**/visuals/data', lambda r: r.fulfill(status=401, body=''))
     put.page.evaluate('document.dispatchEvent(new Event("visibilitychange"))')
     put.page.wait_for_url('**/login?next=*', timeout=3000)
-    assert put.page.url.endswith(f'/login?next=%2Fruns%2F{CODE}%2Fvisuals')
+    assert put.page.url.endswith(f'/login?next=%2Fruns%2F{CODE}%2Fvisuals%23references%2FE1')   # round 3, U14: the address names the tab shown and its card, so signing in comes back to it
 
 
 def test_no_script_error_while_operating(open_page):

@@ -14,9 +14,11 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | `set_answer` | `{action: 'set_answer', element_id, verdict, golden, words}` | at every change of a card's answer at step 2: the starting picture chosen or changed, Yes / No / Correct it chosen, the words box left after typing. It always carries the card's whole answer | R13 |
 | `set_make` | `{action: 'set_make', element_id}` | a press of "Make it now" | R17 |
 | `set_aside` | `{action: 'set_aside', element_id, words}` to set aside; `{action: 'set_aside', element_id, back: true}` to bring back | a press of "Set aside" on a set that was never made (the words at the foot go with it, optional); a press of "Bring back" | follow-up fix 3 |
+| `reapprove` | `{action: 'reapprove', reference_id, sha256}` | a press of Approve on a rejected picture ("Use this picture" on an ignored footage picture, "Use it again" on a removed picture of the operator's own); the server function is `visuals_stage.reapprove_reference` | U17 |
+| `supply` (an action of before, now also on a card) | `{action: 'supply', element_id, name, content_base64}` for a file, `{action: 'supply', element_id, url}` for a link | a press of "Upload my own picture" on the card of a thing or a place, at step 1 and at step 2 | U19 |
 
 - `verdict`: `'yes'`, `'no'`, `'correct'`, or `null` while only the starting picture is chosen.
-- `golden`: the picture's id, or `null` (a person's set, a No, nothing chosen yet). Never an empty string.
+- `golden`: the picture's id, or `null` (a person's set, a No, nothing chosen yet). Never an empty string. Since U19 it may be the id of the operator's own picture of the same element (an approved `supplied` reference); the server refuses another element's picture and, for a person, an uploaded photo.
 - `words`: the text of the card's words box (`''` when empty).
 - Done (`round-sets`) keeps its body of today.
 
@@ -29,6 +31,7 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | `gaps[].shots[].asset.by` | the name of the person who supplied the file (a supplied movie or still) | R21 |
 | `gaps[].shots[].asset.quote` | the operator's words given with the supplied file | R21 |
 | `gaps[].shots[].asset.duration_s` | the length of a supplied movie, in seconds | E17 |
+| `references[].locked` | one plain line saying why the verdict on this picture can no longer be changed (a later step used it), or `null`; set only on an approved or a rejected picture (`visuals_stage.verdict_lock`) | U17 |
 
 ## 3. Controls
 
@@ -45,6 +48,14 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | Bring back an element set aside | `button[data-a="set-back"][data-el="<element>"]` on its card, while the round is open | `Bring back` | follow-up fix 3 |
 | The confirmation of Done at step 1 (a kept film) | `#done-confirm`, shown by the first press of `button[data-a="round-done"]`; Back and Finish stay in `#action` | `N footage picture(s) used · N ignored · N set(s) will be made (paid, about ₹N) · N will not be made`, then who is not made and why | follow-up fix 8 |
 | Retry a failed save of one answer | `button[data-a="set-answer-retry"][data-el="<element>"]` | `Try again` | E9 |
+| The verdict on one picture, both ways (a footage picture at step 1, a picture on Pictures or Takes, a saved picture of an older film, the style sheet, the operator's own picture) | a candidate: `button[data-a="approve"]` and `button[data-a="reject"]`; an approved one: `button[data-a="reject"]`; a rejected one: `button[data-a="reapprove"][data-ref="<picture>"][data-sha]` | `Approve` / `Reject`; on a footage picture `Use this picture` / `Ignore`; on an own picture `Use it again` / `Remove` | U17 |
+| A picture whose verdict can no longer be changed | `[data-locked="<picture>"]` (class `lockd`) in place of the buttons | the server's `locked` line, for example `Step 1 of the reference round is done with this picture used; it can no longer be changed here.` | U17 |
+| A take, both ways | a rejected take offers `button[data-a="select-take"]`, a selected one `button[data-a="reject-take"]`; once its gap is recorded neither | `The gap is recorded; this take can no longer be changed here.` | U17 |
+| Upload the operator's own picture, on the card of a thing or a place (step 1; step 2 on a set that was made and is not yet approved) | `[data-own="<element>"]` holding `input[type=file][id="up-<element>"]` (PNG, JPEG, WebP), `input[id="url-<element>"]` and `button[data-a="supply"][data-el="<element>"]` | `Upload my own picture` | U19 |
+| No upload for a person | `[data-own-no="<element>"]` on the person's card; no file box | `A person's reference is made from the description; an uploaded photo is not used for people.` | U19 |
+| A picture of the operator's own on its card | `.pic[data-own-pic="<element>"][data-item="<picture>"]`; at step 2 it carries `[data-golden="<element>:<picture>"]` like a picture of the set | `your picture` | U19 |
+| The button whose request is running | the button is `disabled` and has class `busy` (it shows ` …` after its text) | | U18 |
+| A refusal or a failure, beside the button pressed | `.near` (class `err` for a refusal, `net` for a failed connection), placed right after the button's own row, inside its card, the right panel or the foot; it stays until the next action or a redraw of the card | the same text as the bar `#fmsg` | U18 |
 
 ## 4. Texts and marks
 
@@ -75,3 +86,6 @@ Everything else the tests use is what `visuals.html` has today (`data-a="<action
 | A picture whose file is missing | the picture is replaced by an element with class `ph` that says `picture not available` | E16 |
 | A lapsed sign-in | the page goes to `/login?next=<the page's path and its #link>` | E10 |
 | A script error | the bar turns red and says `the page hit an error; reload` | failure modes |
+| An ignored footage picture at step 1 | it stays on its card, dimmed, marked `rejected`, with `Use this picture` | U17 |
+| A file the page can tell is wrong, before anything is sent | `That file is larger than 15 MB: choose a smaller picture.`; `That file is not a PNG, JPEG or WebP picture: choose another.`; `Choose a file or paste an https link first.` | U19 |
+| A tab switch | the right panel closes unless the new tab has its own selected card with a picture or a take; the address is `#<tab>` or `#<tab>/<card>` of the tab shown | U14 |

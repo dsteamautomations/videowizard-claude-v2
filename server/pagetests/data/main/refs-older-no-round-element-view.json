@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T11:33:29.401663+00:00",
+   "at": "2026-11-11T13:29:57.527095+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -110,19 +110,19 @@
   },
   "searches": [
    {
-    "at": "2026-11-11T11:33:29.405260+00:00",
+    "at": "2026-11-11T13:29:57.535838+00:00",
     "by": "u1",
     "element_id": "E2",
     "failed": [],
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "db353a6e974a"
+     "f934a240b024"
     ],
     "picked": [
      1
     ],
     "quote": "Yes, search for the kiln.",
-    "search_id": "db353a6e974a",
+    "search_id": "f934a240b024",
     "results": [
      {
       "download": "picture",
@@ -161,7 +161,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-11T11:33:29.401663+00:00",
+   "at": "2026-11-11T13:29:57.527095+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -181,9 +181,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "db353a6e974a",
+     "search_id": "f934a240b024",
      "search_ids": [
-      "db353a6e974a"
+      "f934a240b024"
      ],
      "source": "",
      "verdict": "search",
@@ -324,7 +324,7 @@
   ],
   "references": [
    {
-    "id": "26ab0c59b07dc1c62a82ae3edd1af0b6",
+    "id": "3bc6ec5fef7ed3a97f3d58dd4cb891ad",
     "name": "web-E2-1",
     "kind": "web",
     "element_id": "E2",
@@ -344,13 +344,14 @@
     "golden": false,
     "from_golden": null,
     "edit": null,
+    "locked": null,
     "shot_id": null,
-    "url": "/runs/VW-9/file/run-1/visuals/references/26ab0c59b07dc1c62a82ae3edd1af0b6.png",
+    "url": "/runs/VW-9/file/run-1/visuals/references/3bc6ec5fef7ed3a97f3d58dd4cb891ad.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T11:33:29.406266+00:00",
+     "at": "2026-11-11T13:29:57.538866+00:00",
      "quote": "This one, colour only."
     },
     "rejection": null,
@@ -384,13 +385,14 @@
     "golden": false,
     "from_golden": null,
     "edit": null,
+    "locked": null,
     "shot_id": null,
     "url": "/runs/VW-9/file/run-1/visuals/references/F1.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T11:33:29.405260+00:00",
+     "at": "2026-11-11T13:29:57.536853+00:00",
      "quote": "Yes: the first frame."
     },
     "rejection": null,

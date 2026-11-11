@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T11:33:29.377318+00:00",
+   "at": "2026-11-11T13:29:57.485022+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -110,16 +110,16 @@
   },
   "searches": [
    {
-    "at": "2026-11-11T11:33:29.383495+00:00",
+    "at": "2026-11-11T13:29:57.502828+00:00",
     "by": "u1",
     "element_id": "E2",
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "b5421cc44533"
+     "a741db79a70a"
     ],
     "picked": [],
     "quote": "Yes, search for the kiln.",
-    "search_id": "b5421cc44533",
+    "search_id": "a741db79a70a",
     "results": [
      {
       "download": "picture",
@@ -158,7 +158,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-11T11:33:29.377318+00:00",
+   "at": "2026-11-11T13:29:57.485678+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -177,9 +177,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "b5421cc44533",
+     "search_id": "a741db79a70a",
      "search_ids": [
-      "b5421cc44533"
+      "a741db79a70a"
      ],
      "source": "",
      "verdict": "search",
@@ -347,6 +347,7 @@
     "golden": false,
     "from_golden": null,
     "edit": null,
+    "locked": null,
     "shot_id": null,
     "url": "/runs/VW-9/file/run-1/visuals/references/F1.png",
     "prompt": null,
