@@ -138,8 +138,9 @@ def test_the_round_complete(open_page, _id):
     for c in put.cards():
         rail(put, c['unit']).click()
         assert c['badge'].lower() in ('sheet approved', 'approved', 'from your footage'), f'{c["unit"]} is shown as "{c["badge"]}" though the round is complete'
-        pics = put.page.locator('#s-references .strip .pic[data-item]')
-        assert pics.count() >= 1 and all('approved' in t.lower() for t in pics.all_inner_texts()), f'{c["unit"]}: its pictures do not all say approved'
+        pics = put.page.locator('#s-references .strip .pic[data-item]:visible')
+        said = [' '.join(t.split()) for t in pics.all_inner_texts()]
+        assert said and all('approved' in t.lower() for t in said), f'{c["unit"]}: its pictures do not all say approved: {said}'
         assert put.page.locator('#s-references input[type=radio]').count() == 0
     clean(put)
 
