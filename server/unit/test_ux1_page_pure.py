@@ -45,7 +45,7 @@ def test_1_every_action_id_and_data_attribute_of_the_old_page_is_still_there():
 
 def test_5_every_request_body_is_sent_as_before():
     assert [s for s in OLD_SENDS if s not in SCRIPT] == []
-    assert SCRIPT.count("fetch(base+'/act'") == 2 and "fetch(base+'/data',{cache:'no-store'})" in SCRIPT   # the page talks to the same two routes, nothing new
+    assert SCRIPT.count("fetch(base+'/act'") == 3 and "fetch(base+'/data',{cache:'no-store'})" in SCRIPT   # the page talks to the same two routes, nothing new; UI change, 11 Nov 2026 (R13): a third call on the same route stores one answer of step 2 (set_answer), outside the in-flight lock
 
 
 def test_ux1_the_rail_the_stage_and_the_message_bar_are_on_the_page():

@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import UUID
 
 import base64
+import logging
 import hashlib
 from io import BytesIO
 
@@ -381,6 +382,24 @@ async def visuals_act(request: Request, code: str, vw2_session: str | None = Coo
     return await run_in_threadpool(_visuals_act, code, vw2_session, body)
 
 
+PAGE_FAILED = 'That could not be done; nothing was changed. The builder has been told what failed.'
+
+
+def _page_call(fn, action):
+    """Follow-up, 11 Nov 2026: one page action. A refusal written for the operator arrives as written; anything unexpected (a missing key, a wrong type)
+    goes to the server log with its trace and reaches the operator as one plain sentence, never as a bare key name or an exception's text."""
+    from . import visuals_stage as V
+    try:
+        return fn()
+    except Problem:
+        raise
+    except ValueError as exc:   # the contract's own refusals (need): plain words already
+        V.fail(exc)
+    except Exception:
+        logging.getLogger('vw2.page').exception('visuals page action %r failed', action)
+        raise Problem(500, 'PAGE_ACTION_FAILED', PAGE_FAILED)
+
+
 def _visuals_act(code, vw2_session, body):
     """One JSON post per button. Every action calls the server function the vw tool calls (design/65 §8), behind the visuals stage gate."""
     from fastapi.responses import JSONResponse
@@ -409,9 +428,13 @@ def _visuals_act(code, vw2_session, body):
             'pick': lambda: V.pick(store, user, run, outputs, body['search_id'], list(body.get('picks') or []), quote),
             'nothing-fits': lambda: V.nothing_fits(store, user, run, outputs, body['search_id'], str(body.get('reason') or '')),
             'round-done': lambda: V.round_done(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, conn=conn),   # design/79; design/121 change 6: no search at Done; design/151
-            'round-sets': lambda: V.round_sets(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, conn=conn),   # design/151
+            'round-sets': lambda: V.round_sets(store, user, run, outputs, dict(body.get('verdicts') or {}), quote, conn=conn, partial=True),   # design/151; R15: the page records the answered sets, the others stay on step 2
+            'set_answer': lambda: V.set_answer(store, user, run, outputs, body['element_id'], body.get('verdict'), body.get('golden'), body.get('words')),   # R13: one answer of step 2, stored as it is made
+            'set_aside': lambda: V.set_aside(store, user, run, outputs, body['element_id'], str(body.get('words') or ''), bool(body.get('back'))),   # follow-up: a set never made, set aside at step 2, or brought back
+            'set_make': lambda: V.set_make(conn, store, user, run, outputs, body['element_id']),   # R17: a set that was not made, made now
             'round-picks': lambda: V.round_picks(store, user, run, outputs, dict(body.get('picks') or {}), quote, list(body.get('ignore') or [])),   # design/121 change 1
             'approve': lambda: V.approve_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),
+            'reapprove': lambda: V.reapprove_reference(store, user, run, outputs, body['reference_id'], body['sha256'], quote, conn),   # U17: a rejected picture approved after all, until a later step used it
             'footage': lambda: V.correct_footage(store, user, run, outputs, {k: body.get(k) for k in ('camera', 'support', 'look')}, quote),   # design/88 F4
             'sequence': lambda: V.sequence(store, user, run, outputs, body['shot_id'], list(body.get('reference_ids') or []), quote),
             'still': lambda: V.still_from_reference(store, user, run, outputs, body['shot_id'], body['reference_id'], quote, {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop'), body.get('move')),
@@ -436,7 +459,7 @@ def _visuals_act(code, vw2_session, body):
         }
         if action not in calls:
             raise Problem(404, 'NOT_FOUND', 'No such action.')
-        out = V.guarded(calls[action])
+        out = _page_call(calls[action], action)
         out = out if isinstance(out, dict) else {'done': True}
         return JSONResponse(core.jsonable({**{k: v for k, v in out.items() if k != 'view'}, 'view': _visuals_payload(conn, store, run)}))
 
