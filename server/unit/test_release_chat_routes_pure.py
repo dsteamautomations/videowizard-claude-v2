@@ -39,8 +39,8 @@ def test_an_unexpected_error_in_a_visuals_route_reaches_the_chat_tool_as_the_pla
         raise KeyError('request_key')
     with pytest.raises(Problem) as e:
         VS.guarded(boom)
-    assert e.value.message == web.PAGE_FAILED == 'That could not be done; nothing was changed. The builder has been told what failed.'
-    assert e.value.status == 500 and 'request_key' not in e.value.message and 'request_key' in caplog.text   # the real text goes to the server log
+    assert web.PAGE_FAILED == 'That could not be done; nothing was changed. The builder has been told what failed.'
+    assert e.value.status == 422 and e.value.message == "The request is missing 'request_key', or names something this run does not hold. Nothing was changed." and 'request_key' in caplog.text   # a missing name is a refusal the assistant can act on, in a sentence; the page has its own plain line
     for exc in (TypeError("'NoneType' object is not subscriptable"), ZeroDivisionError('division by zero')):
         with pytest.raises(Problem) as e:
             VS.guarded(lambda: (_ for _ in ()).throw(exc))

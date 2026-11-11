@@ -54,7 +54,10 @@ def guarded(fn):
         return fn()
     except ValueError as exc:
         fail(exc)
-    except (KeyError, TypeError, ZeroDivisionError):
+    except KeyError as exc:   # a missing field in what the chat tool sent, or a record the run does not hold: the assistant can act on the name; the page has its own plain sentence (web._page_call)
+        logging.getLogger('vw2.visuals').exception('a visuals call failed')
+        raise Problem(422, 'VISUALS_CONTRACT', f'The request is missing {exc.args[0]!r}, or names something this run does not hold. Nothing was changed.')
+    except (TypeError, ZeroDivisionError):
         logging.getLogger('vw2.visuals').exception('a visuals call failed')
         raise Problem(500, 'VISUALS_FAILED', UNEXPECTED)
 
