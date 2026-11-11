@@ -72,13 +72,15 @@ class Conn(S.FakeConn):
         return super().execute(sql, params)
 
 
-def film(els=(R.KILN, R.MASON, BRICK), run=NEW, g1=None, g2=None, frame='candidate', **over):
+def film(els=(R.KILN, R.MASON, BRICK), run=NEW, g1=None, g2=None, frame='candidate', tweak=None, **over):
     """A film with a recorded treatment and an accepted plan: G1 one still shot, G2 one video shot; E1 has a footage frame."""
     doc = R.doc_with(*els)
     if g1:
         doc['gaps'][0]['scenes'][0]['shots'] = g1
     if g2:
         doc['gaps'][1]['scenes'][0]['shots'] = g2
+    if tweak:
+        tweak(doc)
     f1 = {**S.ref('F1', frame), 'kind': 'frame', 'element_id': 'E1', 'width': 1920, 'height': 1080}
     over.setdefault('accepted', S.accepted(doc))
     store = R.new_store(doc, {'F1': f1}, **over)
@@ -457,6 +459,160 @@ def _():
     return store, conn, NEW
 
 
+# ---------- states added for layer 1 (a control that appears in none of the states above) and layer 3 (edge cases) ----------
+MEDIA = [{'stage': 'media', 'unit': None, 'summary': {'clips': [{'id': 'C0120', 'name': 'C0120.MP4', 'duration_s': 42.0, 'sha256': 'sha-clip', 'bytes': 1000, 'fps': 25, 'width': 1920, 'height': 1080}]}}]
+PENDING = {'action': 'clip', 'clip_id': 'C0120', 'in_s': 2.0, 'crop': None, 'on_screen': 'G1 at 0:04', 'reason': 'the only shot of the pour', 'considered': 'a closer angle adds nothing', 'quote': ''}
+LONG = 'The retaining wall at the north end of the yard, beside the curing tank and under the neem tree, the one the client calls the old sample wall'
+
+
+@state('controls-treatment-footage', 'treatment', note='session.footage is set directly: prepare measures the clips with ffprobe')
+def _():
+    store = S.store_with(S.session(footage={'summary': {'camera': 'cinema', 'support': 'tripod', 'look': 'natural'}, 'per_clip': {}}))
+    VS.treatment(store, USER, NEW, [], TREAT, '')
+    return store, Conn([]), NEW
+
+
+def two_choices(doc):
+    gap = doc['gaps'][1]
+    scene = lambda sid, shots: {**gap['scenes'][0], 'id': sid, 'shots': shots}
+    opt = lambda cid, title, sid: {'id': cid, 'title': title, 'why': 'it shows the water', 'formats': ['ai_video'], 'description': 'd', 'tradeoff': 't', 'source_strategy': 's',
+                                   'scenes': [scene('S' + cid, [S.shot(sid, 900, 1150, 'video', element_ids=['E1'])])]}
+    gap.update(scenes=[], recommended_choice='A', decision_reason='the pour reads better from the side', choices=[opt('A', 'From the side', 'VS1'), opt('B', 'From above', 'VS2')])
+
+
+@state('controls-plan-two-choices', 'plan')
+def _():
+    _, store, conn = film(tweak=two_choices, accepted={})
+    return store, conn, NEW
+
+
+@state('controls-pictures-many', 'pictures', note='reuse_pending is set directly: the reuse gate writes it when a placement repeats footage already on screen')
+def _():
+    _, store, conn = complete()
+    edit(store, lambda s: s['references'].update(K0={**keyframe('K0', 'IM1', 'rejected'), 'rejection': {'notes': 'the mark reads 320 mm', 'quote': 'No.', 'by': 'u1'}}, K1=keyframe('K1', 'IM1'),
+                                                 L1=S.ref('L1', 'approved')))
+    VS.ask(store, USER, NEW, MEDIA, 'IM1', 'Make the plinth from above or from the side?', ['From above', 'From the side'], 20)
+    VS.ask(store, USER, NEW, MEDIA, 'K1', 'Keep the chalk mark on this picture?', ['Keep it', 'Remove it'])
+    edit(store, lambda s: s.setdefault('reuse_pending', {}).update(IM1=dict(PENDING)))
+    return store, conn, NEW, MEDIA
+
+
+@state('controls-pictures-approved-not-placed', 'pictures')
+def _():
+    _, store, conn = complete()
+    edit(store, lambda s: s['references'].update(K1=keyframe('K1', 'IM1')))
+    VS.approve_reference(store, USER, NEW, [], 'K1', 'sha-K1', 'Yes.', conn=conn)
+    VS.still_from_reference(store, USER, NEW, [], 'IM1', 'K1', 'Use it.')
+    VS.unplace(store, USER, NEW, [], 'IM1', 'Take it out for now.')
+    return store, conn, NEW
+
+
+@state('controls-pictures-clip-placed', 'pictures')
+def _():
+    _, store, conn = complete()
+    VS.fill_clip(store, USER, NEW, MEDIA, 'IM1', 'C0120', 2, 'Use the clip of the plinth.')
+    return store, conn, NEW, MEDIA
+
+
+SEQ = [{'what_appears': 'section', 'hold_s': 7}, {'what_appears': 'cavities', 'hold_s': 7}, {'what_appears': 'label', 'hold_s': 6}]
+
+
+def seq_refs(s):
+    s['references'].update(R1={**S.ref('R1', 'approved'), 'shot_id': 'AN1'}, R2={**S.ref('R2', parents=['R1']), 'shot_id': 'AN1'}, R3={**S.ref('R3', parents=['R2']), 'shot_id': 'AN1'})
+
+
+@state('controls-pictures-sequence-states-made', 'pictures')
+def _():
+    _, store, conn = complete(g1=[S.shot('AN1', 0, 500, 'animation', element_ids=['E1'], states=SEQ)])
+    edit(store, seq_refs)
+    return store, conn, NEW
+
+
+@state('controls-pictures-sequence-one-state', 'pictures')
+def _():
+    _, store, conn = complete(g1=[S.shot('AN1', 0, 500, 'animation', element_ids=['E1'], states=SEQ)])
+    edit(store, lambda s: s['references'].update(R1={**S.ref('R1'), 'shot_id': 'AN1'}))
+    return store, conn, NEW
+
+
+@state('controls-pictures-sequence-placed', 'pictures')
+def _():
+    _, store, conn = complete(g1=[S.shot('AN1', 0, 500, 'animation', element_ids=['E1'], states=SEQ)])
+    edit(store, seq_refs)
+    VS.sequence(store, USER, NEW, [], 'AN1', ['R1', 'R2', 'R3'], 'Yes, these three states.')
+    return store, conn, NEW
+
+
+@state('controls-takes-two-takes', 'takes', note='reuse_pending is set directly, as in controls-pictures-many')
+def _():
+    _, store, conn = complete()
+    edit(store, lambda s: s['references'].update(K0={**keyframe('K0', 'VS1', 'rejected', role='start'), 'rejection': {'notes': 'too dark', 'quote': 'No.', 'by': 'u1'}},
+                                                 K1=keyframe('K1', 'VS1', 'approved', role='start')))
+    conn.jobs += [take('job-take-1', 'VS1'), take('job-take-2', 'VS1')]
+    edit(store, lambda s: s['reviews'].update({'job-take-1': [{'decision': 'rejected', 'notes': 'the water pours upward', 'quote': 'No.', 'by': 'u1'}]}))
+    VS.ask(store, USER, NEW, MEDIA, 'VS1', 'Pour from a bucket or from a hose?', ['A bucket', 'A hose'])
+    edit(store, lambda s: s.setdefault('reuse_pending', {}).update(VS1=dict(PENDING)))
+    return store, conn, NEW, MEDIA
+
+
+@state('controls-older-search-found-nothing', 'references')
+def _():
+    store, conn = older()
+    VS.apify.search_images = lambda keywords, n=10: []
+    VS.search(store, USER, OLD, [], 'E2', 'unfindable kiln words', 'Search again.')
+    return store, conn, OLD
+
+
+@state('refs-no-elements', 'references')
+def _():
+    _, store, conn = film(els=(), tweak=lambda doc: doc.update(elements=[]))
+    return store, conn, NEW
+
+
+@state('refs-step1-picture-answered-spec-waits', 'references')
+def _():
+    _, store, conn = step1(spec=False)
+    VS.approve_reference(store, USER, NEW, [], 'F1', 'sha-F1', 'Yes.', conn=conn)   # the footage picture is answered; the brick's spec still waits (U3)
+    return store, conn, NEW
+
+
+@state('refs-step2-spec-approved-after-refusal', 'references')
+def _():
+    _, store, conn, _s = step2(spec=False)   # the brick's set was refused for its unapproved spec ...
+    VS.approve_spec(store, USER, NEW, [], 'element:BRICK', '')   # ... and the spec is approved afterwards (U8)
+    return store, conn, NEW
+
+
+@state('refs-step2-spec-corrected-after-set', 'references')
+def _():
+    _, store, conn, _s = step2()
+    VS.correct_spec(store, USER, NEW, [], 'element:BRICK', 'the joint is 12 mm, not 10')
+    return store, conn, NEW
+
+
+@state('refs-step2-set-with-a-failed-picture', 'references', note='one picture of the brick set is marked failed, as the image worker marks it')
+def _():
+    _, store, conn, s = step2()
+    edit(store, lambda x: x['references'][sheets(s, 'BRICK')[2]].update(status='failed', key=None))
+    return store, conn, NEW
+
+
+@state('takes-shot-filled-with-supplied-still', 'takes')
+def _():
+    _, store, conn = complete()
+    conn.files = {'run-1/uploads/wall.png': {'key': 'run-1/uploads/wall.png', 'sha256': 'sha-still', 'bytes': 500}}
+    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/wall.png', 'sha-still', 500, 'still', 'A photograph of the wet wall instead.')
+    return store, conn, NEW
+
+
+@state('cross-long-names', 'references')
+def _():
+    wall = {**R.KILN, 'id': 'E3', 'name': LONG, 'requirements': LONG + '. ' + LONG}
+    rows = ROWS + [{'element_id': 'E3', 'prompt': 'the old sample wall'}]
+    _, store, conn, _s = step2(els=(R.KILN, R.MASON, BRICK, wall), rows=rows)
+    return store, conn, NEW
+
+
 def main():
     out = HERE / 'data' / (args.name or args.rev or 'main')
     out.mkdir(parents=True, exist_ok=True)
@@ -465,8 +621,8 @@ def main():
     failed = []
     for name, (tab, meta, fn) in STATES.items():
         try:
-            store, conn, run = fn()
-            view = VS.page_view(conn, store, run, [], run['code'], meta.get('repair', True))
+            store, conn, run, *rest = fn()   # a fourth item, when given: the run's outputs (the media stage's clips)
+            view = VS.page_view(conn, store, run, rest[0] if rest else [], run['code'], meta.get('repair', True))
         except Exception as exc:   # a state this version of the server cannot make: listed, never written
             failed.append((name, f'{type(exc).__name__}: {getattr(exc, "message", None) or exc}'))
             continue

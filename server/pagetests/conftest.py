@@ -62,6 +62,7 @@ class PageUnderTest:
     def __init__(self, page, state, code):
         self.page, self.state, self.payload, self.code = page, state, state['payload'], code
         self.posts, self.js_errors, self.console_errors, self.failed_requests, self.unstubbed = [], [], [], [], []
+        self.data_gets, self.answers = 0, {}   # how many times the page read its data; the answers per action, which a test may change while the page is open
 
     # ----- doing -----
     def click(self, target, **kw):
@@ -92,6 +93,40 @@ class PageUnderTest:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.page.screenshot(path=str(path))
         return path
+
+    def serve(self, state_name, patch=None):
+        """From now on the server answers with another state's payload (what a real server would hold after the last action)."""
+        self.payload = load_state(state_name)['payload']
+        if patch:
+            patch(self.payload)
+
+    def refresh(self):
+        """The page reads its data again, as it does on its timer or when the operator returns to the browser tab."""
+        n = self.data_gets
+        self.page.evaluate('document.dispatchEvent(new Event("visibilitychange"))')
+        self.page.wait_for_function('true', timeout=2000)
+        for _ in range(40):
+            if self.data_gets > n:
+                break
+            self.page.wait_for_timeout(25)
+        self.page.wait_for_timeout(60)
+
+    def wait_posts(self, n=1, ms=1500):
+        """Wait until n requests were sent (or ms passed); returns the posts."""
+        for _ in range(ms // 25):
+            if len(self.posts) >= n:
+                break
+            self.page.wait_for_timeout(25)
+        self.page.wait_for_timeout(60)
+        return self.posts
+
+    def visible(self, selector):
+        loc = self.page.locator(selector)
+        return loc.count() > 0 and loc.first.is_visible()
+
+    def text(self, selector):
+        loc = self.page.locator(selector)
+        return loc.first.inner_text().strip() if loc.count() else ''
 
     # ----- reading -----
     def header_count(self):
@@ -163,15 +198,22 @@ def open_page(browser, assets):
     """open_page(state_name, size='1920x1080', tab=<the state's own tab>, answers={action: (status, body)}) -> PageUnderTest, loaded and on that tab."""
     contexts = []
 
-    def _open(state_name, size='1920x1080', tab=None, answers=None):
+    def _open(state_name, size='1920x1080', tab=None, answers=None, patch=None, clock=False, context=None, wait=True):
         state = load_state(state_name)
+        if patch:   # a field the approved contract adds to the data and the server does not send yet (CONTRACT.md)
+            patch(state['payload'])
         payload, code = state['payload'], state['payload']['run']['code']
         html = assets['env'].get_template('visuals.html').render(run={'code': code}, user={'name': 'SK', 'role': 'Admin'}, version='pagetests', request=None)
         w, h = SIZES[size]
-        ctx = browser.new_context(viewport={'width': w, 'height': h})   # a new context: empty localStorage, no remembered tab
-        contexts.append(ctx)
+        ctx = context or browser.new_context(viewport={'width': w, 'height': h})   # a new context: empty localStorage, no remembered tab
+        if not context:
+            contexts.append(ctx)
         page = ctx.new_page()
+        page.set_default_timeout(5000)   # a control that is not there fails in seconds, not in half a minute
         put = PageUnderTest(page, state, code)
+        put.answers = dict(answers or {})
+        if clock:
+            page.clock.install()   # the page's timers run only when the test moves the clock
 
         def handle(route):
             rq = route.request
@@ -179,12 +221,13 @@ def open_page(browser, assets):
             if path.endswith(f'/runs/{code}/visuals'):
                 return route.fulfill(content_type='text/html', body=html)
             if path.endswith('/visuals/data'):
-                return route.fulfill(content_type='application/json', body=json.dumps(payload))
+                put.data_gets += 1
+                return route.fulfill(content_type='application/json', body=json.dumps(put.payload))
             if path.endswith('/visuals/act'):
                 body = json.loads(rq.post_data or '{}')
                 put.posts.append(body)
-                status, answer = (answers or {}).get(body.get('action'), (200, ANSWERS.get(body.get('action'), {'done': True})))
-                return route.fulfill(status=status, content_type='application/json', body=json.dumps(answer if status >= 400 else {**answer, 'view': payload}))
+                status, answer = put.answers.get(body.get('action'), (200, ANSWERS.get(body.get('action'), {'done': True})))
+                return route.fulfill(status=status, content_type='application/json', body=json.dumps(answer if status >= 400 else {**answer, 'view': put.payload}))
             if path.endswith('/static/style.css'):
                 return route.fulfill(content_type='text/css', body=assets['css'])
             if '/thumb/' in path or '/file/' in path or rq.resource_type == 'image':   # the run's pictures, and a search result's picture on an outside site
@@ -199,8 +242,9 @@ def open_page(browser, assets):
         page.on('requestfailed', lambda r: put.failed_requests.append(f'{r.url}: {r.failure}'))
         page.route('**/*', handle)
         page.goto(f'http://vw.test/runs/{code}/visuals')
-        page.wait_for_function('document.getElementById("line").textContent !== "Loading…"')
-        put.open_tab(tab or state['tab'])
+        if wait:
+            page.wait_for_function('document.getElementById("line").textContent !== "Loading…"')
+            put.open_tab(tab or state['tab'])
         return put
 
     yield _open
@@ -219,7 +263,7 @@ def pytest_runtest_logreport(report):
         if report.failed:
             crash = getattr(report.longrepr, 'reprcrash', None)
             msg = (crash.message if crash else str(report.longrepr)).split('\nassert')[0].strip()
-        _results.append({'test': report.nodeid.split('::')[-1], 'outcome': report.outcome, 'seconds': round(report.duration, 2), 'message': msg})
+        _results.append({'file': report.nodeid.split('::')[0].split('/')[-1], 'test': report.nodeid.split('::')[-1], 'outcome': report.outcome, 'seconds': round(report.duration, 2), 'message': msg})
 
 
 def pytest_terminal_summary(terminalreporter):
@@ -229,8 +273,9 @@ def pytest_terminal_summary(terminalreporter):
     (OUT / f'results-{LABEL}.json').write_text(json.dumps(_results, indent=1, ensure_ascii=False), encoding='utf-8')
     kind = lambda r: r['test'].split('[')[0]
     name = lambda r: re.sub(r'(^\d+x\d+-)|(-\d+x\d+$)', '', r['test'].partition('[')[2].rstrip(']'))
-    failed = lambda k: sorted({name(r) for r in _results if kind(r) == k and r['outcome'] == 'failed'})
-    n = len({name(r) for r in _results})
+    l2 = [r for r in _results if r['file'] == 'test_states.py']
+    failed = lambda k: sorted({name(r) for r in l2 if kind(r) == k and r['outcome'] == 'failed'})
+    n = len({name(r) for r in l2})
     tr = terminalreporter
     tr.write_sep('=', f'visuals page, layer 2: page {REV or "working tree"}, data {DATA.name}')
     tr.write_line(f'states rendered without a script or console error: {n - len(failed("test_loads_without_script_or_console_errors"))} of {n}')
@@ -240,4 +285,17 @@ def pytest_terminal_summary(terminalreporter):
                      ('test_layout_holds', 'states with a layout fault')]:
         f = failed(k)
         tr.write_line(f'{words}: {len(f)}' + (f'  ({", ".join(f)})' if f else ''))
+    ident = lambda r: r['test'].partition('[')[2].rstrip(']')
+
+    def line(words, rows):   # one layer: how many pass, and the ids that fail
+        bad = sorted(ident(r) for r in rows if r['outcome'] != 'passed')
+        if rows:
+            tr.write_line(f'{words}: {len(rows) - len(bad)} of {len(rows)}' + (f'  (failing: {", ".join(bad)})' if bad else ''))
+    tr.write_sep('=', 'layer 1: every control')
+    line('controls doing their one thing', [r for r in _results if r['file'].startswith('test_controls_') and ident(r).startswith('C-')])
+    tr.write_sep('=', 'layer 3: requirements, edge cases, faults, journeys')
+    line('requirements passing', [r for r in _results if r['file'] == 'test_requirements.py'])
+    line('edge cases passing', [r for r in _results if r['file'] == 'test_edge_cases.py'])
+    line('reported faults absent', [r for r in _results if r['file'] == 'test_faults.py'])
+    line('journeys walked to the end', [r for r in _results if r['file'] == 'test_journeys.py'])
     tr.write_line(f'results: {OUT / ("results-" + LABEL + ".json")}; screenshots: {OUT / "screens"}')

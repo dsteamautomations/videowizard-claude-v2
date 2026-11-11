@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:06:02.286620+00:00",
+   "at": "2026-11-11T08:59:01.921949+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running bond or stretcher bond layout",
-     "no flat-laid bricks instead of laid on edge",
-     "no all-stretcher faces facing forward",
-     "no standard rectangular bricks where height is under half length",
-     "no brown, grey, yellow, or multi-toned brick colour",
-     "no weathered, pitted, or rough reclaimed brick surface",
-     "no recessed, raked, or flush-coloured mortar joints",
-     "no thick or uneven mortar joints exceeding 10 mm",
-     "no oversized or non-modular brick dimensions",
-     "no english or flemish bond variation",
-     "no painted, glazed, or whitewashed brick finish",
-     "no wall ties, weep holes, or metal reinforcement fittings"
+     "no running bond (stretcher bond) patterns",
+     "no flat, stretcher-face-only orientations",
+     "no standard red clay textured faces",
+     "no brown, grey, or yellow brick colours",
+     "no standard modular 215 mm x 65 mm brick sizes",
+     "no thin or flush mortar joints",
+     "no bright white or dark contrasting mortar",
+     "no stacked bond layouts",
+     "no smooth modern machine-cut finishes",
+     "no rustic, tumbled, or weathered surfaces",
+     "no weep holes or metal wall ties visible",
+     "no 1:3 or ultra-elongated Roman brick proportions"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T08:06:06.211861+00:00",
+   "at": "2026-11-11T08:59:05.469098+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -418,7 +418,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T08:06:06.211861+00:00",
+     "at": "2026-11-11T08:59:05.469098+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T08:04:31.279285+00:00",
+   "at": "2026-11-11T08:57:33.311294+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -172,18 +172,18 @@
      "correction": null
     },
     "not_this": [
-     "no running bond or stretcher bond pattern",
-     "no English bond alternating all-header and all-stretcher courses",
-     "no standard flat-laid orientation with stretcher faces forward",
-     "no standard modular brick dimensions with 65 mm height",
-     "no oversized or elongated Roman brick proportions",
-     "no yellow, buff, brown, or grey brick colouring",
-     "no weathered, tumbled, or heavily distressed brick textures",
-     "no flush, raked, or dry-stacked mortarless joints",
-     "no recessed or dark charcoal mortar joints",
-     "no wall ties, weep holes, or metal flashing visible",
-     "no painted, glazed, or whitewashed surface finishes",
-     "no Flemish bond laid on the flat bed face"
+     "no running bond or standard stretcher bond",
+     "no bricks laid flat on bed instead of on edge",
+     "no standard red modular brick dimensions",
+     "no yellow, brown, or multi-colored brick faces",
+     "no recessed, raked, or flush mortar joints",
+     "no mortar joints thicker or thinner than 10 mm",
+     "no weathered, tumbled, or heavily textured surfaces",
+     "no all-header or all-stretcher wall patterns",
+     "no bricks lacking the 190 mm by 90 mm face proportion",
+     "no weep holes, wall ties, or metal expansion joints",
+     "no painted, glazed, or whitewashed brick finish",
+     "no vertical stack bond alignment"
     ]
    }
   ],
@@ -195,7 +195,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T08:04:35.444659+00:00",
+   "at": "2026-11-11T08:57:37.065214+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -411,7 +411,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T08:04:35.444659+00:00",
+     "at": "2026-11-11T08:57:37.065214+00:00",
      "quote": "Yes."
     },
     "rejection": null,
