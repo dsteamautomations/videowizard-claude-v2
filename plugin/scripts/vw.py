@@ -611,7 +611,27 @@ def next_line(nxt):
                 f"{page.get('narrations') or 0} narrations kept", (f"direction {page['direction']}" if page.get('direction') and page['direction'] != 'none' else 'no direction recorded'),
                 'final narration made' if page.get('final') else 'no final narration']
         line += ' · ' + ', '.join(bits)
+    s3 = nxt.get('stage3')
+    if s3 and s3.get('do_next'):   # handover (11 Nov 2026): what is left in the assembly or delivery stage, as the server says it
+        hand = s3.get('handover')
+        line += ' ' + (f"On a computer with DaVinci Resolve: {hand}." if hand == s3['do_next'] else s3['do_next'] + (f" On a computer with DaVinci Resolve: {hand}." if hand else ''))
     return line
+
+
+def pull_line(code, nxt, found):
+    """Handover H2, H3, H-E5: after a pull, where the run stands and whether DaVinci Resolve is on this computer (only this computer knows that).
+    With Resolve and a current package the hand-over is named first; without Resolve, what can be done here and what waits."""
+    s3 = (nxt or {}).get('stage3') or {}
+    hand, do = s3.get('handover'), s3.get('do_next')
+    here = (f"DaVinci Resolve {'Studio' if found.get('edition') == 'studio' else '(free)'} is on this computer" if found.get('found')
+            else 'DaVinci Resolve is not on this computer')
+    if not hand:
+        return f'Pulled {code}. {next_line(nxt)} {here}.'
+    rest = do if do and do != hand else None
+    if found.get('found'):
+        return f'Pulled {code}. {here}. Next, the hand-over: {hand}.' + (f' Also in this stage: {rest}.' if rest else '')
+    can = f'What can be done here: {rest}.' if rest else 'Nothing in this stage can be done here.'
+    return f'Pulled {code}. {here}. {can} Waiting for a computer with DaVinci: {hand}.'
 
 
 FORBIDDEN_PLACES = ('/etc', '/private/etc', '/usr', '/System', '/Library')   # not /var: temporary folders hold no secrets and tests live there
@@ -2510,7 +2530,8 @@ def cmd_assembly(a):
             have = f"{'still' if f.get('available_frames') is None else str(f['available_frames']) + ' f available'}"
             lines.append(f"{sid}: slot {f.get('slot_frames')} f, {have}, {'trim from 0' if d.get('end_policy') == 'trim' else 'hold the last frame'}" + (f"; issues: {', '.join(f['issues'])} (needs --accept-as-is or a swap)" if f.get('issues') else ''))
         flagged = out.get('stabilization_flagged') or []
-        emit(out, 0, 'Fills:\n' + '\n'.join(lines) + ('\nFlagged shaky shots: ' + ', '.join(flagged) if flagged else '\nNo shaky shots flagged') + '\nShow this table and ask once; the defaults need no command.')
+        emit(out, 0, 'Fills:\n' + '\n'.join(lines) + ('\nFlagged shaky shots: ' + ', '.join(flagged) if flagged else '\nNo shaky shots flagged')
+             + ('\n' + str(out.get('next')) if out.get('settled') else '\nShow this table and ask once; the defaults need no command.'))   # handover H4: settled fills are shown, never put again
     if a.what == 'choose':
         if a.file:   # design/46 11.3: the exceptions in one file
             items = _json_file(m, a.file)
@@ -2531,9 +2552,11 @@ def cmd_assembly(a):
     if a.what == 'stabilize':
         emit(write(base + '/stabilize', {'sub_clip_id': a.sub, 'choice': a.choice or 'leave'}))
     if a.what == 'build':
-        emit(write(base + '/build', {}))
+        out = write(base + '/build', {})   # handover H4: nothing changed, nothing made again
+        emit(out, 0, f"Nothing changed since version {out.get('version')}: the built film and its render are kept. {out.get('next') or ''}" if out.get('unchanged') else None)
     if a.what == 'render':
-        emit(write(base + '/render', {}), 0, 'Assembly film rendering; wait with `vw assembly status --wait 900`.')
+        out = write(base + '/render', {})
+        emit(out, 0, out.get('next') if out.get('ready') else 'Assembly film rendering; wait with `vw assembly status --wait 900`.')
     if a.what == 'status':   # design/46 11.4
         st, line = wait_for_film(run, 'assembly', a.wait or 0, path=f'/api/runs/{run}/stage3')
         emit(st, 0, line)
@@ -2600,6 +2623,8 @@ def cmd_delivery(a):
     if a.what == 'bundle':
         out = write(base + '/bundle', {})
         _download(m, out['manifest']['key'], 'work/manifest.json')
+        if out.get('current'):   # handover H4: the server made nothing again; its own line says what is next
+            emit(out, 0, f"The editor's package is current ({out['files']} files, {out['bytes'] / 1e6:.0f} MB); nothing was built again. " + str(out.get('next') or '').split('nothing was built again. ', 1)[-1])
         emit(out, 0, f"Bundle manifest: {out['files']} files, {out['bytes'] / 1e6:.0f} MB. On the operator's computer (Windows or Mac): `vw pull {m['code']}`, `vw delivery check`, then `vw delivery download`.")
     if a.what == 'status':
         emit(call('GET', f'/api/runs/{run}/stage3'))
@@ -2724,7 +2749,9 @@ def cmd_pull(a):
         write(f"/api/runs/{run['id']}/claim", {'machine': machine_id()})
     files = [{**f, 'stage': o['stage'], 'action': 'upload'} for o in full['outputs'] for f in o['files']]
     m = make_workspace(full, files=files)
-    emit({**full, 'workspace': str(workspace(a.code))}, 0, f"Pulled {a.code}; files are listed in the manifest (downloads arrive with storage).")
+    nxt = call('GET', f"/api/runs/{run['id']}/next")   # handover H2: where the stage stands, from the server
+    found = handoff.find_resolve()
+    emit({**full, 'next': nxt, 'resolve': found, 'workspace': str(workspace(a.code))}, 0, pull_line(a.code, nxt, found))
 
 
 def cmd_log(a):
