@@ -1439,6 +1439,12 @@ def thing_prompt(plan, run, session, element, subject, frame=False):
     return '\n\n'.join(parts)
 
 
+def material_words(writer_prompt, subject, is_set):
+    """Hotfix, 11 Nov 2026 (VW-19): the material-words check (design/111 F10) reads the writer's words. For a kept set those are the subject block:
+    the server's own kept preamble says "most typical of the place", which the check refused, so no set of a material element could be made."""
+    return subject if is_set else writer_prompt
+
+
 def person_prompt(plan, run, element, why=''):
     """design/151 part 2: a person's character sheet from the plan's words: who they are, their fixed look, their garments, the place, the writer's why line,
     one line against every other person so they stay apart, then the three poses as separate pictures."""
@@ -2688,6 +2694,7 @@ def generate_image(conn, store, user, run, outputs, body):
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
     need(not element.get('speaker'), f"{element['id']} is a real person speaking to camera: never an AI picture of them; their other angles come from their own footage.")   # design/124-b decision (c)
     is_set = body['kind'] == 'sheet' and body['element_id'] != STYLE and mark_kept(session, run)   # design/151: a reference set by the kept method
+    subject_words = body['prompt']   # hotfix 11 Nov 2026 (VW-19): the writer's own words for a kept set, before the server wraps them in its preamble
     if is_set:
         if element['kind'] == 'person':
             distinct_people(plan)
@@ -2888,7 +2895,7 @@ def generate_image(conn, store, user, run, outputs, body):
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
         need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: approve it on the References step (or `vw visuals spec --element {m['id']}`) before a picture shows it.")
         try:
-            library.check_material_prompt(writer_prompt)
+            library.check_material_prompt(material_words(writer_prompt, subject_words, is_set))
         except ValueError as exc:
             need(False, str(exc))
         lines = lines + material_lines(m)
