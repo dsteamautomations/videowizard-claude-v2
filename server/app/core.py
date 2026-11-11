@@ -271,8 +271,21 @@ def acceptance_quote(stage, quote, user):
 
 
 def next_for(conn, run):
-    nxt = compute_next(run, stage_table(run['procedure_version']), current_outputs(conn, run['id']), attempts_for(conn, run['id']))
+    outputs = current_outputs(conn, run['id'])
+    nxt = compute_next(run, stage_table(run['procedure_version']), outputs, attempts_for(conn, run['id']))
     nxt = {**nxt, 'open_defects': open_defects(conn, run['id'])}   # design/48 O.2
+    if nxt.get('stage') in ('assembly', 'delivery'):   # handover (11 Nov 2026): what is done inside the stage and the one next thing to do
+        try:
+            from .stage3 import assembly
+            from .storage import storage
+            try:
+                session = assembly.session_of(storage(), run)
+                assembly._refresh(conn, session)   # read only: the session is not saved here
+            except Problem:
+                session = None   # nothing prepared or bundled yet
+            nxt['stage3'] = assembly.progress(session, outputs)
+        except Exception:   # the report never blocks `next`, which every stage 3 write reads first
+            nxt['stage3'] = None
     if nxt.get('stage') == 'voice':   # design/52 B: what the voices page holds (pick, narrations, direction, final)
         try:
             from . import voices

@@ -107,6 +107,71 @@ def package_first(session, outputs):
     raise Problem(409, 'NOT_ALLOWED', f"{', '.join(changed)} {'was' if len(changed) == 1 else 'were'} recorded again after the editor's package; run `vw delivery bundle` again, then the assembly.")
 
 
+HANDOVER = '`vw delivery check`, `vw delivery download`, then `vw delivery open`'
+
+
+def progress(session, outputs):
+    """Handover (SK, 11 Nov 2026): where the assembly and delivery stages stand, from the session and the recorded outputs alone, so a run taken
+    over on another computer redoes nothing. `do_next` is the one next thing to do in the stage; `handover` is the DaVinci step when it is open
+    (a current package not yet reported from DaVinci), else None. The caller refreshes the render status first (`_refresh`)."""
+    s = session or {}
+    b = s.get('bundle') or {}
+    asm_o = next((o for o in outputs if o['stage'] == 'assembly' and o['unit'] is None), None)
+    if asm_o:   # the delivery stage: the full package holds the approved film
+        approved = next((f['sha256'] for f in asm_o['files'] if f['name'] == 'assembly.mp4'), None)
+        why = None if b and not b.get('early') and b.get('film_sha256') == approved else '`vw delivery bundle`: the full package with the approved film is not made yet'
+    else:
+        try:
+            package_first(s, outputs)
+            why = None
+        except Problem as exc:
+            why = exc.message
+    package = {'state': 'current' if not why else 'stale' if b else 'none', 'why': why, 'early': bool(b.get('early')), 'files': b.get('files'), 'bytes': b.get('bytes')}
+    entry = next((v for v in s.get('versions') or [] if v['digest'] == s.get('current')), None) if s.get('current') else None
+    r = (s.get('renders') or {}).get('assembly') or {}
+    of_build = bool(entry) and r.get('digest') == entry['digest']
+    film = {'state': (r.get('status') or 'none') if of_build else 'stale' if r else 'none', 'version': r.get('version') if of_build else None, 'current': of_build and r.get('status') == 'ready'}
+    last = (s.get('reviews') or [None])[-1]
+    seen = bool(last) and last.get('film_sha256') == (r.get('result') or {}).get('sha256')   # the last review is of the film the session points at
+    led = s.get('resolve')
+    ours = bool(led) and led.get('film_sha256') == b.get('film_sha256')
+    if why or (ours and led['state'] == 'reported'):
+        handover = None
+    elif ours and led['state'] in ('reserved', 'dispatched'):
+        handover = f"the DaVinci step is {led['state']} on {led.get('machine')}: finish it there (`vw delivery resolve --inspect` shows it)"
+    else:
+        handover = HANDOVER
+    if why:
+        do = why
+    elif asm_o:
+        do = handover or f"the timeline is in DaVinci on {led.get('machine')}: `vw delivery zip` for the editor, then the five questions and `vw delivery final --quote`"
+    elif not s.get('fills'):
+        do = '`vw assembly prepare`, show the fills and ask once, then `vw assembly build`'
+    elif seen and last['decision'] == 'changes':
+        do = f"changes asked: {last.get('notes') or '(no notes)'}; change the choices the notes name, then `vw assembly build` and `vw assembly render`: the film is built and rendered again"
+    elif not entry:
+        do = ('a fill changed since the last build: `vw assembly build`, then `vw assembly render`' if s.get('versions') else
+              'the fills are prepared and the operator has not been asked yet: `vw assembly prepare` shows them; ask once, then `vw assembly build`')
+    elif film['state'] in ('queued', 'running'):
+        do = f"the film (version {entry['version']}) is rendering: wait with `vw assembly status --wait 900` (it says how long is left); do not start another"
+    elif film['state'] == 'failed':
+        do = f"the render failed ({r.get('error') or 'see the render record'}): `vw assembly render` again"
+    elif film['state'] != 'ready':
+        do = f"version {entry['version']} is built from the settled fills: `vw assembly render`"
+    elif seen and last['decision'] == 'accepted':
+        do = '`vw assembly record --quote` with the operator\'s words (watched and listened)'
+    elif seen and last['decision'] == 'rejected':
+        do = f"the film was rejected: {last.get('notes') or '(no notes)'}; `vw revise --stage visuals` or `--stage master` as the notes say"
+    else:
+        do = (f"the proof film (version {entry['version']}) is ready to watch and listen: `vw assembly fetch`, then on the operator's yes `vw assembly record --quote`; "
+              'nothing is made again')
+    return {'package': package, 'fills': {'prepared': bool(s.get('fills')), 'settled': bool(s.get('fills')) and bool(entry), 'count': len(s.get('fills') or {})},
+            'built': {'version': entry['version']} if entry else None, 'film': film,
+            'review': {'decision': last['decision'], 'notes': last.get('notes') or '', 'version': last.get('version'), 'of_this_film': seen} if last else None,
+            'recorded': bool(asm_o), 'resolve': {'state': led['state'], 'machine': led.get('machine'), 'this_package': ours} if led else None,
+            'handover': handover, 'do_next': do}
+
+
 def fill_file(files, shot, name, visuals_assets):
     """A gap's file for one shot, by name. Ticket 12: gaps recorded before 16 Oct dropped a second shot's entry when two shots shared one
     file; the shot's asset in the visuals record names that file, and it is used only if the gap's recorded output holds the same
@@ -193,6 +258,7 @@ def prepare(conn, store, user, run, outputs):
                                   'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'},
                                   **({'boundary': shot['boundary']} if shot.get('boundary') else {}), **({'transition': shot['transition']} if shot.get('transition') else {})}   # design/71 P4; design/91 N16
         session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
+    settled = bool(session.get('current')) and S2.digest(session['fills']) == S2.digest(fills)   # handover H4: built from these very fills; nothing to ask again
     session['fills'] = fills
     joins = dissolves(fills, session['choices'])
     session['stabilize'] = {ev['sub_clip_id']: session['stabilize'].get(ev['sub_clip_id'], {'flagged': bool(rows[ev['sub_clip_id']].get('stabilization_needed')), 'choice': 'leave'})
@@ -201,9 +267,14 @@ def prepare(conn, store, user, run, outputs):
     save_session(store, run, session)
     flagged = [k for k, v in session['stabilize'].items() if v['flagged']]
     issues = {k: f['meta']['issues'] for k, f in fills.items() if f['meta']['issues']}
-    return {'gaps': len(plan['gaps']), 'fills': {k: {'slot_frames': f['slot_frames'], 'available_frames': f['available_frames'], 'default': f['default'], 'issues': f['meta']['issues'],
-                                                  'dissolve_into_next': joins[k]} for k, f in fills.items()},
-            'stabilization_flagged': flagged, 'issues': issues, 'next': 'ask the operator per fill (offset, end policy) and per flagged shot (leave / stabilise / swap), then `vw assembly build`'}
+    out = {'gaps': len(plan['gaps']), 'fills': {k: {'slot_frames': f['slot_frames'], 'available_frames': f['available_frames'], 'default': f['default'], 'issues': f['meta']['issues'],
+                                                 'dissolve_into_next': joins[k]} for k, f in fills.items()},
+           'stabilization_flagged': flagged, 'issues': issues, 'next': 'ask the operator per fill (offset, end policy) and per flagged shot (leave / stabilise / swap), then `vw assembly build`'}
+    if settled:
+        _refresh(conn, session)
+        out.update(settled=True, choices=session['choices'], stabilize=session['stabilize'],
+                   next='the fills are settled and the film is built from them: nothing to put to the operator again. ' + progress(session, outputs)['do_next'])
+    return out
 
 
 def choose(store, user, run, shot_id, offset, end_policy, accept_as_is):
@@ -220,7 +291,11 @@ def choose(store, user, run, shot_id, offset, end_policy, accept_as_is):
             fail(f"the take has {f['available_frames'] - offset} frames after the offset but the slot needs {f['slot_frames']}: use hold_last or a smaller offset")
     if f['meta']['issues'] and not accept_as_is:
         fail(f"{shot_id} has issues {f['meta']['issues']}; pass --accept-as-is to use it anyway, or swap it in visuals")
-    session['choices'][shot_id] = {'offset_frames': int(offset), 'end_policy': end_policy, 'accept_as_is': bool(accept_as_is), 'by': user['id']}
+    choice = {'offset_frames': int(offset), 'end_policy': end_policy, 'accept_as_is': bool(accept_as_is)}
+    was = session['choices'].get(shot_id) or {}
+    if {k: was.get(k) for k in choice} == choice:   # handover H4: the same choice said again changes nothing; the build and its film stay
+        return was
+    session['choices'][shot_id] = {**choice, 'by': user['id']}
     session['current'] = None
     save_session(store, run, session)
     return session['choices'][shot_id]
@@ -233,6 +308,8 @@ def stabilize(store, user, run, sub_clip_id, choice):
         fail(f'{sub_clip_id} is not in the master.')
     if choice not in ('leave', 'ffmpeg'):
         fail('choice is leave or ffmpeg (swap a shot in the master stage)')
+    if st.get('choice') == choice:   # handover H4: the same choice again; the build stays
+        return st
     st['choice'] = choice
     session['current'] = None
     save_session(store, run, session)
@@ -290,15 +367,23 @@ def build(conn, store, user, run, outputs):
     assembly = {'contract': CONTRACT_ASSEMBLY, 'run_id': str(run['id']), 'master_output': str(master_o['id']), 'master_digest': master_o['summary']['plan_digest'], 'timeline': tl,
                 'events': events, 'duration_frames': plan['duration_frames'], 'sfx_cues': plan.get('sfx_cues') or [], 'finishing': (plan.get('finishing_preview') or []) + checklist,
                 'choices': session['choices'], 'stabilize': session['stabilize']}
-    version = len(session['versions']) + 1
-    saved = S2.save_json(store, key(run, f'assembly-v{version}.json'), assembly)
-    d = S2.digest(assembly)
-    session['versions'].append({'version': version, 'file': saved, 'digest': d, 'events': len(events)})
+    d = S2.digest(assembly)   # the same fills, choices, gaps and master give the same digest (tested), so "nothing changed" is read from it
+    entry = next((v for v in session['versions'] if v['digest'] == d), None)
+    unchanged = bool(entry)   # handover H4: the version, the built film and its render stay
+    if not entry:
+        version = len(session['versions']) + 1
+        entry = {'version': version, 'file': S2.save_json(store, key(run, f'assembly-v{version}.json'), assembly), 'digest': d, 'events': len(events)}
+        session['versions'].append(entry)
     session['current'] = d
-    session['renders'].pop('assembly', None)
+    if (session['renders'].get('assembly') or {}).get('digest') != d:
+        session['renders'].pop('assembly', None)
+    nxt = '`vw assembly render`, poll, `vw assembly fetch`, let the operator watch and listen, then `vw assembly review`'
+    if unchanged:
+        _refresh(conn, session)
+        nxt = progress(session, outputs)['do_next']
     save_session(store, run, session)
-    return {'version': version, 'digest': d, 'events': len(events), 'stabilized': [e['sub_clip_id'] for e in events if e.get('stabilize')], 'finishing_items': len(assembly['finishing']),
-            'next': '`vw assembly render`, poll, `vw assembly fetch`, let the operator watch and listen, then `vw assembly review`'}
+    return {'version': entry['version'], 'digest': d, 'events': len(events), 'stabilized': [e['sub_clip_id'] for e in events if e.get('stabilize')], 'finishing_items': len(assembly['finishing']),
+            'unchanged': unchanged, 'next': nxt}
 
 
 def clip_item(ev, m, tl_fps, normalised_key):
@@ -323,6 +408,12 @@ def current(store, session):
 def render(conn, store, user, run):
     session = session_of(store, run)
     assembly, entry = current(store, session)
+    _refresh(conn, session)   # handover H4: the job row says whether the film is already there
+    done = session['renders'].get('assembly') or {}
+    if done.get('status') == 'ready' and done.get('digest') == entry['digest'] and done.get('result'):
+        save_session(store, run, session)
+        return {'job_id': done['job_id'], 'version': entry['version'], 'frames': done.get('frames'), 'paid': False, 'ready': True,
+                'next': 'the film of this build is already rendered; nothing was queued: `vw assembly fetch`, then the operator watches and listens'}
     s2 = S2.session_of(store, run)
     pk = S2._package(store, s2)
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}

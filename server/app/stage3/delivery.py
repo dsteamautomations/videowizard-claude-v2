@@ -12,7 +12,7 @@ from .. import core, jobs
 from ..errors import Problem
 from ..stage2 import stage as S2
 from . import CONTRACT_BUNDLE, timeline as TL
-from .assembly import key, session_of, save_session, fail, early_inputs
+from .assembly import key, session_of, save_session, fail, early_inputs, progress
 
 FINAL_WORDS = {'watched': ('watch',), 'listened': ('listen',), 'subtitles read': ('srt', 'subtitle'), 'timeline verified': ('drt', 'timeline'), 'package complete': ('package', 'bundle')}
 
@@ -205,6 +205,11 @@ def visuals_info(store, run, outputs):
 def bundle(conn, store, user, run, outputs):
     session = session_of(store, run, create=True)   # design/132: the early package comes before any assembly session exists
     if not any(o['stage'] == 'assembly' and o['unit'] is None for o in outputs):   # design/115 H1: every shot placed, no assembly yet: the editor's early package
+        b = session.get('bundle') or {}
+        if b.get('early') and b.get('inputs') == early_inputs(outputs):   # handover H4: made from this master and these recorded gaps; nothing is built again
+            return {'manifest': b['manifest'], 'files': b['files'], 'bytes': b['bytes'], 'early': True, 'current': True,
+                    'next': "the editor's package is current; nothing was built again. " + progress(session, outputs)['do_next']}
+        session['resolve'] = None   # a package made anew: an import of the older timeline does not count for it
         return bundle_early(conn, store, user, run, outputs, session)
     asm_o = S2._output(outputs, 'assembly')
     master_o = S2._output(outputs, 'master')

@@ -197,6 +197,33 @@ def test_scenes_and_pause_through_assembly_delivery_and_resolve(home, database, 
     assert drt.count('<audio><track>') == 1 and drt.split('<audio><track>')[1].count('<clipitem>') == 2   # narration as two whole-frame pieces
 
 
+def test_handover_the_davinci_ledger_is_written_at_the_assembly_stage(home, database, fake, gemini):
+    """Handover H5 (11 Nov 2026): reserve and mark are accepted as soon as the editor's package exists, before the proof film is recorded;
+    the final stays at the delivery stage; a repeated bundle is current; `next` carries the stage report."""
+    import httpx
+    code, ws, pk = run_until_assembly(home, database, fake, gemini)
+    rc, out, err = vw(home, 'delivery', 'bundle')
+    assert rc == 0 and out['early'] is True and not out.get('current'), (out, err)
+    rc, again, err = vw(home, 'delivery', 'bundle')
+    assert rc == 0 and again['current'] is True and again['manifest'] == out['manifest'], (again, err)
+    nxt = vw(home, 'next')[1]
+    assert nxt['stage'] == 'assembly' and nxt['stage3']['package']['state'] == 'current' and '`vw delivery check`' in nxt['stage3']['handover']
+    run_id = json.loads((ws / 'manifest.json').read_text())['run_id']
+    token = json.loads((home['home'] / 'session.json').read_text())['token']
+    with httpx.Client(base_url=home['env']['VW2_SERVER_URL'], headers={'X-VW-Plugin': '99.0.0', 'Authorization': 'Bearer ' + token}, timeout=60) as c:
+        def post(path, **body):
+            return c.post(f'/api/runs/{run_id}/delivery/{path}', json={'request_id': str(__import__('uuid').uuid4()), **body})
+        r = post('resolve/reserve', machine='pc-davinci', authorization='open it in DaVinci')
+        assert r.status_code == 200 and r.json()['state'] == 'reserved', r.text
+        assert post('resolve/mark', machine='pc-davinci', state='dispatched').status_code == 200
+        r = post('resolve/mark', machine='pc-davinci', state='reported', report={'route': 'free', 'timeline_verified': True})
+        assert r.status_code == 200 and r.json()['state'] == 'reported', r.text
+        r = post('final', quote='yes: watched, listened, read the subtitles, the timeline matched the film, the package is complete')
+        assert r.status_code == 409 and 'assembly' in r.json()['message'], r.text   # the final stays at the delivery stage
+    nxt = vw(home, 'next')[1]
+    assert nxt['stage'] == 'assembly' and nxt['stage3']['resolve'] == {'state': 'reported', 'machine': 'pc-davinci', 'this_package': True} and nxt['stage3']['handover'] is None
+
+
 def test_srt_per_sentence_shifted():
     sentences = [{'text': 'One.', 'start_frame': 3, 'end_frame': 30}, {'text': 'Two.', 'start_frame': 55, 'end_frame': 70}]
     srt = D.srt_of([], sentences, 25)

@@ -1755,12 +1755,12 @@ def delivery_bundle(run_id: UUID, body: Write, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/delivery/resolve/reserve')
 def delivery_reserve(run_id: UUID, body: ReserveBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))
+    return _s2(conn, user, run_id, ('assembly', 'delivery'), body, lambda run, outputs: deliv.resolve_reserve(storage(), user, run, body.machine, body.authorization))   # handover H5: as soon as the package exists
 
 
 @app.post('/api/runs/{run_id}/delivery/resolve/mark')
 def delivery_mark(run_id: UUID, body: MarkBody, user=User, conn=DB):
-    return _s2(conn, user, run_id, 'delivery', body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
+    return _s2(conn, user, run_id, ('assembly', 'delivery'), body, lambda run, outputs: deliv.resolve_mark(storage(), user, run, body.state, body.machine, body.report, body.note))
 
 
 @app.post('/api/runs/{run_id}/delivery/final', status_code=201)
