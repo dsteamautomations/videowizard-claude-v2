@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     MOTION_VERSION: str = '0.8.226'
     MOTION_TIMEOUT: int = 600   # seconds for one check, snapshot or render
     MOTION_CAP: int = 2         # drawn and motion jobs running at once across the workers (phase 0: under 1 GB each)
+    # integration steps B to D (SK, 12 Nov 2026): the Blender guide. Installed on the VM on 12 Nov; software graphics, no graphics chip.
+    BLENDER_BIN: str = '/opt/vw2/blender/blender-5.2.3-linux-x64/blender'
+    GUIDE_TIMEOUT: int = 900            # seconds for one Blender call (a chunk of frames)
+    GUIDE_CHUNK: int = 30               # frames a call; the job's claim is renewed between calls (about 4 s a frame on the VM)
+    GUIDE_FRAME1_SAMPLES: int = 16      # the first frame again at full quality: the still is made from it and needs true shadows
 
 
 @lru_cache

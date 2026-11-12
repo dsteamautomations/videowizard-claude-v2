@@ -96,7 +96,43 @@ class Provider:
         except (httpx.RequestError,ValueError):
             raise Problem(502,'VIDEO_UNKNOWN' if paid else 'VIDEO_PROVIDER','Provider response was interrupted or invalid. Recover this attempt without regenerating.') from None
 
+    def upload(self,data,mime='video/mp4'):
+        """Integration step D: a guide video to Google's Files API on this provider's own key (two requests, then the wait while it is processed); returns the
+        file's uri. Nothing is charged for an upload. A 429 here is the provider's spend cap or rate limit: named as such, never retried."""
+        import time
+        base,headers='https://generativelanguage.googleapis.com',{'x-goog-api-key':self.key}
+        def cooled(r):
+            if self.key_index is not None and r.status_code in (429,401,403):
+                from . import keys as _keys;_keys.cool('gemini',self.key_index,_keys.reason_of(r.status_code))
+            if r.status_code==429:raise Problem(502,'VIDEO_PROVIDER',"The provider answered 429 at the guide's upload: its spend cap or rate limit is reached. Nothing was charged and nothing was sent; the work stops here until the cap is raised.")
+            raise Problem(502,'VIDEO_PROVIDER',f"The guide could not be uploaded to the provider (HTTP {r.status_code}). Nothing was charged; no take was made.")
+        try:
+            r=httpx.post(base+'/upload/v1beta/files',json={'file':{'display_name':'guide'}},headers={**headers,'X-Goog-Upload-Protocol':'resumable','X-Goog-Upload-Command':'start',
+                'X-Goog-Upload-Header-Content-Length':str(len(data)),'X-Goog-Upload-Header-Content-Type':mime},timeout=60)
+            url=r.headers.get('x-goog-upload-url')
+            if not r.is_success or not url:cooled(r)
+            r=httpx.post(url,content=data,headers={**headers,'X-Goog-Upload-Offset':'0','X-Goog-Upload-Command':'upload, finalize'},timeout=300)
+            if not r.is_success:cooled(r)
+            f=r.json()['file']
+            for _ in range(100):
+                if f.get('state')!='PROCESSING':break
+                time.sleep(3)
+                r=httpx.get(base+'/v1beta/'+f['name'],headers=headers,timeout=60)
+                if not r.is_success:cooled(r)
+                f=r.json()
+            if f.get('state')!='ACTIVE' or not f.get('uri'):raise Problem(502,'VIDEO_PROVIDER',f"The guide's upload did not finish (state {f.get('state')}). Nothing was charged; no take was made.")
+            return f['uri']
+        except (httpx.RequestError,ValueError,KeyError):
+            raise Problem(502,'VIDEO_PROVIDER',"The guide's upload was interrupted. Nothing was charged; no take was made.") from None
+
     def build(self,snapshot,store):
+        if snapshot.get('guide'):   # integration step D: the guide first, then the still, then the words; the length in the request, equal to the guide's
+            still=snapshot['start_image']
+            return {'model':snapshot['model'],'background':True,'store':True,
+                'input':[{'type':'video','uri':self.upload(store.get(snapshot['guide']['key']))},
+                         {'type':'image','mime_type':still['mime_type'],'data':base64.b64encode(store.get(still['key'])).decode()},
+                         {'type':'text','text':snapshot['effective_prompt']}],
+                'response_format':{'type':'video','aspect_ratio':snapshot['aspect_ratio'],'resolution':snapshot['resolution'],'duration':f"{int(snapshot['duration_seconds'])}s"}}
         images=[snapshot[k] for k in ('start_image','end_image') if snapshot.get(k)]
         prompt=snapshot.get('effective_prompt') or motion_text(snapshot)
         return {'model':snapshot['model'],'background':True,'store':True,

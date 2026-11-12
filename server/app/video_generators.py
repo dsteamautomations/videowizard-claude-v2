@@ -13,6 +13,12 @@ CATALOG = [   # design/124 A4 decision 5: Gemini Omni only; every take 3-10 s, a
     {**DEFAULT, 'label': 'Gemini Omni · Direct Google', 'min_seconds': 3, 'max_seconds': 10,
      'duration_control': 'prompt_requested', 'end_image': True},
 ]
+# Integration steps B to D (SK, 12 Nov 2026): the take is an edit of a Blender guide on Gemini Omni 1.2; the still is GPT image 2.6 whatever the
+# film's picture AI (SK, 10 Nov). The lengths live with the scene description (guide_spec.MIN_S, MAX_S: 3 to 15 s), read here so they are stated once.
+from . import guide_spec as _guide
+GUIDE = {'provider': 'google', 'model': 'gemini-omni-1.2-flash', 'label': 'Gemini Omni 1.2 · edit of a guide', 'min_seconds': _guide.MIN_S, 'max_seconds': _guide.MAX_S,
+         'duration_control': 'request', 'guide': True, 'aspect_ratio': '16:9', 'resolution': '720p'}
+STILL = {'model': 'gpt-image-2.6-sunburst', 'size': '1536x864', 'quality': 'high', 'max_inputs': 16}
 OMNI_ONLY = 'Gemini Omni only: every take is Gemini Omni, 3–10 s; split the shot. No other video generator is offered.'
 KLING_SEEDANCE_RETIRED = 'Kling and Seedance are retired; every video take is Gemini Omni'   # design/35 Old ways 7
 

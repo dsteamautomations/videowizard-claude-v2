@@ -419,10 +419,10 @@ def image_cost_inr(cost, pr):
 
 def visuals_spend(conn, run):
     """What this film's visuals have cost so far, at the configured prices: every image job and every take job that ran or is running."""
-    rows = conn.execute("select provider, status, request, cost from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'gemini-image', 'video')", (run['id'],)).fetchall()   # design/120
+    rows = conn.execute("select provider, status, request, cost from vw2_jobs where run_id=%s and stage='visuals' and provider in ('openai', 'gemini-image', 'video', 'guide-still')", (run['id'],)).fetchall()   # design/120; integration step C: a guide's still is a paid picture too
     live = [r for r in rows if r['status'] not in ('failed', 'rejected', 'cancelled')]
     pr = prices()
-    pics = [r for r in live if r['provider'] in IMAGE_JOB_PROVIDERS]
+    pics = [r for r in live if r['provider'] in IMAGE_JOB_PROVIDERS or r['provider'] == 'guide-still']
     images = len(pics)
     ref = lambda r: (r.get('request') or {}).get('reference') or {}
     fixes = sum(1 for r in pics if ref(r).get('fix_of') or str(ref(r).get('name') or '').endswith('-fix'))   # design/96 X3; an old fix by its name
