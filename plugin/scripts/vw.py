@@ -803,6 +803,12 @@ def cmd_guide(a):
             emit({'action': 'refused', 'message': f'{a.file} is not a file of this run folder.'}, 2)
         out = write(base + '/guide/prompt', {'shot_id': a.shot, 'prompt': path.read_text(encoding='utf-8')})
         emit(out, 0, f"{out['words']} words kept. " + str(out.get('next') or ''))
+    if a.what == 'cause':
+        if not (a.cause and a.notes and a.fix):
+            emit({'action': 'refused', 'message': 'Say what was wrong with the last rejected take: `vw guide cause --shot S --cause still|guide|words|model --notes "<what was wrong>" --fix "<the one thing that changes>"`. '
+                                                  'Ask in order: did the first frame match the still; is the fault in the guide; only then the words; else the model\'s own limit.'}, 2)
+        out = write(base + '/guide/cause', {'shot_id': a.shot, 'cause': a.cause, 'notes': a.notes, 'fix': a.fix})
+        emit(out, 0, out.get('next'))
     if a.what == 'shoot':
         if not (a.quote or '').strip():
             emit({'action': 'refused', 'message': "A take is paid for on the operator's word: `vw guide shoot --shot S --quote \"<their words>\"`. Nothing was sent."}, 2)
@@ -3083,9 +3089,10 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.set_defaults(fn=cmd_motion)
-    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot'])   # integration steps B to D
-    for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt'):
+    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
+    for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix'):
         s.add_argument(flag)
+    s.add_argument('--cause', choices=['still', 'guide', 'words', 'model'])
     s.add_argument('--again', action='store_true', help='shoot: send the same request once more, only after a clip that came back unusable, on the operator\'s word')
     s.set_defaults(fn=cmd_guide)
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'library', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])

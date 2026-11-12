@@ -296,6 +296,14 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     need(card['ready'], 'Not ready to shoot; still missing: ' + ', '.join(card['missing']) + '.')
     need(str(quote or '').strip(), "A take is paid for on the operator's word: give their words (--quote).")
     render, still = g['render'], card['still']
+    camera = digest(VS.load_json(store, g['key'])['camera'])
+    rejected = _rejected(session, g)
+    if rejected:
+        last = rejected[-1]
+        need(last.get('cause'), f"Say what was wrong with the last take before another is paid for: `vw guide cause --shot {shot_id} --cause still|guide|words|model --notes \"<what was wrong>\" --fix \"<the one thing that changes>\"`.")
+        here = [t for t in rejected if t.get('camera') == camera]
+        need(not (here and here[-1]['cause']['cause'] == 'model'), 'The last take from this camera failed with no cause that can be named in the guide, the still or the words. ' + LADDER)
+        need(len(here) < 2, f'{len(here)} takes from this camera were rejected. ' + LADDER)
     open_job = conn.execute("select id from vw2_jobs where run_id=%s and stage='visuals' and unit=%s and provider='video' and status in ('queued','running','submitted','submission_unknown','storage_pending')",
                             (run['id'], shot_id)).fetchone()
     if open_job:
@@ -324,7 +332,7 @@ def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):
     VS.save_json(store, k, record)
     session['preparations'][shot_id] = {'preparation_id': identity, 'key': k, 'guide': True}
     job_id = _queue(conn, run, shot_id, 'video', {'kind': 'take', 'preparation_id': identity, 'request_key': k, 'provider': gen['provider'], 'model': gen['model'], 'duration_seconds': seconds})
-    g.setdefault('takes', []).append({'job_id': job_id, 'same': same, 'preparation_id': identity, 'quote': str(quote).strip(), 'by': user['id'], 'at': now()})
+    g.setdefault('takes', []).append({'job_id': job_id, 'same': same, 'camera': camera, 'preparation_id': identity, 'quote': str(quote).strip(), 'by': user['id'], 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'take sent', 'job_id': job_id, 'model': gen['model'], 'seconds': seconds, 'prompt': prompt, 'guide_sha256': render['sha256'], 'still_sha256': still['sha256'],
                                                     'request_key': k, 'quote': str(quote).strip(), 'again': bool(before), 'by': user['id'], 'by_name': user.get('name') or ''})
@@ -441,3 +449,45 @@ def older_start_picture_retired(store, run, outputs, body):
         return   # the picture's own gates answer an unknown shot
     if route_of(shot) == 'video':
         raise Problem(410, 'RETIRED', START_PICTURE_RETIRED)
+
+
+# ---------- when a take is wrong: the cause, then the ladder (SK, 10 Nov 2026: fix once, then cut shots, then hide the detail) ----------
+
+LADDER = ('A third try of the same shot is not made. Choose with the operator: cut the shot into shorter shots, each showing one thing (revise the plan); '
+          'or move the camera closer or to another angle so the detail need not be shown (a new camera in the scene); or leave the shot out.')
+CAUSES = {'still': 'the still (the take\'s first frame did not match it, or the still itself was wrong)', 'guide': 'the guide (a reach, a path, a speed, an entry, a missing support)',
+          'words': 'the words (only what the guide and the still cannot carry)', 'model': 'none of these: the model\'s own limit'}
+
+
+def _rejected(session, g):
+    """The shot's takes whose latest review is a rejection, oldest first. A clip that was never a take (blocked) is not counted."""
+    out = []
+    for t in g.get('takes') or []:
+        reviews = (session.get('reviews') or {}).get(t.get('job_id') or '') or []
+        blocked = ((session.get('take_checks') or {}).get(t.get('job_id') or '') or {}).get('blocked')
+        if reviews and reviews[-1].get('decision') == 'rejected' and not blocked:
+            out.append(t)
+    return out
+
+
+def set_cause(conn, store, user, run, outputs, shot_id, cause, notes, fix):
+    """Why the last rejected take was wrong, asked in order: the first frame against the still, then the guide, only then the words; else the model's own limit.
+    Kept on the take and in the record; the next take is refused until it is said, and a redo changes one thing."""
+    session = VS.session_of(store, run, outputs)
+    g = entry_of(session, shot_id)
+    rejected = _rejected(session, g)
+    need(rejected, 'No take of this shot has been rejected; a cause is said of a rejected take.')
+    last = rejected[-1]
+    need(cause in CAUSES, 'The cause is one of: ' + '; '.join(f'{k} = {v}' for k, v in CAUSES.items()) + '.')
+    need(len(str(notes or '').split()) >= 3, 'Say what was wrong, in a sentence.')
+    need(len(str(fix or '').split()) >= 2, 'Say the one thing that changes next (or "cut the shot", "another angle", "leave it out").')
+    check = (session.get('take_checks') or {}).get(last['job_id']) or {}
+    first = next((r for r in check.get('scorecard') or [] if r['line'] == 'first frame'), None)
+    need(not (cause == 'words' and first and first['state'] == 'Fail'), "The take's first frame did not match the still: the fault is before the video, in the still or the guide. No wording fixes that.")
+    last['cause'] = {'cause': cause, 'notes': str(notes).strip(), 'fix': str(fix).strip(), 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
+    VS.save_session(store, run, session)
+    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'cause of the last take', 'job_id': last['job_id'], 'cause': cause, 'notes': str(notes).strip(), 'fix': str(fix).strip(), 'by': user['id'], 'by_name': user.get('name') or ''})
+    here = [t for t in rejected if t.get('camera') == last.get('camera')]
+    nxt = LADDER if cause == 'model' or len(here) >= 2 else {'still': 'Repair the still (`vw guide repair`) or make it again; then shoot.', 'guide': 'Change the scene (one thing) and send it again: `vw guide scene`. It is free.',
+                                                              'words': 'Change the words (one thing): `vw guide prompt`; then shoot.'}[cause]
+    return {'shot_id': shot_id, 'job_id': last['job_id'], 'cause': cause, 'rejected_from_this_camera': len(here), 'next': nxt}

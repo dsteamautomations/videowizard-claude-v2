@@ -1432,6 +1432,13 @@ class GuidePrompt(Write):
     prompt: str = Field(min_length=1, max_length=8000)
 
 
+class GuideCause(Write):
+    shot_id: str
+    cause: Literal['still', 'guide', 'words', 'model']
+    notes: str = Field(min_length=1, max_length=2000)
+    fix: str = Field(min_length=1, max_length=2000)
+
+
 class GuideShoot(Write):
     shot_id: str
     quote: str = Field(min_length=1)
@@ -1466,6 +1473,11 @@ def visuals_guide_reject(run_id: UUID, body: GuideStillVerdict, user=User, conn=
 @app.post('/api/runs/{run_id}/visuals/guide/prompt')
 def visuals_guide_prompt(run_id: UUID, body: GuidePrompt, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.set_prompt(conn, storage(), user, run, outputs, body.shot_id, body.prompt))
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/cause')
+def visuals_guide_cause(run_id: UUID, body: GuideCause, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.set_cause(conn, storage(), user, run, outputs, body.shot_id, body.cause, body.notes, body.fix))
 
 
 @app.post('/api/runs/{run_id}/visuals/guide/shoot', status_code=201)
