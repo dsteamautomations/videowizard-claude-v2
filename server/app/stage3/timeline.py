@@ -51,13 +51,13 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames,
     main = fmt(fps)
     assets = {}
 
-    def asset(path, kind, rate, frames_=None):
+    def asset(path, kind, rate, frames_=None, silent=False):
         if path not in assets:
             aid = f'a{len(assets) + 1}'
             rate = Fraction(str(rate))
             dur = Fraction(frames_) / rate if frames_ else None
             a = ET.SubElement(res, 'asset', id=aid, name=path.rsplit('/', 1)[-1], start='0s', duration=_t(dur) if dur else '0s',
-                              hasVideo='1' if kind in ('camera', 'movie', 'still', 'reference') else '0', hasAudio='1' if kind in ('camera', 'movie', 'reference', 'audio') else '0')
+                              hasVideo='1' if kind in ('camera', 'movie', 'still', 'reference') else '0', hasAudio='1' if kind in ('camera', 'movie', 'reference', 'audio') and not silent else '0')   # integration step E: an AI take is declared without sound
             if kind != 'audio':
                 a.set('format', fmt(rate))
             ET.SubElement(a, 'media-rep', kind='original-media', src=_url(path))
@@ -73,7 +73,7 @@ def fcpxml(code, tl, events, narration_pieces, finishing, sfx_cues, film_frames,
     for e in events:
         src_fps = Fraction(str(e.get('source_fps') or fps))
         frames_ = e.get('source_frames') or (e['source_out_frame'] if e.get('kind') != 'still' else e['source_out_frame'])
-        aid = asset(e['file'], e.get('kind', 'camera'), src_fps, frames_)
+        aid = asset(e['file'], e.get('kind', 'camera'), src_fps, frames_, silent=bool(e.get('silent')))
         rec_in, rec_out = Fraction(e['record_in_frame']) / fps, Fraction(e['record_out_frame']) / fps
         clip = ET.SubElement(gap, 'asset-clip', ref=aid, lane='1', offset=_t(rec_in), name=e['marker']['name'], start=_t(Fraction(e['source_in_frame']) / src_fps),
                              duration=_t(rec_out - rec_in), format=fmt(src_fps), enabled='1')

@@ -153,10 +153,11 @@ def test_a_shot_that_chose_kling_is_still_read_but_takes_no_new_take(monkeypatch
     assert VS.prepare_take(store, USER, RUN, [], body)['provider']['model'] == VG.OMNI
 
 
-def test_the_plan_check_refuses_a_video_shot_longer_than_omni_makes():
-    with pytest.raises(ValueError, match='split it'):
-        VC.validate_plan(plan([pshot('V1', 0, 300, 'video'), pshot('IM1', 300, 1000, 'image')]), GAPS, Fraction(25))   # 12 s
-    VC.validate_plan(plan([pshot('V1', 0, 250, 'video'), pshot('IM1', 250, 1000, 'image')]), GAPS, Fraction(25))   # 10 s: allowed
+def test_the_plan_check_refuses_a_video_shot_longer_than_omni_makes():   # integration step E: the limit is the guide take's 15 s (was 10)
+    with pytest.raises(ValueError, match='an AI video take is 3–15 s: split it'):
+        VC.validate_plan(plan([pshot('V1', 0, 400, 'video'), pshot('IM1', 400, 1000, 'image')]), GAPS, Fraction(25))   # 16 s
+    VC.validate_plan(plan([pshot('V1', 0, 375, 'video'), pshot('IM1', 375, 1000, 'image')]), GAPS, Fraction(25))   # 15 s: allowed
+    VC.validate_plan(plan([pshot('V1', 0, 300, 'video'), pshot('IM1', 300, 1000, 'image')]), GAPS, Fraction(25))   # 12 s: allowed now
 
 
 # ---------- A4 decision 2: steady takes ----------

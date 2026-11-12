@@ -57,9 +57,9 @@ def test_a1_a4_a5_warn_until_filled():
 
 def test_a3_size_order_rules_and_a_stated_reveal():
     k = kinds(doc_(sized('VS1', 0, 300, 'CU'), sized('VS2', 300, 1000, 'MS')))
-    assert ('VS1', 'size_open') in k and ('VS1', 'size_close_first') in k
+    assert ('VS1', 'size_open') in k and ('VS1', 'size_close_first') not in k   # integration step E (SK, 12 Nov 2026): a close AI video shot not seen wider first is this method's hand-action shot (was: warned)
     k = kinds(doc_(sized('VS1', 0, 200, 'WS'), sized('VS2', 200, 400, 'MS'), sized('VS3', 400, 600, 'MS'), sized('VS4', 600, 1000, 'MS')))
-    assert ('VS4', 'size_repeat') in k and not any(w in ('size_open', 'size_close_first') for _, w in k)
+    assert ('VS4', 'size_repeat') not in k and not any(w in ('size_open', 'size_close_first') for _, w in k)   # integration step E (SK, 12 Nov 2026): three AI video shots at one size in a row are not warned (was: warned)
     k = kinds(doc_(sized('VS1', 0, 500, 'WS'), sized('VS2', 500, 1000, 'CU')))
     assert not any(w.startswith('size_') for _, w in k)   # seen wide first, then close
     k = kinds(doc_(sized('VS1', 0, 300, 'ECU', size_reason='a reveal: the hand first, the wall after'), sized('VS2', 300, 1000, 'WS')))

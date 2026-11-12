@@ -330,6 +330,7 @@ class Shot(Model):
     transition_out: Literal['', 'cut', 'dissolve', 'match'] = ''   # only on a gap's last shot: into the footage after the gap
     transition_reason: str = Field(default='', max_length=500)
     size: Literal['', 'EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU'] = ''   # design/103 A3: the footage analysis's own words
+    recipe: Literal['', 'walker', 'one_action_close', 'transfer_close'] = ''   # integration step E: the kind of an AI video shot; any other kind is not yet available
     size_reason: str = Field(default='', max_length=500)   # a stated reveal or repeat
     camera_reason: str = Field(default='', max_length=1000)   # design/103 A4: what the viewer should feel or read, and why this camera gives it
     claim: Literal['', 'visible', 'invisible'] = ''   # design/103 G2: a claim a camera could film, or one it cannot
@@ -591,12 +592,15 @@ FROZEN_SHARE = 0.10                        # design/89 B4 (SK): warn when frozen
 PAUSE_GAP_S = 0.12                         # design/89 A3: a silence between words this long is a pause a cut may fall in
 CUT_TOLERANCE_S = 0.3                      # a cut further than this from a pause is warned
 WORD_TOLERANCE_S = 0.5                     # a picture that starts more than this after its words is warned
-VIDEO_MIN_ON_SCREEN_S = 2   # design/139 R9 (SK, 2 Nov 2026): made at the generator's 3 s and cut; under 2 s it is one picture
+VIDEO_MIN_ON_SCREEN_S = 1   # integration step E (SK, 10 Nov 2026: cut shots): a shot may be one of several short cuts, each made at the take's 3 s and trimmed; under 1 s it is one picture. Was 2 (design/139 R9)
+PEOPLE_NEAR_MAX = 4   # the method's rule 5: a default, not a proven limit; a crowd is a kind of shot that is not yet available
+CIRCLING = re.compile(r'\b(orbit\w*|circl\w*|arcs? (?:a)?round|around (?:him|her|them|the (?:person|subject|man|woman|worker)))\b', re.I)
 
 
 def _default_generator():
-    from .video_generators import CATALOG, DEFAULT
-    return next(c for c in CATALOG if c['provider'] == DEFAULT['provider'] and c['model'] == DEFAULT['model'])
+    """Integration step E: the limits of an AI video take are the guide take's (video_generators.GUIDE: 3 to 15 s, SK 10 Nov 2026), stated once."""
+    from .video_generators import GUIDE
+    return GUIDE
 
 
 def route_of(shot):
@@ -631,8 +635,8 @@ def routes(plan, fps=25):
                 if shot['visual_type'] in GRAPHIC_TYPES + ('drawn',):
                     out['graphic_seconds'] = round(out['graphic_seconds'] + seconds, 2)
                 if kind == 'video':
-                    out['images_estimated'] += (0 if prev_exact else 1) + (1 if shot.get('end_state_exact') else 0)   # design/112 S1
-                    prev_exact = bool(shot.get('end_state_exact'))
+                    out['images_estimated'] += 1   # integration step E: one still per AI video shot, made from its guide's first frame; no end picture, no shared start
+                    prev_exact = False
                 else:
                     prev_exact = False
                     if kind == 'still':   # design/112 K3
@@ -836,12 +840,10 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                             warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
                                              'from the narration and the brief'})
                         elif (scene.activity_level != 'quiet' and not any(sub.role in ('secondary', 'background') for s in scene.shots for sub in s.subjects)
-                              and not (scene.ambient.strip() and any(s.groups for s in scene.shots))):   # design/124-b decision (a): a crowd is the ambient line plus a group
+                              and not (scene.ambient.strip() and any(s.groups for s in scene.shots))
+                              and not any(s.visual_type == 'video' for s in scene.shots)):   # integration step E: a scene with an AI video shot is not asked for more people; every person there is a box in the guide   # design/124-b decision (a): a crowd is the ambient line plus a group
                             warnings.append({'scene_id': scene.id, 'kind': 'life_missing', 'message': f'scene {scene.id} is {scene.activity_level} but shows one subject and no background '
                                              'activity: add who else is there and what they do (secondary or background subjects with beats) and the working equipment'})
-                    if scenes is counted and any(s.visual_type == 'video' for s in scene.shots) and not scene.ambient.strip():   # design/101 M2
-                        warnings.append({'scene_id': scene.id, 'kind': 'ambient_missing', 'message': f"scene {scene.id}: say what moves around the action (ambient): "
-                                         "trees, air, people in the background, or 'still'"})
                     last_states = {}
                     for shot in scene.shots:
                         need(shot.id not in shot_ids, 'Duplicate shot identity.')
@@ -962,10 +964,18 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                         gap_shots.append(shot)
                         if shot.visual_type == 'video' and seconds is not None:   # design/45 10.7; design/124 A4 decision 5: refused, Omni only
                             omni = _default_generator()
-                            need(seconds <= omni['max_seconds'] + 1e-6, f"shot {shot.id} is {seconds:.1f} s; every take is Gemini Omni, {omni['min_seconds']}–{omni['max_seconds']} s: "
+                            need(seconds <= omni['max_seconds'] + 1e-6, f"shot {shot.id} is {seconds:.1f} s; an AI video take is {omni['min_seconds']}–{omni['max_seconds']} s: "
                                                                         'split it into shots of up to that, cut where an action begins or ends')
                             need(seconds >= VIDEO_MIN_ON_SCREEN_S - 1e-6, f"shot {shot.id} is {seconds:.1f} s of AI video; a take is made at {omni['min_seconds']} s and cut to at least "
                                                                           f"{VIDEO_MIN_ON_SCREEN_S} s on screen: under that, use a single picture (a still)")
+                            people = [s.element_id for s in shot.subjects if ekind.get(s.element_id) == 'person']
+                            need(len(people) <= PEOPLE_NEAR_MAX, f'shot {shot.id} has {len(people)} people; an AI video shot holds at most {PEOPLE_NEAR_MAX}: a crowd is not yet available. '
+                                                                 'Take people out of the shot, or make it footage or a still.')
+                            need(not CIRCLING.search(shot.camera_move or ''), f'shot {shot.id}: a camera that circles a person is not made (the place is rebuilt between angles). Use a fixed camera, or a pan that follows a walker.')
+                            if shot.recipe == 'transfer_close':
+                                need(shot.size in CLOSE_SIZES, f'shot {shot.id}: a transfer (a pour, a pick-up, a hand-over) is its own close shot: give it the size MCU, CU or ECU.')
+                                down = [p.element_id for p in shot.props if p.end.where == 'set_down']
+                                need(not down, f"shot {shot.id}: a transfer ends before the set-down: {', '.join(down)} ends in the hand (in_hand); the set-down is another shot, or is left out.")
                         need(set(shot.element_ids) <= elements, 'Shot names an unknown reference element.')
                         subjects = unique(shot.subjects, 'element_id', 'visible subject')
                         need(subjects <= set(shot.element_ids), 'Every visible subject must be a required shot element.')
@@ -980,8 +990,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                 need(not subject.beats and subject.hold_reason.strip(), 'A held subject needs its reason, not invented beats.')
                                 small_life = SMALL_LIFE.search(subject.hold_reason) and not ('stand' in subject.start.pose.lower() and scene.activity_level in ('normal', 'busy'))   # design/124-b item 3
                                 if living:   # design/110 F6: a living thing that is not the actor still gets its own small change
-                                    need(small_life or subject.start.position != subject.end.position, f'shot {shot.id}: {subject.element_id} is a living thing that stands still from start to end; give it a small move '
-                                         '(its end position a body-length or so from its start, against a landmark).')
+                                    pass   # integration step E: no forced move. A person who stays put is the safest case of a guide-made shot (the method's rule 9); small life is welcome, never required
                                     need(subject.start.pose == subject.end.pose and subject.start.holding == subject.end.holding and subject.start.progress == subject.end.progress,
                                          'A held subject cannot change what it holds or its progress.')
                                 else:
@@ -1078,7 +1087,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                             for lid in shot.fixed:
                                 need(lid in landmarks, f'shot {shot.id}: {lid} is not a landmark of the scene (fixed names landmarks only).')
                                 need(lid not in elements, f'shot {shot.id}: {lid} is an element, a thing that can be carried: it belongs to objects, not to fixed.')
-                            if shot.changes and all(re.search(r'\b(look|looks|gaze|glance|expression|eyes|smile)\b', ch.what, re.I) for ch in shot.changes):   # F7's planning rule
+                            if shot.visual_type != 'video' and shot.changes and all(re.search(r'\b(look|looks|gaze|glance|expression|eyes|smile)\b', ch.what, re.I) for ch in shot.changes):   # F7's planning rule
                                 warnings.append({'shot_id': shot.id, 'kind': 'look_only', 'message': f'shot {shot.id}: its only change is a look or an expression, a weak point of the picture models; prefer a '
                                                  'profile, a view from behind or the hands in close, so the shot does not depend on it'})
                         if shot.visual_type == 'video':   # design/149 B9 (SK): nothing in the frame vanishes; a container that brings a thing is a named prop
@@ -1341,9 +1350,9 @@ def course_warnings(plan, fps, drawn_in_run=True):
                 if not sizes and shot.size not in OPEN_SIZES and not reason:   # A3 (1)
                     out.append({'shot_id': shot.id, 'kind': 'size_open',
                                 'message': f'shot {shot.id} opens scene {scene.id} at {shot.size}: a new place opens wide or medium-wide, unless a reveal is stated (size_reason)'})
-                if len(sizes) >= 2 and sizes[-1] == sizes[-2] == shot.size and not reason:   # A3 (2)
+                if len(sizes) >= 2 and sizes[-1] == sizes[-2] == shot.size and not reason and shot.visual_type != 'video':   # A3 (2); integration step E: not for AI video (hand actions are a run of close shots)
                     out.append({'shot_id': shot.id, 'kind': 'size_repeat', 'message': f'shot {shot.id}: three {shot.size} shots in a row; change the size, or say why (size_reason)'})
-                if shot.size in CLOSE_SIZES and not reason and shot.element_ids and not any(seen.get(e, 99) < SIZE_ORDER.index('MCU') for e in shot.element_ids):   # A3 (3)
+                if shot.size in CLOSE_SIZES and not reason and shot.visual_type != 'video' and shot.element_ids and not any(seen.get(e, 99) < SIZE_ORDER.index('MCU') for e in shot.element_ids):   # A3 (3); not for AI video
                     out.append({'shot_id': shot.id, 'kind': 'size_close_first',
                                 'message': f'shot {shot.id} is a {shot.size} of a subject not seen wider in this scene yet; show it wider first, or state the reveal (size_reason)'})
                 for e in shot.element_ids:

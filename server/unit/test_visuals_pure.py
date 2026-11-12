@@ -206,9 +206,9 @@ def test_a_return_names_a_shot_the_film_shows():
 def test_a_video_shot_longer_than_omni_makes_is_refused(monkeypatch):
     """design/124 A4 decision 5 (was: warned, with a longer generator offered)."""
     from app import video_generators
-    monkeypatch.setattr(VC, '_default_generator', lambda: video_generators.CATALOG[0])   # this module's fixtures lift the limit (conftest); this test runs the real one
+    monkeypatch.setattr(VC, '_default_generator', lambda: video_generators.GUIDE)   # this module's fixtures lift the limit (conftest); this test runs the real one: the guide take, 3 to 15 s (integration step E; was Omni 1.1, 3 to 10)
     doc = plan([shot('VS1', 0, 590, 'video'), shot('VS2', 590, 1000, 'video')])   # 23.6 s and 16.4 s
-    with pytest.raises(ValueError, match='shot VS1 is 23.6 s; every take is Gemini Omni, 3–10 s: split it') as exc:
+    with pytest.raises(ValueError, match='shot VS1 is 23.6 s; an AI video take is 3–15 s: split it') as exc:
         VC.validate_plan(doc, GAPS, Fraction(25))
     assert 'Seedance' not in str(exc.value) and 'generator' not in str(exc.value)
     _, warnings = VC.validate_plan(plan([shot('VS1', 0, 250, 'video'), shot('IM1', 250, 1000, 'image')]), GAPS, Fraction(25))

@@ -452,7 +452,7 @@ def _visuals_act(code, vw2_session, body):
             'supply': lambda: V.supply_own(conn, store, user, run, outputs, body['element_id'], content=base64.b64decode(body['content_base64']) if body.get('content_base64') else None,
                                            url=str(body.get('url') or ''), name=str(body.get('name') or '')),   # design/110 rule 0: the operator's own picture from the page
             'measure': lambda: V.measure(store, user, run, outputs, list(body.get('reference_ids') or []), str(body.get('question') or '')),   # design/89 D2
-            'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
+            'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or ''), body.get('in_s')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),
             'guide-approve': lambda: guide.approve_still(conn, store, user, run, outputs, body['shot_id'], body['still_id'], body['sha256'], quote),   # integration steps B to D
             'guide-reject': lambda: guide.reject_still(conn, store, user, run, outputs, body['shot_id'], body['still_id'], str(body.get('notes') or ''), quote),

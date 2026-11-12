@@ -22,9 +22,10 @@ def test_the_removed_length_rules_are_gone():
     assert not hasattr(VC, 'AI_RUN_S') and 'ai_run' not in VC.WARNING_PLAIN
 
 
-def test_an_ai_video_under_two_seconds_is_refused():
-    with pytest.raises(ValueError, match='use a single picture'):
-        VC.validate_plan(doc_(pshot('V0', 0, 47, 'video'), *tail(47)), GAPS, Fraction(25))
+def test_an_ai_video_under_two_seconds_is_refused():   # integration step E: under ONE second now; a shot may be one of several short cuts (was 2 s)
+    with pytest.raises(ValueError, match='cut to at least 1 s on screen: under that, use a single picture'):
+        VC.validate_plan(doc_(pshot('V0', 0, 24, 'video'), *tail(24)), GAPS, Fraction(25))
+    VC.validate_plan(doc_(pshot('V0', 0, 47, 'video'), *tail(47)), GAPS, Fraction(25))   # 1.88 s: a short cut, allowed now
 
 
 def test_an_ai_video_of_two_seconds_passes_and_is_made_at_three():

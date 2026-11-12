@@ -62,7 +62,7 @@ def test_a_persons_states_carry_a_gaze_when_the_face_is_in_frame_and_a_look_only
         state['objects'] = copy.deepcopy(m['start']['objects'])   # nothing moves: the look is the only change
     look['gaps'][0]['scenes'][0]['shots'][0]['changes'] = [{'what': 'E1 looks up from the course to the window', 'beat_id': 'B2'}]
     _, warnings = check(look)
-    assert any(w['kind'] == 'look_only' and 'profile' in w['message'] for w in warnings)
+    assert not any(w['kind'] == 'look_only' for w in warnings)   # integration step E (SK, 12 Nov 2026): a face close-up is this method's reliable shot; the warning stays for other routes (was: warned)
 
 
 def test_as_before_and_facing_each_other_are_refused_in_a_prompt():

@@ -86,8 +86,7 @@ def test_the_plan_check_holds_the_counts_the_props_and_the_headings_to_account()
         check(broken(lambda sh: sh['subjects'][0]['start'].__setitem__('facing', 'the wall') or sh['subjects'][0]['beats'][0]['start'].__setitem__('facing', 'the wall')))
     with pytest.raises(ValueError, match='heading names a landmark of the scene'):
         check(broken(lambda sh: sh['subjects'][1]['start'].__setitem__('facing', {**HEAD, 'landmark_id': 'L9'})))
-    with pytest.raises(ValueError, match='COW is a living thing that stands still'):
-        check(broken(lambda sh: sh['subjects'][1].__setitem__('end', copy.deepcopy(sh['subjects'][1]['start']))))
+    check(broken(lambda sh: sh['subjects'][1].__setitem__('end', copy.deepcopy(sh['subjects'][1]['start']))))   # integration step E (SK, 12 Nov 2026): a living thing that stays put from start to end is accepted: no forced small move (was: refused, 'stands still')
     with pytest.raises(ValueError, match='objects name elements'):
         check(broken(lambda sh: sh['subjects'][0]['end']['objects'].__setitem__(0, {'element_id': 'NOPE', 'count': 1, 'place': {'landmark_id': 'L1', 'relation': 'on', 'amount': 0, 'unit': 'hand'}})
                      or sh['subjects'][0]['beats'][1]['end']['objects'].__setitem__(0, {'element_id': 'NOPE', 'count': 1, 'place': {'landmark_id': 'L1', 'relation': 'on', 'amount': 0, 'unit': 'hand'}})))

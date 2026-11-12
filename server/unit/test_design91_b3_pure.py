@@ -25,7 +25,7 @@ def test_a_busy_scene_with_one_subject_and_no_background_activity_warns():
     assert (None, 'SC1', 'activity_missing') in kinds(doc)
     doc['gaps'][0]['scenes'][0]['activity_level'] = 'busy'
     found = kinds(doc)
-    assert (None, 'SC1', 'life_missing') in found and (None, 'SC1', 'activity_missing') not in found
+    assert (None, 'SC1', 'life_missing') not in found and (None, 'SC1', 'activity_missing') not in found   # integration step E (SK, 12 Nov 2026): this scene has AI video shots: no life_missing (was: warned)
     doc['gaps'][0]['scenes'][0]['activity_level'] = 'quiet'
     assert (None, 'SC1', 'life_missing') not in kinds(doc)
     out, _ = VC.validate_plan(plan([pshot('IM1', 0, 100, 'image')] + rest()), GAPS, Fraction(25))

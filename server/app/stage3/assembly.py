@@ -199,6 +199,25 @@ def probe_file(store, k, name):
             'issues': ([] if v.get('color_transfer') and v.get('color_primaries') else ['colour untagged']) + (['rotation metadata'] if rotation else [])}
 
 
+def in_frames(meta, pk, avail):
+    """Integration step E: a take's in point (seconds into the take, chosen when it was selected) as film frames: the default start of its fill."""
+    if not (meta or {}).get('in_s'):
+        return 0
+    return max(0, min(int(round(float(meta['in_s']) * float(Fraction(str(pk['timeline']['fps']))))), (avail or 1) - 1))
+
+
+def rate_note(meta, pk):
+    """A take at another frame rate than the film gains repeated frames (or loses some): said to the operator, never hidden."""
+    if (meta or {}).get('kind') != 'movie' or not meta.get('fps'):
+        return ''
+    take, film = Fraction(str(meta['fps'])), Fraction(str(pk['timeline']['fps']))
+    if take == film:
+        return ''
+    more = film - take
+    return (f"the take is {float(take):g} frames a second and the film {float(film):g}: " + (f"{float(more):g} frames in every second are repeated" if more > 0 else f"{float(-more):g} frames in every second are dropped")
+            + '; a film at the take\'s rate avoids it')
+
+
 def prepare(conn, store, user, run, outputs):
     """Collect the master plan and every gap's selected take or asset; probe each fill; default choices."""
     master_o = S2._output(outputs, 'master')
@@ -255,7 +274,8 @@ def prepare(conn, store, user, run, outputs):
             meta = {'kind': 'movie', **probe_file(store, ref['key'], ref['name'])}
         avail = int(Fraction(str(meta['duration_s'] or 0)) * Fraction(str(pk['timeline']['fps']))) if meta.get('duration_s') else None
         fills[shot['shot_id']] = {'gap_id': g['shot_id'], 'file': None if ref.get('clip_fill') else {k: ref[k] for k in ('name', 'key', 'sha256', 'bytes')}, 'placement': placement, 'slot_frames': slot, 'meta': meta,
-                                  'available_frames': avail, 'default': {'offset_frames': 0, 'end_policy': 'trim' if (avail or 0) >= slot else 'hold_last'},
+                                  'available_frames': avail, 'default': {'offset_frames': in_frames(meta, pk, avail), 'end_policy': 'trim' if (avail or 0) - in_frames(meta, pk, avail) >= slot else 'hold_last'},
+                                  **({'rate_note': rate_note(meta, pk)} if rate_note(meta, pk) else {}),
                                   **({'boundary': shot['boundary']} if shot.get('boundary') else {}), **({'transition': shot['transition']} if shot.get('transition') else {})}   # design/71 P4; design/91 N16
         session['choices'].setdefault(shot['shot_id'], {**fills[shot['shot_id']]['default'], 'accept_as_is': False})
     settled = bool(session.get('current')) and S2.digest(session['fills']) == S2.digest(fills)   # handover H4: built from these very fills; nothing to ask again
@@ -439,10 +459,11 @@ def render(conn, store, user, run):
                               'timeline_frames': ev['timeline_frames'], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4")})
             else:
                 n_src = int(Fraction(ev['timeline_frames']) * Fraction(str(fps)) / Fraction(str(pk['timeline']['fps'])))
-                avail = ev.get('offset_frames', 0) + n_src
+                src_in = int(Fraction(ev.get('offset_frames', 0)) * Fraction(str(fps)) / Fraction(str(pk['timeline']['fps'])))   # integration step E: the offset is chosen and checked in film frames; here it becomes the take's own frames (it was used unconverted)
+                avail = src_in + n_src
                 items.append({'kind': 'event', 'sub_clip_id': ev['shot_id'], 'clip': {'id': ev['shot_id'], 'name': ev['file']['name'], 'sha256': ev['file']['sha256'], 'key': ev['file']['key'], 'fps': fps,
                                                                                        'rotation_deg': 0.0, 'hdr': str(m.get('color_transfer') or '').lower() in ('arib-std-b67', 'smpte2084')},
-                              'source_in_frame': ev['offset_frames'], 'source_out_frame': avail, 'timeline_frames': ev['timeline_frames'], 'crop_rect': None,
+                              'source_in_frame': src_in, 'source_out_frame': avail, 'timeline_frames': ev['timeline_frames'], 'crop_rect': None,
                               'hold_last_frame': ev['end_policy'] == 'hold_last', 'a2': [], 'normalised_key': key(run, f"normalised/{ev['shot_id']}.mp4"),
                               'dissolve_into_next': ev.get('dissolve_into_next') or 0})   # design/71 P4
     open_job = session['renders'].get('assembly')

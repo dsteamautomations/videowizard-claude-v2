@@ -156,7 +156,7 @@ def editors_table(events, fps, vis, fmt=None):
         if 'light and colour' in failed:
             add('look', 'E7', failed['light and colour'] + ': match the grade by eye')
         if 'fine detail' in failed:
-            add('look', 'E8', failed['fine detail'] + ': add fine grain to match')
+            add('look', 'E8', failed['fine detail'] + ': add light grain to match, never medium or strong')
         if 'nothing extra' in failed:
             add('look', 'E10', 'the check saw: ' + failed['nothing extra'] + ': paint it out if it distracts')
     once = lambda k, rule, line: rows.append({'kind': k, 'rule': rule, 'where': '', 'shot': '', 'line': line})
@@ -238,6 +238,12 @@ def bundle(conn, store, user, run, outputs):
     for f in asm_o['files']:
         if f['name'].startswith('normalised/'):
             files.append({'role': 'normalised', 'name': layout('normalised', f['name'].split('/', 1)[1], fills), **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
+    for o in outputs:   # integration step E: the raw take beside its trimmed piece, so the editor has handles on both sides of the cut
+        if o['stage'] == 'visuals' and o['unit'] is not None:
+            takes = {f"{sh['shot_id']}.mp4" for sh in (o.get('summary') or {}).get('shots') or [] if sh.get('source') == 'take'}
+            for f in o.get('files') or []:
+                if f['name'] in takes and f['name'] in fills:
+                    files.append({'role': 'ai_raw', 'name': 'Media/AI/Raw/' + f['name'], **{k: f[k] for k in ('key', 'sha256', 'bytes')}})
     for o, name in ((master_o, f"master-v{master_o['summary']['version']}.json"), (asm_o, f"assembly-v{asm_o['summary']['version']}.json")):
         f = next(x for x in o['files'] if x['name'] == name)
         files.append({'role': 'plan', 'name': 'Plans/' + name, **{k: f[k] for k in ('key', 'sha256', 'bytes')}})

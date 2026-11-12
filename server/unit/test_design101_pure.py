@@ -33,7 +33,7 @@ def test_a_scene_takes_an_ambient_line_and_an_old_plan_stays_valid_without_it():
 
 def test_a_scene_with_a_video_shot_and_no_ambient_line_warns_and_a_still_scene_does_not():
     doc = plan([pshot('IM1', 0, 100, 'image'), pshot('VS1', 100, 500, 'video'), pshot('VS2', 500, 1000, 'video')])
-    assert ('SC1', 'ambient_missing') in kinds(doc)
+    assert ('SC1', 'ambient_missing') not in kinds(doc)   # integration step E (SK, 12 Nov 2026): what moves around the action is in the guide; the plan is no longer asked for it in words (was: warned)
     doc['gaps'][0]['scenes'][0]['ambient'] = 'still: nothing else moves'
     assert ('SC1', 'ambient_missing') not in kinds(doc)
     stills = plan([pshot('IM1', 0, 500, 'image'), pshot('IM2', 500, 1000, 'image')])

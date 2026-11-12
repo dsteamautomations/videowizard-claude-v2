@@ -33,7 +33,7 @@ def test_an_unsized_shot_breaks_a_size_run_and_is_never_read_as_the_opener():
     k = kinds(doc_(pshot('VS1', 0, 500, 'video'), sized('VS2', 500, 1000, 'MS')))
     assert not any(w == 'size_open' for _, w in k)   # the scene's opener is the unsized shot, not VS2
     k = kinds(doc_(sized('VS1', 0, 200, 'MS'), sized('VS2', 200, 400, 'MS'), sized('VS3', 400, 600, 'MS'), sized('VS4', 600, 1000, 'WS')))
-    assert ('VS3', 'size_repeat') in k   # unchanged when every shot is sized
+    assert ('VS3', 'size_repeat') not in k   # integration step E (SK, 12 Nov 2026): three AI video shots at one size are not warned (was: warned)
 
 
 def test_an_elements_sizes_are_checked_like_a_drawing_specs():

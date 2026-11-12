@@ -94,7 +94,7 @@ def test_a_crowd_is_one_varied_group_with_a_few_traits_and_life_missing_accepts_
     scene(d)['activity_level'] = 'busy'
     vs1(d)['subjects'] = vs1(d)['subjects'][:1]   # the mason alone, the cow gone
     vs1(d)['element_ids'] = ['E1', 'TROWEL', 'BRICK']
-    assert ('SC1', 'life_missing') in kinds(d)
+    assert ('SC1', 'life_missing') not in kinds(d)   # integration step E (SK, 12 Nov 2026): a scene with an AI video shot is not asked for more people: every person is a box in the guide (was: warned)
     scene(d)['ambient'] = 'workers mixing and carrying in the background'
     vs1(d)['groups'].append({'kind': 'workers', 'count': 20, 'mode': 'varied', 'items': ['a red cap']})
     with pytest.raises(ValueError, match='a few traits'):
@@ -106,7 +106,7 @@ def test_a_crowd_is_one_varied_group_with_a_few_traits_and_life_missing_accepts_
     rule = {l['check']: l for l in VS.group_rule_lines(d, vs1(d))}
     assert 'a red cap' in rule['group alike: workers']['pass_when'] and rule['group count: workers']['pass_when'].startswith('about 20 workers')
     del scene(d)['ambient']
-    assert ('SC1', 'life_missing') in kinds(d)   # the group alone is not the crowd; the ambient line is half of it
+    assert ('SC1', 'life_missing') not in kinds(d)   # integration step E: no life_missing in a scene with an AI video shot (was: warned; the group alone was not the crowd)
 
 
 def test_passer_by_does_not_fire_on_an_element_with_beats():
@@ -123,14 +123,12 @@ def test_a_living_thing_that_holds_keeps_its_place_when_its_small_life_is_named(
     d = base()
     cow = vs1(d)['subjects'][1]
     cow['end']['position'] = copy.deepcopy(cow['start']['position'])
-    with pytest.raises(ValueError, match='stands still'):
-        check(d)
+    check(d)   # integration step E (SK, 12 Nov 2026): staying put needs no small move and no named small life (was: refused, 'stands still')
     cow['hold_reason'] = 'it lies chewing; its tail and ears flick'
     check(d)
     cow['start']['pose'] = cow['end']['pose'] = 'standing'
     scene(d)['activity_level'] = 'busy'
-    with pytest.raises(ValueError, match='stands still'):   # a standing figure in a busy scene keeps the body-length move
-        check(d)
+    check(d)   # a standing figure in a busy scene stays standing too (was: refused)
 
 
 # ---------- item 4: a place staged clean ----------

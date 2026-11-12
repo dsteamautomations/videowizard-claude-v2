@@ -70,11 +70,12 @@ def events_of(plan, pk, outputs, clips):
                 seen.add(f['name'])
             still = name.endswith('.png')
             avail = _frames(media['duration_s'], fps) if media.get('duration_s') else n
-            events.append({'file': layout('ai', name), 'kind': 'still' if still else 'movie', 'source_in_frame': 0, 'source_out_frame': n if still else min(n, avail),
+            src_in = 0 if still else min(_frames(media.get('in_s') or 0, fps), max(avail - 1, 0))   # integration step E: the in point chosen when the take was selected (a take is made a little longer than its slot)
+            events.append({'file': layout('ai', name), 'kind': 'still' if still else 'movie', 'source_in_frame': src_in, 'source_out_frame': n if still else min(src_in + n, avail),
                            'record_in_frame': rec_in, 'record_out_frame': rec_out, 'source_fps': str(fps), 'zoom': 1.0, 'pan': 0.0, 'tilt': 0.0, 'rotation': 0.0, 'color_group': None,
                            'marker': {'name': sid, 'note': ('AI take' if shot.get('source') == 'take' else 'picture') + (f"; planned move {media.get('motion')}" if still and media.get('motion') else '')
-                                      + ('; shorter than its slot: hold the last frame' if not still and avail < n else ''), 'colour': 'Green'},
-                           'a2': [], 'stabilized': False, 'source_frames': n if still else avail})
+                                      + ('; shorter than its slot: hold the last frame' if not still and avail - src_in < n else ''), 'colour': 'Green'},
+                           'a2': [], 'stabilized': False, 'source_frames': n if still else avail, **({'silent': True} if shot.get('source') == 'take' else {})})   # an AI take's own sound is never used
     return events, ai_files
 
 
@@ -162,5 +163,7 @@ def open_edit_text(code):
             "or, by hand: File > Import > Timeline, pick `Timeline/" + code + ".fcpxml`; then in the Media Pool select the camera clips, right-click, Relink, and pick the originals' folder.\n"
             "2. Captions: File > Import > Subtitle, pick `Timeline/" + code + ".srt`; it lands on a subtitle track, one cue per sentence.\n"
             "3. `Cut-list.csv` is the same timeline as a table: one row per cut, source and film in and out in seconds and timecode, and a note per AI picture with its planned move (push in or pan), which the server would have applied; apply it or not as you judge.\n"
-            "4. AI takes are 720p: Super Scale 2x before the final render. A still shorter than its slot is held on its last frame.\n\n"
+            "4. AI takes are 720p: Super Scale 2x before the final render. A still shorter than its slot is held on its last frame.\n"
+            "5. An AI take is placed from the point chosen when it was selected, and without its own sound: the generator's sound is not part of the film. "
+            "A take of a walk that looks slow may be sped up to 1.15 times, never above 1.2. Grain on an AI take: light, or none. A small error in lettering is patched frame by frame, and the shot ends before anyone crosses the patch.\n\n"
             "Nothing is applied for you beyond the cuts: grade, sound, VFX and the end card are yours.\n")

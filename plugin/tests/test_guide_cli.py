@@ -12,7 +12,7 @@ import vw
 
 
 def args(**kw):
-    base = {'what': 'status', 'shot': None, 'file': None, 'override': None, 'still': None, 'sha': None, 'quote': None, 'notes': None, 'region': None, 'prompt': None, 'again': False}
+    base = {'what': 'status', 'shot': None, 'file': None, 'override': None, 'still': None, 'sha': None, 'quote': None, 'notes': None, 'region': None, 'prompt': None, 'again': False, 'cause': None, 'fix': None}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -155,3 +155,10 @@ def test_the_skill_names_no_one_film(tmp_path):
     skill = (PLUGIN / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8').lower()
     for word in ('tea stall', 'tea master', 'kettle', 'hospital', 'documentary'):
         assert word not in skill, word
+
+
+def test_the_cause_of_a_rejected_take_names_one_of_four_what_was_wrong_and_the_one_change(harness, sent, capsys):
+    code, out, err = run(args(what='cause', shot='VS1', cause='guide'), capsys)
+    assert code == 2 and 'did the first frame match the still' in out['message'] and sent == []
+    code, out, err = run(args(what='cause', shot='VS1', cause='guide', notes='the path crosses the post', fix='move the path 0.5 m'), capsys)
+    assert code == 0 and sent == [('/api/runs/run-1/visuals/guide/cause', {'shot_id': 'VS1', 'cause': 'guide', 'notes': 'the path crosses the post', 'fix': 'move the path 0.5 m'})]

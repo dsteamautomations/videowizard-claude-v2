@@ -4468,6 +4468,24 @@ def submit_take(conn, store, user, run, outputs, shot_id):
     return {'job_id': str(row['id']), 'shot_id': shot_id, 'provider': request['provider'], 'model': request['model']}
 
 
+def take_in_point(prep, job, in_s):
+    """Integration step E: where a take starts in its slot, kept on the selection so the editor's package (made before the assembly) and the film both start there.
+    A take made from a guide is a little longer than its slot: with no point given, the slot sits in the middle of the take. Any other take starts at its first frame, as before."""
+    dur = float(((job.get('result') or {}).get('evidence') or {}).get('duration_seconds') or 0)
+    slot = float(((prep or {}).get('placement') or {}).get('exact_seconds') or 0)
+    if in_s is None or str(in_s).strip() == '':
+        return {'in_s': round(max(0.0, (dur - slot) / 2), 2)} if (prep or {}).get('kind') == 'guide' and dur > slot > 0 else {}
+    try:
+        at = float(in_s)
+    except (TypeError, ValueError):
+        raise ValueError('The in point is a number of seconds into the take (for example 0.4).')
+    need(at >= 0, 'The in point is a number of seconds into the take, from 0.')
+    need(not dur or at < dur, f'The in point {at:g} s is past the end of the take ({dur:.1f} s).')
+    need(not (dur and slot) or at + slot <= dur + 0.05, f'The take has {max(dur - at, 0):.1f} s after {at:g} s but its slot needs {slot:.1f} s: choose an earlier point (at most {max(dur - slot, 0):.2f} s), or the last frame is held.'
+         if dur - at >= 0 else '')
+    return {'in_s': round(at, 2)}
+
+
 def take_checklist(session, job):
     """design/74 L6: the checklist of the preparation this take was made from, when it is still the shot's current preparation."""
     prep = session['preparations'].get(job.get('unit')) or {}
@@ -4501,7 +4519,7 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     return review
 
 
-def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes=''):
+def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing_notes='', in_s=None):
     """design/45 10.4: with notes, the accepted review and the selection are one call; without, the latest review must be accepted."""
     need(not re.search(r'\breject', f'{quote or ""} {notes or ""}', re.I),   # design/106 T3: select places a take; words that reject it never do
          'Your words say reject: select places the take in the film. To reject a take, run `vw visuals review --job J --decision rejected --notes "…"`.')
@@ -4542,7 +4560,8 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
         need(live['preparation_digest'] == prep['base_preparation_digest'], 'The plan, references or generator changed since this take was prepared; prepare a current take.')
         context = live['preparation_digest']
     session['selections'][job['unit']] = {'job_id': str(job_id), 'review_id': reviews[-1]['id'], 'preparation_id': job['request']['preparation_id'], 'context_digest': context,
-                                          'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id']}
+                                          'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id'],
+                                          **take_in_point(prep, job, in_s)}
     _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
     if prep.get('kind') == 'guide':
         failed = [r['line'] for r in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('scorecard') or [] if r['state'] == 'Fail']
@@ -5416,7 +5435,8 @@ def record_gap(conn, store, user, run, outputs, gap_id, quote):
                       'color_transfer': ev.get('color_transfer'), 'color_primaries': ev.get('color_primaries'), 'rotation_deg': ev.get('rotation_deg') or 0, 'issues': ev['issues']}
                      if 'issues' in ev else None)   # design/46 11.2: assembly reads this instead of downloading the take
             shots.append({'shot_id': s['id'], 'source': 'take', 'job_id': sel['job_id'], 'placement': {'start_frame': s['start_frame'], 'end_frame': s['end_frame']},
-                          'duration_s': ev.get('duration_seconds'), 'timing_matches_placement': ev.get('timing_matches_placement'), **({'media': media} if media else {}), **boundary})
+                          'duration_s': ev.get('duration_seconds'), 'timing_matches_placement': ev.get('timing_matches_placement'),
+                          **({'media': {**media, **({'in_s': sel['in_s']} if sel.get('in_s') else {})}} if media else {}), **boundary})   # integration step E: the take's in point travels with the recorded shot
         elif asset['kind'] == 'sequence':   # design/65: one file per state; assembly plays them as a build
             media_states = []
             for i, st in enumerate(asset['states'], 1):

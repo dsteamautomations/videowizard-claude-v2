@@ -444,6 +444,7 @@ class TakeSelect(Write):
     quote: str = ''   # design/99 C2
     notes: str = ''          # design/45 10.4: with notes, the accepted review is recorded in the same call
     timing_notes: str = ''
+    in_s: float | None = Field(default=None, ge=0, le=60)   # integration step E: where the take starts in its slot
 
 
 class AssetBody(Write):
@@ -1563,7 +1564,7 @@ def visuals_review(run_id: UUID, body: TakeReview, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/select-take')
 def visuals_select_take(run_id: UUID, body: TakeSelect, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_take(conn, storage(), user, run, outputs, body.job_id, body.quote, body.notes, body.timing_notes))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.select_take(conn, storage(), user, run, outputs, body.job_id, body.quote, body.notes, body.timing_notes, body.in_s))
 
 
 @app.post('/api/runs/{run_id}/visuals/asset')
