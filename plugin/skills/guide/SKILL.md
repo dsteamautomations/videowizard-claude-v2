@@ -87,6 +87,10 @@ Metres. X to the right, Y away from the camera's side, Z up. One JSON object:
 
 A beat shorter than a person takes; a person within 0.5 m of the edge of the ground they stand on; a post within 0.5 m of where someone stops; an action that ends more than a second before the clip does (in a still tail the model undoes the action: let the action fill the clip); pale or look-alike colours (use dark, strongly contrasting colours, one per thing).
 
+### The camera's small drift
+
+The camera in the scene is one fixed position and aim. The server adds a tiny handheld drift to it at render, so the whole picture shifts by a few pixels across the shot. This is deliberate, it is not in your scene, and it is not a fault to fix or to report.
+
 ### What no check can see
 
 Steps, seats, bending and door arcs; an arm passing through a thing; one thing hiding another from the camera; whether a mark will be read as a real thing. The check frames are for these.

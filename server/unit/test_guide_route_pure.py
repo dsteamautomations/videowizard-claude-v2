@@ -640,3 +640,10 @@ def test_a_clip_that_was_never_a_take_is_not_counted_as_a_rejected_one(take_film
     job_id = shot_take(store, conn, {'guide': True, 'blocked': 'the guide came back unedited', 'scorecard': card()})
     reject(store, conn, job_id, 'it is the box video')
     assert GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Send it once more.', again=True)['job_id']   # no cause asked: it was not a take
+
+
+def test_design187_a_guides_own_jobs_are_never_listed_as_takes():   # VW-21: ten free check-frame jobs of one shot showed on the Takes step as ten takes with Select and Reject
+    import inspect
+    from app import visuals_stage as VS
+    src = inspect.getsource(VS.take_jobs)
+    assert "provider not in ('motion', 'guide', 'guide-still')" in src

@@ -971,10 +971,10 @@ def cmd_next(a):
         nxt['voice_page_url'] = voice_page_url(m['code'])
     if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
         nxt['review_page_url'] = review_page_url(m['code'])
-    if nxt.get('stage') == 'visuals':   # design/65: the treatment, the pictures and the takes are approved on the page
-        nxt['visuals_page_url'] = visuals_page_url(m['code'])
+    if nxt.get('stage') == 'visuals':   # design/188 (SK, 12 Nov 2026): the operator decides in the chat, one thing at a time; no page link is given (was design/65: on the page)
+        nxt['visuals_in_chat'] = "The operator's decisions of this stage are taken in the chat, one at a time: `vw visuals next`."
     emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
-         + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else '') + (f" Visuals page: {nxt['visuals_page_url']}" if nxt.get('visuals_page_url') else ''))
+         + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else '') + (f" {nxt['visuals_in_chat']}" if nxt.get('visuals_in_chat') else ''))
 
 
 def file_refs(m, paths, stage, retain):
@@ -1658,7 +1658,7 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1666,7 +1666,7 @@ _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
-    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
+    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': set(), 'decide': {'item', 'choice', 'quote', 'notes'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back'},   # design/177: the page's step-2 actions
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
@@ -1819,12 +1819,12 @@ def cmd_visuals(a):
         files = download_visuals_package(m, out['package']['key'])   # design/65 B12: one file per section
         files += visuals_library_files(ws, call('GET', base + '/library'))   # design/68 L4: the library per step
         url = visuals_page_url(m['code'])
-        told = (f"Tell the operator in one line, never ask: {out['footage']}; they correct it on the visuals page or say so (`vw visuals footage --camera … --support … --look … --quote`). "
+        told = (f"Tell the operator in one line, never ask: {out['footage']}; they correct it by saying so (`vw visuals footage --camera … --support … --look … --quote`). "
                 if out.get('footage') else '')   # design/88 F4
         parts = [f['file'].rsplit('/', 1)[1] for f in files if f['file'].startswith('work/visuals/part-')]   # design/124 C1
         if parts:
             told = f"The instructions are split by step: read prompt.md once, then part-<step>.md when you reach that step ({', '.join(parts)}). " + told
-        emit({**out, 'files': files, 'visuals_page_url': url, 'not_shareable': NOT_SHAREABLE}, 0,
+        emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0,   # design/188: no page link; the operator decides in the chat
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, then part-preparation.md (what to read first). "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
              f"Visuals page (give the operator this link): {url}. " + told)
@@ -1865,7 +1865,7 @@ def cmd_visuals(a):
         t = out.get('totals') or {}
         figures = f"{t.get('gaps', 0)} gaps, {t.get('images', 0)} images, about ₹{out.get('estimate_inr', 0):,.0f} against the cap ₹{out.get('cap_inr', 0):,.0f}"
         if out.get('draft'):
-            emit(out, 0, f"Treatment draft on the visuals page ({figures}): {visuals_page_url(m['code'])}. The operator approves it there, or tell me their yes and run this again with --quote.")
+            emit(out, 0, f"Treatment draft sent ({figures}). Now `vw visuals next`: the server hands the operator one line at a time, in the chat (design/188).")
         emit(out, 0, f"Treatment recorded: {figures}. Now author out/visual-plan.json to it.")
     if a.what == 'sequence':   # design/65 B2': the states of a graphic, approved in one call
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]
@@ -1888,6 +1888,21 @@ def cmd_visuals(a):
         emit({'records': out.get('records', 0), 'file': 'work/visuals/feedback.yaml'}, 0, f"{out.get('records', 0)} records in work/visuals/feedback.yaml")
     if a.what == 'select' and a.gap:
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
+    if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
+        out = write(base + '/chat/next', {})
+        item = out.get('item')
+        if not item:
+            emit(out, 0, ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', ''))
+        (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
+        paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show, saved in the run folder
+        item['show_files'] = paths
+        emit(out, 0, f"{item['position']}. {item['question']} " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
+             + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
+    if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
+        if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
+            emit({'action': 'refused', 'message': 'Give the item and the button chosen: `vw visuals decide --item <id from vw visuals next> --choice <the button\'s choice> --quote "<their words>"`.'}, 2)
+        out = write(base + '/chat/answer', {'item': a.item, 'choice': a.choice, 'quote': a.quote or '', 'notes': a.notes or ''})
+        emit(out, 0, out.get('then'))
     if a.what == 'accept':
         emit(write(base + '/accept', {'gap_ids': a.gaps, 'quote': a.quote}))
     if a.what == 'elements':   # design/73 R1: where each element is seen in the footage
@@ -1921,7 +1936,7 @@ def cmd_visuals(a):
                 errs = out.get('errors') or {}
                 emit(out, 0, f"Step 1 recorded: {len(out.get('queued') or [])} set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
                      + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) + ' (fix what it names, then `vw visuals round --verdicts` again).' if errs else '')
-                     + ' Then `vw visuals status --wait 900`: the operator judges every set in one shot on the page.')
+                     + ' Then `vw visuals next`: the server hands the operator one set at a time, in the chat (design/188).')
             emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} searched thing(s) go to pass 2; the round is at pass {out.get('pass')}.")
         if a.sets:   # design/151: the one-shot verdicts from chat: {element: {verdict: yes|no|correct, words, golden}}
             out = write(base + '/round/sets', {'verdicts': _json_file(m, a.sets), 'quote': a.quote})
@@ -1941,11 +1956,11 @@ def cmd_visuals(a):
             emit(out, 0, f"Round kept: {len(out.get('queued') or [])} missing set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
                  + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '') + ' Then `vw visuals status --wait 900`; the operator judges every set on step 2.')
         if out.get('kept'):
-            emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements (the kept method). Give the operator the page link ({visuals_page_url(m['code'])}): "
+            emit(out, 0, f"Reference round posted for {out.get('elements')} elements (the kept method). Now `vw visuals next`, again after every answer: the server hands the operator one element at a time in the chat, then one set at a time (design/188; no page). What happens: "
                  "step 1 they approve the footage pictures; Done makes every set at once (the server adds the kept preamble, the set line and the four notes to each thing's subject block, and writes each person's sheet from the plan); "
                  "step 2 they judge every set in one shot (Yes with the golden tick, No, or Correct it). Meanwhile write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps; "
                  "then `vw visuals status --wait 900`; ask nothing per element.")
-        emit({**out, 'visuals_page_url': visuals_page_url(m['code'])}, 0, f"Reference round posted for {out.get('elements')} elements. Give the operator the page link ({visuals_page_url(m['code'])}): they answer every element there in two passes. "
+        emit(out, 0, f"Reference round posted for {out.get('elements')} elements. This is an older film's round: the operator answers it in two passes. "
              "While they do, write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps; "
              "then wait with `vw visuals status --wait 900`; ask nothing per element.")
     if a.what == 'search':   # design/73 R3: Google Images for an element the footage lacks, on the operator's yes
@@ -2169,7 +2184,7 @@ def cmd_visuals(a):
         ready = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') != 'rejected')   # defect 30: a rejected take stays 'ready' as a job
         rejected = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') == 'rejected')
         rd = st.get('round') or {}
-        round_line = (f"; reference round at pass {rd.get('pass')}" + (': the operator is on the page, wait' if rd.get('pass') in (1, 2) else ': the sets are being made, wait' if rd.get('pass') == 'making'
+        round_line = (f"; reference round at pass {rd.get('pass')}" + (': the operator answers it in the chat, `vw visuals next`' if rd.get('pass') in (1, 2) else ': the sets are being made, wait' if rd.get('pass') == 'making'
                                                                         else ': complete; the approved sets are the references' if rd.get('kept') else ': read the verdicts and make the sheets')) if rd else ''   # design/151
         if open_:
             images, takes = sum(1 for j in open_ if j.get('provider') in ('openai', 'gemini-image')), sum(1 for j in open_ if j.get('provider') == 'video')   # design/124 A4 item 20: both picture AIs
@@ -2182,7 +2197,7 @@ def cmd_visuals(a):
             line += f"; {len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
-        waiting_line = (f'; {len(wt)} waiting for the operator: ' + '; '.join(f"{w['label']} {server_url()}{w['link']}" for w in wt)) if wt else ''
+        waiting_line = (f"; {len(wt)} waiting for the operator: ask them one at a time with `vw visuals next` (design/188), never from this list") if wt else ''
         due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
         emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':

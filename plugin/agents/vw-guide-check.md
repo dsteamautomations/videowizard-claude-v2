@@ -12,6 +12,8 @@ Look at, inside the run folder:
 - `work/guide/<shot>/frames/`: the strip and the three check frames (the first, the middle and the last frame of the guide). They show plain coloured boxes: box people with a black face mark and chest mark, the set as boxes.
 - `work/guide/<shot>/BUILD.md`: what each box is meant to be and what the shot's one action is. Read it for the intent only; judge the frames.
 
+The whole picture shifts by a few pixels between the frames (up to about ten at this size), walls and ground included. That is deliberate: the server gives the guide's camera a tiny handheld drift so the footage does not look locked off. It is never a fault and never a failed look; judge everything else against the picture as it stands in each frame.
+
 Make every one of these looks, literally, on the frames:
 
 1. Every person named in BUILD.md is a box in the first frame, or the build says they walk in from the edge. Nobody else is there.

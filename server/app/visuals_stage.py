@@ -4502,7 +4502,7 @@ def take_checklist(session, job):
 
 
 def take_jobs(conn, run, shot_id=None):
-    sql = "select id, unit, provider, status, request, result, error, cost, attempt, created_at, updated_at from vw2_jobs where run_id=%s and stage='visuals' and provider <> 'motion'"   # design/130: a helper's check or snapshot is never a take
+    sql = "select id, unit, provider, status, request, result, error, cost, attempt, created_at, updated_at from vw2_jobs where run_id=%s and stage='visuals' and provider not in ('motion', 'guide', 'guide-still')"   # design/130: a helper's check or snapshot is never a take; design/187 (VW-21, 12 Nov 2026): nor are a guide's check frames, its render or its still, which the Takes step showed as ten takes to select
     rows = conn.execute(sql + (' and unit=%s' if shot_id else '') + ' order by created_at', (run['id'], shot_id) if shot_id else (run['id'],)).fetchall()
     return rows
 

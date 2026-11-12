@@ -90,6 +90,8 @@ if __name__ == '__main__':
         d151b(parts)
         from d181_wording_v3 import apply as d181   # design/181, integration step E: an AI video shot is made from a guide; 3 to 15 s; the older take is retired from the text
         prompt = d181(prompt, parts)
+        from d188_wording_v3 import apply as d188   # design/188: the operator's decisions in the chat, one at a time
+        prompt = d188(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

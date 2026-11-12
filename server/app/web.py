@@ -350,6 +350,10 @@ def visuals_page(request: Request, code: str, vw2_session: str | None = Cookie(d
         return login_redirect(request)
     with db_connect() as conn:
         run = _run_by_code(conn, user, code)
+    if not core.is_admin(user):   # design/188 (SK, 12 Nov 2026): the operator decides in the chat, one thing at a time; the page stays for the administrator, to look at a run
+        return HTMLResponse(f'<!doctype html><meta charset="utf-8"><title>{run["code"]}</title><body style="font:16px system-ui;margin:3rem;max-width:40rem">'
+                            f'<h2>{run["code"]}: visuals</h2><p>The decisions of the visuals stage are taken in the chat with the assistant, one at a time. '
+                            'Go back to the chat and it will show you the next one.</p></body>')
     return render(request, 'visuals.html', user=user, run=run)
 
 

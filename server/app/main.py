@@ -1337,6 +1337,13 @@ class MotionUpload(Write):   # design/130
     content_base64: str
 
 
+class ChatAnswer(Write):   # design/188: the operator's answer to the one decision the server handed out
+    item: str = Field(min_length=3, max_length=200)
+    choice: str = Field(min_length=1, max_length=120)
+    quote: str = Field(default='', max_length=2000)
+    notes: str = Field(default='', max_length=4000)
+
+
 class MotionFinish(Write):   # design/186: the finish of a drawn shot taken away or put back
     shot_id: str
     on: bool = False
@@ -1389,6 +1396,18 @@ def visuals_motion_tool(run_id: UUID, body: MotionTool, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/motion/render', status_code=201)
 def visuals_motion_render(run_id: UUID, body: Draw, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.render_motion(conn, storage(), user, run, outputs, body_dict(body)), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/chat/next')
+def visuals_chat_next(run_id: UUID, body: Write, user=User, conn=DB):   # design/188: one decision at a time, in the chat
+    from . import chat_flow
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.next_item(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/visuals/chat/answer')
+def visuals_chat_answer(run_id: UUID, body: ChatAnswer, user=User, conn=DB):
+    from . import chat_flow
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/finish', status_code=201)
