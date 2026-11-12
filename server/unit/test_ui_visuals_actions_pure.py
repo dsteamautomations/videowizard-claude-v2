@@ -269,10 +269,10 @@ def test_a_supplied_file_carries_who_supplied_it_the_words_and_its_length(monkey
     doc = doc_with(KILN, MASON)
     store, conn = new_store(doc, {}, accepted=accepted(doc)), FilesConn([])
     monkeypatch.setattr(VS, '_movie_seconds', lambda store_, key_: 6.0)
-    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/pour.mp4', 'sha-movie', 1000, 'movie', 'My own shot of the pour.')
+    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/pour.mp4', 'sha-movie', 1000, 'movie', 'My own shot of the pour.', 'By hand.')
     asset = view(store, conn)['gaps'][1]['shots'][0]['asset']
     assert (asset['kind'], asset['by'], asset['quote'], asset['duration_s']) == ('movie', 'SK', 'My own shot of the pour.', 6.0)
-    VS.add_asset(conn, store, OTHER, NEW, [], 'VS1', 'run-1/uploads/wall.png', 'sha-movie', 1000, 'still', 'A photograph instead.')
+    VS.add_asset(conn, store, OTHER, NEW, [], 'VS1', 'run-1/uploads/wall.png', 'sha-movie', 1000, 'still', 'A photograph instead.', 'By hand.')
     asset = view(store, conn)['gaps'][1]['shots'][0]['asset']
     assert (asset['kind'], asset['by'], asset['quote'], asset['duration_s']) == ('still', 'Revathi', 'A photograph instead.', None)
 
@@ -280,7 +280,7 @@ def test_a_supplied_file_carries_who_supplied_it_the_words_and_its_length(monkey
 def test_a_file_supplied_before_this_change_or_one_that_cannot_be_measured_still_opens():
     doc = doc_with(KILN, MASON)
     store, conn = new_store(doc, {}, accepted=accepted(doc)), FilesConn([])
-    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/pour.mp4', 'sha-movie', 1000, 'movie', 'Mine.')   # no such file in the store: the length is unknown, never an error
+    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/pour.mp4', 'sha-movie', 1000, 'movie', 'Mine.', 'By hand.')   # no such file in the store: the length is unknown, never an error
     s = saved(store)
     assert s['assets']['VS1']['duration_s'] is None
     s['assets']['VS1'] = {k: v for k, v in s['assets']['VS1'].items() if k not in ('by_name', 'duration_s')}   # as stored before this change

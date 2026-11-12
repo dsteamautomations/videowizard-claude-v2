@@ -453,6 +453,7 @@ class AssetBody(Write):
     bytes: int = Field(ge=1)
     kind: Literal['movie', 'still']
     quote: str = Field(min_length=1)
+    made: str = ''   # integration step A: how the file was made; required (an older tool that sends none is refused with the way to give it)
 
 
 class GapBody(Write):
@@ -1241,6 +1242,13 @@ def visuals_status(run_id: UUID, user=User, conn=DB):
     return Response(visuals_stage.status(conn, storage(), run, core.current_outputs(conn, run['id']), repair=repair))
 
 
+@app.get('/api/runs/{run_id}/visuals/shots/{shot_id}/generations')
+def visuals_generations(run_id: UUID, shot_id: str, user=User, conn=DB):
+    """Integration step A: the record of every attempt of a shot, oldest first."""
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: visuals_stage.generations_of(conn, storage(), run, core.current_outputs(conn, run['id']), shot_id)))
+
+
 @app.get('/api/runs/{run_id}/visuals/library')
 def visuals_library(run_id: UUID, user=User, conn=DB):
     """design/68 L3: the library files per step for the run's version."""
@@ -1460,7 +1468,7 @@ def visuals_select_take(run_id: UUID, body: TakeSelect, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/asset')
 def visuals_asset(run_id: UUID, body: AssetBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_asset(conn, storage(), user, run, outputs, body.shot_id, body.key, body.sha256, body.bytes, body.kind, body.quote))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_asset(conn, storage(), user, run, outputs, body.shot_id, body.key, body.sha256, body.bytes, body.kind, body.quote, body.made))
 
 
 @app.post('/api/runs/{run_id}/visuals/treatment')

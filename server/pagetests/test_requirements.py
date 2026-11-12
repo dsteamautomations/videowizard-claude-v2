@@ -313,7 +313,7 @@ def test_a_supplied_shot_is_shown_as_done_on_takes(open_page, _id):
     c = put.page.locator('[id="card-VS1"]')
     text = c.inner_text()
     assert 'waiting for the assistant' not in text.lower() and 'No take yet' not in text, 'the shot is shown as waiting though it is filled'
-    assert 'ok' in c.locator('.turn').get_attribute('class').split() and 'Supplied by SK' in text and 'My own shot of the pour.' in text
+    assert 'ok' in c.locator('.turn').get_attribute('class').split() and 'Supplied by SK' in text and 'My own shot of the pour.' in text and 'made outside; checks skipped' in text and 'Filmed on my phone at the site.' in text
     player = c.locator('video, button[data-play]')
     src = player.first.get_attribute('src') or player.first.get_attribute('data-play')
     assert src.endswith('/file/run-1/uploads/wall-pour.mp4'), 'the supplied file cannot be played'

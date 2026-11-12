@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T16:37:06.643081+00:00",
+   "at": "2026-11-12T05:38:42.307439+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -110,19 +110,19 @@
   },
   "searches": [
    {
-    "at": "2026-11-11T16:37:06.657067+00:00",
+    "at": "2026-11-12T05:38:42.312973+00:00",
     "by": "u1",
     "element_id": "E2",
     "failed": [],
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "482ff033395d"
+     "bff9ebcb4bae"
     ],
     "picked": [
      1
     ],
     "quote": "Yes, search for the kiln.",
-    "search_id": "482ff033395d",
+    "search_id": "bff9ebcb4bae",
     "results": [
      {
       "download": "picture",
@@ -161,7 +161,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-11T16:37:06.644082+00:00",
+   "at": "2026-11-12T05:38:42.308449+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -181,9 +181,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "482ff033395d",
+     "search_id": "bff9ebcb4bae",
      "search_ids": [
-      "482ff033395d"
+      "bff9ebcb4bae"
      ],
      "source": "",
      "verdict": "search",
@@ -324,6 +324,47 @@
   ],
   "references": [
    {
+    "id": "740c6f249b321665f7d36c4497555f3f",
+    "name": "web-E2-1",
+    "kind": "web",
+    "element_id": "E2",
+    "status": "approved",
+    "sha256": "bd4dff19f47601e4cd53bf2ac252216c6da2fd7fd6a127bcf69fd4a6c306565d",
+    "job_id": null,
+    "width": 64,
+    "height": 48,
+    "check_pending": null,
+    "set": null,
+    "set_n": null,
+    "notes": null,
+    "sources": null,
+    "note": "colour only",
+    "from_thumbnail": false,
+    "sources_changed": false,
+    "golden": false,
+    "from_golden": null,
+    "edit": null,
+    "locked": null,
+    "shot_id": null,
+    "url": "/runs/VW-9/file/run-1/visuals/references/740c6f249b321665f7d36c4497555f3f.png",
+    "prompt": null,
+    "parents": [],
+    "approval": {
+     "by": "u1",
+     "at": "2026-11-12T05:38:42.316153+00:00",
+     "quote": "This one, colour only."
+    },
+    "rejection": null,
+    "checklist": null,
+    "check": null,
+    "pending_end": false,
+    "end_queued": null,
+    "role": null,
+    "fix_of": null,
+    "fix_queued": null,
+    "fix_for": null
+   },
+   {
     "id": "F1",
     "name": "F1",
     "kind": "frame",
@@ -351,49 +392,8 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:06.657067+00:00",
+     "at": "2026-11-12T05:38:42.313976+00:00",
      "quote": "Yes: the first frame."
-    },
-    "rejection": null,
-    "checklist": null,
-    "check": null,
-    "pending_end": false,
-    "end_queued": null,
-    "role": null,
-    "fix_of": null,
-    "fix_queued": null,
-    "fix_for": null
-   },
-   {
-    "id": "a6bae09fcaeb0935b9a576d20f5000b5",
-    "name": "web-E2-1",
-    "kind": "web",
-    "element_id": "E2",
-    "status": "approved",
-    "sha256": "bd4dff19f47601e4cd53bf2ac252216c6da2fd7fd6a127bcf69fd4a6c306565d",
-    "job_id": null,
-    "width": 64,
-    "height": 48,
-    "check_pending": null,
-    "set": null,
-    "set_n": null,
-    "notes": null,
-    "sources": null,
-    "note": "colour only",
-    "from_thumbnail": false,
-    "sources_changed": false,
-    "golden": false,
-    "from_golden": null,
-    "edit": null,
-    "locked": null,
-    "shot_id": null,
-    "url": "/runs/VW-9/file/run-1/visuals/references/a6bae09fcaeb0935b9a576d20f5000b5.png",
-    "prompt": null,
-    "parents": [],
-    "approval": {
-     "by": "u1",
-     "at": "2026-11-11T16:37:06.659736+00:00",
-     "quote": "This one, colour only."
     },
     "rejection": null,
     "checklist": null,

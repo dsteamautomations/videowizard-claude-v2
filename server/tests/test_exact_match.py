@@ -318,7 +318,7 @@ def test_blanks_inside_a_scene_go_through_visuals_and_assembly(home, database, f
     (ws / 'out' / 'placeholder.png').write_bytes(png_bytes((40, 40, 40), (1920, 1080)))
     assert vw(home, 'upload', '--stage', 'visuals', '--file', 'out/placeholder.png')[0] == 0
     for s in ('VA', 'VB', 'VC'):   # one file shared by three shots, two of them in the same gap (ticket 12)
-        assert vw(home, 'visuals', 'asset', '--shot', s, '--file', 'out/placeholder.png', '--kind', 'still', '--quote', 'placeholder')[0] == 0
+        assert vw(home, 'visuals', 'asset', '--shot', s, '--file', 'out/placeholder.png', '--kind', 'still', '--quote', 'placeholder', '--made', 'a test picture')[0] == 0
     for g in ('BEAT_01-B1', 'BEAT_02'):
         rc, out, err = vw(home, 'visuals', 'record', '--gap', g, '--quote', 'done')
         assert rc == 0, (out, err)

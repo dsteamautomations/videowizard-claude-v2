@@ -1554,7 +1554,7 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1571,7 +1571,7 @@ VISUALS_FLAGS = {
     'bind': {'file', 'shot', 'refs', 'selector', 'quote'}, 'packet': {'shot'}, 'generator': {'shot', 'provider', 'model'},
     'prepare-take': {'shot', 'start', 'end', 'motion', 'continuity', 'seconds', 'answer', 'subject'}, 'take': {'shot', 'shots'}, 'draw': {'shot'}, 'font': {'file'}, 'scene': {'shot', 'file', 'download'},   # design/113; design/117
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
-    'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote'},
+    'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote', 'made'}, 'generations': {'shot'},
     'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'element', 'quote', 'notes'},
     'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'}}
 _VISUALS_ALL = set().union(*VISUALS_FLAGS.values()) | {'inr'}
@@ -2156,11 +2156,22 @@ def cmd_visuals(a):
                      (f". Limits: {out['limits']}" if out.get('limits') else '') + '.')
     if a.what == 'asset':
         if not a.file:   # W11
-            emit({'action': 'refused', 'message': 'Give the uploaded file: `asset --shot S --file out/<name> --kind … --quote "…"`.'}, 2)
+            emit({'action': 'refused', 'message': 'Give the uploaded file: `asset --shot S --file out/<name> --kind … --made "<how the file was made>" --quote "…"`.'}, 2)
+        if not (a.made or '').strip():   # integration step A: a handed-in file says how it was made; refused here before anything is sent
+            emit({'action': 'refused', 'message': 'Say how the file was made: `asset --shot S --file out/<name> --kind … --made "<how the file was made>" --quote "…"`. Nothing was sent.'}, 2)
         entry = next((f for f in m['files'] if f.get('name') == Path(a.file).name and f.get('receipt')), None)
         if not entry:
             emit({'action': 'refused', 'message': 'Upload the asset first: `vw upload --stage visuals --file out/<name>`.'}, 2)
-        emit(write(base + '/asset', {'shot_id': a.shot, 'key': entry['key'], 'sha256': entry['sha256'], 'bytes': entry['bytes'], 'kind': a.kind, 'quote': a.quote}))
+        emit(write(base + '/asset', {'shot_id': a.shot, 'key': entry['key'], 'sha256': entry['sha256'], 'bytes': entry['bytes'], 'kind': a.kind, 'quote': a.quote, 'made': a.made}))
+    if a.what == 'generations':   # integration step A: the record of every attempt of a shot, oldest first
+        if not a.shot:
+            emit({'action': 'refused', 'message': 'Name the shot: `vw visuals generations --shot S`.'}, 2)
+        out, code = request('GET', f'{base}/shots/{a.shot}/generations')
+        if code:
+            finish(out, code)
+        rows = out.get('generations') or []
+        emit(out, 0, out.get('message') or f"{a.shot}: {len(rows)} generation{'s' if len(rows) != 1 else ''}. " + ' '.join(
+            f"#{g['attempt']} {g['how']}" + (f" ({g['verdict']})" if g.get('verdict') else '') + (': ' + str((g.get('record') or [{}])[0].get('made'))[:120] if (g.get('record') or [{}])[0].get('made') else '') + '.' for g in rows))
     if a.what == 'record':   # design/45 10.4: several gaps, or all that are ready
         gaps = list(a.gaps or ([a.gap] if a.gap else []))
         if not gaps:
@@ -2967,7 +2978,7 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')

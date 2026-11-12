@@ -41,7 +41,8 @@ from app import visuals_stage as VS   # noqa: E402
 import test_visuals_stage_pure as S   # noqa: E402
 import test_design151_refs_pure as R   # noqa: E402
 
-USER, NEW, OLD = S.USER, R.NEW, R.OLD
+USER, OLD = S.USER, R.OLD
+NEW = {**R.NEW, 'film': {**R.NEW['film'], 'motion': {'value': 'restrained'}}}   # design/179: a film names its motion style at the treatment; without one no state past the treatment can be built
 PRICES = {'image_inr': 20.0, 'video_inr_per_s': 8.0, 'usd_inr': 88.0}
 VS.prices = lambda: PRICES   # as the unit tests: fixed prices, no settings file
 BRICK = {'id': 'BRICK', 'name': 'Red brick', 'kind': 'material', 'identity': 'exact', 'requirements': 'the client\'s fired red brick',
@@ -393,7 +394,7 @@ def _():
 def _():
     _, store, conn = complete()
     conn.files = {'run-1/uploads/wall-pour.mp4': {'key': 'run-1/uploads/wall-pour.mp4', 'sha256': 'sha-movie', 'bytes': 1000}}
-    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/wall-pour.mp4', 'sha-movie', 1000, 'movie', 'My own shot of the pour.')
+    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/wall-pour.mp4', 'sha-movie', 1000, 'movie', 'My own shot of the pour.', 'Filmed on my phone at the site.')
     return store, conn, NEW
 
 
@@ -601,7 +602,7 @@ def _():
 def _():
     _, store, conn = complete()
     conn.files = {'run-1/uploads/wall.png': {'key': 'run-1/uploads/wall.png', 'sha256': 'sha-still', 'bytes': 500}}
-    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/wall.png', 'sha-still', 500, 'still', 'A photograph of the wet wall instead.')
+    VS.add_asset(conn, store, USER, NEW, [], 'VS1', 'run-1/uploads/wall.png', 'sha-still', 500, 'still', 'A photograph of the wet wall instead.', 'My own photograph.')
     return store, conn, NEW
 
 

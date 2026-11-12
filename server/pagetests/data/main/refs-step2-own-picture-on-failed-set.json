@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T16:37:08.043506+00:00",
+   "at": "2026-11-12T05:38:46.406521+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -182,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T16:37:08.043506+00:00",
+   "at": "2026-11-12T05:38:46.409536+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -193,7 +193,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:08.046579+00:00",
+      "at": "2026-11-12T05:38:46.422172+00:00",
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -235,7 +235,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:08.049497+00:00",
+      "at": "2026-11-12T05:38:46.436341+00:00",
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -257,7 +257,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:08.052100+00:00",
+      "at": "2026-11-12T05:38:46.446839+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -282,7 +282,7 @@
   "kept": true,
   "questions": {},
   "golden": {
-   "BRICK": "4e3ef4b5f1a23aaaf5f41baed8810c83",
+   "BRICK": "760efde35cfd16a70b721c877da9686c",
    "E1": "F1"
   },
   "illustrative": {
@@ -510,7 +510,7 @@
     "fix_for": null
    },
    {
-    "id": "4e3ef4b5f1a23aaaf5f41baed8810c83",
+    "id": "760efde35cfd16a70b721c877da9686c",
     "name": "my-brick.png",
     "kind": "supplied",
     "element_id": "BRICK",
@@ -532,12 +532,12 @@
     "edit": null,
     "locked": "This picture is recorded as the starting picture; it can no longer be changed here.",
     "shot_id": null,
-    "url": "/runs/VW-20/file/run-1/visuals/references/4e3ef4b5f1a23aaaf5f41baed8810c83.png",
+    "url": "/runs/VW-20/file/run-1/visuals/references/760efde35cfd16a70b721c877da9686c.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.054112+00:00",
+     "at": "2026-11-12T05:38:46.465959+00:00",
      "quote": "Added by the operator on the page"
     },
     "rejection": null,
@@ -578,7 +578,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.044498+00:00",
+     "at": "2026-11-12T05:38:46.411047+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

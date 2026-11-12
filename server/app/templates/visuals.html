@@ -1007,7 +1007,7 @@ function shotState(s){   // design/86 K3: whose turn it is on this shot, and how
   const ids=new Set(kf.map(r=>r.id)), isStart=r=>{if(r.role)return r.role==='start';return !(r.parents||[]).some(p=>ids.has(p));};   // design/106 T1
   const open=s.takes.find(k=>['queued','running','submitted','storage_pending'].includes(k.status)), ready=s.takes.find(k=>k.status==='ready'&&!k.selected&&!takeRejected(k));
   if(supplied(s)){const a=s.asset, slot=(s.end_frame-s.start_frame)/(Number(d.fps)||25), short=a.kind==='still'||(a.duration_s!=null&&Number(a.duration_s)<slot-0.04);   // R21: who supplied it, with which words; E17: what assembly does with a still or a short file
-    return ['ok',(a.by?'Supplied by '+a.by:'Filled with a supplied file')+(a.quote?': “'+a.quote+'”':'')+(a.kind==='still'?' · a still picture':a.duration_s!=null?' · '+a.duration_s+' s':'')+(short?' · assembly holds the last frame':'')+'.'];}
+    return ['ok',(a.by?'Supplied by '+a.by:'Filled with a supplied file')+(a.quote?': “'+a.quote+'”':'')+(a.kind==='still'?' · a still picture':a.duration_s!=null?' · '+a.duration_s+' s':'')+(short?' · assembly holds the last frame':'')+' · made outside; checks skipped'+(a.made?' (“'+a.made+'”)':'')+'.'];}
   if(s.route==='drawn'){   // design/113 E3: a drawing has no start or end image; it is rendered, free, and judged here
     if(s.takes.some(k=>k.selected))return ['ok','Drawing approved.'];
     if(ready&&s.takes.some(k=>k.status==='ready'&&!takeRejected(k)&&k.check&&(k.check.must_failed||[]).length))return ['you','Held: a line still failed after the server\'s passes. Look at the sheet; select the drawing with your reason, or reject it.'];   // design/117 answer 1

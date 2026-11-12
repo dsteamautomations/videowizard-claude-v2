@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T16:37:07.993868+00:00",
+   "at": "2026-11-12T05:38:46.145493+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -182,7 +182,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T16:37:07.994875+00:00",
+   "at": "2026-11-12T05:38:46.147519+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -192,7 +192,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:07.996873+00:00",
+      "at": "2026-11-12T05:38:46.162188+00:00",
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -235,7 +235,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:07.998873+00:00",
+      "at": "2026-11-12T05:38:46.173263+00:00",
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -257,7 +257,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:08.001391+00:00",
+      "at": "2026-11-12T05:38:46.177800+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -517,6 +517,47 @@
     "fix_for": null
    },
    {
+    "id": "7d3f83963132de6464dc8441e2818232",
+    "name": "my-kiln.png",
+    "kind": "supplied",
+    "element_id": "E2",
+    "status": "approved",
+    "sha256": "bd4dff19f47601e4cd53bf2ac252216c6da2fd7fd6a127bcf69fd4a6c306565d",
+    "job_id": null,
+    "width": 64,
+    "height": 48,
+    "check_pending": null,
+    "set": null,
+    "set_n": null,
+    "notes": null,
+    "sources": null,
+    "note": "",
+    "from_thumbnail": false,
+    "sources_changed": false,
+    "golden": false,
+    "from_golden": null,
+    "edit": null,
+    "locked": null,
+    "shot_id": null,
+    "url": "/runs/VW-20/file/run-1/visuals/references/7d3f83963132de6464dc8441e2818232.png",
+    "prompt": null,
+    "parents": [],
+    "approval": {
+     "by": "u1",
+     "at": "2026-11-12T05:38:46.189897+00:00",
+     "quote": "Added by the operator on the page"
+    },
+    "rejection": null,
+    "checklist": null,
+    "check": null,
+    "pending_end": false,
+    "end_queued": null,
+    "role": null,
+    "fix_of": null,
+    "fix_queued": null,
+    "fix_for": null
+   },
+   {
     "id": "F1",
     "name": "F1",
     "kind": "frame",
@@ -544,7 +585,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.994875+00:00",
+     "at": "2026-11-12T05:38:46.147519+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -673,47 +714,6 @@
     "prompt": "Character sheet of Mason (P1), a person in this film.\nWho they are: the mason who lays the plinth.\nFixed look: a man of about forty, lean, dark skin, short grey hair, a thin moustache, a cotton lungi folded to the knee and a faded shirt.\nGarments: a white lungi and a blue shirt.\nPlace: yard, day; the film's look: warm daylight.\nWhy: kneels all day.\nMake a set of three separate pictures of this one person, one per turn: 1, a full-length front view standing at ease; 2, a full-length three-quarter view in a working pose of their trade; 3, a close-up of the face. Deliver each as one separate output image at full size, never a collage, grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; no text, numbers or captions inside any picture.",
     "parents": [],
     "approval": null,
-    "rejection": null,
-    "checklist": null,
-    "check": null,
-    "pending_end": false,
-    "end_queued": null,
-    "role": null,
-    "fix_of": null,
-    "fix_queued": null,
-    "fix_for": null
-   },
-   {
-    "id": "dd2ff7888f4e3919773a6611f4e56a83",
-    "name": "my-kiln.png",
-    "kind": "supplied",
-    "element_id": "E2",
-    "status": "approved",
-    "sha256": "bd4dff19f47601e4cd53bf2ac252216c6da2fd7fd6a127bcf69fd4a6c306565d",
-    "job_id": null,
-    "width": 64,
-    "height": 48,
-    "check_pending": null,
-    "set": null,
-    "set_n": null,
-    "notes": null,
-    "sources": null,
-    "note": "",
-    "from_thumbnail": false,
-    "sources_changed": false,
-    "golden": false,
-    "from_golden": null,
-    "edit": null,
-    "locked": null,
-    "shot_id": null,
-    "url": "/runs/VW-20/file/run-1/visuals/references/dd2ff7888f4e3919773a6611f4e56a83.png",
-    "prompt": null,
-    "parents": [],
-    "approval": {
-     "by": "u1",
-     "at": "2026-11-11T16:37:08.005823+00:00",
-     "quote": "Added by the operator on the page"
-    },
     "rejection": null,
     "checklist": null,
     "check": null,

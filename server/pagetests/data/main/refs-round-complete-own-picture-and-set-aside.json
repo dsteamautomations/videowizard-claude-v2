@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T16:37:08.084898+00:00",
+   "at": "2026-11-12T05:38:46.570883+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -182,12 +182,12 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T16:37:08.085902+00:00",
+   "at": "2026-11-12T05:38:46.577477+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
      "aside": {
-      "at": "2026-11-11T16:37:08.092419+00:00",
+      "at": "2026-11-12T05:38:46.605079+00:00",
       "by": "u1",
       "words": ""
      },
@@ -197,7 +197,7 @@
      "ignored": true,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:08.088900+00:00",
+      "at": "2026-11-12T05:38:46.593903+00:00",
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -255,7 +255,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:08.091422+00:00",
+      "at": "2026-11-12T05:38:46.598721+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -281,7 +281,7 @@
   "questions": {},
   "golden": {
    "E1": "F1",
-   "E2": "e96192fef582a5ad56f35b161cbeba69",
+   "E2": "c95b75640eaaaefcb35ab8bd76dbe77e",
    "P1": "be070e7d69133e3b67d5d1a91bc9fe9e"
   },
   "illustrative": {
@@ -435,7 +435,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.086901+00:00",
+     "at": "2026-11-12T05:38:46.582348+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -481,7 +481,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.092932+00:00",
+     "at": "2026-11-12T05:38:46.608200+00:00",
      "quote": "Yes."
     },
     "rejection": null,
@@ -527,7 +527,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.092932+00:00",
+     "at": "2026-11-12T05:38:46.608200+00:00",
      "quote": "Yes."
     },
     "rejection": null,
@@ -573,7 +573,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.092932+00:00",
+     "at": "2026-11-12T05:38:46.608200+00:00",
      "quote": "Yes."
     },
     "rejection": null,
@@ -587,7 +587,7 @@
     "fix_for": null
    },
    {
-    "id": "e96192fef582a5ad56f35b161cbeba69",
+    "id": "c95b75640eaaaefcb35ab8bd76dbe77e",
     "name": "my-kiln.png",
     "kind": "supplied",
     "element_id": "E2",
@@ -609,12 +609,12 @@
     "edit": null,
     "locked": "This picture is recorded as the starting picture; it can no longer be changed here.",
     "shot_id": null,
-    "url": "/runs/VW-20/file/run-1/visuals/references/e96192fef582a5ad56f35b161cbeba69.png",
+    "url": "/runs/VW-20/file/run-1/visuals/references/c95b75640eaaaefcb35ab8bd76dbe77e.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:08.086901+00:00",
+     "at": "2026-11-12T05:38:46.582348+00:00",
      "quote": "Added by the operator on the page"
     },
     "rejection": null,

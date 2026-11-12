@@ -47,7 +47,7 @@ def run_until_assembly(home, database, fake, gemini, scenes=False):
     assert vw(home, 'visuals', 'accept', '--gaps', gap, '--quote', 'yes')[0] == 0
     (ws / 'out' / 'wall.png').write_bytes(png_bytes((90, 90, 90), (1920, 1080)))
     assert vw(home, 'upload', '--stage', 'visuals', '--file', 'out/wall.png')[0] == 0
-    assert vw(home, 'visuals', 'asset', '--shot', 'VS2', '--file', 'out/wall.png', '--kind', 'still', '--quote', 'use it')[0] == 0
+    assert vw(home, 'visuals', 'asset', '--shot', 'VS2', '--file', 'out/wall.png', '--kind', 'still', '--quote', 'use it', '--made', 'a test picture')[0] == 0
     rc, out, err = vw(home, 'visuals', 'record', '--gap', gap, '--quote', 'done')
     assert rc == 0, (out, err)
     assert vw(home, 'next')[1]['stage'] == 'assembly'

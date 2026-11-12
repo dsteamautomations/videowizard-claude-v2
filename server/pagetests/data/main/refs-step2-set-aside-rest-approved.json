@@ -23,7 +23,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-11T16:37:07.942067+00:00",
+   "at": "2026-11-12T05:38:45.557843+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -204,7 +204,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-11T16:37:07.943078+00:00",
+   "at": "2026-11-12T05:38:45.559841+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -214,7 +214,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:07.946084+00:00",
+      "at": "2026-11-12T05:38:45.568392+00:00",
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -257,7 +257,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:07.948083+00:00",
+      "at": "2026-11-12T05:38:45.585493+00:00",
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -274,7 +274,7 @@
     },
     "E3": {
      "aside": {
-      "at": "2026-11-11T16:37:07.964433+00:00",
+      "at": "2026-11-12T05:38:45.825823+00:00",
       "by": "u1",
       "words": ""
      },
@@ -286,7 +286,7 @@
      "ignored": true,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:07.950590+00:00",
+      "at": "2026-11-12T05:38:45.599447+00:00",
       "specs": {}
      },
      "prompt": "the yard wall",
@@ -309,7 +309,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-11T16:37:07.953107+00:00",
+      "at": "2026-11-12T05:38:45.619115+00:00",
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -498,7 +498,7 @@
      "notes": "the wall is too low",
      "quote": "Again.",
      "by": "u1",
-     "at": "2026-11-11T16:37:07.955204+00:00"
+     "at": "2026-11-12T05:38:45.666538+00:00"
     },
     "checklist": null,
     "check": null,
@@ -545,7 +545,7 @@
      "notes": "the wall is too low",
      "quote": "Again.",
      "by": "u1",
-     "at": "2026-11-11T16:37:07.955204+00:00"
+     "at": "2026-11-12T05:38:45.666538+00:00"
     },
     "checklist": null,
     "check": null,
@@ -592,7 +592,7 @@
      "notes": "the wall is too low",
      "quote": "Again.",
      "by": "u1",
-     "at": "2026-11-11T16:37:07.955204+00:00"
+     "at": "2026-11-12T05:38:45.666538+00:00"
     },
     "checklist": null,
     "check": null,
@@ -636,7 +636,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -682,7 +682,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -723,7 +723,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.943078+00:00",
+     "at": "2026-11-12T05:38:45.560843+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -806,7 +806,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -852,7 +852,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -898,7 +898,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -944,7 +944,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -990,7 +990,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,
@@ -1036,7 +1036,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-11T16:37:07.959207+00:00",
+     "at": "2026-11-12T05:38:45.745393+00:00",
      "quote": "These."
     },
     "rejection": null,

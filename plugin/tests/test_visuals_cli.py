@@ -15,7 +15,7 @@ def args(**kw):
     base = {'what': 'status', 'download': False, 'file': None, 'gap': None, 'gaps': None, 'choice': None, 'quote': None, 'element': None, 'name': None, 'clip': None, 'at': None, 'url': None,
             'kind': None, 'prompt': None, 'parents': None, 'size': None, 'quality': None, 'ref': None, 'sha': None, 'shot': None, 'shots': None, 'provider': None, 'model': None,
             'start': None, 'end': None, 'motion': None, 'continuity': None, 'seconds': None, 'job': None, 'decision': None, 'notes': None, 'timing': None, 'refs': None,
-            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'sets': None, 'end_answer': None, 'question': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'move': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None, 'rebuild': False}
+            'subject': None, 'selector': None, 'answer': None, 'variants': None, 'sets': None, 'end_answer': None, 'question': None, 'camera': None, 'support': None, 'look': None, 'reuse': None, 'considered': None, 'crop': None, 'move': None, 'wait': 0, 'keywords': None, 'search': None, 'n': None, 'note': None, 'reason': None, 'verdicts': None, 'picks': None, 'rebuild': False, 'made': None}
     return argparse.Namespace(**{**base, **kw})
 
 

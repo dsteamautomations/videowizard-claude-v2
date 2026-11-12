@@ -270,6 +270,7 @@ def test_a_supplied_still_and_a_short_supplied_movie(open_page, _id):
     still = open_page('takes-shot-filled-with-supplied-still', patch=supplied())
     show(still, 'VS1')
     text = still.page.locator('[id="card-VS1"]').inner_text()
+    assert 'made outside; checks skipped' in text and 'My own photograph.' in text, 'integration step A: a handed-in still does not say it was made outside, with how'
     assert 'Supplied by SK' in text and 'assembly holds the last frame' in text, f'a supplied still is shown as: "{" ".join(text.split())[:160]}"'
     assert still.page.locator('[id="card-VS1"] img[src*="uploads/wall.png"]').count() == 1, 'the supplied still is not shown'
     movie = open_page('takes-shot-filled-with-supplied-movie', patch=supplied(duration_s=6.0))   # the slot is 10 s

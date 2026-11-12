@@ -20,7 +20,7 @@ from pathlib import Path
 
 from psycopg.types.json import Jsonb
 
-from . import apify, core, film, image_check, jobs, keys, library, video_generators
+from . import apify, core, film, generations, image_check, jobs, keys, library, video_generators
 from . import footage as FM   # design/88
 from .config import settings
 from .errors import Problem, UNEXPECTED
@@ -704,7 +704,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                            'bound': [b['id'] for rows in binding.get('references', {}).values() for b in rows],
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {}),   # design/89 B3
-                                                      **({'by': asset.get('by_name') or '', 'quote': asset.get('quote') or '', 'duration_s': asset.get('duration_s')} if asset['kind'] in ('movie', 'still') else {})} if asset else None),   # R21, E17: a supplied file
+                                                      **({'by': asset.get('by_name') or '', 'quote': asset.get('quote') or '', 'duration_s': asset.get('duration_s'), 'made_outside': True, 'made': asset.get('made') or ''} if asset['kind'] in ('movie', 'still') else {})} if asset else None),   # R21, E17: a supplied file
                                            'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'], **_state_order(session, sh),   # design/94 A2
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
                                            'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
@@ -5217,19 +5217,38 @@ def _movie_seconds(store, file_key):
         return None
 
 
-def add_asset(conn, store, user, run, outputs, shot_id, file_key, sha256, size, kind, quote):
-    """A hand-made movie or still already uploaded with a receipt becomes the shot's output."""
+NEED_MADE = 'Say how the file was made: `vw visuals asset --shot S --file out/<name> --kind … --made "<how the file was made>" --quote "…"`. A file handed in without it is no longer taken (integration step A).'
+CHECKS_SKIPPED = 'made outside; checks skipped'   # what the page and the status say of a handed-in file
+
+
+def add_asset(conn, store, user, run, outputs, shot_id, file_key, sha256, size, kind, quote, made=''):
+    """A hand-made movie or still already uploaded with a receipt becomes the shot's output. Integration step A (SK, 12 Nov 2026): it says how it was
+    made, and every hand-in is one row of the shot's record, written before the file is placed (no file without its record)."""
     session = session_of(store, run, outputs)
     plan, gap, scene, shot = guarded(lambda: locate(store, session, shot_id))
     need(kind in ('movie', 'still'), 'Local assets are movie or still.')
+    made, limit = (made or '').strip(), settings().MAX_QUOTE_CHARS
+    need(made, NEED_MADE)
+    need(len(made) <= limit, f'How the file was made is {len(made):,} characters; the limit is {limit:,}. Shorten it; nothing was stored.')
     row = conn.execute('select key, sha256, bytes from vw2_files where run_id=%s and key=%s', (run['id'], file_key)).fetchone()
     need(row and row['sha256'] == sha256, 'Upload the asset with a receipt first (vw upload).')
-    session['assets'][shot_id] = {'kind': kind, 'key': file_key, 'sha256': sha256, 'bytes': size, 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or '',   # R21: the page says who supplied it
+    generations.opened(conn, run['id'], shot_id, 'handed in', {'kind': 'handed in', 'checks': 'not run', 'note': "handed in; the application's checks were not run",
+                                                               'made': made, 'file_kind': kind, 'key': file_key, 'sha256': sha256, 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
+    session['assets'][shot_id] = {'kind': kind, 'key': file_key, 'sha256': sha256, 'bytes': size, 'quote': quote, 'made': made, 'by': user['id'], 'by_name': user.get('name') or '',   # R21: the page says who supplied it
                                   'duration_s': _movie_seconds(store, file_key) if kind == 'movie' else None,   # E17
                                   'placement': {'start_frame': shot['start_frame'], 'end_frame': shot['end_frame']}}
     session['selections'].pop(shot_id, None)
     save_session(store, run, session)
-    return session['assets'][shot_id]
+    return {**session['assets'][shot_id], 'record': CHECKS_SKIPPED}
+
+
+def generations_of(conn, store, run, outputs, shot_id):
+    """Integration step A: every attempt of a shot, oldest first. Rows of a shot the plan no longer holds are still read; a shot with neither rows nor a place in the plan is refused."""
+    rows = generations.of_shot(conn, run['id'], shot_id)
+    if rows:
+        return {'shot_id': shot_id, 'generations': rows}
+    guarded(lambda: locate(store, session_of(store, run, outputs), shot_id))
+    return {'shot_id': shot_id, 'generations': [], 'message': f'No generations yet for {shot_id}.'}
 
 
 # ---------- status / gap outputs ----------
@@ -5264,7 +5283,8 @@ def status(conn, store, run, outputs, repair=True):
         if plan and gid in session['accepted']:
             for s in shots_of(plan, session, gid):
                 entry['shots'].append({'shot_id': s['id'], 'visual_type': s['visual_type'], 'bound': s['id'] in session['bindings'], 'prepared': s['id'] in session['preparations'],
-                                       'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets']})
+                                       'selected': s['id'] in session['selections'], 'asset': s['id'] in session['assets'],
+                                       'made_outside': (session['assets'].get(s['id']) or {}).get('kind') in ('movie', 'still')})   # integration step A: a handed-in file, checks skipped
         gaps.append(entry)
     refs = [{**{k: r.get(k) for k in ('id', 'name', 'kind', 'element_id', 'status', 'sha256', 'job_id', 'set', 'set_n', 'notes', 'sources')}, 'note': (r.get('source') or {}).get('note') or '', 'sources_changed': bool(r.get('sources_changed'))}   # design/106 N4; design/110; design/151
             for r in session['references'].values()]

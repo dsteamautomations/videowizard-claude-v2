@@ -296,7 +296,7 @@ def test_v1_v2_v3_v4_v5_v6_v7_v8_v9_v11_v12_v14_v15_v16_v18_end_to_end(home, dat
     assert rc == 2 and 'video shot' in out['message']
     (ws / 'out' / 'wall.png').write_bytes(png_bytes((90, 90, 90), (1920, 1080)))
     assert vw(home, 'upload', '--stage', 'visuals', '--file', 'out/wall.png')[0] == 0
-    rc, out, err = vw(home, 'visuals', 'asset', '--shot', 'VS2', '--file', 'out/wall.png', '--kind', 'still', '--quote', 'use the wall still')
+    rc, out, err = vw(home, 'visuals', 'asset', '--shot', 'VS2', '--file', 'out/wall.png', '--kind', 'still', '--quote', 'use the wall still', '--made', 'a test picture')
     assert rc == 0 and out['placement'] == {'start_frame': 40, 'end_frame': frames}, err
     rc, out, err = vw(home, 'visuals', 'record', '--gaps', 'all', '--quote', 'G2 done')
     assert rc == 0 and out['recorded'] == ['G2'] and out['skipped'] == {}, err
