@@ -403,7 +403,7 @@ def _page_call(fn, action):
 def _visuals_act(code, vw2_session, body):
     """One JSON post per button. Every action calls the server function the vw tool calls (design/65 §8), behind the visuals stage gate."""
     from fastapi.responses import JSONResponse
-    from . import visuals_stage as V
+    from . import guide, visuals_stage as V
     from .storage import storage
     user = page_user(vw2_session)
     if not user:
@@ -454,6 +454,9 @@ def _visuals_act(code, vw2_session, body):
             'measure': lambda: V.measure(store, user, run, outputs, list(body.get('reference_ids') or []), str(body.get('question') or '')),   # design/89 D2
             'select-take': lambda: V.select_take(conn, store, user, run, outputs, body['job_id'], quote, str(body.get('notes') or 'approved on the visuals page'), str(body.get('timing_notes') or '')),
             'reject-take': lambda: V.review_take(conn, store, user, run, outputs, body['job_id'], 'rejected', str(body.get('notes') or ''), '', quote),
+            'guide-approve': lambda: guide.approve_still(conn, store, user, run, outputs, body['shot_id'], body['still_id'], body['sha256'], quote),   # integration steps B to D
+            'guide-reject': lambda: guide.reject_still(conn, store, user, run, outputs, body['shot_id'], body['still_id'], str(body.get('notes') or ''), quote),
+            'guide-shoot': lambda: guide.shoot(conn, store, user, run, outputs, body['shot_id'], quote or f"Shoot, pressed on the visuals page by {user.get('name') or user['id']}", bool(body.get('again'))),
             'reject': lambda: V.reject_reference(store, user, run, outputs, body['reference_id'], str(body.get('notes') or ''), quote),   # design/74 L7
             'record': lambda: V.record_gaps(conn, store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
         }

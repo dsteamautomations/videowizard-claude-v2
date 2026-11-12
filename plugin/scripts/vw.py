@@ -720,6 +720,96 @@ def motion_wait(base, job, wait=MOTION_WAIT_S, poll=3):
         time.sleep(poll)
 
 
+def _guide_json(ws, name, what):
+    """A JSON file of the run folder for `vw guide`: refused in plain words when it is missing or not JSON."""
+    if not name:
+        emit({'action': 'refused', 'message': f'Give the file: `vw guide {what} --shot S --file work/guide/S/<name>.json`.'}, 2)
+    path = (ws / name) if (ws / name).is_file() else Path(name)
+    if not path.is_file():
+        emit({'action': 'refused', 'message': f'{name} is not a file of this run folder.'}, 2)
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except ValueError as exc:
+        emit({'action': 'refused', 'message': f'{name} is not valid JSON: {exc}.'}, 2)
+
+
+def _guide_fetch(base, shot, folder, names):
+    """Save the named files of a shot's guide into the run folder; returns their paths."""
+    import base64 as _b64
+    folder.mkdir(parents=True, exist_ok=True)
+    out = []
+    for name in names:
+        got = call('GET', f'{base}/guide/{shot}/file/{name}')
+        (folder / got['file']).write_bytes(_b64.b64decode(got['base64']))
+        out.append(str(folder / got['file']))
+    return out
+
+
+def cmd_guide(a):
+    """Integration steps B to D: one AI video shot made the new way: a scene description (checked before any spend), check frames, a fresh checker's
+    verdict, the rendered guide, the still on GPT image 2.6 and its overlay, the take's words, and the take on the operator's word. Blender runs on the
+    server; nothing on this computer needs it."""
+    m = active()
+    base = f"/api/runs/{m['run_id']}/visuals"
+    ws = workspace(m['code'])
+    if not a.shot:
+        emit({'action': 'refused', 'message': f'Give the AI video shot: `vw guide {a.what} --shot S`.'}, 2)
+    folder = ws / 'work' / 'guide' / a.shot
+    if a.what == 'status':
+        out = call('GET', f'{base}/guide/{a.shot}')
+        emit(out, 0, out.get('next'))
+    if a.what == 'scene':
+        spec = _guide_json(ws, a.file, 'scene')
+        out = write(base + '/guide/scene', {'shot_id': a.shot, 'scene': spec, 'overrides': {'support': a.override} if a.override else {}})
+        folder.mkdir(parents=True, exist_ok=True)
+        save_json(folder / 'last.json', {'sha256': out['sha256'], 'at': datetime.now(timezone.utc).isoformat()})
+        if out.get('layout'):
+            (folder / 'layout.txt').write_text(out['layout'], encoding='utf-8')
+        emit(out, 0, ' '.join([f"{len(out.get('warnings') or [])} warnings" + (': ' + ' '.join(out['warnings']) if out.get('warnings') else '') + '.', out.get('cannot_see') or '', out.get('next') or '']).strip())
+    if a.what in ('frames', 'look'):
+        st = call('GET', f'{base}/guide/{a.shot}')
+        names = [n for n in st.get('files') or [] if (n == 'strip' or n.startswith('check-')) == (a.what == 'frames') and n != 'guide']
+        if not names:
+            emit({'action': 'refused', 'message': 'Nothing to fetch yet. ' + str(st.get('next') or '')}, 2)
+        paths = _guide_fetch(base, a.shot, folder / ('frames' if a.what == 'frames' else 'look'), names)
+        emit({'shot_id': a.shot, 'sha256': (st.get('guide') or {}).get('sha256'), 'files': paths, 'cannot_see': (st.get('guide') or {}).get('cannot_see')}, 0,
+             f"{len(paths)} files in work/guide/{a.shot}/{'frames' if a.what == 'frames' else 'look'}/. " + (('A fresh vw-guide-check helper looks at them now. ' + str((st.get('guide') or {}).get('cannot_see') or '')) if a.what == 'frames'
+                                                                                              else 'Each overlay shows the guide\'s outlines in red over the still: every person and thing sits on them, or the still is repaired or made again.'))
+    if a.what == 'verdict':
+        v = _guide_json(ws, a.file, 'verdict')
+        sha = v.get('sha256') or (load_json(folder / 'last.json') or {}).get('sha256') or ''
+        looks = v.get('looks') or []
+        out = write(base + '/guide/verdict', {'shot_id': a.shot, 'sha256': sha, 'passed': bool(v.get('pass')), 'looks': looks, 'notes': str(v.get('notes') or '')})
+        emit(out, 0, f"Round {out['round']}: " + ('passed. ' if out['pass'] else 'failed (' + '; '.join(out.get('failed') or []) + '). ') + str(out.get('next') or ''))
+    if a.what == 'still':
+        body = _guide_json(ws, a.file, 'still')
+        out = write(base + '/guide/still', {'shot_id': a.shot, 'prompt': str(body.get('prompt') or ''), 'parents': body.get('parents') or []})
+        emit(out, 0, out.get('next'))
+    if a.what == 'repair':
+        if not (a.still and a.region and a.prompt):
+            emit({'action': 'refused', 'message': 'A repair names the still, the region and what changes: `vw guide repair --shot S --still ID --region left,top,width,height --prompt "the band at the wall foot is teal; make it grey stone paving."`'}, 2)
+        out = write(base + '/guide/still', {'shot_id': a.shot, 'prompt': a.prompt, 'parents': [], 'repair_of': a.still, 'region': _region(a.region)})
+        emit(out, 0, out.get('next'))
+    if a.what in ('approve', 'reject'):
+        if not a.still or (a.what == 'approve' and not a.sha) or (a.what == 'reject' and not a.notes):
+            emit({'action': 'refused', 'message': '`vw guide approve --shot S --still ID --sha <its sha256> --quote "<the operator\'s words>"`; `vw guide reject --shot S --still ID --notes "<what is wrong>"`.'}, 2)
+        out = write(f'{base}/guide/{a.what}', {'shot_id': a.shot, 'still_id': a.still, 'sha256': a.sha or '', 'notes': a.notes or '', 'quote': a.quote or ''})
+        emit(out, 0, out.get('next'))
+    if a.what == 'prompt':
+        if not a.file:
+            emit({'action': 'refused', 'message': "Give the take's words as a text file: `vw guide prompt --shot S --file work/guide/S/take.txt`."}, 2)
+        path = (ws / a.file) if (ws / a.file).is_file() else Path(a.file)
+        if not path.is_file():
+            emit({'action': 'refused', 'message': f'{a.file} is not a file of this run folder.'}, 2)
+        out = write(base + '/guide/prompt', {'shot_id': a.shot, 'prompt': path.read_text(encoding='utf-8')})
+        emit(out, 0, f"{out['words']} words kept. " + str(out.get('next') or ''))
+    if a.what == 'shoot':
+        if not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': "A take is paid for on the operator's word: `vw guide shoot --shot S --quote \"<their words>\"`. Nothing was sent."}, 2)
+        out = write(base + '/guide/shoot', {'shot_id': a.shot, 'quote': a.quote, 'again': bool(a.again)})
+        emit(out, 0, out.get('next'))
+
+
 def cmd_motion(a):
     """design/130: one drawn shot of a film started with --drawn motion: brief, upload, check, snapshot, render, status. HyperFrames runs on the server;
     nothing on this computer needs Node."""
@@ -2993,6 +3083,11 @@ def build_parser():
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.set_defaults(fn=cmd_motion)
+    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot'])   # integration steps B to D
+    for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt'):
+        s.add_argument(flag)
+    s.add_argument('--again', action='store_true', help='shoot: send the same request once more, only after a clip that came back unusable, on the operator\'s word')
+    s.set_defaults(fn=cmd_guide)
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'library', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film', '--scene'):   # design/142 R6: --scene BEAT_02,BEAT_07 for the second look again
         s.add_argument(flag)

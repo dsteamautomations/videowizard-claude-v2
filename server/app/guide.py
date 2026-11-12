@@ -375,3 +375,44 @@ def view(session, shot_id, url):
                         'url': url(s['key']) if s.get('key') else None, 'overlay_url': url(s['overlay_key']) if s.get('overlay_key') else None,
                         'current': s.get('guide_sha256') == g['sha256']} for s in g.get('stills') or [] if s.get('status') != 'superseded'],
             'take_prompt': (g.get('take_prompt') or {}).get('prompt'), 'card': {k: v for k, v in ready_card(session, shot_id, VS.prices()['video_inr_per_s']).items() if k in ('ready', 'missing', 'seconds', 'cost_inr', 'prompt', 'look_for')}}
+
+
+def status(conn, store, run, outputs, shot_id):
+    """Where a shot's guide stands, for the chat tool: the same view the page shows (keys in place of links), the files it can fetch, and what comes next."""
+    session = VS.session_of(store, run, outputs)
+    VS.guarded(lambda: VS.locate(store, session, shot_id))
+    v = view(session, shot_id, lambda k: k)
+    if v is None:
+        return {'shot_id': shot_id, 'guide': None, 'next': f'No guide yet: write the scene description and send it, `vw guide scene --shot {shot_id} --file work/guide/{shot_id}/scene.json`.'}
+    g = session['guides'][shot_id]
+    names = (['strip'] + [f"check-{f['n']:04d}" for f in (g.get('frames') or {}).get('frames') or []] if (g.get('frames') or {}).get('status') == 'ready' else []) \
+        + (['frame1', 'guide'] if (g.get('render') or {}).get('status') == 'ready' else []) \
+        + [n for s in g.get('stills') or [] if s.get('key') for n in (['still-' + s['id']] + (['overlay-' + s['id']] if s.get('overlay_key') else []))]
+    f, r, card = v['frames'], v['render'], v['card']
+    if f['status'] != 'ready':
+        nxt = 'The check frames failed: ' + str(f['error']) if f['status'] == 'failed' else 'The check frames are being rendered; ask again in a minute.'
+    elif not v['verdicts'] or not v['verdicts'][-1]['pass']:
+        nxt = f'A fresh vw-guide-check helper looks at the check frames (`vw guide frames --shot {shot_id}`) and gives its verdict (`vw guide verdict`).'
+    elif r['status'] != 'ready':
+        nxt = 'The render failed: ' + str(r['error']) if r['status'] == 'failed' else 'The guide is being rendered (free, several minutes); ask again later.'
+    elif card['ready']:
+        nxt = f"Ready to shoot: show the operator the card ({card['seconds']} s, about {card['cost_inr']:.0f} rupees). On their word: `vw guide shoot --shot {shot_id} --quote \"…\"`."
+    else:
+        nxt = 'Still missing before the take: ' + ', '.join(card['missing']) + '.'
+    return {'shot_id': shot_id, 'guide': v, 'files': names, 'next': nxt}
+
+
+def file(store, run, outputs, shot_id, name):
+    """One picture (or the guide video) of a shot's guide, for the chat tool to save and look at."""
+    import base64
+    session = VS.session_of(store, run, outputs)
+    g = entry_of(session, shot_id)
+    frames, render = g.get('frames') or {}, g.get('render') or {}
+    keys = {'strip': (frames.get('strip_key'), 'image/jpeg', 'jpg'), 'frame1': (render.get('frame1_key'), 'image/png', 'png'), 'guide': (render.get('guide_key'), 'video/mp4', 'mp4')}
+    keys.update({f"check-{f['n']:04d}": (f['key'], 'image/png', 'png') for f in frames.get('frames') or []})
+    for s in g.get('stills') or []:
+        keys['still-' + s['id']] = (s.get('key'), 'image/png', 'png')
+        keys['overlay-' + s['id']] = (s.get('overlay_key'), 'image/jpeg', 'jpg')
+    k, mime, ext = keys.get(name) or (None, None, None)
+    need(k, f'{name} is not a file of this guide yet (`vw guide status --shot {shot_id}` lists them).')
+    return {'name': name, 'file': f'{name}.{ext}', 'mime': mime, 'base64': base64.b64encode(store.get(k)).decode()}

@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response as RawResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from . import analysis_jobs, auth, brandlib, connect, core, elevenlabs, film, files, jobs, library, runlog, visuals_stage, voices, web, worker
+from . import analysis_jobs, auth, brandlib, connect, core, elevenlabs, film, files, guide, jobs, library, runlog, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -1395,6 +1395,94 @@ def visuals_motion_brief(run_id: UUID, shot_id: str, user=User, conn=DB):   # de
 def visuals_motion_job(run_id: UUID, job_id: UUID, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)   # design/92: a read never waits for the lock
     return Response(visuals_stage.guarded(lambda: visuals_stage.motion_job(conn, storage(), run, job_id)))
+
+
+class GuideScene(Write):   # integration steps B to D: the new way of making an AI video shot (app/guide.py)
+    shot_id: str = Field(min_length=1, max_length=80)
+    scene: dict
+    overrides: dict[str, str] = Field(default_factory=dict)
+
+
+class GuideVerdict(Write):
+    shot_id: str
+    sha256: str = Field(pattern=r'^[0-9a-f]{64}$')
+    passed: bool
+    looks: list[dict] = Field(min_length=1, max_length=60)
+    notes: str = Field(default='', max_length=2000)
+
+
+class GuideStill(Write):
+    shot_id: str
+    prompt: str = Field(min_length=1, max_length=8000)
+    parents: list[dict] = Field(default_factory=list, max_length=15)
+    repair_of: str | None = None
+    region: dict | None = None
+
+
+class GuideStillVerdict(Write):
+    shot_id: str
+    still_id: str
+    sha256: str = ''
+    notes: str = Field(default='', max_length=2000)
+    quote: str = ''
+
+
+class GuidePrompt(Write):
+    shot_id: str
+    prompt: str = Field(min_length=1, max_length=8000)
+
+
+class GuideShoot(Write):
+    shot_id: str
+    quote: str = Field(min_length=1)
+    again: bool = False
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/scene', status_code=201)
+def visuals_guide_scene(run_id: UUID, body: GuideScene, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.set_scene(conn, storage(), user, run, outputs, body.shot_id, body.scene, body.overrides), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/verdict')
+def visuals_guide_verdict(run_id: UUID, body: GuideVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.verdict(conn, storage(), user, run, outputs, body.shot_id, body.sha256, body.passed, body.looks, body.notes))
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/still', status_code=201)
+def visuals_guide_still(run_id: UUID, body: GuideStill, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.request_still(conn, storage(), user, run, outputs, body.shot_id, body.prompt, body.parents, body.repair_of, body.region), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/approve')
+def visuals_guide_approve(run_id: UUID, body: GuideStillVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.approve_still(conn, storage(), user, run, outputs, body.shot_id, body.still_id, body.sha256, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/reject')
+def visuals_guide_reject(run_id: UUID, body: GuideStillVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.reject_still(conn, storage(), user, run, outputs, body.shot_id, body.still_id, body.notes, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/prompt')
+def visuals_guide_prompt(run_id: UUID, body: GuidePrompt, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.set_prompt(conn, storage(), user, run, outputs, body.shot_id, body.prompt))
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/shoot', status_code=201)
+def visuals_guide_shoot(run_id: UUID, body: GuideShoot, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.shoot(conn, storage(), user, run, outputs, body.shot_id, body.quote, body.again), 201)
+
+
+@app.get('/api/runs/{run_id}/visuals/guide/{shot_id}')
+def visuals_guide_status(run_id: UUID, shot_id: str, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)   # a read never waits for the lock
+    return Response(visuals_stage.guarded(lambda: guide.status(conn, storage(), run, core.current_outputs(conn, run['id']), shot_id)))
+
+
+@app.get('/api/runs/{run_id}/visuals/guide/{shot_id}/file/{name}')
+def visuals_guide_file(run_id: UUID, shot_id: str, name: str, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: guide.file(storage(), run, core.current_outputs(conn, run['id']), shot_id, name)))
 
 
 @app.get('/api/runs/{run_id}/visuals/plan')
