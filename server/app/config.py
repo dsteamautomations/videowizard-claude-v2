@@ -18,14 +18,14 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.93.0'
+    SERVER_VERSION: str = '0.94.0'
     GEMINI_IMAGE_MODEL: str = 'gemini-3-pro-image'   # design/120: Nano Banana Pro as Google's docs name it; SK's exact id goes in server/.env (VW2_GEMINI_IMAGE_MODEL)
     GEMINI_IMAGE_SIZE: str = '2K'                     # design/120: 1K, 2K or 4K (uppercase K)
     GEMINI_IMAGE_USD: float = 0.134                   # design/120: Google's price per 1K/2K picture, 28 Oct 2026
     GEMINI_IMAGE_USD_4K: float = 0.24
     GEMINI_IMAGE_INPUT_USD: float = 0.0011             # per input picture (560 tokens)
     DRAWN_FIX_MODEL: str = 'gemini-3.8-flash'   # design/117 answer 3: Flash first; the Pro model is this one line
-    PLUGIN_MIN_VERSION: str = '0.79.0'   # design/180, integration step A (SK, 12 Nov 2026): a hand-in says how the file was made (`--made`); an older tool sends none and would be refused. 0.78.0 design/179 (SK, 12 Nov 2026): the motion skill reads the brief's Motion style, `vw motion-style`; an older skill would contradict the brief. 0.70.0 design/142 (SK, 2 Nov 2026: "YES change"): vw category, shape, colours, font, log and the second look's stills; design/95 F5; 0.66.0 design/130 (vw motion, the motion helpers, the guard's motion skill); 0.65.1 design/129 I (the guard only in the operator folder, the second look's record, downloads run again); 0.65.0 the design/126 build (ST2, ME1, VI1, OP1, U1-U7); G2 (SK, 31 Oct 2026, after defect 36): an older tool is told to update; 0.64.2 `vw visuals plan` (defect 37); 0.64.3 crops in image files (defect 38); 0.64.4 the sweep fixes W1-W13
+    PLUGIN_MIN_VERSION: str = '0.80.0'   # design/181, integration steps B to D (SK, 12 Nov 2026): an AI video shot is made with `vw guide`; an older tool has only the retired take commands. 0.79.0 design/180, integration step A (SK, 12 Nov 2026): a hand-in says how the file was made (`--made`); an older tool sends none and would be refused. 0.78.0 design/179 (SK, 12 Nov 2026): the motion skill reads the brief's Motion style, `vw motion-style`; an older skill would contradict the brief. 0.70.0 design/142 (SK, 2 Nov 2026: "YES change"): vw category, shape, colours, font, log and the second look's stills; design/95 F5; 0.66.0 design/130 (vw motion, the motion helpers, the guard's motion skill); 0.65.1 design/129 I (the guard only in the operator folder, the second look's record, downloads run again); 0.65.0 the design/126 build (ST2, ME1, VI1, OP1, U1-U7); G2 (SK, 31 Oct 2026, after defect 36): an older tool is told to update; 0.64.2 `vw visuals plan` (defect 37); 0.64.3 crops in image files (defect 38); 0.64.4 the sweep fixes W1-W13
     # storage: Supabase bucket in production; a local folder when STORAGE_LOCAL_DIR is set (tests, local dev)
     STORAGE_SUPABASE_URL: str = ''
     STORAGE_SUPABASE_SERVICE_KEY: SecretStr = SecretStr('')

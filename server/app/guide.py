@@ -416,3 +416,28 @@ def file(store, run, outputs, shot_id, name):
     k, mime, ext = keys.get(name) or (None, None, None)
     need(k, f'{name} is not a file of this guide yet (`vw guide status --shot {shot_id}` lists them).')
     return {'name': name, 'file': f'{name}.{ext}', 'mime': mime, 'base64': base64.b64encode(store.get(k)).decode()}
+
+
+# ---------- the older way, retired by name (SK, 12 Nov 2026: no switch; each step deletes the part it replaces) ----------
+
+TAKE_RETIRED = ('The picture-to-video take (a start picture, an end picture and a motion text) is retired. An AI video shot is made from a guide: load the vw:guide skill, '
+                'then `vw guide scene --shot S --file work/guide/S/scene.json`.')
+START_PICTURE_RETIRED = ('A start picture composed from words is retired for an AI video shot. Its still is made from the guide\'s first frame: '
+                         '`vw guide still --shot S --file …` after the guide is rendered (the vw:guide skill).')
+
+
+def older_take_retired(*_):
+    raise Problem(410, 'RETIRED', TAKE_RETIRED)
+
+
+def older_start_picture_retired(store, run, outputs, body):
+    """A keyframe asked for an AI video shot is the older way's start (or end) picture: refused by name. Every other picture is untouched."""
+    if body.get('kind') != 'keyframe' or not body.get('shot_id'):
+        return
+    session = VS.session_of(store, run, outputs)
+    try:
+        shot = VS.locate(store, session, body['shot_id'])[3]
+    except ValueError:
+        return   # the picture's own gates answer an unknown shot
+    if route_of(shot) == 'video':
+        raise Problem(410, 'RETIRED', START_PICTURE_RETIRED)

@@ -1499,7 +1499,7 @@ def visuals_scene_get(run_id: UUID, shot_id: str, user=User, conn=DB):   # desig
 
 @app.post('/api/runs/{run_id}/visuals/images', status_code=201)
 def visuals_image(run_id: UUID, body: ImageGenerate, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.generate_image(conn, storage(), user, run, outputs, body_dict(body)), 201)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: (guide.older_start_picture_retired(storage(), run, outputs, body_dict(body)), visuals_stage.generate_image(conn, storage(), user, run, outputs, body_dict(body)))[1], 201)
 
 
 class FootageCorrect(Write):   # design/88 F4
@@ -1536,12 +1536,12 @@ def visuals_generator(run_id: UUID, body: GeneratorBody, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/prepare-take')
 def visuals_prepare_take(run_id: UUID, body: PrepareTake, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.prepare_take(storage(), user, run, outputs, body_dict(body)))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.older_take_retired())   # integration step D: retired by name (design/35 old ways 38); visuals_stage.prepare_take is deleted in step F
 
 
 @app.post('/api/runs/{run_id}/visuals/take', status_code=201)
 def visuals_take(run_id: UUID, body: ShotBody, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.submit_take(conn, storage(), user, run, outputs, body.shot_id), 201)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.older_take_retired(), 201)   # the take is sent by `vw guide shoot`, on the operator's word
 
 
 @app.post('/api/runs/{run_id}/visuals/review')

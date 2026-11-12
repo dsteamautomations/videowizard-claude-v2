@@ -1051,6 +1051,7 @@ function renderTakes(){
       if(pair.length){sh+='<div class="ds" style="margin-top:6px">The pictures: click a picture to see it large, approve or reject it.</div><div class="strip">'+latest.map(card).join('')+'</div>'+(older.length?'<details class="chkd"><summary class="ds">'+older.length+' earlier picture'+(older.length>1?'s':'')+'</summary><div class="strip">'+older.map(card).join('')+'</div></details>':'')+pairPlan(s);}
       if(supplied(s)){sh+=s.asset.kind==='movie'?'<div class="btns"><button class="ic" data-play="'+esc(s.asset.url)+'" data-name="'+esc(s.shot_id)+' · supplied file">▶</button><span class="ds">the supplied file · in the film at '+filmAt(s)+'</span></div>'
         :'<div class="strip"><div class="pic on"><img src="'+esc(thumbOf(s.asset.url))+'" loading="lazy" decoding="async" alt=""><div class="cap">the supplied still · in the film at '+filmAt(s)+'</div></div></div>';}   // R21, E17
+      sh+=guideBox(s);
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:17px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+reviewsOf(k)+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else if(!supplied(s)){sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
       h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
@@ -1062,6 +1063,38 @@ function renderTakes(){
   root.querySelectorAll('tr[data-take]').forEach(tr=>tr.addEventListener('click',()=>selectPic({take:tr.dataset.take})));
   root.querySelectorAll('button[data-a]').forEach(b=>{if(!b.closest('#panel'))b.addEventListener('click',()=>click(b));});
   wireGrid(root,renderTakes);
+}
+// ---------- the guide of an AI video shot (integration steps B to D): the server's data, the server's functions (guide.approve_still, reject_still, shoot) ----------
+function guideBox(s){
+  const g=s.guide;if(!g)return '';
+  const pic=(u,cap)=>u?'<a class="pic on" href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" loading="lazy" decoding="async" alt=""><div class="cap">'+esc(cap)+'</div></a>':'';
+  const v=g.verdicts.length?g.verdicts[g.verdicts.length-1]:null, f=g.frames, r=g.render, c=g.card;
+  let h='<div class="guide" data-guide="'+esc(s.shot_id)+'"><div class="ds" style="margin-top:6px"><b>The guide</b> · '+esc(String(g.seconds))+' s · '+esc((g.recipe||'').replace(/_/g,' '))+'</div>';
+  h+='<div class="ds">'+(f.status==='failed'?'The check frames failed: '+esc(f.error||''):f.status!=='ready'?'The check frames are being rendered.'
+    :!v?'Check frames ready; a fresh checker looks at them.':v.pass?'Checked (round '+esc(String(v.round))+'): passed.':'Checked (round '+esc(String(v.round))+'): failed. '+esc((v.looks||[]).filter(x=>!x.pass).map(x=>x.look).join('; ')))
+    +(v&&v.pass?(r.status==='failed'?' The render failed: '+esc(r.error||''):r.status!=='ready'?' The guide is being rendered.':' Guide rendered.'):'')+'</div>';
+  if(g.warnings.length)h+='<details class="chkd"><summary class="ds">'+g.warnings.length+' warning'+(g.warnings.length>1?'s':'')+' on the scene</summary><div class="ds">'+g.warnings.map(esc).join('<br>')+'</div></details>';
+  if(f.strip_url||r.guide_url)h+='<div class="strip">'+pic(f.strip_url,'check frames')+(r.guide_url?'<div class="btns"><button class="ic" data-play="'+esc(r.guide_url)+'" data-name="'+esc(s.shot_id)+' · the guide">▶</button><span class="ds">the guide</span></div>':'')+'</div>';
+  g.stills.forEach(st=>{
+    const stale=!st.current?' · made from an earlier scene':'';
+    h+='<div class="strip">'+pic(st.overlay_url||st.url,(st.repair_of?'repair · ':'')+'the still on its guide'+stale)+'<div class="ds" style="align-self:center">'
+      +(st.status==='generating'?'The still is being made.':st.status==='failed'?'The still failed: '+esc(st.error||''):st.status==='rejected'?'Rejected.':st.status==='approved'?'Approved ✓':'Look at the overlay: every person and thing sits on the red outlines.')
+      +(st.status==='candidate'&&st.current?'<div class="btns"><button class="go" data-a="guide-approve" data-shot="'+esc(s.shot_id)+'" data-still="'+esc(st.id)+'" data-sha="'+esc(st.sha256||'')+'">Approve the still</button><button data-a="guide-reject" data-shot="'+esc(s.shot_id)+'" data-still="'+esc(st.id)+'">Reject</button></div>':'')
+      +'</div></div>';
+  });
+  if(c.ready){
+    h+='<div class="turn you">Ready to shoot: one take of '+esc(String(c.seconds))+' s, about ₹'+esc(String(Math.round(c.cost_inr)))+'. '+esc(c.look_for)+'</div>'
+      +'<details class="chkd"><summary class="ds">The words that will be sent</summary><div class="ds" style="white-space:pre-wrap">'+esc(c.prompt||'')+'</div></details>'
+      +'<div class="btns"><button class="go" data-a="guide-shoot" data-shot="'+esc(s.shot_id)+'">Shoot</button></div>';
+  }else if(r.status==='ready'){h+='<div class="ds">Before the take, still missing: '+esc(c.missing.join(', '))+'.</div>';}
+  s.takes.filter(k=>k.check&&k.check.guide).forEach(k=>{
+    const ck=k.check;
+    h+='<div class="ds" style="margin-top:6px"><b>Take '+esc(k.job_id.slice(0,8))+'</b>'+(ck.blocked?' · not shown as a take: '+esc(ck.blocked):'')+(ck.not_read?' · not read by the tool':'')+'</div>'
+      +'<table><tbody>'+(ck.scorecard||[]).map(x=>'<tr><td>'+esc(x.line)+'</td><td><span class="badge '+(x.state==='Pass'?'ok':x.state==='Fail'?'err':'dec')+'">'+esc(x.state)+'</span></td><td class="ds">'+esc(x.seen||'')+(x.at_s!=null?' ('+esc(String(x.at_s))+' s)':'')+'</td></tr>').join('')+'</tbody></table>'
+      +(ck.watch?'<div class="ds">One thing to watch: '+esc(ck.watch.line)+(ck.watch.at_s!=null?' at '+esc(String(ck.watch.at_s))+' s':'')+': '+esc(ck.watch.what||'')+'</div>':'')
+      +'<div class="strip">'+pic(k.pair_url,'first frame beside the still')+pic(k.sheet_url,'4 frames a second')+'</div>';
+  });
+  return h+'</div>';
 }
 // ---------- record ----------
 function readyGaps(){return data.gaps.filter(g=>g.accepted&&!g.recorded&&g.shots.length&&g.shots.every(s=>s.asset||s.takes.some(k=>k.selected)));}
@@ -1162,6 +1195,9 @@ async function doClick(b){
   if(a==='sequence'){await send({action:'sequence',shot_id:b.dataset.shot},'Sequence approved and held.');return;}
   if(a==='fix'){const j=await send({action:'fix',reference_id:b.dataset.ref},'Fix requested.');if(j)msg('Fix requested for \''+(j.for||'')+'\' (₹'+(j.cost_inr||fixPrice())+'); it appears here in about a minute.');return;}   // design/96 X1
   if(a==='unplace'){await send({action:'unplace',shot_id:b.dataset.shot},'Picture taken out of the shot; it stays approved.');return;}   // design/94 L3
+  if(a==='guide-approve'){await send({action:'guide-approve',shot_id:b.dataset.shot,still_id:b.dataset.still,sha256:b.dataset.sha,quote:q},'Still approved.');return;}   // integration steps B to D
+  if(a==='guide-reject'){if(!q){need('Say what is wrong with the still, then Reject.');return;}await send({action:'guide-reject',shot_id:b.dataset.shot,still_id:b.dataset.still,notes:q,quote:q},'Still rejected.');return;}
+  if(a==='guide-shoot'){await send({action:'guide-shoot',shot_id:b.dataset.shot,quote:q},'The take is being made.');return;}
   if(a==='select-take'){await send({action:'select-take',job_id:b.dataset.job},'Take selected.');return;}
   if(a==='reject-take'){const j=await send({action:'reject-take',job_id:b.dataset.job},'Take rejected.');if(j){rejOpen=b.dataset.job;renderStep();}return;}
   if(a==='search'){const kw=(($('kw-'+b.dataset.el)||{}).value||'').trim();if(!kwOk(kw)){needWords('kw-'+b.dataset.el,KW_TEXT);return;} await send({action:'search',element_id:b.dataset.el,keywords:kw,source:(($('src-'+b.dataset.el)||{}).value||'').trim()},'Search done: tick the pictures to use, then Save.');return;}   // design/121 change 5

@@ -451,3 +451,93 @@ def test_the_view_of_a_guide_lists_where_it_stands_and_every_picture(film):
     assert v['frames']['strip_url'] == '/f/strip' and v['render']['guide_url'].endswith('guide.mp4') and v['stills'][0]['overlay_url'] == '/f/ov.jpg'
     assert v['card'] == {'ready': True, 'missing': [], 'seconds': 10, 'cost_inr': 80.0, 'prompt': v['card']['prompt'], 'look_for': v['card']['look_for']} and 'red outlines' in v['card']['look_for']
     assert GD.view(saved(store), 'IM1', lambda k: k) is None
+
+
+# ---------- selecting or rejecting a take made from a guide ----------
+
+class TakeConn(Conn):
+    """Plus the finished take's job row, as the take worker leaves it."""
+
+    def execute(self, sql, params=()):
+        if 'select * from vw2_jobs where id=' in sql:
+            row = getattr(self, 'take', None)
+            return type('R', (), {'fetchone': lambda _: row})()
+        return super().execute(sql, params)
+
+
+def shot_take(store, conn, check):
+    ready(store, conn)
+    job_id = GD.shoot(conn, store, USER, NEW, [], 'VS1', 'Shoot.')['job_id']
+    conn.take = {'id': job_id, 'run_id': 'run-1', 'unit': 'VS1', 'provider': 'video', 'status': 'ready', 'request': conn.queued[-1]['request'],
+                 'result': {'key': 'run-1/visuals/takes/t.mp4', 'sha256': 'sha-take', 'bytes': 9, 'evidence': {'timing_matches_placement': True, 'duration_seconds': 10.0}}}
+    s = saved(store)
+    s.setdefault('take_checks', {})[job_id] = check
+    VS.save_session(store, NEW, s)
+    return job_id
+
+
+def card(**states):
+    return [{'line': l, 'state': states.get(l.split()[0], 'Pass'), 'seen': ''} for l in ('real footage and length', 'first frame', 'people', 'the action', 'objects', 'bodies and contact', 'the place and the light')] + [{'line': 'the join', 'state': 'Not sure', 'seen': ''}]
+
+
+@pytest.fixture
+def take_film():
+    doc = doc_with(KILN, MASON)
+    refs = {'R1': {'id': 'R1', 'kind': 'sheet', 'element_id': 'P1', 'status': 'approved', 'key': 'run-1/visuals/references/R1.png', 'sha256': 'sha-R1'}}
+    return new_store(doc, refs, accepted=accepted(doc)), TakeConn()
+
+
+def test_a_clip_that_failed_a_blocking_check_cannot_be_selected(take_film):
+    store, conn = take_film
+    job_id = shot_take(store, conn, {'guide': True, 'blocked': 'the guide came back unedited', 'scorecard': card()})
+    assert 'This clip is not a take: the guide came back unedited' in refused(lambda: VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.', 'looks fine'))
+    assert 'VS1' not in saved(store)['selections']
+
+
+def test_a_take_with_a_failed_scorecard_line_needs_the_operators_written_reason_and_the_departure_is_recorded(take_film):
+    store, conn = take_film
+    job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': False, 'scorecard': card(objects='Fail')})
+    VS.review_take(conn, store, USER, NEW, [], job_id, 'accepted', '', '', 'ok')
+    assert 'The scorecard fails on: objects' in refused(lambda: VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.'))
+    VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.', 'the second glass is out of the cut')
+    assert saved(store)['selections']['VS1']['job_id'] == job_id
+    row = conn.rows[0]
+    assert row['verdict'] == 'accepted' and row['record'][-1]['kind'] == 'take accepted' and row['record'][-1]['departs_on'] == ['objects'] and row['record'][-1]['notes'] == 'the second glass is out of the cut'
+
+
+def test_a_take_the_tool_did_not_read_is_never_taken_as_clean(take_film):
+    store, conn = take_film
+    job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': True, 'scorecard': card(people='Not sure')})
+    VS.review_take(conn, store, USER, NEW, [], job_id, 'accepted', '', '', 'ok')
+    assert 'not read by the tool' in refused(lambda: VS.select_take(conn, store, USER, NEW, [], job_id, 'Take it.'))
+
+
+def test_a_clean_take_is_selected_and_a_rejected_one_closes_the_attempt_so_the_next_opens_a_new_one(take_film):
+    store, conn = take_film
+    job_id = shot_take(store, conn, {'guide': True, 'blocked': None, 'not_read': False, 'scorecard': card()})
+    VS.review_take(conn, store, USER, NEW, [], job_id, 'rejected', 'her hand passes through the gate', '', '')
+    row = conn.rows[0]
+    assert row['verdict'] == 'rejected' and row['record'][-1]['kind'] == 'take rejected' and row['record'][-1]['notes'] == 'her hand passes through the gate'
+    changed = spec10()
+    changed['people'][2]['at'] = [4.0, 1.2, 0.3]
+    scene(store, conn, changed)
+    assert [r['attempt'] for r in conn.rows] == [1, 2] and conn.rows[1]['verdict'] is None and conn.rows[1]['record'][0]['kind'] == 'scene'
+
+
+# ---------- the older way, retired by name ----------
+
+def test_the_picture_to_video_take_is_refused_by_name_with_the_new_way(film):
+    with pytest.raises(Problem) as e:
+        GD.older_take_retired()
+    assert (e.value.status, e.value.code) == (410, 'RETIRED') and 'vw guide scene' in e.value.message and 'retired' in e.value.message
+
+
+def test_a_start_picture_from_words_is_refused_for_an_ai_video_shot_only(film):
+    store, conn = film
+    with pytest.raises(Problem) as e:
+        GD.older_start_picture_retired(store, NEW, [], {'kind': 'keyframe', 'shot_id': 'VS1'})
+    assert e.value.code == 'RETIRED' and 'vw guide still' in e.value.message
+    assert GD.older_start_picture_retired(store, NEW, [], {'kind': 'keyframe', 'shot_id': 'IM1'}) is None   # a still shot's picture is untouched
+    assert GD.older_start_picture_retired(store, NEW, [], {'kind': 'sheet', 'shot_id': 'VS1'}) is None
+    assert GD.older_start_picture_retired(store, NEW, [], {'kind': 'keyframe', 'shot_id': 'NOPE'}) is None
+    assert GD.older_start_picture_retired(store, NEW, [], {'kind': 'keyframe'}) is None
