@@ -123,3 +123,7 @@ SK's decisions after the plan: build A, then pictures, then video, in one go; no
 - Six page mentions remain in the instructions (plan: 3, preparation, picture-search, later: 1 each), none telling the operator to decide there; section E forbids the page.
 - The existing unit suites were not run after this change; some of their tests pin the old messages and will fail until updated.
 - The waiting lines name a shot by its id, not yet by its gap.
+
+## Deployed
+
+12 Nov 2026, on SK's "fine, let's deploy" (he dropped VW-21 as it stands, so no gating by instruction version was built): main bb4bb93 live as server 0.96.0, plugin 0.82.0 (minimum 0.82.0), with design/187 and the guide checker's drift line. Server and workers restarted with no job running; the chat route answers. Unit suites not run (SK's word). First real use: VW-22.
