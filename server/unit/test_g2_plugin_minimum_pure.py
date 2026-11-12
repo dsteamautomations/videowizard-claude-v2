@@ -4,9 +4,9 @@ from app.config import Settings
 from app.main import plugin_refusal
 
 
-def test_an_older_tool_is_told_to_update_and_0_70_0_passes():   # design/142 raised it to 0.70.0 (SK, 2 Nov 2026)
+def test_an_older_tool_is_told_to_update_and_0_78_0_passes():   # design/179 raised it to 0.78.0 (SK, 12 Nov 2026): the motion skill reads the brief's style
     minimum = Settings.model_fields['PLUGIN_MIN_VERSION'].default
-    assert minimum == '0.70.0'
-    said = plugin_refusal('/api/runs/x/visuals/images', '0.69.0', minimum)
-    assert said and '0.69.0' in said and '0.70.0' in said and 'update it' in said
-    assert plugin_refusal('/api/runs/x/visuals/images', '0.70.0', minimum) is None and plugin_refusal('/api/runs/x', '0.70.1', minimum) is None
+    assert minimum == '0.78.0'
+    said = plugin_refusal('/api/runs/x/visuals/images', '0.77.0', minimum)
+    assert said and '0.77.0' in said and '0.78.0' in said and 'update it' in said
+    assert plugin_refusal('/api/runs/x/visuals/images', '0.78.0', minimum) is None and plugin_refusal('/api/runs/x', '0.78.1', minimum) is None

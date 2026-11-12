@@ -38,7 +38,7 @@ Details: `references/format.md` (the project shape, attributes, timing) and `ref
 
 ## Motion craft, for these shots
 
-Calm, eased, technical: arrivals on long ease-outs (`power3.out`, `expo.out`), a build in sequence (staggered, never all at once), a label that lands and holds dead still, a slow push-in only when the brief asks. Real motion, not cuts between states: parts build, arrows travel, a highlight moves the eye. A line the viewer reads holds at least 0.5 s plus 0.3 s a word.
+How things move and appear is the film's, not this skill's: follow the brief's "Motion style" part for the pace, the arrivals, the labels, the camera and the changes between states. Where the brief's own lines for this shot ask for something the style does not, the brief's lines win for that shot. A line the viewer reads holds at least 0.5 s plus 0.3 s a word.
 
 ## The loop
 

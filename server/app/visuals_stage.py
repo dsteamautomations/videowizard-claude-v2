@@ -499,6 +499,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     draft with the words given there). `propose` is refused without a record and when a route departs from it.
     design/124 Change 3: a sent document starts with its Direction (a few lines). Change 6: accept or send_back names lines of the draft
     (direction, G1, ...); the draft is recorded when every line is accepted."""
+    need_motion_style(run)   # design/179 S3: the film's motion style is asked once, here, recommended from its category
     session = session_of(store, run, outputs)
     if accept or send_back:
         return _treatment_lines(store, user, run, session, list(accept or []), list(send_back or []), notes, quote)
@@ -4664,25 +4665,32 @@ def _film_frame(session):
     return fps, W, H
 
 
+def need_motion_style(run):
+    film.need_motion(run)   # a function of its own: `treatment` has a local of the module's name
+
+
 def film_font_files(run):
     """design/139 R13: the film's chosen font as {file name: 'server'} (a file under server/fonts), none for Noto Sans or a film from before."""
     name = film.font(run)
-    return {film.FONTS[name]: 'server'} if name and name != 'Noto Sans' else {}
+    faces = film.font_faces(name, film.font_scripts(run)) if name else []   # design/179: one file per script the film is written in
+    return {f['file']: 'server' for f in faces if f['family'] != 'Noto Sans'}   # Noto Sans itself is always there (NotoSans-Variable.ttf)
 
 
 def need_font(run, session=None):
     """design/139 R13: the drawing font is asked once, before the first drawing, with Noto Sans as the reference; a brand font given with
     `vw visuals font --file` answers it too."""
-    need(film.font(run) or (session or {}).get('font'), 'Ask the operator the drawing font once, Noto Sans recommended (or ' + ', '.join(f for f in film.FONTS if f != 'Noto Sans') +
-                         '), and record it: `vw font <name> --quote "<their words>"`.')
+    need(film.font(run) or (session or {}).get('font'), "Ask the operator the film's font once: `vw font` lists the fonts that fit this film's motion style and hold its language, the first is the "
+                                                         'one to recommend. Record it: `vw font <name> --quote "<their words>"`.')
 
 
 def _motion_fonts(store, session, run=None):
     """{file name: bytes} placed in assets/fonts, and the family names a project may use (Noto Sans always, for the scripts the chosen font lacks)."""
     from . import drawn
     files, names = {'NotoSans-Variable.ttf': drawn.font_file().read_bytes()}, ['Noto Sans']
+    faces = {f['file']: f['family'] for f in film.font_faces(film.font(run), film.font_scripts(run))} if film.font(run) else {}
     for file in film_font_files(run):
-        files[file], names = (drawn.FONTS / file).read_bytes(), names + [film.font(run)]
+        files[file] = (drawn.FONTS / file).read_bytes()
+        names += [faces.get(file) or film.font(run)] if (faces.get(file) or film.font(run)) not in names else []
     if session.get('font'):
         files[Path(session['font']['name']).name] = store.get(session['font']['key'])
         names.append(Path(session['font']['name']).stem)
@@ -4888,6 +4896,9 @@ def motion_brief(store, run, outputs, shot_id):
     fonts = _motion_fonts(store, session, run)
     pictures = brief_pictures(session, shot)
     sm = shot.get('scene_motion') or {}
+    for miss in film.missing_letters(film.font(run), sm.get('labels') or []):   # design/179 E7: named before the render, not after
+        need(False, f"The label \"{miss['label']}\" has letters the film's font ({film.font(run)}) does not hold: {' '.join(miss['letters'][:8])}. Ask the operator: another font for this film "
+                    '(`vw font` lists those that hold its language), or other words for the label.')
     lines = [f"# Brief: drawn shot {shot['id']} (HyperFrames)", '',
              f"Length: exactly {frames} frames at {fps} fps = {float(exact):.3f} s. Size {W}x{H}. Root: data-duration=\"{float(exact):g}\" data-fps=\"{fps}\" data-width=\"{W}\" data-height=\"{H}\".",
              f"Narration (spoken over it; silent picture): \"{shot.get('narration', '')}\"",
@@ -4901,9 +4912,12 @@ def motion_brief(store, run, outputs, shot_id):
                   f"proportions {'; '.join(spec.get('proportions') or []) or '-'}; label \"{spec.get('label') or ''}\"" + (' (illustrative: no figure for an unknown size).' if spec.get('illustrative') else '.')]
     lines += [f"Text on screen, word for word, and only these: {'; '.join(chr(34) + l + chr(34) for l in sm.get('labels') or []) or 'name them in the plan (scene_motion.labels) and use them exactly'}.",
               'Pictures you may place (approved; copies beside this brief in refs/ to look at): ' + ('; '.join(f"assets/ref/{rid}.png = {r.get('name') or r.get('subject') or r.get('kind')}" for rid, r in pictures) or 'none') + '.',
-              f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family.",
+              f"Fonts: {', '.join(chr(34) + n + chr(34) for n in fonts[1])}, from assets/fonts/{' or assets/fonts/'.join(fonts[0])} with @font-face; no other family."
+              + (f" The film's font is {film.font(run)}: every text is set in it (its family for each script, as named here; two files of one family are its regular and its bold); "
+                 '"Noto Sans" only for a sign it lacks.' if film.font(run) and film.font(run) != 'Noto Sans' else ''),
               f"Rules: GSAP from {'assets/vendor/gsap.min.js'}; nothing loads from the network; no Math.random, Date, timers; no sound; text at least 2.6 % of the frame height, inside the inner 90 %; "
-              'flat, clean, technical; every label sentence case as written above.']
+              'every label sentence case as written above.',
+              '', film.style_part(run)]   # design/179 S4: the film's motion style; the fixed 'flat, clean, technical' is gone
     for stem in _subjects_of(plan, shot):   # design/130 §4 step 8: what earlier films taught about this shot's subject (design/134 16)
         lines += ['', f'Subject rules ({stem}): every one holds in this drawing.', *(f'- {r}' for r in _subject_rules(store, stem))]
     return {'shot_id': shot['id'], 'brief': '\n'.join(lines) + '\n', 'refs': [rid for rid, _ in pictures], 'frames': frames, 'fps': str(fps)}

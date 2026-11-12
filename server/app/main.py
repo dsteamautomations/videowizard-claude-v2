@@ -1125,7 +1125,7 @@ def post_library_unmark(run_id: UUID, body: LibraryOne, user=User, conn=DB):
 
 
 class FilmChoice(Write):   # design/137, design/139: one choice with the operator's words
-    key: Literal['category', 'shape', 'colours', 'font']
+    key: Literal['category', 'shape', 'colours', 'font', 'motion']   # design/179: the motion style
     value: str = Field(min_length=1, max_length=300)
     quote: str = Field(min_length=1, max_length=2000)
     video: str | None = None
@@ -1137,15 +1137,33 @@ def get_film(run_id: UUID, user=User, conn=DB):
     """The film's choices, and the clip count with the shape and rate recommendation once the clips are listed (design/139 R1)."""
     run = core.load_run(conn, user, run_id)
     media = next((o for o in core.current_outputs(conn, run['id']) if o['stage'] == 'media' and o['unit'] is None), None)
+    outputs = core.current_outputs(conn, run['id'])
+    scripts = _film_scripts(outputs)
+    last = conn.execute("select film->'font'->>'value' as font from vw2_runs where client_id=%s and id<>%s and film->'font'->>'value' is not null order by created_at desc limit 1",
+                        (run.get('client_id'), run['id'])).fetchone() if run.get('client_id') else None
+    order, st = film.recommend_styles(film.category(run)), film.styles()
+    offer = film.fonts_for(film.motion(run) or order[0], scripts, (last or {}).get('font'))
     return Response({'film': film.choices(run), 'older': film.older(run), 'recommendation': film.recommend((media or {}).get('summary', {}).get('clips') or []) if media else None,
-                     'categories': list(library.CATEGORIES), 'fonts': list(film.FONTS)})
+                     'categories': list(library.CATEGORIES), 'fonts': [f['name'] for f in offer],
+                     'motion_styles': [{'name': n, 'title': st[n]['title'], 'for': st[n]['for'], 'recommended': i == 0} for i, n in enumerate(order)],   # design/179 S3: the first is the one to recommend
+                     'font_offer': offer, 'written_in': sorted(film.SCRIPT_NAMES[s] for s in scripts | {'latin'}),
+                     'font_note': "Recommend the first font: the client's last font when they have one, else the first that fits the film's motion style. One font for the whole film."})
 
 
 @app.post('/api/runs/{run_id}/film')
 def post_film(run_id: UUID, body: FilmChoice, user=User, conn=DB):
     run = core.load_run(conn, user, run_id, lock=True)
-    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, {'film': film.record(conn, user, run, body.key, body.value, body.quote, body.video, body.fps)}))
+    scripts = (_film_scripts(core.current_outputs(conn, run['id'])) | {'latin'}) if body.key == 'font' else None   # design/179 S6, S8: a font must hold the film's language
+    status, resp = core.with_receipt(conn, user, body_dict(body), lambda: (200, {'film': film.record(conn, user, run, body.key, body.value, body.quote, body.video, body.fps, scripts)}))
     return Response(resp, status_code=status)
+
+
+def _film_scripts(outputs):
+    """design/179 S8: the scripts the film is written in, read from its script's letters; none while there is no script yet."""
+    try:
+        return film.scripts_of(voices.script_text(storage(), outputs))
+    except Exception:   # no script yet, or its file is not readable: nothing is known, English is assumed by the caller
+        return set()
 
 
 @app.post('/api/runs/{run_id}/analysis/start', status_code=201)

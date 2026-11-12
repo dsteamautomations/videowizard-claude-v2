@@ -3012,11 +3012,12 @@ def build_parser():
     for key, helptext in (('category', "the film's video category, read from the script and confirmed by the operator (design/137)"),
                           ('shape', "the film's shape, then the AI video shape, from the clip count (design/139 R1); with no value: the count and the recommendation"),
                           ('colours', 'the colours the operator prefers when the client card has none, or "no preference" (design/139 R3)'),
-                          ('font', 'the drawing font, Noto Sans recommended (design/139 R13)')):
+                          ('font', "the film's one font; with no value: the fonts that fit its motion style and hold its language, the first to recommend (design/139 R13, design/179)"),
+                          ('motion-style', "the film's motion style, recommended from its category; with no value: the styles, the first to recommend (design/179)")):
         s = sub.add_parser(key, help=helptext); s.add_argument('value', nargs='*'); s.add_argument('--quote')
         if key == 'shape':
             s.add_argument('--video', choices=['horizontal', 'vertical']); s.add_argument('--fps', type=int)
-        s.set_defaults(fn=cmd_film, key=key)
+        s.set_defaults(fn=cmd_film, key='motion' if key == 'motion-style' else key)
     return p
 
 

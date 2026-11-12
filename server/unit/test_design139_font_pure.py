@@ -16,12 +16,12 @@ def test_the_font_choice_is_checked():
     assert F.check('font', 'Inter') == {'value': 'Inter'}
     with pytest.raises(Problem) as e:
         F.check('font', 'Comic Sans')
-    assert 'Noto Sans recommended' in e.value.message
+    assert 'not a font the server holds; offer: Noto Sans, Noto Serif, Anek' in e.value.message   # design/179: the set of fifteen; the recommendation follows the film's style
 
 
 def test_the_recorded_font_reaches_the_motion_route_beside_noto_sans():
     files, names = VS._motion_fonts(None, {}, {'film': {'font': {'value': 'Montserrat'}}})
-    assert set(files) == {'NotoSans-Variable.ttf', 'Montserrat-Variable.ttf'} and names == ['Noto Sans', 'Montserrat']
+    assert set(files) == {'NotoSans-Variable.ttf', 'Montserrat-wght.ttf'} and names == ['Noto Sans', 'Montserrat']   # design/179: the set's own file
     assert VS._motion_fonts(None, {}, {'film': None}) == ({'NotoSans-Variable.ttf': drawn.font_file().read_bytes()}, ['Noto Sans'])
     assert VS.film_font_files({'film': {'font': {'value': 'Lato'}}}) == {'Lato-Regular.ttf': 'server'}
 
