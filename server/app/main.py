@@ -1337,6 +1337,11 @@ class MotionUpload(Write):   # design/130
     content_base64: str
 
 
+class MotionFinish(Write):   # design/186: the finish of a drawn shot taken away or put back
+    shot_id: str
+    on: bool = False
+
+
 class MotionTool(Write):   # design/130: a helper's check or snapshot, run on the server
     shot_id: str
     op: Literal['check', 'snapshot']
@@ -1384,6 +1389,11 @@ def visuals_motion_tool(run_id: UUID, body: MotionTool, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/motion/render', status_code=201)
 def visuals_motion_render(run_id: UUID, body: Draw, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.render_motion(conn, storage(), user, run, outputs, body_dict(body)), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/finish', status_code=201)
+def visuals_motion_finish(run_id: UUID, body: MotionFinish, user=User, conn=DB):   # design/186
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.motion_finish(conn, storage(), user, run, outputs, body.shot_id, body.on), 201)
 
 
 @app.get('/api/runs/{run_id}/visuals/motion/brief/{shot_id}')

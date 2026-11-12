@@ -79,6 +79,7 @@ def problems(files, refs, fonts, frames, fps, width, height):
             for name in (n.strip().strip('"\'') for n in (css or attr).split(',')):
                 if name and name.lower() not in allowed and not name.startswith('var('):
                     out.append(f'{k} uses the font {name}: use {", ".join(fonts)}')
+    out += finish_of(files)[1]
     for rid in ref_ids(files):
         r = refs.get(rid) or {}
         if r.get('status') != 'approved' or not r.get('key'):
@@ -96,6 +97,67 @@ def problems(files, refs, fonts, frames, fps, width, height):
     if (root.get('data-width'), root.get('data-height')) != (str(width), str(height)):
         out.append(f'the root is {root.get("data-width")}x{root.get("data-height")}; the film is {width}x{height}')
     return list(dict.fromkeys(out))
+
+
+# ---------- design/186: the finish, a layer the server adds to a drawn shot (SK, 12 Nov 2026: finish effects only, as a removable layer) ----------
+
+FINISH = ('blur', 'grain', 'vignette')   # the server's order; three parts of the HyperFrames library kept in server/motion_parts (Apache 2.0, NOTICE.md)
+FINISH_DIR = Path(__file__).resolve().parents[1] / 'motion_parts'
+FINISH_MARK = 'data-hf-motion-blur'      # the one thing a helper writes for blur: this attribute on each element its timeline moves
+FINISH_PHRASE = {'blur': 'a soft blur on the moving parts', 'grain': 'a film grain', 'vignette': 'a soft darkening of the corners'}
+FINISH_SOFTER = (('opacity: 0.15;', 'opacity: 0.09;'),                                           # the grain, lighter than the library's: it is felt, not seen, and the file stays smaller
+                 ('var(--vignette-color, rgba(0, 0, 0, 0.7))', 'var(--vignette-color, rgba(40, 20, 10, 0.26))'))   # the vignette, a warm quarter-strength
+
+
+def finish_of(files):
+    """(the effects a project asks for, in the server's order; what is wrong with its finish.json). No file: no finish."""
+    if 'finish.json' not in files:
+        return [], []
+    bad = ['finish.json names the effects wanted as a list, any of ' + ', '.join(FINISH) + ' (for example ["blur", "grain"]); the server adds the layer itself']
+    try:
+        doc = json.loads(files['finish.json'].decode('utf-8'))
+    except (ValueError, UnicodeError):
+        return [], bad
+    names = doc.get('effects') if isinstance(doc, dict) else doc
+    if not isinstance(names, list) or any(n not in FINISH for n in names):
+        return [], bad
+    return [n for n in FINISH if n in names], []
+
+
+def finish_note(files, effects):
+    """What the helper is told about its finish that is not an error: blur asked for with no element marked."""
+    if 'blur' in effects and not any(FINISH_MARK in t for t in _texts(files, ('.html', '.svg')).values()):
+        return f'The finish asks for blur but nothing is marked for it: put {FINISH_MARK} on each element the timeline moves. The other effects apply.'
+    return ''
+
+
+def finish_in_force(effects, off):
+    return [] if off else list(effects)
+
+
+def finish_words(effects):
+    """The sentence the user reads where a drawing carries a finish."""
+    parts = [FINISH_PHRASE[n] for n in FINISH if n in effects]
+    if not parts:
+        return ''
+    listed = parts[0] if len(parts) == 1 else ', '.join(parts[:-1]) + ' and ' + parts[-1]
+    return f"This drawing has an added effect on top: {listed}. If you don't like it, it can be taken away."
+
+
+def apply_finish(folder, effects, width=1920, height=1080):
+    """The finish layer written into the prepared project's index.html, once, at the end of the page: one box the size of the film holding the
+    server's own copies of the effects asked for. The helper's files never carry this code; without the layer the drawing is complete."""
+    effects = [n for n in FINISH if n in (effects or [])]
+    index = Path(folder) / 'index.html'
+    text = index.read_text(encoding='utf-8')
+    if not effects or 'id="vw-finish"' in text:
+        return
+    parts = '\n'.join((FINISH_DIR / f'{n}.html').read_text(encoding='utf-8') for n in ('vignette', 'grain', 'blur') if n in effects)   # the vignette under the grain; the blur's script last
+    for old, new in FINISH_SOFTER:
+        parts = parts.replace(old, new)
+    layer = f'<div id="vw-finish" style="position:absolute;left:0;top:0;width:{int(width)}px;height:{int(height)}px;pointer-events:none;overflow:hidden">\n{parts}\n</div>\n'
+    at = text.rfind('</body>')
+    index.write_text(text[:at] + layer + text[at:] if at >= 0 else text + '\n' + layer, encoding='utf-8')
 
 
 def _fraction(v):

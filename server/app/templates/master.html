@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ run.code }} master · VideoWizard{% endblock %}
+{% block body %}
+{# design/185: the master film, view only. The approval stays in chat. #}
+{% if view.state == 'rendering' %}<meta http-equiv="refresh" content="15">{% endif %}
+<h1>{{ run.code }} — {{ run.title }}: master film</h1>
+<p><a href="/runs/{{ run.code }}">Back to the run</a></p>
+{% if view.state == 'ready' %}
+<video controls preload="metadata" style="width:100%;max-width:1280px;background:#000" src="/runs/{{ run.code }}/film/{{ view.key }}"></video>
+<p>Master version {{ view.version }}{% if view.duration_s %} · {{ view.duration_s|round(1) }} s{% endif %}{% if view.mix %} · loudness {{ view.mix.integrated_lufs }} LUFS, peak {{ view.mix.true_peak_dbfs }} dBFS{% endif %}
+ · {% if view.recorded %}recorded (approved){% else %}not yet approved: watch and listen, then answer in the chat{% endif %}</p>
+{% elif view.state == 'rendering' %}
+<p>Master version {{ view.version }} is being rendered. This page reloads by itself every 15 seconds.</p>
+{% elif view.state == 'not_rendered' %}
+<p>Master version {{ view.version }} is built but not rendered yet.</p>
+{% elif view.state == 'failed' %}
+<p class="err">The render of master version {{ view.version }} did not finish: {{ view.error }}</p>
+{% elif view.state == 'missing' %}
+<p class="err">The film of master version {{ view.version }} is not in storage. Render the master again.</p>
+{% else %}
+<p>No master film yet. The master is built after the options are approved and every shot is decided; a change to the options removes it until it is built again.</p>
+{% endif %}
+{% endblock %}

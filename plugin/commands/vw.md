@@ -57,3 +57,4 @@ Operator request: $ARGUMENTS
 
 
 **Directory** (design/50): the client card from the directory is shown at the brief as context, never as answers; the operator's words first, the script second, the directory last; record `directory_differences`. `vw brand fetch` saves the directory's logo files under in/brand/ for a visuals reference.
+**A finish on a drawn shot** (design/186): `vw motion render` says when a drawing carries a finish (a soft blur on moving parts, a film grain, a soft darkening of the corners) and gives the sentence to tell the operator. If the operator does not like the effect, explain it in those plain words and take it away on their word: `vw motion finish --shot S --off` (a new take in under a minute, selected like any take); `--on` puts it back. Never ask the operator to choose effects; the helper chose them from the motion style.

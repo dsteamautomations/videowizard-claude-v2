@@ -745,6 +745,33 @@ def review_view(conn, store, run):
             'second_look': entry.get('second_look')}   # design/129 P4
 
 
+def master_state(master, render, exists):
+    """design/185: what the master page shows, from the built master, its render record and a storage check. View only."""
+    if not master:
+        return {'state': 'none'}
+    out = {'version': master.get('version')}
+    if not render or render.get('digest') != master.get('digest'):
+        return {**out, 'state': 'not_rendered'}
+    if render.get('status') in ('queued', 'running'):
+        return {**out, 'state': 'rendering'}
+    result = render.get('result') or {}
+    if render.get('status') != 'ready' or not result.get('key'):
+        return {**out, 'state': 'failed', 'error': render.get('error') or 'see the render record'}
+    if not exists(result['key']):
+        return {**out, 'state': 'missing'}
+    return {**out, 'state': 'ready', 'key': result['key'], 'duration_s': result.get('duration_s'), 'mix': (result.get('record') or {}).get('mix')}
+
+
+def master_view(conn, store, run):
+    """design/185: a read for the master page; no write (a revise or a new build drops the master, so the page then says none)."""
+    try:
+        session = session_of(store, run)
+    except Problem:
+        return {'state': 'none'}
+    _refresh(conn, store, run, session)
+    return {**master_state(session.get('master'), (session.get('renders') or {}).get('master'), store.exists), 'recorded': bool((session.get('recorded') or {}).get('master'))}
+
+
 def _refuse_answer(s, sl, decisions, lab, action, edit):
     """design/127: the answer each row takes, refused by name otherwise."""
     if action in RETIRED_ACTIONS:

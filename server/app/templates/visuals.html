@@ -670,7 +670,7 @@ function panelBody(){
   if(selPic.take){   // design/97 P2: a take is judged beside its player
     let s=null,k=null;(d.gaps||[]).forEach(g=>g.shots.forEach(x=>{const t=(x.takes||[]).find(y=>y.job_id===selPic.take);if(t){s={...x,gap:g};k=t;}}));
     if(!k)return '<div class="empty">That take is gone.</div>';
-    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+(k.sheet_url?'<img class="sheet" src="'+esc(k.sheet_url)+'" alt="every frame of the drawing, the time under each">':'')+checklist(k.checklist)+takeCheck(k.check)+drawnPasses(k.check)+factCheck(k.fact_check)+
+    return '<div class="ds"><b>'+(s.route==='drawn'?'Drawing · ':'Take · ')+headOf(s).replace('AI video · ','').replace('Drawn · ','')+'</b> · '+esc(k.job_id.slice(0,8))+' · '+(takeRejected(k)?'rejected':esc(k.status))+'</div>'+(k.url?'<video src="'+esc(k.url)+'" controls preload="metadata"></video>':'')+(k.sheet_url?'<img class="sheet" src="'+esc(k.sheet_url)+'" alt="every frame of the drawing, the time under each">':'')+checklist(k.checklist)+takeCheck(k.check)+drawnPasses(k.check)+factCheck(k.fact_check)+finishBox(s,k,can)+
       (k.selected?'<div class="ds ok">Approved · in the film at '+filmAt(s)+'</div>':'')+(takeRejected(k)?'<div class="ds err">Rejected'+(k.reviews[k.reviews.length-1].notes?': '+esc(k.reviews[k.reviews.length-1].notes):'')+'</div>':'')+(rejOpen===k.job_id?reasonBox('reject-take',k.job_id):'')+(can&&k.status==='ready'&&!k.selected&&!takeRejected(k)?actBox('<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button><button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>')
         :can&&k.status==='ready'?(s.gap.recorded?'<div class="ds lockd">The gap is recorded; this take can no longer be changed here.</div>'   // U17: an answered take offers the opposite verdict only (a rejected one Select, a selected one Reject), until its gap is recorded
           :actBox(k.selected?'<button data-a="reject-take" data-job="'+esc(k.job_id)+'">Reject</button>':'<button class="go" data-a="select-take" data-job="'+esc(k.job_id)+'">Select</button>')):'');
@@ -1065,6 +1065,12 @@ function renderTakes(){
   wireGrid(root,renderTakes);
 }
 // ---------- the guide of an AI video shot (integration steps B to D): the server's data, the server's functions (guide.approve_still, reject_still, shoot) ----------
+function finishBox(s,k,can){   // design/186: a drawing's finish said in plain words, with the way to take it away or put it back
+  const f=k.finish;if(!f)return '';
+  const gone=f.taken_away||!f.effects.length;
+  return '<div class="ds">'+(f.effects.length?esc(f.words):(f.left_off?'The finish was left off this drawing: '+esc(f.left_off)+'.':'This drawing is without its finish (taken away).'))+'</div>'
+    +(can&&!s.gap.recorded&&!(f.left_off&&!f.taken_away&&!f.effects.length)?'<div class="btns"><button data-a="motion-finish" data-shot="'+esc(s.shot_id)+'" data-on="'+(gone?'1':'')+'">'+(gone?'Put the effect back':'Take the effect away')+'</button></div>':'');
+}
 function guideBox(s){
   const g=s.guide;if(!g)return '';
   const pic=(u,cap)=>u?'<a class="pic on" href="'+esc(u)+'" target="_blank" rel="noopener"><img src="'+esc(u)+'" loading="lazy" decoding="async" alt=""><div class="cap">'+esc(cap)+'</div></a>':'';
@@ -1197,6 +1203,7 @@ async function doClick(b){
   if(a==='unplace'){await send({action:'unplace',shot_id:b.dataset.shot},'Picture taken out of the shot; it stays approved.');return;}   // design/94 L3
   if(a==='guide-approve'){await send({action:'guide-approve',shot_id:b.dataset.shot,still_id:b.dataset.still,sha256:b.dataset.sha,quote:q},'Still approved.');return;}   // integration steps B to D
   if(a==='guide-reject'){if(!q){need('Say what is wrong with the still, then Reject.');return;}await send({action:'guide-reject',shot_id:b.dataset.shot,still_id:b.dataset.still,notes:q,quote:q},'Still rejected.');return;}
+  if(a==='motion-finish'){await send({action:'motion-finish',shot_id:b.dataset.shot,on:!!b.dataset.on},b.dataset.on?'The drawing is being made again with the effect.':'The drawing is being made again without the effect.');return;}   // design/186
   if(a==='guide-shoot'){await send({action:'guide-shoot',shot_id:b.dataset.shot,quote:q},'The take is being made.');return;}
   if(a==='select-take'){await send({action:'select-take',job_id:b.dataset.job},'Take selected.');return;}
   if(a==='reject-take'){const j=await send({action:'reject-take',job_id:b.dataset.job},'Take rejected.');if(j){rejOpen=b.dataset.job;renderStep();}return;}

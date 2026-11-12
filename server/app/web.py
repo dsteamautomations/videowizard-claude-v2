@@ -457,6 +457,7 @@ def _visuals_act(code, vw2_session, body):
             'guide-approve': lambda: guide.approve_still(conn, store, user, run, outputs, body['shot_id'], body['still_id'], body['sha256'], quote),   # integration steps B to D
             'guide-reject': lambda: guide.reject_still(conn, store, user, run, outputs, body['shot_id'], body['still_id'], str(body.get('notes') or ''), quote),
             'guide-shoot': lambda: guide.shoot(conn, store, user, run, outputs, body['shot_id'], quote or f"Shoot, pressed on the visuals page by {user.get('name') or user['id']}", bool(body.get('again'))),
+            'motion-finish': lambda: V.motion_finish(conn, store, user, run, outputs, body['shot_id'], bool(body.get('on'))),   # design/186: the same server function as `vw motion finish`
             'reject': lambda: V.reject_reference(store, user, run, outputs, body['reference_id'], str(body.get('notes') or ''), quote),   # design/74 L7
             'record': lambda: V.record_gaps(conn, store, user, run, outputs, list(body.get('gap_ids') or ['all']), quote),
         }
@@ -475,6 +476,20 @@ def review_page(request: Request, code: str, vw2_session: str | None = Cookie(de
     with db_connect() as conn:
         run = _run_by_code(conn, user, code)
     return render(request, 'review.html', user=user, run=run)
+
+
+@router.get('/runs/{code}/master', response_class=HTMLResponse)
+def master_page(request: Request, code: str, vw2_session: str | None = Cookie(default=None)):
+    """design/185: the master film in the browser. View only: the approval stays in chat (`vw master record`)."""
+    from .stage2 import stage as stage2
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+        view = stage2.master_view(conn, storage(), run)
+    return render(request, 'master.html', user=user, run=run, view=view)
 
 
 @router.get('/runs/{code}/review/data')

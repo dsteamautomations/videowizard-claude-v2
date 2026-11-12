@@ -898,6 +898,11 @@ def cmd_motion(a):
         emit(out, 0, out.get('next'))
     if a.what == 'render':
         out = write(base + '/motion/render', {'shot_id': a.shot})
+        emit(out, 0, ' '.join(x for x in (out.get('next'), ('Tell the operator: ' + out['tell_the_operator']) if out.get('tell_the_operator') else '') if x))
+    if a.what == 'finish':   # design/186: the operator's word takes a drawing's finish away, or puts it back; the same server function as the page's button
+        if not a.shot or a.off == a.on:
+            emit({'action': 'refused', 'message': 'Say which way: `vw motion finish --shot S --off` takes the finish away, `--on` puts it back.'}, 2)
+        out = write(base + '/motion/finish', {'shot_id': a.shot, 'on': bool(a.on)})
         emit(out, 0, out.get('next'))
 
 
@@ -1462,8 +1467,11 @@ def cmd_analysis(a):
             time.sleep(15)
         c = st.get('counts') or {}
         line = ', '.join(f'{v} {k}' for k, v in sorted(c.items()))
+        aside = set_aside(units)
+        if aside:
+            line += f"; {len(aside)} set aside by the server (tell the operator each name and reason; if a clip matters they stop and file a defect, or `vw analysis retry --unit <id>`): " + '; '.join(f"{x['name']}: {x['reason']}" for x in aside)
         if decide:
-            line += f"; {len(decide)} need a decision: " + ', '.join(u['unit'] for u in decide)
+            line += f"; {len(decide)} need a decision: " + ', '.join(f"{u.get('name') or u['unit']} ({u.get('error') or u['status']})" for u in decide)
         elif open_:
             done = [float(u['cost']['elapsed_seconds']) for u in units if u['status'] == 'retained' and (u.get('cost') or {}).get('elapsed_seconds')]
             avg = sum(done) / len(done) if done else 288.0   # VW-3's average Gemini time per clip
@@ -1474,7 +1482,7 @@ def cmd_analysis(a):
         shown = {'counts': c, 'cap': st.get('cap'), 'units': len(units),   # design/59 L15: what the assistant acts on; the card of a clip is `show --unit`
                  'open': [{'unit': u['unit'], 'status': u['status'], 'phase': u.get('phase')} for u in open_],
                  'decide': [{'unit': u['unit'], 'status': u['status'], 'error': u.get('error')} for u in decide],
-                 'recorded': sum(1 for u in units if u.get('recorded')), 'excluded': sum(1 for u in units if u.get('excluded'))}
+                 'recorded': sum(1 for u in units if u.get('recorded')), 'excluded': sum(1 for u in units if u.get('excluded')), 'set_aside': aside}
         emit(shown, 0, 'Analysis: ' + line)
     if a.what == 'show':
         st = call('GET', f'/api/runs/{run}/analysis')
@@ -2665,7 +2673,7 @@ def cmd_master(a):
         emit(write(f'/api/runs/{run}/stage2/render', {'film': 'master'}), 0, 'Master film rendering; poll `vw master status`.')
     if a.what == 'status':   # design/44 8.2
         st, line = wait_for_film(run, 'master', a.wait or 0)
-        emit(st, 0, line)
+        emit(st, 0, line + (f"; watch it in the browser: {server_url()}/runs/{m['code']}/master" if 'ready' in line else ''))   # design/185
     if a.what == 'fetch':
         _s2_fetch(m, 'master', 'out/master.mp4')
     if a.what == 'record':   # design/44 8.4: one approval records the master and the first cut
@@ -2976,6 +2984,12 @@ def cmd_film(a):
     emit(write(f"/api/runs/{m['run_id']}/film", body))
 
 
+def set_aside(units):
+    """design/183: the clips the server set aside because the analysis model refused them: [{unit, name, reason}]."""
+    return [{'unit': u['unit'], 'name': (u.get('summary') or {}).get('name') or u.get('name') or u['unit'], 'reason': ((u.get('summary') or {}).get('note') or '').replace('Set aside by the server: ', '')}
+            for u in units if (u.get('summary') or {}).get('set_aside')]
+
+
 def cmd_close(a):
     m = active()
     missing = [f['name'] for f in m['files'] if f['action'] == 'upload' and not f.get('receipt')]
@@ -3085,10 +3099,11 @@ def build_parser():
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
-    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule'])   # design/130
+    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish'])   # design/130; design/186: finish
     for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote'):
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
+    s.add_argument('--off', action='store_true', help="finish: take the drawing's finish away (design/186)"); s.add_argument('--on', action='store_true', help='finish: put it back')
     s.set_defaults(fn=cmd_motion)
     s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
     for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix'):

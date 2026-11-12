@@ -165,7 +165,8 @@ def test_a4_the_other_passing_failures_are_retried(conn, status, result):
 @pytest.mark.parametrize('status,result', [('failed', {'failure': 'blocked_response'}), ('failed', {'failure': 'model_json'}), ('failed', {'phase': 'prepare'}),
                                            ('rejected', {'http_status': 400}), ('rejected', {'http_status': 403}),
                                            ('submission_unknown', {'failure': 'timeout', 'phase': 'generate'}), ('retained_unstructured', {})])
-def test_a4_a_failure_that_would_repeat_is_not_retried(conn, status, result):
+def test_a4_a_failure_that_would_repeat_is_not_retried(conn, status, result, monkeypatch):
+    monkeypatch.setattr(AJ, '_set_aside', lambda *a: None)   # design/183: an HTTP 400 now sets the clip aside (its own test); here only: never retried
     AJ.finalize(conn, None, job(), status, result, 'x', None, None)
     assert conn.inserts == []
 

@@ -207,7 +207,7 @@ def repolicy(conn, user, run, outputs, policy):
 
 
 def status(conn, run, outputs):
-    rows = conn.execute("select id, unit, status, attempt, error, cost, result, created_at, updated_at, lease_until from vw2_jobs where run_id=%s and stage='analysis' order by created_at", (run['id'],)).fetchall()
+    rows = conn.execute("select id, unit, status, attempt, error, cost, result, created_at, updated_at, lease_until, request->'clip'->>'name' as name from vw2_jobs where run_id=%s and stage='analysis' order by created_at", (run['id'],)).fetchall()
     latest = {}
     for r in rows:
         latest[r['unit']] = r  # last row per unit wins (created_at order)
@@ -215,7 +215,7 @@ def status(conn, run, outputs):
     units = []
     for unit, r in latest.items():
         phase = ((r['result'] or {}).get('phase') if r['status'] in ('running', 'storage_pending', 'submission_unknown') else None)
-        units.append({'unit': unit, 'job_id': str(r['id']), 'status': r['status'], 'attempt': r['attempt'], 'phase': phase, 'error': r['error'], 'cost': r['cost'],
+        units.append({'unit': unit, 'name': r['name'], 'job_id': str(r['id']), 'status': r['status'], 'attempt': r['attempt'], 'phase': phase, 'error': r['error'], 'cost': r['cost'],
                       'recorded': unit in done, 'excluded': bool((done.get(unit) or {}).get('summary', {}).get('excluded')) if unit in done else False,
                       'summary': (done[unit]['summary'] if unit in done else None), 'updated_at': r['updated_at']})
     counts = {}
@@ -360,7 +360,8 @@ def process_inspection(job):
                 except GeminiTransportError as exc:
                     _cool(exc, k_idx)
                     if exc.code == 'http_error' and exc.http_status in (400, 401, 403, 404, 413, 429):
-                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status, 'key_index': k_idx}, f'Provider rejected the inspection ({exc.code}, HTTP {exc.http_status}).', None, None
+                        diagnostic = (exc.metadata or {}).get('provider_error')
+                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status, 'key_index': k_idx, 'provider_error': diagnostic}, rejected_error('inspection', exc.http_status, diagnostic), None, None
                     if exc.code in ('incomplete_response', 'empty_response', 'model_json', 'blocked_response', 'provider_stream_error'):
                         return 'failed', {'failure': exc.code}, str(exc), None, None
                     return 'submission_unknown', {'failure': exc.code}, f'Outcome unknown after dispatch ({exc.code}).', None, None
@@ -451,15 +452,18 @@ def process(job):
                 renew(jid, 'generate')
                 dispatched = True
                 try:
-                    received = transport.generate(payload)
+                    received, plain = generate(transport, payload, lambda: transport_factory(
+                        k_key, request['identity']['model'], terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS, initial_soft_wait_seconds=60,
+                        on_update=lambda e: None, capture_answer_deltas=False, allow_agentic_video=True))
                     raw = received.get('raw') or json.dumps(received['body'], ensure_ascii=False)
-                    durable(paths['response.json'], json.dumps({'raw': raw, 'metadata': received['metadata'], 'received_at': datetime.now(timezone.utc).isoformat()}, ensure_ascii=False).encode('utf-8'))
+                    durable(paths['response.json'], json.dumps({'raw': raw, 'metadata': received['metadata'], 'received_at': datetime.now(timezone.utc).isoformat(), 'plain_fallback': plain}, ensure_ascii=False).encode('utf-8'))
                 except GeminiTransportError as exc:
                     cls = classify_failure(exc)
                     _cool(exc, k_idx)
                     meta = exc.metadata or {}
                     if exc.code == 'http_error' and exc.http_status in (400, 401, 403, 404, 413, 429) or cls['category'] in ('spending_or_billing_limit', 'quota_limit'):
-                        return 'rejected', {'failure': exc.code, 'http_status': exc.http_status, 'category': cls['category'], 'key_index': k_idx}, f'Provider rejected the request ({exc.code}, HTTP {exc.http_status}).', None, None
+                        return ('rejected', {'failure': exc.code, 'http_status': exc.http_status, 'category': cls['category'], 'key_index': k_idx, 'provider_error': meta.get('provider_error')},
+                                rejected_error('request', exc.http_status, meta.get('provider_error')), None, None)
                     if exc.code in ('incomplete_response', 'empty_response', 'model_json', 'blocked_response'):
                         return 'failed', {'failure': exc.code}, str(exc), None, None
                     if exc.code == 'provider_stream_error':
@@ -478,7 +482,7 @@ def process(job):
         raw_bytes = saved['raw'].encode('utf-8')
         store.put(base + '.response.json', raw_bytes, 'application/json')
         result = {'response_key': base + '.response.json', 'response_sha256': hashlib.sha256(raw_bytes).hexdigest(), 'response_bytes': len(raw_bytes),
-                  'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': {**analysis.summary_of(reviewed, clip), 'look': read_json(paths['response.json'].parent / 'look.json')}}
+                  'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': {**analysis.summary_of(reviewed, clip), 'look': read_json(paths['response.json'].parent / 'look.json'), **({'plain_fallback': True} if saved.get('plain_fallback') else {})}}
         if reviewed['status'] == 'retained':
             from .clip_log import gate
             ev = json.dumps(gate.evidence_document(reviewed, request, clip), ensure_ascii=False).encode('utf-8')
@@ -512,11 +516,16 @@ def finalize(conn, user_id, job, status, result, error, cost, retry_in):
                  {'name': Path(result['evidence_key']).name, 'key': result['evidence_key'], 'sha256': result['evidence_sha256'], 'bytes': result['evidence_bytes'], 'location': 'storage', 'receipt': True}]
         user = {'id': user_id or run['owner_id'], 'name': 'worker', 'role': 'Member', 'kind': 'executor'}
         conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run['id']),))
-        existing = conn.execute("select 1 from vw2_stage_outputs where run_id=%s and stage='analysis' and unit=%s and not stale", (run['id'], clip['id'])).fetchone()
+        existing = conn.execute("select id, summary from vw2_stage_outputs where run_id=%s and stage='analysis' and unit=%s and not stale", (run['id'], clip['id'])).fetchone()
+        if existing and (existing['summary'] or {}).get('set_aside'):   # design/183: the operator had the clip tried again and it passed: the server's set-aside gives way
+            conn.execute('update vw2_stage_outputs set stale = true where id=%s', (existing['id'],))
+            existing = None
         if not existing:
             core.output(conn, user, run, {'stage': 'analysis', 'unit': clip['id'], 'files': files,
                                           'summary': {**result['summary'], 'cost': cost, 'job_id': str(job['id'])}})
             runlog.write(conn, clip_entry(run['id'], clip, result['summary']))   # design/142 R1
+    elif set_aside_reason(status, result):
+        _set_aside(conn, user_id, job, set_aside_reason(status, result))
     elif passing_failure(status, result) and not job['request'].get('retry_of') and int(job['request'].get('auto_retries') or 0) < AUTO_RETRIES:
         # design/125 A4: a passing failure is retried by itself up to three times (same frozen request, fresh row, the next key); an operator's retry gets none
         request = {k: v for k, v in job['request'].items() if k not in ('retry_of', 'retry_note', 'auto_retry_of', 'capacity_retry_of')}
@@ -528,6 +537,80 @@ def finalize(conn, user_id, job, status, result, error, cost, retry_in):
 
 
 AUTO_RETRIES = 3
+REASON_CHARS = 500
+
+
+def provider_reason(diagnostic):
+    """design/183: the provider's own words for a refusal, as one line (its status, its message, its reason codes). The transport has already
+    removed keys and addresses and bounded each field. 'no reason given' when the answer could not be read."""
+    d = diagnostic if isinstance(diagnostic, dict) else {}
+    head = ': '.join(x for x in (d.get('status'), d.get('message')) if isinstance(x, str) and x.strip())
+    codes = ', '.join(x for x in (d.get('reasons') or []) if isinstance(x, str))
+    return (' '.join(x for x in (head, f'({codes})' if codes else '') if x) or 'no reason given')[:REASON_CHARS]
+
+
+def generate(transport, payload, fresh):
+    """design/183: send the analysis request; (the answer, whether plain mode was needed). A request in agentic video mode that the provider
+    refuses with HTTP 400 for a reason of its own (defect 48: 'Request contains an invalid argument' for one clip, only with agentic mode and the
+    answer schema together) is sent once more without the agentic mode, the mode a clip of 15 s or less gets, on a new transport from `fresh()` (a transport that has
+    failed refuses every further call). Anything else is raised as it came."""
+    try:
+        return transport.generate(payload), False
+    except GeminiTransportError as exc:
+        agentic = any('mediaProcessing' in part for part in payload['contents'][0]['parts'])
+        result = {'http_status': exc.http_status, 'category': classify_failure(exc)['category'], 'provider_error': (exc.metadata or {}).get('provider_error')}
+        if not (agentic and exc.code == 'http_error' and exc.http_status == 400 and set_aside_reason('rejected', result)):
+            raise
+    plain = {**payload, 'contents': [{**payload['contents'][0], 'parts': [{k: v for k, v in part.items() if k != 'mediaProcessing'} for part in payload['contents'][0]['parts']]}]}
+    return fresh().generate(plain), True
+
+
+def rejected_error(what, http_status, diagnostic):
+    return f'Provider rejected the {what} (HTTP {http_status}): {provider_reason(diagnostic)}'
+
+
+CLIP_FAULT = (400, 413)   # the request itself was refused: the clip's content, form or size. 401, 403, 404, 429 and 5xx are the key's, the account's or the service's
+
+
+def set_aside_reason(status, result):
+    """design/183 (SK, 12 Nov 2026, defect 48): the reason a refused clip is set aside with, or None when the refusal is not the clip's own
+    (a key that is not valid, a spending or quota limit, a busy service) or the outcome is not a refusal at all."""
+    result = result or {}
+    if status != 'rejected' or result.get('http_status') not in CLIP_FAULT or result.get('category') in ('spending_or_billing_limit', 'quota_limit'):
+        return None
+    reason = provider_reason(result.get('provider_error'))
+    if 'api key' in reason.lower() or 'api_key' in reason.lower():
+        return None
+    return f"the analysis model refused this clip (HTTP {result['http_status']}): {reason}"
+
+
+def others_remain(retained, open_jobs):
+    """A clip is set aside only while the film still has other footage: one clip kept, or one still being analysed."""
+    return retained > 0 or open_jobs > 0
+
+
+def _set_aside(conn, user_id, job, reason):
+    """Record the refused clip as excluded, by the server, with the reason, so the stage goes on; the operator is told its name and the reason
+    by `vw analysis status` and may have it tried again or file a defect. Any refusal here leaves the clip rejected, as before design/183."""
+    run = conn.execute('select * from vw2_runs where id=%s', (job['run_id'],)).fetchone()
+    clip = job['request'].get('clip') or {}
+    conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(run['id']),))
+    if conn.execute("select 1 from vw2_stage_outputs where run_id=%s and stage='analysis' and unit=%s and not stale", (run['id'], job['unit'])).fetchone():
+        return
+    retained = conn.execute("select count(*) from vw2_stage_outputs where run_id=%s and stage='analysis' and unit is not null and not stale and not coalesce((summary->>'excluded')::boolean, false)", (run['id'],)).fetchone()['count']
+    open_jobs = conn.execute("select count(*) from vw2_jobs where run_id=%s and stage='analysis' and unit<>%s and status in ('queued','running','storage_pending','submission_unknown')", (run['id'], job['unit'])).fetchone()['count']
+    if not others_remain(retained, open_jobs):
+        return
+    user = {'id': user_id or run['owner_id'], 'name': 'worker', 'role': 'Member', 'kind': 'executor'}
+    try:
+        with conn.transaction():
+            core.output(conn, user, run, {'stage': 'analysis', 'unit': job['unit'], 'files': [],
+                                          'summary': {'excluded': True, 'set_aside': True, 'name': clip.get('name') or job['unit'], 'note': 'Set aside by the server: ' + reason, 'job_id': str(job['id'])}})
+            runlog.write(conn, {'run_id': run['id'], 'stage': 'analysis', 'kind': 'decision', 'about': f"clip {clip.get('name') or job['unit']}",
+                                'rule': 'design/183 (a clip the analysis model refuses is set aside with its reason and does not block the stage)', 'entry': 'set aside: ' + reason,
+                                'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
+    except Problem:
+        pass   # the clip stays rejected and the operator decides, as before
 
 
 def clip_entry(run_id, clip, summary):

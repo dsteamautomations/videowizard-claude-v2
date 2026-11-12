@@ -40,6 +40,17 @@ Details: `references/format.md` (the project shape, attributes, timing) and `ref
 
 How things move and appear is the film's, not this skill's: follow the brief's "Motion style" part for the pace, the arrivals, the labels, the camera and the changes between states. Where the brief's own lines for this shot ask for something the style does not, the brief's lines win for that shot. A line the viewer reads holds at least 0.5 s plus 0.3 s a word.
 
+## A finish, when it suits the shot
+
+A finish is a layer of effects the **server** adds on top of your drawing at snapshot and render: `blur` (a camera-like blur on the parts that move), `grain` (a fine film grain) and `vignette` (a soft darkening of the corners). It changes how the drawing looks, never what it shows. You never write or paste its code.
+
+- To ask for one, put `finish.json` at the project root: a list with any of the three, for example `["blur", "grain", "vignette"]`. For blur, also put the attribute `data-hf-motion-blur` on each HTML element your timeline moves by `transform` (the element that moves, not a container, and not an element inside an `<svg>`). Nothing else.
+- **Your drawing must be complete and right without the finish.** The operator can have it taken away, and the server leaves it off by itself if it cannot be drawn; the shot is then your drawing alone.
+- Whether a finish suits is decided by the brief's "Motion style": a calm, still style takes `grain` and `vignette` at most; a style with parts that travel fast may take `blur` as well. With no reason from the style, ask for none.
+- Keep one finish for all the drawn shots of a film: if the brief or an earlier shot's `REVIEW.md` names the film's finish, use the same.
+- Look at your snapshots with the finish on (they come that way). If a label is harder to read, or a moving label smears while it must be read, take that effect out of `finish.json`.
+- Say in `REVIEW.md` which finish you asked for and why, or that you asked for none.
+
 ## The loop
 
 1. Read `brief.md` and `rules.md`, look at `refs/`, read the two references. With no pictures in `refs/`, first build the key frame as a still (everything in place, nothing moving), upload and snapshot it, and stop: answer "key frame ready" with its sha256, so it is checked before you animate.

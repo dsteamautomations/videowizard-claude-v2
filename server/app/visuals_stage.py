@@ -690,7 +690,8 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                  'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j),
                                                  'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key') or ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('sheet_key')) if (res.get('sheet_key') or ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('sheet_key')) else None,
  'pair_url': url(((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('pair_key')) if ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('pair_key') else None,   # design/91 N3; design/117 P4
-                                                 **({'fact_check': ((session.get('motion_checks') or {}).get(j['unit']) or [None])[-1]} if (j.get('request') or {}).get('kind') == 'motion' else {})})   # design/130: the latest verdict on the shot
+                                                 **({'fact_check': ((session.get('motion_checks') or {}).get(j['unit']) or [None])[-1]} if (j.get('request') or {}).get('kind') == 'motion' else {}),
+                                                 **(_finish_view(session, j, res) if (j.get('request') or {}).get('kind') == 'motion' else {})})   # design/130: the latest verdict on the shot
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
         entry = {'gap_id': gid, **g, 'accepted': gid in session['accepted'], 'recorded': gid in session['recorded_gaps'], 'shots': [], 'choices': None, 'warnings': [], **_accepted_words(session, gid)}
@@ -4745,6 +4746,16 @@ def _motion_fonts(store, session, run=None):
     return files, names
 
 
+def _finish_view(session, job, result):
+    """design/186: what the page shows of a drawing's finish: the effects this take carries with the plain sentence, why one was left off, and
+    whether the operator has taken it away (so the button offers the other way)."""
+    from . import motion
+    carried, off = result.get('finish') or [], bool((session.get('motion_finish_off') or {}).get(job['unit']))
+    if not (carried or off or result.get('finish_left_off')):
+        return {}
+    return {'finish': {'effects': carried, 'words': motion.finish_words(carried), 'left_off': result.get('finish_left_off') or '', 'taken_away': off}}
+
+
 def set_motion(store, user, run, outputs, shot_id, name, content):
     """design/130 §4: a drawn shot's HyperFrames project, one zip kept with the run and named by the plan through its sha256; refused with the reasons
     when it breaks a rule (never checked or rendered)."""
@@ -4768,7 +4779,9 @@ def set_motion(store, user, run, outputs, shot_id, name, content):
     store.put(k, content, 'application/zip')
     session.setdefault('motion_projects', {})[sha] = {'key': k, 'shot_id': shot_id, 'name': name, 'bytes': len(content), 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
     save_session(store, run, session)
+    effects = motion.finish_of(files)[0]   # design/186
     return {'sha256': sha, 'bytes': len(content), 'files': sorted(files), 'refs': motion.ref_ids(files), 'text': motion.visible_text(files)[:2000],
+            **({'finish': effects, 'finish_note': motion.finish_note(files, effects) or 'The server adds this finish at snapshot and render; the drawing must be complete without it.'} if effects else {}),
             'next': f"Project stored. Check it with `vw motion check --shot {shot_id} --sha {sha}`; when it is right, put scene_motion: {{sha256: {sha}, labels: [...], cues: [...]}} "
                     f"on {shot_id} in the plan, then `vw motion render --shot {shot_id}`."}
 
@@ -4798,7 +4811,9 @@ def _motion_request(store, session, run, shot_id, sha=None):
     frames = shot['end_frame'] - shot['start_frame']
     exact = Fraction(frames) / Fraction(str(fps))
     labels = sm.get('labels') or [] if sha == sm.get('sha256') else []
+    finish = motion.finish_in_force(motion.finish_of(files)[0], off=bool((session.get('motion_finish_off') or {}).get(shot['id'])))   # design/186: only when there is one, so an older shot's request is unchanged
     return shot, spec, files, {
+        **({'finish': finish} if finish else {}),
         'kind': 'motion', 'shot_id': shot['id'], 'sha256': sha, 'project_key': row['key'], 'width': W, 'height': H, 'fps': str(fps), 'frames': frames,
         'images': images, 'fonts': fonts, 'labels': labels, 'sidecar': motion.sidecar(seconds, [c['selector'] for c in cues or []]),
         'plan_digest': digest(plan), 'palette': str(((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or ''),
@@ -4855,9 +4870,35 @@ def render_motion(conn, store, user, run, outputs, body):
     row_ = conn.execute("insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'visuals',%s,'drawn',%s, gen_random_uuid()) returning id",
                         (run['id'], shot['id'], Jsonb({'kind': 'motion', 'request_key': key_, 'preparation_id': identity, 'shot_id': shot['id'], 'frames': frames, 'duration_seconds': exact}))).fetchone()
     save_session(store, run, session)
-    return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames,
+    return {'job_id': str(row_['id']), 'preparation_id': identity, 'frames': frames, **({'finish': request['finish'], 'tell_the_operator': motion.finish_words(request['finish'])} if request.get('finish') else {}),
             'next': f'Rendering {frames} frames on the server, free: HyperFrames checks the project and the timing, renders, and the drawing and its sheet show on the Takes step; '
                     'select it there or reject it with what to change.'}
+
+
+def motion_finish(conn, store, user, run, outputs, shot_id, on):
+    """design/186 (SK, 12 Nov 2026): the finish of a drawn shot taken away, or put back, by the operator: the same drawing rendered once more
+    without (or with) the layer. One function for the page's button and `vw motion finish`. Free. A new take: the selection is not moved."""
+    from . import motion
+    _motion_run(run)
+    session = session_of(store, run, outputs)
+    shot, _spec, files, _request = _motion_request(store, session, run, shot_id)
+    asked = motion.finish_of(files)[0]
+    need(asked, f"The drawing of {shot['id']} has no finish: there is nothing to take away or put back.")
+    off_now = bool((session.get('motion_finish_off') or {}).get(shot['id']))
+    if off_now == (not on):
+        return {'changed': False, 'finish': [] if off_now else asked, 'next': 'The drawing is already without its finish.' if off_now else 'The drawing already has its finish.'}
+    flags = session.setdefault('motion_finish_off', {})
+    if on:
+        flags.pop(shot['id'], None)
+    else:
+        flags[shot['id']] = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    save_session(store, run, session)
+    from . import runlog
+    runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f"shot {shot['id']}", 'rule': 'design/186 (a finish is a layer the operator can have taken away)',
+                        'entry': ('the finish put back: ' if on else 'the finish taken away: ') + ', '.join(asked), 'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': '', 'request_id': None})
+    out = render_motion(conn, store, user, run, outputs, {'shot_id': shot['id']})
+    return {**out, 'changed': True, 'finish': asked if on else [],
+            'next': ('The drawing is being rendered again with its finish' if on else 'The drawing is being rendered again without the finish') + ': a new take on the Takes step, in under a minute; select it there.'}
 
 
 SUBJECT_RULES = Path(__file__).resolve().parents[1] / 'subject_rules'   # design/130 §4 step 8: one file per subject, seeded in the repo

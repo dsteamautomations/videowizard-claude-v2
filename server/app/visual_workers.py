@@ -637,14 +637,41 @@ def process_drawn(job):
         return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
 
 
-def _motion_folder(store, request, folder):
+def _motion_folder(store, request, folder, finish=None):
     """design/130: the project unpacked into the job's spool folder with GSAP, the fonts, the approved pictures and the timing sidecar beside it."""
     from . import drawn, motion
     fonts = {n: ((drawn.FONTS / n).read_bytes() if k in (None, 'server') else store.get(k)) for n, k in (request.get('fonts') or {'NotoSans-Variable.ttf': None}).items()}   # design/139 R13: 'server', a file under server/fonts
     refs = {rid: store.get(k) for rid, k in (request.get('images') or {}).items()}
     if folder.exists():
         shutil.rmtree(folder)
-    return motion.prepare(folder, motion.unpack(store.get(request['project_key'])), gsap=motion.gsap_bytes(), fonts=fonts, refs=refs, sidecar=request.get('sidecar') or {'assertions': []})
+    out = motion.prepare(folder, motion.unpack(store.get(request['project_key'])), gsap=motion.gsap_bytes(), fonts=fonts, refs=refs, sidecar=request.get('sidecar') or {'assertions': []})
+    motion.apply_finish(out, finish, int(request.get('width') or 1920), int(request.get('height') or 1080))   # design/186: the server's layer, never the helper's code
+    return out
+
+
+def _same_twice(project, seconds, folder):
+    """design/186: one frame from the middle of the shot, drawn twice: the same picture both times?"""
+    from . import motion
+    shots = [motion.snapshot(project, [seconds], '', Path(folder) / name) for name in ('twice-a', 'twice-b')]
+    return bool(shots[0]) and len(shots[0]) == len(shots[1]) and all(a.read_bytes() == b.read_bytes() for a, b in zip(*shots))
+
+
+def render_with_finish(effects, build, twice, render):
+    """design/186: (the movie, the effects it carries, why the finish was left off). `build(effects)` prepares the project with that finish,
+    `twice(project)` says whether it draws the same two times, `render(project)` makes the movie. A finish that draws differently twice or
+    breaks the render is left off and the shot is rendered without it: a finish never stops a film. A plain render that fails is raised."""
+    effects = list(effects or [])
+    if effects:
+        why = ''
+        try:
+            project = build(effects)
+            if twice(project):
+                return render(project), effects, ''
+            why = 'the finish drew differently the second time'
+        except Exception as exc:   # noqa: BLE001: whatever the finish broke, the drawing itself is still good
+            why = f'the finish could not be rendered ({str(exc)[:160]})'
+        return render(build([])), [], why
+    return render(build([])), [], ''
 
 
 def process_motion(job):
@@ -662,7 +689,12 @@ def process_motion(job):
             lines = '; '.join(f"{e['code']}: {e['message']}" + (f" (fix: {e['fix']})" if e.get('fix') else '') for e in report['errors'][:4])
             return 'failed', {'phase': 'check', 'errors': report['errors'][:12]}, f'HyperFrames check failed: {lines}', None, None
         planned, fps, W, H = int(request['frames']), Fraction(str(request['fps'])), int(request['width']), int(request['height'])
-        path = motion.render(project, request['fps'], SPOOL / jid / 'output.mp4')
+        # design/186: the check above judged the helper's own drawing; the finish is the server's layer, added now, and left off if it misbehaves
+        path, finish, left_off = render_with_finish(
+            request.get('finish'),
+            lambda effects: _motion_folder(store, request, SPOOL / jid / ('project-finish' if effects else 'project'), effects),
+            lambda p: _same_twice(p, float(planned / fps) / 2, SPOOL / jid),
+            lambda p: motion.render(p, request['fps'], SPOOL / jid / 'output.mp4'))
         ev = probe(path)
         code = [{'check': 'frames', 'weight': 'must', 'pass': abs(float(ev['duration_seconds']) * float(fps) - planned) < 1, 'seen': f"{float(ev['duration_seconds']):.3f} s at {fps} fps for {planned} frames"},
                 {'check': 'size', 'weight': 'must', 'pass': (ev.get('width'), ev.get('height')) == (W, H), 'seen': f"{ev.get('width')}x{ev.get('height')} for {W}x{H}"}]
@@ -679,7 +711,7 @@ def process_motion(job):
         check = {'lines': code, 'must_failed': failed, 'model': None, 'best_pass': 1, 'sheet_key': sheet_key, 'fixed_svg_key': None, 'passes': [{'pass': 1, 'failed': [c['check'] for c in failed]}],
                  'hyperframes': {'version': settings().MOTION_VERSION, 'warnings': report.get('warnings', [])[:12]}}
         return 'ready', {'provider_id': 'motion', 'key': k, 'sha256': sha, 'bytes': len(data), 'evidence': evidence, 'code': code, 'sheet_key': sheet_key, 'fixed_svg_key': None,
-                         'check': check}, None, {'provider': 'motion', 'seconds': float(exact), 'inr': 0}, None
+                         'check': check, **({'finish': finish} if finish else {}), **({'finish_left_off': left_off} if left_off else {})}, None, {'provider': 'motion', 'seconds': float(exact), 'inr': 0}, None
     except Exception as exc:   # a render that fails is reported, never retried blindly
         return 'failed', {'phase': 'render'}, f'Render failed ({exc.__class__.__name__}: {exc}).', None, None
 
@@ -697,7 +729,14 @@ def process_motion_tool(job):
             return 'ready', motion.check(project), None, {'provider': 'motion', 'inr': 0}, None
         shots, out_dir = [], SPOOL / jid / 'snapshots'
         out_dir.mkdir(parents=True, exist_ok=True)
-        for t, p in zip(request['at'], motion.snapshot(project, request['at'], request.get('zoom') or '', out_dir)):
+        if request.get('finish'):   # design/186: the helper and the fact checker look at the frames as the film will show them; a finish that cannot be drawn is left off here too
+            try:
+                pngs = motion.snapshot(_motion_folder(store, request, SPOOL / jid / 'project-finish', request['finish']), request['at'], request.get('zoom') or '', out_dir)
+            except Exception:   # noqa: BLE001
+                pngs = motion.snapshot(project, request['at'], request.get('zoom') or '', out_dir)
+        else:
+            pngs = motion.snapshot(project, request['at'], request.get('zoom') or '', out_dir)
+        for t, p in zip(request['at'], pngs):
             k = f"{job['run_id']}/visuals/motion/tools/{jid}/{len(shots)}.png"
             data = Path(p).read_bytes()
             store.put(k, data, 'image/png')
