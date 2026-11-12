@@ -632,6 +632,12 @@ def _treatment_lines(store, user, run, session, accept, send_back, notes, quote)
 
 # ---------- design/65 §8: what the visuals page shows ----------
 
+def _guide_view(session, shot_id, url):
+    """Integration steps B to D: the guide of a shot for the page (None when it has none). Imported here because guide.py builds on this module."""
+    from . import guide
+    return guide.view(session, shot_id, url)
+
+
 def page_view(conn, store, run, outputs, code, repair=True):
     """The page's data in one read of the session (plus the package for the intended visuals): the treatment (draft or record), the plan's gaps and
     shots with their pictures, the references with their image links, the takes, the budget. Links go through the run's file route."""
@@ -674,7 +680,8 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                  'duration_s': (res.get('evidence') or {}).get('duration_seconds'), 'timing_matches': (res.get('evidence') or {}).get('timing_matches_placement'),
                                                  'reviews': [{k: rv.get(k) for k in ('decision', 'notes', 'quote', 'by')} for rv in session['reviews'].get(str(j['id']), [])],
                                                  'selected': (session['selections'].get(j['unit']) or {}).get('job_id') == str(j['id']), 'checklist': take_checklist(session, j),
-                                                 'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key')) if res.get('sheet_key') else None,   # design/91 N3; design/117 P4
+                                                 'check': (session.get('take_checks') or {}).get(str(j['id'])), 'sheet_url': url(res.get('sheet_key') or ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('sheet_key')) if (res.get('sheet_key') or ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('sheet_key')) else None,
+ 'pair_url': url(((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('pair_key')) if ((session.get('take_checks') or {}).get(str(j['id'])) or {}).get('pair_key') else None,   # design/91 N3; design/117 P4
                                                  **({'fact_check': ((session.get('motion_checks') or {}).get(j['unit']) or [None])[-1]} if (j.get('request') or {}).get('kind') == 'motion' else {})})   # design/130: the latest verdict on the shot
     gaps = []
     for gid, g in sorted(session['source']['gaps'].items(), key=lambda kv: kv[1].get('start_frame', 0)):
@@ -705,7 +712,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                            'asset': ({'kind': asset['kind'], 'url': url(asset.get('key')), 'reference_id': asset.get('reference_id'), 'states': [{'reference_id': st['reference_id'], 'url': url(st['key']), 'hold_frames': st['hold_frames']} for st in asset.get('states') or []],
                                                       **({k: asset.get(k) for k in ('clip_id', 'name', 'in_s', 'out_s')} if asset['kind'] == 'clip' else {}),   # design/89 B3
                                                       **({'by': asset.get('by_name') or '', 'quote': asset.get('quote') or '', 'duration_s': asset.get('duration_s'), 'made_outside': True, 'made': asset.get('made') or ''} if asset['kind'] in ('movie', 'still') else {})} if asset else None),   # R21, E17: a supplied file
-                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'], **_state_order(session, sh),   # design/94 A2
+                                           'takes': takes.get(sh['id'], []), 'prepared': sh['id'] in session['preparations'], 'guide': _guide_view(session, sh['id'], url), **_state_order(session, sh),   # design/94 A2
                                            'changes': sh.get('changes') or [], 'motion': (session['preparations'].get(sh['id']) or {}).get('motion_prompt'),   # design/91 N1
                                            'pair_check': (session['preparations'].get(sh['id']) or {}).get('pair_check'),
                                            'message': sh.get('message') or '', 'adds': sh.get('adds') or '',   # design/91 N11
@@ -3913,7 +3920,7 @@ def _feedback_take(session, run, user, job, prep, verdict, quote, notes):
     answer = (prep or {}).get('answer') or {}
     inputs = [{'picture_id': (prep or {}).get(role, {}).get('reference_id'), 'tag': tag} for role, tag in (('start_image', 'first-frame'), ('end_image', 'last-frame')) if (prep or {}).get(role)]
     _feedback(session, run, user, kind='take', ident=job['id'], owner=job['unit'], step='take', verdict=verdict, quote=quote, notes=notes,
-              prompt=(prep or {}).get('motion_prompt') or '', checklist=answer.get('checklist'), suggestion=answer.get('suggestion'), model=(prep or {}).get('model'), inputs=inputs)
+              prompt=(prep or {}).get('effective_prompt' if (prep or {}).get('kind') == 'guide' else 'motion_prompt') or '', checklist=answer.get('checklist'), suggestion=answer.get('suggestion'), model=(prep or {}).get('model'), inputs=inputs)
 
 
 def _prep_of(store, job):
@@ -4486,7 +4493,10 @@ def review_take(conn, store, user, run, outputs, job_id, decision, notes, timing
     if session['selections'].get(job['unit'], {}).get('job_id') == str(job_id):
         session['selections'].pop(job['unit'])
     if decision == 'rejected':   # design/74 L7
-        _feedback_take(session, run, user, job, _prep_of(store, job), 'reject', quote, notes)
+        prep = _prep_of(store, job)
+        _feedback_take(session, run, user, job, prep, 'reject', quote, notes)
+        if prep.get('kind') == 'guide':   # integration step D: the attempt of the record ends with its verdict and the operator's words; the next step opens a new attempt
+            generations.closed(conn, run['id'], job['unit'], 'guide', 'rejected', {'kind': 'take rejected', 'job_id': str(job_id), 'notes': notes or '', 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
     save_session(store, run, session)
     return review
 
@@ -4519,6 +4529,14 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
             need(checks or str(notes or '').strip(), 'This drawing has no fact check of its project yet: run a vw-motion-check helper and `vw motion verdict`, or select it with --notes saying why not.')
             need(not bad or str(notes or '').strip(), f"This drawing is held: the fact check failed: {'; '.join(bad)}. Select it with --notes saying why it is taken anyway, or redo the shot.")
         context = prep['plan_digest']
+    elif prep.get('kind') == 'guide':   # integration step D: a take made from a guide stands on the plan it was shot for; its checks decide what the operator must say
+        need(prep.get('plan_digest') == digest(current_plan(store, session)), f"The plan changed since this take was shot; make the shot again from its guide (`vw guide status --shot {job['unit']}`).")
+        check = (session.get('take_checks') or {}).get(str(job_id)) or {}
+        need(not check.get('blocked'), f"This clip is not a take: {check.get('blocked')}. It cannot be selected.")
+        failed = [r['line'] for r in check.get('scorecard') or [] if r['state'] == 'Fail']
+        need(not failed or str(notes or '').strip(), f"The scorecard fails on: {', '.join(failed)}. Select the take with --notes saying why it is taken anyway (the departure is recorded), or reject it.")
+        need(not check.get('not_read') or str(notes or '').strip(), 'This take was not read by the tool (the reading did not run): it is not known to be clean. Select it with --notes saying what you checked yourself, or reject it.')
+        context = prep['plan_digest']
     else:
         live = packet(store, run, outputs, job['unit'], session)
         need(live['preparation_digest'] == prep['base_preparation_digest'], 'The plan, references or generator changed since this take was prepared; prepare a current take.')
@@ -4526,6 +4544,9 @@ def select_take(conn, store, user, run, outputs, job_id, quote, notes='', timing
     session['selections'][job['unit']] = {'job_id': str(job_id), 'review_id': reviews[-1]['id'], 'preparation_id': job['request']['preparation_id'], 'context_digest': context,
                                           'take': {k: job['result'][k] for k in ('key', 'sha256', 'bytes')}, 'quote': quote, 'by': user['id']}
     _feedback_take(session, run, user, job, prep, 'pass', quote, '')   # design/74 L7
+    if prep.get('kind') == 'guide':
+        failed = [r['line'] for r in ((session.get('take_checks') or {}).get(str(job_id)) or {}).get('scorecard') or [] if r['state'] == 'Fail']
+        generations.closed(conn, run['id'], job['unit'], 'guide', 'accepted', {'kind': 'take accepted', 'job_id': str(job_id), 'departs_on': failed, 'notes': notes or '', 'quote': quote, 'by': user['id'], 'by_name': user.get('name') or ''})
     save_session(store, run, session)
     shot = guarded(lambda: locate(store, session, job['unit']))[3]
     return {**session['selections'][job['unit']], 'next': f"Take selected: in the film at {film_time(session, shot)} ({job['unit']})."}   # design/97 A4

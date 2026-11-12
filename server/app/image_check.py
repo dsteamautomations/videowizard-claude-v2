@@ -51,8 +51,18 @@ AMBIENT_LINE = {'check': 'surroundings move', 'pass_when': "what the plan's ambi
 CAMERA_STEADY = {'check': 'camera steady', 'pass_when': 'the framing does not move, drift, zoom or slide from the first frame to the last; only the subjects move', 'weight': 'must'}   # design/112 S4
 
 
+GUIDE_TAKE_LINES = [   # integration step D: the reading lines of a take made from a guide; their names are the scorecard's. Never "frozen person" or "surroundings move": a person standing still is this method's safest case
+    {'check': 'people', 'pass_when': 'exactly the people of the first frame are there from the first frame to the last: nobody appears, vanishes, is doubled or changes into another person; faces and clothes stay the same', 'weight': 'must'},
+    {'check': 'the action', 'pass_when': 'the one action the edit below asks for happens, once, in real time, and nothing else is done; every sign or lettering reads the same in the last frames as in the first', 'weight': 'must'},
+    {'check': 'objects', 'pass_when': 'every object is there at the start and at the end unless a hand visibly moves it; none appears, vanishes, doubles, or changes shape, size or kind; counted things keep their count', 'weight': 'must'},
+    {'check': 'bodies and contact', 'pass_when': 'hands grip what they hold and never pass through anything; no extra limb or finger; feet stay on the ground; no body bends in a way a body cannot', 'weight': 'must'},
+    {'check': 'the place and the light', 'pass_when': 'the place, its fixed things and their colours, and the direction and brightness of the light stay the same from the first frame to the last, the last seconds included', 'weight': 'must'}]
+
+
 def take_lines_for(snapshot):
     """The fixed take lines plus those the snapshot earns (design/101 M4, design/104 C5, design/110 F5, F6, design/111 F8, F16, design/112 S4)."""
+    if snapshot.get('kind') == 'guide':
+        return GUIDE_TAKE_LINES
     return (TAKE_LINES + ([AMBIENT_LINE] if ambient_moves(snapshot) else []) + ([LIGHT_KEPT] if snapshot.get('light') else [])
             + ([TOOL_KEPT] if snapshot.get('tool_lines') else []) + ([HEADING_KEPT] if snapshot.get('heading_lines') else []) + ([BACKGROUND_KEPT] if snapshot.get('fixed_line') else [])
             + ([PERSON_KEPT] if snapshot.get('person_lines') else []) + ([CAMERA_STEADY] if 'camera_move' in snapshot and not (snapshot.get('camera_move') or '').strip() else []))
@@ -173,7 +183,7 @@ def _model_take_check(snapshot, video_path, sha256, transport_factory):
         if not keys.pool('gemini', settings()):
             record['error'] = 'no Gemini key on the server'
             return record
-        plan = '\n'.join(['The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
+        plan = '\n'.join([('The edit asked for: ' + str(snapshot.get('prompt') or '')[:4000]) if snapshot.get('kind') == 'guide' else 'The motion asked for: ' + str(snapshot.get('motion_prompt') or '')[:2000]] +
                          [f"Planned change, {c['at_s'][0]}–{c['at_s'][1]} s: {c['what']}" for c in snapshot.get('changes') or []] +
                          (['What stays unchanged: ' + str(snapshot['continuity_notes'])[:1000]] if snapshot.get('continuity_notes') else []) +
                          (['What must move around the action (the ambient line): ' + str(snapshot['ambient'])[:1000]] if ambient_moves(snapshot) else []) +

@@ -518,12 +518,20 @@ def check_take(job, result):
     try:
         snapshot = json.loads(store.get(job['request']['request_key']).decode('utf-8'))
         record = image_check.run_take_check(snapshot, SPOOL / str(job['id']) / 'output.mp4', result['sha256'], transport_factory)
+        if snapshot.get('kind') == 'guide':   # integration step D: the two checks that block, the sheets and the scorecard
+            from . import guide_worker
+            record.update(guide_worker.take_checks(snapshot, SPOOL / str(job['id']) / 'output.mp4', store, job['run_id'], str(job['id']), record))
         with connect() as conn:
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             k = f"{job['run_id']}/visuals/session.json"
             session = json.loads(store.get(k).decode('utf-8'))
             session.setdefault('take_checks', {})[str(job['id'])] = record
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
+            if snapshot.get('kind') == 'guide':
+                from . import generations
+                generations.add(conn, job['run_id'], snapshot['shot_id'], 'guide', {'kind': 'take checked', 'job_id': str(job['id']), 'key': result.get('key'), 'sha256': result.get('sha256'),
+                                                                                    'blocked': record.get('blocked'), 'scorecard': record.get('scorecard'), 'watch': record.get('watch'), 'not_read': record.get('not_read'),
+                                                                                    'sheet_key': record.get('sheet_key'), 'pair_key': record.get('pair_key')})
     except Exception:   # a take is never held back by its check
         return
 
@@ -759,7 +767,10 @@ def tick():
         if due:
             check_image(job, outcome[1])   # design/92: after the transaction, no lock held while Gemini reads it
         busy = True
-    from . import worker
+    from . import guide_worker, worker
+    if worker.STOP:
+        return busy
+    busy = guide_worker.tick() or busy   # integration steps B to D: a guide's still, then one Blender render at a time
     if worker.STOP:
         return busy
     with connect() as conn:
