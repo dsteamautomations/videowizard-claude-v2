@@ -49,3 +49,7 @@ New: `test_step_e_film_pure.py` (9), `test_step_e_plan_pure.py` (8), seven ladde
 - The treatment's estimate still prices an AI video shot's still at the film's own picture price, not GPT image's; the re-run allowance is a separate line, not part of the estimate.
 - The lens, the camera position, the pace and the hand are in the scene description, not the plan; the plan carries only the kind of shot.
 - Nothing here has run on the server; the page was not tested (SK: unit tests only until the end).
+
+## Deployed
+
+12 Nov 2026, on SK's yes: main 75696d5 (design/180, 181, 182 together) live as server 0.94.0, minimum plugin 0.80.0. Migration 014 applied at the server's start; server then workers restarted with no run open; Blender 5.2.3 answers for the service user. No test run before the deployment (SK: the first real test is the users', on the Mac). Not verified live: any guide, still or take.
