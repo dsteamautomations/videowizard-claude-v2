@@ -128,6 +128,19 @@ def start(conn, user, run, outputs, policy, again):
             clips = [c for c in clips if c['id'] not in excluded]
             conn.execute("update vw2_runs set film = coalesce(film, '{}'::jsonb) || jsonb_build_object('library_skipped', %s::jsonb) where id=%s",
                          (Jsonb([f for f in found if f['clip_id'] in skipped]), run['id']))
+    # defect 49 (VW-22, 12 Nov 2026): a clip skipped because the client's library already holds it is left out of this film for good. It is recorded
+    # as its own output (as `exclude` records one), so the stage can finish, and a later start does not send it to the model after all (VW-21: 45 paid jobs).
+    library = set() if again else {f['clip_id'] for f in ((conn.execute('select film from vw2_runs where id=%s', (run['id'],)).fetchone() or {}).get('film') or {}).get('library_skipped') or []}
+    if library:
+        excluded |= library
+        clips = [c for c in clips if c['id'] not in library]
+        have = {o['unit'] for o in outputs if o['stage'] == 'analysis'}
+        for cid in sorted(library - have):
+            core.output(conn, user, run, {'stage': 'analysis', 'unit': cid, 'files': [],
+                                          'summary': {'excluded': True, 'library_skipped': True, 'note': "already in the client's library: skipped on the operator's word, offered from the library instead"}})
+        if not clips:
+            return {'created': [], 'reused': [], 'excluded': sorted(excluded), 'clips': 0, 'library_skipped': len(library),
+                    'next': "Every clip of this film is already in the client's library: nothing to analyse; they are offered from the library."}
     if not clips:
         raise Problem(422, 'ANALYSIS_POLICY', 'Every clip is excluded; nothing to analyse.')
     open_jobs = conn.execute("select unit from vw2_jobs where run_id=%s and stage='analysis' and status in ('queued','running','submission_unknown','storage_pending')",
