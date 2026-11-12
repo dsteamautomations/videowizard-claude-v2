@@ -43,3 +43,7 @@ A rejected clip blocking the analysis stage until the operator acts: retired for
 - No page shows the analysed clips, so the name and reason appear in the chat and in the decision log only.
 - The first cut does not repeat the list of clips set aside.
 - Versions are not raised yet; that is done when the set is committed.
+
+## Deployed
+
+12 Nov 2026, on SK's "Yes, deploy all": main 3eca28d live as server 0.95.0, plugin 0.81.0 (minimum 0.81.0), together with design/185. No run's job was running at the restart. Not verified live yet: VW-21 is the first real use.

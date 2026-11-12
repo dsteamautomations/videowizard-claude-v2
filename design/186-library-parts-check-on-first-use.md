@@ -88,3 +88,7 @@ Also not covered, found while building:
 - There is no size limit on a drawn take in the application, so "over the existing limit the finish is left off" has nothing to act on; the take's size is recorded as before.
 - The instruction for the main assistant is in `commands/vw.md` only, not in the visuals instructions (`v3.json`).
 - Blur works on HTML elements moved by `transform`, not on shapes inside an `<svg>`; the skill says so.
+
+## Deployed
+
+12 Nov 2026, on SK's "Yes, deploy all": main 3eca28d live as server 0.95.0, plugin 0.81.0 (minimum 0.81.0), together with design/185. No run's job was running at the restart. Not verified live yet: VW-21 is the first real use.
