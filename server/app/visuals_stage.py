@@ -377,6 +377,14 @@ def _short_text(text, n=160):
     return t if len(t) <= n else t[:n - 1] + '…'
 
 
+RERUN_SHARE = 0.3   # integration step E: about 1.3 takes for every AI video shot made (the consultant's two films: 1.25 to 1.4); replaced by this film's own figure in step F
+
+
+def rerun_allowance(video_seconds, pr):
+    """What the takes that will have to be made again are likely to cost, shown beside the estimate, never hidden inside it."""
+    return round(float(video_seconds) * RERUN_SHARE * pr['video_inr_per_s'], 2)
+
+
 def prices():
     s = settings()
     return {'image_inr': float(s.VISUALS_PRICE_IMAGE_INR), 'video_inr_per_s': float(s.VISUALS_PRICE_VIDEO_INR_PER_S), 'usd_inr': float(s.VISUALS_USD_INR)}
@@ -556,7 +564,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         totals['frozen_limit'] = float(session.get('frozen_limit') or FROZEN_SHARE)
     pr = prices()
     estimate = round(totals['images'] * image_price_inr(run) + video_seconds * pr['video_inr_per_s'], 2)
-    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
+    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'rerun_allowance_inr': rerun_allowance(video_seconds, pr), 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
               **({'direction': str(document['direction']).strip()} if str((document or {}).get('direction') or '').strip() else {})}   # design/124 Change 3
     if not str(quote or '').strip():   # the draft the page shows for approval
         record['lines'] = _carry_lines(session, record)   # design/124 Change 6

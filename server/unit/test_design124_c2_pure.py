@@ -81,7 +81,7 @@ def test_a_footage_shot_needs_no_information_progression_and_a_generated_one_is_
     check(plan([{**pshot('FT1', 0, 500, 'footage'), 'information_progression': ''}, pshot('IM2', 500, 1000, 'image')]))
     with pytest.raises(ValueError, match='shot IM1: describe the composition or information progression'):
         check(plan([{**pshot('IM1', 0, 500, 'image'), 'information_progression': ''}, pshot('IM2', 500, 1000, 'image')]))
-    assert '(the 10 s limit and `information_progression` among them)' in PART['plan']
+    assert '(the 15 s limit and `information_progression` among them)' in PART['plan']   # integration step E: 15 s (was 10)
 
 
 # ---------- 6. a drawn shot: named at plan time, finished after the picture search ----------

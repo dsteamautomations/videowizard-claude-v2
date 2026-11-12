@@ -133,7 +133,7 @@ def test_9a_no_retired_sentence_is_in_the_text_the_ai_reads():
 def test_9_10_the_new_wording_is_there():
     st = next(s for s in V3['stages'] if s['name'] == 'visuals')
     later = next(p for p in st['parts'] if p['name'] == 'later')['text']
-    assert 'then the start image, with an end request only when `end_state_exact` is true;' in later
+    assert 'the older `bind`, `packet`, start image, `prepare-take` and `take` are retired for them' in later   # design/181: the guide replaces them (was: 'then the start image, with an end request only when end_state_exact is true')
     assert 'A labelled diagram is drawn (HyperFrames on a motion film)' in st['prompt'] and 'with `vw visuals draw` only on a `--drawn svg` film' in st['prompt']
 
 

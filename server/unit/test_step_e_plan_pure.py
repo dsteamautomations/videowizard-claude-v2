@@ -81,3 +81,24 @@ def test_a_kind_of_shot_with_no_recipe_cannot_be_named_in_the_plan():
         check(d)
     vs1(d)['recipe'] = 'walker'
     check(d)
+
+
+# ---------- the treatment's cost, and the instructions ----------
+
+def test_the_takes_likely_to_be_made_again_are_shown_beside_the_estimate():
+    from app import visuals_stage as VS
+    assert VS.RERUN_SHARE == 0.3 and VS.rerun_allowance(40, {'video_inr_per_s': 8.0}) == 96.0 and VS.rerun_allowance(0, {'video_inr_per_s': 8.0}) == 0.0
+    import inspect
+    assert "'rerun_allowance_inr': rerun_allowance(video_seconds, pr)" in inspect.getsource(VS.treatment)
+
+
+def test_the_instructions_say_fifteen_seconds_the_guide_and_no_longer_teach_the_older_take():
+    import json
+    from pathlib import Path
+    st = next(s for s in json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    text = ' '.join([st['prompt'], *st['steps'], *(p['text'] for p in st['parts'])])
+    assert 'A take is 3 to 15 seconds' in text and 'AI video 1 to 15 s on screen' in text and 'every take is an edit of a guide, 3 to 15 s' in text and '(the 15 s limit and' in text
+    assert '`vw:guide` skill' in text and '`vw guide shoot --shot S --quote' in text and 'vw guide cause' in text and 'one still per AI video shot' in text
+    for gone in ('3 to 10 s', '2 to 10 s', 'makes 3 to 10 seconds', 'vw visuals prepare-take --shot S --start', 'vw visuals take --shots all', 'never a start image before the packet', 'clip-from-frame'):
+        assert gone not in text, gone
+    assert 'not yet available as AI video' in text and 'two rejected takes from one camera' in text

@@ -377,7 +377,7 @@ def test_steps_and_command_text_carry_the_new_flow():
     joined = ' '.join(steps)
     assert 'hand-made' not in joined and 'shall the editor' not in joined and 'on their instruction only' in joined   # the operator's file stays, never planned
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert 'take --shots all' in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' not in md
+    assert 'vw guide scene' in md and 'guide shoot' in md and 'take --shots all' not in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' not in md
     assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap' not in md and 'visuals page' in md and 'vw visuals reject' in md and 'vw visuals feedback' in md
 
 
@@ -570,7 +570,7 @@ def test_steps_and_command_text_carry_the_long_blank_the_ai_run_and_the_continui
     """design/84 V3, design/85 G1-G3."""
     vis, opt, doc = json.dumps(STAGES['visuals']), json.dumps(STAGES['options']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'ai_run' in vis and '3–5 s' in STAGES['visuals']['prompt'] and 'E2' in opt and 'blank over 12 s' in opt
-    assert '--continuity' in doc and '2 to 10 s on screen' in doc and 'the steps name the flags to act on' in doc   # design/125 P10; design/142: the AI-run rule is retired
+    assert '--continuity' not in doc and '1 to 15 s on screen' in doc and 'the steps name the flags to act on' in doc   # design/125 P10; design/142: the AI-run rule is retired; integration step E: the guide take, 1 to 15 s (was 2 to 10 s and the continuity line of prepare-take)
     assert 'end_answer' in vis and '--variants 2' in vis and 'One change, two at most' in vis and 'close reference' in vis and 'checks every picture' in vis   # design/86 K1, K4, K5, K8
     assert '--end-answer' in doc and '--variants 2' in doc and 'one change per edit' in doc
 
