@@ -106,3 +106,7 @@ Checked: `server/tests/check_chat_card.py` (stand-ins for the decision functions
 - A guard against accepting without reading.
 - Measuring the real time on a real 20-gap plan; first seen on the next user run.
 - Keeping half-filled answers when the browser store is not allowed.
+
+## Deployed
+
+13 Nov 2026: live as server 0.97.0, plugin 0.83.0 (minimum 0.83.0), main 8fc6106. Server and worker restarted; no job was running. Not yet seen on a real run.

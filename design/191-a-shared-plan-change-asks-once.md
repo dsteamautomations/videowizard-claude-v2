@@ -127,3 +127,7 @@ Not covered, beyond section 9:
 - `server/tests/test_visuals.py` (needs Docker; not running on this PC on 13 Nov): not run against this change.
 - The page's badge and list: written, not opened in a browser.
 - A run that is in the middle of a reference round's first step at the deployment: the first-step answers kept in the chat so far are asked again once (the kept shape changed).
+
+## 13. Deployed
+
+13 Nov 2026: live as server 0.97.0, plugin 0.83.0 (minimum 0.83.0), main 8fc6106, with design/190. Not yet seen on a real run.
