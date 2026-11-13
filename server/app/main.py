@@ -1342,6 +1342,23 @@ class ChatAnswer(Write):   # design/188: the operator's answer to the one decisi
     choice: str = Field(min_length=1, max_length=120)
     quote: str = Field(default='', max_length=2000)
     notes: str = Field(default='', max_length=4000)
+    one: bool = False   # design/190: what comes next is asked one at a time, never on a card
+
+
+class ChatNext(Write):   # design/190: `one` asks the treatment's lines and the plan's gaps one at a time (a machine that cannot show the card)
+    one: bool = False
+
+
+class CardEntry(Strict):
+    n: int = Field(ge=1, le=40)
+    choice: Literal['accept', 'change']
+    notes: str = Field(default='', max_length=4000)
+
+
+class CardAnswers(Write):   # design/190: every answer of one card, recorded in one call
+    card: str = Field(min_length=6, max_length=40)
+    answers: list[CardEntry] = Field(min_length=1, max_length=40)
+    one: bool = False
 
 
 class MotionFinish(Write):   # design/186: the finish of a drawn shot taken away or put back
@@ -1399,15 +1416,21 @@ def visuals_motion_render(run_id: UUID, body: Draw, user=User, conn=DB):
 
 
 @app.post('/api/runs/{run_id}/visuals/chat/next')
-def visuals_chat_next(run_id: UUID, body: Write, user=User, conn=DB):   # design/188: one decision at a time, in the chat
+def visuals_chat_next(run_id: UUID, body: ChatNext, user=User, conn=DB):   # design/188: one decision at a time, in the chat; design/190: or one card
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.next_item(conn, storage(), user, run, outputs))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.next_item(conn, storage(), user, run, outputs, body.one))
+
+
+@app.post('/api/runs/{run_id}/visuals/chat/card')
+def visuals_chat_card(run_id: UUID, body: CardAnswers, user=User, conn=DB):   # design/190
+    from . import chat_flow
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.card_answer(conn, storage(), user, run, outputs, body.card, [a.model_dump() for a in body.answers], body.one))
 
 
 @app.post('/api/runs/{run_id}/visuals/chat/answer')
 def visuals_chat_answer(run_id: UUID, body: ChatAnswer, user=User, conn=DB):
     from . import chat_flow
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes))
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.answer(conn, storage(), user, run, outputs, body.item, body.choice, body.quote, body.notes, body.one))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/finish', status_code=201)

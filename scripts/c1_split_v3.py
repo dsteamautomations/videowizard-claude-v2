@@ -92,6 +92,10 @@ if __name__ == '__main__':
         prompt = d181(prompt, parts)
         from d188_wording_v3 import apply as d188   # design/188: the operator's decisions in the chat, one at a time
         prompt = d188(prompt, parts)
+        from d190_wording_v3 import apply as d190   # design/190: the treatment and the plan on one card
+        prompt = d190(prompt, parts)
+        from d191_wording_v3 import apply as d191   # design/191: a change of the plan's shared part is asked once
+        prompt = d191(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

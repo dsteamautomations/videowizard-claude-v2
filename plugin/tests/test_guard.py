@@ -105,7 +105,7 @@ def test_connectors_browser_and_subagents_are_blocked(tmp_path):
 def test_questions_task_list_and_tool_search_are_allowed_and_the_web_needs_a_yes(tmp_path):
     runs = active(tmp_path)
     for tool, inp in (('AskUserQuestion', {'questions': []}), ('TodoWrite', {'todos': []}), ('TodoRead', {}),
-                      ('mcp__ccd_turn__update_plan', {'items': []}), ('mcp__ccd_turn__wrap_up', {'recap': 'x'}), ('mcp__ccd_view__show_pane', {}),
+                      ('mcp__ccd_turn__update_plan', {'items': []}), ('mcp__ccd_turn__wrap_up', {'recap': 'x'}), ('mcp__ccd_view__show_pane', {}), ('mcp__visualize__show_widget', {'widget_code': '<div></div>'}),
                       ('ToolSearch', {'query': 'select:WebSearch'})):
         assert guard(tool, inp, tmp_path)[0] == 0, tool
     assert guard('WebSearch', {'query': 'rat-trap bond'}, tmp_path)[0] == 2   # design/48 O.1: no recorded yes
@@ -198,9 +198,9 @@ def test_shell_characters_inside_a_quoted_argument_are_not_chaining(tmp_path):
     code, err = guard('Bash', {'command': f'python "{vw_path}" stage brief record --quote "same as last time & I approve <all of it> | yes"'}, tmp_path)
     assert code == 0, err
     code, err = guard('Bash', {'command': f'python "{vw_path}" stage brief record --quote "yes" && rm -rf /'}, tmp_path)
-    assert code == 2 and 'chaining' in err
+    assert code == 2 and 'one vw command per call' in err
     code, err = guard('Bash', {'command': f'python "{vw_path}" next > /tmp/x'}, tmp_path)
-    assert code == 2 and 'chaining' in err
+    assert code == 2 and 'one vw command per call' in err
 
 
 def test_files_inside_the_run_may_be_sent_or_revealed_to_the_operator(tmp_path):

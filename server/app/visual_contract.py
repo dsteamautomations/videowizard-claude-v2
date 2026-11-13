@@ -1428,6 +1428,17 @@ def gap_digest(plan, gap):
     return digest(content)
 
 
+def gap_own_digest(plan, gap):
+    """design/191: the gap's own content alone (the gap and the elements it uses, without their notes): `gap_digest` without the part every gap shares."""
+    used = {eid for scene in all_scenes(gap) for shot in scene['shots'] for eid in shot['element_ids']}
+    return digest({'gap': note_free_gap(gap), 'elements': note_free_elements([e for e in plan['elements'] if e['id'] in used])})
+
+
+def shared_digest(plan):
+    """design/191: the part every gap shares (the foundation and the sequence rules)."""
+    return digest({'foundation': plan['foundation'], **({'sequence_rules': plan['sequence_rules']} if plan.get('sequence_rules') else {})})
+
+
 def all_scenes(gap):
     return [scene for choice in gap.get('choices', []) for scene in choice['scenes']] if gap.get('choices') else gap['scenes']
 

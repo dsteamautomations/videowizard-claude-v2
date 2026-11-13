@@ -176,7 +176,9 @@ def duplicates_decision(found, choice):
     if choice not in ('keep', 'skip'):
         lines = '; '.join(f"{f['name']} is {f['kind']} as {f['library_name']} (from {', '.join(map(str, f['films'] or []))})" for f in found)
         raise Problem(409, 'LIBRARY_REPEATS', f'The client\'s library already holds {len(found)} of these clips: {lines}. Ask the operator once: analyse them anyway, '
-                                              'or skip them (left out of this film, offered from the library in the library round)? Then `vw analysis start --duplicates keep|skip`.',
+                                              'or skip them? Say the difference plainly: skipped is free, and every skipped clip is offered again in the library round with its description, '
+                                              'to be matched to the scenes by eye, without the model saying which lines it fits; analysed anyway is paid, and the model says which lines '
+                                              'each clip fits. Then `vw analysis start --duplicates keep|skip`.',
                       repeats=found)
     return [f['clip_id'] for f in found] if choice == 'skip' else []
 
@@ -197,8 +199,14 @@ def library_round(conn, store, run, outputs, session, save_package):
     if not run.get('client_id'):
         return {'candidates': [], 'note': 'no client on this run: no library'}
     pk = session_package(store, session)
-    own = {c.get('sha256') for c in (session['package'].get('clips') or {}).values()}
     skipped = {f.get('name') for f in (run['film'] or {}).get('library_skipped') or []}
+    skipped_ids = {f.get('clip_id') for f in (run['film'] or {}).get('library_skipped') or []}
+    # VW-22 (12 Nov 2026): a skipped clip is one of this film's own media files (it was uploaded, then left out of the analysis because the library
+    # holds it). Counting it as "this batch's own file" left every skipped clip out of the round, so "take it from the library" offered nothing.
+    # Own, here, is what this film analysed itself. A clip the round added before (library_from) is not own either, so the round can be run again.
+    mine = {cid: c for cid, c in (session['package'].get('clips') or {}).items() if not c.get('library_from')}
+    own = {c.get('sha256') for cid, c in mine.items() if cid not in skipped_ids}
+    here = {c.get('sha256'): c for cid, c in mine.items() if cid in skipped_ids}   # the skipped ones: their file is in this run's own media
     rejected = set(session.get('library_rejected') or [])
     rows = [r for r in generic_rows(conn, run['client_id'], 'clip-log-v1')] + [dict(r) for r in conn.execute(
         'select * from vw2_library where client_id=%s and not generic and not missing and name = any(%s)', (run['client_id'], sorted(skipped))).fetchall()] if skipped else \
@@ -212,15 +220,17 @@ def library_round(conn, store, run, outputs, session, save_package):
         if r['sha256'] in own or r['sha256'] in seen or not r.get('evidence_key'):
             continue
         seen.add(r['sha256'])
-        if not store.exists(r['media_key']):
-            conn.execute('update vw2_library set missing=true, updated_at=now() where id=%s', (r['id'],))
+        media_key = f"{run['id']}/media/{here[r['sha256']]['name']}" if r['sha256'] in here else r['media_key']   # this film's own copy when it has one
+        if not store.exists(media_key):
+            if media_key == r['media_key']:
+                conn.execute('update vw2_library set missing=true, updated_at=now() where id=%s', (r['id'],))
             continue
         try:
             log = json.loads(store.get(r['evidence_key']).decode('utf-8')).get('log') or {}
         except Exception:   # noqa: BLE001
             continue
         film_from = (r.get('films') or ['?'])[0]
-        clip = {'id': r['sha256'][:16], 'name': r['name'], 'sha256': r['sha256'], **(r.get('clip') or {}), 'key': r['media_key'], 'library_from': film_from}
+        clip = {'id': r['sha256'][:16], 'name': r['name'], 'sha256': r['sha256'], **(r.get('clip') or {}), 'key': media_key, 'library_from': film_from}
         solver.solve(log, policy, clip, timeline)
         d = r.get('description') or {}
         for sub in log.get('sub_clips') or []:

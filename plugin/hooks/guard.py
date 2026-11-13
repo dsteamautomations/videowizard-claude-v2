@@ -15,7 +15,7 @@ WRITE_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
 READ_TOOLS = ('Read', 'Glob', 'Grep')
 FILE_TOOLS = ('SendUserFile', 'mcp__ccd_host__reveal_path')   # design/49 V5: show a run file to the operator
 ALWAYS = ('AskUserQuestion', 'TodoWrite', 'TodoRead', 'ToolSearch',
-          'mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_view__show_pane',
+          'mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_view__show_pane', 'mcp__visualize__show_widget', 'mcp__visualize__read_me',   # design/190: the card of a whole step
           'SubagentHandback')   # design/148 A3 (SK, 3 Nov 2026): the plugin's own helpers report back; a message to a helper stays blocked
 WEB_TOOLS = ('WebSearch', 'WebFetch')
 WEB_MINUTES = 10   # design/48 O.1: one recorded yes covers the search and the fetches on that subject for ten minutes
@@ -112,8 +112,10 @@ def decide(tool, inp, cwd, vw):
         if not m or Path(script).resolve() != vw:
             return f'Blocked: the operator may only run the vw tool: python "{vw}" <command>. For anything else, tell the operator or file a defect.'
         bare = re.sub(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'', '""', m.group(4))   # design/49 V4: an operator's quoted words may hold & | < >
-        if re.search(r'[;&|`<>]|\$\(', bare):
-            return 'Blocked: no command chaining or redirection; run one vw command at a time.'
+        found = sorted(set(re.findall(r'&&|\|\||2>&1|[;&|`<>]|\$\(', bare)))
+        if found:   # VW-22 (12 Nov 2026): the block names what it found, so the next call is right the first time
+            return ('Blocked: one vw command per call, and nothing else in it. Found ' + ' '.join(found) + ' outside quotes. Do not join commands (&&, ;), pipe (|), '
+                    "redirect (>, <, 2>&1) or use backticks or $(...); put the operator's words inside double quotes; run the next command as its own call.")
         return None
     if tool in FILE_TOOLS:   # design/49 V5: a file inside the run may be shown to the operator
         allowed = active_run(cwd)
@@ -133,6 +135,13 @@ def decide(tool, inp, cwd, vw):
             t0 = (t0 if t0.is_absolute() else cwd / t0).resolve()
             skills = (vw.parent.parent / 'skills').resolve()
             if t0 == skills or skills in t0.parents:
+                return None
+    if tool in READ_TOOLS:   # VW-22 (12 Nov 2026): an answer of the tool too long for one message is saved by Claude Code under the session's own tool-results folder; reading it back is reading the tool's answer
+        raw1 = inp.get('file_path') or inp.get('path') or ''
+        if raw1:
+            t1 = Path(raw1).expanduser().resolve()
+            projects = (Path.home() / '.claude' / 'projects').resolve()
+            if projects in t1.parents and 'tool-results' in t1.parts:
                 return None
     if tool in WRITE_TOOLS or tool in READ_TOOLS:
         allowed = active_run(cwd)
@@ -168,7 +177,7 @@ def detail_of(tool, inp, reason):
         if inp.get(k):
             return str(inp[k])[:120]
     if inp.get('command'):
-        return str(inp['command'])[:80]
+        return str(inp['command'])[:400]   # the whole command, so a block can be understood afterwards (was 80 characters)
     return ''
 
 

@@ -1658,7 +1658,7 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1666,7 +1666,7 @@ _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
-    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': set(), 'decide': {'item', 'choice', 'quote', 'notes'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
+    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back'},   # design/177: the page's step-2 actions
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
@@ -1848,6 +1848,8 @@ def cmd_visuals(a):
         if out.get('warnings'):
             open_ = sum(1 for w in out['warnings'] if not w.get('answered'))
             line += f"; {len(out['warnings'])} warning(s), {open_} unanswered: answer each in its shot's warning_answers (kind and answer), never in the purpose"
+        if out.get('shared_change'):   # design/191: one question for every gap whose own shots are unchanged
+            line += '; ' + out['shared_change']
         emit(out, 0 if out.get('status') != 'rejected' else 2, line)
     if a.what == 'treatment' and (getattr(a, 'accept', None) or getattr(a, 'send_back', None)):   # design/124 Change 6: the operator's verdict per line
         acc = [x.strip() for x in (getattr(a, 'accept', None) or '').split(',') if x.strip()]
@@ -1888,21 +1890,51 @@ def cmd_visuals(a):
         emit({'records': out.get('records', 0), 'file': 'work/visuals/feedback.yaml'}, 0, f"{out.get('records', 0)} records in work/visuals/feedback.yaml")
     if a.what == 'select' and a.gap:
         emit(write(base + '/select', {'choices': {a.gap: a.choice}}))
-    if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
-        out = write(base + '/chat/next', {})
-        item = out.get('item')
+    def chat_line(out):   # design/188: the one decision as a line, its files saved in the run folder; or what is being made
+        item, card = out.get('item'), out.get('card')
+        if card:   # design/190: the whole step on one card; its page is saved as a file (read it, never this answer, for the card's text)
+            folder = ws / 'work' / 'chat'
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / f"{card['id']}.html").write_text(card.pop('widget_code'), encoding='utf-8')
+            card['card_file'], card['answers_path'] = str(folder / f"{card['id']}.html"), str(folder / f"{card['id']}.answers.json")   # full paths, for reading and writing; the command takes `answers_file`
+            return (f"{card['step']}: {card['entries']} entries on one card ({card['id']}). Say: \"{card['say_before']}\" Card file: {card['card_file']}. "
+                    f"Write the answers to: {card['answers_path']}. Then: vw visuals card --file {card['answers_file']}. " + out['how'])
         if not item:
-            emit(out, 0, ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', ''))
+            return ' '.join(out.get('working') or []) + (' ' if out.get('working') else '') + out.get('say_last', '')
         (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
-        paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show, saved in the run folder
+        paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show
         item['show_files'] = paths
-        emit(out, 0, f"{item['position']}. {item['question']} " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
-             + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
+        return (f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
+                + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
+    if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
+        out = write(base + '/chat/next', {'one': bool(a.one)})
+        emit(out, 0, chat_line(out))
+    if a.what == 'card':   # design/190: every answer of one card in one call. The answers file is the copy kept here until the server has them; then it is marked sent
+        given = Path(a.file or '')
+        path = given if given.is_absolute() else ws / given
+        sent = path.with_name(path.name.replace('.answers.json', '') + '.sent.json')
+        if not a.file or not path.is_file():
+            emit({'action': 'refused', 'message': (f'These answers were sent before ({sent.name}); nothing more to send. Run `vw visuals next`.' if a.file and sent.is_file()
+                                                   else 'Give the answers file of the card: `vw visuals card --file <answers_file>` (the file `vw visuals next` named).')}, 2)
+        doc = load_json(path)
+        rows = (doc or {}).get('answers') if isinstance(doc, dict) else None
+        if not (isinstance(doc, dict) and isinstance(doc.get('card'), str) and isinstance(rows, list) and rows
+                and all(isinstance(r, dict) and isinstance(r.get('n'), int) and r.get('choice') in ('accept', 'change') for r in rows)):
+            emit({'action': 'refused', 'message': f'{path.name} must be {{"card": "<id>", "answers": [{{"n": 1, "choice": "accept"}}, {{"n": 2, "choice": "change", "notes": "<their words>"}}]}}: '
+                                                  'the part from { to } of the "Card answers:" message, as it is.'}, 2)
+        body = {'card': doc['card'], 'answers': [{'n': r['n'], 'choice': r['choice'], 'notes': str(r.get('notes') or '')} for r in rows], 'one': bool(a.one)}
+        rid = str(uuid.uuid5(uuid.NAMESPACE_URL, 'vw-card:' + json.dumps(body, sort_keys=True, ensure_ascii=False)))   # the same answers sent again are the same request: recorded once
+        out = call('POST', base + '/chat/card', json={'request_id': rid, **body})
+        try:
+            path.replace(sent)   # spent: this file is never sent again
+        except OSError:
+            pass
+        emit(out, 0, (out.get('then') or 'Recorded.') + ' ' + chat_line(out))
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
         if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
             emit({'action': 'refused', 'message': 'Give the item and the button chosen: `vw visuals decide --item <id from vw visuals next> --choice <the button\'s choice> --quote "<their words>"`.'}, 2)
-        out = write(base + '/chat/answer', {'item': a.item, 'choice': a.choice, 'quote': a.quote or '', 'notes': a.notes or ''})
-        emit(out, 0, out.get('then'))
+        out = write(base + '/chat/answer', {'item': a.item, 'choice': a.choice, 'quote': a.quote or '', 'notes': a.notes or '', 'one': bool(a.one)})
+        emit(out, 0, 'Recorded. ' + (out.get('then') or '') + ' ' + chat_line(out))   # the answer carries the next decision: one call per answer
     if a.what == 'accept':
         emit(write(base + '/accept', {'gap_ids': a.gaps, 'quote': a.quote}))
     if a.what == 'elements':   # design/73 R1: where each element is seen in the footage
@@ -2653,12 +2685,13 @@ def cmd_master(a):
         out = call('GET', base + '/slides')
         out['review_page_url'] = review_page_url(m['code'])   # design/62: the default place to decide
         emit(out, 0, f"{out.get('answered', 0)} of {out.get('of', 0)} answered; waiting: " + (', '.join(out.get('waiting') or []) or 'none')
-             + f". Review page: {out['review_page_url']}")
+             + f". Review page: {out['review_page_url']}. In chat: `vw master decide --slide <label> --action KEEP|REJECT|TRIM [--note …] [--edit \"in:+12,out:-6\"]`, "
+               'or a file that is a list with one object per answer, [{"slide": "2.1", "action": "KEEP", "note": "", "edit": ""}]: `vw master decide --file out/decisions.json`.')
     if a.what == 'decide':
         if a.file:   # design/44 8.1: every answer in one call, in order, stopping at the first refusal
             answers = _json_file(m, a.file)
             if not isinstance(answers, list):
-                emit({'action': 'refused', 'message': f'{a.file} must be a list of {{slide, action, note, edit}}.'}, 2)
+                emit({'action': 'refused', 'message': f'{a.file} must be a list with one object per answer: [{{"slide": "2.1", "action": "KEEP", "note": "", "edit": ""}}] (action KEEP, REJECT or TRIM; edit only for a TRIM, like "in:+12,out:-6").'}, 2)
             recorded, last = [], {}
             for i, ans in enumerate(answers):
                 body = {'request_id': str(uuid.uuid4()), 'slide': slide_label(ans.get('slide', '')), 'action': ans.get('action'), 'note': ans.get('note') or '',
@@ -3107,6 +3140,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
+    s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')
     s.add_argument('--again', action='store_true', help='approve: a rejected picture approved after all (design/177)')

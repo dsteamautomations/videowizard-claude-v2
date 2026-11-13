@@ -119,6 +119,18 @@ def clip_key(run, clip):
     return clip.get('key') or f"{run['id']}/media/{clip['name']}"
 
 
+def skipped_note(run):
+    """Defect 49 follow-up (VW-22, 12 Nov 2026): what the assistant is told when clips were skipped at the analysis because the client's library holds
+    them. Without it the assistant read the thin coverage as lost footage and offered the operator a paid analysis or blanks; both are wrong."""
+    n = len((run.get('film') or {}).get('library_skipped') or [])
+    if not n:
+        return {}
+    return {'library_skipped': f"{n} of this film's clips were skipped at the analysis because the client's library already holds them. They are not lost and need no new "
+                               "analysis: the library round (`vw options library`) offers every one of them, generic or not, with its description, at no cost. A stored study says "
+                               "which lines of ITS film a clip fitted, not of this one, so these clips carry no line fits and the coverage figures here do not count them: match them "
+                               "to the scenes by their descriptions in that round. Never offer the operator a paid analysis of them, and never treat their scenes as blanks before the library round."}
+
+
 def library(conn, store, user, run, outputs):
     """design/147 L4: the library round, after the second look; one flow for the tool and a page."""
     from .. import brandlib
@@ -204,7 +216,7 @@ def prepare(conn, store, user, run, outputs):
     eligible = sum(1 for r in rows if r['eligibility'].startswith('ELIGIBLE'))
     return {'package': saved, 'beats': len(windows), 'clips': len(cards), 'sub_clips': len(rows), 'eligible_sub_clips': eligible, 'coverage': pk['coverage'],
             'learned_rules': len(rules), 'scenes_approved': bool(approved), 'pauses': len(plan['cuts']), 'sentences': len(narration['sentences']),
-            'next': prepare_next(bool(approved))}
+            **skipped_note(run), 'next': prepare_next(bool(approved))}
 
 
 def prepare_next(approved):
@@ -253,7 +265,7 @@ def set_scenes(conn, store, user, run, outputs, document, quote):
 
 def coverage(store, run):
     session = session_of(store, run)
-    return {'coverage': load_json(store, session['package']['key'])['coverage'], 'beats': session['package']['beats']}
+    return {'coverage': load_json(store, session['package']['key'])['coverage'], 'beats': session['package']['beats'], **skipped_note(run)}
 
 
 def _package(store, session):

@@ -28,7 +28,7 @@ from .planning.digest import digest
 from .storage import storage
 from .video_providers import motion_text, transfer
 from .visual_contract import script_people_warnings   # design/151 Q4 (re-exported for the tool)
-from .visual_contract import GAZE_CAMERA, take_seconds, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
+from .visual_contract import GAZE_CAMERA, take_seconds, STILL_MOVING_MAX_S, FROZEN_SHARE, _graphics_run, GRAPHIC_TYPES, STILL_TYPES, WARNING_PLAIN, all_scenes, answer_warnings, chosen_scenes, gap_digest, gap_own_digest, shared_digest, note_free_gap, need, route_of, routes, validate_plan, note_free_elements, note_free_scene
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
@@ -331,6 +331,24 @@ def propose(conn, store, user, run, outputs, document):
             scenes = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])['scenes']
         used = {route_of(sh) for sc in scenes for sh in sc['shots']}
         need(used <= said, f"gap {gap['gap_id']}: the plan uses {sorted(used)} but the treatment says {sorted(said)}; record a new treatment with the reason, or change the plan.")
+    new = new_version(store, run, session, plan, user, warnings)
+    version, identity = new['version'], new['plan_digest']
+    save_session(store, run, session)
+    from . import runlog
+    for e in plan_log(run, plan, version):   # design/145 L3
+        runlog.write(conn, e)
+    if new['kept_recorded']:   # design/191 A5
+        runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'gap ' + ', '.join(new['kept_recorded']), 'rule': f'visual plan v{version}',
+                            'entry': 'already recorded into the film and its own shots unchanged: the acceptance is kept through a change of the shared part, without asking again',
+                            'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None})
+    shared = sorted(session.get('shared_pending') or {})
+    return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']],
+            **({'shared_change': f"The part every gap shares changed. {len(shared)} gap(s) the operator had accepted keep their own shots ({', '.join(shared)}): the operator is asked ONE question for all of them "
+                                 '(`vw visuals next`). Do not ask them gap by gap.'} if shared else {})}
+
+
+def new_version(store, run, session, plan, user, warnings):
+    """A validated plan stored as the next version, and every approval carried into it (design/191). The session is changed, not saved."""
     version = len(session['versions']) + 1
     record = {'run_id': str(run['id']), 'version': version, 'source_plan_digest': session['source']['plan_digest'], 'document': plan,
               'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
@@ -338,20 +356,189 @@ def propose(conn, store, user, run, outputs, document):
     identity = digest(plan)
     session['versions'].append({'version': version, 'file': pk, 'plan_digest': identity, 'warnings': warnings})
     session['current'] = identity
-    # accepted gaps survive only if their scoped digest is unchanged
-    for gid, acc in list(session['accepted'].items()):
-        gap = next((g for g in plan['gaps'] if g['gap_id'] == gid), None)
-        if not gap or acc['digest'] != gap_digest(plan, gap):
-            session['accepted'].pop(gid)
-    for gid, rv in list((session.get('revisions') or {}).items()):   # design/76: a revision is answered once the gap is proposed changed
-        gap = next((g for g in plan['gaps'] if g['gap_id'] == gid), None)
-        if not gap or rv.get('digest') != gap_digest(plan, gap):
+    return {'version': version, 'plan_digest': identity, 'kept_recorded': _carry_acceptances(session, plan, version)}
+
+
+def _carry_acceptances(session, plan, version):
+    """design/191: what a new plan version does to the operator's approvals. A gap's acceptance stands when nothing it covers changed. When only the
+    part every gap shares changed (the foundation, the sequence rules) and the gap's own shots are as accepted, the acceptance waits behind ONE
+    question for all such gaps (`shared_pending`): until it is answered the gap counts as not accepted. When the gap's own content changed it is
+    asked again by itself, and the version it was accepted in is kept (`was_accepted`) so the question can say what changed. An acceptance from
+    before this release (no `own` fingerprint) is asked again on any change, as before.
+    Returns the gaps kept without asking: already recorded into the film, own content unchanged (section 11, A5)."""
+    gaps = {g['gap_id']: g for g in plan['gaps']}
+    shared = shared_digest(plan)
+    for gid, cs in list(session['choice_selections'].items()):   # section 11, B1: a chosen way the gap no longer offers is not a choice any more; it is asked again
+        if gid not in gaps or not any(c['id'] == (cs or {}).get('choice_id') for c in gaps[gid].get('choices') or []):
+            session['choice_selections'].pop(gid)
+    pending, was, kept = session.setdefault('shared_pending', {}), session.setdefault('was_accepted', {}), []
+    before = {**pending, **session['accepted']}
+    session['accepted'].clear()
+    pending.clear()
+    for gid, acc in before.items():
+        gap = gaps.get(gid)
+        if not gap:
+            continue
+        full = gap_digest(plan, gap)
+        if acc['digest'] == full:
+            session['accepted'][gid] = acc
+        elif acc.get('own') and acc['own'] == gap_own_digest(plan, gap):
+            if gid in session['recorded_gaps']:
+                session['accepted'][gid] = {**acc, 'digest': full, 'shared': shared, 'version': version, 'kept': 'recorded before; only the shared part changed'}
+                _restamp_bindings(session, gap, acc['digest'], full)
+                kept.append(gid)
+            else:
+                pending[gid] = acc
+        elif acc.get('version'):
+            was[gid] = acc['version']
+    for gid in [g for g in was if g not in gaps or g in session['accepted'] or g in pending]:
+        was.pop(gid)
+    for gid, rv in list((session.get('revisions') or {}).items()):   # design/76: a revision is answered once the gap is proposed changed; A2: its own content, not the shared part
+        gap = gaps.get(gid)
+        if not gap or (rv['own'] != gap_own_digest(plan, gap) if rv.get('own') else rv.get('digest') != gap_digest(plan, gap)):
             session['revisions'].pop(gid)
+    if not pending or (session.get('shared_revision') or {}).get('shared') != shared:   # the shared part was proposed changed: the operator's words on it are answered
+        session.pop('shared_revision', None)
+    return kept
+
+
+def _restamp_bindings(session, gap, old, new):
+    """A shot's references stay bound when its gap is accepted again with its own shots unchanged (design/191, section 6)."""
+    for scene in all_scenes(gap):
+        for sh in scene['shots']:
+            b = session['bindings'].get(sh['id'])
+            if b and b.get('gap_digest') == old:
+                b['gap_digest'] = new
+
+
+def _version_now(session):
+    return next((v['version'] for v in session['versions'] if v['plan_digest'] == session['current']), None)
+
+
+def _plan_version(store, session, version, cache=None):
+    cache = cache if cache is not None else {}
+    if version not in cache:
+        entry = next(v for v in session['versions'] if v['version'] == version)
+        cache[version] = load_json(store, entry['file']['key'])['document']
+    return cache[version]
+
+
+def _diff(a, b, path):
+    """What differs between two values of a plan, one line per changed leaf: where it is, what it was, what it is now. Rows that carry an id are
+    matched by it (a rule, a shot, an element); other lists by their place."""
+    if a == b:
+        return []
+    at = lambda k: f'{path} › {k}' if path else str(k)
+    if isinstance(a, dict) and isinstance(b, dict):
+        return [x for k in list(a) + [k for k in b if k not in a] for x in _diff(a.get(k), b.get(k), at(k))]
+    if isinstance(a, list) and isinstance(b, list) and (a or b) and all(isinstance(x, dict) and x.get('id') for x in a + b):
+        A, B = {x['id']: x for x in a}, {x['id']: x for x in b}
+        return ([f'{at(i)}: removed' for i in A if i not in B] + [f'{at(i)}: added' for i in B if i not in A]
+                + [x for i in A if i in B for x in _diff(A[i], B[i], at(i))])
+    if isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        return [x for i, (p, q) in enumerate(zip(a, b), 1) for x in _diff(p, q, at(i))]
+    text = lambda v: v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+    if isinstance(a, list) and isinstance(b, list) and all(not isinstance(x, (dict, list)) for x in a + b):   # a list that grew or shrank: the items taken out and put in
+        out = [f'{path}: removed "{_short_text(text(x), 90)}"' for x in a if x not in b] + [f'{path}: added "{_short_text(text(x), 90)}"' for x in b if x not in a]
+        return out or [f'{path}: the order changed']
+    A, B = ('' if a in (None, '', [], {}) else ' '.join(text(a).split())), ('' if b in (None, '', [], {}) else ' '.join(text(b).split()))
+    first = next((i for i, (x, y) in enumerate(zip(A, B)) if x != y), min(len(A), len(B)))
+    start = max(0, first - 30) if max(len(A), len(B)) > 90 else 0   # a long value: shown from just before where it differs, so the two sides are never the same words
+    show = lambda v: 'nothing' if not v else '"' + ('…' if start else '') + _short_text(v[start:], 90) + '"'
+    return [f'{path}: {show(A)} → {show(B)}']
+
+
+def shared_change(store, session, plan, cache=None):
+    """design/191: the one question's content: the gaps whose own shots are as accepted while the shared part changed, and every change of that part
+    between the version they were accepted in and this one. None when no gap waits so. Raises when the earlier version cannot be read."""
+    pending = session.get('shared_pending') or {}
+    gids = [g['gap_id'] for g in plan['gaps'] if g['gap_id'] in pending]
+    if not gids:
+        return None
+    versions, changes = sorted({pending[g]['version'] for g in gids}), []
+    for v in versions:   # gaps accepted in different versions: every change since each of them, once
+        old = _plan_version(store, session, v, cache)
+        changes += (_diff(old.get('foundation') or {}, plan.get('foundation') or {}, 'The foundation')
+                    + _diff(old.get('sequence_rules') or [], plan.get('sequence_rules') or [], 'The sequence rules'))
+    return {'gaps': gids, 'changes': list(dict.fromkeys(changes)) or ['The shared rules changed.'], 'from_version': versions[0]}
+
+
+def gap_changes(store, session, plan, gap, cache=None):
+    """design/191: for a gap asked again because its own content changed, what changed since the version the operator accepted. [] when the gap was
+    never accepted (or not since this release); one plain line when the earlier version cannot be read."""
+    version = (session.get('was_accepted') or {}).get(gap['gap_id'])
+    if not version:
+        return []
+    try:
+        old = _plan_version(store, session, version, cache)
+        before = next(g for g in old['gaps'] if g['gap_id'] == gap['gap_id'])
+        used = {eid for scene in all_scenes(gap) + all_scenes(before) for sh in scene['shots'] for eid in sh['element_ids']}
+        return (_diff(note_free_gap(before), note_free_gap(gap), '')
+                + _diff(note_free_elements([e for e in old['elements'] if e['id'] in used]), note_free_elements([e for e in plan['elements'] if e['id'] in used]), 'Elements')
+                + (['The film\'s shared rules changed as well.'] if shared_digest(old) != shared_digest(plan) else [])) or ['It differs from the version you accepted.']
+    except (Problem, StopIteration, KeyError, TypeError, ValueError):
+        return ['It changed since you accepted it; what changed could not be read.']
+
+
+def status_shared(store, session, plan=None):
+    """design/191: the shared change that waits for the operator's one answer, for the status and the visuals page: its gaps, the full list of
+    changes, and the operator's words when they asked for a change. None when nothing waits."""
+    if not session.get('shared_pending'):
+        return None
+    try:
+        info = shared_change(store, session, plan or current_plan(store, session))
+    except (Problem, StopIteration, KeyError, TypeError, ValueError):
+        info = {'gaps': sorted(session['shared_pending']), 'changes': ['What changed could not be read: each gap is asked by itself.'], 'unread': True}
+    rv = session.get('shared_revision')
+    return info and {**info, **({'revise': {k: rv.get(k) for k in ('notes', 'quote', 'by', 'at')}} if rv else {})}
+
+
+def _shared_note(store, session):
+    """For the status and the page: the shared change that waits for the operator's one answer, when there is one."""
+    info = status_shared(store, session)
+    return {'shared_change': info} if info else {}
+
+
+def accept_shared(conn, store, user, run, outputs, quote):
+    """design/191: the operator's one yes to a change of the shared part: every gap whose own shots are as accepted is accepted under the current
+    version, with the operator's words on each; their shots' references stay bound; one line in the run's log."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    try:
+        info = shared_change(store, session, plan)
+    except (Problem, StopIteration, KeyError, TypeError, ValueError):
+        fail('The earlier plan version could not be read, so the change cannot be shown as one question: accept the gaps one by one.')
+    need(info, 'No change of the shared rules waits for an answer.')
+    words, version, shared = said(quote, 'accepted', user), _version_now(session), shared_digest(plan)
+    for gid in info['gaps']:
+        gap = next(g for g in plan['gaps'] if g['gap_id'] == gid)
+        acc = session['shared_pending'].pop(gid)
+        full = gap_digest(plan, gap)
+        session['accepted'][gid] = {'digest': full, 'own': acc['own'], 'shared': shared, 'version': version, 'choice_id': (session['choice_selections'].get(gid) or {}).get('choice_id'),
+                                    'quote': words, 'by': user['id'], 'with_shared_change': info['from_version']}
+        _restamp_bindings(session, gap, acc['digest'], full)
+        _feedback(session, run, user, kind='gap', ident=gid, owner=gid, step=None, verdict='pass', quote=words, notes='the change of the shared rules accepted; its own shots unchanged', prompt='', checklist=None, suggestion='', model='', inputs=())
+    session.pop('shared_revision', None)
     save_session(store, run, session)
     from . import runlog
-    for e in plan_log(run, plan, version):   # design/145 L3
-        runlog.write(conn, e)
-    return {'version': version, 'plan_digest': identity, 'warnings': warnings, 'routes': routes(plan, _fps(session) or 25), 'gaps': [g['gap_id'] for g in plan['gaps']]}
+    runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'gap ' + ', '.join(info['gaps']), 'rule': f'visual plan v{version}',
+                        'entry': _short_text(f"the change of the shared rules accepted once for {len(info['gaps'])} gaps whose own shots are unchanged ({', '.join(info['gaps'])}): " + '; '.join(info['changes']), 3900),
+                        'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': words, 'request_id': None})
+    return {'accepted': sorted(session['accepted']), 'with_shared_change': info['gaps'], 'changes': info['changes']}
+
+
+def revise_shared(store, user, run, outputs, notes, quote):
+    """design/191: the operator's words on a change of the shared part. They wait for the assistant; the gaps stay unaccepted; the question is asked
+    again when the shared part is proposed changed."""
+    session = session_of(store, run, outputs)
+    plan = guarded(lambda: current_plan(store, session))
+    need(session.get('shared_pending'), 'No change of the shared rules waits for an answer.')
+    words = str(notes or '').strip() or str(quote or '').strip()
+    need(words, 'Say what to change in the shared rules.')
+    session['shared_revision'] = {'notes': words, 'quote': str(quote or '').strip() or words, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'shared': shared_digest(plan)}
+    save_session(store, run, session)
+    return {'revise': True, 'notes': words, 'for_the_assistant': "The operator asks for this change in the plan's shared part (the foundation, the sequence rules): " + words
+                                                                 + ' Change only that and propose the plan again; the gaps keep their shots.'}
 
 
 # ---------- design/65 B7: the cap ----------
@@ -599,9 +786,16 @@ def _carry_lines(session, record):
     if old is None and session.get('treatment'):
         old = {k: {'digest': d, 'state': 'accepted', 'quote': session['treatment'].get('quote')} for k, d in _line_digests(session['treatment']).items()}
     old, lines = old or {}, {}
+    was = session.get('treatment_draft') or session.get('treatment') or {}
+    was_gaps = {e.get('gap_id'): e for e in was.get('gaps') or []}
+    now_gaps = {e.get('gap_id'): e for e in record.get('gaps') or []}
     for k, d in _line_digests(record).items():
         o = old.get(k)
         lines[k] = dict(o) if o and o['digest'] == d else {'digest': d, 'state': 'to_accept', **({'changed': True} if o else {})}
+        if o and o['digest'] != d:   # design/191 section 11, B2: what changed in the line, for the question
+            changes = ([f'Before: "{_short_text(was.get("direction"), 400)}"'] if was.get('direction') else []) if k == 'direction' else (_diff(was_gaps[k], now_gaps[k], '') if k in was_gaps else [])
+            if changes:
+                lines[k]['changes'] = changes
     return lines
 
 
@@ -735,7 +929,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
                                                                                      if sh.get('drawing_spec') else None)})
         gaps.append(entry)
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'busy': not repair, 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
+    return {'state': 'prepared', 'busy': not repair, **_shared_note(store, session), 'fps': session['source'].get('fps'), 'plan_digest': session.get('current'), 'versions': len(session['versions']),
             'footage': footage_view(session, outputs),   # design/88 F4: told, not asked
             'reuse_pending': session.get('reuse_pending') or {},   # design/89 H7: a reuse the operator may approve here
             'clips': [{k: c.get(k) for k in ('id', 'name', 'duration_s')} for c in media_clips(outputs).values()],   # finding 7: a clip stretch placed from the page
@@ -1837,7 +2031,7 @@ def _no_question(session, *items):
     qs = session.get('questions') or {}
     for item in items:
         q = qs.get(item) if item else None
-        need(not q, f"{item} waits for the operator's answer: {q['question'] if q else ''} Answer it on the page or with `vw visuals answer --item {item} --answer \"…\"`; "
+        need(not q, f"{item} waits for the operator's answer: {q['question'] if q else ''} It is asked in the chat: `vw visuals next`; "
                     f"nothing is made from {item} until then.")
 
 
@@ -1847,8 +2041,8 @@ def ask(store, user, run, outputs, item, question, choices, cost_inr=None):
     need(_item_kind(store, session, item), f'{item} is not a picture, a shot or an element of this run.')
     q = _open(session, item, question, choices, user['id'], cost_inr)
     save_session(store, run, session)
-    return {**q, 'next': f"Question recorded on {item}: the operator answers on the page (the buttons on its card) or you record their words with `vw visuals answer --item {item} --answer \"…\"`; "
-                         f"nothing is made from {item} until then. Wait with `vw visuals status --wait`."}
+    return {**q, 'next': f"Question recorded on {item}: the server hands it to the operator in the chat, in its turn: `vw visuals next`; "
+                         f"nothing is made from {item} until then."}
 
 
 def answer(store, user, run, outputs, item, words):
@@ -2112,8 +2306,14 @@ def accept(store, user, run, outputs, gap_ids, quote):
         need(gap, f'Unknown gap {gid}.')
         if gap.get('choices'):
             need(session['choice_selections'].get(gid), f'Select a choice for gap {gid} before accepting it.')
-        session['accepted'][gid] = {'digest': gap_digest(plan, gap), 'choice_id': (session['choice_selections'].get(gid) or {}).get('choice_id'), 'quote': quote, 'by': user['id']}
+        session['accepted'][gid] = {'digest': gap_digest(plan, gap), 'own': gap_own_digest(plan, gap), 'shared': shared_digest(plan), 'version': _version_now(session),   # design/191: the two fingerprints
+                                    'choice_id': (session['choice_selections'].get(gid) or {}).get('choice_id'), 'quote': quote, 'by': user['id']}
         (session.get('revisions') or {}).pop(gid, None)   # design/76: accepted after all
+        waited = (session.get('shared_pending') or {}).get(gid)
+        if waited and waited.get('own') == gap_own_digest(plan, gap):   # design/191: its own shots are as accepted: their references stay bound
+            _restamp_bindings(session, gap, waited['digest'], gap_digest(plan, gap))
+        for k in ('shared_pending', 'was_accepted'):   # design/191: accepted by itself, whatever waited
+            (session.get(k) or {}).pop(gid, None)
         _feedback(session, run, user, kind='gap', ident=gid, owner=gid, step=None, verdict='pass', quote=quote, notes='', prompt='', checklist=None, suggestion='', model='', inputs=())   # design/75
     save_session(store, run, session)
     return {'accepted': sorted(session['accepted'])}
@@ -2129,7 +2329,9 @@ def revise_gap(store, user, run, outputs, gap_id, notes, quote):
     need((quote or '').strip(), 'The operator reply is required.')
     words = str(notes or '').strip() or str(quote)
     session['accepted'].pop(gap_id, None)
-    session.setdefault('revisions', {})[gap_id] = {'notes': words, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': gap_digest(plan, gap)}
+    (session.get('shared_pending') or {}).pop(gap_id, None)   # design/191: sent back by itself
+    session.setdefault('revisions', {})[gap_id] = {'notes': words, 'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': gap_digest(plan, gap),
+                                                   'own': gap_own_digest(plan, gap)}   # design/191 A2: answered when the gap's own content is proposed changed
     _feedback(session, run, user, kind='gap', ident=gap_id, owner=gap_id, step=None, verdict='fix', quote=quote, notes=words, prompt='', checklist=None, suggestion='', model='', inputs=())
     save_session(store, run, session)
     return {'gap_id': gap_id, 'revise': True, 'notes': words}
@@ -2142,6 +2344,8 @@ def _accepted_words(session, gid):
     rv = (session.get('revisions') or {}).get(gid)
     if rv:
         out['revise'] = {k: rv.get(k) for k in ('notes', 'quote', 'by', 'at')}
+    if gid in (session.get('shared_pending') or {}):   # design/191: its own shots are as accepted; only the shared rules changed
+        out['shared_only'] = True
     return out
 
 
@@ -4601,7 +4805,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     spec = shot.get('drawing_spec')
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: approve the specs as one table (`vw visuals spec`, or on the page) before the drawing is rendered.")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves it in the chat, in its turn (`vw visuals next`), before the drawing is rendered.")
     fps = session['source']['fps']
     res = session['source'].get('resolution') or [1920, 1080]   # defect 33: a run stores [1920, 1080] (the master's summary), the fixtures '1920x1080'; both read, as defect 26 did
     W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
@@ -4853,7 +5057,7 @@ def render_motion(conn, store, user, run, outputs, body):
     _no_question(session, shot['id'])   # design/110 rule 0
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: approve the specs as one table (`vw visuals spec`, or on the page) before the drawing is rendered.")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves it in the chat, in its turn (`vw visuals next`), before the drawing is rendered.")
     missing = motion.missing_labels(files, request['labels'])
     need(not missing, '; '.join(f'the project does not show the label "{l}" word for word' for l in missing) + ': fix the text in the project or the label in the plan.')
     lost = motion.missing_selectors(files, [c['selector'] for c in (shot.get('scene_motion') or {}).get('cues') or []])
@@ -5384,7 +5588,7 @@ def status(conn, store, run, outputs, repair=True):
              for j in take_rows]
     t = session.get('treatment')
     sp = visuals_spend(conn, run)
-    return {'state': 'prepared', 'busy': not repair, 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
+    return {'state': 'prepared', 'busy': not repair, **_shared_note(store, session), 'plan_digest': session.get('current'), 'versions': len(session['versions']), 'gaps': gaps, 'references': refs, 'jobs': jobs_,
             'searches': _searches(session),   # design/73: the searches, their picks and any "nothing fits" reason, for the assistant
             'round': _round_view(session),    # design/79: pass 1, pass 2 or complete, with each element's verdict
             'treatment': ({k: t[k] for k in ('totals', 'estimate_inr', 'quote', 'by', 'at', 'digest')} if t else None),   # design/65 B6
