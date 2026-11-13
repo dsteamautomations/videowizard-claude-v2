@@ -1,0 +1,299 @@
+# Video analysis and clip choice, in eight steps
+
+13 Nov 2026. Written for Deepa, in plain words. It describes the application as it is today, read from the code and the served instructions, and marks in each step what stays and what may change. Nothing in the application was changed.
+
+**How to use this file.** Each step ends with a table "What the test showed". It is empty now. After the Gemini 4 Hydrogen test it will be filled in, so a later problem can be checked against the step it belongs to.
+
+The film has twelve stages: intake, brief, script, voice, media, analysis, options, master, first cut, visuals, assembly, delivery. This file covers stage 6 (analysis) and stage 7 (options).
+
+---
+
+## Step 1: before the model watches anything
+
+**In one line:** before any clip is watched, the server checks that everything is ready, skips clips it already knows, and packs one locked folder per clip.
+
+Think of a new helper joining a film crew. Before they watch any footage, someone hands them a folder: what the film is about, the script, the house rules.
+
+1. **Claude starts it without asking the operator.** The clip list was agreed at stage 5. Claude only says that analysis is starting, one paid request per clip.
+2. **The server checks four things first**, and refuses to start if one is missing:
+   - the brief, the script and the footage list are approved;
+   - the film's shape is known (wide or tall, frames a second);
+   - the operator has said whether the sound of the clips may be used;
+   - whether the client gave safety rules. If none were given, a clip is not thrown out only because a worker has no helmet.
+3. **The server looks for clips it has seen before.** In VW-22, 45 of 46 clips were already in the client's library. The server asked once: analyse again (paid) or skip (free).
+4. **The server makes one folder per clip.** It holds the clip; what the film is for, who it is for, its tone and message; the script cut into numbered **paragraphs**; the chapters; the safety and brand rules; the rule about people who talk on camera; the long instruction; and the form to fill in, with 159 boxes.
+5. **The folder is saved and locked.** The same clip sent again with nothing changed reuses the old answer. Nobody pays twice.
+6. **Two ways of watching.** A clip of 15 seconds or less: the model looks once. A longer clip: the model may go back and look again at parts.
+
+**Guard rails:** Claude may use only the one tool, one command at a time. Paid steps are told, not asked. Claude is told not to read the clips' full logs.
+
+| Part | Stays or changes |
+|---|---|
+| Starting without asking; the four checks; the check for clips seen before; one locked folder per clip | Stays |
+| The model that watches | Changes to Gemini 4 Hydrogen (Deepa, 13 Nov). Needs SK's yes before it goes live |
+| The script cut into paragraphs | May change to sentences |
+| The 15-second limit for the look-again way | To be measured for Hydrogen |
+| The form with 159 boxes | May change later: some boxes are read by nothing |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 2: the model watches one clip
+
+**In one line:** the model cuts each clip into pieces, fills in a form for every piece, and says which paragraphs of the script each piece shows.
+
+**Job 1: cut the clip into pieces.** It cuts wherever something changes: the camera starts or stops moving, someone starts or stops talking, the action changes.
+
+Example, the 19-second test clip of the mason:
+
+| Piece | Seconds | What happens |
+|---|---|---|
+| 1 | 0 to 7.5 | The mason spreads mortar. Nobody talks. |
+| 2 | 7.5 to 10.3 | He keeps working while a person behind the camera asks a question. |
+| 3 | 10.3 to 15.5 | A helper puts down two bricks. The mason answers. |
+| 4 | 16.8 to 19.2 | The mason stands and strikes a brick four times. |
+
+From 15.5 to 16.8 seconds his head leaves the picture. The model left that part out.
+
+**Job 2: fill in the form for each piece**, in seven groups: from where to where it is usable and the one moment that must not be cut away; people and speech; camera; pace, cut points and impacts; script fit; sound; safety and quality.
+
+**Job 3: write a ten-line card for the whole clip.**
+
+**Rules the model must follow:** never make things up; say what it is unsure of; say what a piece does not show; do not decide the crop; two kinds of script fit, exact and related.
+
+**Weak point:** the script fit is by paragraph. The model does not say which sentence, or from which second to which.
+
+| Part | Stays or changes |
+|---|---|
+| Cutting into pieces; the seven groups; the rules | Stays |
+| The model | Changes to Gemini 4 Hydrogen |
+| Script fit by paragraph | May change to: which sentence, from which second to which |
+| Boxes that nothing reads | May change later: use the good ones, drop the weak ones |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 3: the answer comes back
+
+**In one line:** the server saves the answer, checks it piece by piece, throws out only what is broken, and tries again by itself when the model stumbles. No AI.
+
+1. **The answer is saved at once.** If the server stops halfway, it carries on from the copy.
+2. **Is it a proper form?** A jumble is kept and marked "not readable". It is not asked for again by itself.
+3. **Is it about the right clip?** A form about another clip is failed.
+4. **Each piece is checked alone.** A wrongly filled piece is thrown out; the good ones stay.
+5. **Do the times agree?** Every time is written as a clock time, in seconds and as a frame. A small mismatch gives a note. A piece outside the clip is thrown out.
+6. **Small checks, each giving a note:** the card has ten lines; no speech reported when the sound was removed; no two pieces with one name.
+
+The rule of this desk: check, do not repair.
+
+| What goes wrong | What the server does |
+|---|---|
+| The answer is cut off, empty, or the service is busy | Tries again by itself, up to three times |
+| One key is over its limit | Rests that key and uses the next |
+| The model refuses the clip itself | Sets the clip aside with the reason and carries on |
+| Nobody knows if the request went through | Waits; the operator chooses to recover it or set it aside |
+| The operator asks for another try | Allowed three times; then the operator must decide |
+
+Claude waits, reports the count and the languages heard. Nothing is approved in this stage.
+
+Example: VW-23 sent 94 clips, 8 needed a second try, all 94 came through, giving 187 pieces.
+
+| Part | Stays or changes |
+|---|---|
+| Everything in this step | Stays |
+| Hydrogen's answers passing this desk | Not yet shown. To be tested |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 4: may this piece be used at all?
+
+**In one line:** the server throws out bad and unsafe pieces, hides people who are seen talking when it can, and gives every piece one of five answers. No AI.
+
+Most films have a narrator. People in the footage should not be seen talking, because their voice is not in the film.
+
+| Answer | Meaning |
+|---|---|
+| Use as it is | Nothing to hide |
+| Use with a crop | Someone is talking, but can be cut out of the picture |
+| Use as a speaker | The film allows speakers to be seen |
+| Sound only | The picture is refused; the sound is kept as background knowledge |
+| Rejected | Not usable |
+
+How the server decides, in order:
+
+1. **Bad or unsafe?** Graded "reject", or not safe for the client: out. The operator can drop a safety flag for a client; that costs nothing.
+2. **Is someone talking?** Yes when they look at the camera, or when lips can be seen and speech is heard. A worker with their back turned is not talking.
+3. **Does this film show speakers?** Then the piece is used as a speaker.
+4. **If not, can the speaker be cut out?** The model drew three boxes: the speaker's head, the speaker's body, the action that must stay. The server tries a cut from the side, then from above or below. The picture may be blown up at most 1.35 times, or 2 times for 4K footage. What remains must be sharp.
+
+Extras: the shot size after a crop; whether the last frame may be held as a still; slow motion only at 50 frames a second or more.
+
+| Part | Stays or changes |
+|---|---|
+| Everything in this step | Stays |
+| Hydrogen's boxes and its "lips visible" answers | Not yet checked. To be tested |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 5: what Claude is given to choose from
+
+**In one line:** Claude chooses clips from a short written list and never sees the footage; the best description of each piece is written but not on that list.
+
+Claude's instruction opens with "you have NOT seen the footage". Think of someone picking photos for a magazine page from captions only.
+
+The pack holds: the instruction; the scenes; every sentence and word with the moment it is spoken; the file shapes; the coverage report; one file per scene with its sentences and the pieces that fit it; and "other", the pieces that fit no scene. Each file is small enough to read in one go.
+
+A piece is listed under a scene as **direct** (the model said it shows a paragraph exactly, and that paragraph falls in the scene), **chapter** (same chapter of the film) or **related**.
+
+**The short list for each piece:** its name and the clip's name; "seen", which is one line about the whole clip; how it fits; grade; length; start and end; wide or close; the moment that must not be cut away; what the action leaves behind; safety flags; which of the five answers it got.
+
+**The weakness.** The line "seen" comes from the clip's ten-line card and describes the whole clip. In the test clip, piece 1 (mortar) and piece 4 (brick) carry the same line. The model's own description of each piece, and its "does not show" line, are not on the list.
+
+Claude can ask for the full row of one piece, or the full log of one clip. In VW-21, VW-22 and VW-23 no full log was opened even once.
+
+| Part | Stays or changes |
+|---|---|
+| The pack, the coverage report, small files | Stays |
+| The short list | Approved by Deepa, 13 Nov: add each piece's own description and its "does not show" line |
+| Fit by paragraph | May change to sentence and seconds |
+| Claude never watching | May change in part: the model that watches does the fine matching |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 6: the library question, the scenes and the pauses
+
+**In one line:** the operator marks clips for the library and approves the scenes; pauses can be added here, but Claude has read nothing about the footage yet, so none are proposed.
+
+**Part 1, the library question.** Some clips would be true in any film for this client: the factory gate, staff at work. Claude reads each clip's name and ten-line card, makes a shortlist, and asks the operator which to mark. "None" is a fine answer. The server will not start the options stage until this is answered. Every analysed clip is stored for the client, which is how a later film skips clips it already has.
+
+The same weakness as step 5 is here. Claude shortlists from the card, not from the pieces. The whole clip is marked, never one piece. When a library clip is offered to a later film, its pieces come with the one line about the whole clip and no script fit.
+
+**Part 2, the scenes.** Claude reads only the paragraphs, the sentences and the file shapes, "and nothing else yet". It proposes the scenes in one message, usually one per paragraph, each with a title and its chapter. A scene must start at the start of a sentence. The operator approves. A fault seen in VW-21 and VW-23: Claude wrote the first word as "1" where "W00001" was wanted, and was refused.
+
+**Part 3, the pauses.** A pause is a short silence put into the narration between two sentences. Nothing is recorded again. Rules today: only after the end of a sentence; at most 4 seconds; each needs a reason; a gap already in the recording counts; once approved, every scene's length is fixed. None has been proposed in the runs seen, because the instruction only says "any pauses", only one reason is allowed, and Claude has not read about the footage yet.
+
+| Part | Stays or changes |
+|---|---|
+| The library question; the scenes | Stays |
+| The library weakness | Approved by Deepa, 13 Nov: show each piece's own description; mark by piece; give a library piece its own description for a later film |
+| The first-word fault | Approved: one filled example with a real word number |
+| Longest pause | Decided: up to 4 seconds is usual, 7 seconds the longest allowed, shorter pauses stay allowed |
+| When pauses are proposed | Approved: the server suggests them after the first choice of clips; the operator approves them then. Needs a step that re-times the film |
+| Reasons for a pause | Approved: more reasons allowed, such as after a key number or before a new chapter |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 7: Claude builds the cut, and the server checks it
+
+**In one line:** Claude lays real footage only under words it truly shows, leaves blanks elsewhere, and the server refuses the cut until every rule is met.
+
+1. **Claude shows the coverage first**, scene by scene: these words have real footage, these will be blank.
+2. **Round one, exact matches only.** "The same action, on the same object, done the same way. Related is not enough." A piece of the mason carrying bricks does not go under "the mason spreads mortar".
+3. **Blanks are normal.** A blank says how long it is and what it must show. A later stage fills it with AI video or a drawing.
+4. **Round two, general footage into some blanks**, only from clips round one did not use, never under a number or a claim.
+5. **Spare choices** for a shot, seen by the operator only after a reject.
+
+Main rules for Claude: cut to the meaning, shots of 2 to 3.5 seconds; each clip once in the film; every sentence tied to a shot or a blank, with a reason; every blank names the pieces looked at and why not; a doubtful shot carries a question for the operator; a shot starts a quarter to half a second before its words.
+
+**The server's rule check, no AI.** Refusals stop the cut: a piece not allowed or not safe; a shot outside the usable part; the must-keep moment cut away; a shot too short to understand; three shots of one size in a row; hard sun to cloudy light inside a scene; shots that do not add up to the scene's length; a clip used twice with no note. Flags do not stop the cut; some must be acted on, others are only counted.
+
+Examples: VW-23's cut was refused 9 times before it passed; VW-21's, 5 times. Many refusals are about the form of the file, not the film.
+
+| Part | Stays or changes |
+|---|---|
+| Claude builds the cut; two rounds; the rule check | Stays |
+| Where the exact match comes from | May change: Hydrogen says which sentence each piece shows, and Claude builds from that |
+| Refusals about the form of a file | Proposed, not yet approved: a filled example for every file Claude writes |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## Step 8: the second look, the review film and the operator's answers
+
+**In one line:** a helper checks the cut against still pictures, the operator watches the review film and answers keep, reject or trim on every shot, and the first answer approves the cut.
+
+**Part 1, the second look.** The server takes still pictures from every shot as cut: first, middle, last, one a second, one every half second under a claim. One helper per scene, a fresh Claude that knows only its scene, puts sentence and pictures side by side: does the picture show the words; is there a better piece; does the cut fall where the action ends. A helper may change its scene and must say why. Then the rule check runs again. Limit: still pictures only, no movement, no sound.
+
+**Part 2, a doubt about a cut point.** Free: nine stills around the point. Paid: Gemini watches one second before and after, as video.
+
+**Part 3, the library round.** Library clips this film may use are offered now.
+
+**Part 4, the review film.** The server saves the cut as a version, names scenes and shots by number (scene 2; shots 2.1, 2.2; a spare 2.2A1), and makes a review film, free. The operator watches it on the review page.
+
+**Part 5, the answers.**
+
+| Answer | What it does |
+|---|---|
+| Keep | The shot stays as placed |
+| Reject | The shot goes; its spare is offered; with no spare the stretch becomes a blank |
+| Trim | The shot stays but starts or ends a little earlier or later |
+
+Guards: a trim stays inside the usable part, keeps the must-keep moment and does not make the shot too short. AI shots inside a scene need no answer. The first answer approves the whole cut. A reject needs no reason. After three rounds, Claude suggests that failing scenes become blanks.
+
+| Part | Stays or changes |
+|---|---|
+| The second look; the stills and the paid look; the review film; keep, reject, trim | Stays |
+| The operator's answers as a measure | Proposed, not yet approved: count them per film, with the share of narration under real footage and a small check of blanks |
+| A reject needs no reason | Suggested, not yet approved: one click for the reason |
+
+**What the test showed**
+
+| Point | Result |
+|---|---|
+| | |
+
+---
+
+## The faults found while reading, in one list
+
+| # | Fault | Step |
+|---|---|---|
+| F1 | Claude is given one line about the whole clip for every piece; each piece's own description is not on its list | 5 |
+| F2 | The "does not show" line is not on the list | 5 |
+| F3 | No full log was opened in VW-21, VW-22 or VW-23, so much that is written is read by nobody | 5 |
+| F4 | The library is chosen from the clip's card, the whole clip is marked, and a library piece arrives with no script fit | 6 |
+| F5 | The script fit is by paragraph, not by sentence and seconds | 2 |
+| F6 | Pauses are asked for before anything about the footage is read | 6 |
+| F7 | The first word of a scene is written wrongly, the same way, run after run | 6 |
+| F8 | Many refusals of the cut are about the form of the file | 7 |
+| F9 | The model's colour-group label, its notes for the editor, the spoken words, the best frame, the title zone, the graphics ideas and the defects are written and used by nothing | 2 |
+| F10 | The 15-second limit for the look-again way is ours and has never been measured for Hydrogen | 1 |

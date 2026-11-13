@@ -1,0 +1,264 @@
+<title>VideoWizard Stage Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: a film strip of stage frames on top; the chosen frame opens below as one hands-on demo, four short cards and one line to remember; a recall quiz closes the page. */
+:root{
+  --bg:#F2F5F7; --surface:#FFFFFF; --ink:#13202B; --muted:#586A77; --line:#D3DCE2;
+  --accent:#0B6E79; --on-accent:#FFFFFF; --mark:#F2C14E; --on-mark:#13202B;
+  --good:#1B7F45; --bad:#B4232C; --strip:#13202B; --on-strip:#E8EEF2; --hole:#F2F5F7;
+  --display:"Space Grotesk","Segoe UI",system-ui,sans-serif; --body:"Inter","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F171D; --surface:#17222B; --ink:#E8EEF2; --muted:#94A6B3; --line:#2B3A46;
+  --accent:#55C6D1; --on-accent:#0F171D; --mark:#F2C14E; --on-mark:#13202B;
+  --good:#5FD38D; --bad:#FF8A8F; --strip:#070C10; --on-strip:#E8EEF2; --hole:#0F171D; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0F171D; --surface:#17222B; --ink:#E8EEF2; --muted:#94A6B3; --line:#2B3A46;
+  --accent:#55C6D1; --on-accent:#0F171D; --mark:#F2C14E; --on-mark:#13202B;
+  --good:#5FD38D; --bad:#FF8A8F; --strip:#070C10; --on-strip:#E8EEF2; --hole:#0F171D; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:clamp(1.7rem,4.5vw,2.5rem)}
+h2{font-size:clamp(1.4rem,3.5vw,1.9rem)}
+h3{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:var(--body);font-weight:600}
+p{margin:0}
+.eyebrow{font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.lead{color:var(--muted);max-width:60ch}
+header{display:flex;flex-direction:column;gap:8px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* film strip */
+.strip{background:var(--strip);border-radius:10px;padding:18px 12px;position:relative;
+  background-image:radial-gradient(circle,var(--hole) 3px,transparent 3.5px),radial-gradient(circle,var(--hole) 3px,transparent 3.5px);
+  background-size:18px 10px,18px 10px;background-position:4px 4px,4px calc(100% - 4px);background-repeat:repeat-x}
+.frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.frame{width:100%;min-height:74px;text-align:left;border:2px solid transparent;border-radius:6px;background:var(--surface);color:var(--ink);padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.frame .n{font-family:var(--display);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.frame .nm{font-family:var(--display);font-weight:700;font-size:1rem}
+.frame .tg{font-size:.78rem;color:var(--muted)}
+.frame[aria-current="true"]{background:var(--mark);color:var(--on-mark);border-color:var(--mark)}
+.frame[aria-current="true"] .n,.frame[aria-current="true"] .tg{color:var(--on-mark)}
+.frame:disabled{background:transparent;border:2px dashed var(--muted);color:var(--on-strip);cursor:default;opacity:.75}
+.frame:disabled .n,.frame:disabled .tg{color:var(--on-strip)}
+
+/* stage panel */
+.stage{display:flex;flex-direction:column;gap:20px}
+.stage-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px}
+.num{font-family:var(--display);font-weight:700;color:var(--accent);font-size:1rem;font-variant-numeric:tabular-nums}
+.job{font-size:1.1rem;max-width:60ch}
+.demo{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.demo-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.tagline{font-size:.78rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.btn{background:var(--accent);color:var(--on-accent);border:0;border-radius:8px;padding:9px 16px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.doc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.doc li{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;padding:8px 10px;border-radius:6px;background:var(--bg);min-width:0}
+.doc li.cut span:first-child{text-decoration:line-through;color:var(--muted)}
+.doc .why{font-size:.78rem;color:var(--bad);font-weight:600}
+.doc li.keep .why{color:var(--good)}
+.chip{background:var(--bg);border:1.5px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:600}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.say{min-height:3em;padding:12px 14px;border-left:4px solid var(--mark);background:var(--bg);border-radius:0 8px 8px 0}
+.ba{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.ba div{background:var(--bg);border-radius:8px;padding:12px;min-width:0}
+.ba b{display:block;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+mark{background:var(--mark);color:var(--on-mark);padding:0 3px;border-radius:3px}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.steps button{width:100%;text-align:left;background:var(--bg);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;font-weight:600}
+.steps button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
+.steps small{display:block;font-weight:400;font-variant-numeric:tabular-nums;opacity:.8}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:22px 28px}
+.cards section{display:flex;flex-direction:column;gap:8px;min-width:0;border-top:2px solid var(--ink);padding-top:10px}
+.cards ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
+.remember{background:var(--mark);color:var(--on-mark);border-radius:12px;padding:16px 20px;display:flex;flex-direction:column;gap:2px}
+.remember span{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+.remember strong{font-family:var(--display);font-size:clamp(1.2rem,3.4vw,1.6rem);line-height:1.2}
+.pager{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+/* quiz */
+.quiz{border-top:1px solid var(--line);padding-top:28px;display:flex;flex-direction:column;gap:16px}
+.clue{font-family:var(--display);font-size:clamp(1.15rem,3.2vw,1.5rem);min-height:2.4em}
+.score{color:var(--muted);font-variant-numeric:tabular-nums}
+.fb{font-weight:600;min-height:1.5em}
+.fb.ok{color:var(--good)} .fb.no{color:var(--bad)}
+@media (prefers-reduced-motion:no-preference){ .frame,.chip,.steps button{transition:background-color .15s,border-color .15s} }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">From a client's document to a finished film</p>
+    <h1>VideoWizard, stage by stage</h1>
+    <p class="lead">Tap a frame. Each stage shows what you bring, what VideoWizard does, what you decide and what you get.</p>
+  </header>
+
+  <nav class="strip" aria-label="Stages"><ol class="frames" id="frames"></ol></nav>
+
+  <main class="stage" id="stage" aria-live="polite"></main>
+
+  <section class="quiz" aria-labelledby="qh">
+    <p class="eyebrow">Recall check</p>
+    <h2 id="qh">Which stage is this?</h2>
+    <p class="clue" id="clue"></p>
+    <div class="row" id="answers"></div>
+    <p class="fb" id="fb"></p>
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <span class="score" id="score"></span>
+      <button class="btn ghost" id="nextq" type="button">Next clue</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const STAGES = [
+ { id:'intake', name:'Intake', tag:'Find the script', job:'Pull the spoken words out of the client’s document.',
+   bring:['The client’s document: Word, PDF or text'],
+   does:['Numbers every line','Marks lines that are not spoken','Never rewrites a word','Suggests up to three titles','Suggests the kind of film'],
+   decide:['Which title','Is the cleaned script complete?','Is the kind of film right?'],
+   get:['A clean script','A title','The film’s category'],
+   remember:'When in doubt, the line stays.' },
+ { id:'brief', name:'Brief', tag:'Agree the aim', job:'Agree what the film is for before anything is made.',
+   bring:['The clean script','Your brand and safety rules','Where the film will play'],
+   does:['Proposes five decisions, each with a reason','Lists the chapters the footage will show','Reads the narration language from the script','Offers last time’s answers to a repeat client'],
+   decide:['Approve, or change any of the five','Speaker on camera or not','Answer a question only if one blocks the brief'],
+   get:['An approved brief every later stage follows'],
+   remember:'Purpose. Audience. Message. Tone. Ending.' },
+ { id:'script', name:'Script', tag:'Polish the words', job:'Check the words against the brief. Change only what helps.',
+   bring:['The clean script','The approved brief'],
+   does:['Shows each change as before and after, with a reason','Says so when nothing needs changing','Lists the claims the film rests on','Checks a claim on the web only if you say yes'],
+   decide:['Each change: accept, reject or reword','Which claims to check'],
+   get:['The final spoken text','Numbered beats for the stages that follow'],
+   remember:'No word changes without your yes.' },
+ { id:'voice', name:'Voice', tag:'Record the narrator', job:'Choose how it is read, who reads it, and record it.',
+   bring:['The final spoken text','Tricky words and how to say them'],
+   does:['Proposes a delivery: best fit or experimental','Offers short test passages','Lets up to six voices try the passage','Records the full script in up to three voices'],
+   decide:['The delivery and the test passage','The voice','The final narration, after listening'],
+   get:['One final narration. It is not recorded again.'],
+   remember:'Only your ears decide.' }
+];
+const LATER = ['Media','Analysis','Options','Master','First cut','Visuals','Assembly','Delivery'];
+
+const $ = (s, el=document) => el.querySelector(s);
+const li = a => a.map(x => `<li>${x}</li>`).join('');
+let current = 0;
+
+const DEMOS = {
+ intake(el){
+   const doc = [
+     ['Scene 1: The dry season','Scene heading',0], ['Duration: 30 seconds','Timing',0],
+     ['Every summer, the village well runs low.','Spoken',1], ['Visuals: cracked soil, empty buckets','Visual note',0],
+     ['One roof can change that.','Spoken',1], ['Music: soft and hopeful','Note to the crew',0] ];
+   let cleaned = false;
+   const draw = () => {
+     el.innerHTML = `<div class="demo-top"><h3>Try it: clean a document</h3><span class="tagline">Example document</span></div>
+       <ul class="doc">${doc.map(d => `<li class="${cleaned ? (d[2] ? 'keep' : 'cut') : ''}"><span>${d[0]}</span>${cleaned ? `<span class="why">${d[2] ? 'Stays' : 'Out: ' + d[1].toLowerCase()}</span>` : ''}</li>`).join('')}</ul>
+       <div class="row"><button class="btn" type="button" id="clean">${cleaned ? 'Show the original' : 'Clean it'}</button></div>`;
+     $('#clean', el).onclick = () => { cleaned = !cleaned; draw(); $('#clean', el).focus(); };
+   };
+   draw();
+ },
+ brief(el){
+   const five = { Purpose:'What the viewer should understand, feel or do.', Audience:'Who is watching.', Message:'The one idea the film carries.',
+                  Tone:'How it should sound and feel.', Ending:'How the film closes.' };
+   el.innerHTML = `<div class="demo-top"><h3>Try it: the five decisions</h3><span class="tagline">Tap each one</span></div>
+     <div class="row">${Object.keys(five).map(k => `<button class="chip" type="button" aria-pressed="false">${k}</button>`).join('')}</div>
+     <p class="say" id="say">Five decisions shape the whole film.</p>`;
+   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+     el.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+     $('#say', el).innerHTML = `<strong>${b.textContent}.</strong> ${five[b.textContent]}`; });
+ },
+ script(el){
+   const out = { Accept:'The change goes in.', Reject:'The original stays.', Reword:'You type your own wording.' };
+   el.innerHTML = `<div class="demo-top"><h3>Try it: decide one change</h3><span class="tagline">Example change</span></div>
+     <div class="ba"><div><b>Before</b>…stored in tanks or even <mark>the</mark> drums.</div><div><b>After</b>…stored in tanks or even drums.</div>
+     <div><b>Why</b>The extra word would sound like a slip.</div></div>
+     <div class="row">${Object.keys(out).map(k => `<button class="chip" type="button" aria-pressed="false">${k}</button>`).join('')}</div>
+     <p class="say" id="say">Your call on every change.</p>`;
+   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+     el.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+     $('#say', el).innerHTML = `<strong>${b.textContent}.</strong> ${out[b.textContent]}`; });
+ },
+ voice(el){
+   const steps = [['Direction','Pick how it should be read, and a short test passage.'],['Say it right','List tricky words and how to say them. Do this before recording.'],
+     ['Browse','Play samples in the voice library.'],['Try','Up to six voices read the test passage.'],
+     ['Narrate','Up to three voices read the full script.'],['Final','Listen. Make one narration final.']];
+   el.innerHTML = `<div class="demo-top"><h3>Try it: walk the six steps</h3><span class="tagline">Tap in order</span></div>
+     <ol class="steps">${steps.map((s,i) => `<li><button type="button" aria-pressed="false"><small>Step ${i+1}</small>${s[0]}</button></li>`).join('')}</ol>
+     <p class="say" id="say">Six steps from the words to the recording.</p>`;
+   el.querySelectorAll('.steps button').forEach((b,i) => b.onclick = () => {
+     el.querySelectorAll('.steps button').forEach(x => x.setAttribute('aria-pressed', x === b));
+     $('#say', el).innerHTML = `<strong>${steps[i][0]}.</strong> ${steps[i][1]}`; });
+ }
+};
+
+function drawFrames(){
+  const all = STAGES.map((s,i) => `<li><button class="frame" type="button" data-i="${i}" aria-current="${i === current}">
+      <span class="n">${String(i+1).padStart(2,'0')}</span><span class="nm">${s.name}</span><span class="tg">${s.tag}</span></button></li>`)
+    .concat(LATER.map((n,i) => `<li><button class="frame" type="button" disabled>
+      <span class="n">${String(STAGES.length+i+1).padStart(2,'0')}</span><span class="nm">${n}</span><span class="tg">Coming soon</span></button></li>`));
+  $('#frames').innerHTML = all.join('');
+  document.querySelectorAll('.frame[data-i]').forEach(b => b.onclick = () => show(+b.dataset.i, true));
+}
+
+function show(i, fromUser){
+  current = (i + STAGES.length) % STAGES.length;
+  const s = STAGES[current];
+  drawFrames();
+  $('#stage').innerHTML = `
+    <div class="stage-head"><span class="num">Stage ${current+1} of ${STAGES.length + LATER.length}</span><h2>${s.name}</h2></div>
+    <p class="job">${s.job}</p>
+    <div class="demo" id="demo"></div>
+    <div class="cards">
+      <section><h3>You bring</h3><ul>${li(s.bring)}</ul></section>
+      <section><h3>VideoWizard does</h3><ul>${li(s.does)}</ul></section>
+      <section><h3>You decide</h3><ul>${li(s.decide)}</ul></section>
+      <section><h3>You get</h3><ul>${li(s.get)}</ul></section>
+    </div>
+    <div class="remember"><span>Remember</span><strong>${s.remember}</strong></div>
+    <div class="pager"><button class="btn ghost" type="button" id="prev">← ${STAGES[(current-1+STAGES.length)%STAGES.length].name}</button>
+      <button class="btn" type="button" id="next">${STAGES[(current+1)%STAGES.length].name} →</button></div>`;
+  DEMOS[s.id]($('#demo'));
+  $('#prev').onclick = () => show(current-1, true);
+  $('#next').onclick = () => show(current+1, true);
+  if (fromUser && location.hash !== '#' + s.id) { try { history.replaceState(null, '', '#' + s.id); } catch(e) { location.hash = s.id; } }
+}
+
+function fromHash(){ const i = STAGES.findIndex(s => '#' + s.id === location.hash); show(i < 0 ? 0 : i, false); }
+window.addEventListener('hashchange', fromHash);
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea')) return;
+  if (e.key === 'ArrowRight') show(current+1, true);
+  if (e.key === 'ArrowLeft') show(current-1, true);
+});
+
+/* recall quiz */
+const CLUES = [['Three title suggestions appear here.',0],['Purpose, audience, message, tone, ending.',1],['You accept, reject or reword each change.',2],
+  ['You listen before anything is final.',3],['Scene headings and timings are taken out.',0],['The film’s claims are listed for you.',2],
+  ['Tricky words get a say-it-like-this list.',3],['A repeat client is offered last time’s answers.',1],
+  ['Chapters of the film are listed.',1],['Up to six voices read a short test passage.',3]];
+let order = [], q = -1, right = 0, asked = 0, answered = false;
+function nextClue(){
+  if (!order.length) order = CLUES.map((_,i) => i).sort(() => Math.random() - .5);
+  q = order.pop(); answered = false;
+  $('#clue').textContent = CLUES[q][0]; $('#fb').textContent = ''; $('#fb').className = 'fb';
+  $('#answers').innerHTML = STAGES.map((s,i) => `<button class="chip" type="button" data-a="${i}" aria-pressed="false">${s.name}</button>`).join('');
+  document.querySelectorAll('#answers .chip').forEach(b => b.onclick = () => answer(+b.dataset.a, b));
+  $('#score').textContent = asked ? `${right} of ${asked} right` : 'No answers yet';
+}
+function answer(a, b){
+  if (answered) return; answered = true; asked++;
+  const ok = a === CLUES[q][1]; if (ok) right++;
+  b.setAttribute('aria-pressed','true');
+  $('#fb').textContent = ok ? 'Right.' : `Not quite. It is ${STAGES[CLUES[q][1]].name}.`;
+  $('#fb').className = 'fb ' + (ok ? 'ok' : 'no');
+  $('#score').textContent = `${right} of ${asked} right`;
+}
+$('#nextq').onclick = nextClue;
+
+fromHash(); nextClue();
+</script>

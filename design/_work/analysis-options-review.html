@@ -1,0 +1,308 @@
+<title>Analysis and Options Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one reading column; a verdict band, then numbered findings as tables, two flowcharts, and the test frame. */
+:root{
+  --bg:#F2F5F7; --surface:#FFFFFF; --ink:#13202B; --muted:#586A77; --line:#D3DCE2;
+  --accent:#0B6E79; --mark:#F2C14E; --on-mark:#13202B; --bad:#B4232C; --good:#1B7F45; --warn:#8A5A00;
+  --display:"Space Grotesk","Segoe UI",system-ui,sans-serif; --body:"Inter","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F171D; --surface:#17222B; --ink:#E8EEF2; --muted:#94A6B3; --line:#2B3A46;
+  --accent:#55C6D1; --mark:#F2C14E; --on-mark:#13202B; --bad:#FF8A8F; --good:#5FD38D; --warn:#F2C14E; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0F171D; --surface:#17222B; --ink:#E8EEF2; --muted:#94A6B3; --line:#2B3A46;
+  --accent:#55C6D1; --mark:#F2C14E; --on-mark:#13202B; --bad:#FF8A8F; --good:#5FD38D; --warn:#F2C14E; color-scheme:dark }
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
+.wrap{max-width:920px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:30px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2;text-wrap:balance}
+h1{font-size:clamp(1.7rem,4.5vw,2.4rem)} h2{font-size:1.45rem} h3{font-size:1.05rem}
+p{margin:0;max-width:68ch} ul,ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;max-width:68ch}
+section{display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.muted{color:var(--muted)}
+.band{background:var(--mark);color:var(--on-mark);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.band ul{max-width:none}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.92rem}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:.76rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td:first-child{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+code{font-size:.86em;background:var(--bg);padding:1px 5px;border-radius:4px}
+.tag{display:inline-block;font-size:.74rem;font-weight:600;border-radius:999px;padding:1px 9px;border:1.5px solid currentColor;white-space:nowrap}
+.keep{color:var(--good)} .change{color:var(--warn)} .drop{color:var(--bad)}
+.chart{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:14px}
+pre.mermaid{margin:0;min-width:560px}
+.src a{color:var(--accent)}
+</style>
+
+<div class="wrap">
+<header style="display:flex;flex-direction:column;gap:8px">
+  <p class="eyebrow">VideoWizard · 13 Nov 2026 · for Deepa and SK</p>
+  <h1>Analysis and options: the proposal, checked</h1>
+  <p class="muted">A review of the side thread's proposal (changes A to H), today's process against a corrected proposal, two flowcharts, the first paid runs on one clip (section 9), every field the model answers (section 10) and the next test plan (section 11). Nothing here is built into the application.</p>
+</header>
+
+<div class="band">
+  <h3>In short</h3>
+  <ul>
+    <li>The direction holds: the model that watches the video should judge the fine match, and the result should be measured.</li>
+    <li>The proposal has seven errors and five gaps. Two matter most: the cost figure is about twenty times too low, and moving the pauses breaks the fixed timeline.</li>
+    <li>One change should be dropped as written (sentence fit in the first log) and one redesigned (the second Gemini pass should rank candidates, not only check one).</li>
+  </ul>
+</div>
+
+<section>
+  <h2>1. Errors found in the proposal</h2>
+  <div class="scroll"><table>
+    <tr><th>#</th><th>The proposal said</th><th>What the code and the run show</th><th>Effect</th></tr>
+    <tr><td>E1</td><td>VW-23's analysis used 825,554 tokens in and 551,095 out.</td><td>That is the text input only. The cost record also holds 16,872,733 tokens of video read through the model's own tool calls (14,652,687 of them cached), and 1,101,718 thinking tokens. Only 28 of the 94 clips ran in the agentic mode, and they account for nearly all of it.</td><td>Today's cost is not known in money, and any added pass must be costed on the full figure. Measure this before anything else.</td></tr>
+    <tr><td>E2</td><td>Change C is "the paid inspect of today, turned from an exception into the rule".</td><td>Today's inspect looks at one edge of a sub-clip, one second either side, to settle a cut point (<code>stage2/stage.py:479</code>). It does not ask whether the clip shows the sentence.</td><td>C is a new request, a new answer shape and a new kind of job. It is more work than the proposal implies.</td></tr>
+    <tr><td>E3</td><td>Change G: propose the pauses after round 1 of the placement.</td><td>The options prompt says the scene lengths are "fixed" and include "any approved pauses", and every scene's shots must "sum exactly to the scene's frames". A pause added later lengthens its scene and shifts every frame after it.</td><td>As written, G undoes round 1. It needs a second approval of scenes and pauses and a server step that re-times the placement. Neither exists.</td></tr>
+    <tr><td>E4</td><td>Change D: add the fit by sentence to the first log and expect fewer output tokens.</td><td>The one time Gemini was given sentences (the model test, 35 sentences), it wrote 10,281 to 12,315 output tokens for a 19-second clip. VW-23 averages 5,863 per clip with paragraphs.</td><td>Sentence fit makes the first log longer and slower, not shorter.</td></tr>
+    <tr><td>E5</td><td>Weakness W8: Gemini writes fields "nobody reads" (entities, sound cues, editorial ideas).</td><td><code>entities</code> is read by the brand library, the options stage and the visuals stage. Only the placer's reading copy leaves the three out.</td><td>Dropping <code>entities</code> would break the library and the visuals stage. Each field needs its own check.</td></tr>
+    <tr><td>E6</td><td>Weakness W5: most flags are noise (51 flags nobody acted on).</td><td>The check already splits flags into those to act on and those "for information", counted only (<code>validator.py:383</code>, design/142 R10, later than the evidence quoted).</td><td>Part of change F is already built. The evidence is out of date.</td></tr>
+    <tr><td>E7</td><td>VW-23's options check was rejected three times.</td><td>Nine times by the time the cut was proposed at 11:02 UTC.</td><td>The case for change H (a filled example) is stronger than stated.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>2. What the proposal missed</h2>
+  <div class="scroll"><table>
+    <tr><th>#</th><th>Gap</th><th>Why it matters</th></tr>
+    <tr><td>G1</td><td>Change C only checks the clip the blind placer already chose.</td><td>It can say "wrong", but it cannot find the better clip the placer never picked. The watcher should be shown the sentence and the best few candidates, and rank them. That is also what you asked to test.</td></tr>
+    <tr><td>G2</td><td>The client's library.</td><td>A clip already in the library is skipped and later matched "by eye, without the model saying which lines it fits" (<code>brandlib.py:178</code>). The first log's script fit is for one film only. So the first pass should describe what is seen, and the second pass should do the fitting. Library clips then get the same check as new ones.</td></tr>
+    <tr><td>G3</td><td>The score in change A cannot see a missed clip.</td><td>The operator answers only the shots that were placed. A blank where good footage existed is never judged. VW-23 has 187 sub-clips and 18 blanks. A second measure is needed: how much narration sits under real footage, and a small audit of blanks.</td></tr>
+    <tr><td>G4</td><td>Changes B and C overlap.</td><td>If the watcher checks every direct match as video, frame strips for the same shots add nothing. Use the video check for direct matches and the strips for B-roll.</td></tr>
+    <tr><td>G5</td><td>Load on the server.</td><td>During VW-23's analysis the database timed out once and the workers retried seven times (08:38 UTC); 8 of 94 jobs needed a second attempt; a job waited 26 minutes on average. More passes add to this. Change E also names no model and cannot judge colour from text.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>3. Today against the corrected proposal</h2>
+  <div class="scroll"><table>
+    <tr><th>Step</th><th>Today</th><th>Proposed, corrected</th></tr>
+    <tr><td>Watch each clip</td><td><b>Gemini 3.8 Flash</b>, one request per clip. Describes it and says which paragraphs it fits.</td><td>The same model, or the test's winner. Describes what is seen and what is not. Paragraph fit stays as a hint only. No sentence fit here.</td></tr>
+    <tr><td>Sort the pieces</td><td><b>Server, no AI.</b> Eligibility, crops, pieces per scene.</td><td>No change.</td></tr>
+    <tr><td>Scenes and pauses</td><td><b>Claude</b> proposes, the operator approves. Pauses before any footage is read.</td><td>Scenes approved first. Pauses suggested by the server after the first placement, approved a second time, then the server re-times.</td></tr>
+    <tr><td>Fine match</td><td><b>Claude, from text.</b> "You have NOT seen the footage."</td><td><b>Gemini as watcher.</b> For each sentence that names something the camera can see: the sentence and its best few candidate clips as video. It ranks them, gives in and out seconds, and says what is missing.</td></tr>
+    <tr><td>Build the cut</td><td><b>Claude</b>, two rounds: exact matches, then B-roll.</td><td><b>Claude</b>, from the watcher's verdicts. Order, shot sizes, blanks. Looks at frame strips before placing B-roll.</td></tr>
+    <tr><td>Rule check</td><td><b>Server.</b> Some checks compare words.</td><td>Server. Word checks on direct matches give way to the watcher's answer.</td></tr>
+    <tr><td>Second look</td><td><b>Claude helper</b>, still frames, one per scene.</td><td>Kept, for the sequence only: does shot 2 follow shot 1.</td></tr>
+    <tr><td>Doubt at a cut point</td><td><b>Gemini</b>, paid inspect, one second either side.</td><td>No change.</td></tr>
+    <tr><td>Judge</td><td><b>Operator</b>: keep, reject or trim each footage shot.</td><td>The same answers become a score per film, with a coverage figure and a small audit of blanks.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>4. Flowchart: today</h2>
+  <div class="chart"><pre class="mermaid">
+flowchart TD
+  A["Footage: 94 clips"] --> B["Gemini 3.8 Flash<br/>watches each clip alone<br/>writes a log: what is seen, sound, quality,<br/>which PARAGRAPHS it fits"]
+  B --> C["Server, no AI<br/>eligibility, crops,<br/>pieces listed per scene"]
+  C --> D["Claude<br/>proposes scenes and pauses<br/>has read no footage log yet"]
+  D --> E{"Operator<br/>approves scenes"}
+  E --> F["Claude, from text only<br/>round 1: exact matches to sentence and frame<br/>round 2: B-roll into blanks"]
+  F --> G["Server, no AI<br/>rule check"]
+  G -- "rejected" --> F
+  G --> H["Claude helper<br/>second look at still frames,<br/>one per scene"]
+  H --> I["Gemini, only on a doubt<br/>inspects one cut point,<br/>one second either side"]
+  I --> J["Server renders the review film"]
+  J --> K{"Operator<br/>keep, reject or trim<br/>every footage shot"}
+  </pre></div>
+</section>
+
+<section>
+  <h2>5. Flowchart: proposed, redrawn with Gemini 4 Hydrogen</h2>
+  <p>Redrawn on 13 Nov after Deepa chose Gemini 4 Hydrogen. The fine match moves into the analysis itself: the model that watches the clip also says which sentence each part of it shows. Section 11 tests whether this holds.</p>
+  <div class="chart"><pre class="mermaid">
+flowchart TD
+  A["Footage"] --> B["Gemini 4 Hydrogen, agentic<br/>watches each clip with the film's SENTENCES<br/>writes what is seen and what is NOT shown<br/>for each sentence the clip can show:<br/>from second, to second, exact or partly, what is missing"]
+  L["Client's library clips"] --> W["Gemini 4 Hydrogen<br/>the same question for a library clip<br/>against this film's sentences"]
+  B --> C["Server, no AI<br/>eligibility, crops<br/>ranks the proposals per sentence"]
+  W --> C
+  C --> D["Claude<br/>proposes scenes"]
+  D --> E{"Operator<br/>approves scenes"}
+  E --> F["Claude<br/>builds the cut from Gemini's ranked proposals<br/>order, shot sizes, blanks<br/>sees frame strips before placing B-roll"]
+  F --> G["Server, no AI<br/>rule check<br/>suggests pauses where an action<br/>needs longer than its sentence"]
+  G -- "rejected" --> F
+  G --> P{"Operator<br/>approves pauses"}
+  P --> R["Server, no AI<br/>re-times the cut"]
+  R --> H["Claude helper<br/>second look: does the sequence read"]
+  H --> J["Server renders the review film"]
+  J --> K{"Operator<br/>keep, reject or trim"}
+  K --> S["Server, no AI<br/>score per film: shots kept as placed,<br/>narration under real footage, blanks audited"]
+  </pre></div>
+  <p class="muted">What changed from the first drawing: no separate watcher pass for new footage. One paid request per clip does both jobs. Only library clips, which were analysed for another film, need a second look. The film-wide pass (change E) is still left out.</p>
+</section>
+
+<section>
+  <h2>6. Each change, after the review</h2>
+  <div class="scroll"><table>
+    <tr><th>Change</th><th>Verdict</th><th>What changes</th></tr>
+    <tr><td>A. Score</td><td><span class="tag change">Keep, widen</span></td><td>Add coverage and a blank audit (G3). Check first that past films have recorded answers; I did not verify this.</td></tr>
+    <tr><td>B. Placer sees first</td><td><span class="tag change">Narrow</span></td><td>For B-roll only. Direct matches go to the watcher (G4).</td></tr>
+    <tr><td>C. Second Gemini pass</td><td><span class="tag change">Redesign</span></td><td>Rank the best few candidates per sentence, not check one (G1). Include library clips (G2). Cost it on the full token figure (E1).</td></tr>
+    <tr><td>D. Shorter first log</td><td><span class="tag drop">Drop the sentence fit</span></td><td>Keep only: a required "does not show" line, and removing fields proven unread one by one (E4, E5).</td></tr>
+    <tr><td>E. Film-wide pass</td><td><span class="tag change">Later</span></td><td>Name the model, give it one frame per sub-clip, test the size.</td></tr>
+    <tr><td>F. Checks by meaning</td><td><span class="tag change">Partly built</span></td><td>The flag split exists (E6). What remains: word checks on direct matches, and "required, or a reason".</td></tr>
+    <tr><td>G. Pauses</td><td><span class="tag change">Redesign</span></td><td>Second approval and a re-timing step (E3). Limit to an action the sentence names; the rule "never hold a shot longer because the footage exists" still stands.</td></tr>
+    <tr><td>H. Filled examples</td><td><span class="tag keep">Keep</span></td><td>Cheapest fix. Two runs hit the identical refusal; nine check rejections in VW-23.</td></tr>
+  </table></div>
+  <p>Order: first measure today's cost and score (E1, A). Then run the test below. Then H. Then C and G if the test supports them.</p>
+</section>
+
+<section>
+  <h2>7. Test frame: Gemini 3.8 Flash against Gemini 4 Hydrogen</h2>
+  <p>For your approval. Nothing runs until you say so. The test runs outside the application and reads copies only; VW-23, the server and the database are not touched.</p>
+  <h3>The two models</h3>
+  <ul>
+    <li><b>gemini-3.8-flash</b>: the model in use today.</li>
+    <li><b>gemini-4-hydrogen</b>: released 12 Nov 2026. Reported price 1.50 dollars per million input tokens and 7.50 per million output. It takes video. Google has not named it as Flash's successor; its documents still list 3.8 Flash as current. I have not confirmed its video limits or its agentic mode from Google's own pages.</li>
+  </ul>
+  <h3>Part 1: watch a clip and report</h3>
+  <ul>
+    <li><b>Material:</b> six VW-23 clips of different kinds: one clear action, one action in several steps, one with speech, one flagged for risk, one under 15 seconds, one long.</li>
+    <li><b>Request:</b> the production prompt and answer shape, identical for both models; only the model name differs. Two runs each, to see how much a model disagrees with itself.</li>
+    <li><b>Truth, written before any output is read:</b> a fact sheet per clip from a person watching it. Eight to ten facts that can be checked: the action, the object, start and end to half a second, people, sound events, and what the clip does not show.</li>
+    <li><b>Judged blind:</b> the outputs are labelled X and Y. You score them against the fact sheet. No model judges.</li>
+    <li><b>Measured:</b> facts right, wrong, missing and invented; error at the boundaries in seconds; whether "does not show" is filled and true; whether the answer passes the server's own check; all tokens including video and thinking; seconds; retries.</li>
+  </ul>
+  <h3>Part 2: analyse and suggest clips (replaced by section 11)</h3>
+  <ul>
+    <li><b>Material:</b> ten sentences from VW-23's approved scenes. Six where footage was placed, two where the operator rejects or trims, two blanks where footage may exist.</li>
+    <li><b>For each sentence:</b> four candidate sub-clips sent as video. One is a decoy: the right activity, the wrong step.</li>
+    <li><b>Asked of each model:</b> rank the four; give in and out seconds for the best; does it show exactly this (yes, partly, no); what is missing. "None fits" is an allowed answer.</li>
+    <li><b>Third arm, no new cost:</b> what Claude placed from text in VW-23. This is today's method and the baseline.</li>
+    <li><b>Truth:</b> your own pick for each sentence, made by watching the four clips before seeing any model's answer, plus the operator's keep, reject or trim on VW-23.</li>
+    <li><b>Measured:</b> first choice matching yours; decoys chosen; "none fits" given rightly; in and out within half a second of your trim; tokens and seconds per sentence.</li>
+    <li><b>Size:</b> one request per sentence with four clips, two models, two runs: forty requests.</li>
+  </ul>
+  <h3>Rules set before the run</h3>
+  <ul>
+    <li>Hydrogen replaces Flash for watching clips only if it has fewer wrong and invented facts on at least five of the six clips.</li>
+    <li>The watcher is worth building only if its first choice matches yours on at least eight of ten sentences and beats the text-only baseline by two or more.</li>
+    <li>One request per model is run first and its full token count reported. You then say go or stop.</li>
+  </ul>
+  <h3>Needed from you</h3>
+  <ul>
+    <li>A Gemini key for the test, given as a file, as with the earlier tests.</li>
+    <li>VW-23's clips and files, copied from the operator's computer or read from storage.</li>
+    <li>About an hour of your time: the fact sheets for six clips and your picks for ten sentences.</li>
+  </ul>
+  <h3>What this test will not show</h3>
+  <ul>
+    <li>One film, one kind of film (a building documentary), small numbers.</li>
+    <li>Gemini as the builder of the whole cut. Part 2 tests the judgement per sentence, not the assembly.</li>
+    <li>Money, until the price of 3.8 Flash and the billing of cached video tokens are confirmed.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>8. Not checked</h2>
+  <ul>
+    <li>design/140 and design/27 themselves. I read the code they led to, not the notes.</li>
+    <li>Whether past films hold recorded keep, reject and trim answers to score.</li>
+    <li>How many footage shots VW-23's cut holds; the log shows 18 blanks and 6 recorded choices.</li>
+    <li>Whether the 14.6 million cached tokens are billed at a lower rate.</li>
+    <li>Hydrogen's limits for video, from Google's own documentation.</li>
+  </ul>
+  <p class="src muted">Model facts from: <a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-hydrogen/">Google's announcement of Gemini 4 Hydrogen</a>, <a href="https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions">Google Cloud model versions</a>, <a href="https://ai.google.dev/gemini-api/docs/models">Gemini API models</a>, as returned by a web search on 13 Nov 2026.</p>
+</section>
+<section>
+  <h2>9. First runs, 13 Nov: one clip, judged by Deepa</h2>
+  <p>Clip C0120, 19 seconds. The production request, agentic, one run per model. Deepa watched the clip and gave the truth.</p>
+  <div class="scroll"><table>
+    <tr><th>Point</th><th>Deepa's verdict</th><th>Gemini 3.8 Flash</th><th>Gemini 4 Hydrogen</th></tr>
+    <tr><td>Helper's bricks</td><td>Two</td><td><span class="tag keep">Right</span> two</td><td><span class="tag keep">Right</span> two</td></tr>
+    <tr><td>Strikes on the brick</td><td>Four. A small corner comes off on the fourth; the brick stays whole.</td><td><span class="tag drop">Wrong</span> three</td><td><span class="tag keep">Right</span> four. Its overview says "splits a brick", which is too strong.</td></tr>
+    <tr><td>Quiet moment near 13.5 s</td><td>None. The mason is working.</td><td><span class="tag drop">Wrong</span> offered 12.8 to 15.8 s as clean sound</td><td><span class="tag keep">Right</span> no clean sound there</td></tr>
+    <tr><td>Who speaks, 14 to 17 s</td><td>The interviewer</td><td><span class="tag keep">Right</span> off-camera chatter</td><td><span class="tag keep">Right</span> background speech, off camera</td></tr>
+    <tr><td>Head leaves the frame</td><td></td><td>Kept in a grade A piece</td><td>Left out as head-clipped</td></tr>
+    <tr><td>Uncertainty and limits left empty</td><td></td><td>23 of 34</td><td>5 of 35</td></tr>
+    <tr><td>Time</td><td></td><td>326.5 s, 19 looks</td><td>177.2 s, 6 looks</td></tr>
+    <tr><td>Total tokens</td><td></td><td>700,212</td><td>222,533</td></tr>
+    <tr><td>Cost today</td><td></td><td>about 0.27 dollars</td><td>about 0.52 dollars</td></tr>
+    <tr><td>Cost at January 2027 prices</td><td></td><td>about 0.53 dollars</td><td>about 0.52 dollars</td></tr>
+  </table></div>
+  <ul>
+    <li><b>Decision (Deepa, 13 Nov):</b> go with Gemini 4 Hydrogen. It rests on one clip and one run per model.</li>
+    <li><b>A lesson:</b> the earlier "truth" for this clip was written by Claude from frames and sound levels in October. It was wrong on the bricks, the strikes and the quiet gap. The truth must come from a person watching.</li>
+    <li><b>Hydrogen is not steady on every point.</b> In one of its three runs it named the mason as the speaker after 14 seconds.</li>
+    <li>Flash's cost assumes its cached tokens are billed at the cache rate. At the full rate it is about 0.65 dollars.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>10. Every field Hydrogen answered, and who uses it</h2>
+  <p>The answer shape has 147 field names. I searched the server and the plugin for each one. 93 are named somewhere in the code. 54 are never named by any rule or check. Some of those may still reach the placer when it opens a clip's full log; I did not trace that.</p>
+  <div class="scroll"><table>
+    <tr><th>Group</th><th>Fields</th><th>What Hydrogen wrote for this clip</th><th>What to do</th></tr>
+    <tr><td>Used by rules today</td><td>The usable window, grade, safety flags, shot size, cut points, accent events, the action peak, clean sound, paragraph fit and its limits, pairing constraints, entities.</td><td>Accurate where checked: four strikes timed to 0.3 s, the head-clipped stretch left out, limits filled.</td><td>Keep.</td></tr>
+    <tr><td>Written, never used: high value</td><td><code>clip_level_notes_for_editor</code>, the speech transcript and its translation, <code>why_sliced_here</code>, <code>hero_frame</code>, <code>prerequisite_action</code>, <code>beat_fit_reasoning</code>.</td><td>The notes held the two best judgements on this clip: do not cut between its four pieces, and leave out 15.5 to 16.8 s. The transcript holds a fact: the mason says the wall is "only for training".</td><td>Use them. The notes and the reasoning go to the placer. The transcript goes to the claim check. The hero frame becomes the picture shown for the piece.</td></tr>
+    <tr><td>Written, never used: for a later stage</td><td><code>vfx_and_graphics_opportunities</code>, <code>text_safe_zone</code>, <code>ocr_text_on_screen</code>.</td><td>Named where a label on the wall cavity would help and where a title can sit.</td><td>Offer them to the visuals stage. Check on-screen text against the brand rules.</td></tr>
+    <tr><td>Written, never used: low value</td><td>Lens feel, camera angle, depth of field, leading lines, movement easing, mood and marketing tags, sound-effect track fields, people roles.</td><td>Filled, plausible, read by nothing.</td><td>Drop after the test, to shorten the answer.</td></tr>
+  </table></div>
+  <h3>What this changes in how a clip is assessed</h3>
+  <ul>
+    <li><b>The model already makes editorial judgements that no rule reads.</b> Before adding a new pass, use what is already paid for.</li>
+    <li><b>Counts and outcomes need care.</b> Hydrogen counted right here, but called a chipped corner a split. Ask for the outcome as "what is different at the end, exactly".</li>
+    <li><b>Who is speaking is not steady.</b> Treat the speaker label as a lead, not a fact, until tested on more clips.</li>
+    <li><b>In this test the model was given sentences, not paragraphs,</b> and it fitted each piece to a sentence with a reason and a limit. That is the fine match the proposal wanted from a second pass. It may only need a time range added.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>11. Test plan: can Gemini 4 Hydrogen alone say which clip goes where?</h2>
+  <p>For approval. Nothing runs until Deepa says so. It runs outside the application on copies; no run, server or database is touched.</p>
+  <h3>The film</h3>
+  <ul>
+    <li><b>VW-19</b>, the short rat-trap bond explainer. It is complete on this computer: 11 sentences in 7 scenes, 46 clips, and Claude's finished cut. No file is needed from another computer.</li>
+  </ul>
+  <h3>First, a small check: which way should a short clip be watched?</h3>
+  <p>Added on 13 Nov at Deepa's request. The model can watch a clip in two ways. The plain way looks once. The look-again way lets it go back to parts of the clip. Today the application uses the look-again way only for a clip longer than 15 seconds. That limit is ours, set on 29 Oct; it is not the provider's. No published shortest length for the look-again way was found for any model, and Google's own pages do not name Hydrogen for it. Our one run on a 19-second clip is the only proof here that Hydrogen accepts it.</p>
+  <ul>
+    <li><b>VW-19's clips:</b> 46 in all, from 3.8 to 95 seconds. 28 are 15 seconds or less. 18 are longer.</li>
+    <li><b>The check:</b> four clips, of 3.8, 8.2, 13.0 and 16.8 seconds. Each is sent to Hydrogen twice, once each way, with the same question as arm 2. Eight small requests.</li>
+    <li><b>Recorded for each:</b> accepted or refused (an earlier fault was a refusal that came only with the look-again way and the answer form together); how many times it looked; tokens; seconds; and the two answers side by side, for Deepa to say which is better.</li>
+    <li><b>What it decides:</b> the way each of the 46 clips is sent in arm 2. If the look-again way is refused or no better on short clips, arm 2 does what the application does today: plain for the 28 short clips, look-again for the 18 longer ones. If it is clearly better on short clips, all 46 go the look-again way, and that becomes a proposal to lower the 15-second limit.</li>
+  </ul>
+  <h3>Three answers to compare</h3>
+  <div class="scroll"><table>
+    <tr><th>Arm</th><th>Who</th><th>How</th><th>Cost</th></tr>
+    <tr><td>1. Today</td><td>Claude, from text</td><td>The cut that exists: 10 footage shots and 5 blanks, placed from Flash's logs without seeing the footage.</td><td>None</td></tr>
+    <tr><td>2. Gemini alone, clip by clip</td><td>Gemini 4 Hydrogen</td><td>Each of the 46 clips is sent once with the 11 numbered sentences, watched the way the small check above decides. The question: which part of this clip best shows which sentence. For each: from second, to second, exact or partly or related only, and what is missing. "Fits none" is allowed. Then plain arithmetic picks the best proposal per sentence.</td><td>Paid, 46 requests, after the 8 of the small check</td></tr>
+    <tr><td>3. Fields audit</td><td>No model</td><td>For every place where arms 1 and 2 differ, and every pick Deepa marks wrong: was the deciding fact already in the log, in a field nobody reads?</td><td>None</td></tr>
+  </table></div>
+  <p class="muted">A fourth arm is held back: one request per sentence with four candidate clips. It runs only if arm 2's result is unclear.</p>
+  <h3>The truth</h3>
+  <ul>
+    <li>For each of the 11 sentences Deepa gets the candidate pieces as short video files: Claude's pick, Gemini's pick and any runner-up, labelled A, B, C with no names.</li>
+    <li>She marks each: shows exactly this, partly, or not. Then she picks the best, or "none, leave a blank".</li>
+    <li>No model judges. About one hour.</li>
+  </ul>
+  <h3>Measured</h3>
+  <ul>
+    <li>Per sentence: whose pick Deepa chose.</li>
+    <li>Picks she marks "not": the wrong placements of each arm.</li>
+    <li>Blanks where a fitting clip existed.</li>
+    <li>From and to seconds against the part she would use.</li>
+    <li>Tokens, cost and time for arm 2.</li>
+  </ul>
+  <h3>Rules set before the run</h3>
+  <ul>
+    <li>The small check runs first: eight requests. Their tokens and cost are reported with the answers. Deepa then says which way to watch short clips, and go or stop.</li>
+    <li>A cap of 15 US dollars for the whole test.</li>
+    <li>Gemini-alone placement goes forward as a build proposal only if Deepa marks it right on at least 9 of 11 sentences and it has fewer wrong picks than today's cut.</li>
+    <li>If the two are close, today's flow stays and the cheaper fixes go first: use the unread fields, filled examples.</li>
+  </ul>
+  <h3>What it will not show</h3>
+  <ul>
+    <li>One short film of one kind. Eleven sentences is a small number.</li>
+    <li>The cut as a sequence: shot sizes, order, joins. That stays Claude's and the second look's job in every arm.</li>
+    <li>Library clips, and films with little footage.</li>
+  </ul>
+</section>
+</div>
