@@ -129,6 +129,25 @@ def apply(text, items, register, tweaks=None):
     return ''.join(out), spans
 
 
+def already_read_as(text, items, register, tweaks):
+    """design/192 (voice 12): the first tweak whose tag its sentence is read with anyway (from the register, the base list and the other tweaks), which apply()
+    would not send; None when every tweak changes something."""
+    base = {(i['passage_id'], i['sentence']): i['tag'].strip() for i in (items or [])}
+    rows = sentences_of(text)
+    for t in tweaks or []:
+        key = (t['passage_id'], t['sentence'])
+        others = {**base, **{(o['passage_id'], o['sentence']): o['tag'].strip() for o in tweaks if o is not t}}
+        current = (register or '').strip() or None
+        for r in rows:
+            k = (r['passage_id'], r['sentence'])
+            current = others.get(k, current)
+            if k == key:
+                break
+        if current and current.lower() == t['tag'].strip().lower():
+            return t
+    return None
+
+
 def untag(tagged, spans):
     out, cursor = [], 0
     for a, b in spans:

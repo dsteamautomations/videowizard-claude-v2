@@ -461,6 +461,9 @@ def set_tweaks(store, run, outputs, voice_id, tweaks):
     problems = VD.validate({'register': doc.get('register') or '[measured]', 'items': tweaks}, script['spoken_text'])
     if problems:
         raise Problem(422, 'DIRECTION', 'The tweaks were refused: ' + '; '.join(problems[:6]) + '. Nothing was narrated.', problems=problems)
+    same = VD.already_read_as(script['spoken_text'], doc.get('base') or [], doc.get('register') or '', tweaks) if doc.get('chosen') != 'none' else None
+    if same:   # design/192 (voice 12): a tag equal to the one in force is never sent to the narrator; say so instead of returning the stored recording
+        raise Problem(422, 'TAG_IN_FORCE', f"This sentence is already read as {same['tag']}; pick a different tag. Nothing was narrated.")
     doc.setdefault('tweaks', {})[voice_id] = [{'passage_id': t['passage_id'], 'sentence': t['sentence'], 'tag': t['tag']} for t in tweaks]
     save_doc(store, run, 'direction.json', doc)
     return {'voice_id': voice_id, 'tweaks': len(tweaks)}
