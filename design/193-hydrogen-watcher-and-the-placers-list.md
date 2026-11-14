@@ -1,6 +1,6 @@
 # design/193: Gemini 4 Hydrogen watches every clip, fits by sentence, and the placer gets each piece's own lines
 
-**Status:** built on 14 Nov 2026 on the user's go-ahead, committed, **not deployed**. See "Built" at the end.
+**Status:** built and **deployed on 14 Nov 2026** (server 0.98.0, plugin 0.84.0, minimum 0.84.0, main 980f805). See "Built" and "Deployed" at the end.
 
 **From:** the tests of 13 and 14 Nov on VW-19 ([hydrogen-test-results.md](_work/hydrogen-test-results.md), [hydrogen-settings-test.md](_work/hydrogen-settings-test.md), [phase1-sentence-fit-results.md](_work/phase1-sentence-fit-results.md)) and the verdict agreed on 14 Nov: change the model and the list now; do not rebuild the placing around Gemini yet. Claude stays the one who chooses the clip.
 
@@ -132,3 +132,7 @@ One real check at the deployment: one short clip analysed on the live server wit
 **Not covered, beyond section 7**
 - The list is still long for a common action: about 83,000 characters for VW-19's second scene against 29,000 today, in several part files.
 - The plugin's instructions file (`plugin/commands/vw.md`) was not changed; the stage instructions carry the new wording.
+
+## 9. Deployed
+
+14 Nov 2026, on the user's word: server 0.98.0, plugin 0.84.0 (minimum 0.84.0), main 980f805. Server and workers restarted; no job was running. The live instructions (version 3) carry the new analysis settings and the two rules, read back from the live database. No live key test was made, by the user's decision. First real use: VW-23, whose analysis and first cut are redone for a comparison with its cut of 13 Nov (baseline: [vw23-baseline-before-193.md](_work/vw23-baseline-before-193.md)).

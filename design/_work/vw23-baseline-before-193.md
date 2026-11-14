@@ -16,6 +16,6 @@
 Where the old records are:
 - The cut: `stage2/options-v1.json`; the review film: `stage2/review-v1-33a31026.mp4`. Both names carry their version, so a new cut does not overwrite them. The options output row (id `8462abfd-6212-46c4-a22f-f824ab4e2e0c`) is marked replaced when the analysis is redone, not deleted.
 - The answers: the run's log, stage `master`, lines "slide N, decision KEEP or REJECT".
-- The Flash logs and the old list (`analysis/*.json`, `stage2/package.json`, `stage2/session.json`) have fixed names and would be overwritten. They are to be copied to `kept-before-193/` on the VM before the redo. **Not done yet on 14 Nov: the Google Cloud sign-in on this computer had expired.**
+- The Flash logs and the old list (`analysis/*.json`, `stage2/package.json`, `stage2/session.json`) have fixed names and would be overwritten. They were copied on 14 Nov, before the redo, to `kept-before-193/` inside the run's storage folder: 287 files. Copies only; nothing existing was changed.
 
 The split of the 41 slides into footage shots, alternatives and blanks is not counted here; it is read from the cut when the comparison is made.
