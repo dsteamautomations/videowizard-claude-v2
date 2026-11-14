@@ -566,8 +566,20 @@ def direction_for(store, run, voice_id):
     return {'register': doc.get('register') or '', 'items': doc.get('base') or [], 'tweaks': (doc.get('tweaks') or {}).get(voice_id) or [], 'digest': doc.get('digest')}
 
 
+VOICE_FINAL = ('The final narration is chosen, so the voice stage is closed: nothing was recorded and nothing was charged. '
+               'To record again, reopen the voice stage first (`vw revise --stage voice`).')
+
+
+def refuse_after_final(outputs):
+    """design/192 (voice 13): once a narration is the voice stage's output, no tryout and no narration is made, from the page or the chat, until the stage is
+    reopened (a revise makes that output stale, so it is no longer among the current ones)."""
+    if any(o['stage'] == 'voice' and o['unit'] is None for o in outputs):
+        raise Problem(409, 'VOICE_FINAL', VOICE_FINAL)
+
+
 def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tweaks=None):
     """A full narration in one voice with the run's direction; every narration is kept on the page state."""
+    refuse_after_final(outputs)
     if tweaks is not None:
         set_tweaks(store, run, outputs, voice_id, tweaks)
     script, _ = script_text(store, outputs)
@@ -604,6 +616,7 @@ def v4_settings(values):
 def tryout(conn, store, user, run, outputs, voice_ids, request_id, settings=None):
     """design/54 step 2: up to six voices read the chosen test passage with the direction's register and tags; a library voice is saved to the account by the submission.
     design/139 R2: read with the operator's v4 settings, recorded on each tryout so the narration uses them."""
+    refuse_after_final(outputs)
     check_cap(voice_ids, TRYOUT_MAX, 'tryout')
     settings = v4_settings(settings)
     doc = direction_of(store, run)
