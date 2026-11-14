@@ -358,7 +358,7 @@ def propose(conn, store, user, run, doc):
     save_session(store, run, session)
     return {'version': version, 'digest': identity, 'options': len(work['options']), 'gaps': session['versions'][-1]['gaps'],
             **V.answer_flags(result['flags']), 'flags_total': len(result['flags']), 'scenes': scenes,
-            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of') if s.get(k) is not None} | {'seconds': round(s['frames'] / timeline(run)['fps'], 2)} for s in slides],   # defect 47
+            'slides': [{k: s.get(k) for k in ('no', 'type', 'title', 'b_roll', 'note', 'of', 'flags') if s.get(k) is not None} | {'seconds': round(s['frames'] / timeline(run)['fps'], 2)} for s in slides],   # defect 47
             **({'advice': round_advice(version)} if round_advice(version) else {}),
             'next': PROPOSE_NEXT}
 
@@ -681,7 +681,7 @@ def _slide_rows(sl, decisions, fps):
         lab = str(s['no'])
         d = decisions.get(lab)
         needs, why = needs_answer(s, sl, decisions)
-        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'library', 'note', 'of', 'ai_only', 'intent', 'marker_reasons')},
+        rows.append({'slide': lab, **{k: s.get(k) for k in ('type', 'title', 'scene', 'number', 'colour', 'hint', 'words', 'clip', 'b_roll', 'library', 'note', 'of', 'ai_only', 'intent', 'marker_reasons', 'flags')},
                      'lines': list(s.get('lines') or []), 'seconds': round(s['frames'] / fps, 2), 'answerable': _answerable(s), 'needs_answer': needs, 'why': why,
                      'answer': ({k: d.get(k) for k in ('action', 'note', 'edit', 'by', 'at')} if d else None)})
     return rows

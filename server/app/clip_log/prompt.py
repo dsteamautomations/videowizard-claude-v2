@@ -27,6 +27,16 @@ def policy_paragraph(policy):
     return ('SPEAKER POLICY IN FORCE: Mode 4, Picture only (allow_speaker_audio=false, show_speaker_video=true). Source speech is muted; people may be seen talking. Log speech for context.')
 
 
+GRADES_AND_FLAGS = (   # design/195 (SK, 14 Nov 2026): a flag warns the person who chooses; only useless footage is rejected
+    'USABILITY GRADE AND FLAGS. usability_grade REJECT is only for footage nobody could use: an empty frame with no subject, an uncontrolled camera move (a whip, a drop, a bump) '
+    'across the whole sub-clip, or a picture that cannot be watched (out of focus, black, blown out). Grade every other sub-clip A, B or C on its picture alone. A person talking, '
+    'laughing or looking at the lens is never by itself a reason for REJECT: fill speaker_crop_module so the solver can try to hold the frame on the action alone, and slice so that '
+    'the seconds without the talk or the look stand as their own sub-clip. When someone walks in, or the action is interrupted, slice around those seconds; do not reject the whole. '
+    'risk_flags are labels for the person who chooses the shots: a licence plate, a logo, a label, a signboard, a phone, clutter, a crew item, an unprofessional moment. '
+    'A flag never lowers the grade, and client_safe is false only when the sub-clip breaks a brand or safety rule the project config records. A foreground object the camera moves '
+    'past in a reveal is a technique, not a defect and not a flag.')
+
+
 def beat_rule(n, by_sentence):
     """Rule 6 of the instruction: the fit by paragraph as it always was, or (design/193 R2) the fit by sentence, written into the two text
     fields the form already has: in the look-again way the provider refuses the form with even one more field (found 14 Nov 2026)."""
@@ -82,6 +92,8 @@ PILLAR 5 — Script-beat alignment, process continuity and marketing value: beat
 PILLAR 6 — Colour and audio: clip-level lighting_and_weather, exposure_health, contrast_profile, color_match_group_id (so matching shots can be graded together). Per sub-clip: clean_nat_sound_intervals (speech-free mechanical or ambient sound worth keeping on track A2, exact in/out) and creative_sfx_cues for track A3 with exact start/end/duration and a description; resolved_sfx_file is always HUMAN_TO_SOURCE because no asset manifest exists.
 
 PILLAR 7 — Per-sub-clip client safety and technical QC (technical_qc_and_remediation): ocr_text_on_screen, client_safe plus risk_flags (missing PPE, trash or clutter, competitor brands, licence plates, children, copyrighted music), defects_detected with ranges (focus_hunt, exposure_pump, camera_bump, rolling_shutter, single_channel_audio, other), stabilization_needed, horizon_rotation_deg, voice_isolation_recommended, dual_mono_channel_fix.
+
+{GRADES_AND_FLAGS}
 
 EXTRA (beyond the blueprint, keep them): vfx_and_graphics_opportunities per sub-clip: where a callout, arrow, cutaway diagram, dynamic zoom, speed ramp, clean-plate removal or text overlay would help the explainer, with exact window and why. editorial_ideas per sub-clip: how an editor could use it. entities at clip level with first/last seen. clip_level_notes_for_editor for anything that does not fit a field.
 

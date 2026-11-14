@@ -52,6 +52,19 @@ def _seconds(frames, fps):
     return f'{frames / fps:.1f} s'
 
 
+def warnings(row):
+    """design/195: what the operator is told about a piece: the clip study's flags in its own words, and its "not safe" mark. None when there is nothing."""
+    out = [ascii_text(str(f).replace('_', ' ')) for f in row.get('risk_flags') or []]
+    if row.get('client_safe') is False:
+        out.append('marked not safe for the client by the clip study')
+    return out or None
+
+
+def has_lines(row):
+    w = warnings(row)
+    return wrap('Has: ' + '; '.join(w)) if w else []
+
+
 def slides(doc, pk, fps):
     beats = {b['beat_id']: (i + 1, b) for i, b in enumerate(pk['beats'])}
     rows = {r['sub_clip_id']: r for r in pk['sub_clips']}
@@ -90,17 +103,17 @@ def slides(doc, pk, fps):
             what = clip_name(row, cards)
             out.append({**common, 'no': label, 'type': 'shot', 'title': name, 'clip': what, 'b_roll': b_roll, 'sub_clip_id': ev.get('sub_clip_id'),
                         'library': row.get('library_from') if ev.get('match') == 'library' else None,   # design/147 L4: a library proposal names its film
-                        'note': ev.get('note') if isinstance(ev.get('note'), dict) else None,
+                        'note': ev.get('note') if isinstance(ev.get('note'), dict) else None, 'flags': warnings(row),
                         'marker_reasons': {k: v for k, v in (ev.get('marker_reasons') or {}).items() if str(v or '').strip()} or None,   # design/142 R4: shown to the operator
                         'hint': ('B-roll: fine to reject. ' if b_roll else '') + 'Keep uses it, Reject leaves an AI stretch in its place, Trim shortens or shifts it',
-                        'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said)})
+                        'lines': [name + (' · B-roll' if b_roll else ''), what, f'Time: {_seconds(k, fps)}'] + said_lines(said) + has_lines(row)})
             for m, alt in enumerate(ev.get('alternatives') or [], 1):
                 arow = rows.get(alt.get('sub_clip_id')) or {'clip_id': '', 'clip_name': alt.get('sub_clip_id', '')}
                 aname = f'{name} · Alternative {m}'
                 out.append({**common, 'no': f'{label}A{m}', 'type': 'alternative', 'title': aname, 'of': label, 'alt_index': m - 1, 'clip': clip_name(arow, cards), 'sub_clip_id': alt.get('sub_clip_id'),
-                            'library': arow.get('library_from') if alt.get('match') == 'library' else None,
+                            'library': arow.get('library_from') if alt.get('match') == 'library' else None, 'flags': warnings(arow),
                             'b_roll': alt.get('match') == 'b_roll', 'hint': f'another clip for Shot {i}; open when Shot {i} is rejected; keep at most one',
-                            'lines': [aname, clip_name(arow, cards), f'Time: {_seconds(k, fps)}', f'Words: the same as Shot {i}']})
+                            'lines': [aname, clip_name(arow, cards), f'Time: {_seconds(k, fps)}', f'Words: the same as Shot {i}'] + has_lines(arow)})
     return out
 
 

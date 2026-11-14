@@ -129,7 +129,7 @@ def eligibility(sub, policy, max_zoom, src_w, src_h, timeline_w, timeline_h):
     safe, _, gone = client_safety(sub, policy)
     if gone and safe and not sub['client_safe']:
         notes.append('client-safe after operator waiver of: ' + ', '.join(gone))
-    if sub['usability_grade'] == 'REJECT' or not safe:
+    if sub['usability_grade'] == 'REJECT':   # design/195 (SK, 14 Nov 2026): "not safe" is a warning on the shot, the operator decides; only a reject grade removes a piece
         return 'REJECT_ALL', None, notes
     talking = bool(p.get('looking_at_lens') or (p.get('mouth_visible') and p.get('speech_translation_block')))   # design/125 P4
     if not talking:

@@ -111,6 +111,7 @@ function row(s,can){
   if(s.words){info+='<div class="words">“'+esc(s.words)+'”</div>';}
   if(s.type==='alternative'){info+='<div class="ds">the same words as '+esc(s.of)+'</div>';}
   if(s.type==='ai'&&s.intent){info+='<div class="ds">For AI: '+esc(s.intent)+'</div>';}
+  if(s.flags&&s.flags.length){info+='<div class="q">'+esc('Has: '+s.flags.join('; '))+'</div>';}
   if(s.note&&s.note.question){info+='<div class="q">Question: '+esc(s.note.question)+'</div>';}
   if(s.marker_reasons){info+='<div class="q">Timing: '+esc(Object.values(s.marker_reasons).join('; '))+'</div>';}
   info+='<div class="ds">'+esc(s.hint||'')+' · '+fmt(s.seconds)+(c?' · at '+fmt(c[0]):'')+'</div></div>';
