@@ -2,7 +2,12 @@
 
 14 November 2026. Approved by SK on 14 Nov; built on branch `accurate-images` in the steps of section 12. The trial's drawings, pictures and prompts are outside the repository, in the review folder (`drawings-first-test-2026-11-14`). The drawing standard is design/195.
 
-**One change from the approved plan, made in the build (step 1):** the drawing tool sits on the server, not in the plugin. A drawing set is data (facts, pieces in real units, people, views); the helper writes that description and the server draws every view from it (`server/app/draw3d.py`). So no helper code runs anywhere, the same description can be checked before it is drawn, and labels are placed by the server in one column. Wherever this document says "the drawing tool in the plugin" or "on the operator's machine", read "the server draws the helper's description". Read against `main` (server 0.98.0, not deployed).
+**One change from the approved plan, made in the build (step 1):** the drawing tool sits on the server, not in the plugin. A drawing set is data (facts, pieces in real units, people, views); the helper writes that description and the server draws every view from it (`server/app/draw3d.py`). So no helper code runs anywhere, the same description can be checked before it is drawn, and labels are placed by the server in one column. Wherever this document says "the drawing tool in the plugin" or "on the operator's machine", read "the server draws the helper's description".
+
+**Three more things the build settled (steps 4 and 5):**
+- The guide's first frame (the Blender boxes) stays Image 1 of a still, because the take is made from that guide and must start on it. The shot's two drawings follow as Images 2 and 3. A thing's real shape enters the drawing when its piece of the scene is marked `drawn_as`.
+- No switch: the still made from the box frame alone is retired for every new still at release (SK's rule of 12 Nov: no route switch), not "kept until the first film has run". The rows are 55 to 58 of design/35.
+- The server has no cutting view: a cut is modelled as its own pieces. Built: steps 1 to 6 on branch `accurate-images`; nothing deployed. Read against `main` (server 0.98.0, not deployed).
 
 Basis: SK's trial document (`drawings-first-handover-from-trial-2026-11-14.txt`), the drawing standard (`drawing-standard-2026-11-14.md`), and the five-scenario trial on film VW-18 (`drawings-first-test-2026-11-14/vw18/RESULTS.md`).
 

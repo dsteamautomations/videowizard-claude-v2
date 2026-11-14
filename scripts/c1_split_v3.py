@@ -96,6 +96,8 @@ if __name__ == '__main__':
         prompt = d190(prompt, parts)
         from d191_wording_v3 import apply as d191   # design/191: a change of the plan's shared part is asked once
         prompt = d191(prompt, parts)
+        from d194_wording_v3 import apply as d194   # design/194: a thing drawn before the round; the shot's drawing before the still; the look reference
+        prompt = d194(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

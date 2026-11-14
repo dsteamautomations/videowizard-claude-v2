@@ -14,6 +14,7 @@ You write data and words. You never run Blender, never call a picture or video m
 | Step | Command | Paid? |
 |---|---|---|
 | 1. Scene description | a `vw-guide-scene` helper writes `work/guide/<shot>/scene.json`; `vw guide scene --shot S --file …` | free |
+| 1b. The shot's drawing | the server draws the shot from the scene: through the camera and from above, each person with front, back and working arm marked. The operator approves it in the chat (`vw visuals next`), or `vw guide drawing --shot S` then `vw guide drawing-approve --shot S --sha … --quote "<their words>"`. No still before their Yes. | free |
 | 2. Check frames | `vw guide frames --shot S` (three frames and a strip arrive in `work/guide/<shot>/frames/`) | free |
 | 3. The double check | a fresh `vw-guide-check` helper, who has not seen the build, writes `verdict.json`; `vw guide verdict --shot S --file …` | free |
 | 4. The guide is rendered | by the server, after a passing verdict; `vw guide status --shot S` | free, several minutes |
@@ -128,3 +129,24 @@ Ask in this order, and change one thing:
 4. Only then the words, and only for what the guide and the still cannot carry.
 
 The same request is never sent twice. After a second failure, do not try a third time: propose cutting the shot into shorter cuts, a closer angle, or leaving the detail out, and let the operator choose.
+
+## A person stands where a real person would do the job
+
+The server refuses a posture no person can hold, before any spend. Lay the place out so that it cannot arise:
+
+1. **Face the work.** The body faces what the person does or watches. What the right hand uses is in front of the body or to its right, between hip and shoulder height.
+2. **Never behind.** Nothing a hand uses lies behind the line of the shoulders. An arm bends at the elbow; it never reaches backward and never stretches (0.62 m from shoulder to hand at most).
+3. **Head and body agree.** Give `"watches": [x, y, z]` on a person who watches something: it must lie within 45 degrees of the way the body faces.
+4. **Right side to the camera.** A person who faces left has the right side away from the camera, so the working hand is hidden. A person who works with the right hand faces right, or the camera stands over the right shoulder.
+5. **The layout gives way, not the body.** Where the plan's layout makes the job impossible to stage, move the person, the thing or the camera by the least that makes it possible; mirror the layout if that is what it takes. The plan's meaning stays (who does what to what); its left and right may change.
+6. **Say every such change.** List it in the scene: `"changed_from_plan": ["The plan had the man at the right of the machine; he stands at its left, facing right, so his right hand is toward the camera."]`. The operator sees these lines with the shot's drawing.
+
+## The shot's drawing
+
+When the scene is accepted, the server draws it from the same numbers as the guide (free): through the film's camera and from above. Every person is drawn with a pale face and chest with dark marks, a purple back and an orange right arm, so the operator and the picture AI can both see which way each person faces and which arm works.
+
+- A piece of the set or a prop that is a thing with an approved drawing set (the `vw:drawing` skill) carries `"drawn_as": "<element id>"`, and `"turn": <degrees>` when it is turned. It is then drawn as the thing's own model, standing where its box stands. Make the box the thing's real size: the server says when the two disagree.
+- The operator approves the drawing before the still. A correction changes the scene, and the new scene is drawn and approved again.
+- The still's request then carries the two drawings after the guide's first frame, with the words that explain them. You do not send them and you do not describe them: write the still's words as before.
+- When an approved still looks drawn rather than photographed, make it again with a look reference: `"look": "<the id of an approved picture of this film>"` in the still's file. Only its surface, light and colour are taken.
+

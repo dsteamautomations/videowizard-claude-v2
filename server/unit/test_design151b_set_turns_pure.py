@@ -254,7 +254,7 @@ def test_the_instructions_say_a_footage_picture_needs_no_ai_set():
     root = Path(VS.__file__).resolve().parents[2]
     v3 = json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
     parts = {p['name']: p['text'] for p in next(s for s in v3['stages'] if s['name'] == 'visuals')['parts']}
-    assert 'a thing with an approved footage picture gets no AI set' in parts['picture-search'] and 'is made from it' not in parts['picture-search']
+    assert 'a thing with an approved footage picture and no approved drawings gets no AI set' in parts['picture-search'] and 'is made from it' not in parts['picture-search']   # design/194: with approved drawings it gets a set
     assert "a thing's approved footage picture, else the ticked picture of its set" in parts['later']
     md = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'gets no AI set' in md and 'is made from it' not in md
