@@ -1193,6 +1193,8 @@ def cmd_stage(a):
     for ref in refs:
         m['files'] = [f for f in m['files'] if f['name'] != ref['name']] + [{**ref, 'stage': a.stage, 'action': 'retain' if result.get('retain', True) else 'upload'}]
     save_json(manifest_path(m['code']), m)
+    if a.stage == 'script':   # design/192 (script row 4): the changes, the decisions and the claims, in the run's log
+        log_quiet(m, 'step', stages_text.script_log_line(result.get('summary') or {}))
     warning = (result.get('summary') or {}).get('length_warning')   # design/39 4.3: said out loud, not only stored
     if a.stage == 'media':   # design/57: the receipt, not the row; the per-clip summary and the file references stay on the server
         clips = (row.get('summary') or {}).get('clips') or []

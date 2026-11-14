@@ -534,4 +534,13 @@ def script_record(ws, procedure, prior):
     return {'files': ['out/script.json'], 'summary': summary, 'retain': True, 'upload': True}
 
 
+def script_log_line(summary):
+    """design/192 (script row 4): what the script record decided, as one line of the run's log: the changes proposed, accepted and rejected, and each claim
+    with checked or not. Never the script itself."""
+    claims = summary.get('claims') or []
+    said = '; '.join(f'"{" ".join(str(c.get("text") or "").split())[:80]}" ' + ('checked' if c.get('checked') else 'not checked') for c in claims)
+    return (f"script recorded: {summary.get('changes_proposed', 0)} change(s) proposed, {summary.get('changes_accepted', 0)} accepted, {summary.get('changes_rejected', 0)} rejected; "
+            + (f'{len(claims)} claim(s): {said}' if claims else 'no claims listed'))
+
+
 STAGES = {'intake': (intake_prepare, intake_record), 'brief': (brief_prepare, brief_record), 'script': (script_prepare, script_record)}
