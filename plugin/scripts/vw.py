@@ -769,6 +769,37 @@ def _guide_fetch(base, shot, folder, names):
     return out
 
 
+def cmd_drawing(a):
+    """design/194: a thing's drawing set. A helper describes the thing once as data (facts with sources, solid pieces in real units, views); the server
+    checks it, draws every view and keeps both sheets of each: the labelled one for the operator, the plain one for the picture AI. Free. The operator
+    approves the drawings (in the chat, or here with their words) before any paid picture uses them."""
+    m = active()
+    base = f"/api/runs/{m['run_id']}/visuals"
+    ws = workspace(m['code'])
+    if not a.element:
+        emit({'action': 'refused', 'message': f'Give the thing: `vw drawing {a.what} --element E`.'}, 2)
+    if a.what == 'set':
+        out = write(base + '/drawing/set', {'element_id': a.element, 'drawing': _guide_json(ws, a.file, 'set')})
+        emit(out, 0, out.get('next'))
+    if a.what == 'show':
+        import base64 as _b64
+        st = call('GET', f'{base}/drawing/{a.element}')
+        folder = ws / 'work' / 'drawing' / a.element
+        folder.mkdir(parents=True, exist_ok=True)
+        paths = []
+        for v in st.get('views') or []:
+            got = call('GET', f"{base}/drawing/{a.element}/file/{v['id']}")
+            (folder / got['file']).write_bytes(_b64.b64decode(got['base64']))
+            paths.append(str(folder / got['file']))
+        emit({**st, 'files': paths}, 0, f"{len(paths)} labelled sheets in work/drawing/{a.element}/; the drawing set is {st.get('status')}. Show them to the operator: each sheet says what it shows "
+                                        f"and what it is for. Assumed sizes: {'; '.join(st.get('assumed') or []) or 'none'}.")
+    if not (a.sha and a.quote) or (a.what == 'reject' and not a.notes):
+        emit({'action': 'refused', 'message': '`vw drawing approve --element E --sha <its sha256> --quote "<the operator\'s words>"`; '
+                                              '`vw drawing reject --element E --sha <its sha256> --notes "<what is wrong>" --quote "<the operator\'s words>"`.'}, 2)
+    out = write(base + '/drawing/verdict', {'element_id': a.element, 'sha256': a.sha, 'approved': a.what == 'approve', 'quote': a.quote, 'notes': a.notes or ''})
+    emit(out, 0, out.get('next'))
+
+
 def cmd_guide(a):
     """Integration steps B to D: one AI video shot made the new way: a scene description (checked before any spend), check frames, a fresh checker's
     verdict, the rendered guide, the still on GPT image 2.6 and its overlay, the take's words, and the take on the operator's word. Blender runs on the
@@ -3184,6 +3215,10 @@ def build_parser():
     s.add_argument('--cause', choices=['still', 'guide', 'words', 'model'])
     s.add_argument('--again', action='store_true', help='shoot: send the same request once more, only after a clip that came back unusable, on the operator\'s word')
     s.set_defaults(fn=cmd_guide)
+    s = sub.add_parser('drawing'); s.add_argument('what', choices=['set', 'show', 'approve', 'reject'])   # design/194: a thing's drawing set
+    for flag in ('--element', '--file', '--sha', '--quote', '--notes'):
+        s.add_argument(flag)
+    s.set_defaults(fn=cmd_drawing)
     s = sub.add_parser('options'); s.add_argument('what', choices=['prepare', 'coverage', 'scenes', 'check', 'propose', 'second-look', 'join-second-look', 'library', 'frames', 'inspect', 'render', 'status', 'show', 'log', 'fetch', 'record'])
     for flag in ('--file', '--sub', '--edge', '--option', '--unit', '--quote', '--film', '--scene'):   # design/142 R6: --scene BEAT_02,BEAT_07 for the second look again
         s.add_argument(flag)
