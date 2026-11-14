@@ -8,7 +8,7 @@ Run by Claude's scripts outside the application (`model-test/sentences_vw19_hydr
 
 - **Gemini can answer the fine question.** Given the script as sentences, it named the sentences each piece shows and how exactly, for 134 of 142 allowed pieces, in the form asked.
 - **It is strict, and that is the gain.** It calls a fit exact for only three of the eleven sentences (3, 8 and 9: the cavities, bricks laid on edge, the pattern of each course). For the opening, the quality sentence and the closing it offers footage only as "related". For four sentences it offers nothing usable, and those are the same four that today's cut left blank.
-- **The cut built from its answers differs from today's on 7 of 11 sentences**, and is honest about what each shot lacks. Which is better is for Deepa: the A and B files are ready.
+- **The cut built from its answers is about level with today's on this film.** Deepa judged the seven sentences with footage blind: the new cut better on 2, today's better on 3, the same on 2.
 - **One weakness found:** the seconds it gives are mostly the whole piece, not the few seconds that show the sentence.
 - **One limit found:** in the look-again way Google refuses our answer form with even one more field. The sentence fit had to go into fields the form already has.
 
@@ -139,13 +139,41 @@ A fresh Claude helper that had not seen the footage or today's cut built the pic
 
 ## Test 6 and 7: Deepa's judgement and the new score
 
-Ready, not done. For the seven sentences with footage on either side there are two short video files, A and B, drawn by lot:
+Deepa watched the A and B files on 14 Nov without knowing which was which. The key was opened afterwards.
 
-- Files: `C:\Coworkspace\Review Videobuilder Tool\model-test\out-vw19-ab\` (`S01-A.mp4` to `S11-B.mp4`).
-- The sheet to mark: [phase1-ab-sheet.md](phase1-ab-sheet.md).
-- The key (which is today's and which is new): `key.json` in the same folder. Open it only after marking.
+| # | Sentence (short) | Deepa's mark | Which that was |
+|---|---|---|---|
+| 1 | The opening | B is better | **The new cut** (C0112, then C0089) |
+| 2 | Unlike conventional brickwork, bricks on edge | B is better | **Today's cut** (C0102) |
+| 3 | Continuous hollow cavities | B is better | **The new cut** (C0093) |
+| 6 | Quality of the bricks | The same clip in both; she likes neither: "there is nothing about quality" | Both wrong. Gemini had marked this clip "related" only and wrote "does not show brick testing or quality". Today's cut had called it a direct match. |
+| 8 | Bricks laid carefully on edge | The same, and a good fit | Both right (the same seconds of C0091) |
+| 9 | Each course forms a pattern | B is better | **Today's cut** (C0108, then C0099) |
+| 11 | The closing | A is better. B shows the same building twice, the second time with the camera moving the other way | **Today's cut** is A (C0136, then the round pavilion C0288). The new cut is B (C0134, then C0136: two clips of the Takshashila building). |
 
-The new score is counted from those marks.
+**The score, seven sentences with footage:**
+
+| | Sentences |
+|---|---|
+| The new cut better | 2 (sentences 1 and 3) |
+| Today's cut better | 3 (sentences 2, 9 and 11) |
+| The same and right | 1 (sentence 8) |
+| The same and wrong | 1 (sentence 6) |
+
+The four blanks are the same in both cuts.
+
+**Reading, with care:**
+- On this film the new way is not better than today's. It is about level: two better, three worse.
+- Where Gemini's own mark was "exact" (sentences 3, 8 and one shot of 9) the picks were right twice and lost once. Where the helper built from "partly" or "related" pieces (1, 2, 9's second shot, 11), it won once and lost three times.
+- Gemini's strictness was right on sentence 6: it said the clip does not show quality, and Deepa agrees. The helper used it anyway because the test's rules allowed a related piece under a general statement. Under a stricter rule both cuts would have a blank there.
+- Seven sentences, one film, one judge. A difference of one sentence is not a result.
+
+**Why the new cut put the same building twice under sentence 11.** Two causes, both in how the test was made, and one gap in the application:
+1. **The helper was not given such a rule.** It worked from six rules written for this test. They say "do not use the same seconds twice" and "prefer different clips side by side". C0134 and C0136 are different clips, so it broke neither.
+2. **Nothing in the list says the two clips are the same building.** Gemini watches each clip alone. It described C0134 as "tracking left to right along the finished two-storey building" and C0136 as "pulls backward from the Takshashila entrance porch". Both name the building, but no field says "this is the same subject as that clip, filmed the other way".
+3. **In the application I found a rule only inside one clip:** two pieces of the same clip can be marked "mutually exclusive" (to avoid a zoom in and out), and the server checks that. I found no rule, in the instructions or the checks, for two different clips that film the same subject with the camera going there and back. If such a rule exists in the editors' own guide, it is not in the application as far as I searched. Today's cut avoided the fault here by taking the second shot from another building.
+
+This is what the proposal's "one look at the whole film" (change E) is for: one pass over all the clips that says which clips are the same place or the same move filmed twice. Proposed as a new row for the fixes list: **two clips of the same subject with the camera moving in opposite directions are one choice; use one of them.**
 
 ## Pauses, now that the fit is by sentence
 
@@ -166,11 +194,10 @@ All are inside the usual limit of 4 seconds.
 | From which second to which | Weak as asked: 344 of 417 answers give the whole piece. Needs a sharper question or a narrower piece. |
 | Claude builds the cut from Gemini's answers and a richer list | Works on the choice per sentence. The list is long for the action sentences and needs a cut-off. |
 | The form | At its limit in the look-again way: to add a field, one must go. |
-| The operator's answers as a score | The baseline is counted (8 of 10 kept). The comparison waits for Deepa's marks. |
+| The operator's answers as a score | Counted. Baseline: 8 of 10 kept. Deepa's blind comparison: the new cut better on 2 sentences, today's on 3, level on 2. |
 
 ## Not known, not done
 
-- Whether the new picks are better: Deepa's marks.
 - Whether Gemini's descriptions are right: no fact was checked by a person in this phase.
 - The full options stage with the new list (frames, crops, the server's rule check, the second look).
 - Another kind of film. This is one short documentary-explainer.
