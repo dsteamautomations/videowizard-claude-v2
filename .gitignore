@@ -11,3 +11,6 @@ design/_work/sample-run/
 design/31-ipv6-stall-evidence.md
 design/31-operator-laptop-setup.md
 .DS_Store
+
+# local unit tests of work in progress (SK, 14 Nov 2026): never committed
+unit-local/

@@ -68,25 +68,38 @@ def _headers(response):
     return {k: response.headers[k] for k in ('request-id', 'history-item-id', 'character-cost') if k in response.headers}
 
 
-def _ensure_piece(piece, snap, provider, renew):
+def _ensure_piece(piece, snap, provider, renew, jid=None):
     """Journal one piece: reuse a journaled response or audio, otherwise one paid request. The raw timed response is written before
-    it is parsed (a bad timing can never cause a second paid call)."""
+    it is parsed (a bad timing can never cause a second paid call). Returns whether this job paid for the piece (design/192, voice 7): the journal names the
+    job that made the request; a piece journaled by another job, or before journals named one, is a reused recording."""
     raw_path, mp3_path, meta_path = piece_paths(piece)
     if mp3_path.is_file() and meta_path.is_file():
-        return
+        return bool(jid) and json.loads(meta_path.read_text(encoding='utf-8')).get('job_id') == jid
     if raw_path.is_file():
         saved = json.loads(raw_path.read_text(encoding='utf-8'))
         response = httpx.Response(200, content=saved['body'].encode('utf-8'), headers=saved['headers'])
+        paid_by = saved.get('job_id')
     else:
         response = provider.synthesize({**snap, 'text': piece['text']})
-        durable(raw_path, json.dumps({'body': response.text, 'received_at': datetime.now(timezone.utc).isoformat(), 'headers': _headers(response)}, ensure_ascii=False).encode('utf-8'))
+        paid_by = jid
+        durable(raw_path, json.dumps({'body': response.text, 'received_at': datetime.now(timezone.utc).isoformat(), 'headers': _headers(response), 'job_id': jid}, ensure_ascii=False).encode('utf-8'))
     data, alignments = decode_response(response)
     if not is_mp3(data):
         raise Problem(502, 'PROVIDER_UNKNOWN', 'Provider response was not a usable MP3. The attempt is retained; check provider history.')
     durable(mp3_path, data)
-    durable(meta_path, json.dumps({'headers': _headers(response), 'alignments': alignments, 'characters': len(piece['text'])}, ensure_ascii=False).encode('utf-8'))
+    durable(meta_path, json.dumps({'headers': _headers(response), 'alignments': alignments, 'characters': len(piece['text']), 'job_id': paid_by}, ensure_ascii=False).encode('utf-8'))
     if renew:
         renew()
+    return bool(jid) and paid_by == jid
+
+
+def piece_cost(pieces, metas, paid):
+    """design/192 (voice 7): the characters this job paid for. A reused piece costs nothing; a paid one counts what the provider billed, else its length."""
+    total = 0
+    for piece, m, was_paid in zip(pieces, metas, paid):
+        billed = str(m['headers'].get('character-cost', ''))
+        total += (int(billed) if billed.isdigit() else piece['characters']) if was_paid else 0
+    return total
 
 
 def process_voice(job, provider=None, store=None, renew=None):
@@ -103,13 +116,12 @@ def process_voice(job, provider=None, store=None, renew=None):
         legacy = audio_path.is_file() and legacy_meta.is_file() and not snap.get('pieces')   # a job journaled by the per-job scheme
         if job['status'] == 'storage_pending' and not legacy and not all(any(p.is_file() for p in piece_paths(piece)[:2]) for piece in pieces):
             raise Problem(409, 'PROVIDER_UNKNOWN', 'Saved response is missing. Recover from provider history; do not regenerate.')
-        piece_results = []
+        piece_results, paid = [], None
         if legacy:
             meta = json.loads(legacy_meta.read_text(encoding='utf-8'))
             alignments, cost_chars, metas = meta.get('alignments') or {}, None, [meta]
         else:
-            for piece in pieces:
-                _ensure_piece(piece, snap, provider, renew)
+            paid = [_ensure_piece(piece, snap, provider, renew, jid) for piece in pieces]
             if not audio_path.is_file():
                 NP.concat_mp3([piece_paths(piece)[1] for piece in pieces], audio_path, settings().FFMPEG_EXECUTABLE)
             metas = [json.loads(piece_paths(piece)[2].read_text(encoding='utf-8')) for piece in pieces]
@@ -139,6 +151,8 @@ def process_voice(job, provider=None, store=None, renew=None):
             raise Problem(502, 'STORAGE', 'Recording read-back failed.')
         billed = [int(m['headers']['character-cost']) for m in metas if str(m['headers'].get('character-cost', '')).isdigit()]
         cost = {'characters': sum(billed) if len(billed) == len(metas) else snap['characters'], 'model': snap['model_id'], 'pieces': len(pieces)}
+        if paid is not None:   # design/192 (voice 7): a reused recording is not a new cost
+            cost = {**cost, 'characters': piece_cost(pieces, metas, paid), 'reused_pieces': paid.count(False)}
         return 'ready', result, None, cost, None
     except (Problem, OSError, ValueError, subprocess.SubprocessError) as exc:
         done = [piece for piece in pieces if any(p.is_file() for p in piece_paths(piece)[:2])]

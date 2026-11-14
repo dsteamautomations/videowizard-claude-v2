@@ -108,7 +108,7 @@ def need_text(data, keys, stage):
 
 # ---------- intake ----------
 
-def intake_prepare(ws, procedure, prior, file=None, earlier_titles=None):
+def intake_prepare(ws, procedure, prior, file=None, earlier_titles=None, last_category=None):
     files = sorted(p for p in (ws / 'in').iterdir() if p.is_file() and p.suffix.lower() in SUFFIXES)
     if not files:
         raise Refused(f"Put the source script in {ws / 'in'} as TXT, MD, Fountain, DOCX or PDF, then run prepare again.")
@@ -138,7 +138,8 @@ def intake_prepare(ws, procedure, prior, file=None, earlier_titles=None):
     (ws / 'work' / 'intake-source.json').write_text(json.dumps({'file': source.name, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data),
                                                                    'prepared_at': prepared_at, **result}, indent=1), encoding='utf-8')
     return {'prompt': prompt, 'source_file': source.name, 'numbered_file': 'work/intake-numbered.md', 'lines': len(lines), 'characters': len(result['text']),
-            'earlier_titles': earlier, 'warnings': result['warnings'], 'needs_readable_copy': result['needs_readable_copy'], 'prepared_at': prepared_at,
+            'earlier_titles': earlier, 'last_category': last_category,   # design/192: what this client's last film recorded, to recommend
+            'warnings': result['warnings'], 'needs_readable_copy': result['needs_readable_copy'], 'prepared_at': prepared_at,
             'output_file': 'out/intake.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
@@ -224,9 +225,11 @@ def last_brief_text(lb):
         return 'none'
     prod = lb.get('production') or {}
     lines = [f"from run {lb.get('run')}:"]
-    for k in ('field_speech_languages', 'narration_language', 'show_speaker_video', 'brand_and_safety_rules', 'target_runtime_s'):
+    for k in ('field_speech_languages', 'narration_language', 'show_speaker_video', 'brand_and_safety_rules', 'target_runtime_s', 'format'):   # design/192: where it plays too
         if k in prod:
             v = prod[k]
+            if k == 'format' and isinstance(v, dict):
+                v = f"plays on {', '.join(v.get('destinations') or []) or 'not said'}; watched muted: {'yes' if v.get('watched_muted') else 'no'}"
             shown = 'none' if v in (None, [], '') else (', '.join(str(x) for x in v) if isinstance(v, list) else str(v))
             lines.append(f'  {k}: {shown}')
     questions = {q.get('id'): q.get('question') for q in lb.get('questions') or [] if isinstance(q, dict)}
@@ -294,13 +297,28 @@ def directory_differences(data):
     return out
 
 
-def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None, client_card=None):
+SAME_AS_LAST = 'Same as last time, approved'
+SAME_KEYS = ('brand_and_safety_rules', 'show_speaker_video', 'format', 'target_runtime_s')
+NOT_ASKED = 'not asked last time'
+
+
+def same_as_last(lb):
+    """design/192 (brief 2): the client's last production values, filled in, for one approval. A value the last brief did not hold is marked,
+    so only that one is asked. The chapters are never among them (design/56 L10). None when the client has no latest brief."""
+    prod = (lb or {}).get('production')
+    if not isinstance(prod, dict):
+        return None
+    return {'from_run': lb.get('run'), 'production': {k: prod[k] if k in prod else NOT_ASKED for k in SAME_KEYS}, 'first_answer': SAME_AS_LAST}
+
+
+def brief_prepare(ws, procedure, prior, last_brief=None, client_rules=None, client_card=None, category=None):
     intake = prior('intake')
     timing = intake['summary'].get('timing_lines') or []   # design/53 L2
     prompt = (procedure['prompt'].replace('{last_brief}', last_brief_text(last_brief)).replace('{client_rules}', client_rules_text(client_rules))
-              .replace('{document_timing}', '\n'.join(f'- {t}' for t in timing) or 'none').replace('{client_card}', client_card_text(client_card)))   # design/50
+              .replace('{document_timing}', '\n'.join(f'- {t}' for t in timing) or 'none').replace('{client_card}', client_card_text(client_card))   # design/50
+              .replace('{category}', category or 'not recorded'))   # design/192 (brief 1)
     return {'prompt': prompt, 'inputs': {'title': intake['summary']['title'], 'client': intake['summary']['client'],
-            'script': cleaned_script(ws, intake), 'last_brief': last_brief, 'client_rules': client_rules or [], 'document_timing': timing, 'client_card': client_card or {}}, 'prepared_at': stamp(ws, 'brief'),
+            'script': cleaned_script(ws, intake), 'last_brief': last_brief, 'client_rules': client_rules or [], 'document_timing': timing, 'client_card': client_card or {}, 'category': category}, 'same_as_last': same_as_last(last_brief), 'prepared_at': stamp(ws, 'brief'),
             'output_file': 'out/brief.json', 'output_shape': procedure['output_shape'], 'steps': procedure['steps']}
 
 
@@ -392,7 +410,7 @@ def production_inputs(given, client_card=None):
     if out['process_stages'] == GENERIC_STAGES:
         raise Refused('out/brief.json: production.process_stages must be the chapters of the film, from the script, or empty; the generic names are not allowed.')
     if any(not plain_chapter_name(x) for x in out['process_stages']) or len({x.strip().lower() for x in out['process_stages']}) < len(out['process_stages']):
-        raise Refused('out/brief.json: production.process_stages are the plain names of what the footage shows ("Mixing the mortar"), in film order: '
+        raise Refused('out/brief.json: production.process_stages are the plain names of what the footage shows (a step such as "Fitting the filter", or a place such as "The showroom floor"), in film order: '
                       'no Chapter_N or Stage N prefixes, no underscores, no numbering, no duplicates.')
     out['format'] = format_inputs(given.get('format'))   # design/53 L7
     out['defaults_applied'] = sorted(k for k in list(BLUEPRINT_DEFAULTS) + ['format'] if k not in given)

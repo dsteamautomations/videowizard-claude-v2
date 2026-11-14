@@ -12,9 +12,10 @@ WORD_KEYS = ('quote', 'accepted_quote', 'confirm_quote', 'note', 'notes', 'reaso
 PATH = re.compile(r'^/api/runs/([0-9a-f-]{36})/([a-z_-]+)(?:/(.*))?$')
 PAGE = re.compile(r'^/runs/([A-Za-z0-9_-]+)/(visuals|review|voices2)/act$')   # design/145 L1: the pages' buttons
 PAGE_STAGE = {'visuals': 'visuals', 'review': 'master', 'voices2': 'voice'}
-FILM_STAGE = {'category': 'brief', 'shape': 'media', 'colours': 'visuals', 'font': 'visuals'}   # design/139: where each choice is asked
+FILM_STAGE = {'category': 'intake', 'shape': 'media', 'colours': 'visuals', 'font': 'visuals'}   # design/139: where each choice is asked
 SEGMENT_STAGE = {'voice': 'voice', 'analysis': 'analysis', 'options': 'options', 'master': 'master', 'visuals': 'visuals', 'motion': 'visuals', 'assembly': 'assembly',
                  'delivery': 'delivery', 'files': 'media'}
+PLAIN_KINDS = ('step', 'question', 'answer')   # design/192 (intake 8, brief 7): the prepare of a text stage, a question asked with the question tool, its answer
 SKIP = {'log', 'files'}   # the assistant's entries are written by their own endpoint; design/145 L4: upload signs and receipts (the media record says it)
 log = logging.getLogger('vw2.runlog')
 
@@ -64,8 +65,11 @@ def assistant_entry(run_id, stage, body):
     text = ' '.join(str(body.get('text') or '').split())
     if not text:
         raise Problem(422, 'LOG_ENTRY', 'Say what was decided and why (the text of the entry).')
-    return {'run_id': run_id, 'stage': stage or '', 'kind': str(body.get('kind') or 'decision'), 'about': _short(body.get('about') or '', 200),
-            'rule': _short(body.get('rule') or '', 200) or 'no rule', 'entry': _short(text, 4000), 'by_kind': 'assistant', 'by_name': '', 'quote': '',
+    kind = str(body.get('kind') or 'decision')
+    plain = kind in PLAIN_KINDS   # design/192: a step, a question or an answer is a record of when, not a judgement call: it names no rule
+    return {'run_id': run_id, 'stage': stage or '', 'kind': kind, 'about': _short(body.get('about') or '', 200),
+            'rule': _short(body.get('rule') or '', 200) or ('' if plain else 'no rule'), 'entry': _short(text, 4000),
+            'by_kind': 'operator' if kind == 'answer' else 'assistant', 'by_name': '', 'quote': '',
             'request_id': body.get('request_id')}
 
 

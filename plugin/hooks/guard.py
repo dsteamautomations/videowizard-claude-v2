@@ -208,6 +208,12 @@ def main():
     if reason:
         log_block(cwd, tool, reason, detail_of(tool, inp, reason))
         block(reason)
+    if tool == 'AskUserQuestion':   # design/192 (intake 8, brief 7): the question goes to the run's log; never a reason to stop it
+        try:
+            import asked
+            asked.log(data, cwd, root)
+        except Exception:   # noqa: BLE001
+            pass
     sys.exit(0)
 
 

@@ -436,7 +436,9 @@ def record_direction(store, run, outputs, body, user):
     if passages:
         pp = passages[choice - 1]
         chosen_passage = {'n': choice, **pp, 'words': pp['last_word'] - pp['first_word'] + 1, 'text': VD.passage_text(script['spoken_text'], pp['first_word'], pp['last_word'])}
-    doc = {'contract': 'vw2-voice-direction-v2', 'kind_of_film': body.get('kind_of_film') or '', 'options': body.get('options') or {}, 'registers': body.get('registers') or {},
+    from . import film
+    kind = (None if film.older(run) else film.category(run)) or body.get('kind_of_film') or ''   # design/192 (voice 5): the run's category; an older film keeps the assistant's line
+    doc = {'contract': 'vw2-voice-direction-v2', 'kind_of_film': kind, 'options': body.get('options') or {}, 'registers': body.get('registers') or {},
            'chosen': chosen, 'register': register, 'base': items, 'digest': digest, 'approved_by': user['name'], 'at': datetime.now(timezone.utc).isoformat(),
            'number': direction_number(direction_of(store, run), digest),   # design/144 V3
            'quote': body.get('quote') or '', 'tweaks': (direction_of(store, run) or {}).get('tweaks') or {},
@@ -455,9 +457,10 @@ def set_tweaks(store, run, outputs, voice_id, tweaks):
     if not doc:
         raise Problem(409, 'NOT_ALLOWED', 'Record the direction first (vw voice direct record).')
     script, _ = script_text(store, outputs)
+    tweaks = [{**t, 'tag': VD.bracketed(t.get('tag'))} if isinstance(t, dict) else t for t in tweaks]   # design/192 (voice 11): brackets added on both front ends
     problems = VD.validate({'register': doc.get('register') or '[measured]', 'items': tweaks}, script['spoken_text'])
     if problems:
-        raise Problem(422, 'DIRECTION', 'The tweaks were refused: ' + '; '.join(problems[:6]), problems=problems)
+        raise Problem(422, 'DIRECTION', 'The tweaks were refused: ' + '; '.join(problems[:6]) + '. Nothing was narrated.', problems=problems)
     doc.setdefault('tweaks', {})[voice_id] = [{'passage_id': t['passage_id'], 'sentence': t['sentence'], 'tag': t['tag']} for t in tweaks]
     save_doc(store, run, 'direction.json', doc)
     return {'voice_id': voice_id, 'tweaks': len(tweaks)}
@@ -623,7 +626,16 @@ def tryout(conn, store, user, run, outputs, voice_ids, request_id, settings=None
 def narrate_many(conn, store, user, run, outputs, voice_ids, request_id, by='page'):
     """design/54 step 3: up to three voices read the whole script with the direction; every narration is kept."""
     check_cap(voice_ids, NARRATE_MAX, 'narration')
-    rows = [narrate(conn, store, user, run, outputs, vid, sub_request_id(request_id, i), by) for i, vid in enumerate(voice_ids)]
+    rows, same = [], []
+    for i, vid in enumerate(voice_ids):   # design/192 (voice 1): a voice with nothing changed is left out, never a reason to undo the others' narrations
+        try:
+            rows.append(narrate(conn, store, user, run, outputs, vid, sub_request_id(request_id, i), by))
+        except Problem as exc:
+            if exc.code != 'SAME_RECORDING' or len(voice_ids) == 1:
+                raise
+            same.append(exc)
+    if same and not rows:
+        raise same[0]
     state = page_state(store, run)
     state['step'] = 'narrations'
     save_doc(store, run, 'page.json', state)

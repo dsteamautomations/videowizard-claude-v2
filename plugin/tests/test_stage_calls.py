@@ -46,6 +46,7 @@ def harness(ws, monkeypatch):
     monkeypatch.setattr(vw, 'request', fake.request)
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: vw.call('POST', path, json=body))
     monkeypatch.setattr(vw, 'machine_id', lambda: 'mac-1')
+    monkeypatch.setattr(vw, 'log_quiet', lambda m, kind, text: None)   # design/192: a text stage's prepare leaves one log entry; not what these tests time
     uploaded = []
 
     def upload_file(m, stage, path, sha, size):

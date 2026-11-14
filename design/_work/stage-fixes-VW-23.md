@@ -2,6 +2,8 @@
 
 Fixes approved by Deepa on 13 Nov 2026 unless marked otherwise. None is built yet.
 
+**Built 14 Nov 2026 (design/192), on branch `worktree-stage-fixes-vw23`, unit tests only, not merged, not deployed:** intake 1 to 8; brief 1 to 5 and 7; script 1; voice 1, 2, 4 to 7 and 11. The lines "None is built yet" below are older than this note. Still to do: script 2 to 4; voice 8 to 10 and 12 to 19.
+
 ## Intake
 
 | # | Observation | Fix |
@@ -14,7 +16,7 @@ Fixes approved by Deepa on 13 Nov 2026 unless marked otherwise. None is built ye
 | 6 | "Clients rarely send a bare script. They send a plan…" assumes a documentary plan. | "The document may be a bare script or a plan around one." |
 | 7 | The no-rewrite rule is written in capitals and repeated several times (an older-model habit). It also stops the assistant pointing out a mistyped line. | State the rule once in plain case. Add: list any line that looks mistyped in `notes`; do not change it. |
 | 8 | Intake leaves one log line, and the category is logged under `brief`. | Log the prepare step and the questions of the text stages. Log the category under intake. |
-| 9 | The run is recorded as SK's though it ran on Uma's laptop. Reviews cannot be split by operator. | Not yet approved: confirm whether Uma used SK's sign-in; if so, each operator signs in as themselves. |
+| 9 | The run is recorded as SK's though it ran on Uma's laptop. Reviews cannot be split by operator. | No change (14 Nov): it was SK's sign-in. During testing the team uses SK's sign-in on purpose, so the fix is dropped. |
 
 ## Brief
 

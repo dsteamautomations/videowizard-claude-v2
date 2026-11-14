@@ -17,6 +17,19 @@ PAUSES = ('long pause', 'pause', 'silence', 'silent', 'break', 'beat')
 ACCENTS = ('accent',)
 
 
+# design/192 (voice 11): the tags the voices page offers to pick from; the direction prompt names the same ones. Another tag may be typed.
+SUGGESTED_TAGS = ('[measured]', '[warm]', '[confident]', '[thoughtful]', '[earnest]', '[reassuring]', '[matter-of-fact]', '[emphatic]',
+                  '[slowly]', '[unhurried]', '[brisk]', '[with weight on the figures]', '[lifting at the end]')
+
+
+def bracketed(tag):
+    """design/192 (voice 11): a tag as the narrator reads it: the square brackets are added when the operator left them out."""
+    if not isinstance(tag, str):
+        return tag
+    inner = tag.strip().strip('[]').strip()
+    return f'[{inner}]' if inner else tag.strip()
+
+
 def sentences_of(text):
     """[{passage_id, sentence, start, end, text, first_words}] in order; passages are the script's paragraphs (P001…), sentences count inside each."""
     rows = []

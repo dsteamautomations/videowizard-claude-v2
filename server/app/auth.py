@@ -108,6 +108,44 @@ def current_user(authorization: str | None = Header(default=None), vw2_session: 
     return {'id': row['user_id'], 'name': row['user_name'], 'role': row['role'], 'kind': row['kind'], '_session': row['token_hash']}
 
 
+TICKET_MINUTES = 10
+
+
+def page_ticket(user):
+    """design/192 (voice 4): a one-use ticket for a page link the tool gives the operator, made from the laptop's own sign-in. It is a browser session of ten
+    minutes whose only use is the exchange below (no new kind of session, so no change to the table)."""
+    token = secrets.token_urlsafe(32)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=TICKET_MINUTES)
+    with connect() as conn:
+        conn.execute('insert into vw2_sessions(token_hash,user_id,user_name,role,kind,expires_at) values (%s,%s,%s,%s,%s,%s)',
+                     (_hash(token), user['id'], user['name'], user['role'], 'browser', expires))
+    return {'ticket': token, 'expires_at': expires}
+
+
+def exchange_ticket(ticket):
+    """The ticket spent (it works once) for a full browser session; None when it is unknown, used or older than ten minutes. Only a session that ends within the
+    ticket's ten minutes is taken, so an ordinary sign-in can never be spent through a link."""
+    with connect() as conn:
+        row = conn.execute("update vw2_sessions set revoked = true where token_hash=%s and kind='browser' and not revoked and expires_at > now() "
+                           "and expires_at <= now() + make_interval(mins => %s) returning user_id, user_name, role", (_hash(str(ticket)), TICKET_MINUTES)).fetchone()
+        if not row:
+            return None
+        token = secrets.token_urlsafe(48)
+        conn.execute('insert into vw2_sessions(token_hash,user_id,user_name,role,kind,expires_at) values (%s,%s,%s,%s,%s,%s)',
+                     (_hash(token), row['user_id'], row['user_name'], row['role'], 'browser', datetime.now(timezone.utc) + timedelta(hours=settings().SESSION_HOURS)))
+    return token
+
+
+def landing_page(path, query):
+    """The page a ticket link lands on: it moves on to the same address without the ticket."""
+    from html import escape
+    from urllib.parse import urlencode
+    rest = [(k, v) for k, v in query if k != 'ticket']
+    url = path + ('?' + urlencode(rest) if rest else '')
+    return (f'<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url={escape(url, quote=True)}"><title>VideoWizard</title>'
+            f'<p>Opening the page… <a href="{escape(url, quote=True)}">continue</a></p>')
+
+
 def sign_out(user):
     with connect() as conn:
         conn.execute('update vw2_sessions set revoked = true where token_hash = %s', (user['_session'],))

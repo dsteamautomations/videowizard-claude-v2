@@ -114,6 +114,13 @@ def last_voice(conn, client_id):
             'choice_note': s.get('choice_note') or ''}
 
 
+def last_category(conn, client_id):
+    """design/192 (intake 2): the category this client's newest film recorded, to recommend at intake; None when no film of theirs recorded one."""
+    row = conn.execute("select film->'category'->>'value' as category from vw2_runs where client_id=%s and film->'category'->>'value' is not null "
+                       'order by created_at desc limit 1', (client_id,)).fetchone()
+    return row['category'] if row else None
+
+
 def client_rules(conn, client_id):
     """Rules learned from master rejections for this client (design/37 2.3)."""
     rows = conn.execute('select rule, source_run, created_at from vw2_client_rules where client_id=%s order by id', (client_id or '',)).fetchall()
@@ -196,7 +203,7 @@ def load_run(conn, user, run_id, lock=False):
 
 
 def list_runs(conn, user):
-    sql = 'select id, code, title, client, owner_name, procedure_version, status, created_at, closed_at from vw2_runs'
+    sql = 'select id, code, title, client, owner_id, owner_name, procedure_version, image_provider, drawn_route, status, created_at, closed_at from vw2_runs'   # design/192: `vw last`
     if is_admin(user):
         return conn.execute(sql + ' order by created_at desc limit 200').fetchall()
     return conn.execute(sql + ' where owner_id = %s order by created_at desc limit 200', (user['id'],)).fetchall()

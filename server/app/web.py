@@ -247,7 +247,8 @@ def _voices2_state(conn, user, run):
     except Problem:
         known = voices.known_voices(last_voice, [], [])
     return {'run': {'code': run['code'], 'title': run.get('title'), 'client': run.get('client'), 'stage': nxt.get('stage')}, 'state': state, 'direction': direction, 'pronunciations': voices.pronunciations_of(store, run), 'jobs': jobs_,
-            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account, 'last_voice': last_voice, 'known': known}
+            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account, 'last_voice': last_voice, 'known': known,
+            'tags': list(__import__('app.voice_direction', fromlist=['SUGGESTED_TAGS']).SUGGESTED_TAGS)}   # design/192 (voice 11): the tags to pick from
 
 
 # ---------- design/62: the review page (watch the film, decide by button); the audio route voices2 plays from (lost in the 0.20.0 cleanup) ----------
@@ -639,8 +640,9 @@ def _voices2_act(code, vw2_session, body):
             rows = voices.tryout(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid, body.get('settings'))   # design/139 R2
             return JSONResponse({'jobs': [str(r['id']) for r in rows], 'saved': [r['request'].get('name') for r in rows if r['request'].get('saved_from_library')]})
         if action == 'narrate':
-            rows = voices.narrate_many(conn, store, user, run, outputs, list(body.get('voice_ids') or []), rid, 'page')
-            return JSONResponse({'jobs': [str(r['id']) for r in rows]})
+            asked = list(body.get('voice_ids') or [])
+            rows = voices.narrate_many(conn, store, user, run, outputs, asked, rid, 'page')
+            return JSONResponse({'jobs': [str(r['id']) for r in rows], 'same': len(asked) - len(rows)})   # design/192 (voice 1): voices left out, nothing changed
         if action == 'tweaks':
             return JSONResponse(voices.set_tweaks(store, run, outputs, body['voice_id'], list(body.get('tweaks') or [])))
         if action == 'narrate-again':

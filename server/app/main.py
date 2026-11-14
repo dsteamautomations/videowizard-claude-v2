@@ -92,6 +92,25 @@ async def decision_log(request, call_next):
     return RawResponse(content=raw, status_code=response.status_code, headers=dict(response.headers), media_type=response.media_type)
 
 
+@app.middleware('http')
+async def page_ticket_gate(request, call_next):
+    """design/192 (voice 4): a page opened with ?ticket= signs the browser in (one use, ten minutes) and lands on the page without the ticket. The landing is a
+    small page that moves on by itself, not a redirect: the cookie is same-site only, and a redirect from a link clicked elsewhere would not carry it.
+    A used or expired ticket lands on the same page, which asks for the sign-in as before."""
+    ticket = request.query_params.get('ticket') if request.method == 'GET' and not request.url.path.startswith('/api/') else None
+    if not ticket:
+        return await call_next(request)
+    from fastapi.responses import HTMLResponse
+    try:
+        token = await run_in_threadpool(auth.exchange_ticket, ticket)
+    except Exception:   # noqa: BLE001  the page then asks for the sign-in, as it did before tickets
+        token = None
+    response = HTMLResponse(auth.landing_page(request.url.path, request.query_params.multi_items()))
+    if token:
+        response.set_cookie(web.COOKIE, token, httponly=True, samesite='strict', secure=settings().APP_ORIGIN.startswith('https'), max_age=settings().SESSION_HOURS * 3600)
+    return response
+
+
 @app.exception_handler(Problem)
 def problem(request, exc: Problem):
     return Response({'code': exc.code, 'message': exc.message, **exc.extra}, status_code=exc.status)
@@ -719,6 +738,12 @@ def logout(user=User):
     return {'ok': True}
 
 
+@app.post('/api/auth/page-ticket', status_code=201)
+def page_ticket(user=User):
+    """design/192 (voice 4): a one-use ticket for a page link, so the laptop's sign-in covers the browser pages too."""
+    return Response(auth.page_ticket(user), status_code=201)
+
+
 @app.get('/api/auth/me')
 def me(user=User):
     return Response({k: user[k] for k in ('id', 'name', 'role', 'kind')})
@@ -734,6 +759,7 @@ def create_run(body: NewRun, user=User, conn=DB):
                      'last_brief': core.last_brief(conn, run['client_id']),                    # what the client said last time (design/37 2.2)
                      'client_rules': core.client_rules(conn, run['client_id']),               # rules learned for the client (design/37 2.3)
                      'last_voice': core.last_voice(conn, run['client_id']),                   # the client's narrator last time (design/39 4.2)
+                     'last_category': core.last_category(conn, run['client_id']),             # the category their last film recorded (design/192)
                      'client_card': auth.client_card(run['client_id'])}                       # what the directory knows (design/50)
     status, resp = core.with_receipt(conn, user, body_dict(body), create)
     return Response(resp, status_code=status)
@@ -1060,7 +1086,7 @@ class LogEntry(Write):   # design/142 R1: the assistant's judgement call, with t
     text: str = Field(min_length=1, max_length=4000)
     about: str = Field(default='', max_length=200)
     rule: str = Field(default='', max_length=200)
-    kind: Literal['decision', 'workaround', 'choice', 'blank', 'no_rule'] = 'decision'
+    kind: Literal['decision', 'workaround', 'choice', 'blank', 'no_rule', 'step', 'question', 'answer'] = 'decision'   # design/192: the last three are written by the tool and its hook
 
 
 @app.post('/api/runs/{run_id}/log', status_code=201)

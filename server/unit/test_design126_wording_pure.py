@@ -15,7 +15,7 @@ def test_in1_intake_prompt_trimmed_rules_kept():
     p = flat(V3['intake']['prompt'])
     assert 'survives it easily' not in p and 'honest, inspectable relationship' not in p and 'Return only JSON' not in p
     assert 'Write this to out/intake.json:' in p
-    assert 'YOU NEVER REWRITE A LINE' in p and 'So the bar for removing is HIGH' in p and 'A line you wrongly KEEP' in p
+    assert 'You never rewrite a line' in p and 'So the bar for removing is high' in p and 'A line you wrongly keep' in p   # design/192: the same rules, once, in plain case
     assert 'Return only JSON' in V2['intake']['prompt']   # version 2 untouched
 
 

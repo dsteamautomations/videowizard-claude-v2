@@ -543,6 +543,7 @@ def make_workspace(run, keep_logs=False, assembly_machine=None, files=None):
          'last_brief': run.get('last_brief'), 'client_rules': run.get('client_rules') or [],   # design/37 2.2, 2.3
          'last_voice': run.get('last_voice'),   # design/39 4.2
          'client_card': run.get('client_card') or {},   # design/50
+         'last_category': run.get('last_category'),   # design/192: what this client's last film recorded
          'keep_logs': keep_logs, 'assembly_machine': assembly_machine, 'closed': False, 'files': files or []}
     save_json(manifest_path(run['code']), m)
     (RUNS / '.active').write_text(run['code'], encoding='utf-8')
@@ -583,6 +584,28 @@ def cmd_connect(a):
 
 def cmd_whoami(a):
     emit(call('GET', '/api/auth/me'))
+
+
+def last_run_of(me, rows):
+    """design/192 (intake 3): the newest run this user owns that recorded its picture AI; None when there is none."""
+    for r in rows or []:
+        if r.get('owner_id') == me.get('id') and r.get('image_provider'):
+            return {k: r.get(k) for k in ('code', 'client', 'image_provider', 'drawn_route')}
+    return None
+
+
+def cmd_last(a):
+    """design/192 (intake 1, 3): the first command of a new video. It needs the sign-in (a laptop that is not signed in is told to sign in before
+    anything is asked) and answers this user's last run, to offer "same as last run"."""
+    me = call('GET', '/api/auth/me')
+    last = last_run_of(me, call('GET', '/api/runs'))
+    if not last:
+        emit({'signed_in_as': me.get('name'), 'last': None}, 0, f"Signed in as {me.get('name')}. No earlier run to copy: ask the client, the picture AI and the script.")
+    same = f"{last['client']}, {last['image_provider']}, {last.get('drawn_route') or 'svg'}"
+    emit({'signed_in_as': me.get('name'), 'last': last}, 0,
+         f"Signed in as {me.get('name')}. Last run {last['code']}: client, picture AI, drawn shots: {same}. "
+         f'Offer as the first answer to click: "Same as last run: {same}"; the other answer is "Different". '
+         f"On same: `vw start --client \"{last['client']}\" --images {last['image_provider']}" + (f" --drawn {last['drawn_route']}" if last.get('drawn_route') else '') + ' [--script <path>]`.')
 
 
 def preflight(need_gb):
@@ -951,6 +974,27 @@ def cmd_clients(a):
     emit({'clients': rows}, 0, f'{len(rows)} active client(s)' + (f" matching {a.search!r}" if a.search else '') + '; the operator picks one, then `vw start --client "<name>"`.')
 
 
+def signed_link(url):
+    """design/192 (voice 4): a page link the operator opens without a second sign-in: a one-use ticket made from this laptop's own sign-in, valid ten
+    minutes. Any failure gives the plain link, which asks for the sign-in as before."""
+    try:
+        with api() as c:
+            r = c.post('/api/auth/page-ticket', json={}, timeout=10)
+        ticket = r.json().get('ticket') if r.status_code < 300 else None
+    except Exception:   # noqa: BLE001  a link is never worth a failed step
+        ticket = None
+    return url + ('&' if '?' in url else '?') + 'ticket=' + ticket if ticket else url
+
+
+def log_quiet(m, kind, text):
+    """design/192 (intake 8, brief 7): one entry of the run's log that never fails or delays the step it describes."""
+    try:
+        with api() as c:
+            c.post(f"/api/runs/{m['run_id']}/log", json={'request_id': str(uuid.uuid4()), 'kind': kind, 'text': text[:900]}, timeout=5)
+    except Exception:   # noqa: BLE001
+        pass
+
+
 def voice_page_url(code):
     return f"{server_url()}/runs/{code}/voices2"   # design/54: the end-to-end page
 
@@ -968,9 +1012,9 @@ def cmd_next(a):
     nxt = call('GET', f"/api/runs/{m['run_id']}/next")
     ensure_mine(nxt, a.take_over, m['run_id'])
     if nxt.get('stage') == 'voice':   # VW-6: the link the operator asks for
-        nxt['voice_page_url'] = voice_page_url(m['code'])
+        nxt['voice_page_url'] = signed_link(voice_page_url(m['code']))
     if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
-        nxt['review_page_url'] = review_page_url(m['code'])
+        nxt['review_page_url'] = signed_link(review_page_url(m['code']))
     if nxt.get('stage') == 'visuals':   # design/188 (SK, 12 Nov 2026): the operator decides in the chat, one thing at a time; no page link is given (was design/65: on the page)
         nxt['visuals_in_chat'] = "The operator's decisions of this stage are taken in the chat, one at a time: `vw visuals next`."
     emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
@@ -1095,11 +1139,14 @@ def cmd_stage(a):
             out = stages_text.intake_preview(ws)
             emit(out, 0, f"{out['file']}: the script as it will be kept, {out['kept']} lines ({out['removed']} removed); ask the operator to read it before approving.")
         if a.step == 'prepare':
-            extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or []} if a.stage == 'intake' else \
-                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}} if a.stage == 'brief' else \
-                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else \
+            extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or [], 'last_category': m.get('last_category')} if a.stage == 'intake' else \
+                {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}, 'category': film_category(full)} if a.stage == 'brief' else \
+                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': signed_link(voice_page_url(m['code']))} if a.stage == 'voice' else \
                 {'known': lambda shas: (write(f"/api/runs/{m['run_id']}/library/known", {'shas': shas}) or {}).get('known') or {}} if a.stage == 'media' else {}   # design/147 L2
-            emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepare(ws, procedure, prior, **extra)}, 0, f'{a.stage}: inputs and prompt ready')
+            prepared = prepare(ws, procedure, prior, **extra)
+            if a.stage in stages_text.STAGES:   # design/192 (intake 8, brief 7): when the assistant's work on a text stage began
+                log_quiet(m, 'step', f'{a.stage} prepare: the inputs and the instructions were given to the assistant')
+            emit({'stage': a.stage, 'not_shareable': NOT_SHAREABLE, **prepared}, 0, f'{a.stage}: inputs and prompt ready')
         if a.stage == 'media':
             def progress(k, n, name, size):   # design/41 5.4: one line per finished clip, visible in the tool result
                 print(f'uploaded {k}/{n} {name} ({size / 1e6:.0f} MB)', file=sys.stderr, flush=True)
@@ -1114,6 +1161,10 @@ def cmd_stage(a):
                 fetch_job_files(m, job)
             result = record(ws, procedure, prior, job)
         elif a.stage == 'intake':
+            if getattr(a, 'category', None):   # design/192 (intake 2): answered with the title; recorded first, so a wrong name stops before the record
+                if not (a.quote or '').strip():
+                    emit({'action': 'refused', 'message': "--category is the operator's answer: pass their words with --quote. Nothing was recorded."}, 2)
+                write(f"/api/runs/{m['run_id']}/film", {'key': 'category', 'value': a.category, 'quote': a.quote})
             result = record(ws, procedure, prior, a.title, m.get('client') or '')
         elif a.stage == 'brief':
             result = record(ws, procedure, prior, client_card=m.get('client_card') or {})   # design/50 C
@@ -1148,6 +1199,11 @@ def cmd_stage(a):
         row = {**row, 'files': f"{len(row.get('files') or [])} file references, kept on the server", 'summary': {k: v for k, v in (row.get('summary') or {}).items() if k != 'clips'},
                'clips_recorded': len(clips), 'total_mb': round(sum(c.get('bytes') or 0 for c in clips) / 1e6)}
     emit(row, 0, f'Recorded {a.stage}. ' + (next_line(row['next']) if row.get('next') else 'Run `vw next`.') + (f' WARNING: {warning}' if warning else ''))
+
+
+def film_category(full):
+    """design/192: the category recorded on the run, or None (not asked yet, or a film started before categories)."""
+    return (((full or {}).get('film') or {}).get('category') or {}).get('value')
 
 
 def run_and_procedure(m, stage, with_procedure):
@@ -1300,9 +1356,9 @@ def cmd_voice(a):
             emit({'stage': 'voice', 'step': 'direction', 'not_shareable': NOT_SHAREABLE, 'prompt': procedure.get('direction_prompt') or '',
                   'inputs': {'sentences': script_sentences(script['spoken_text']), 'words': len(script['spoken_text'].split()),
                              'brief': {k: brief.get(k, '') for k in ('purpose', 'audience', 'message', 'tone', 'ending', 'constraints')},
-                             'production': brief.get('production') or {}, 'voice': page.get('pick')},
+                             'production': brief.get('production') or {}, 'voice': page.get('pick'), 'kind_of_film': film_category(full)},   # design/192 (voice 5)
                   'output_file': 'out/direction.json'}, 0,
-                 'direction: sentences (with word numbers), brief and prompt ready; write out/direction.json (two lists and three test passages), present both and the passages, then `vw voice direct record --choice best_fit|experimental|none --passage 1|2|3 --quote "<their words>"`')
+                 'direction: sentences (with word numbers), brief and prompt ready; write out/direction.json (two lists and one recommended test passage; two more only on request), ask one question whose first answer is "Best fit, passage 1", then `vw voice direct record --choice best_fit|experimental|none [--passage N] --quote "<their words>"`')
         if a.step == 'record':
             doc = load_json(ws / 'out' / 'direction.json')
             if not isinstance(doc, dict):
@@ -1318,6 +1374,8 @@ def cmd_voice(a):
             passages = doc.get('test_passages') or []   # design/54 B
             if not isinstance(passages, list) or not passages:
                 emit({'action': 'refused', 'message': 'out/direction.json: test_passages must list one to three passages {passage_id, first_word, last_word, why}.'}, 2)
+            if a.passage is None and len(passages) == 1:   # design/192 (voice 6): one recommended passage needs no number
+                a.passage = 1
             if a.passage is None:
                 emit({'action': 'refused', 'message': '--passage 1|2|3 is required: the test passage the operator chose.'}, 2)
             if not 1 <= a.passage <= len(passages):
@@ -1327,7 +1385,7 @@ def cmd_voice(a):
                     'kind_of_film': doc.get('kind_of_film') or '', 'quote': a.quote.strip(), 'test_passages': passages, 'passage': a.passage}
             out = write(f"/api/runs/{m['run_id']}/voice/direction", body)
             emit(out, 0, f"direction recorded: {a.choice} ({out.get('items', 0)} tag(s)) and test passage {a.passage}; both apply to every tryout and narration of this run. "
-                 f"Give the operator the voices page: {voice_page_url(m['code'])} (everything else happens there; say 'what is next' when a narration is final).")
+                 f"Give the operator the voices page: {signed_link(voice_page_url(m['code']))} (everything else happens there; say 'what is next' when a narration is final).")
         emit({'action': 'refused', 'message': 'vw voice direct prepare | record'}, 2)
     if a.what == 'pronounce':   # design/144 V1: the words a voice may say wrongly, how each is said; one message, one answer
         if not a.file:
@@ -1371,7 +1429,7 @@ def cmd_voice(a):
         if m:   # the voices page with the same filters: the default place to listen, try and choose
             from urllib.parse import urlencode
             q = {'tab': tab, **{k: v for k, v in (('language', a.language), ('accent', a.accent), ('gender', a.gender), ('age', a.age), ('use_case', (a.use_case or [''])[0]), ('search', a.search)) if v}}
-            found['voice_page_url'] = voice_page_url(m['code']) + '?' + urlencode(q)
+            found['voice_page_url'] = signed_link(voice_page_url(m['code']) + '?' + urlencode(q))
         emit(found, 0, catalog_lines(found, page) + (f"\nvoices page with these filters (the default; give the operator this link): {found['voice_page_url']}" if found.get('voice_page_url') else ''))
     if a.what == 'models':
         emit(call('GET', '/api/voice/models'))
@@ -2978,9 +3036,21 @@ def cmd_pull(a):
     emit({**full, 'next': nxt, 'resolve': found, 'workspace': str(workspace(a.code))}, 0, pull_line(a.code, nxt, found))
 
 
+TEXT_STAGES = ('intake', 'brief', 'script')
+
+
 def cmd_log(a):
     """design/142 R1: the run's decision log. With text, the assistant's own entry (what was decided, about what, by which rule or "no rule");
     with --show, the whole log, every stage, written to work/decision-log.md. Not `vw options log`, which downloads one clip's analysis log."""
+    if a.kind in ('question', 'answer'):   # design/192 (intake 8, brief 7): written by the hook on the question tool, in the text stages only; never an error
+        text = ' '.join(a.text or []).strip()
+        try:
+            m = active()
+            if text and (call('GET', f"/api/runs/{m['run_id']}/next") or {}).get('stage') in TEXT_STAGES:
+                write(f"/api/runs/{m['run_id']}/log", {'text': text[:900], 'kind': a.kind})
+        except SystemExit:
+            pass
+        sys.exit(0)
     m = active()
     if a.show:
         out = call('GET', f"/api/runs/{m['run_id']}/log")
@@ -3093,6 +3163,7 @@ def build_parser():
     sub = p.add_subparsers(dest='cmd', required=True)
     s = sub.add_parser('connect'); s.add_argument('--timeout', type=float, default=600); s.add_argument('--poll', type=float, default=2); s.set_defaults(fn=cmd_connect)
     sub.add_parser('whoami').set_defaults(fn=cmd_whoami)
+    sub.add_parser('last', help='the first command of a new video: checks the sign-in and answers the last run (design/192)').set_defaults(fn=cmd_last)
     s = sub.add_parser('start')
     s.add_argument('--client', required=True); s.add_argument('--version'); s.add_argument('--script', help='the script file to copy into in/ (design/34 1.6)')
     s.add_argument('--images', choices=['openai', 'gemini'], help='the image model of this run, asked of the operator, never changed later')
@@ -3108,7 +3179,7 @@ def build_parser():
     s = sub.add_parser('defect'); s.add_argument('--stage'); s.add_argument('--error', required=True); s.add_argument('--log'); s.set_defaults(fn=cmd_defect)
     s = sub.add_parser('clients'); s.add_argument('--search'); s.set_defaults(fn=cmd_clients)
     s = sub.add_parser('web'); s.add_argument('--about'); s.add_argument('--ok', help="the operator's words allowing the search (design/48 O.1)"); s.set_defaults(fn=cmd_web)
-    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
+    s = sub.add_parser('stage'); s.add_argument('stage'); s.add_argument('step', choices=['prepare', 'preview', 'record']); s.add_argument('--quote'); s.add_argument('--title'); s.add_argument('--category', help='intake record: the category the operator chose with the title (design/192)'); s.add_argument('--file', help='intake prepare: which document in in/ is the script')
     s.add_argument('--camera-audio', choices=['allowed', 'excluded'], help='media record: may the camera sound be used in the film (design/41 5.1)'); s.add_argument('--note', help="media record: the operator's words on the sound")
     for f in ('--camera', '--support', '--look', '--footage-note'):   # design/126 ME1: refused by name; the footage is measured at visuals
         s.add_argument(f, help=argparse.SUPPRESS)
@@ -3183,7 +3254,7 @@ def build_parser():
     s = sub.add_parser('pull'); s.add_argument('code'); s.add_argument('--take-over', action='store_true'); s.set_defaults(fn=cmd_pull)
     sub.add_parser('close').set_defaults(fn=cmd_close)
     s = sub.add_parser('log', help="the run's decision log (design/142): add an entry, or --show the whole log"); s.add_argument('text', nargs='*')
-    s.add_argument('--about'); s.add_argument('--rule'); s.add_argument('--kind', default='decision', choices=['decision', 'workaround', 'choice', 'blank', 'no_rule'])
+    s.add_argument('--about'); s.add_argument('--rule'); s.add_argument('--kind', default='decision', choices=['decision', 'workaround', 'choice', 'blank', 'no_rule', 'question', 'answer'])
     s.add_argument('--show', action='store_true'); s.set_defaults(fn=cmd_log)
     s = sub.add_parser('library', help='the brand-generic library (design/147): show, mark, unmark, remark'); s.add_argument('what', choices=['show', 'mark', 'unmark', 'remark'])
     s.add_argument('--generic', help='mark: the clip names to mark brand-generic, comma-separated; empty for none'); s.add_argument('--clip'); s.add_argument('--quote'); s.set_defaults(fn=cmd_library)

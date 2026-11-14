@@ -23,6 +23,26 @@ def voice_model(request):
     return model
 
 
+def same_recording(snapshot, earlier):
+    """design/192 (voice 1): the place (1, 2, …), among this voice's narrations in the order they were made, of a ready one that asked the provider for exactly
+    what `snapshot` asks: voice, model, settings, format and the text with its tags, piece by piece, with the same pronunciation list. None when there is none."""
+    want = [p['identity'] for p in narration_pieces.pieces_of(snapshot)]
+    for n, row in enumerate(earlier, 1):
+        req = row['request'] or {}
+        try:
+            same = row['status'] == 'ready' and req.get('pronunciations_version') == snapshot.get('pronunciations_version') \
+                and [p['identity'] for p in narration_pieces.pieces_of(req)] == want
+        except (KeyError, TypeError):   # an older row of another shape is never the same recording
+            same = False
+        if same:
+            return n
+    return None
+
+
+SAME_RECORDING = ("Nothing changed since narration #{n} in this voice, so this would be the same recording: no narration was made and nothing was charged. "
+                  "For a new take, change something first: the stability or similarity (try the voice again with other settings on the Try step), or a sentence's tag.")
+
+
 def submit_voice(conn, user, run, outputs, request, request_id, store=None):
     """Validate an audition/narration request against the accepted script, then queue it. Paid; informed, not gated.
     A narration carries the run's recorded direction (design/52 D): the provider reads the tagged text, the record keeps the accepted one."""
@@ -76,6 +96,12 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
                 **({'dictionaries': [said['dictionary']], 'pronunciations_version': said['version']} if said and said.get('dictionary') else {}),
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
                 **({'timing_mode': 'generation', 'pieces': pieces, **directed} if kind == 'narration' else {})}
+    if kind == 'narration':   # design/192 (voice 1): asked again with nothing changed, it is refused before any job row is made
+        earlier = conn.execute("select status, request from vw2_jobs where run_id=%s and stage='voice' and request->>'kind' = 'narration' and request->>'voice_id' = %s "
+                               'order by created_at', (run['id'], voice['voice_id'])).fetchall()
+        n = same_recording(snapshot, earlier)
+        if n:
+            raise Problem(409, 'SAME_RECORDING', SAME_RECORDING.format(n=n))
     row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'voice',%s,'elevenlabs',%s,%s) returning *''',
                        (run['id'], voice['voice_id'] if kind == 'audition' else None, Json(snapshot), request_id)).fetchone()
     return row
