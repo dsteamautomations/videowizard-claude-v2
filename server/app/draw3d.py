@@ -27,6 +27,7 @@ KINDS = {   # the plain words a view is called by, and how the image model is to
 }
 MIN_VIEWS = {'engineered': 4, 'composition': 3, 'form': 2, 'shot': 2}   # a shot's drawing: through the camera and from above
 MAX_VIEWS, MAX_PIECES, MAX_LABEL, MAX_LINE = 6, 4000, 60, 120
+MAX_REPEATS = 3   # a piece may be repeated along up to three directions: a row, rows of it, layers of those
 AXES = {'X': 0, 'Y': 1, 'Z': 2}
 NAMES = {'white': (245, 245, 240), 'black': (25, 25, 25), 'dark grey': (70, 70, 72), 'grey': (150, 150, 148), 'light grey': (195, 195, 198), 'red': (200, 60, 50),
          'brick red': (200, 100, 62), 'orange': (225, 130, 40), 'yellow': (220, 185, 50), 'green': (70, 135, 70), 'grey-green': (120, 140, 130), 'blue': (65, 100, 150),
@@ -101,6 +102,42 @@ def _piece_problems(i, p, materials):
     return out
 
 
+def _shift(p, v):
+    """A piece moved by v."""
+    a = AXES.get(p.get('axis'), 0)
+    o = [i for i in range(3) if i != a]
+    if p['shape'] == 'box':
+        return {**p, 'min': [p['min'][i] + v[i] for i in range(3)], 'max': [p['max'][i] + v[i] for i in range(3)]}
+    if p['shape'] == 'prism':
+        return {**p, 'from': p['from'] + v[a], 'to': p['to'] + v[a], 'outline': [[q[0] + v[o[0]], q[1] + v[o[1]]] for q in p['outline']]}
+    return {**p, 'from': p['from'] + v[a], 'to': p['to'] + v[a], 'centre': [p['centre'][0] + v[o[0]], p['centre'][1] + v[o[1]]]}
+
+
+def _repeats_ok(p):
+    r = p.get('repeat')
+    return r is None or (isinstance(r, list) and 1 <= len(r) <= MAX_REPEATS and all(isinstance(x, dict) and _vec(x.get('step')) and any(x['step']) and isinstance(x.get('count'), int)
+                                                                                    and not isinstance(x.get('count'), bool) and 1 <= x['count'] <= MAX_PIECES for x in r))
+
+
+def _count(p):
+    n = 1
+    for x in p.get('repeat') or []:
+        n *= x['count']
+    return n
+
+
+def expanded(pieces):
+    """Every piece with its repeats written out: "repeat": [{"step": [dx, dy, dz], "count": n}, …] makes n copies along each step, one inside the other.
+    So a row of equal things, rows of it and layers of those are a few lines of data, each size written once."""
+    out = []
+    for p in pieces:
+        copies = [{k: v for k, v in p.items() if k != 'repeat'}]
+        for x in p.get('repeat') or []:
+            copies = [_shift(c, [x['step'][i] * k for i in range(3)]) for k in range(x['count']) for c in copies]
+        out += copies
+    return out
+
+
 def problems(d):
     """Everything wrong with a drawing set, in plain words; an empty list means it can be drawn."""
     if not isinstance(d, dict):
@@ -124,8 +161,13 @@ def problems(d):
     if not isinstance(pieces, list) or (not pieces and not people):
         out.append('The drawing set has no pieces: give at least one solid piece or one person.')
         pieces = []
-    if len(pieces) > MAX_PIECES:
-        out.append(f'The drawing set has {len(pieces)} pieces; the most is {MAX_PIECES}. Draw repeated pieces only where a camera can see them.')
+    bad = [i + 1 for i, p in enumerate(pieces) if isinstance(p, dict) and not _repeats_ok(p)]
+    if bad:
+        out.append(f"piece {bad[0]}: \"repeat\" is a list of one to {MAX_REPEATS} entries, each {{\"step\": [dx, dy, dz], \"count\": n}} with a step that moves and a whole count of at least 1.")
+        pieces = []
+    total = sum(_count(p) for p in pieces if isinstance(p, dict))
+    if total > MAX_PIECES:
+        out.append(f'The drawing set has {total} pieces with its repeats written out; the most is {MAX_PIECES}. Draw repeated pieces only where a camera can see them.')
         pieces = []
     for i, p in enumerate(pieces):
         out += _piece_problems(i, p, materials)
@@ -268,7 +310,7 @@ def _placer(pl):
 def model(d):
     """Every face of the model: its corner points, the way it looks out, its material's colour and the operator's marking colour."""
     faces, mats = [], d['materials']
-    for p in d.get('pieces') or []:
+    for p in expanded(d.get('pieces') or []):
         colour, mark, turn = mats[p['material']]['colour'], p.get('colour'), _placer(p.get('place'))
         if p['shape'] == 'box':
             _box(faces, p['min'], p['max'], colour, mark, turn)

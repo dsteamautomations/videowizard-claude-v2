@@ -3063,6 +3063,9 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
     session = session_of(store, run, outputs)
     rd = session.get('round')
     need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
+    open_ = sorted(eid for eid, d in (session.get('drawings') or {}).items() if d.get('status') in ('proposed', 'rejected') and eid in rd['elements'] and not (verdicts or {}).get(eid, {}).get('verdict') == 'ignore')
+    need(not open_, 'The reference drawings of ' + ', '.join(open_) + ' are not approved yet: the operator answers them first (`vw visuals next`), and a corrected set is sent again (`vw drawing set`). '
+                    'The sets are made with the approved drawings, so Done waits for them.')   # design/194
     quote = said(quote, 'Pass 1 done', user)   # design/99 C6: the click approves the frames
     verdicts = verdicts or {}
     waiting = []

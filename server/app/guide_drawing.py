@@ -39,7 +39,7 @@ def _placed(thing, box_lo, box_hi, turn, prefix):
     place = {'scale': k, 'turn': float(turn or 0.0), 'origin': [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]],
              'at': [(box_lo[0] + box_hi[0]) / 2, (box_lo[1] + box_hi[1]) / 2, box_lo[2]]}
     mats = {f'{prefix}.{n}': dict(m) for n, m in thing['materials'].items()}
-    pieces = [{**p, 'material': f"{prefix}.{p['material']}", 'place': place} for p in thing['pieces']]
+    pieces = [{**p, 'material': f"{prefix}.{p['material']}", 'place': place} for p in draw3d.expanded(thing['pieces'])]
     plo, phi = _extent(pieces, mats)
     return pieces, mats, [phi[i] - plo[i] for i in range(3)]
 

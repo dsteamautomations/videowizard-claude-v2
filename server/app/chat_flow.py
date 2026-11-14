@@ -343,7 +343,7 @@ def _drawing_items(ctx):
             lines += ['Sizes and facts with a source:'] + [f'- {x}' for x in r['sourced'][:12]]
         if r.get('assumed'):
             lines += ['ASSUMED, with no source (say if any is wrong):'] + [f'- {x}' for x in r['assumed'][:12]]
-        items.append(_item(f"drawing:{eid}:{r['sha256'][:10]}", 'drawing', f'{n} of {len(rows)} drawing sets', f"{names.get(eid) or r.get('name') or eid}: are these drawings right?", run_,
+        items.append(_item(f"drawing:{eid}:{r['sha256'][:10]}", 'drawing', f'Reference drawings, {n} of {len(rows)}', f"{names.get(eid) or r.get('name') or eid}: are these reference drawings right?", run_,
                            [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawings.')],
                            text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"drawing-{eid}-{v['id']}.png"} for v in r['views']]))
     if plan and session.get('guides'):   # Area B: the drawing of an AI video shot, before its still
@@ -360,7 +360,7 @@ def _drawing_items(ctx):
                      'Check that each person faces what they do and that the working hand can reach it.']
             lines += (['Changed from the plan to make the shot possible:'] + [f'- {c}' for c in d['changes']]) if d.get('changes') else []
             lines += (['Notes:'] + [f'- {c}' for c in d['notes']]) if d.get('notes') else []
-            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'AI video, the drawing of the shot', f"{shots[sid].get('title') or sid}: is the shot laid out right in these drawings?", run_,
+            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'AI video, the layout drawing of the shot', f"{shots[sid].get('title') or sid}: is the shot laid out right in these two drawings?", run_,
                                [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawing of the shot.')],
                                text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in d['views']]))
     return items

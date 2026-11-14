@@ -73,8 +73,9 @@ def test_a_thing_without_a_drawing_set_goes_the_older_way_unchanged():
 def test_a_drawing_set_that_is_not_approved_is_never_sent():
     store = frames_only(doc_with(KILN, MASON))
     drawn(store, 'E2', approve=False)
-    _, req = round_made(store)
-    assert req['E2']['parents'] == [] and 'How to read the drawings.' not in req['E2']['prompt']
+    assert DR.approved_sheets(saved(store), 'E2') == [] and not [r for r in saved(store)['references'].values() if r.get('kind') == 'drawing']
+    with pytest.raises((Problem, ValueError), match='not approved yet'):            # and the round's Done waits for the operator's answer
+        round_made(store)
 
 
 def test_a_changed_drawing_set_takes_its_old_sheets_out_until_it_is_approved_again():
@@ -83,9 +84,7 @@ def test_a_changed_drawing_set_takes_its_old_sheets_out_until_it_is_approved_aga
     d = dovetail()
     d['facts'][0]['value'] = 20
     sha2 = drawn(store, 'E2', approve=False, d=d)
-    assert not [r for r in saved(store)['references'].values() if r.get('kind') == 'drawing']
-    _, req = round_made(store)
-    assert req['E2']['parents'] == []
+    assert not [r for r in saved(store)['references'].values() if r.get('kind') == 'drawing'] and DR.approved_sheets(saved(store), 'E2') == []
     store2 = frames_only(doc_with(KILN, MASON))
     sha = drawn(store2, 'E2')
     sheets = [r for r in saved(store2)['references'].values() if r.get('kind') == 'drawing']
@@ -97,3 +96,32 @@ def test_a_person_never_carries_a_drawing():
     drawn(store, 'E2')
     _, req = round_made(store)
     assert req['P1']['parents'] == [] and 'How to read the drawings.' not in req['P1']['prompt']
+
+
+# ---------- the review round: the round waits for the drawings ----------
+
+def test_done_waits_while_a_drawing_set_is_unanswered_or_corrected():
+    store = frames_only(doc_with(KILN, MASON))
+    sha = drawn(store, 'E2', approve=False)
+    conn = FakeConn([])
+    VS.round_start(store, USER, NEW, [], ROWS, conn=conn)
+    with pytest.raises((Problem, ValueError), match='reference drawings of E2 are not approved yet'):
+        g(lambda: VS.round_done(store, USER, NEW, [], YES, 'Yes, the frame.', conn=conn))
+    assert conn.inserted == []                                                       # nothing was made
+    DR.verdict(conn, store, USER, NEW, [], 'E2', sha, False, 'no', 'the kiln is round, not square')
+    with pytest.raises((Problem, ValueError), match='not approved yet'):
+        g(lambda: VS.round_done(store, USER, NEW, [], YES, 'Yes, the frame.', conn=conn))
+    out = VS.round_done(store, USER, NEW, [], {**YES, 'E2': {'verdict': 'ignore'}}, 'Yes, the frame.', conn=conn)   # a thing the operator leaves out does not hold the round
+    assert 'E2' not in out['queued']
+
+
+def test_a_drawing_set_sent_after_its_things_set_was_made_says_so():
+    store = frames_only(doc_with(KILN, MASON))
+    round_made(store)
+    conn = FakeConn([])
+    late_set = DR.set_drawing(conn, store, USER, NEW, [], 'E2', dovetail())
+    assert 'already made without these drawings' in late_set['late'] and late_set['next'].startswith('Its set was already made')
+    late_frame = DR.set_drawing(conn, store, USER, NEW, [], 'E1', dovetail())
+    assert 'footage picture was already taken as its reference' in late_frame['late']
+    store2 = frames_only(doc_with(KILN, MASON))
+    assert 'late' not in DR.set_drawing(conn, store2, USER, NEW, [], 'E2', dovetail())

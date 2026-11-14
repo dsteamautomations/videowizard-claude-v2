@@ -37,7 +37,7 @@ RIGHT_HAND_WORDS = ('Right-handed staging: each person works with the right hand
                     'The left hand does nothing: it rests.')
 LOOK_WORDS = ('Image {n} is a look reference. Keep its look in your picture: its real surface textures, its light, its true colours and the way it reads as an ordinary photograph. '
               'Take nothing else from it: not the positions, not the arrangement, not the state of any thing, not the people. Where it differs from Image 1 or from the facts, Image 1 and the facts win.')
-NOT_APPROVED = ("The operator has not approved this shot's drawing yet. It is shown in the chat (`vw chat`); or fetch it with `vw guide drawing --shot {shot}` and record their answer with "
+NOT_APPROVED = ("The operator has not approved this shot's drawing yet. It is shown in the chat (`vw visuals next`); or fetch it with `vw guide drawing --shot {shot}` and record their answer with "
                 "`vw guide drawing-approve --shot {shot} --sha {sha} --quote \"<the operator's words>\"`.")
 
 # what a take prompt never carries (the 48 failed methods; the single-run ones are precautions): (pattern, what to say)
@@ -488,6 +488,11 @@ def status(conn, store, run, outputs, shot_id):
         nxt = f"Ready to shoot: show the operator the card ({card['seconds']} s, about {card['cost_inr']:.0f} rupees). On their word: `vw guide shoot --shot {shot_id} --quote \"…\"`."
     else:
         nxt = 'Still missing before the take: ' + ', '.join(card['missing']) + '.'
+    d = g.get('drawing') or {}
+    if d.get('status') == 'proposed':   # design/194: no still before the operator's Yes on the shot's drawing
+        nxt = f"The shot's drawing waits for the operator's answer (`vw visuals next`, or `vw guide drawing --shot {shot_id}`); no still is made before their Yes. " + nxt
+    elif d.get('status') == 'rejected':
+        nxt = f"The operator corrected the shot's drawing ({(d.get('verdict') or {}).get('notes')}): change the scene and send it again (`vw guide scene --shot {shot_id} --file …`). " + nxt
     return {'shot_id': shot_id, 'guide': v, 'files': names, 'next': nxt}
 
 

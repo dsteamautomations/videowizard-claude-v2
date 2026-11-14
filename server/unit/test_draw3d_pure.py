@@ -190,3 +190,55 @@ def test_the_back_colour_is_kept_for_backs_alone():
     d = dovetail()
     d['materials']['maple']['colour'] = list(D.BACK)
     assert 'kept for' in ' '.join(D.problems(d))
+
+
+# ---------- equal pieces are written once and repeated (the review round: a helper cannot run a script of its own) ----------
+
+def bricks():
+    d = dovetail()
+    d.update(level='form', views=d['views'][:2], labels=[], dims=[],
+             pieces=[{'shape': 'box', 'min': [0, 0, 0], 'max': [230, 75, 110], 'material': 'maple', 'repeat': [{'step': [240, 0, 0], 'count': 8}, {'step': [0, 0, 120], 'count': 5}]}])
+    return d
+
+
+def test_a_repeated_piece_is_a_row_and_rows_of_it():
+    d = bricks()
+    assert D.problems(d) == []
+    out = D.expanded(d['pieces'])
+    assert len(out) == 40 and all('repeat' not in p for p in out)
+    assert {tuple(p['min']) for p in out} == {(240 * i, 0, 120 * k) for i in range(8) for k in range(5)}
+    assert all([b - a for a, b in zip(p['min'], p['max'])] == [230, 75, 110] for p in out)          # every copy the same size: the size is written once
+    assert len(D.model(d)) == 40 * 6
+
+
+def test_a_prism_and_a_cylinder_repeat_along_their_own_axes_too():
+    prism = {'shape': 'prism', 'axis': 'X', 'from': 0, 'to': 18, 'outline': [[0, 6], [18, 8], [18, 35], [0, 38]], 'material': 'walnut', 'repeat': [{'step': [0, 0, 38], 'count': 3}]}
+    cyl = {'shape': 'cylinder', 'axis': 'Z', 'centre': [40, 40], 'radius': 5, 'from': 0, 'to': 60, 'material': 'maple', 'repeat': [{'step': [100, 0, 0], 'count': 2}]}
+    a, b = D.expanded([prism]), D.expanded([cyl])
+    assert [p['outline'][0] for p in a] == [[0, 6], [0, 44], [0, 82]] and all((p['from'], p['to']) == (0, 18) for p in a)
+    assert [p['centre'] for p in b] == [[40, 40], [140, 40]] and all((p['from'], p['to']) == (0, 60) for p in b)
+
+
+@pytest.mark.parametrize('repeat, said', [
+    ([{'step': [0, 0, 0], 'count': 3}], 'repeat'),
+    ([{'step': [240, 0, 0], 'count': 0}], 'repeat'),
+    ([{'step': [240, 0, 0], 'count': 2.5}], 'repeat'),
+    ([{'step': [1, 0, 0], 'count': 2}] * 4, 'repeat'),
+    ([{'step': [240, 0, 0], 'count': 100}, {'step': [0, 0, 120], 'count': 100}], 'with its repeats written out'),
+])
+def test_a_faulty_repeat_is_refused_in_plain_words(repeat, said):
+    d = bricks()
+    d['pieces'][0]['repeat'] = repeat
+    assert said in ' '.join(D.problems(d))
+
+
+def test_the_example_in_the_helpers_skill_is_a_drawing_set_the_server_accepts():
+    """A helper copies this example; if the server refused it, the first drawing of every film would start with a refusal."""
+    import json
+    from pathlib import Path
+    text = (Path(D.__file__).resolve().parents[2] / 'plugin' / 'skills' / 'drawing' / 'SKILL.md').read_text(encoding='utf-8')
+    example = json.loads(text.split('```json')[1].split('```')[0])
+    assert D.problems(example) == []
+    assert len(D.render(example)) == 4 and len(D.expanded(example['pieces'])) == 3 + 8 * 5      # three single pieces and one brick repeated 8 along and 5 up
+    for kind in re.findall(r'`([a-z -]+)`', text[text.index('`kind` is one of') + len('`kind` is one of'):text.index('A camera view gives')]):
+        assert kind in D.KINDS, kind

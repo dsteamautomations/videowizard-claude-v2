@@ -7,7 +7,15 @@
 **Three more things the build settled (steps 4 and 5):**
 - The guide's first frame (the Blender boxes) stays Image 1 of a still, because the take is made from that guide and must start on it. The shot's two drawings follow as Images 2 and 3. A thing's real shape enters the drawing when its piece of the scene is marked `drawn_as`.
 - No switch: the still made from the box frame alone is retired for every new still at release (SK's rule of 12 Nov: no route switch), not "kept until the first film has run". The rows are 55 to 58 of design/35.
-- The server has no cutting view: a cut is modelled as its own pieces. Built: steps 1 to 6 on branch `accurate-images`; nothing deployed. Read against `main` (server 0.98.0, not deployed).
+- The server has no cutting view: a cut is modelled as its own pieces. Built: steps 1 to 6 on branch `accurate-images`; nothing deployed.
+
+**Approved here but not built in this branch** (each is said so the text below is not read as done):
+- The plan has no field that marks a thing for drawing or its level. The assistant decides at the picture search, from the rule in the instructions, and the level is in the drawing set itself.
+- A still that is not a video's first frame (a shot picture made with `vw visuals image`) gets no shot drawing. It uses the thing's reference set, which was made with the drawings. An approved sheet is a reference of the film (kind `drawing`) and can be named among such a picture's parents by hand.
+- No check line is added to a start picture for posture; the posture is refused earlier, on the scene's numbers, and the operator sees the shot's drawing. A guide's still is not read by the picture checker, as before.
+- The Gemini-only line "do not move the camera" is not sent: start pictures are made on GPT image, and a thing's reference set has no camera to hold.
+
+**Found and fixed in the review round (14 Nov):** the operator-side guard now lets the `vw:drawing` skill and the `vw-drawing` helper through; a helper cannot run a script on the operator's machine, so equal pieces are written once with `repeat`; the round's Done waits while a drawing set is unanswered or corrected; a drawing set sent after its thing's set was made says so; the guide's status names the shot's drawing as what waits; the example in the skill is checked by a test against the server's own rules; the instructions say a drawing set is not the drawing spec of a drawn graphic. Read against `main` (server 0.98.0, not deployed).
 
 Basis: SK's trial document (`drawings-first-handover-from-trial-2026-11-14.txt`), the drawing standard (`drawing-standard-2026-11-14.md`), and the five-scenario trial on film VW-18 (`drawings-first-test-2026-11-14/vw18/RESULTS.md`).
 

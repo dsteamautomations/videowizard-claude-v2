@@ -100,7 +100,7 @@ Steps, seats, bending and door arcs; an arm passing through a thing; one thing h
 
 `still.json` is `{"prompt": "…", "parents": [{"id": "R12", "job": "the father: copy his face, hair, build and clothes", "crop": {"left": 0.1, "top": 0, "width": 0.4, "height": 0.6}}]}`.
 
-- The server puts the guide's first frame first and writes the layout numbers and "Exactly N people" itself. Do not write positions in words.
+- The server puts the guide's first frame first (Image 1), then the shot's two approved drawings (Images 2 and 3) with the words that explain them, and writes the layout numbers and "Exactly N people" itself. Do not write positions in words, and do not describe the drawings. Your `parents` therefore start at Image 4; with the frame and the two drawings, at most 13 of them (12 with a look reference).
 - Your words, in this order: the view (size and angle); the place; each box and who or what it is, with that person's or thing's one fixed description, word for word the same in every still of the film; **THE MOMENT** (nothing done yet; or already walking); the sizes of props; the light by what it does (the sun's side, the shadows), no mood word.
 - `parents`: only approved pictures, each with its job. For the first still of a scene: the people's full-length and face pictures and each prop's picture, cropped to the thing. For later stills of the same scene: crops of the scene's first approved still. Never a whole photo taken from another camera position; never a person's working-pose picture.
 - A describes-what-it-looks-like word beats a trade name. A "not a …" phrase goes in only after that fault has been seen.

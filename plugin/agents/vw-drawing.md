@@ -14,7 +14,7 @@ Then, inside the run folder:
 
 1. Decide the level: engineered, composition or form. If the thing needs no drawing, or you cannot reach its level, stop and say so in one line.
 2. Write the facts: every size, count and state a picture of the thing must show, each with its source or marked assumed. When the footage frame and the plan's sizes disagree, follow the frame and note the conflict.
-3. Write `work/drawing/<element>/set.json`: the materials, the pieces from the facts' numbers, the views with what each shows and what it is for. Use a short script of your own to work out repeated pieces if you need one; send only the JSON it writes.
+3. Write `work/drawing/<element>/set.json`: the materials, the pieces from the facts' numbers, the views with what each shows and what it is for. A thing built of equal pieces (a course of bricks, a row of planks, a stack) is one piece with `repeat`, never the same piece typed many times. You cannot run a script here: the description is written by hand, so keep it small.
 4. Send it: `vw drawing set --element <element> --file work/drawing/<element>/set.json`. Read every refusal. Fix what it names and send again.
 5. Fetch the sheets (`vw drawing show --element <element>`) and look at each one. A view that does not show what its `shows` line says is wrong: fix the model, never the words.
 6. Write `work/drawing/<element>/BUILD.md`: the level and why, the facts and their sources, every assumed size, what was left out of the model, and any conflict between the footage and the plan.

@@ -109,10 +109,13 @@ def set_drawing(conn, store, user, run, outputs, element_id, description):
                         'sourced': [_fact_line(f, True) for f in facts if not f.get('assumed')], 'assumed': [_fact_line(f) for f in facts if f.get('assumed')],
                         'status': 'proposed', 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
     VS.save_session(store, run, session)
-    return {'element_id': element_id, 'sha256': sha, 'status': 'proposed', 'views': [{'id': v['id'], 'name': v['name'], 'kind': v['kind']} for v in views],
+    slot = ((session.get('round') or {}).get('elements') or {}).get(element_id) or {}
+    late = ('Its footage picture was already taken as its reference, so no set will be made with these drawings on this round: say so to the operator. ' if slot.get('from_footage') else
+            'Its set was already made without these drawings: once they are approved, the operator answers that set No or Correct it on step 2 and it is made again with them. ' if slot.get('set') else '')
+    return {'element_id': element_id, 'sha256': sha, 'status': 'proposed', **({'late': late.strip()} if late else {}), 'views': [{'id': v['id'], 'name': v['name'], 'kind': v['kind']} for v in views],
             'assumed': rows[element_id]['assumed'],
-            'next': f"The drawings are made (free). The operator looks at them in the chat (`vw chat`) and approves or corrects them; "
-                    f"or `vw drawing approve --element {element_id} --sha {sha} --quote \"<the operator's words>\"`."}
+            'next': late + f"The drawings are made (free). The operator looks at them in the chat (`vw visuals next`) and approves or corrects them; "
+                           f"or `vw drawing show --element {element_id}`, then `vw drawing approve --element {element_id} --sha {sha} --quote \"<the operator's words>\"`."}
 
 
 def verdict(conn, store, user, run, outputs, element_id, sha256, approved, quote, notes=''):

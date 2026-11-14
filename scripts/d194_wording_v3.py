@@ -13,7 +13,7 @@ DRAW_FIRST = ("A thing whose construction, pattern or mechanism must be right in
               "`vw drawing set --element E --file work/drawing/E/set.json` (free; the server draws every view and refuses a faulty set in plain words). `vw visuals next` then shows the operator "
               "the labelled sheets with the sources and the assumed sizes, and they answer Yes or Correct it. Approved drawings go with that thing's set by themselves, with the words that explain "
               "them and its facts. Where the footage and the plan's sizes disagree, draw from the footage and tell the operator in one line. A loose or living thing gets a form sheet; "
-              "a person never gets a drawing set.\n")
+              "a person never gets a drawing set. A drawing set is a reference for the picture AI; it is not the drawing spec of a drawn graphic.\n")
 WAIT = "`vw visuals status --wait 900` until the round is complete; ask nothing per element and generate nothing meanwhile."
 PAIRS = {
     'picture-search': [

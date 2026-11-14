@@ -42,7 +42,7 @@ Never lower the level to save time. If you cannot reach the level, say so and st
   "facts": [
     {"what": "board thickness", "value": 18, "unit": "mm", "source": "the joiner's drawing"},
     {"what": "slope of a tail", "value": "1 in 7", "assumed": true},
-    {"what": "the guard door", "value": "closed"}
+    {"what": "the joint", "value": "closed tight, no gap", "source": "the shot's plan"}
   ],
   "materials": {
     "maple":  {"colour": [230, 201, 154], "is": "pale maple, the pin board"},
@@ -51,11 +51,17 @@ Never lower the level to save time. If you cannot reach the level, say so and st
   "pieces": [
     {"shape": "box", "min": [18, 0, 0], "max": [150, 18, 120], "material": "maple"},
     {"shape": "prism", "axis": "X", "from": 0, "to": 18, "outline": [[0, 6], [18, 8.57], [18, 35.43], [0, 38]], "material": "walnut"},
-    {"shape": "cylinder", "axis": "Z", "centre": [40, 40], "radius": 5, "from": 0, "to": 60, "material": "maple"}
+    {"shape": "cylinder", "axis": "Z", "centre": [40, 40], "radius": 5, "from": 0, "to": 60, "material": "maple"},
+    {"shape": "box", "min": [0, 0, 0], "max": [230, 75, 110], "material": "maple",
+     "repeat": [{"step": [240, 0, 0], "count": 8}, {"step": [0, 0, 240], "count": 5}]}
   ],
   "views": [
     {"id": "a", "kind": "square on", "name": "The tail board, square on", "toward": [-1, 0, 0],
      "shows": "the tails and the ends of the pins between them", "for": "the pattern on this face"},
+    {"id": "b", "kind": "square on", "name": "The pin board, square on", "toward": [0, -1, 0],
+     "shows": "the pins with straight sides and the ends of the tails", "for": "the pattern on this face"},
+    {"id": "c", "kind": "from above", "name": "From above", "toward": [0, 0, 1],
+     "shows": "the two boards meeting at the corner", "for": "how the boards stand to each other"},
     {"id": "d", "kind": "three-quarter", "name": "From outside the corner", "toward": [-1, -1, 0.9],
      "shows": "both boards and how they lock", "for": "the overall form"}
   ],
@@ -67,9 +73,10 @@ Never lower the level to save time. If you cannot reach the level, say so and st
 | Part | Rule |
 |---|---|
 | `unit` | `mm` for a thing, `m` for a place. Z is up. |
-| `facts` | each has `what`, and a `source` or `"assumed": true`. Counts, lengths and states (closed, dry, full, at rest) are facts. These lines go into the picture's request and into its check. |
+| `facts` | each has `what`, and a `source` or `"assumed": true`; the server refuses a fact with neither. Counts, lengths and states (closed, dry, full, at rest) are facts. These lines go into the picture's request and into its check. |
 | `materials` | one colour for one material, with `is`: what it is, in plain words. Purple is kept for a person's back; the server refuses a material close to it. |
-| `pieces` | `box` (`min`, `max`), `prism` (`axis`, `from`, `to`, and an `outline` of points in the two other axes), `cylinder` (`axis`, `centre` in the two other axes, `radius`, `from`, `to`; `radius_to` for a taper). At most 4,000. A piece may carry `colour`, a marking colour for the operator's sheet only. |
+| `pieces` | `box` (`min`, `max`), `prism` (`axis`, `from`, `to`, and an `outline` of points in the two other axes), `cylinder` (`axis`, `centre` in the two other axes, `radius`, `from`, `to`; `radius_to` for a taper). A piece may carry `colour`, a marking colour for the operator's sheet only. |
+| `repeat` | on a piece: up to three entries, each `{"step": [dx, dy, dz], "count": n}`. The piece is copied n times along the step; a second entry repeats that whole row, a third those rows. The example's last piece is 8 bricks in a row, and that row on 5 courses. This is how anything built of equal pieces is written: you cannot run a script, and a size is still written once. At most 4,000 pieces with the repeats written out. |
 | `views` | each has `id`, `kind`, `name`, `shows` (what it shows) and `for` (what it is for), one line each. `kind` is one of: `from above`, `square on`, `cut through`, `pulled apart`, `three-quarter`, `one unit enlarged`, `side by side`, `through the camera`. A camera view gives `camera` (`position`, `aim`, `lens`); every other view gives `toward`, the direction from the thing to the eye. At most 6. |
 | `labels`, `dims` | for the operator's sheet: a point of the model and short words. The server sets them in one column. |
 | `people` | optional, in a composition: `at`, `facing` (the way the chest points), `height`, and `hands` (where each hand is). The server draws the face and chest pale with dark marks, the back purple and the right arm orange. |

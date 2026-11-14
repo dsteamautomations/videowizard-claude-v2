@@ -198,3 +198,25 @@ def test_the_shots_drawing_can_be_fetched_as_the_operators_sheets(film):
     assert 'drawing-camera' in st['files'] and 'drawing-above' in st['files'] and st['guide']['drawing']['status'] == 'approved'
     got = GD.file(store, NEW, [], 'VS1', 'drawing-camera')
     assert got['mime'] == 'image/png' and got['file'] == 'drawing-camera.png'
+
+
+# ---------- the review round: what is next is said ----------
+
+def test_the_guides_status_names_the_drawing_as_what_waits(film):
+    store, conn = film
+    sha = ready_for_the_still(store, conn)
+    assert "The shot's drawing waits for the operator's answer" in GD.status(conn, store, NEW, [], 'VS1')['next']
+    GD.drawing_verdict(conn, store, USER, NEW, [], 'VS1', sha, False, 'no', 'the mother faces the wrong way')
+    nxt = GD.status(conn, store, NEW, [], 'VS1')['next']
+    assert 'the mother faces the wrong way' in nxt and 'change the scene' in nxt
+    scene(store, conn)                                                               # the same scene again changes nothing; a corrected drawing stays corrected
+    assert saved(store)['guides']['VS1']['drawing']['status'] == 'rejected'
+
+
+def test_a_thing_built_of_repeated_pieces_stands_in_a_shot():
+    thing = dovetail()
+    thing['pieces'] = [{'shape': 'box', 'min': [0, 0, 0], 'max': [50, 150, 30], 'material': 'maple', 'repeat': [{'step': [50, 0, 0], 'count': 3}, {'step': [0, 0, 30], 'count': 4}]}]
+    spec = home_walk()
+    spec['set'].append({'id': 'STACK', 'name': 'the stack', 'shape': 'box', 'min': [2.0, -0.4, 0.0], 'max': [2.15, -0.25, 0.12], 'colour': [0.6, 0.4, 0.2], 'drawn_as': 'E1'})
+    d, notes = GDR.description(spec, {'E1': thing})
+    assert D.problems(d) == [] and notes == [] and len([p for p in d['pieces'] if p['material'].startswith('STACK.')]) == 12
