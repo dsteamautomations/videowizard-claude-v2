@@ -12,6 +12,22 @@ Run by Claude's scripts outside the application (`model-test/sentences_vw19_hydr
 - **One weakness found:** the seconds it gives are mostly the whole piece, not the few seconds that show the sentence.
 - **One limit found:** in the look-again way Google refuses our answer form with even one more field. The sentence fit had to go into fields the form already has.
 
+## What "today's cut" and "the new cut" mean
+
+| | Today's cut | The new cut |
+|---|---|---|
+| What it is | The real cut of VW-19, made in the application on 11 Nov | A cut made for this test on 14 Nov, outside the application |
+| Who watched the clips | Gemini 3.8 Flash, as the application sends them: the plain way for clips of 15 seconds or less, the look-again way for longer ones | Gemini 4 Hydrogen, the look-again way for every clip, high thinking, high picture quality |
+| What Gemini was asked | Describe each clip and say which paragraph of the script each piece fits (7 paragraphs) | The same, with the script as 11 sentences, and for each piece: which sentence, how exactly, what is missing |
+| Who chose the clip for each sentence | Claude, the operator's assistant in the application (which Claude model was not checked) | Claude, a helper started from the master thread (Fable 5.2) |
+| What Claude worked from | The application's short list: one line about the whole clip for every piece, with grades and timings | A list built from Gemini's answers: per sentence, the pieces ranked, each with its own description and its "does not show" line |
+| The rules | The application's full instructions for the options stage | Six rules written for the test |
+| Did Claude see the footage | No | No |
+| Checks afterwards | The server's rule check with corrections; a second look by a Claude helper at still frames | None: one pass |
+| What came out | The full file the server needs (frames, crops, markers) | A choice per sentence: which clip, which seconds |
+
+Today's cut had the weaker watcher and the poorer list, but the full process. The new cut had the stronger watcher and the richer list, but a thin process with nothing checked. The score compares these two as they are; it does not show what the new input would do with the full process behind it.
+
 ## Test 1: today's score (the baseline)
 
 From the operator's recorded answers on VW-19's finished cut.
