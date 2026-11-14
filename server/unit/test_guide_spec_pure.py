@@ -257,3 +257,47 @@ def test_a_walker_faces_the_way_they_walk_and_the_right_is_the_persons_own_right
     pos, yaw, speed = G.person_at(spec['people'][0], 1.0)
     assert speed == pytest.approx(0.95, abs=0.02) and pos[0] == pytest.approx(-2.2 + 0.95, abs=0.01)
     assert G.right_of(yaw) == pytest.approx((0.0, -1.0, 0.0), abs=1e-6)   # walking to +X, his right is toward the camera (-Y)
+
+
+# ---------- posture (design/200, SK 14 Nov 2026): a person stands where a real person would do the job ----------
+
+def test_a_hand_working_in_front_of_the_body_passes_the_posture_check():
+    rows = G.checks(counter_pour())
+    assert not said(rows, 'posture') and ('posture', 'info') in levels(rows, 'posture')
+
+
+def test_a_hand_reaching_behind_the_shoulders_is_refused_with_the_distance_and_the_moment():
+    """The lab shot as first planned: the body faces one way and the right hand works a knob behind it. No person can."""
+    spec = counter_pour()
+    spec['people'][0]['hands']['right'] = [{'t': 0, 'at': [-0.2, 0.45, 1.15]}, {'t': 3, 'at': [-0.2, 0.45, 1.25]}]   # he faces -Y; the hand is 0.35 m behind him
+    spec['props'] = []
+    text = said(G.checks(spec), 'posture')
+    assert 'behind the line of the shoulders' in text and '0.35 m' in text and 'the man' in text and 'in front' in text
+
+
+def test_the_same_job_mirrored_so_the_person_faces_it_passes():
+    spec = counter_pour()
+    spec['people'][0].update(facing=[0, 1], hands={'right': [{'t': 0, 'at': [0.2, 0.45, 1.15]}, {'t': 3, 'at': [0.2, 0.45, 1.25]}]})   # turned round: the knob is now in front, on his right
+    spec['props'] = []
+    assert not said(G.checks(spec), 'posture')
+
+
+def test_what_a_person_watches_lies_within_a_comfortable_turn_of_the_head():
+    spec = counter_pour()
+    spec['people'][0]['watches'] = [-0.8, -2.0, 1.4]          # ahead and a little to one side: 22 degrees
+    assert not said(G.checks(spec), 'posture')
+    spec['people'][0]['watches'] = [3.0, 0.1, 1.4]            # square to his side: 90 degrees
+    text = said(G.checks(spec), 'posture')
+    assert '90 degrees' in text and '45 degrees' in text and 'Turn the body' in text
+
+
+def test_a_walker_is_judged_by_the_way_they_walk():
+    spec = home_walk()
+    spec['people'][0]['watches'] = [-10.0, -0.8, 1.5]         # the father walks to the right and looks straight back
+    assert '180 degrees' in said(G.checks(spec), 'posture')
+
+
+def test_what_is_watched_is_a_point_of_three_numbers():
+    spec = counter_pour()
+    spec['people'][0]['watches'] = 'the dial'
+    assert any('watches' in m for m in G.problems(spec))

@@ -32,7 +32,7 @@ from .visual_contract import GAZE_CAMERA, take_seconds, STILL_MOVING_MAX_S, FROZ
 
 STAGE = 'visuals'
 IMAGE_MODELS = {'generate': 'gpt-image-2.5-flare-2026-09-08', 'edit': 'gpt-image-2.5-sunburst-2026-09-08'}   # design/82 U4: pinned snapshots (API reference, 22 Oct 2026)
-REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state', 'style', 'component')   # design/117 P1: a thing alone on a transparent background, placed by SVG scenes   # design/65: a state of a graphic sequence, generated from the previous state
+REF_KINDS = ('frame', 'supplied', 'web', 'isolated', 'sheet', 'keyframe', 'state', 'style', 'component', 'drawing')   # design/117 P1: a thing alone on a transparent background, placed by SVG scenes   # design/65: a state of a graphic sequence, generated from the previous state
 TREATMENT_ROUTES = ('footage', 'still', 'graphic_sequence', 'video', 'drawn')   # design/113
 DISSOLVE_S = 0.5   # between the states of a graphic sequence
 MAX_INPUTS = 16    # design/71 P2: GPT Image's limit on input pictures (the library's fact sheet A5)
@@ -1595,6 +1595,10 @@ KEPT_NOTES = ("With the pictures, tell me: (1) the one method you chose and why,
               "you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.")
 KEPT_COSMETICS = ("Cosmetic requirements, which do not touch the technical content:\n- The place reads as {place}; the film's look: {look}.\n- Natural daylight as in that place, natural colours, no filters, no stylisation, no illustration.\n"
                   "- Camera close enough that the subject is readable, the surroundings soft.\n- No person, no text, logos, watermarks, stock-site lettering or maker's stamps; nothing in the picture that the real photographs do not justify.")
+KEPT_DRAWN_LINE = ("The drawings were made from this thing's real sizes and approved by the film's operator. For how the thing is built, its pattern, its proportions and its counts, the drawings "
+                   "and the facts below are the truth: where a real photograph differs from them, the drawings win. Take from the real photographs only what a drawing cannot show: the material, "
+                   "its surface, colour and wear, and the place. The picture is a photograph of the real thing, never a picture of a drawing.")   # design/200: the one case where the photographs do not win
+DRAWN_LOOK_LINE = {'check': 'a photograph, not a drawing', 'weight': 'must', 'pass_when': 'the picture reads as an ordinary photograph of a real thing: no flat colour fills, no outlines, no white drawing background'}
 KEPT_FRAME_LINE = "Image 1 is the approved footage frame of {name}: take the thing itself from it (its exact form, material and wear); what the frame does not show, take from the real photographs."
 HOW_WORDS = re.compile(r'\b(step by step|how to|how it is done|procedure)\b', re.I)
 PERSON_SET = ("Make a set of three separate pictures of this one person, one per turn: 1, a full-length front view standing at ease; 2, a full-length three-quarter view in a working pose of their trade; 3, a close-up of the face. "
@@ -1645,7 +1649,7 @@ def _place_look(plan):
     return place, str((plan.get('foundation') or {}).get('appearance') or '').strip() or 'as the footage'
 
 
-def thing_prompt(plan, run, session, element, subject, frame=False):
+def thing_prompt(plan, run, session, element, subject, frame=False, drawn=None):
     """design/151 part 3: the kept method's prompt for a thing: the preamble and the set line verbatim, the writer's subject block (what, never how), the
     cosmetics from the plan (Q7), the frame's job line when the thing has one (Q1), the four notes."""
     subject = ' '.join(str(subject or '').split())
@@ -1657,6 +1661,9 @@ def thing_prompt(plan, run, session, element, subject, frame=False):
     parts = [KEPT_PREAMBLE, KEPT_SET_LINE, 'What the picture must represent: ' + subject.rstrip('.') + '.']
     if frame:
         parts.append(KEPT_FRAME_LINE.format(name=element.get('name') or element['id']))
+    if drawn:   # design/200: (how to read the drawings sent, the facts) of the thing's approved drawing set
+        how, facts = drawn
+        parts += [how, KEPT_DRAWN_LINE] + (['What must be true:\n' + '\n'.join(f'- {f}' for f in facts)] if facts else [])
     parts += [KEPT_COSMETICS.format(place=place, look=look), KEPT_NOTES]
     return '\n\n'.join(parts)
 
@@ -2703,6 +2710,8 @@ def _from_footage(session, plan, rd):
     for eid, row in rd['elements'].items():
         if row.get('ignored') or kinds.get(eid) == 'person' or row.get('set'):
             continue
+        if (session.get('drawings') or {}).get(eid, {}).get('status') == 'approved':
+            continue   # design/200: a thing with an approved drawing set gets its set, made from its footage picture and the drawings; without one, the footage picture is the reference as before
         approved = [fid for fid in row.get('frames') or [] if (session['references'].get(fid) or {}).get('status') == 'approved']
         mine = [] if approved else _own_pictures(session, eid)   # F2 (11 Nov 2026): an approved own picture is the reference, as a footage picture is
         if not approved and not mine:
@@ -3054,6 +3063,9 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
     session = session_of(store, run, outputs)
     rd = session.get('round')
     need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
+    open_ = sorted(eid for eid, d in (session.get('drawings') or {}).items() if d.get('status') in ('proposed', 'rejected') and eid in rd['elements'] and not (verdicts or {}).get(eid, {}).get('verdict') == 'ignore')
+    need(not open_, 'The reference drawings of ' + ', '.join(open_) + ' are not approved yet: the operator answers them first (`vw visuals next`), and a corrected set is sent again (`vw drawing set`). '
+                    'The sets are made with the approved drawings, so Done waits for them.')   # design/200
     quote = said(quote, 'Pass 1 done', user)   # design/99 C6: the click approves the frames
     verdicts = verdicts or {}
     waiting = []
@@ -3213,7 +3225,11 @@ def generate_image(conn, store, user, run, outputs, body):
         else:
             own = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
             parents_ = list(body.get('parents') or []) or own[:1]   # Q1: a thing the footage shows is made from its approved frame
-            body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_)), 'parents': parents_, 'set': True, 'search': True, 'views': set_views(element)}
+            from . import drawings   # design/200: an approved drawing set of the thing goes with the request, after the frame, with the words that explain it and its facts
+            sheets = [s['id'] for s in drawings.approved_sheets(session, element['id']) if s['id'] not in parents_]
+            drawn = (drawings.words(store, session, element['id'], first=len(parents_) + 1), drawings.must_be_true(session, element['id'])) if sheets else None
+            body = {**body, 'prompt': thing_prompt(plan, run, session, element, body['prompt'], frame=bool(parents_), drawn=drawn), 'parents': parents_ + sheets, 'set': True, 'search': True,
+                    'views': set_views(element), **({'drawn_facts': drawn[1]} if drawn else {})}
     if element['kind'] not in ('person', 'graphic', 'style') and body['element_id'] != STYLE:
         from .visual_contract import footage_cited
         frames_ok = [r for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == element['id'] and r.get('status') == 'approved']
@@ -3378,6 +3394,8 @@ def generate_image(conn, store, user, run, outputs, body):
         lines = list(lines or []) + COMPONENT_LINES
     if is_set:   # design/151: the kept method's checks on a thing's set; a person's set alone on plain ground
         lines = list(lines or []) + (PERSON_SET_LINES if element['kind'] == 'person' else KEPT_THING_LINES)
+        if body.get('drawn_facts') is not None:   # design/200: the facts of the drawing set are checked on the picture, and it must be a photograph
+            lines += [{'check': 'drawn fact: ' + f, 'weight': 'must', 'pass_when': f'the picture shows it as the approved drawings do: {f}'} for f in body['drawn_facts']] + [DRAWN_LOOK_LINE]
     elif body['kind'] == 'sheet' and body['element_id'] != STYLE:
         lines = list(lines or []) + sheet_lines(element)   # design/119 rule 2
         if not body.get('fix_of'):   # design/121 change 4: the operator's note on each source, in the prompt and as a must line

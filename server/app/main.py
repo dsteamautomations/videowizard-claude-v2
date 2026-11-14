@@ -12,7 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response as RawResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from . import analysis_jobs, auth, brandlib, connect, core, elevenlabs, film, files, guide, jobs, library, runlog, visuals_stage, voices, web, worker
+from . import analysis_jobs, auth, brandlib, connect, core, drawings, elevenlabs, film, files, guide, jobs, library, runlog, visuals_stage, voices, web, worker
 from .stage2 import stage as stage2
 from .stage3 import assembly as stage3, delivery as deliv
 from .stage3 import assembly as stage3, delivery as deliv
@@ -1517,6 +1517,15 @@ class GuideStill(Write):
     parents: list[dict] = Field(default_factory=list, max_length=15)
     repair_of: str | None = None
     region: dict | None = None
+    look: str | None = None   # design/200: a look reference, an approved picture of this film
+
+
+class GuideDrawingVerdict(Write):   # design/200: the operator's verdict on a shot's drawing
+    shot_id: str
+    sha256: str
+    approved: bool
+    quote: str = Field(min_length=1, max_length=500)
+    notes: str = Field(default='', max_length=2000)
 
 
 class GuideStillVerdict(Write):
@@ -1557,7 +1566,12 @@ def visuals_guide_verdict(run_id: UUID, body: GuideVerdict, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/guide/still', status_code=201)
 def visuals_guide_still(run_id: UUID, body: GuideStill, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.request_still(conn, storage(), user, run, outputs, body.shot_id, body.prompt, body.parents, body.repair_of, body.region), 201)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.request_still(conn, storage(), user, run, outputs, body.shot_id, body.prompt, body.parents, body.repair_of, body.region, body.look), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/drawing')
+def visuals_guide_drawing(run_id: UUID, body: GuideDrawingVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.drawing_verdict(conn, storage(), user, run, outputs, body.shot_id, body.sha256, body.approved, body.quote, body.notes))
 
 
 @app.post('/api/runs/{run_id}/visuals/guide/approve')
@@ -1583,6 +1597,41 @@ def visuals_guide_cause(run_id: UUID, body: GuideCause, user=User, conn=DB):
 @app.post('/api/runs/{run_id}/visuals/guide/shoot', status_code=201)
 def visuals_guide_shoot(run_id: UUID, body: GuideShoot, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.shoot(conn, storage(), user, run, outputs, body.shot_id, body.quote, body.again), 201)
+
+
+class DrawingSet(Write):   # design/200: a thing's drawing set (app/drawings.py); free, nothing is queued
+    element_id: str = Field(min_length=1, max_length=80)
+    drawing: dict
+
+
+class DrawingVerdict(Write):
+    element_id: str = Field(min_length=1, max_length=80)
+    sha256: str
+    approved: bool
+    quote: str = Field(min_length=1, max_length=500)
+    notes: str = Field(default='', max_length=2000)
+
+
+@app.post('/api/runs/{run_id}/visuals/drawing/set', status_code=201)
+def visuals_drawing_set(run_id: UUID, body: DrawingSet, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: drawings.set_drawing(conn, storage(), user, run, outputs, body.element_id, body.drawing), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/drawing/verdict')
+def visuals_drawing_verdict(run_id: UUID, body: DrawingVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: drawings.verdict(conn, storage(), user, run, outputs, body.element_id, body.sha256, body.approved, body.quote, body.notes))
+
+
+@app.get('/api/runs/{run_id}/visuals/drawing/{element_id}')
+def visuals_drawing_status(run_id: UUID, element_id: str, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)   # a read never waits for the lock
+    return Response(visuals_stage.guarded(lambda: drawings.status(storage(), run, core.current_outputs(conn, run['id']), element_id)))
+
+
+@app.get('/api/runs/{run_id}/visuals/drawing/{element_id}/file/{name}')
+def visuals_drawing_file(run_id: UUID, element_id: str, name: str, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: drawings.file(storage(), run, core.current_outputs(conn, run['id']), element_id, name)))
 
 
 @app.get('/api/runs/{run_id}/visuals/guide/{shot_id}')

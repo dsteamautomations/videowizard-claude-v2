@@ -20,6 +20,7 @@ BODY_W, BODY_D, HEAD = 0.44, 0.26, 0.22     # the consultant's box person
 SHOULDER_OUT, SHOULDER_DOWN = 0.20, 0.30
 RECIPES = ('walker', 'one_action_close', 'transfer_close')
 PACES = {'stroll': (0.6, 1.1), 'everyday': (1.1, 1.5), 'brisk': (1.5, 1.9), 'hurried': (1.9, 2.5)}   # m/s (08-blender §5); a warning when the box is outside its band
+HEAD_TURN, BEHIND = 45.0, 0.05                # design/200 (SK, 14 Nov 2026): the head turns this far from the body, degrees (Claude's figure, not a tested limit); a hand this far behind the shoulders, metres, is behind
 BEATS = {'lift': 1.0, 'pass': 1.0, 'set_down': 1.0}   # the shortest real length of a beat, seconds (learning L4)
 
 
@@ -310,6 +311,8 @@ def problems(spec):
             out.append(f'{i}: facing is [x, y], the way the person looks on the ground.')
         if p.get('path') is None and p.get('facing') is None:
             out.append(f'{i}: say which way the person faces: "facing": [x, y].')
+        if p.get('watches') is not None and not _vec(p['watches']):
+            out.append(f'{i}: watches is [x, y, z], the point the person looks at (design/200).')
         if p.get('pace') is not None and p['pace'] not in PACES:
             out.append(f'{i}: pace is one of ' + ', '.join(PACES) + '.')
         hands = p.get('hands')
@@ -338,6 +341,9 @@ def problems(spec):
     act = spec.get('action')
     if not (isinstance(act, dict) and isinstance(act.get('start'), (int, float)) and isinstance(act.get('end'), (int, float)) and 0 <= act['start'] < act['end'] <= sec + 1e-6):
         out.append('action: {"start": seconds, "end": seconds}, when the one action of the shot begins and ends.')
+    changed = spec.get('changed_from_plan')
+    if changed is not None and not (isinstance(changed, list) and len(changed) <= 10 and all(isinstance(c, str) and 0 < len(c.strip()) <= 300 for c in changed)):
+        out.append('changed_from_plan: a list of at most ten plain lines, each saying what the plan said, what the scene has and why (design/200).')
     marks = spec.get('marks')
     if marks is not None and not (isinstance(marks, dict) and set(marks) <= {'band', 'stripes'}):
         out.append('marks: {"band": id of the set piece that marks the walking line, or null; "stripes": true or false}.')
@@ -421,6 +427,32 @@ def checks(spec, subjects=None):
                 return _dot((h[0], h[1], 0.0), _unit((to_cam[0], to_cam[1], 0.0))) < -0.1
             if any(far_side(t) for t in ts):
                 rows.append(_row('right_hand', 'refuse', f"{p['name']}'s right hand works on the far side of the body from the camera, so it is hidden. Move the camera to the person's right side."))
+    # posture (design/200, SK 14 Nov 2026): a hand works in front of the body, never behind the shoulders; what a person watches lies within a turn of the head
+    for p in people:
+        fine = True
+        for side in (p.get('hands') or {}):
+            def ahead(t):
+                fx, fy = _rot(person_at(p, t)[1], 0.0, -1.0)
+                return _dot(_sub(hand(p, t, side), shoulder(p, t, side)), (fx, fy, 0.0))
+            worst = min((ahead(t), t) for t in ts)
+            if worst[0] < -BEHIND:
+                fine = False
+                rows.append(_row('posture', 'refuse', f"{p['name']}'s {side} hand is {-worst[0]:.2f} m behind the line of the shoulders at {worst[1]:.1f} s. No arm reaches backward: "
+                                 f"turn the person to face the thing, or put the thing in front of them or on their right.", value=round(-worst[0], 3)))
+        if p.get('watches') is not None:
+            def turn(t):
+                pos, yaw, _ = person_at(p, t)
+                fx, fy = _rot(yaw, 0.0, -1.0)
+                to = (p['watches'][0] - pos[0], p['watches'][1] - pos[1])
+                n = math.hypot(*to)
+                return 0.0 if n < 1e-6 else math.degrees(math.acos(max(-1.0, min(1.0, (fx * to[0] + fy * to[1]) / n))))
+            worst = max((turn(t), t) for t in ts)
+            if worst[0] > HEAD_TURN + 1e-6:
+                fine = False
+                rows.append(_row('posture', 'refuse', f"{p['name']} faces {worst[0]:.0f} degrees away from what they watch at {worst[1]:.1f} s; a head turns {HEAD_TURN:.0f} degrees at most. "
+                                 f"Turn the body toward it, or move it.", value=round(worst[0], 1)))
+        if fine and (p.get('hands') or p.get('watches') is not None):
+            rows.append(_row('posture', 'info', f"{p['name']} works in front of the body and faces what they watch."))
     by = people_by_id(spec)
     for pr in props:
         for h in pr.get('held') or []:

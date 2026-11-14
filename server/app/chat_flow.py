@@ -327,6 +327,45 @@ def _spec_text(spec):
     return '\n'.join(rows)[:6000]
 
 
+def _drawing_items(ctx):
+    """design/200: a thing's drawing set that waits for the operator: its labelled sheets, the facts with their sources, the sizes that are assumed.
+    Approved by its exact content, before any paid picture uses it."""
+    from . import drawings
+    session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
+    rows = [(eid, r) for eid, r in (session.get('drawings') or {}).items() if r.get('status') == 'proposed']
+    names = _names(plan) if plan else {}
+    items = []
+    for n, (eid, r) in enumerate(rows, 1):
+        def run_(choice, quote, words, eid=eid, sha=r['sha256']):
+            return drawings.verdict(conn, store, user, run, outputs, eid, sha, choice == 'yes', quote, words)
+        lines = ['Each sheet says what it shows and what it is for. These drawings go to the picture AI as references, so check them against what you know of the thing.']
+        if r.get('sourced'):
+            lines += ['Sizes and facts with a source:'] + [f'- {x}' for x in r['sourced'][:12]]
+        if r.get('assumed'):
+            lines += ['ASSUMED, with no source (say if any is wrong):'] + [f'- {x}' for x in r['assumed'][:12]]
+        items.append(_item(f"drawing:{eid}:{r['sha256'][:10]}", 'drawing', f'Reference drawings, {n} of {len(rows)}', f"{names.get(eid) or r.get('name') or eid}: are these reference drawings right?", run_,
+                           [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawings.')],
+                           text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"drawing-{eid}-{v['id']}.png"} for v in r['views']]))
+    if plan and session.get('guides'):   # Area B: the drawing of an AI video shot, before its still
+        from . import guide
+        shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
+        for sid, g in session['guides'].items():
+            d = g.get('drawing') or {}
+            if sid not in shots or d.get('status') != 'proposed' or d.get('sha256') != g['sha256']:
+                continue
+
+            def run_(choice, quote, words, sid=sid, sha=g['sha256']):
+                return guide.drawing_verdict(conn, store, user, run, outputs, sid, sha, choice == 'yes', quote, words)
+            lines = ["Each person's pale side with the dark stripe is the chest, the purple side is the back, the orange arm is the right arm, the arm that works. "
+                     'Check that each person faces what they do and that the working hand can reach it.']
+            lines += (['Changed from the plan to make the shot possible:'] + [f'- {c}' for c in d['changes']]) if d.get('changes') else []
+            lines += (['Notes:'] + [f'- {c}' for c in d['notes']]) if d.get('notes') else []
+            items.append(_item(f"shot-drawing:{sid}:{g['sha256'][:10]}", 'drawing', 'AI video, the layout drawing of the shot', f"{shots[sid].get('title') or sid}: is the shot laid out right in these two drawings?", run_,
+                               [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what is wrong in the drawing of the shot.')],
+                               text=chr(10).join(lines), show=[{'key': v['labelled_key'], 'name': f"{sid}-drawing-{v['id']}.png"} for v in d['views']]))
+    return items
+
+
 def _waiting_items(ctx):
     session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
     if not plan:
@@ -550,7 +589,7 @@ def _candidates(ctx):
     note = [f"Plan: the assistant is revising {', '.join(revising)}."] if revising else []
     if p_items:
         return p_items, '', note
-    for step in (_round_items, _waiting_items, _guide_items, _record_items):
+    for step in (_drawing_items, _round_items, _waiting_items, _guide_items, _record_items):   # design/200: a drawing set is approved before the pictures made from it
         items = step(ctx)
         if items:
             return items, '', note
