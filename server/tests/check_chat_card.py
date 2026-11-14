@@ -99,36 +99,63 @@ def refused(fn):
 
 
 def demo():
-    # the treatment: every line on one card; the code holds each entry, cannot end its script, and no line of it is too long to read back
+    # the direction comes first and alone (SK, 14 Nov 2026): no gap line is shown until it is accepted
     treatment_state(3)
     out = C.next_item(*ARGS)
-    card = out['card']
-    assert out['item'] is None and card['entries'] == 4 and card['step'] == 'Treatment', out
+    assert out['item']['id'].startswith('treatment:direction') and 'card' not in out, out
+    change = next(b['choice'] for b in out['item']['buttons'] if b.get('needs_words'))
+    CALLS.clear()
+    got = C.answer(*ARGS, out['item']['id'], change, 'Change this', 'warmer')
+    assert CALLS == [('treatment', [], ['direction'], 'warmer')] and got['item'] is None and not got.get('card') and got['needed'] is False, (CALLS, got)
+    STATE['session']['treatment_draft']['lines']['direction'] = {'digest': 'e' * 12, 'state': 'to_accept'}   # the assistant sent the direction again
+    out = C.next_item(*ARGS)
+    assert out['item']['id'].startswith('treatment:direction:eeee') and 'card' not in out, out   # it returns alone
+    got = C.answer(*ARGS, out['item']['id'], 'accept', 'Accept', '')
+    card = got['card']
+    assert got['item'] is None and card['entries'] == 3 and card['step'] == 'Treatment', got   # only now the gap lines, on one card
     code = card['widget_code']
-    assert '__DATA__' not in code and code.count('</script>') == 1 and '<\\/script>' in code and 'dir:1' in code
+    assert '__DATA__' not in code and code.count('</script>') == 1 and '<\\/script>' in code and 'dirChange' not in code and 'dir:' not in code
     assert max(len(line) for line in code.split('\n')) < 2000, max(len(line) for line in code.split('\n'))
     assert C.next_item(*ARGS)['card']['id'] == card['id']   # shown again: the same card
 
-    # recorded once: the changes first, the accepted ones in one record; the same card again changes nothing
+    # every entry is answered or nothing is recorded: the page checks it, and so does the server
     CALLS.clear()
-    got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'accept', ''), (3, 'change', 'show the finished wall'), (4, 'accept', '')))
-    assert got['recorded'] == [1, 2, 3, 4] and CALLS == [('treatment', [], ['G2'], 'show the finished wall'), ('treatment', ['direction', 'G1', 'G3'], [], '')], (got, CALLS)
+    assert 'Answer every entry' in refused(lambda: C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'accept', '')))) and not CALLS
+    page = (Path(C.__file__).with_name('chat_card.html')).read_text(encoding='utf-8')
+    assert 'function missing(){return D.e.map((_,i)=>i).filter(i=>!ans[i])}' in page and 'You changed the direction' not in page
+
+    # recorded once: the changes first, the accepted ones in one record; the same card again changes nothing
+    got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'change', 'show the finished wall'), (3, 'accept', '')))
+    assert got['recorded'] == [1, 2, 3] and CALLS == [('treatment', [], ['G2'], 'show the finished wall'), ('treatment', ['G1', 'G3'], [], '')], (got, CALLS)
     before = copy.deepcopy(STATE['session'])
     CALLS.clear()
     again = C.card_answer(*ARGS, card['id'], answers((1, 'change', 'x')))
     assert again['already'] and not CALLS and STATE['session'] == before
 
-    # a changed direction: only the direction is recorded, and no gap line is asked until it is back
-    treatment_state(3)
-    card = C.next_item(*ARGS)['card']
+    def gap_card():
+        treatment_state(3)
+        STATE['session']['treatment_draft']['lines']['direction']['state'] = 'accepted'
+        return C.next_item(*ARGS)['card']
+
+    def old_card():
+        """A card handed out before this change, still open in the chat: the direction and the gap lines together."""
+        treatment_state(3)
+        ids = [i['id'] for i in C._candidates(C._ctx(*ARGS))[0]]
+        assert len(ids) == 4 and ids[0].startswith('treatment:direction:')
+        STATE['session']['chat_card'] = {'id': 'card-old0000000', 'items': ids, 'at': 'x'}
+        return 'card-old0000000'
+
+    # an old card with a changed direction is still taken once, the old way: only the direction is recorded
     CALLS.clear()
-    got = C.card_answer(*ARGS, card['id'], answers((1, 'change', 'warmer'), (2, 'accept', ''), (3, 'accept', ''), (4, 'accept', '')))
-    assert got['recorded'] == [1] and got['held'] == [2, 3, 4] and CALLS == [('treatment', [], ['direction'], 'warmer')], (got, CALLS)
+    got = C.card_answer(*ARGS, old_card(), answers((1, 'change', 'warmer'), (2, 'accept', '')))
+    assert got['recorded'] == [1] and got['held'] == [2] and CALLS == [('treatment', [], ['direction'], 'warmer')], (got, CALLS)
     assert got['item'] is None and not got.get('card') and got['needed'] is False
+    got = C.card_answer(*ARGS, old_card(), answers((1, 'accept', ''), (2, 'accept', ''), (3, 'accept', ''), (4, 'accept', '')))
+    assert got['recorded'] == [1, 2, 3, 4], got
+    assert 'Answer every entry' in refused(lambda: C.card_answer(*ARGS, old_card(), answers((1, 'accept', ''), (2, 'accept', ''))))
 
     # an older card, a missing entry, a change without words, an entry answered twice: refused, nothing recorded
-    treatment_state(3)
-    card = C.next_item(*ARGS)['card']
+    card = gap_card()
     CALLS.clear()
     assert 'not the card that is open' in refused(lambda: C.card_answer(*ARGS, 'card-0000000000', answers((1, 'accept', ''))))
     assert 'no entry 9' in refused(lambda: C.card_answer(*ARGS, card['id'], answers((9, 'accept', ''))))
@@ -138,32 +165,23 @@ def demo():
 
     # an entry that changed after the card was shown is not recorded and comes again; the others are recorded
     STATE['session']['treatment_draft']['lines']['G2']['digest'] = 'changed00000'
-    got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'accept', ''), (3, 'accept', ''), (4, 'accept', '')))
-    assert got['recorded'] == [1, 2, 4] and got['not_open'] == [3] and got['item']['id'].startswith('treatment:G2:changed'), got   # one left: asked on its own
+    got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'accept', ''), (3, 'accept', '')))
+    assert got['recorded'] == [1, 3] and got['not_open'] == [2] and got['item']['id'].startswith('treatment:G2:changed'), got   # one left: asked on its own
 
-    # a first attempt that failed halfway had recorded entry 2's change: sent again, it counts as recorded and the change is passed on
-    treatment_state(3)
-    card = C.next_item(*ARGS)['card']
+    # a first attempt that failed halfway had recorded entry 1's change: sent again, it counts as recorded and the change is passed on
+    card = gap_card()
     STATE['session']['treatment_draft']['lines']['G1'] = {'digest': '000000000001', 'state': 'sent_back', 'note': 'shorter'}
     CALLS.clear()
-    got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'change', 'shorter'), (3, 'accept', ''), (4, 'accept', '')))
-    assert got['recorded'] == [1, 2, 3, 4] and not got['not_open'] and 'change in entries 2' in got['then'] and CALLS == [('treatment', ['direction', 'G2', 'G3'], [], '')], (got, CALLS)
-
-    # the direction was accepted elsewhere while the card was open: its change is not open any more, and the gaps are still recorded
-    treatment_state(3)
-    card = C.next_item(*ARGS)['card']
-    STATE['session']['treatment_draft']['lines']['direction']['state'] = 'accepted'
-    got = C.card_answer(*ARGS, card['id'], answers((1, 'change', 'warmer'), (2, 'accept', ''), (3, 'accept', ''), (4, 'accept', '')))
-    assert got['recorded'] == [2, 3, 4] and got['not_open'] == [1] and not got['held'], got
+    got = C.card_answer(*ARGS, card['id'], answers((1, 'change', 'shorter'), (2, 'accept', ''), (3, 'accept', '')))
+    assert got['recorded'] == [1, 2, 3] and not got['not_open'] and 'change in entries 1' in got['then'] and CALLS == [('treatment', ['G2', 'G3'], [], '')], (got, CALLS)
 
     # one at a time, the older way: an item, and a card shown before is no longer answered
-    treatment_state(3)
-    card = C.next_item(*ARGS)['card']
+    card = gap_card()
     one = C.next_item(*ARGS, True)
-    assert one['item']['id'].startswith('treatment:direction') and 'card' not in one
+    assert one['item']['id'].startswith('treatment:G1') and 'card' not in one
     assert 'not the card that is open' in refused(lambda: C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''))))
     nxt = C.answer(*ARGS, one['item']['id'], 'accept', 'Accept', '', True)
-    assert nxt['item']['id'].startswith('treatment:G1') and 'card' not in nxt
+    assert nxt['item']['id'].startswith('treatment:G2') and 'card' not in nxt
 
     # the plan: an offered choice is asked first, on its own; then the gaps on one card; a long plan in cards of ten
     plan_state(3, choice_on='G2')
@@ -171,7 +189,7 @@ def demo():
     assert first['item']['kind'] == 'plan choice', first
     STATE['session']['choice_selections']['G2'] = {'choice_id': 'a'}
     card = C.next_item(*ARGS)['card']
-    assert card['step'] == 'Plan' and card['entries'] == 3 and 'It shows / this' in card['widget_code'] and 'dir:0' in card['widget_code']
+    assert card['step'] == 'Plan' and card['entries'] == 3 and 'It shows / this' in card['widget_code']
     CALLS.clear()
     got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'change', 'shorter'), (3, 'accept', '')))
     assert CALLS == [('revise', 'G2', 'shorter'), ('accept', ['G1', 'G3'])] and got['recorded'] == [1, 2, 3] and got['needed'] is False, (CALLS, got)

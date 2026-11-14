@@ -14,7 +14,6 @@
 <button type="button" id="save" style="margin-top:8px">Save the change</button>
 </div>
 </div>
-<p id="dirn" style="display:none;font-size:13px;color:var(--text-warning);margin:12px 0 0">You changed the direction. Every gap line is written again from it, so only the direction is sent now. The gaps come back afterwards.</p>
 <div style="display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap"><button type="button" id="sub">Submit all ↗</button><span id="left" style="font-size:13px;color:var(--text-secondary)"></span></div>
 <textarea id="out" rows="4" readonly style="display:none;width:100%;margin-top:10px;font-family:var(--font-mono);font-size:12px"></textarea>
 </div>
@@ -25,8 +24,7 @@ let ans={},cur=0,done=false,store=false,timer=0;
 try{const v=localStorage.getItem(D.id);if(v)ans=JSON.parse(v)||{};localStorage.setItem(D.id,JSON.stringify(ans));store=true}catch(e){ans={}}
 function keep(){if(store)try{localStorage.setItem(D.id,JSON.stringify(ans))}catch(e){}}
 function el(tag,text,css){const x=document.createElement(tag);if(text!=null)x.textContent=text;if(css)x.style.cssText=css;return x}
-function dirChange(){return !!(D.dir&&ans[0]&&ans[0].c==='change')}
-function missing(){return dirChange()?[]:D.e.map((_,i)=>i).filter(i=>!ans[i])}
+function missing(){return D.e.map((_,i)=>i).filter(i=>!ans[i])}
 function draw(){
 const e=D.e[cur],a=ans[cur];
 $('say').textContent=D.say;$('sum').textContent=D.sum||'';$('sum').style.display=D.sum?'block':'none';
@@ -46,7 +44,6 @@ const acc=$('acc'),chg=$('chg'),isA=a&&a.c==='accept',isC=a&&a.c==='change';
 acc.textContent=isA?'Accepted ✓':'Accept';acc.style.cssText=isA?'background:var(--bg-success);color:var(--text-success);border-color:var(--border-success)':'';acc.setAttribute('aria-pressed',isA?'true':'false');
 chg.textContent=isC?'Change saved ✓':'Change this';chg.style.cssText=isC?'background:var(--bg-warning);color:var(--text-warning);border-color:var(--border-warning)':'';chg.setAttribute('aria-pressed',isC?'true':'false');
 $('box').style.display=isC&&!done?'block':'none';$('note').value=isC?a.n:'';$('err').style.display='none';
-$('dirn').style.display=dirChange()?'block':'none';
 const m=missing();$('left').textContent=done?'Submitted. Your answers are being recorded.':(m.length?m.length+' still to answer':'All answered: press Submit all');
 }
 function next(){const m=missing();if(!m.length){draw();return}const j=m.find(i=>i>cur);cur=j==null?m[0]:j;draw()}
@@ -57,7 +54,7 @@ $('note').oninput=()=>{$('err').style.display='none'};
 $('save').onclick=()=>{if(done)return;const n=$('note').value.trim();if(!n){$('err').style.display='block';return}ans[cur]={c:'change',n:n};keep();advance()};
 $('sub').onclick=()=>{if(done)return;clearTimeout(timer);const m=missing();
 if(m.length){cur=m[0];draw();$('left').textContent='Answer these first: '+m.map(i=>i+1).join(', ');return}
-const list=(dirChange()?[0]:D.e.map((_,i)=>i)).map(i=>ans[i].c==='accept'?{n:i+1,choice:'accept'}:{n:i+1,choice:'change',notes:ans[i].n});
+const list=D.e.map((_,i)=>i).map(i=>ans[i].c==='accept'?{n:i+1,choice:'accept'}:{n:i+1,choice:'change',notes:ans[i].n});
 const msg='Card answers: '+JSON.stringify({card:D.id,answers:list});
 done=true;$('sub').disabled=true;$('sub').textContent='Submitted';draw();
 try{sendPrompt(msg);if(store)try{localStorage.removeItem(D.id)}catch(e){}}
