@@ -450,7 +450,16 @@ def process(job):
                                               terminal_deadline_seconds=settings().ANALYSIS_DEADLINE_SECONDS, initial_soft_wait_seconds=60,
                                               on_update=lambda e: None, capture_answer_deltas=False, allow_agentic_video=True)
                 renew(jid, 'upload')
-                uploaded = transport.upload(attachment, request['mime'], sha, existing_receipt=_receipt(read_json(paths['upload.json']), k_idx))
+                try:
+                    uploaded = transport.upload(attachment, request['mime'], sha, existing_receipt=_receipt(read_json(paths['upload.json']), k_idx))
+                except GeminiTransportError as exc:   # defect 51: nothing was sent to the model; hand the clip back now, never hold a slot for the lease
+                    _cool(exc, k_idx)
+                    meta = exc.metadata or {}
+                    print(f"analysis upload failed ({exc.code}, HTTP {exc.http_status}): {provider_reason(meta.get('provider_error'))}", flush=True)
+                    if exc.code == 'http_error':
+                        return ('rejected', {'failure': exc.code, 'http_status': exc.http_status, 'category': classify_failure(exc)['category'], 'key_index': k_idx,
+                                             'provider_error': meta.get('provider_error'), 'phase': 'upload'}, rejected_error('upload', exc.http_status, meta.get('provider_error')), None, None)
+                    return 'failed', ({'failure': exc.code} if exc.code.startswith(('upload_', 'source_')) else {'failure': 'upload', 'detail': exc.code}), str(exc), None, None
                 durable(paths['upload.json'], json.dumps({**uploaded, 'key_index': k_idx}).encode('utf-8'))
                 mode = request['identity']['settings']['processing_mode']
                 wire_schema = request['wire_schema']
@@ -633,7 +642,7 @@ def clip_entry(run_id, clip, summary):
             f"{summary.get('risk_flags', 0)} risk flags; languages heard: {', '.join(summary.get('languages') or []) or 'none'}")
     return {'run_id': run_id, 'stage': 'analysis', 'kind': 'decision', 'about': f"clip {clip.get('name') or clip.get('id')}", 'rule': 'the analysis gate (eligibility and crops)',
             'entry': text, 'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None}
-PASSING = ('provider_stream_error', 'incomplete_response', 'empty_response')
+PASSING = ('provider_stream_error', 'incomplete_response', 'empty_response', 'upload')   # 'upload' (defect 51): the upload never got through; nothing was sent
 
 
 def passing_failure(status, result):
