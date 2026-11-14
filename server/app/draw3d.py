@@ -25,7 +25,7 @@ KINDS = {   # the plain words a view is called by, and how the image model is to
     'side by side': 'two things or two states drawn side by side for comparison',
     'through the camera': "seen through the film's camera with a real lens; this is the exact frame",
 }
-MIN_VIEWS = {'engineered': 4, 'composition': 3, 'form': 2}
+MIN_VIEWS = {'engineered': 4, 'composition': 3, 'form': 2, 'shot': 2}   # a shot's drawing: through the camera and from above
 MAX_VIEWS, MAX_PIECES, MAX_LABEL, MAX_LINE = 6, 4000, 60, 120
 AXES = {'X': 0, 'Y': 1, 'Z': 2}
 NAMES = {'white': (245, 245, 240), 'black': (25, 25, 25), 'dark grey': (70, 70, 72), 'grey': (150, 150, 148), 'light grey': (195, 195, 198), 'red': (200, 60, 50),
@@ -106,7 +106,7 @@ def problems(d):
         out.append('The unit of the drawing set is "mm" (a thing) or "m" (a place).')
     level = d.get('level')
     if level not in MIN_VIEWS:
-        out.append('The level is "engineered", "composition" or "form".')
+        out.append('The level is "engineered", "composition" or "form" for a thing, "shot" for a shot.')
     for i, f in enumerate(d.get('facts') or []):
         if not (isinstance(f, dict) and str(f.get('what') or '').strip() and (str(f.get('source') or '').strip() or f.get('assumed') is True)):
             out.append(f'fact {i + 1}: a fact says what it is, and gives its source or is marked "assumed": true.')
@@ -404,62 +404,75 @@ def scale_of(d, view_id):
     return _layout(d, next(v for v in d['views'] if v['id'] == view_id))[3]
 
 
-def _svg(w, h, body):
+def svg_of(ops):
+    """A sheet's drawing instructions as one SVG document."""
+    w, h = ops['size']
+    body = []
+    if ops['clip']:
+        x, y, cw, ch = ops['clip']
+        body.append(f'<defs><clipPath id="f"><rect x="{x:.1f}" y="{y:.1f}" width="{cw:.1f}" height="{ch:.1f}"/></clipPath></defs><g clip-path="url(#f)">')
+    body.append(f'<g stroke="{INK}" stroke-width="0.6" stroke-linejoin="round">')
+    body += [f'<polygon points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in pts)}" fill="{fill}"/>' for pts, fill in ops['polys']]
+    body.append('</g>' + ('</g>' if ops['clip'] else ''))
+    if ops['frame']:
+        x, y, fw, fh = ops['frame']
+        body.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{fw:.1f}" height="{fh:.1f}" fill="none" stroke="#111" stroke-width="1.5"/>')
+    body += [f'<path class="{cls}" d="M{" L".join(f"{x:.1f} {y:.1f}" for x, y in pts)}"/>' for pts, cls in ops['lines']]
+    body += [f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2" fill="#555"/>' for x, y in ops['dots']]
+    for cls, x, y, text, anchor in ops['texts']:
+        body.append(f'<text class="{cls}" x="{x:.1f}" y="{y:.1f}">{esc(text)}</text>' if anchor == 'start' else f'<text class="{cls}" text-anchor="{anchor}" x="{x:.1f}" y="{y:.1f}">{esc(text)}</text>')
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w * 2:.0f}" height="{h * 2:.0f}" viewBox="0 0 {w:.1f} {h:.1f}">'
             '<style>.t{font:13px Arial,sans-serif;fill:#222}.d{font:12px Arial,sans-serif;fill:#222}.e{font:13px Arial,sans-serif;fill:#444}.h{font:bold 16px Arial,sans-serif;fill:#111}'
             '.ld{stroke:#555;stroke-width:.7;fill:none}.dm{stroke:#333;stroke-width:.7;fill:none}</style>'
-            f'<rect width="{w:.1f}" height="{h:.1f}" fill="#ffffff"/>{body}</svg>')
+            f'<rect width="{w:.1f}" height="{h:.1f}" fill="#ffffff"/>{"".join(body)}</svg>')
 
 
-def _polys(faces, to, fill, dx=0.0, dy=0.0):
-    out = [f'<g stroke="{INK}" stroke-width="0.6" stroke-linejoin="round">']
-    for f in faces:
-        pts = ' '.join(f'{to(q)[0] - dx:.1f},{to(q)[1] - dy:.1f}' for q in f['xy'])
-        out.append(f'<polygon points="{pts}" fill="{f[fill]}"/>')
-    return ''.join(out) + '</g>'
+def _sheet(d, view):
+    """The two sheets of one view as drawing instructions: the operator's (title, what the view is, labels in one column, sizes) and the image model's (the drawing alone)."""
+    e, faces, to, s, w, h = _layout(d, view)
+    at = lambda p: to(e.page(tuple(p)))
+    lab = {'polys': [([to(q) for q in f['xy']], f['fill_marked']) for f in faces], 'clip': None if e.flat else (LEFT, TOP_Y, w, h), 'frame': None if e.flat else (LEFT, TOP_Y, w, h),
+           'lines': [], 'dots': [], 'texts': [('h', LEFT, 30.0, f"{view['name']} ({view['kind']})", 'start'), ('e', LEFT, 52.0, f"What it shows: {view['shows']}", 'start'),
+                                              ('e', LEFT, 70.0, f"What it is for: {view['for']}", 'start')]}
+    ty = TOP_Y - 8
+    for (ax, ay), text in sorted(((at(r['at']), r['text']) for r in d.get('labels') or [] if r['view'] == view['id']), key=lambda r: r[0][1]):
+        ty = max(ty + 18, ay)                      # one column, in the order of the points, so the leaders do not cross
+        lab['lines'].append(([(ax, ay), (LABEL_X - 6, ty - 4)], 'ld'))
+        lab['dots'].append((ax, ay))
+        lab['texts'].append(('t', LABEL_X, ty, text, 'start'))
+    cx, cy = LEFT + w / 2, TOP_Y + h / 2
+    for r in d.get('dims') or []:
+        if r['view'] != view['id']:
+            continue
+        (ax, ay), (bx, by) = at(r['from']), at(r['to'])
+        nx, ny = -(by - ay), bx - ax
+        m = math.hypot(nx, ny) or 1.0
+        nx, ny = nx / m * 16, ny / m * 16
+        mx, my = (ax + bx) / 2, (ay + by) / 2
+        if (mx + nx - cx) ** 2 + (my + ny - cy) ** 2 < (mx - nx - cx) ** 2 + (my - ny - cy) ** 2:
+            nx, ny = -nx, -ny                      # the size line stands on the side away from the middle of the drawing
+        lab['lines'].append(([(ax, ay), (ax + nx, ay + ny), (bx + nx, by + ny), (bx, by)], 'dm'))
+        lab['texts'].append(('d', mx + nx * 1.9, my + ny * 1.9 + 4, r['text'], 'middle'))
+    lab['size'] = (SHEET_W, max([TOP_Y + h, ty]) + 30)
+    if e.flat:
+        dx, dy = LEFT - 10, TOP_Y - 10
+        plain = {'size': (w + 20, h + 20), 'clip': None, 'frame': None, 'polys': [([(x - dx, y - dy) for x, y in (to(q) for q in f['xy'])], f['fill']) for f in faces]}
+    else:
+        k = FRAME_W / w
+        plain = {'size': (FRAME_W, FRAME_W / e.aspect), 'clip': (0.0, 0.0, FRAME_W, FRAME_W / e.aspect), 'frame': None,
+                 'polys': [([((x - LEFT) * k, (y - TOP_Y) * k) for x, y in (to(q) for q in f['xy'])], f['fill']) for f in faces]}
+    plain.update(lines=[], dots=[], texts=[])
+    return lab, plain
 
 
 def render(d):
-    """One entry per view: 'labelled' (the operator's sheet) and 'plain' (the image model's copy: no text, one colour for one material), as SVG, with the plain copy's size in pixels."""
+    """One entry per view: 'labelled' (the operator's sheet) and 'plain' (the image model's copy: no text, one colour for one material) as SVG,
+    the same two as drawing instructions ('labelled_ops', 'plain_ops') for a picture file, and the plain copy's size in pixels."""
     sheets = []
     for view in d['views']:
-        e, faces, to, s, w, h = _layout(d, view)
-        at = lambda p: to(e.page(tuple(p)))
-        frame = '' if e.flat else f'<rect x="{LEFT}" y="{TOP_Y}" width="{w:.1f}" height="{h:.1f}" fill="none" stroke="#111" stroke-width="1.5"/>'
-        clip = '' if e.flat else f'<clipPath id="f"><rect x="{LEFT}" y="{TOP_Y}" width="{w:.1f}" height="{h:.1f}"/></clipPath>'
-        notes = [f'<text class="h" x="{LEFT}" y="30">{esc(view["name"])} ({esc(view["kind"])})</text>',
-                 f'<text class="e" x="{LEFT}" y="52">What it shows: {esc(view["shows"])}</text>', f'<text class="e" x="{LEFT}" y="70">What it is for: {esc(view["for"])}</text>']
-        labels = sorted(((at(r['at']), r['text']) for r in d.get('labels') or [] if r['view'] == view['id']), key=lambda r: r[0][1])
-        ty = TOP_Y + 10
-        for (ax, ay), text in labels:   # one column, in the order of the points, so the leaders do not cross
-            ty = max(ty + 18 if notes[-1].startswith('<line') or len(notes) > 3 else ty, ay)
-            notes.append(f'<line class="ld" x1="{ax:.1f}" y1="{ay:.1f}" x2="{LABEL_X - 6}" y2="{ty - 4:.1f}"/><circle cx="{ax:.1f}" cy="{ay:.1f}" r="2" fill="#555"/>'
-                         f'<text class="t" x="{LABEL_X}" y="{ty:.1f}">{esc(text)}</text>')
-        cx, cy = LEFT + w / 2, TOP_Y + h / 2
-        for r in d.get('dims') or []:
-            if r['view'] != view['id']:
-                continue
-            (ax, ay), (bx, by) = at(r['from']), at(r['to'])
-            nx, ny = -(by - ay), bx - ax
-            m = math.hypot(nx, ny) or 1.0
-            nx, ny = nx / m * 16, ny / m * 16
-            if (ax + bx) / 2 + nx - cx < (ax + bx) / 2 - nx - cx and abs(nx) > abs(ny) or (ay + by) / 2 + ny - cy < (ay + by) / 2 - ny - cy and abs(ny) >= abs(nx):
-                pass
-            else:
-                nx, ny = (nx, ny) if ((ax + bx) / 2 + nx - cx) ** 2 + ((ay + by) / 2 + ny - cy) ** 2 >= ((ax + bx) / 2 - nx - cx) ** 2 + ((ay + by) / 2 - ny - cy) ** 2 else (-nx, -ny)
-            notes.append(f'<path class="dm" d="M{ax:.1f} {ay:.1f}L{ax + nx:.1f} {ay + ny:.1f}L{bx + nx:.1f} {by + ny:.1f}L{bx:.1f} {by:.1f}"/>'
-                         f'<text class="d" text-anchor="middle" x="{(ax + bx) / 2 + nx * 1.9:.1f}" y="{(ay + by) / 2 + ny * 1.9 + 4:.1f}">{esc(r["text"])}</text>')
-        last = max([TOP_Y + h] + [float(n.split(' y="')[-1].split('"')[0]) for n in notes if '<text class="t"' in n])
-        labelled = _svg(SHEET_W, last + 30, f'<defs>{clip}</defs><g{"" if e.flat else " clip-path=\"url(#f)\""}>{_polys(faces, to, "fill_marked")}</g>{frame}{"".join(notes)}')
-        if e.flat:
-            pw, ph = w + 20, h + 20
-            plain = _svg(pw, ph, _polys(faces, to, 'fill', LEFT - 10, TOP_Y - 10))
-        else:
-            pw, ph = FRAME_W, FRAME_W / e.aspect
-            k = FRAME_W / w
-            plain = _svg(pw, ph, f'<defs><clipPath id="f"><rect width="{pw}" height="{ph:.1f}"/></clipPath></defs><g clip-path="url(#f)">'
-                                 + _polys(faces, lambda q: ((to(q)[0] - LEFT) * k, (to(q)[1] - TOP_Y) * k), 'fill') + '</g>')
-        sheets.append({'view': view['id'], 'name': view['name'], 'kind': view['kind'], 'labelled': labelled, 'plain': plain, 'width': round(pw * 2), 'height': round(ph * 2)})
+        lab, plain = _sheet(d, view)
+        sheets.append({'view': view['id'], 'name': view['name'], 'kind': view['kind'], 'labelled': svg_of(lab), 'plain': svg_of(plain), 'labelled_ops': lab, 'plain_ops': plain,
+                       'width': round(plain['size'][0] * 2), 'height': round(plain['size'][1] * 2)})
     return sheets
 
 
