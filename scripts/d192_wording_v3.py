@@ -93,6 +93,11 @@ SCRIPT_STEPS = [
      'the tool takes four choices a question and four questions a call, so more than four claims go in the same call). "Qualitative" is never a reason to leave out a claim under (a) or (b). '
      'A claim not ticked stays in `claims` with checked: false. For the ticked claims say once: "I am deviating from the usual procedure.'),
 ]
+SPOKEN = 'will sound wrong when spoken'   # script row 2 (SK, 14 Nov: "Yes, add it"); its own mark, so the script adds it to a file the first part already changed
+SCRIPT_PROMPT = [
+    ('Avoid copy-editing for its own sake.',
+     'Avoid copy-editing for its own sake. A line that will sound wrong when spoken (a slip\nwaiting to happen, a tongue-twister, a sentence too long for one breath) is a useful change:\npropose it as a normal before/after.'),
+]
 VOICE_STEPS = [
     ('the two lists (best_fit, experimental) and three test passages of 50 to 100 words; present the kind of film, each list as rows (first words, tag, reason) with the count of tagged sentences, '
      'one line on the experimental idea, and the three passages with why each tests a voice; ask one question: which list (best fit, experimental, none) and which test passage (1, 2 or 3).',
@@ -149,8 +154,12 @@ def swap_steps(steps, pairs, where):
 
 def apply(d):
     st = {s['name']: s for s in d['stages']}
+    changed = False
+    if SPOKEN not in st['script']['prompt']:
+        st['script']['prompt'] = swap_all(st['script']['prompt'], SCRIPT_PROMPT, 'script prompt')
+        changed = True
     if MARK in st['intake']['prompt']:
-        return False
+        return changed
     st['intake']['prompt'] = swap_all(st['intake']['prompt'], INTAKE_PROMPT, 'intake prompt')
     swap_steps(st['intake']['steps'], INTAKE_STEPS, 'intake steps')
     st['brief']['prompt'] = swap_all(st['brief']['prompt'], BRIEF_PROMPT, 'brief prompt')
