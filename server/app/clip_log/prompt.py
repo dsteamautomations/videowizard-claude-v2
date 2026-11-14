@@ -27,7 +27,22 @@ def policy_paragraph(policy):
     return ('SPEAKER POLICY IN FORCE: Mode 4, Picture only (allow_speaker_audio=false, show_speaker_video=true). Source speech is muted; people may be seen talking. Log speech for context.')
 
 
-def build(project_config, ffprobe_meta, fps, frames, beats, clip_tag, policy, audio_removed=False):
+def beat_rule(n, by_sentence):
+    """Rule 6 of the instruction: the fit by paragraph as it always was, or (design/193 R2) the fit by sentence, written into the two text
+    fields the form already has: in the look-again way the provider refuses the form with even one more field (found 14 Nov 2026)."""
+    if not by_sentence:
+        return (f'6. Beats: the script is split into BEAT_01..BEAT_{n:02d} above. For each sub-clip give primary_fit_for_beats (Tier-1 direct, literal match: the visual shows exactly what '
+                'the sentence says) and secondary_fit_for_beats (Tier-2 contextual or illustrative). Empty lists are valid. Explain in beat_fit_reasoning.')
+    width = max(2, len(str(n)))
+    return (f'6. Beats: each BEAT above is ONE sentence of the narration (BEAT_{1:0{width}d}..BEAT_{n:0{width}d}). primary_fit_for_beats: only the sentences whose words this sub-clip shows '
+            'exactly. secondary_fit_for_beats: the sentences it shows in part, or only suits. Empty lists are valid. In beat_fit_reasoning write one line for each fitted sentence, the best '
+            'first, each starting with the beat id, the seconds of this clip that show it (inside the window of the sub-clip, from-to with one decimal) and one of EXACT, PARTLY or RELATED, '
+            'then why; for example "BEAT_05 2.9-4.5 s PARTLY: the tool is picked up, but it is not yet used". EXACT: the picture shows exactly what the sentence says. PARTLY: it shows a '
+            'part of it. RELATED: it only suits the subject. In beat_fit_limits write, for each fitted sentence, what the sentence says that those seconds do not show, each line starting '
+            'with the beat id. Never stretch a fit.')
+
+
+def build(project_config, ffprobe_meta, fps, frames, beats, clip_tag, policy, audio_removed=False, by_sentence=False):
     n = len(beats)
     text = f"""You are Stage 1 (single-pass video ingestion) of a video editing pipeline. You inspect ONE raw clip once and log raw, observable evidence so that a later assembly stage (which has NOT seen the footage) can build a film from many such logs. Be exact, be literal, and never invent what you cannot see or hear.
 
@@ -45,7 +60,7 @@ GLOBAL RULES
 3. Decoupled observation vs policy: you log raw observations and bounding boxes. You do NOT compute crop rectangles, zoom values, DaVinci transforms, cumulative zoom, or the final visual_eligibility enum. A deterministic solver does that from your boxes. Do not include those values anywhere.
 4. Conditional blocks: speech_translation_block is null when no speech is audible in the sub-clip. speaker_crop_module is null unless mouth_visible or looking_at_lens is true for someone in the sub-clip; when it is filled, give the three boxes so the solver can hide the speaker while keeping the action.
 5. Not every field can be determined from every clip. Where something is genuinely unobservable, give the most conservative value the schema allows and list the field with the reason in unavailable_or_uncertain. Never pad with plausible-sounding guesses.
-6. Beats: the script is split into BEAT_01..BEAT_{n:02d} above. For each sub-clip give primary_fit_for_beats (Tier-1 direct, literal match: the visual shows exactly what the sentence says) and secondary_fit_for_beats (Tier-2 contextual or illustrative). Empty lists are valid. Explain in beat_fit_reasoning.
+{beat_rule(n, by_sentence)}
 
 EVIDENCE DISCIPLINE (applies to every field)
 - Match the certainty of every statement to its supporting evidence. Describe visual observations from visual evidence alone; attribute spoken content to the speaker and never promote a spoken claim into an observed fact.

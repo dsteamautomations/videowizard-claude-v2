@@ -1,6 +1,6 @@
 # design/193: Gemini 4 Hydrogen watches every clip, fits by sentence, and the placer gets each piece's own lines
 
-**Status:** requirements, for approval. No code written. 14 Nov 2026.
+**Status:** built on 14 Nov 2026 on the user's go-ahead, committed, **not deployed**. See "Built" at the end.
 
 **From:** the tests of 13 and 14 Nov on VW-19 ([hydrogen-test-results.md](_work/hydrogen-test-results.md), [hydrogen-settings-test.md](_work/hydrogen-settings-test.md), [phase1-sentence-fit-results.md](_work/phase1-sentence-fit-results.md)) and the verdict agreed on 14 Nov: change the model and the list now; do not rebuild the placing around Gemini yet. Claude stays the one who chooses the clip.
 
@@ -109,3 +109,26 @@ One real check at the deployment: one short clip analysed on the live server wit
 - **Long clips and other kinds of film.** Tested on one short documentary-explainer; the two longest clips of the first test were not answered.
 - **The cost of a large film.** Estimated from the average, not measured: about 30 US dollars for 90 clips.
 - **Films in progress are not moved** to the new logs.
+
+## 8. Built (14 Nov 2026, committed, not deployed; server 0.98.0, plugin 0.84.0, plugin minimum 0.84.0)
+
+- **R1:** `procedures/v3.json` analysis: `gemini-4-hydrogen`, `processing_mode: AGENTIC`, `fit_unit: sentence`; the step's wording (`scripts/d193_wording_v3.py`).
+- **R2:** `analysis.sentence_beats` and `build_request_clip_log` (the sentences as beats; the identity records `fit_unit` and the count); `clip_log/prompt.beat_rule` (rule 6 by sentence; the paragraph rule word for word as it was). No field added to the form.
+- **R3:** `stage2/package.own_lines`, `fit_unit`, `scene_fits_by_sentence`; `stage2/stage.py` chooses by sentence or by paragraph; `plugin/scripts/vw.py` `pieces_by_scene` shows `what`, `fits` and, for a paragraph log, `does_not_show`.
+- **Crowded scenes (found while building):** on VW-19 two scenes had over 100 direct pieces. The list now puts the pieces exact for a sentence of the scene first and in full, then ten more in full, and the rest as one short row each.
+- **R4:** `stage2/validator.related_as_direct`, called where a scene's step names the shot that shows it.
+- **R5:** rule 4 of the options instructions and item 4 of the second look (`plugin/agents/vw-scene-review.md`). Not a server check.
+- **Old ways:** rows 51 to 54 of design/35.
+
+**Checked**
+- `server/tests/check_sentence_fit.py`: every row of sections 1 and 4 that the code decides, on the real functions; passes. `check_chat_card.py` and `check_shared_change.py` still pass; the guard tests pass (15).
+- The new code run on the 46 real answers of the 14 Nov test (no cost): the script's 11 sentences and the narration's 11 agree word for word; 145 pieces, 421 fit lines read, 4 left out; every scene gets its pieces.
+- The new rule R4 applied to VW-19's real cut: it would refuse three of its seven direct shots, under the opening, the "quality of the bricks" sentence and the closing. Deepa rejected the quality shot on 14 Nov and the operator rejected the closing shots on 11 Nov; the opening was kept by both. Under the rule the opening must be placed as B-roll, which is allowed.
+
+**Not run**
+- `server/tests` (needs Docker, not running on this computer). Three expectations in `test_analysis.py` and one in `test_voice_media.py` that named the old model were changed to the new one, unrun.
+- No request was sent to the provider from the application's own code path; the request shape is the one the 14 Nov test sent.
+
+**Not covered, beyond section 7**
+- The list is still long for a common action: about 83,000 characters for VW-19's second scene against 29,000 today, in several part files.
+- The plugin's instructions file (`plugin/commands/vw.md`) was not changed; the stage instructions carry the new wording.

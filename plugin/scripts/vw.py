@@ -188,10 +188,11 @@ def options_reading_files(ws, data):
     return files
 
 
-PIECE_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'in_s', 'out_s', 'native_shot_size', 'effective_shot_size',
+PIECE_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'what', 'does_not_show', 'fits', 'fit', 'grade', 'duration_s', 'in_frame', 'out_frame', 'in_s', 'out_s', 'native_shot_size', 'effective_shot_size',
                 'action_peak', 'outcome_state', 'pairing_constraints', 'risk_flags', 'eligibility', 'min_hold_s')   # design/125 P3: what a choice needs
-RELATED_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'fit', 'grade', 'duration_s')   # design/126 OP1: a related piece in one short row; its full row on demand
+RELATED_FIELDS = ('sub_clip_id', 'clip_name', 'seen', 'what', 'fit', 'grade', 'duration_s')   # design/126 OP1: a related piece in one short row; its full row on demand
 FIT_ORDER = ('direct', 'related', 'chapter')
+FULL_PARTLY = 10   # design/193: direct pieces shown in full beyond those exact for a sentence of the scene
 
 
 def fit_of(row, beat):
@@ -211,9 +212,32 @@ def pieces_by_scene(data):
         seen[c.get('clip_id')] = line.split('OVERVIEW:', 1)[1].strip() if line else ''
     rows = [r for r in data.get('sub_clips') or [] if isinstance(r, dict)]
 
-    def light(r, fit):
-        p = {k: seen.get(r.get('clip_id'), '') if k == 'seen' else fit if k == 'fit' else r.get(k) for k in (RELATED_FIELDS if fit == 'related' else PIECE_FIELDS)}
+    def own(r, k, scene):   # design/193 R3: the piece's own lines: what it does not show, and the clip study's fit to this scene's sentences
+        if k == 'does_not_show':   # a log by sentence says it per sentence, inside `fits` (its own text numbers the film's sentences, not the scenes)
+            return None if r.get('fit_unit') == 'sentence' else r.get('beat_fit_limits')
+        return [{a: b for a, b in ((x, f.get(x)) for x in ('step_id', 'match', 'from_s', 'to_s', 'missing')) if b not in (None, '')}
+                for f in r.get('sentence_fits') or [] if scene and str(f.get('step_id') or '').startswith(scene + '.')]
+
+    def rank(r, scene):   # exact for a sentence of this scene first, then partly, then the rest
+        marks = [f.get('match') for f in r.get('sentence_fits') or [] if str(f.get('step_id') or '').startswith(scene + '.')]
+        return 0 if 'EXACT' in marks else 1 if 'PARTLY' in marks else 2
+
+    def light(r, fit, scene=None, short=False):
+        p = {k: seen.get(r.get('clip_id'), '') if k == 'seen' else fit if k == 'fit' else own(r, k, scene) if k in ('does_not_show', 'fits') else r.get(k)
+             for k in (RELATED_FIELDS if fit == 'related' or short else PIECE_FIELDS)}
+        if (fit == 'related' or short) and len(str(p.get('what') or '')) > 160:   # a short row: the start of its description is enough to decide whether to ask for the full row
+            p['what'] = str(p['what'])[:157] + '…'
         return {k: v for k, v in p.items() if v not in (None, '', [], {})}
+
+    def of_scene(fits, scene):
+        """design/193: a scene's pieces. Every piece exact for one of its sentences in full, then the first FULL_PARTLY other direct pieces in full;
+        the direct pieces past that as one short row each (its full row: `vw options show --sub S`), so a common action does not bury the list."""
+        out, full = [], 0
+        for f, r in fits:
+            short = f == 'direct' and r.get('fit_unit') == 'sentence' and rank(r, scene) > 0 and full >= FULL_PARTLY
+            full += f == 'direct' and rank(r, scene) > 0 and not short
+            out.append(light(r, f, scene, short))
+        return out
 
     def once(pieces):   # ponytail: a clip's overview once per file; the later pieces of that clip read it above
         named = set()
@@ -226,11 +250,11 @@ def pieces_by_scene(data):
     for b in data.get('beats') or []:
         fits = [(fit_of(r, b), r) for r in rows]
         fits = [(f, r) for f, r in fits if f]
-        fits.sort(key=lambda x: FIT_ORDER.index(x[0]) if x[0] in FIT_ORDER else len(FIT_ORDER))
+        fits.sort(key=lambda x: (FIT_ORDER.index(x[0]) if x[0] in FIT_ORDER else len(FIT_ORDER), rank(x[1], b['beat_id'])))
         placed.update(r['sub_clip_id'] for _, r in fits)
         scenes.append({'beat_id': b['beat_id'], 'title': b.get('title'), 'process_stages': b.get('process_stages') or [], 'target_beat_frames': b.get('target_beat_frames'),
                        'sentences': [{k: s.get(k) for k in ('step_id', 'text', 'start_frame', 'end_frame')} for s in b.get('steps') or []],
-                       'pieces': once([light(r, f) for f, r in fits])})
+                       'pieces': once(of_scene(fits, b['beat_id']))})
     return scenes, once([light(r, None) for r in rows if r['sub_clip_id'] not in placed])
 
 

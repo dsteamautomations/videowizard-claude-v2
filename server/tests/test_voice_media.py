@@ -306,7 +306,7 @@ def test_m2_m4_m5_m6_media_upload_resume_dedupe_close(home, database, fake):
     with psycopg.connect(database) as c:
         assert c.execute("select count(*) from vw2_files where stage='media' and name like '%%.mp4'").fetchone()[0] == 4  # a.mp4 once (resumed), b, v (CFR copy), r; the copy deduped
     nxt = vw(home, 'next')[1]
-    assert nxt['stage'] == 'analysis' and nxt['units_open'] == out['summary']['units']['analysis'] and nxt['paid'] == 'gemini-3.8-flash'
+    assert nxt['stage'] == 'analysis' and nxt['units_open'] == out['summary']['units']['analysis'] and nxt['paid'] == 'gemini-4-hydrogen'
     # M5: close (remaining stages are not done, so close is not allowed yet) — verify receipts instead via a direct close attempt
     rc, out, _ = vw(home, 'close')
     assert rc == 2 and out['code'] == 'NOT_ALLOWED'

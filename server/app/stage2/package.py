@@ -80,7 +80,89 @@ def ruled_out(rows):
             for r in rows if not str(r['eligibility']).startswith('ELIGIBLE')]
 
 
-def sub_clip_row(clip, log, sub, timeline_fps):
+FIT_LINE = re.compile(r'BEAT_(\d+)\D{0,6}?(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*s?\W{0,4}(EXACT|PARTLY|RELATED)\W*(.*)', re.S)
+
+
+def _beat_lines(text):
+    """A fit field cut into its lines, one per sentence named: each starts at a beat id."""
+    return [p.strip(' \n;/|-') for p in re.split(r'(?=BEAT_\d+)', str(text or '')) if p.strip().startswith('BEAT_')]
+
+
+def own_lines(sub, n_sentences):
+    """design/193 R3: a piece's own lines for the placer: what it shows, and (from a log by sentence) its fit to each sentence, read from the two
+    text fields the clip study writes: the sentence's number, the seconds, EXACT, PARTLY or RELATED, why, and what is missing. A line that is not
+    in the form asked for, names a sentence the script does not have, or gives seconds outside the piece is left out and counted. A sentence the
+    study lists as primary with no usable line still counts, as exact, with "no line given". n_sentences 0: a log by paragraph, nothing is read."""
+    out = {'what': sub.get('visual_action_observed')}
+    if not n_sentences:
+        return out
+    story, w = sub.get('continuity_and_story') or {}, sub.get('max_usable_window') or {}
+    lo, hi = float(w.get('in_s') or 0) - 0.35, float(w.get('out_s') or 0) + 0.35
+    number = lambda t: int(re.match(r'BEAT_(\d+)', t).group(1))
+    missing = {number(l): re.sub(r'^BEAT_\d+\W*', '', l).strip() for l in _beat_lines(story.get('beat_fit_limits'))}
+    fits, unread = [], 0
+    for line in _beat_lines(story.get('beat_fit_reasoning')):
+        m = FIT_LINE.match(line)
+        if not m:
+            unread += 1
+            continue
+        i, a, z = int(m.group(1)), float(m.group(2)), float(m.group(3))
+        if not 1 <= i <= n_sentences or a < lo or z > hi or a >= z:
+            unread += 1
+            continue
+        if not any(f['sentence'] == i for f in fits):
+            fits.append({'sentence': i, 'from_s': a, 'to_s': z, 'match': m.group(4), 'why': ' '.join(m.group(5).split())[:400], 'missing': missing.get(i, '')})
+    for b in story.get('primary_fit_for_beats') or []:
+        m = re.match(r'BEAT_(\d+)$', str(b))
+        if m and 1 <= int(m.group(1)) <= n_sentences and not any(f['sentence'] == int(m.group(1)) for f in fits):
+            fits.append({'sentence': int(m.group(1)), 'from_s': None, 'to_s': None, 'match': 'EXACT', 'why': 'no line given', 'missing': missing.get(int(m.group(1)), '')})
+    return {**out, 'sentence_fits': fits, 'fit_lines_unread': unread}
+
+
+def fit_unit(identities, n_sentences):
+    """design/193: which kind of log a film holds, and why when it is not by sentence. By sentence only when every clip was studied so and
+    counted the sentences the narration has; else by paragraph, as before, with the reason for the tool's answer ('' for an older film)."""
+    kinds = [i.get('fit_unit') == 'sentence' for i in identities]
+    if not any(kinds):
+        return 'paragraph', ''
+    if not all(kinds):
+        return 'paragraph', 'Some clips were studied before the fit by sentence: this film is packaged by paragraph, as before.'
+    counts = sorted({i.get('sentences') for i in identities}, key=str)
+    if counts != [n_sentences]:
+        return 'paragraph', f'The clip study counted {counts} sentences and the narration has {n_sentences}: this film is packaged by paragraph, as before.'
+    return 'sentence', ''
+
+
+def scene_fits_by_sentence(rows, windows, sentences):
+    """design/193 R3: with logs by sentence, a row fits a scene directly when the clip study marked it EXACT or PARTLY for a sentence of that scene,
+    is related when only RELATED, and fits by chapter when its process_stage is the scene's chapter (as `scene_fits`). A sentence belongs to the scene
+    its first word starts in, and is numbered there as the scene's step (BEAT_03.S2), as `with_steps` numbers it. Each fit gains its scene and step."""
+    place = {}
+    for w in windows:
+        own = [i for i, s in enumerate(sentences or [], 1) if w['timeline_start_frame'] <= s['start_frame'] < w['timeline_end_frame']]
+        place.update({i: (w['beat_id'], f"{w['beat_id']}.S{n}") for n, i in enumerate(own, 1)})
+    for r in rows:
+        r['model_fits'] = {'primary': r['primary_fits'], 'secondary': r['secondary_fits']}
+        kinds, fits = {}, []
+        for f in r.get('sentence_fits') or []:
+            at = place.get(f['sentence'])
+            if not at:
+                continue
+            fits.append({**f, 'scene': at[0], 'step_id': at[1]})
+            if kinds.get(at[0]) != 'direct':
+                kinds[at[0]] = 'related' if f['match'] == 'RELATED' else 'direct'
+        for w in windows:
+            if kinds.get(w['beat_id']) != 'direct' and r.get('process_stage') and r['process_stage'] in w['process_stages']:
+                kinds[w['beat_id']] = 'chapter'
+        kinds = {w['beat_id']: kinds[w['beat_id']] for w in windows if w['beat_id'] in kinds}
+        r['sentence_fits'] = fits
+        r['primary_fits'] = [b for b, k in kinds.items() if k != 'related']
+        r['secondary_fits'] = [b for b, k in kinds.items() if k == 'related']
+        r['fit_kinds'], r['fit_source'], r['fit_unit'] = kinds, 'clip study by sentence, and scene chapter', 'sentence'
+    return rows
+
+
+def sub_clip_row(clip, log, sub, timeline_fps, n_sentences=0):
     src_fps = Fraction(str(clip.get('fps') or timeline_fps))
     w = sub['max_usable_window']
     st = sub['stage15']
@@ -109,7 +191,7 @@ def sub_clip_row(clip, log, sub, timeline_fps):
             'speech': bool(people.get('speech_translation_block')), 'facts_match_visual': any(f.get('matches_visual_on_screen') for f in ((people.get('speech_translation_block') or {}).get('extracted_domain_facts') or [])),
             'tc_confidence': sub.get('tc_confidence'), 'confidence': confidence_of(sub), 'stabilization_needed': bool((sub.get('technical_qc_and_remediation') or {}).get('stabilization_needed')),
             'horizon_rotation_deg': (sub.get('technical_qc_and_remediation') or {}).get('horizon_rotation_deg') or 0.0,
-            'editorial_ideas': sub.get('editorial_ideas') or []}
+            'editorial_ideas': sub.get('editorial_ideas') or [], **own_lines(sub, n_sentences)}   # design/193 R3
 
 
 def scene_fits(rows, windows, paragraphs):
