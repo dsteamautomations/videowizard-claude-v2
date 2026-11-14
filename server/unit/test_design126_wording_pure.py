@@ -49,7 +49,7 @@ def test_sc1_to_sc5_script_prompt_and_step():
 
 def test_an1_analysis_starts_without_asking():
     s = V3['analysis']['steps'][0]
-    assert '?' not in s and 'without asking' in s and '--understand-audio no' in s and '--exclude' in s and '15 seconds' in s
+    assert '?' not in s and 'without asking' in s and '--understand-audio no' in s and '--exclude' in s and 'Gemini 4 Hydrogen' in s and 'look-again' in s   # design/193
 
 
 def test_op2_op3_options_steps():

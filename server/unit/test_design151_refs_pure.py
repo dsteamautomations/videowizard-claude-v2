@@ -378,6 +378,6 @@ def test_the_instructions_say_the_kept_round_and_name_what_is_retired():
     root = Path(VS.__file__).resolve().parents[2]
     v3 = json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
     later = next(p['text'] for p in next(s for s in v3['stages'] if s['name'] == 'visuals')['parts'] if p['name'] == 'later')
-    assert 'kept method' in later and 'Yes, No or Correct it' in later and 'round --sets' in later
+    assert 'kept method' in later and 'judged in the chat' in later and 'round --sets' in later   # design/188: each set is judged in the chat, one at a time
     md = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'round --sets' in md and 'the server adds the kept preamble' in md and 'tick' in md
