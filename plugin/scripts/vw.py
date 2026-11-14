@@ -658,6 +658,8 @@ def next_line(nxt):
                 f"{page.get('narrations') or 0} narrations kept", (f"direction {page['direction']}" if page.get('direction') and page['direction'] != 'none' else 'no direction recorded'),
                 'final narration made' if page.get('final') else 'no final narration']
         line += ' · ' + ', '.join(bits)
+        if page.get('do_next'):   # design/194 (the re-review): the one next thing inside the voice stage, as the server says it
+            line += '. ' + page['do_next']
     s3 = nxt.get('stage3')
     if s3 and s3.get('do_next'):   # handover (11 Nov 2026): what is left in the assembly or delivery stage, as the server says it
         hand = s3.get('handover')
@@ -1165,7 +1167,7 @@ def cmd_stage(a):
         if a.step == 'prepare':
             extra = {'file': a.file, 'earlier_titles': m.get('client_runs') or [], 'last_category': m.get('last_category')} if a.stage == 'intake' else \
                 {'last_brief': m.get('last_brief'), 'client_rules': m.get('client_rules') or [], 'client_card': m.get('client_card') or {}, 'category': film_category(full)} if a.stage == 'brief' else \
-                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': signed_link(voice_page_url(m['code']))} if a.stage == 'voice' else \
+                {'last_voice': m.get('last_voice'), 'favourites': favourites(), 'voice_page': voice_page_of(nxt, m['run_id']), 'page_url': voice_page_url(m['code'])} if a.stage == 'voice' else \
                 {'known': lambda shas: (write(f"/api/runs/{m['run_id']}/library/known", {'shas': shas}) or {}).get('known') or {}} if a.stage == 'media' else {}   # design/147 L2
             prepared = prepare(ws, procedure, prior, **extra)
             if a.stage in stages_text.STAGES:   # design/192 (intake 8, brief 7): when the assistant's work on a text stage began

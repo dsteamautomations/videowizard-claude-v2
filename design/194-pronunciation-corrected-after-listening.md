@@ -125,6 +125,23 @@ Everything in sections 1 and 2 is built on branch `worktree-stage-fixes-vw23`. N
 
 **Not covered.** `server/tests` (Docker) not run; `test_voice_media.py` and any test that posts the old list will need new expectations. Nothing was tried with a real voice or on the live page. Python 3.9 is not installed here. Dragging to pick several words was tried only as code, not by hand. A name of several words is not marked in the script after it is picked (only single words are).
 
+## 8a. Re-review of the instructions against the revised order (SK, 14 Nov)
+
+SK: "the pronunciation step is not asked in the chat because it has to be done in the UI", and one round of re-review so that "what is next" gives the revised order. Read again: the steps of intake, brief, script and voice and the voice prompt in `server/procedures/v3.json`; the direction prompt's opening and closing parts; `plugin/commands/vw.md`; `plugin/operator-CLAUDE.md`; the tool's voice message (`stages_av.voice_prepare`), `vw next` (`vw.next_line`, `cmd_next`), `vw voice`; the server's `compute_next`, `next_for`, `voices.page_summary`, `film.need_category`.
+
+| # | Found | Changed |
+|---|---|---|
+| 1 | The chat text and voice step 5 offered `vw voice pronounce` as an equal way beside the page. | The page is the way. The assistant never asks a pronunciation question in the chat, before or after a narration, and never proposes a word list or a spelling; the tool's command is only for an operator who says they cannot use the page. |
+| 2 | The voice prompt told the assistant to ask the operator to "listen for pronunciation" and to "correct an issue". | It now says pronunciation is the operator's step on the page. |
+| 3 | The tool's own message at `vw stage voice prepare` gave the old order: agree a voice, then the direction, then narrate. | The order of the steps: the direction and the test passage first, then the voices page; the client's last voice named as the recommendation when the link is given. |
+| 4 | `vw next` in the voice stage listed counts but not what comes next. | The server now says the one next thing inside the stage (`voices.voice_do_next`): direction first; then try and narrate on the page; then listen, correct words or tone there, narrate again when the final words changed; then make one final. |
+| 5 | After a reopen of the voice stage, `vw next` could still say "final narration made". | While voice is the next stage no narration is the final. |
+| 6 | The voice text and the operator guidance still said "the operator signs in". A sign-in ticket made at `vw stage voice prepare` would be old by the time the link is given. | The texts say the link signs the browser in; the prepare prints the plain address, and the link given to the operator comes from the direction record or `vw next`. |
+| 7 | Brief step 0 did not name the category and `same_as_last`, which the prepare now prints. | Named. |
+| 8 | Script step 2 asked for the approval before the claim checks, though a check can change the wording. | The claim checks come first, then the one approval question. |
+
+Nothing was found in the intake steps. `scripts/d194b_wording_v3.py` holds the instruction text changes.
+
 ## 9. Not covered by this design
 
 - Whether Eleven v4 obeys a plain respelling for every word, and whether a try and a full narration sound alike: only a paid test on a real voice shows it.

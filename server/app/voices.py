@@ -861,8 +861,39 @@ def finalise(conn, store, user, run, outputs, job_id, quote, recorded_from='page
     return out
 
 
+def voice_do_next(state, direction, words):
+    """design/194 (the re-review): the one next thing inside the voice stage, in the order of the stage, as `vw next` says it. Pronunciation is the operator's
+    step on the voices page and is never a question in the chat."""
+    if not direction:
+        return ('First, in the chat, the direction and the test passage: `vw voice direct prepare`, one question whose first answer is "Best fit, passage 1". '
+                'Then the voices page; no pronunciation question is asked.')
+    narrations = state.get('narrations') or []
+    if not narrations:
+        return ('Next, on the voices page (give the operator the link): they try voices on the test passage and narrate up to three; a voice they already know needs no tryout. '
+                'Nothing is asked in the chat meanwhile, and no pronunciation question.')
+    version = int((words or {}).get('version') or 0)
+    rows = (words or {}).get('words') or []
+    trying = sum(1 for w in rows if w.get('state') != 'final')
+    final = sum(1 for w in rows if w.get('final_say_as'))
+    latest = {}
+    for n in narrations:
+        latest[n.get('voice_id')] = n
+    behind = bool(version) and any(int(n.get('pronunciations_version') or 0) != version for n in latest.values())
+    out = ["Next, on the voices page: the operator listens to each narration. A word that sounds wrong is corrected there ('A word sounds wrong'), never by a question in the chat; "
+           "a sentence's tone or pace with 'A sentence's tone or pace'."]
+    if final or trying:
+        out.append(f"Words: {final} final" + (f", {trying} still being tried (in no narration until made final)" if trying else '') + '.')
+    if behind:
+        out.append("The final words changed since the last narration: 'Narrate again with the final words' on the page.")
+    out.append('Then they make one narration final there; after that, `vw next`.')
+    return ' '.join(out)
+
+
 def page_summary(store, run):
     state = page_state(store, run)
     direction = direction_of(store, run)
+    words = words_view(store, run)
     return {'pick': state.get('pick'), 'narrations': len(state['narrations']), 'final': bool(state.get('final')), 'direction': (direction or {}).get('chosen') or None,
-            'passage': ((direction or {}).get('passage') or {}).get('n'), 'step': state.get('step') or 'browse', 'tried': len(state.get('tried') or [])}
+            'passage': ((direction or {}).get('passage') or {}).get('n'), 'step': state.get('step') or 'browse', 'tried': len(state.get('tried') or []),
+            'words': {'final': sum(1 for w in words['words'] if w.get('final_say_as')), 'trying': sum(1 for w in words['words'] if w.get('state') != 'final')},
+            'do_next': voice_do_next(state, direction, words)}

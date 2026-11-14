@@ -254,9 +254,13 @@ def voice_prepare(ws, procedure, prior, last_voice=None, favourites=None, voice_
     script = json.loads((ws / 'out' / 'script.json').read_text(encoding='utf-8'))
     brief = (prior('brief') or {}).get('summary') or {}   # design/39 4.2: the brief, the languages and the client's last voice
     production = brief.get('production') or {}
-    message = 'Agree a voice with the operator (one question per message, the voices page or the catalog), then the direction, then narrate and record.'
+    # design/194 (the re-review): the order of the stage as the steps give it; pronunciation is the operator's step on the page, never a question in the chat
+    message = ('First the direction and the test passage (`vw voice direct prepare`, one question whose first answer is "Best fit, passage 1"). Then give the operator the voices page link '
+               'the direction record prints: there they try voices, narrate, correct a word that sounds wrong or a sentence\'s tone or pace, and make one narration final. '
+               'No pronunciation question is asked in the chat.')
     if last_voice:
-        message = f"Last voice for this client: {last_voice.get('name')} ({last_voice.get('model_id')}, run {last_voice.get('run')}). Propose it first: same voice as last time, or compare? " + message
+        message = (f"Last voice for this client: {last_voice.get('name')} ({last_voice.get('model_id')}, run {last_voice.get('run')}): name it as the first recommendation when you give "
+                   'the voices page link (same voice as last time, or compare?). ') + message
     if favourites:   # design/52 M: proposed after the last voice, before the catalogue
         names = ', '.join(f"{f.get('name')} ({f.get('narrations', 0)} narration(s), last used {f.get('last_used') or 'never'})" for f in favourites[:8])
         message += f' Favourites: {names}.'
@@ -264,7 +268,7 @@ def voice_prepare(ws, procedure, prior, last_voice=None, favourites=None, voice_
     if page.get('pick'):
         message += f" On the voices page the operator picked {page['pick'].get('name') or page['pick'].get('voice_id')} (provisional); {page.get('narrations', 0)} narration(s) kept; direction {page.get('direction') or 'none'}."
     if page_url:
-        message += f' The voices page: {page_url} (the operator signs in; give them this link when they want it).'
+        message += f' The voices page is {page_url}; the link the direction record and `vw next` print signs the operator\'s browser in by itself (ten minutes, one use).'
     return {'prompt': procedure.get('prompt') or '', 'direction_prompt': procedure.get('direction_prompt') or '', 'steps': procedure.get('steps') or [], 'voice_page_url': page_url,
             'inputs': {'spoken_text': script['spoken_text'], 'characters': len(script['spoken_text']), 'content_digest': script['content_digest'],
                        'passages': len(script['passages']),

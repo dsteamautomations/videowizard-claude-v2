@@ -33,6 +33,8 @@
     "the two lists (best_fit, experimental) and three test passages",
     "propose a web search: say \"I am deviating from the usual procedure",
     "Before the first full narration (design/144)",
-    "list every word a voice may say wrongly"
+    "list every word a voice may say wrongly",
+    "ask the operator to listen for pronunciation, pace",
+    "A word that sounds wrong is corrected then, never asked about before the narration"
   ]
 }

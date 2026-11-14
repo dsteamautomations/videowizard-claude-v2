@@ -297,7 +297,7 @@ def next_for(conn, run):
         try:
             from . import voices
             from .storage import storage
-            nxt['voice_page'] = voices.page_summary(storage(), run)
+            nxt['voice_page'] = {**voices.page_summary(storage(), run), 'final': False}   # design/194: while voice is the next stage no narration is the final (after a reopen the page's old mark is stale)
         except Problem:
             nxt['voice_page'] = None
     return nxt
