@@ -679,7 +679,7 @@ def _public(item, summary, n_waiting, one=False):
 CARD_KINDS = ('treatment line', 'plan gap')
 CARD_ALL, CARD_PART = 12, 10   # up to 12 entries on one card; a longer step comes as cards of 10
 CARD_SAY = ('What to do: read each {what} and choose Accept or Change this. The numbers at the top show where you are: green is accepted, amber has a change. '
-            'When every number is coloured, press Submit all. Nothing is recorded until then.')
+            'When every number is coloured, press Submit all: your answers appear in the message box below. Press Enter to send them. Nothing is recorded until you send them.')
 
 
 def _lit(value):
@@ -724,7 +724,7 @@ def _card(session, items, summary):
 CARD_HOW = ('The tool saved the card in the run folder (`card_file`). Post `say_before` as your own one line. Then read `card_file` and show it with the card tool '
             '(`mcp__visualize__show_widget`): `widget_code` is the whole text of that file, character for character, nothing added, changed or left out; `title` is the card\'s id; '
             'one loading message, "Laying out the card". Do not call `read_me` for it and do not post the entries as text as well. Then wait for the operator. '
-            'Submit all puts one message into the chat: "Card answers: {…}". Write the part from { to } as it is into the file `answers_path` and run '
+            'Submit all puts one line into the message box and the operator sends it: "Card answers (press Enter to send; do not edit or delete): {…}". Write the part from { to } as it is into the file `answers_path` and run '
             '`vw visuals card --file <answers_file>` (`answers_file` as it is given, the path inside the run folder): one call records every answer and brings what comes next. If the operator answers in words instead, write the same file yourself: '
             '{"card": "<id>", "answers": [{"n": 1, "choice": "accept"}, {"n": 2, "choice": "change", "notes": "<their words>"}]} (n is the entry\'s number on the card). '
             'If the card tool is not there or fails, run `vw visuals next --one`: the same decisions, one at a time. Say nothing about what you did.')

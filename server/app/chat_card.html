@@ -44,7 +44,7 @@ const acc=$('acc'),chg=$('chg'),isA=a&&a.c==='accept',isC=a&&a.c==='change';
 acc.textContent=isA?'Accepted ✓':'Accept';acc.style.cssText=isA?'background:var(--bg-success);color:var(--text-success);border-color:var(--border-success)':'';acc.setAttribute('aria-pressed',isA?'true':'false');
 chg.textContent=isC?'Change saved ✓':'Change this';chg.style.cssText=isC?'background:var(--bg-warning);color:var(--text-warning);border-color:var(--border-warning)':'';chg.setAttribute('aria-pressed',isC?'true':'false');
 $('box').style.display=isC&&!done?'block':'none';$('note').value=isC?a.n:'';$('err').style.display='none';
-const m=missing();$('left').textContent=done?'Submitted. Your answers are being recorded.':(m.length?m.length+' still to answer':'All answered: press Submit all');
+const m=missing();$('left').textContent=done?'Your answers are in the message box below. Press Enter to send them. Nothing is recorded until you do.':(m.length?m.length+' still to answer':'All answered: press Submit all');
 }
 function next(){const m=missing();if(!m.length){draw();return}const j=m.find(i=>i>cur);cur=j==null?m[0]:j;draw()}
 function advance(){draw();if(D.auto){clearTimeout(timer);timer=setTimeout(next,500)}}
@@ -52,12 +52,14 @@ $('acc').onclick=()=>{if(done||(ans[cur]&&ans[cur].c==='accept'))return;ans[cur]
 $('chg').onclick=()=>{if(done)return;clearTimeout(timer);$('box').style.display='block';$('note').focus()};
 $('note').oninput=()=>{$('err').style.display='none'};
 $('save').onclick=()=>{if(done)return;const n=$('note').value.trim();if(!n){$('err').style.display='block';return}ans[cur]={c:'change',n:n};keep();advance()};
-$('sub').onclick=()=>{if(done)return;clearTimeout(timer);const m=missing();
+let msg='';
+$('sub').onclick=()=>{clearTimeout(timer);
+if(!done){const m=missing();
 if(m.length){cur=m[0];draw();$('left').textContent='Answer these first: '+m.map(i=>i+1).join(', ');return}
 const list=D.e.map((_,i)=>i).map(i=>ans[i].c==='accept'?{n:i+1,choice:'accept'}:{n:i+1,choice:'change',notes:ans[i].n});
-const msg='Card answers: '+JSON.stringify({card:D.id,answers:list});
-done=true;$('sub').disabled=true;$('sub').textContent='Submitted';draw();
-try{sendPrompt(msg);if(store)try{localStorage.removeItem(D.id)}catch(e){}}
-catch(e){const o=$('out');o.style.display='block';o.value=msg;$('left').textContent='The card could not send by itself. Copy the line below into the chat.'}};
+msg='Card answers (press Enter to send; do not edit or delete): '+JSON.stringify({card:D.id,answers:list});
+done=true;$('sub').textContent='Put my answers in the message box again';draw()}
+try{sendPrompt(msg)}
+catch(e){const o=$('out');o.style.display='block';o.value=msg;$('left').textContent='The card could not put the answers in the message box. Copy the line below into the chat and send it.'}};
 draw();
 </script>

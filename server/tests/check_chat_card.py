@@ -123,6 +123,12 @@ def demo():
     assert 'Answer every entry' in refused(lambda: C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'accept', '')))) and not CALLS
     page = (Path(C.__file__).with_name('chat_card.html')).read_text(encoding='utf-8')
     assert 'function missing(){return D.e.map((_,i)=>i).filter(i=>!ans[i])}' in page and 'You changed the direction' not in page
+    # the answers wait in the message box (SK, 14 Nov 2026): the line says so itself, the card says what to do, and a deleted line can be put back
+    for needle in ("'Card answers (press Enter to send; do not edit or delete): '", 'Your answers are in the message box below. Press Enter to send them. Nothing is recorded until you do.',
+                   'Put my answers in the message box again'):
+        assert needle in page, needle
+    assert 'being recorded' not in page and 'disabled=true' not in page and 'removeItem' not in page   # nothing claims a record, and the answers are kept
+    assert 'Card answers (press Enter to send; do not edit or delete): {' in C.CARD_HOW
 
     # recorded once: the changes first, the accepted ones in one record; the same card again changes nothing
     got = C.card_answer(*ARGS, card['id'], answers((1, 'accept', ''), (2, 'change', 'show the finished wall'), (3, 'accept', '')))
