@@ -268,3 +268,34 @@ Your mark:
 
 Your mark: 
 
+
+## Part A, marked (Deepa, 14 Nov)
+
+| Clip | Deepa's mark |
+|---|---|
+| C0032 (3.8 s) | The look-again way is right: it is a ceiling fan, not a wooden batten. |
+| C0114 (8.2 s) | Both ways found the wall and the foot in the shot. Nothing more to tell them apart by reading. |
+| C0113 (13.0 s), C0134 (16.8 s) | The look-again way brings more: the masons, their actions, more detail. |
+
+Deepa's observation: the instruction is the same; the look-again way pulls more information. Confirmed by the figures below. More is not the same as right: only C0032 has been judged on a fact so far.
+
+| Clip | Words written, plain | Words written, look-again | Pieces, plain | Pieces, look-again | Things named, plain | Things named, look-again |
+|---|---|---|---|---|---|---|
+| C0032 | 3,700 tokens | 4,142 | 1 | 1 | | |
+| C0114 | 5,219 | 9,068 | 2 | 3 | 4 | 4 |
+| C0113 | 8,455 | 11,937 | 3 | 4 | 8 | 11 |
+| C0134 | 7,776 | 8,581 | 3 | 3 | 7 | 8 |
+
+## Part A2: where the two ways contradict each other (found by Claude, 14 Nov; for a yes or no each)
+
+| # | Clip | The plain way says | The look-again way says | Question |
+|---|---|---|---|---|
+| 1 | C0114 | The camera moves forward along the wall | The camera pulls back along the wall, then pauses when the foot comes in | Does the camera move forward or backward? |
+| 2 | C0114 | The piece fits paragraphs 2 and 5 directly | It fits paragraph 2 directly, paragraph 5 only loosely | Does it show bricks being laid (paragraph 5), or only the finished cavities (paragraph 2)? |
+| 3 | C0113 | The sweeping at 1.5 to 4.3 s fits no paragraph directly | It fits paragraph 2 directly | Are the bricks on edge and the cavities clearly seen while he sweeps the front? |
+| 4 | C0113 | One person in the frame at 2.6 to 4.2 s | Two people | How many people are seen then? |
+| 5 | C0113 | The first 1.5 s is grade B | Grade C | Is the first second and a half usable? |
+| 6 | C0113 | A hand broom | A straw broom; also a trowel put into the pan, and a parked motorbike behind | Is there a motorbike in the background? |
+| 7 | C0134 | The camera moves forward and to the right | The camera only tracks to the right | Does the camera come closer to the building, or only slide sideways? |
+| 8 | C0134 | Flags the name sign and a debris pile as risks | Flags nothing, but its notes mention both | Should a visible building name be a risk flag? |
+| 9 | C0134 | A terracotta-coloured brick building | Brick painted terracotta, so not proof of bare rat-trap brickwork | Is the brick painted over? |
