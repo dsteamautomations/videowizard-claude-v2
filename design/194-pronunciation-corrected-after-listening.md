@@ -1,7 +1,7 @@
-# 193 — Pronunciation, corrected after listening (design and requirements)
+# 194 — Pronunciation, corrected after listening (design and requirements)
 
 14 Nov 2026. Source: `design/_work/stage-fixes-VW-23.md`, voice rows 8, 10 and 16 to 19, with the eight points a to h (all decided by Deepa, 13 Nov).
-Nothing here is built. This document and the mock-up are shown first, as row 18 asks. Mock-up: `design/193-assets/pronunciation-mockup.html`.
+Nothing here is built. This document and the mock-up are shown first, as row 18 asks. Mock-up: `design/194-assets/pronunciation-mockup.html`.
 
 ## 1. What the operator does (the control)
 
