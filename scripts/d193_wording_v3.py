@@ -12,13 +12,12 @@ ANALYSIS_STEP = ('One paid Gemini 3.8 Flash request per clip (agentic for a clip
                  'One paid Gemini 4 Hydrogen request per clip, each watched the look-again way; tell the operator, with the likely cost (about 0.33 US dollars a clip), do not ask.')
 OPTIONS = [
     ("\n8. Notes: a shot that needs the operator's eye carries a note",
-     " Each piece's row carries its own lines: `what` (what this piece shows; `seen` is its whole clip), `does_not_show`, and `fits` (the clip study's fit of this piece to this scene's "
-     "sentences: EXACT, PARTLY or RELATED, with the seconds of the clip and what is missing). Choose from these, not from the clip's line. A piece only RELATED to a sentence, or with no fit "
-     "for it, is never a direct match for that sentence: place it as B-roll, choose another piece, or leave a blank; the server refuses it otherwise."
+     " Choose from each piece's own lines, not its clip's (`seen`): `what` it shows and `fits`, the clip study's fit to this scene's sentences (EXACT, PARTLY or RELATED, the seconds, "
+     "what is missing). A piece only RELATED to a sentence, or with no fit for it, is never its direct match: B-roll, another piece or a blank; the server refuses it."
      "\n8. Notes: a shot that needs the operator's eye carries a note"),
     ('never side by side at the same shot size.',
-     'never side by side at the same shot size. Two clips that show the same subject with the camera moving in opposite directions (a pan one way and back, a move in and out) are one '
-     'choice: use one of them, never both in neighbouring shots.'),
+     'never side by side at the same shot size. Two clips of one subject with the camera moving in opposite directions (a pan there and back, a move in and out) are one choice: '
+     'never both in neighbouring shots.'),
 ]
 
 

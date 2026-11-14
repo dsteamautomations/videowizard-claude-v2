@@ -437,7 +437,7 @@ def test_snapshot_crops_are_cut_from_each_frame_and_kept(monkeypatch, tmp_path):
 def test_take_jobs_never_lists_a_helpers_check_or_snapshot():
     conn = FakeConn([])
     VS.take_jobs(conn, MRUN)
-    assert "provider <> 'motion'" in conn.sql[-1][0]
+    assert "provider not in ('motion', 'guide'" in conn.sql[-1][0]   # design/187: a guide's own jobs are not takes either
 
 
 # ---------- SK, 1 Nov: the motion route is the default, and a labelled graphic on a motion film is drawn ----------

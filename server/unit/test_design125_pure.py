@@ -80,8 +80,10 @@ def test_m2_the_media_facts_in_the_steps_only():
 
 def test_a2_short_clips_use_the_plain_mode_from_version_3():
     proc = V3['analysis']
-    assert proc['settings']['processing_mode'] == 'auto' and proc['settings']['agentic_over_seconds'] == 15
-    assert analysis.processing_mode(proc, 15.0) == 'STATIC' and analysis.processing_mode(proc, 15.1) == 'AGENTIC'
+    assert proc['settings']['processing_mode'] == 'AGENTIC' and 'agentic_over_seconds' not in proc['settings']   # design/193: every clip is watched the look-again way
+    assert analysis.processing_mode(proc, 3.0) == 'AGENTIC'
+    older = {'settings': {'processing_mode': 'auto', 'agentic_over_seconds': 15}}   # the 15-second rule still reads where a procedure sets it
+    assert analysis.processing_mode(older, 15.0) == 'STATIC' and analysis.processing_mode(older, 15.1) == 'AGENTIC'
     assert V2['analysis']['settings']['processing_mode'] == 'AGENTIC'
     assert 'up to three times' in '\n'.join(proc['steps'])
 
