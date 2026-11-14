@@ -123,10 +123,10 @@ def finish(conn, job_id, status, *, result=None, error=None, cost=None, retry_in
                         datetime.now(timezone.utc) + timedelta(minutes=retry_in) if retry_in else None, job_id)).fetchone()
     if row and not retry_in and status not in ('queued', 'running', 'storage_pending') and not (row['stage'] == 'analysis' and status == 'retained'):
         from . import runlog   # design/145 L2: every background result is an entry (a kept clip is logged at record, with its details)
-        runlog.write(conn, job_entry(row, status, result, error))
+        runlog.write(conn, job_entry(row, status, result, error, cost))
 
 
-def job_entry(row, status, result, error):
+def job_entry(row, status, result, error, cost=None):
     req, res = row.get('request') or {}, result or {}
     ref = req.get('reference') or {}
     name = ref.get('name') or req.get('name') or (req.get('clip') or {}).get('name') or req.get('shot_id') or row.get('unit') or ''
@@ -138,6 +138,10 @@ def job_entry(row, status, result, error):
         facts.append(f"{len(res['marks'])} marks from the read")
     if res.get('duration_s'):
         facts.append(f"{float(res['duration_s']):.1f} s")
+    if isinstance(cost, dict) and 'reused_pieces' in cost:   # design/192 (voice 15): a new recording, or one taken from the store
+        n, reused = cost.get('pieces') or 1, cost['reused_pieces']
+        facts.append('new recording' if not reused else 'reused recording, nothing charged' if reused >= n else f'{reused} of {n} pieces reused')
+        facts.append(f"{cost.get('characters', 0)} characters charged")
     text = f"{req.get('kind') or row['stage']} job {status}" + (f"; {'; '.join(facts)}" if facts else '') + (f"; error: {str(error)[:500]}" if error else '')
     return {'run_id': row['run_id'], 'stage': row['stage'], 'kind': 'result', 'about': f"{ref.get('kind') or req.get('kind') or ''} {name}".strip(), 'rule': '',
             'entry': text, 'by_kind': 'server', 'by_name': '', 'quote': '', 'request_id': None}

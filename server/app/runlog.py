@@ -49,6 +49,9 @@ def entry_from(path, body, status, response):
 
 def _entry(run_id, stage, step, body, status, response, run_code=None):
     about = ', '.join(f'{k} {_short(body[k], 80)}' for k in ABOUT_KEYS if body.get(k) not in (None, '', [], {}) and k != 'stage')
+    if isinstance(body.get('tweaks'), list):   # design/192 (voice 15): the sentence and the tag sent with a narration, or that none was sent
+        sent = '; '.join(f"{t.get('passage_id')} sentence {t.get('sentence')} {_short(t.get('tag'), 70)}" for t in body['tweaks'][:6] if isinstance(t, dict))
+        about += (', ' if about else '') + (f'tag sent: {sent}' if sent else 'no tag sent')
     words = next((_short(body[k], 1000) for k in WORD_KEYS if str(body.get(k) or '').strip()), '')
     entry = {'run_id': run_id, 'stage': stage, 'about': about, 'quote': words, 'request_id': body.get('request_id'),
              'by_kind': 'operator' if words or run_code else 'assistant', 'by_name': '', **({'run_code': run_code} if run_code else {})}
@@ -57,7 +60,7 @@ def _entry(run_id, stage, step, body, status, response, run_code=None):
     if response.get('status') == 'rejected' or response.get('act_on'):
         said = list(response.get('refusals') or []) + list(response.get('act_on') or []) + ([response['error']] if response.get('error') else [])
         return {**entry, 'kind': 'refusal', 'rule': 'check', 'entry': f"{step} rejected: " + _short('; '.join(map(str, said)), 1500)}
-    made = ', '.join(f'{k} {response[k]}' for k in ('reference_id', 'job_id', 'version', 'status') if isinstance(response.get(k), (str, int)))
+    made = ', '.join(f'{k} {response[k]}' for k in ('reference_id', 'job_id', 'job', 'version', 'status') if isinstance(response.get(k), (str, int)))   # `job`: the voices page's narrate-again
     return {**entry, 'kind': 'step', 'rule': '', 'entry': step + (f' ({made})' if made else '')}
 
 
