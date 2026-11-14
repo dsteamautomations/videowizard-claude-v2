@@ -341,6 +341,9 @@ def problems(spec):
     act = spec.get('action')
     if not (isinstance(act, dict) and isinstance(act.get('start'), (int, float)) and isinstance(act.get('end'), (int, float)) and 0 <= act['start'] < act['end'] <= sec + 1e-6):
         out.append('action: {"start": seconds, "end": seconds}, when the one action of the shot begins and ends.')
+    changed = spec.get('changed_from_plan')
+    if changed is not None and not (isinstance(changed, list) and len(changed) <= 10 and all(isinstance(c, str) and 0 < len(c.strip()) <= 300 for c in changed)):
+        out.append('changed_from_plan: a list of at most ten plain lines, each saying what the plan said, what the scene has and why (design/194).')
     marks = spec.get('marks')
     if marks is not None and not (isinstance(marks, dict) and set(marks) <= {'band', 'stripes'}):
         out.append('marks: {"band": id of the set piece that marks the walking line, or null; "stripes": true or false}.')

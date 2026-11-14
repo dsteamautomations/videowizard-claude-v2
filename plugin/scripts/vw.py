@@ -813,6 +813,22 @@ def cmd_guide(a):
     if a.what == 'status':
         out = call('GET', f'{base}/guide/{a.shot}')
         emit(out, 0, out.get('next'))
+    if a.what == 'drawing':   # design/194: the shot's drawing, made from the scene (free): the operator's two sheets
+        st = call('GET', f'{base}/guide/{a.shot}')
+        names = [n for n in st.get('files') or [] if n.startswith('drawing-')]
+        if not names:
+            emit({'action': 'refused', 'message': f'{a.shot} has no drawing yet: send its scene first (`vw guide scene --shot {a.shot} --file …`).'}, 2)
+        paths = _guide_fetch(base, a.shot, folder / 'drawing', names)
+        d = (st.get('guide') or {}).get('drawing') or {}
+        emit({'shot_id': a.shot, 'sha256': d.get('sha256'), 'status': d.get('status'), 'files': paths, 'changes': d.get('changes') or [], 'notes': d.get('notes') or []}, 0,
+             f"{len(paths)} sheets in work/guide/{a.shot}/drawing/; the drawing is {d.get('status')}. Show them to the operator: each person's pale side is the front, the purple side the back, "
+             f"the orange arm the right arm. Their answer: `vw guide drawing-approve --shot {a.shot} --sha {d.get('sha256')} --quote \"…\"` or `vw guide drawing-reject … --notes \"<what is wrong>\" --quote \"…\"`.")
+    if a.what in ('drawing-approve', 'drawing-reject'):
+        if not (a.sha and a.quote) or (a.what == 'drawing-reject' and not a.notes):
+            emit({'action': 'refused', 'message': "`vw guide drawing-approve --shot S --sha <the scene's sha256> --quote \"<the operator's words>\"`; "
+                                                  "`vw guide drawing-reject --shot S --sha <the scene's sha256> --notes \"<what is wrong>\" --quote \"<the operator's words>\"`."}, 2)
+        out = write(base + '/guide/drawing', {'shot_id': a.shot, 'sha256': a.sha, 'approved': a.what == 'drawing-approve', 'quote': a.quote, 'notes': a.notes or ''})
+        emit(out, 0, out.get('next'))
     if a.what == 'scene':
         spec = _guide_json(ws, a.file, 'scene')
         out = write(base + '/guide/scene', {'shot_id': a.shot, 'scene': spec, 'overrides': {'support': a.override} if a.override else {}})
@@ -838,7 +854,7 @@ def cmd_guide(a):
         emit(out, 0, f"Round {out['round']}: " + ('passed. ' if out['pass'] else 'failed (' + '; '.join(out.get('failed') or []) + '). ') + str(out.get('next') or ''))
     if a.what == 'still':
         body = _guide_json(ws, a.file, 'still')
-        out = write(base + '/guide/still', {'shot_id': a.shot, 'prompt': str(body.get('prompt') or ''), 'parents': body.get('parents') or []})
+        out = write(base + '/guide/still', {'shot_id': a.shot, 'prompt': str(body.get('prompt') or ''), 'parents': body.get('parents') or [], **({'look': str(body['look'])} if body.get('look') else {})})   # design/194: "look": an approved picture whose look is kept
         emit(out, 0, out.get('next'))
     if a.what == 'repair':
         if not (a.still and a.region and a.prompt):
@@ -3209,7 +3225,7 @@ def build_parser():
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.add_argument('--off', action='store_true', help="finish: take the drawing's finish away (design/186)"); s.add_argument('--on', action='store_true', help='finish: put it back')
     s.set_defaults(fn=cmd_motion)
-    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
+    s = sub.add_parser('guide'); s.add_argument('what', choices=['scene', 'status', 'frames', 'verdict', 'drawing', 'drawing-approve', 'drawing-reject', 'still', 'look', 'repair', 'approve', 'reject', 'prompt', 'shoot', 'cause'])   # integration steps B to E
     for flag in ('--shot', '--file', '--override', '--still', '--sha', '--quote', '--notes', '--region', '--prompt', '--fix'):
         s.add_argument(flag)
     s.add_argument('--cause', choices=['still', 'guide', 'words', 'model'])

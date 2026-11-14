@@ -75,6 +75,10 @@ def _piece_problems(i, p, materials):
         out.append(f"{what}: its material {p.get('material')!r} is not in the list of materials.")
     if 'colour' in p and not _rgb(p['colour']):
         out.append(f'{what}: its marking colour is three whole numbers from 0 to 255.')
+    pl = p.get('place')
+    if pl is not None and not (isinstance(pl, dict) and _num(pl.get('scale', 1.0)) and pl.get('scale', 1.0) > 0 and _num(pl.get('turn', 0.0))
+                               and _vec(pl.get('origin', [0, 0, 0])) and _vec(pl.get('at', [0, 0, 0]))):
+        out.append(f'{what}: "place" gives scale (greater than nothing), turn in degrees, and "origin" and "at" as three numbers each.')
     shape = p.get('shape')
     if shape == 'box':
         if not (_vec(p.get('min')) and _vec(p.get('max'))):
@@ -252,18 +256,27 @@ def _person(faces, p):
             _bar(faces, elbow, hand, 0.05 * h, colour)
 
 
+def _placer(pl):
+    """The function that stands a piece in its place: scaled about `origin`, turned about the upright axis, with `origin` landing on `at`."""
+    if not pl:
+        return None
+    k, th, o, a = pl.get('scale', 1.0), math.radians(pl.get('turn', 0.0)), pl.get('origin', (0, 0, 0)), pl.get('at', (0, 0, 0))
+    c, s = math.cos(th), math.sin(th)
+    return lambda p: (a[0] + k * ((p[0] - o[0]) * c - (p[1] - o[1]) * s), a[1] + k * ((p[0] - o[0]) * s + (p[1] - o[1]) * c), a[2] + k * (p[2] - o[2]))
+
+
 def model(d):
     """Every face of the model: its corner points, the way it looks out, its material's colour and the operator's marking colour."""
     faces, mats = [], d['materials']
     for p in d.get('pieces') or []:
-        colour, mark = mats[p['material']]['colour'], p.get('colour')
+        colour, mark, turn = mats[p['material']]['colour'], p.get('colour'), _placer(p.get('place'))
         if p['shape'] == 'box':
-            _box(faces, p['min'], p['max'], colour, mark)
+            _box(faces, p['min'], p['max'], colour, mark, turn)
         elif p['shape'] == 'prism':
-            _prism(faces, AXES[p['axis']], p['from'], p['to'], p['outline'], colour, mark)
+            _prism(faces, AXES[p['axis']], p['from'], p['to'], p['outline'], colour, mark, turn)
         else:
             ring = lambda rr: [(p['centre'][0] + rr * math.cos(2 * math.pi * i / 16), p['centre'][1] + rr * math.sin(2 * math.pi * i / 16)) for i in range(16)]
-            _prism(faces, AXES[p['axis']], p['from'], p['to'], ring(p['radius']), colour, mark, a1_outline=ring(p.get('radius_to', p['radius'])))
+            _prism(faces, AXES[p['axis']], p['from'], p['to'], ring(p['radius']), colour, mark, turn, a1_outline=ring(p.get('radius_to', p['radius'])))
     for p in d.get('people') or []:
         _person(faces, p)
     return faces

@@ -105,6 +105,7 @@ def rendered(store, conn):
     job = {'id': g['render']['job_id'], 'request': {'kind': 'guide-render', 'shot_id': 'VS1', 'sha256': g['sha256']}}
     GD.apply_result(s, job, 'ready', {'guide_key': 'run-1/visuals/guides/x/guide.mp4', 'sha256': 'sha-guide', 'bytes': 9, 'frame1_key': 'run-1/visuals/guides/x/frame1.png', 'frame1_sha256': 'sha-f1', 'render_seconds': 600}, None)
     VS.save_session(store, NEW, s)
+    GD.drawing_verdict(conn, store, USER, NEW, [], 'VS1', g['sha256'], True, 'yes, that is the shot')   # design/194: the operator approves the shot's drawing before the still
 
 
 def still_made(store, conn, ok=True):
@@ -244,9 +245,11 @@ def test_the_still_is_gpt_image_2_6_on_any_film_with_the_guide_frame_first_the_l
     q = conn.queued[-1]
     r = q['request']
     assert q['provider'] == 'guide-still' and (r['model'], r['size'], r['quality'], r['op'], r['provider']) == ('gpt-image-2.6-sunburst', '1536x864', 'high', 'edit', 'openai')
-    assert [p['key'] for p in r['parents']] == ['run-1/visuals/guides/x/frame1.png', 'run-1/visuals/references/R1.png']
+    sha = saved(store)['guides']['VS1']['sha256']
+    assert [p['key'] for p in r['parents']] == ['run-1/visuals/guides/x/frame1.png', f'run-1/visuals/guides/{sha}/drawing-camera-plain.png', f'run-1/visuals/guides/{sha}/drawing-above-plain.png',
+                                                'run-1/visuals/references/R1.png']   # design/194: the box frame stays Image 1; the shot's two drawings follow; then the given pictures
     assert r['prompt'].startswith('The FIRST image is a rough 3D layout') and STILL_WORDS in r['prompt'] and 'EXACT LAYOUT, measured from the first image' in r['prompt']
-    assert 'Exactly 3 people in view; no one else.' in r['prompt'] and 'Image 1 is the layout: take from it positions and framing only. Image 2 is the mason: copy his face, build and clothes.' in r['prompt']
+    assert 'Exactly 3 people in view; no one else.' in r['prompt'] and 'Image 1 is the layout: take from it positions and framing only. Image 4 is the mason: copy his face, build and clothes.' in r['prompt']
     still = saved(store)['guides']['VS1']['stills'][0]
     assert still['status'] == 'generating' and still['prompt'] == STILL_WORDS and still['inputs'] == [{'id': 'R1', 'job': 'the mason: copy his face, build and clothes'}]
 

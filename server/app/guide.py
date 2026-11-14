@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from psycopg.types.json import Jsonb
 
-from . import generations, guide_spec as G, video_generators
+from . import draw3d, generations, guide_drawing, guide_spec as G, video_generators
 from . import visuals_stage as VS
 from .errors import Problem
 from .planning.digest import digest
@@ -29,6 +29,16 @@ LIGHT_LINE = 'Light stays exactly as in the image.'
 SILENCE_LINE = 'No dialogue. No extra sound effects.'
 REPAIR_OPEN = 'Change ONLY the transparent (masked) area: {words} Everything else stays exactly as it is: every person, face, object, position and the light.'
 MAX_ROUNDS_BEFORE_OPERATOR = 2
+# design/194, Area B: said to GPT image with the shot's drawings (SK, 14 Nov 2026): it copies a reference faithfully, so it is told what not to copy
+DIAGRAM_WORDS = ('The drawings are diagrams. Use them only for which way each person faces, which arm works, what each thing is and how it is built. Do not copy how they look: their clean edges, '
+                 'even tones and perfect regularity are artificial. Make every surface, every person and the ground as they are in real life, with natural variation, wear and dust.')
+RIGHT_HAND_WORDS = ('Right-handed staging: each person works with the right hand, which is on the camera\'s side of the body and fully visible. What that hand uses is in front of the body, '
+                    'within easy reach with the elbow bent. No arm reaches backward, across the body or behind the shoulders; the body, the head and the working hand point the same way. '
+                    'The left hand does nothing: it rests.')
+LOOK_WORDS = ('Image {n} is a look reference. Keep its look in your picture: its real surface textures, its light, its true colours and the way it reads as an ordinary photograph. '
+              'Take nothing else from it: not the positions, not the arrangement, not the state of any thing, not the people. Where it differs from Image 1 or from the facts, Image 1 and the facts win.')
+NOT_APPROVED = ("The operator has not approved this shot's drawing yet. It is shown in the chat (`vw chat`); or fetch it with `vw guide drawing --shot {shot}` and record their answer with "
+                "`vw guide drawing-approve --shot {shot} --sha {sha} --quote \"<the operator's words>\"`.")
 
 # what a take prompt never carries (the 48 failed methods; the single-run ones are precautions): (pattern, what to say)
 NEVER = [
@@ -68,6 +78,65 @@ def _people_of(plan, shot):
 
 # ---------- step B: the scene, the checks before spend, the check frames ----------
 
+def _draw(store, run, session, spec, sha):
+    """design/194: the shot's drawing, from the scene's own numbers: through the camera and from above, both sheets of each stored. Free. It waits for the operator."""
+    import hashlib
+    from . import drawings
+    things = {eid: VS.load_json(store, r['key']) for eid, r in (session.get('drawings') or {}).items() if r.get('status') == 'approved'}
+    d, notes = guide_drawing.description(spec, things)
+    wrong = draw3d.problems(d)
+    need(not wrong, 'The shot cannot be drawn: ' + ' '.join(wrong[:4]))
+    views = []
+    for s in draw3d.render(d):
+        row = {'id': s['view'], 'name': s['name'], 'kind': s['kind'], 'width': s['width'], 'height': s['height']}
+        for which, ops in (('labelled', s['labelled_ops']), ('plain', s['plain_ops'])):
+            data = drawings.png(ops)
+            k = VS.key(run, f"guides/{sha}/drawing-{s['view']}{'-plain' if which == 'plain' else ''}.png")
+            store.put(k, data, 'image/png')
+            row[f'{which}_key'], row[f'{which}_sha256'] = k, hashlib.sha256(data).hexdigest()
+        views.append(row)
+    return {'status': 'proposed', 'sha256': sha, 'views': views, 'how': draw3d.how_to_read(d, [v['id'] for v in views], first=2),
+            'changes': [str(c).strip() for c in spec.get('changed_from_plan') or []], 'notes': notes, 'at': now()}
+
+
+def _ensure_drawing(store, run, session, g, spec):
+    """A guide made before design/194 has no drawing: it is made now (free) and waits for the operator like any other."""
+    if (g.get('drawing') or {}).get('sha256') != g['sha256']:
+        g['drawing'] = _draw(store, run, session, spec, g['sha256'])
+        VS.save_session(store, run, session)
+    return g['drawing']
+
+
+def drawing_verdict(conn, store, user, run, outputs, shot_id, sha256, approved, quote, notes=''):
+    """The operator's verdict on a shot's drawing, by the scene it was made from: approved with their words, or a correction in words (the scene is then changed)."""
+    session = VS.session_of(store, run, outputs)
+    g = entry_of(session, shot_id)
+    d = _ensure_drawing(store, run, session, g, VS.load_json(store, g['key']))
+    need(d['sha256'] == sha256, 'The scene changed since this drawing was looked at; look at the current drawing (`vw guide drawing`).')
+    need(str(quote or '').strip(), "A verdict carries the operator's own words.")
+    notes = str(notes or '').strip()
+    need(approved or notes, "A correction says what is wrong, in the operator's words.")
+    d.update(status='approved' if approved else 'rejected', verdict={'approved': bool(approved), 'quote': str(quote).strip()[:500], 'notes': notes[:2000], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
+    VS.save_session(store, run, session)
+    generations.add(conn, run['id'], shot_id, HOW, {'kind': 'shot drawing approved' if approved else 'shot drawing corrected', 'sha256': sha256, 'quote': d['verdict']['quote'], 'notes': notes[:2000],
+                                                    'by': user['id'], 'by_name': user.get('name') or ''})
+    return {'shot_id': shot_id, 'status': d['status'],
+            'next': "The shot's drawing is approved; it goes with the still's request." if approved else 'Change the scene with the correction (one thing at a time) and upload it again: `vw guide scene`.'}
+
+
+def _drawn_facts(session, parents):
+    """The facts of every drawn thing among a still's parent pictures, one plain line each, under the thing's name."""
+    from . import drawings
+    out, seen = [], set()
+    for p in parents or []:
+        eid = ((session.get('references') or {}).get(p.get('id')) or {}).get('element_id')
+        if eid and eid not in seen:
+            seen.add(eid)
+            name = ((session.get('drawings') or {}).get(eid) or {}).get('name') or eid
+            out += [f'{name}: {f}' for f in drawings.must_be_true(session, eid)]
+    return out
+
+
 def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
     """A helper's scene description for a shot: its shape, then every check that needs no Blender; refused before anything is rendered or paid.
     `overrides`: {'support': '<why>'} is the one refusal that can be overridden, with its reason on the record."""
@@ -98,14 +167,15 @@ def set_scene(conn, store, user, run, outputs, shot_id, spec, overrides=None):
                        'checks': rows, 'overrides': [{'check': c, 'reason': why, 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()} for c, why in overrides.items()],
                        'frames': {'job_id': job_id, 'status': 'queued'}, 'verdicts': [], 'rounds_before': len(old.get('verdicts') or []) + int(old.get('rounds_before') or 0),
                        'stills': [s for s in old.get('stills') or [] if s.get('status') == 'approved'], 'takes': old.get('takes') or [], 'by': user['id'], 'at': now()}
+    guides[shot_id]['drawing'] = _draw(store, run, session, spec, sha)   # design/194: free; the operator approves it before the still
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'scene', 'sha256': sha, 'key': k, 'recipe': spec['recipe'], 'process_note': spec['process_note'], 'seconds': spec['seconds'],
                                                     'checks': [{'check': r['check'], 'level': r['level'], 'message': r['message']} for r in rows if r['level'] != 'info'],
                                                     'overrides': overrides, 'by': user['id'], 'by_name': user.get('name') or ''})
     return {'shot_id': shot_id, 'sha256': sha, 'job_id': job_id, 'frames': frames,
             'warnings': [r['message'] for r in rows if r['level'] == 'warn'], 'info': [r['message'] for r in rows if r['level'] == 'info'],
-            'cannot_see': G.BLIND, 'layout': G.layout_block(spec),
-            'next': f'Check frames {frames} are being rendered (free). Then a fresh vw-guide-check helper looks at them: `vw guide frames --shot {shot_id}`, `vw guide verdict --shot {shot_id} --file …`.'}
+            'cannot_see': G.BLIND, 'layout': G.layout_block(spec), 'drawing_notes': guides[shot_id]['drawing']['notes'],
+            'next': f"The shot's drawing is made (free); the operator approves it in the chat before the still. " f'Check frames {frames} are being rendered (free). Then a fresh vw-guide-check helper looks at them: `vw guide frames --shot {shot_id}`, `vw guide verdict --shot {shot_id} --file …`.'}
 
 
 def verdict(conn, store, user, run, outputs, shot_id, sha256, passed, looks, notes=''):
@@ -154,7 +224,7 @@ def _input(store, run, session, shot_id, p):
     return VS.cropped_parent(store, run, row, p.get('crop')), str(p['job']).strip()
 
 
-def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, repair_of=None, region=None):
+def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, repair_of=None, region=None, look=None):
     """The still of a shot: GPT image 2.6 whatever the film's picture AI (SK, 10 Nov); Image 1 is the guide's first frame; then the given approved pictures,
     each with its job; the layout numbers are written by the server from the scene. With `repair_of` and `region`: a masked repair of one wrong part."""
     session = VS.session_of(store, run, outputs)
@@ -167,6 +237,7 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
     need(not any(s.get('status') == 'generating' for s in g.get('stills') or []), 'A still of this shot is being made; wait for it (`vw guide status`).')
     spec = VS.load_json(store, g['key'])
     still = video_generators.STILL
+    sheets = []
     if repair_of:
         base = next((s for s in g['stills'] if s['id'] == repair_of and s.get('key') and s.get('status') in ('candidate', 'approved')), None)
         need(base, f'{repair_of} is not a finished still of this shot.')
@@ -176,19 +247,27 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         effective = REPAIR_OPEN.format(words=words)
     else:
         need(isinstance(parents, list), 'parents: a list of {"id", "job", "crop"?}.')
+        d = _ensure_drawing(store, run, session, g, spec)   # design/194, Area B
+        need(d['status'] == 'approved', NOT_APPROVED.format(shot=shot_id, sha=g['sha256']))
         pairs = [_input(store, run, session, shot_id, p) for p in parents]
-        inputs = [{'id': 'guide-frame-' + g['sha256'][:12], 'key': render['frame1_key'], 'sha256': render['frame1_sha256']}] + [a for a, _ in pairs]
+        sheets = [{'id': f"shot-drawing-{v['id']}-{g['sha256'][:12]}", 'key': v['plain_key'], 'sha256': v['plain_sha256']} for v in d['views']]
+        looks = [_input(store, run, session, shot_id, {'id': look, 'job': 'a look reference'})[0]] if look else []
+        inputs = [{'id': 'guide-frame-' + g['sha256'][:12], 'key': render['frame1_key'], 'sha256': render['frame1_sha256']}] + sheets + [a for a, _ in pairs] + looks
         jobs_ = [j for _, j in pairs]
-        need(len(inputs) <= still['max_inputs'], f"{len(inputs)} input pictures; GPT image takes at most {still['max_inputs']}, the guide's frame included.")
-        roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2)]
-        effective = '\n'.join([STILL_OPEN, words, G.layout_block(spec), ' '.join(roles)])
+        need(len(inputs) <= still['max_inputs'], f"{len(inputs)} input pictures; GPT image takes at most {still['max_inputs']}, the guide's frame and the shot's two drawings included.")
+        roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2 + len(sheets))]
+        facts = _drawn_facts(session, parents)
+        effective = '\n'.join(x for x in [STILL_OPEN, d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
+                                          RIGHT_HAND_WORDS if any(p.get('hands') for p in spec.get('people') or []) else '',
+                                          ('What must be true:\n' + '\n'.join(f'- {f}' for f in facts)) if facts else '',
+                                          LOOK_WORDS.format(n=len(inputs)) if looks else ''] if x)
     VS.check_cap(conn, run, session, VS.image_price_inr(run, provider='openai'), 'this still')
     still_id = uuid.uuid4().hex
     request = {'kind': 'guide-still', 'op': 'edit', 'provider': 'openai', 'model': still['model'], 'prompt': effective, 'size': still['size'], 'quality': still['quality'],
                'parents': inputs, 'reference': {'id': still_id}, 'shot_id': shot_id, 'sha256': g['sha256'], **({'region': region} if repair_of else {})}
     job_id = _queue(conn, run, shot_id, 'guide-still', request)
     g.setdefault('stills', []).append({'id': still_id, 'job_id': job_id, 'status': 'generating', 'guide_sha256': g['sha256'], 'prompt': words, 'effective_prompt': effective,
-                                       'inputs': [{'id': i['id'], 'job': j} for i, j in zip(inputs[1:], jobs_)], **({'repair_of': repair_of, 'region': region} if repair_of else {}),
+                                       'inputs': [{'id': i['id'], 'job': j} for i, j in zip(inputs[1 + len(sheets):], jobs_)], **({'look': look} if look and not repair_of else {}), **({'repair_of': repair_of, 'region': region} if repair_of else {}),
                                        'model': still['model'], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()})
     VS.save_session(store, run, session)
     generations.add(conn, run['id'], shot_id, HOW, {'kind': 'still repair asked' if repair_of else 'still asked', 'still_id': still_id, 'model': still['model'], 'prompt': effective,
@@ -382,6 +461,7 @@ def view(session, shot_id, url):
             'stills': [{'id': s['id'], 'status': s['status'], 'sha256': s.get('sha256'), 'error': s.get('error'), 'repair_of': s.get('repair_of'), 'prompt': s.get('prompt'),
                         'url': url(s['key']) if s.get('key') else None, 'overlay_url': url(s['overlay_key']) if s.get('overlay_key') else None,
                         'current': s.get('guide_sha256') == g['sha256']} for s in g.get('stills') or [] if s.get('status') != 'superseded'],
+            'drawing': {k: (g.get('drawing') or {}).get(k) for k in ('status', 'sha256', 'changes', 'notes')},
             'take_prompt': (g.get('take_prompt') or {}).get('prompt'), 'card': {k: v for k, v in ready_card(session, shot_id, VS.prices()['video_inr_per_s']).items() if k in ('ready', 'missing', 'seconds', 'cost_inr', 'prompt', 'look_for')}}
 
 
@@ -396,6 +476,7 @@ def status(conn, store, run, outputs, shot_id):
     names = (['strip'] + [f"check-{f['n']:04d}" for f in (g.get('frames') or {}).get('frames') or []] if (g.get('frames') or {}).get('status') == 'ready' else []) \
         + (['frame1', 'guide'] if (g.get('render') or {}).get('status') == 'ready' else []) \
         + [n for s in g.get('stills') or [] if s.get('key') for n in (['still-' + s['id']] + (['overlay-' + s['id']] if s.get('overlay_key') else []))]
+    names += ['drawing-' + x['id'] for x in (g.get('drawing') or {}).get('views') or []]
     f, r, card = v['frames'], v['render'], v['card']
     if f['status'] != 'ready':
         nxt = 'The check frames failed: ' + str(f['error']) if f['status'] == 'failed' else 'The check frames are being rendered; ask again in a minute.'
@@ -418,6 +499,7 @@ def file(store, run, outputs, shot_id, name):
     frames, render = g.get('frames') or {}, g.get('render') or {}
     keys = {'strip': (frames.get('strip_key'), 'image/jpeg', 'jpg'), 'frame1': (render.get('frame1_key'), 'image/png', 'png'), 'guide': (render.get('guide_key'), 'video/mp4', 'mp4')}
     keys.update({f"check-{f['n']:04d}": (f['key'], 'image/png', 'png') for f in frames.get('frames') or []})
+    keys.update({'drawing-' + v['id']: (v['labelled_key'], 'image/png', 'png') for v in (g.get('drawing') or {}).get('views') or []})   # design/194: the operator's sheets of the shot's drawing
     for s in g.get('stills') or []:
         keys['still-' + s['id']] = (s.get('key'), 'image/png', 'png')
         keys['overlay-' + s['id']] = (s.get('overlay_key'), 'image/jpeg', 'jpg')

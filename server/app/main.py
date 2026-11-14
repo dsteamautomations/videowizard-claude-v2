@@ -1470,6 +1470,15 @@ class GuideStill(Write):
     parents: list[dict] = Field(default_factory=list, max_length=15)
     repair_of: str | None = None
     region: dict | None = None
+    look: str | None = None   # design/194: a look reference, an approved picture of this film
+
+
+class GuideDrawingVerdict(Write):   # design/194: the operator's verdict on a shot's drawing
+    shot_id: str
+    sha256: str
+    approved: bool
+    quote: str = Field(min_length=1, max_length=500)
+    notes: str = Field(default='', max_length=2000)
 
 
 class GuideStillVerdict(Write):
@@ -1510,7 +1519,12 @@ def visuals_guide_verdict(run_id: UUID, body: GuideVerdict, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/guide/still', status_code=201)
 def visuals_guide_still(run_id: UUID, body: GuideStill, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.request_still(conn, storage(), user, run, outputs, body.shot_id, body.prompt, body.parents, body.repair_of, body.region), 201)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.request_still(conn, storage(), user, run, outputs, body.shot_id, body.prompt, body.parents, body.repair_of, body.region, body.look), 201)
+
+
+@app.post('/api/runs/{run_id}/visuals/guide/drawing')
+def visuals_guide_drawing(run_id: UUID, body: GuideDrawingVerdict, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: guide.drawing_verdict(conn, storage(), user, run, outputs, body.shot_id, body.sha256, body.approved, body.quote, body.notes))
 
 
 @app.post('/api/runs/{run_id}/visuals/guide/approve')
