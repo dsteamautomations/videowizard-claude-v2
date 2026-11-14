@@ -1,0 +1,166 @@
+{
+ "sentences": [
+  {
+   "n": 1,
+   "shots": [
+    {
+     "clip": "C0112_02780260.mp4",
+     "piece": "SUB_9AC32ADE617A_01",
+     "from_s": 6.5,
+     "to_s": 10.5,
+     "match": "RELATED",
+     "why": "Masons at work on a rat-trap bond wall: honest B-roll for the opening statement naming the technique."
+    },
+    {
+     "clip": "C0089_02753020.mp4",
+     "piece": "SUB_20DD79ACF050_03",
+     "from_s": 14.5,
+     "to_s": 18.5,
+     "match": "RELATED",
+     "why": "Wide view of the mason team preparing mortar on a rat-trap bond wall: B-roll for the general claim, which the camera cannot show exactly."
+    }
+   ],
+   "blank": null
+  },
+  {
+   "n": 2,
+   "shots": [
+    {
+     "clip": "C0085_02747380.mp4",
+     "piece": "SUB_37D6E9613F69_02",
+     "from_s": 19.0,
+     "to_s": 22.34,
+     "match": "PARTLY",
+     "why": "Close-up of bricks standing on edge in a row: shows the second half, bricks placed on their edge."
+    }
+   ],
+   "blank": {
+    "seconds": 3.3,
+    "should_show": "Graphic or AI shot of conventional brickwork with bricks laid flat, ready to contrast with the on-edge bricks that follow.",
+    "why_no_footage": "No candidate shows conventional flat-laid brickwork."
+   }
+  },
+  {
+   "n": 3,
+   "shots": [
+    {
+     "clip": "C0093_02758876.mp4",
+     "piece": "SUB_8B989F41EFB3_02",
+     "from_s": 12.5,
+     "to_s": 16.26,
+     "match": "EXACT",
+     "why": "High diagonal angle looks into the row of hollow cavities formed inside the brick-on-edge wall."
+    }
+   ],
+   "blank": null
+  },
+  {
+   "n": 4,
+   "shots": [],
+   "blank": {
+    "seconds": 7.44,
+    "should_show": "Graphic: brick count of a conventional wall against a rat-trap bond wall, about 25 percent fewer bricks, leading to lower material cost.",
+    "why_no_footage": "A percentage and a cost claim; the only candidate is a grade B wall poster with a defect, not the saving itself."
+   }
+  },
+  {
+   "n": 5,
+   "shots": [],
+   "blank": {
+    "seconds": 4.52,
+    "should_show": "Graphic or AI shot: cross-section of the cavity wall with outside heat stopped by the air gap and a cooler room inside.",
+    "why_no_footage": "Heat flow and indoor comfort cannot be seen; candidates show only building exteriors."
+   }
+  },
+  {
+   "n": 6,
+   "shots": [
+    {
+     "clip": "C0081_02743972.mp4",
+     "piece": "SUB_62D836CCA85D_01",
+     "from_s": 1.0,
+     "to_s": 6.02,
+     "match": "RELATED",
+     "why": "Close-up of individual red clay bricks, their texture and firing marks: suits a general statement about brick quality."
+    }
+   ],
+   "blank": null
+  },
+  {
+   "n": 7,
+   "shots": [],
+   "blank": {
+    "seconds": 2.94,
+    "should_show": "Graphic: brick strength grade rising in step with building height (number of storeys).",
+    "why_no_footage": "No candidates; an abstract strength rule."
+   }
+  },
+  {
+   "n": 8,
+   "shots": [
+    {
+     "clip": "C0091_02755996.mp4",
+     "piece": "SUB_15694574B6B0_03",
+     "from_s": 16.3,
+     "to_s": 18.62,
+     "match": "EXACT",
+     "why": "Mason places a brick on edge onto the mortar bed and aligns it by hand."
+    }
+   ],
+   "blank": null
+  },
+  {
+   "n": 9,
+   "shots": [
+    {
+     "clip": "C0104_02772676.mp4",
+     "piece": "SUB_E5DE3CC29659_05",
+     "from_s": 49.5,
+     "to_s": 52.5,
+     "match": "EXACT",
+     "why": "Header and stretcher bricks go down along the course, the alternating pattern closing a cavity inside the wall."
+    },
+    {
+     "clip": "C0105_02777428.mp4",
+     "piece": "SUB_4A3F8ACC7E57_01",
+     "from_s": 1.6,
+     "to_s": 4.64,
+     "match": "PARTLY",
+     "why": "Three completed courses at a corner show the finished pattern and the cavities on top; the laying itself is in the shot before."
+    }
+   ],
+   "blank": null
+  },
+  {
+   "n": 10,
+   "shots": [],
+   "blank": {
+    "seconds": 4.66,
+    "should_show": "AI shot or graphic: finished rat-trap bond wall being wetted with water, with a seven-day counter.",
+    "why_no_footage": "No candidates show curing."
+   }
+  },
+  {
+   "n": 11,
+   "shots": [
+    {
+     "clip": "C0134_02797372.mp4",
+     "piece": "SUB_E0CAD4CB3A79_02",
+     "from_s": 4.0,
+     "to_s": 7.6,
+     "match": "RELATED",
+     "why": "Finished two-storey rat-trap bond building facade: closing B-roll for the general statement."
+    },
+    {
+     "clip": "C0136_02799100.mp4",
+     "piece": "SUB_5D72A4D6F839_02",
+     "from_s": 3.0,
+     "to_s": 6.6,
+     "match": "RELATED",
+     "why": "Slow reveal of another completed two-storey brick building: calm closing image."
+    }
+   ],
+   "blank": null
+  }
+ ]
+}
