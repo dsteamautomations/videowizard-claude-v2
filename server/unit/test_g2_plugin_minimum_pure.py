@@ -6,7 +6,7 @@ from app.main import plugin_refusal
 
 def test_an_older_tool_is_told_to_update_and_the_minimum_passes():   # integration step A raised it to 0.79.0 (SK, 12 Nov 2026: a hand-in says how it was made); design/179 raised it to 0.78.0: the motion skill reads the brief's style
     minimum = Settings.model_fields['PLUGIN_MIN_VERSION'].default
-    assert minimum == '0.84.0'   # design/193 (design/188: 0.82.0; design/190: 0.83.0)
+    assert minimum == '0.85.0'   # design/192 and 194 (design/193: 0.84.0; design/188: 0.82.0; design/190: 0.83.0)
     said = plugin_refusal('/api/runs/x/visuals/images', '0.83.0', minimum)
-    assert said and '0.83.0' in said and '0.84.0' in said and 'update it' in said
-    assert plugin_refusal('/api/runs/x/visuals/images', '0.84.0', minimum) is None and plugin_refusal('/api/runs/x', '0.84.1', minimum) is None
+    assert said and '0.83.0' in said and '0.85.0' in said and 'update it' in said
+    assert plugin_refusal('/api/runs/x/visuals/images', '0.85.0', minimum) is None and plugin_refusal('/api/runs/x', '0.85.1', minimum) is None
