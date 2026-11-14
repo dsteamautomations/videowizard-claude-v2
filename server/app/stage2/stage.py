@@ -176,7 +176,7 @@ def prepare(conn, store, user, run, outputs):
                  'sentences': NR.sentences(words, timeline(run)['fps'], to_tl), 'silences': NR.silences(words, timeline(run)['fps'], to_tl, plan['total_frames']),
                  'pause_rules': {'only_after_sentence_end': True, 'max_seconds': NR.MAX_PAUSE_S, 'seconds_means': 'total silence wanted; the recording\'s own gap counts toward it'}}
     clips = {c['id']: c for c in media_o['summary']['clips']}
-    cards, rows, landmarks, entities, policy = [], [], set(), [], None
+    cards, rows, landmarks, entities, policy, identities = [], [], set(), [], None, []
     for o in outputs:
         if o['stage'] != 'analysis' or o['unit'] is None or o['summary'].get('excluded'):
             continue
@@ -188,9 +188,11 @@ def prepare(conn, store, user, run, outputs):
         if not clip:
             continue
         policy = policy or (doc['identity'].get('speaker_policy') or {})
+        identities.append(doc['identity'])
+        by_sentence = int(doc['identity'].get('sentences') or 0) if doc['identity'].get('fit_unit') == 'sentence' else 0   # design/193
         cards.append({'clip_id': clip['id'], 'clip_name': clip['name'], 'descriptive_name': log.get('descriptive_name'), 'lines': log.get('summary_card_lines') or []})
         for sub in log.get('sub_clips') or []:
-            rows.append(P.sub_clip_row(clip, log, sub, timeline(run)['fps']))
+            rows.append(P.sub_clip_row(clip, log, sub, timeline(run)['fps'], by_sentence))
             landmarks.update((sub.get('continuity_and_story') or {}).get('world_landmarks_and_props') or [])
         entities.extend({'clip_id': clip['id'], **e} for e in log.get('entities') or [])
     if not rows:
@@ -198,7 +200,14 @@ def prepare(conn, store, user, run, outputs):
     grouped = looks.groups({o['unit']: o['summary'].get('look') for o in outputs if o['stage'] == 'analysis' and o['unit'] is not None and not o['summary'].get('excluded')})
     for r in rows:   # design/142 R5: the colour group is the server's own measure, not the analysis's label
         r['color_group'] = grouped.get(r['clip_id'])
-    if approved:   # design/125 P8: the logs know the script's paragraphs; each is mapped to the approved scenes its words fall in, beside the chapter
+    unit, fit_note = P.fit_unit(identities, len(narration['sentences']))   # design/193: by sentence only when every clip was studied so and the counts agree
+    if unit == 'sentence':
+        P.scene_fits_by_sentence(rows, windows, narration['sentences'])
+    else:
+        for r in rows:   # by paragraph: a sentence number means nothing here
+            r.pop('sentence_fits', None)
+            r.pop('fit_lines_unread', None)
+    if unit != 'sentence' and approved:   # design/125 P8: the logs know the script's paragraphs; each is mapped to the approved scenes its words fall in, beside the chapter
         at = {w['id']: w for w in narration['words']}
         paragraphs = {}
         for b in beats:

@@ -54,6 +54,20 @@ def _piece(tag, ev, row, policy, refusals, flags=None):
     return True
 
 
+def related_as_direct(row, step_id, ev):
+    """design/193 R4: with a log by sentence, a shot marked direct under a sentence needs the clip study's EXACT or PARTLY fit of that piece to
+    that sentence. Only RELATED, or no fit at all: the reason it is refused, with the ways out. None when it passes, when the shot is B-roll or
+    a library clip, or when the log is by paragraph (an older film is checked as before)."""
+    if row.get('fit_unit') != 'sentence' or row.get('library') or ev.get('match') != 'direct':
+        return None
+    fit = next((f for f in row.get('sentence_fits') or [] if f.get('step_id') == step_id), None)
+    if fit and fit.get('match') != 'RELATED':
+        return None
+    why = ('the clip study marked this piece only RELATED to this sentence' + (f" (it does not show: {fit['missing']})" if fit.get('missing') else '')) if fit \
+        else 'the clip study gives this piece no fit for this sentence'
+    return why + ': a direct match must show what the sentence says. Place it as B-roll (match b_roll), choose another piece, or leave a blank'
+
+
 def _note(tag, ev, refusals):
     """design/127: a doubtful shot carries a note {kind, question}, shown with it; the operator's answer is the shot's own."""
     if 'decision' in ev:
@@ -244,6 +258,9 @@ def validate_options(doc, package, policy):
                 if not str(s.get('why') or '').strip():
                     refusals.append(f'OPTION #{n}: N17 step {sid} is shown by shot {k}: say why (the logged action, process_stage or outcome_state that shows it)')
                 row = rows.get(e.get('sub_clip_id')) or {}
+                said = related_as_direct(row, sid, e)
+                if said:
+                    refusals.append(f'OPTION #{n}: step {sid} ({own_steps[sid]["text"][:60]}) is shown by shot {k} as a direct match, but {said}')
                 if row.get('process_stage') and beat.get('process_stages') and row['process_stage'] not in beat['process_stages']:
                     flags.append(f"OPTION #{n}: N17 stage: step {sid} ({own_steps[sid]['text'][:60]}) is shown by a clip of the stage {row['process_stage']!r}; the scene narrates "
                                  f"{', '.join(beat['process_stages'])}: the right step?")   # design/126 OP3: for information, its reason already required

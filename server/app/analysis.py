@@ -29,6 +29,15 @@ def passages_of(script):
     return [{'passage_id': pid, 'text': text} for pid, text in script['passages'].items()]
 
 
+def sentence_beats(script):
+    """design/193 R2: the script's sentences in order, as the beats the clip study fits (BEAT_01, BEAT_02, ...), split as the voice stage splits
+    them. [] when the script holds no spoken text: the caller then gives the paragraphs, as before."""
+    from .voice_direction import sentences_of
+    rows = sentences_of(str(script.get('spoken_text') or ''))
+    width = max(2, len(str(len(rows))))
+    return [{'beat_id': f'BEAT_{i:0{width}d}', 'text': ' '.join(str(r['text']).split())} for i, r in enumerate(rows, 1)]
+
+
 def processing_mode(procedure, duration_s):
     mode = procedure['settings'].get('processing_mode', 'auto')
     if mode == 'auto':
@@ -72,7 +81,8 @@ def build_request_clip_log(run, procedure, brief, script, clip, policy, *, gener
     except (ValueError, ZeroDivisionError):
         fps = Fraction(TIMELINE['fps'])
     frames = int(math.floor(Fraction(str(duration)) * fps))
-    beats = [{'beat_id': b['beat_id'], 'text': b['text']} for b in (script.get('beats') or [])] or \
+    sentences = sentence_beats(script) if procedure['settings'].get('fit_unit') == 'sentence' else []   # design/193 R2: the fit by sentence; the paragraphs when the script has none
+    beats = sentences or [{'beat_id': b['beat_id'], 'text': b['text']} for b in (script.get('beats') or [])] or \
         [{'beat_id': f'BEAT_{i + 1:02d}', 'text': t} for i, t in enumerate(passages_of(script) and [p['text'] for p in passages_of(script)])]
     production = brief.get('production') or {}
     sp = request_policy(policy, production)
@@ -94,12 +104,13 @@ def build_request_clip_log(run, procedure, brief, script, clip, policy, *, gener
     understand_audio = bool(policy.get('understand_audio', True))
     if not understand_audio:
         ffprobe_meta['audio_channels'] = 0
-    text = P.build(project_config, ffprobe_meta, float(fps), frames, beats, clip_tag, sp, audio_removed=not understand_audio)
+    text = P.build(project_config, ffprobe_meta, float(fps), frames, beats, clip_tag, sp, audio_removed=not understand_audio, by_sentence=bool(sentences))
     schema = S.build_schema(clip_tag, clip['name'])
     identity = {'contract_version': CONTRACT, 'run_id': str(run['id']), 'source_id': clip['id'], 'clip_tag': clip_tag, 'source_sha256': clip['sha256'], 'script_digest': script['content_digest'],
                 'brief_digest': brief.get('content_digest'), 'camera_audio': policy['camera_audio'], 'understand_audio': understand_audio, 'speaker_policy': sp,
                 'prompt_digest': digest(text), 'schema_digest': digest(schema), 'model': procedure['model'], 'settings': {**procedure['settings'], 'processing_mode': processing_mode(procedure, duration)},
-                'timeline': TIMELINE, **({'generation': str(generation)} if generation else {})}
+                'timeline': TIMELINE, **({'fit_unit': 'sentence', 'sentences': len(sentences)} if sentences else {}),   # design/193: every later step reads which kind of log this is
+                **({'generation': str(generation)} if generation else {})}
     return {'contract_version': CONTRACT, 'identity': identity, 'analysis_key': digest(identity), 'prompt': text, 'schema': schema, 'wire_schema': S.wire_schema(schema),
             'clip': clip, 'mime': 'video/mp4', 'fps': str(fps), 'duration_frames': frames, 'policy': sp, 'timeline': TIMELINE, 'audio_removed': not understand_audio,
             'project_config': project_config, 'ffprobe_meta': ffprobe_meta}

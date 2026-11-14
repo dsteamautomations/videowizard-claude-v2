@@ -2,7 +2,35 @@
 
 13 Nov 2026. Written for Deepa, in plain words. It describes the application as it is today, read from the code and the served instructions, and marks in each step what stays and what may change. Nothing in the application was changed.
 
-**How to use this file.** Each step ends with a table "What the test showed". It is empty now. After the Gemini 4 Hydrogen test it will be filled in, so a later problem can be checked against the step it belongs to.
+## The verdict (14 Nov 2026, agreed by Deepa)
+
+**Change the model and the list now. Do not rebuild the placing around Gemini yet.** Claude stays the one who chooses the clip; Gemini becomes a better witness.
+
+| Decision | What it means | Why |
+|---|---|---|
+| Gemini 4 Hydrogen watches every clip | The look-again way for every clip, high thinking, high picture quality. About 0.33 US dollars a clip. | It works with our request as it is; every answer passed the server's check; where a person judged a fact (the fan, the strikes, who speaks) it was right. |
+| The script is given as sentences | Gemini says, for each piece, which sentence it shows, how exactly, and what is missing. No new field in the form. | Its fit is stricter and by sentence. It was right that no clip shows flat brickwork, and that the "quality" clip shows no quality. |
+| The placer's list carries each piece's own lines | Its own description, its "does not show" line and its fit by sentence. | Today 97 of 107 pieces carry a line that describes another piece, and the "does not show" line is written and never shown. |
+| A "related" piece is never placed as a direct match | It may be B-roll. | Sentence 6: Deepa rejected it, Gemini had warned, today's cut called it direct. |
+| Two clips of the same subject filmed there and back are one choice | Use one of them, not both, in neighbouring shots. | Sentence 11: the same building appeared twice. This rule was not found in the application. |
+
+**Not done, and why**
+
+| Not done | Why |
+|---|---|
+| Letting Gemini's answer decide the placement | Judged blind on VW-19, the cut built from Gemini's answers was better on 2 sentences, today's on 3, level on 2. Not better. |
+| Asking Gemini for the exact seconds | It gave the whole piece 344 times out of 417. |
+| Lower thinking or picture quality to save cost | At lower thinking it stops looking again and missed the fan. |
+| Batch or cache | The half-price batch refused the look-again way; reordering the request did not get the cache. |
+| A new field in the answer form | In the look-again way Google refuses the form with even one more field. |
+
+**What it rests on:** one short documentary-explainer (VW-19: 46 clips, 11 sentences), one judge, about 37 US dollars of tests. The measure from here is the next real film's score from the operator's keep, reject and trim answers, against VW-19's 8 of 10.
+
+**Where the detail is:** the first test, [hydrogen-test-results.md](hydrogen-test-results.md); the settings, cache and batch, [hydrogen-settings-test.md](hydrogen-settings-test.md); the sentence fit and the blind comparison, [phase1-sentence-fit-results.md](phase1-sentence-fit-results.md); the requirements for the change, [design/193](../193-hydrogen-watcher-and-the-placers-list.md).
+
+---
+
+**How to use this file.** Each step ends with a table "What the test showed". It was filled in after the Gemini 4 Hydrogen tests of 13 and 14 Nov, so a later problem can be checked against the step it belongs to.
 
 The film has twelve stages: intake, brief, script, voice, media, analysis, options, master, first cut, visuals, assembly, delivery. This file covers stage 6 (analysis) and stage 7 (options).
 

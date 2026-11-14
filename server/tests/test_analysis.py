@@ -225,18 +225,18 @@ def test_a9_lease_expiry_then_recover(home, database, fake, gemini):
 
 
 def test_a15_phase1_model_and_settings(home, database, fake, gemini):
-    """design/11 Phase 1: gemini-3.8-flash, thinking HIGH, AGENTIC on the part (never inside fileData), no temperature; cost names the model."""
+    """design/11 Phase 1, design/193: gemini-4-hydrogen, thinking HIGH, AGENTIC on the part (never inside fileData), no temperature; cost names the model."""
     run_until_analysis(home, database, fake, n_clips=1, seconds=2)
     vw(home, *START)
     drain()
-    assert gemini.models == ['gemini-3.8-flash']
+    assert gemini.models == ['gemini-4-hydrogen']
     p = gemini.payloads[-1]
     part = p['contents'][0]['parts'][0]
     assert part['mediaProcessing'] == 'AGENTIC' and 'mediaProcessing' not in part['fileData']
     assert p['generationConfig']['thinkingConfig'] == {'thinkingLevel': 'HIGH'} and 'temperature' not in p['generationConfig']
     st = vw(home, 'analysis', 'status')[1]
     unit = next(iter(st['units'].values())) if isinstance(st.get('units'), dict) else st['units'][0]
-    assert unit['cost']['model'] == 'gemini-3.8-flash'
+    assert unit['cost']['model'] == 'gemini-4-hydrogen'
 
 
 def test_a16_identity_changes_with_model_only():
@@ -246,7 +246,7 @@ def test_a16_identity_changes_with_model_only():
     script = {'spoken_text': 'A.\n', 'content_digest': 'd', 'passages': {'P001': 'A.'}}
     a = analysis.build_request({'id': 'r'}, proc, {}, script, clip, {'camera_audio': 'allowed'})
     b = analysis.build_request({'id': 'r'}, {**proc, 'model': 'gemini-4-argon'}, {}, script, clip, {'camera_audio': 'allowed'})
-    assert a['analysis_key'] != b['analysis_key'] and a['identity']['model'] == 'gemini-3.8-flash'
+    assert a['analysis_key'] != b['analysis_key'] and a['identity']['model'] == 'gemini-4-hydrogen'
 
 
 def test_e20_version2_runs_go_to_options_not_planning(home, database, fake, gemini):

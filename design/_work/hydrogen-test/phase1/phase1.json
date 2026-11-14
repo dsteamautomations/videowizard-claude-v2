@@ -1,0 +1,385 @@
+{
+ "run": {
+  "clips": 46,
+  "answered": 46,
+  "missing": [],
+  "requests": 53,
+  "failed": {
+   "incomplete_response": 2,
+   "connection_error": 1
+  },
+  "plain_fallback": [
+   "DJI_20241219103046_0091_D00000000_00000000.mp4"
+  ],
+  "usd": 16.64,
+  "usd_per_clip": 0.327,
+  "seconds_per_clip": 120,
+  "looks_per_clip": 4.8,
+  "answer_status": {
+   "retained": 46
+  },
+  "pieces": 145,
+  "pieces_thrown_out": 0,
+  "check_notes": 1,
+  "allowed": {
+   "ELIGIBLE_AS_IS": 128,
+   "REJECT_ALL": 2,
+   "ELIGIBLE_WITH_CROP": 14,
+   "REJECT_VIDEO_KEEP_AUDIO_CONTEXT": 1
+  }
+ },
+ "fit": {
+  "allowed_pieces": 142,
+  "with_a_primary_sentence": 55,
+  "with_any_fit_line": 134,
+  "fit_lines": 417,
+  "fit_lines_not_in_the_asked_form": 4,
+  "by_match": {
+   "PARTLY": 281,
+   "RELATED": 77,
+   "EXACT": 59
+  },
+  "exact_without_missing_line": 7,
+  "primary_but_no_exact_line": 2,
+  "fit_seconds_outside_the_piece": 0
+ },
+ "per_sentence": [
+  {
+   "sentence": 1,
+   "seconds": 8.0,
+   "exact": 0,
+   "partly": 1,
+   "related": 24,
+   "today": [
+    "C0089 1.04-5.24",
+    "C0104 65.1-69.14"
+   ]
+  },
+  {
+   "sentence": 2,
+   "seconds": 6.64,
+   "exact": 0,
+   "partly": 105,
+   "related": 0,
+   "today": [
+    "C0102 0.64-4.2"
+   ]
+  },
+  {
+   "sentence": 3,
+   "seconds": 3.76,
+   "exact": 30,
+   "partly": 51,
+   "related": 3,
+   "today": [
+    "C0131 0.56-4.56"
+   ]
+  },
+  {
+   "sentence": 4,
+   "seconds": 7.44,
+   "exact": 0,
+   "partly": 1,
+   "related": 0,
+   "today": [
+    "blank"
+   ]
+  },
+  {
+   "sentence": 5,
+   "seconds": 4.52,
+   "exact": 0,
+   "partly": 4,
+   "related": 14,
+   "today": [
+    "blank"
+   ]
+  },
+  {
+   "sentence": 6,
+   "seconds": 5.02,
+   "exact": 0,
+   "partly": 0,
+   "related": 2,
+   "today": [
+    "C0081 0.9-4.1"
+   ]
+  },
+  {
+   "sentence": 7,
+   "seconds": 2.94,
+   "exact": 0,
+   "partly": 0,
+   "related": 0,
+   "today": [
+    "blank"
+   ]
+  },
+  {
+   "sentence": 8,
+   "seconds": 2.32,
+   "exact": 26,
+   "partly": 31,
+   "related": 10,
+   "today": [
+    "C0091 15.96-18.2"
+   ]
+  },
+  {
+   "sentence": 9,
+   "seconds": 6.04,
+   "exact": 3,
+   "partly": 88,
+   "related": 3,
+   "today": [
+    "C0108 6.36-9.52",
+    "C0099 8.0-11.08"
+   ]
+  },
+  {
+   "sentence": 10,
+   "seconds": 4.66,
+   "exact": 0,
+   "partly": 0,
+   "related": 0,
+   "today": [
+    "blank"
+   ]
+  },
+  {
+   "sentence": 11,
+   "seconds": 7.2,
+   "exact": 0,
+   "partly": 0,
+   "related": 21,
+   "today": [
+    "C0136 2.8-6.4",
+    "C0288 6.7-10.3"
+   ]
+  }
+ ],
+ "list": {
+  "chars_md": 46335,
+  "candidates": 417,
+  "sentences_with_an_exact_piece": 3,
+  "sentences_with_no_piece": [
+   7,
+   10
+  ]
+ },
+ "twice": [
+  {
+   "clip": "C0088",
+   "pieces_run1": 5,
+   "pieces_run2": 4,
+   "exact_run1": [
+    "BEAT_08"
+   ],
+   "exact_run2": [
+    "BEAT_08"
+   ],
+   "same_exact_sentences": true,
+   "fits_in_both": 4,
+   "fits_in_one_only": 2
+  },
+  {
+   "clip": "C0092",
+   "pieces_run1": 5,
+   "pieces_run2": 5,
+   "exact_run1": [
+    "BEAT_08"
+   ],
+   "exact_run2": [
+    "BEAT_08"
+   ],
+   "same_exact_sentences": true,
+   "fits_in_both": 5,
+   "fits_in_one_only": 0
+  },
+  {
+   "clip": "C0102",
+   "pieces_run1": 3,
+   "pieces_run2": 3,
+   "exact_run1": [
+    "BEAT_08"
+   ],
+   "exact_run2": [
+    "BEAT_08"
+   ],
+   "same_exact_sentences": true,
+   "fits_in_both": 3,
+   "fits_in_one_only": 3
+  },
+  {
+   "clip": "C0113",
+   "pieces_run1": 3,
+   "pieces_run2": 3,
+   "exact_run1": [],
+   "exact_run2": [],
+   "same_exact_sentences": true,
+   "fits_in_both": 3,
+   "fits_in_one_only": 0
+  }
+ ],
+ "pauses": {
+  "exact_pieces_whose_moment_outlasts_the_sentence": 14,
+  "rows": [
+   {
+    "sentence": "BEAT_03",
+    "clip": "C0095",
+    "moment_s": 4.8,
+    "sentence_s": 3.76,
+    "pause_s": 1.0
+   },
+   {
+    "sentence": "BEAT_03",
+    "clip": "C0095",
+    "moment_s": 4.8,
+    "sentence_s": 3.76,
+    "pause_s": 1.0
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0092",
+    "moment_s": 3.0,
+    "sentence_s": 2.32,
+    "pause_s": 0.7
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0097",
+    "moment_s": 3.0,
+    "sentence_s": 2.32,
+    "pause_s": 0.7
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0099",
+    "moment_s": 3.0,
+    "sentence_s": 2.32,
+    "pause_s": 0.7
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0104",
+    "moment_s": 3.0,
+    "sentence_s": 2.32,
+    "pause_s": 0.7
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0104",
+    "moment_s": 3.0,
+    "sentence_s": 2.32,
+    "pause_s": 0.7
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0122",
+    "moment_s": 3.0,
+    "sentence_s": 2.32,
+    "pause_s": 0.7
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0089",
+    "moment_s": 2.8,
+    "sentence_s": 2.32,
+    "pause_s": 0.5
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0104",
+    "moment_s": 2.7,
+    "sentence_s": 2.32,
+    "pause_s": 0.4
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0104",
+    "moment_s": 2.7,
+    "sentence_s": 2.32,
+    "pause_s": 0.4
+   },
+   {
+    "sentence": "BEAT_08",
+    "clip": "C0092",
+    "moment_s": 2.6,
+    "sentence_s": 2.32,
+    "pause_s": 0.3
+   }
+  ]
+ },
+ "today": [
+  {
+   "sentence": "BEAT_01",
+   "clip": "C0089_02753020.mp4",
+   "from_s": 1.04,
+   "to_s": 5.24,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_01",
+   "clip": "C0104_02772676.mp4",
+   "from_s": 65.1,
+   "to_s": 69.14,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_02",
+   "clip": "C0102_02769436.mp4",
+   "from_s": 0.64,
+   "to_s": 4.2,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_03",
+   "clip": "C0131_02795212.mp4",
+   "from_s": 0.56,
+   "to_s": 4.56,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_06",
+   "clip": "C0081_02743972.mp4",
+   "from_s": 0.9,
+   "to_s": 4.1,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_08",
+   "clip": "C0091_02755996.mp4",
+   "from_s": 15.96,
+   "to_s": 18.2,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_09",
+   "clip": "C0108_02778676.mp4",
+   "from_s": 6.36,
+   "to_s": 9.52,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_09",
+   "clip": "C0099_02766196.mp4",
+   "from_s": 8.0,
+   "to_s": 11.08,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_11",
+   "clip": "C0136_02799100.mp4",
+   "from_s": 2.8,
+   "to_s": 6.4,
+   "match": "direct"
+  },
+  {
+   "sentence": "BEAT_11",
+   "clip": "C0288_03064924.mp4",
+   "from_s": 6.7,
+   "to_s": 10.3,
+   "match": "direct"
+  }
+ ]
+}
