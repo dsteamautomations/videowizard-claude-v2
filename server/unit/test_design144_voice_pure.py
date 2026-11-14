@@ -96,7 +96,7 @@ def test_the_direction_warns_about_volume_lowering_tags_on_deep_voices():   # de
 
 
 def test_a_narration_answer_names_where_the_tweak_control_is():   # design/144 V4
-    assert "Change a sentence's tag" in V.TWEAK_HINT and 'vw voice tweak' in V.TWEAK_HINT
+    assert "A sentence's tone or pace" in V.TWEAK_HINT and 'vw voice tweak' in V.TWEAK_HINT and 'A word sounds wrong' in V.TWEAK_HINT   # design/194: the control renamed, the word control beside it
     from pathlib import Path
     page = (Path(V.__file__).parent / 'templates' / 'voices2.html').read_text(encoding='utf-8')
-    assert "<summary>Change a sentence's tag</summary>" in page and 'direction_number' in page and 'made_before_pronunciations_change' in page
+    assert "<summary>A sentence's tone or pace</summary>" in page and 'direction_number' in page and 'made_before_pronunciations_change' in page

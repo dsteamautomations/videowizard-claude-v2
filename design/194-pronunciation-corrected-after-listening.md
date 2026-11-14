@@ -91,7 +91,7 @@ How a try is made (a choice to confirm): for a try, the respelling is written in
 
 | # | Failure | Handling |
 |---|---|---|
-| 1 | ElevenLabs refuses or fails a try | The try shows "failed" with the reason; the tries count is not raised; nothing changes in the list. |
+| 1 | ElevenLabs refuses or fails a try | A try refused before it is sent changes nothing and is not counted. A try that fails after it was sent shows "failed" with the reason and stays counted. |
 | 2 | The dictionary cannot be made when a word is made final (key without the permission, provider down) | The word stays "still trying"; the message says why; narrations keep the earlier list. |
 | 3 | The voice does not obey the respelling | The operator hears it and types another; no limit, the tries are counted. If no respelling works, the word can be removed and the script changed at the script stage. |
 | 4 | The try sounded right but the narration sounds different | Possible (section 2, last paragraph). The operator corrects again and narrates again; each narration is kept. |
@@ -111,7 +111,21 @@ How a try is made (a choice to confirm): for a try, the respelling is written in
 
 Stored-recording identity with and without a list; the list's states and versions; a try's text with the respelling in place (first sentence, word alone, several words, with a tag); refusals (not in the script, empty, after the final); the kept audio for a repeated try; the client's words copied once; the chat flags; the page's data and the panel's code; the removed question in the instruction text.
 
-## 8. Not covered by this design
+## 8. Built, 14 Nov 2026 (SK: "Approved, build it")
+
+Everything in sections 1 and 2 is built on branch `worktree-stage-fixes-vw23`. Not merged, not deployed.
+
+**Tests (run by Claude on this computer, Python 3.12; unit tests only, by SK's word).** New: 35 tests in `unit-local/test_d194.py` (not in git), all pass, with the 87 of design/192: 122 pass. Existing `server/unit` and `plugin/tests`: the same failures as before this build (the 4 and 7 that failed before any of this work, and 2 in the analysis tests that came with `main`'s design/193). Two existing tests were changed because they pin what is retired: the old `--file` list (`plugin/tests/test_design142.py`) and the old control's name (`server/unit/test_design144_voice_pure.py`). The page was tried in a browser on a local copy with a stand-in server (no network, no sound): open the panel, pick a word, the empty-box refusal, hear, final, narrate again, remove, Escape.
+
+**Review for effects on existing flows.** Found and fixed: a word's try would have been counted as an audition of the voice in the usage lists; it would have been read as the voice's latest tryout on the Try step and for the narration's settings. Remaining, by design:
+- A narration job that carries a pronunciation list and is waiting to be stored at the moment of the deploy would not find its stored pieces (their identity now includes the list). Deploy when no voice job is open.
+- A film of a client whose earlier film has a pronunciation list gets those words at its next first narration without a question (point e), also films already open at the deploy.
+- `GET …/voice/pronunciations` answers the words with their states; `client_last` is gone. `POST …/voice/pronunciations` answers `RETIRED`.
+- A try is counted when it is submitted; a try the provider fails afterwards stays counted and shows "failed".
+
+**Not covered.** `server/tests` (Docker) not run; `test_voice_media.py` and any test that posts the old list will need new expectations. Nothing was tried with a real voice or on the live page. Python 3.9 is not installed here. Dragging to pick several words was tried only as code, not by hand. A name of several words is not marked in the script after it is picked (only single words are).
+
+## 9. Not covered by this design
 
 - Whether Eleven v4 obeys a plain respelling for every word, and whether a try and a full narration sound alike: only a paid test on a real voice shows it.
 - Splicing a corrected sentence into an old recording (decided against: point b).

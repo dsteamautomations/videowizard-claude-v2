@@ -72,10 +72,12 @@ def test_a_piece_shows_its_seconds_beside_its_frames():
     assert 'in_s' in vw.PIECE_FIELDS and 'out_s' in vw.PIECE_FIELDS
 
 
-def test_pronounce_sends_the_list_with_the_operators_words(harness, monkeypatch, capsys):   # design/144 V1
+def test_the_list_before_the_narration_is_retired_and_a_word_is_corrected_after_listening(harness, monkeypatch, capsys):   # design/194 (was design/144 V1)
     sent = {}
-    (vw.RUNS / 'VW-9' / 'out' / 'pronunciations.json').write_text('[{"word": "NARDEP", "say_as": "NAR-dep", "ipa": "", "kind": "abbreviation"}]', encoding='utf-8')
-    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (sent.update(path=path, **body) or {'version': 1}))
-    code, out = run(['voice', 'pronounce', '--file', 'out/pronunciations.json', '--quote', 'yes, add Kendra too'], capsys)
-    assert code == 0 and sent['path'].endswith('/voice/pronunciations') and sent['items'][0]['word'] == 'NARDEP' and sent['quote'] == 'yes, add Kendra too'
-    assert run(['voice', 'pronounce', '--file', 'out/pronunciations.json'], capsys)[0] == 2   # without their words
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (sent.update(path=path, **body) or {'job': 'j-1', 'tries': 1, 'characters': 40}))
+    code, out = run(['voice', 'pronounce', '--file', 'out/pronunciations.json', '--quote', 'yes'], capsys)
+    assert code == 2 and 'retired (design/194)' in out['message'] and sent == {}
+    code, out = run(['voice', 'pronounce', '--word', 'NARDEP', '--say', 'NAR-dep', '--hear', '--voice', 'v1'], capsys)
+    assert code == 0 and sent['path'].endswith('/voice/word') and (sent['action'], sent['word'], sent['say_as'], sent['voice_id'], sent['alone']) == ('hear', 'NARDEP', 'NAR-dep', 'v1', False)
+    assert run(['voice', 'pronounce', '--word', 'NARDEP', '--final'], capsys)[0] == 0 and sent['action'] == 'final'
+    assert run(['voice', 'pronounce', '--word', 'NARDEP', '--say', 'NAR-dep'], capsys)[0] == 2   # no voice to hear it in

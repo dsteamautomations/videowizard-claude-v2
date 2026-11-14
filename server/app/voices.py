@@ -2,6 +2,7 @@
 restore of library copies, the usage directory, and a run's voice page state (shortlist, pick, narrations, final).
 The pure parts take plain dicts; the database and storage parts are below them."""
 import json
+import re
 from datetime import datetime, timezone
 
 from psycopg.types.json import Json
@@ -34,7 +35,7 @@ def aggregate(job_rows, output_rows):
 
     for j in job_rows:
         req = j.get('request') or {}
-        if j.get('status') != 'ready' or not req.get('voice_id'):
+        if j.get('status') != 'ready' or not req.get('voice_id') or req.get('pronounce'):   # design/194: a word's try is not an audition of the voice
             continue
         e = entry(req['voice_id'], req.get('name') or '')
         kind = 'narrations' if req.get('kind') == 'narration' else 'auditions'
@@ -558,6 +559,182 @@ def last_client_list(store, runs):
     return []
 
 
+# ---------- design/194 (voice rows 16 to 19): a word corrected after listening ----------
+
+RETIRED_LIST = ("The pronunciation list before the narration is retired (design/194): nobody knows which words come out wrong before listening. After a narration, "
+                "correct a word on the voices page ('A word sounds wrong') or with `vw voice pronounce --word W --say \"<how it sounds>\" --hear --voice ID`, "
+                "then `vw voice pronounce --word W --final`, and narrate again.")
+
+
+def word_pattern(word):
+    """The word as it stands in the script: whole, as written; a name of several words with any spacing between them."""
+    return re.compile(r'(?<!\w)' + r'\s+'.join(re.escape(t) for t in str(word).split()) + r'(?!\w)')
+
+
+def places(text, word):
+    return len(word_pattern(word).findall(text)) if str(word).split() else 0
+
+
+def check_word(text, word, say_as=None):
+    """The word (in the script) and, when given, how it is said (not empty, not the word itself); spaces tidied."""
+    word = ' '.join(str(word or '').split())
+    if not word or len(word) > 80:
+        raise Problem(422, 'WORD', 'Name the word: one word, or a few next to each other, as written in the script.')
+    if not places(text, word):
+        raise Problem(422, 'WORD', f'"{word}" is not in the script as written (capitals count). Pick it from the script.')
+    if say_as is None:
+        return word, None
+    say_as = ' '.join(str(say_as or '').split())
+    if not say_as or len(say_as) > 120:
+        raise Problem(422, 'WORD', 'Type how it should sound first, the way you would say it (for example "Man-ga-loor"). Nothing was sent.')
+    if say_as.lower() == word.lower():
+        raise Problem(422, 'WORD', f'"{say_as}" is the word as written, which is what the voice reads now. Type how it should sound. Nothing was sent.')
+    return word, say_as
+
+
+def try_text(text, word, say_as, alone=False, direction=None):
+    """What the voice reads for one try: the first sentence that holds the word, with the respelling in its place and the tag that sentence is read
+    with; or the respelling alone."""
+    if alone:
+        return say_as + '.'
+    pattern = word_pattern(word)
+    row = next((r for r in VD.sentences_of(text) if pattern.search(r['text'])), None)
+    if not row:
+        raise Problem(422, 'WORD', f'"{word}" is not inside one sentence of the script.')
+    tag = VD.tag_at(text, direction['items'], direction['register'], direction['tweaks'], (row['passage_id'], row['sentence'])) if direction else None
+    return (tag + ' ' if tag else '') + pattern.sub(lambda m: say_as, row['text'])
+
+
+def _final_of(item):
+    """An entry's final pronunciation, or None while it is only being tried. An entry of a list made before design/194 has no states: it is final."""
+    if 'final' in item:
+        return item['final']
+    return {'say_as': item.get('say_as') or '', 'ipa': item.get('ipa') or ''}
+
+
+def words_doc(store, run):
+    doc = pronunciations_of(store, run) or {'version': 0, 'items': [], 'dictionary': None}
+    for it in doc['items']:
+        it['final'] = _final_of(it)
+        it.setdefault('tries', 0)
+        it.setdefault('heard', {})
+    return doc
+
+
+def _is_final(item):
+    fin = item.get('final')
+    return bool(fin) and (fin.get('say_as') or '') == (item.get('say_as') or '')
+
+
+def words_view(store, run, text=None):
+    """The corrected words as the page and the chat show them: each with its state, its tries, its places in the script and where it was heard."""
+    doc = words_doc(store, run)
+    return {'version': doc.get('version') or 0,
+            'words': [{'word': it['word'], 'say_as': it.get('say_as') or '', 'final_say_as': (it.get('final') or {}).get('say_as') or (it.get('final') or {}).get('ipa') or None,
+                       'state': 'final' if _is_final(it) else 'trying', 'tries': int(it.get('tries') or 0), 'places': places(text, it['word']) if text is not None else None,
+                       'from_run': it.get('from_run'), 'heard': it.get('heard') or {}} for it in doc['items']]}
+
+
+def _rebuild(store, user, run, doc):
+    """The dictionary of the final words, one version up; narrations made with an earlier list are marked. A refused dictionary changes nothing."""
+    finals = [{'word': it['word'], 'say_as': it['final'].get('say_as') or '', 'ipa': it['final'].get('ipa') or '', 'kind': it.get('kind') or 'other'}
+              for it in doc['items'] if it.get('final') and (it['final'].get('say_as') or it['final'].get('ipa'))]
+    version = int(doc.get('version') or 0) + 1
+    dictionary = make_dictionary(f"vw2-{run.get('code') or run['id']}-v{version}", pronunciation_rules(finals)) if finals else None
+    doc.update(version=version, dictionary=dictionary, by=user.get('name'), at=datetime.now(timezone.utc).isoformat())
+    save_doc(store, run, 'pronunciations.json', doc)
+    state = page_state(store, run)
+    if state.get('narrations'):
+        for n in state['narrations']:
+            if n.get('pronunciations_version') != version:
+                n['made_before_pronunciations_change'] = True
+        save_doc(store, run, 'page.json', state)
+    return doc
+
+
+def _item(doc, word):
+    return next((it for it in doc['items'] if it['word'] == word), None)
+
+
+def try_word(conn, store, user, run, outputs, voice_id, word, say_as, request_id, alone=False):
+    """Hear one word in a voice, in its sentence or alone (points a, c, d, f): a small paid request, like a tryout. The same respelling asked again in
+    the same voice plays what was kept. The word is 'still trying' until it is made final; a try never reaches a narration."""
+    refuse_after_final(outputs)
+    script, _ = script_text(store, outputs)
+    word, say_as = check_word(script['spoken_text'], word, say_as)
+    doc = words_doc(store, run)
+    it = _item(doc, word)
+    last = ((it or {}).get('heard') or {}).get(voice_id) or {}
+    if last.get('job_id') and last.get('say_as') == say_as and bool(last.get('alone')) == bool(alone) and conn is not None:
+        kept = conn.execute('select id, status from vw2_jobs where id=%s and run_id=%s', (last['job_id'], run['id'])).fetchone()
+        if kept and kept['status'] in ('ready', 'queued', 'running', 'storage_pending'):
+            return {'job': str(kept['id']), 'kept': True, 'tries': int(it.get('tries') or 0), 'word': word, 'say_as': say_as}
+    text = try_text(script['spoken_text'], word, say_as, alone, direction_for(store, run, voice_id))
+    row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': voice_id, 'text': text, 'model_id': elevenlabs.DEFAULT_MODEL,
+                                                       'settings': heard_settings(conn, run, voice_id),
+                                                       'pronounce': {'word': word, 'say_as': say_as, 'alone': bool(alone)}}, request_id, store=store)
+    if it is None:
+        it = {'word': word, 'say_as': say_as, 'ipa': '', 'kind': 'other', 'final': None, 'tries': 0, 'heard': {}}
+        doc['items'].append(it)
+    it['say_as'], it['tries'] = say_as, int(it.get('tries') or 0) + 1
+    heard = {'say_as': say_as, 'alone': bool(alone), 'job_id': str(row['id'])}
+    for vid in {voice_id, row['request']['voice_id']}:
+        it['heard'][vid] = heard
+    save_doc(store, run, 'pronunciations.json', doc)
+    return {'job': str(row['id']), 'kept': False, 'tries': it['tries'], 'characters': len(text), 'word': word, 'say_as': say_as}
+
+
+def finalise_word(store, user, run, outputs, word):
+    """'Pronunciation final for this word' (row 16e): from now on every narration says it this way, in every place and every voice."""
+    refuse_after_final(outputs)
+    doc = words_doc(store, run)
+    it = _item(doc, ' '.join(str(word or '').split()))
+    if not it:
+        raise Problem(404, 'WORD', 'That word has no correction yet: type how it sounds and hear it first.')
+    if not int(it.get('tries') or 0) and not it.get('from_run') and not it.get('final'):
+        raise Problem(409, 'WORD', 'Hear it once first; then make it final.')
+    if not _is_final(it):
+        it['final'] = {'say_as': it.get('say_as') or '', 'ipa': it.get('ipa') or ''}
+        _rebuild(store, user, run, doc)
+    return words_view(store, run)
+
+
+def remove_word(store, user, run, outputs, word):
+    """A correction taken away, for this film only (a client's remembered word too): the voice reads the word as written again."""
+    refuse_after_final(outputs)
+    doc = words_doc(store, run)
+    it = _item(doc, ' '.join(str(word or '').split()))
+    if not it:
+        raise Problem(404, 'WORD', 'That word has no correction.')
+    doc['items'].remove(it)
+    if it.get('final'):
+        _rebuild(store, user, run, doc)
+    else:
+        save_doc(store, run, 'pronunciations.json', doc)
+    return words_view(store, run)
+
+
+def ensure_client_words(conn, store, user, run):
+    """Point e: when a run has no list yet, the final words of the client's newest film that has some are copied in, once, and become this run's
+    dictionary. A run with no client, or a client with no words, gets an empty list (so this is not asked again)."""
+    if conn is None or not run.get('client_id') or store.exists(_key(run, 'pronunciations.json')):
+        return None
+    doc = {'version': 0, 'items': [], 'dictionary': None}
+    earlier = conn.execute('select id, code from vw2_runs where client_id=%s and id<>%s order by created_at desc', (run['client_id'], run['id'])).fetchall()
+    for r in earlier:
+        old = load_doc(store, dict(r), 'pronunciations.json', None)
+        finals = [(it, _final_of(it)) for it in (old or {}).get('items') or []]
+        finals = [(it, f) for it, f in finals if f and (f.get('say_as') or f.get('ipa'))]
+        if finals:
+            doc['items'] = [{'word': it['word'], 'say_as': f.get('say_as') or '', 'ipa': f.get('ipa') or '', 'kind': it.get('kind') or 'other',
+                             'final': {'say_as': f.get('say_as') or '', 'ipa': f.get('ipa') or ''}, 'tries': 0, 'heard': {}, 'from_run': r['code']} for it, f in finals]
+            break
+    if doc['items']:
+        return _rebuild(store, user, run, doc)
+    save_doc(store, run, 'pronunciations.json', doc)
+    return doc
+
+
 def direction_for(store, run, voice_id):
     """What a narration of this run in this voice is directed with: the base list and that voice's tweaks; None when no direction is recorded."""
     doc = direction_of(store, run)
@@ -580,6 +757,10 @@ def refuse_after_final(outputs):
 def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tweaks=None):
     """A full narration in one voice with the run's direction; every narration is kept on the page state."""
     refuse_after_final(outputs)
+    try:   # design/194 (point e): the client's final words, applied at the first narration without a question
+        ensure_client_words(conn, store, user, run)
+    except Problem:   # the narration goes ahead without them; the page lists none
+        pass
     if tweaks is not None:
         set_tweaks(store, run, outputs, voice_id, tweaks)
     script, _ = script_text(store, outputs)
@@ -594,15 +775,16 @@ def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tw
     return {**dict(row), 'direction_number': (direction_of(store, run) or {}).get('number'), 'hint': TWEAK_HINT}
 
 
-TWEAK_HINT = ("To change one sentence's tag for this voice: the voices page, Narrations step, the narration's row, 'Change a sentence's tag' "
-              '(or `vw voice tweak --voice ID --file out/<tweaks>.json`).')   # design/144 V4: the chat side cannot see the page
+TWEAK_HINT = ("To change one sentence's tone or pace for this voice: the voices page, Narrations step, the narration's row, 'A sentence's tone or pace' "
+              "(or `vw voice tweak --voice ID --file out/<tweaks>.json`). A word that sounds wrong: 'A word sounds wrong' on the same row "
+              '(or `vw voice pronounce --word W --say "<how it sounds>" --hear --voice ID`, then `--final`).')   # design/144 V4, design/194: the chat side cannot see the page
 
 
 def heard_settings(conn, run, voice_id):
     """design/139 R2: the settings of this voice's latest audition, from the page or the chat (the fault: the narration used the defaults).
     No audition, or one made with a retired model, means the v4 defaults."""
     row = conn.execute("select request->>'model_id' as model, request->'settings' as settings from vw2_jobs where run_id=%s and stage='voice' "
-                       "and request->>'kind'='audition' and request->>'voice_id'=%s order by created_at desc limit 1", (run['id'], voice_id)).fetchone()
+                       "and request->>'kind'='audition' and request->'pronounce' is null and request->>'voice_id'=%s order by created_at desc limit 1", (run['id'], voice_id)).fetchone()   # design/194: not a word's try
     return v4_settings(row['settings'] if row and row['model'] == elevenlabs.DEFAULT_MODEL else None)
 
 

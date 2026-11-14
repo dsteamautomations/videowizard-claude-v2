@@ -68,6 +68,8 @@ def piece_identity(snapshot, text):
     """What the provider is asked for, hashed: the same request is journaled once and never paid for twice."""
     body = {'voice_id': snapshot.get('voice_id'), 'model_id': snapshot.get('model_id'), 'settings': snapshot.get('settings'),
             'format': snapshot.get('format'), 'text': text}
+    if snapshot.get('dictionaries'):   # design/194 (voice row 8): a changed pronunciation list is a new recording; a request without a list keeps its identity
+        body['dictionaries'] = snapshot['dictionaries']
     return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
 
 

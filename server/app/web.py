@@ -219,10 +219,13 @@ def _voices2_state(conn, user, run):
     store = storage()
     outputs = core.current_outputs(conn, run['id'])
     state = voices.page_state(store, run)
+    if state.get('final') and not any(o['stage'] == 'voice' and o['unit'] is None for o in outputs):   # design/194: after a reopen the old final is no longer the final
+        state = {**state, 'final': None}
     direction = voices.direction_of(store, run)
     job_rows = conn.execute("select id, status, request, result, error, created_at from vw2_jobs where run_id=%s and stage='voice' order by created_at", (run['id'],)).fetchall()
     jobs_ = [{'id': str(j['id']), 'status': j['status'], 'kind': j['request'].get('kind'), 'voice_id': j['request'].get('voice_id'), 'name': j['request'].get('name'),
-              'directed': bool(j['request'].get('directed')), 'passage': j['request'].get('passage'), 'saved_from_library': bool(j['request'].get('saved_from_library')),
+              'directed': bool(j['request'].get('directed')), 'passage': j['request'].get('passage'), 'pronounce': j['request'].get('pronounce'),   # design/194: a word's try
+               'saved_from_library': bool(j['request'].get('saved_from_library')),
               'audio_key': (j['result'] or {}).get('audio_key'), 'duration_s': (j['result'] or {}).get('duration_s'), 'error': j['error'], 'created_at': j['created_at'].isoformat()}
              for j in job_rows]
     try:
@@ -231,8 +234,10 @@ def _voices2_state(conn, user, run):
         directed = VD.apply(script['spoken_text'], (direction or {}).get('base') or [], (direction or {}).get('register') or '')[0] if direction and direction.get('chosen') != 'none' else script['spoken_text']
         sentences = [{'passage_id': r['passage_id'], 'sentence': r['sentence'], 'text': r['text']} for r in VD.sentences_of(script['spoken_text'])]
         characters = len(script['spoken_text'])
+        words = voices.words_view(store, run, script['spoken_text'])   # design/194: the corrected words and the script to pick from
+        script_plain = script['spoken_text']
     except Problem:
-        directed, sentences, characters = '', [], 0
+        directed, sentences, characters, words, script_plain = '', [], 0, {'version': 0, 'words': []}, ''
     try:
         account = voices.account(elevenlabs.ElevenLabs())
     except Problem as exc:
@@ -247,7 +252,7 @@ def _voices2_state(conn, user, run):
     except Problem:
         known = voices.known_voices(last_voice, [], [])
     return {'run': {'code': run['code'], 'title': run.get('title'), 'client': run.get('client'), 'stage': nxt.get('stage')}, 'state': state, 'direction': direction, 'pronunciations': voices.pronunciations_of(store, run), 'jobs': jobs_,
-            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'account': account, 'last_voice': last_voice, 'known': known,
+            'directed_script': directed, 'sentences': sentences, 'characters': characters, 'words': words, 'script_text': script_plain, 'account': account, 'last_voice': last_voice, 'known': known,
             'tags': list(__import__('app.voice_direction', fromlist=['SUGGESTED_TAGS']).SUGGESTED_TAGS)}   # design/192 (voice 11): the tags to pick from
 
 
@@ -648,6 +653,12 @@ def _voices2_act(code, vw2_session, body):
         if action == 'narrate-again':
             row = voices.narrate(conn, store, user, run, outputs, body['voice_id'], rid, 'page', list(body.get('tweaks') or []) or None)
             return JSONResponse({'job': str(row['id'])})
+        if action == 'word-hear':   # design/194: the same three functions `vw voice pronounce` calls
+            return JSONResponse(voices.try_word(conn, store, user, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), rid, bool(body.get('alone'))))
+        if action == 'word-final':
+            return JSONResponse(voices.finalise_word(store, user, run, outputs, body.get('word')))
+        if action == 'word-remove':
+            return JSONResponse(voices.remove_word(store, user, run, outputs, body.get('word')))
         if action == 'final':
             out = voices.finalise(conn, store, user, run, outputs, body['job_id'], body.get('quote') or '', 'page')
             return JSONResponse({'recorded': True, 'next': (out.get('next') or {}).get('stage')})

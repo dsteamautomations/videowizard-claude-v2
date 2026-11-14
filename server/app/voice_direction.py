@@ -148,6 +148,18 @@ def already_read_as(text, items, register, tweaks):
     return None
 
 
+def tag_at(text, items, register, tweaks, key):
+    """design/194: the tag a sentence is read with (the register, the base list and the voice's tweaks carried forward); None when there is none."""
+    tags = {(i['passage_id'], i['sentence']): i['tag'].strip() for i in list(items or []) + list(tweaks or [])}
+    current = (register or '').strip() or None
+    for r in sentences_of(text):
+        k = (r['passage_id'], r['sentence'])
+        current = tags.get(k, current)
+        if k == key:
+            return current
+    return None
+
+
 def untag(tagged, spans):
     out, cursor = [], 0
     for a, b in spans:

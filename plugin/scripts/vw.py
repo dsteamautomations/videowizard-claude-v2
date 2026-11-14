@@ -1413,16 +1413,27 @@ def cmd_voice(a):
             emit(out, 0, f"direction recorded: {a.choice} ({out.get('items', 0)} tag(s)) and test passage {a.passage}; both apply to every tryout and narration of this run. "
                  f"Give the operator the voices page: {signed_link(voice_page_url(m['code']))} (everything else happens there; say 'what is next' when a narration is final).")
         emit({'action': 'refused', 'message': 'vw voice direct prepare | record'}, 2)
-    if a.what == 'pronounce':   # design/144 V1: the words a voice may say wrongly, how each is said; one message, one answer
-        if not a.file:
-            out = call('GET', f"/api/runs/{m['run_id']}/voice/pronunciations")
-            emit(out, 0, 'This run\'s list, and the client\'s last list to start from. Write out/pronunciations.json ([{word, say_as, ipa, kind}]), show the operator the one message, '
-                         'then `vw voice pronounce --file out/pronunciations.json --quote "<their words>"`.')
-        items = load_json(workspace(m['code']) / a.file)
-        if not isinstance(items, list) or not (a.quote or '').strip():
-            emit({'action': 'refused', 'message': f'{a.file} must hold a list of {{word, say_as, ipa, kind}}, and --quote the operator\'s words.'}, 2)
-        out = write(f"/api/runs/{m['run_id']}/voice/pronunciations", {'items': items, 'quote': a.quote})
-        emit(out, 0, f"Pronunciation list {out['version']} kept ({len(items)} words); every narration from now on uses it.")
+    if a.what == 'pronounce':   # design/194: a word corrected after listening (was design/144 V1: a list before the narration, retired by name)
+        base = f"/api/runs/{m['run_id']}/voice"
+        if a.file:
+            emit({'action': 'refused', 'message': PRONOUNCE_RETIRED}, 2)
+        if not a.word:
+            out = call('GET', base + '/pronunciations')
+            lines = [f"{w['word']} -> {w.get('say_as') or w.get('final_say_as') or ''} · {'final' if w.get('state') == 'final' else 'still trying'} · {w.get('tries') or 0} tries"
+                     + (f" · from {w['from_run']}" if w.get('from_run') else '') for w in out.get('words') or []]
+            emit(out, 0, '\n'.join(lines) or 'No word is corrected on this run. After a narration: `vw voice pronounce --word W --say "<how it sounds>" --hear --voice ID`.')
+        if a.remove:
+            emit(write(base + '/word', {'action': 'remove', 'word': a.word}), 0, f'"{a.word}" removed for this film: the voice reads it as written again. Narrate again to hear it.')
+        if a.final:
+            emit(write(base + '/word', {'action': 'final', 'word': a.word}), 0,
+                 f'"{a.word}" is final: every narration from now on says it this way, in every place. Narrate again with `vw voice narrate --voice ID`.')
+        if not (a.say or '').strip() or not a.voice:
+            emit({'action': 'refused', 'message': 'Give how it sounds and the voice to hear it in: `vw voice pronounce --word W --say "<how it sounds>" --hear --voice ID [--alone]`.'}, 2)
+        out = write(base + '/word', {'action': 'hear', 'word': a.word, 'say_as': a.say, 'voice_id': a.voice[0], 'alone': bool(a.alone)})
+        emit(out, 0, (f"This spelling was already heard in this voice: job {out['job']} is kept, no new request. " if out.get('kept') else
+                      f"Try {out.get('tries')} submitted (paid, {out.get('characters')} characters). ")
+             + f"`vw voice jobs --wait 60`, then `vw voice fetch --job {out['job']}` and give the operator the file to listen to. "
+             f"Another spelling: the same command with another --say. When it sounds right: `vw voice pronounce --word \"{a.word}\" --final`.")
     if a.what == 'tweak':
         if not a.voice or not a.file:
             emit({'action': 'refused', 'message': 'vw voice tweak --voice ID --file out/<tweaks>.json (a list of {passage_id, sentence, tag}).'}, 2)
@@ -1512,6 +1523,9 @@ def cmd_voice(a):
              f"Fetched {Path(written[0]).name}. Give the operator the path to listen to" + (", ask for approval, then `vw stage voice record --job ID --quote`." if job['request']['kind'] == 'narration' else '.'))
 
 
+PRONOUNCE_RETIRED = ("The pronunciation list before the narration is retired (design/194): nobody knows which words come out wrong before listening. "
+                     "After a narration, correct a word on the voices page ('A word sounds wrong') or with "
+                     "`vw voice pronounce --word W --say \"<how it sounds>\" --hear --voice ID`, then `vw voice pronounce --word W --final`, and narrate again.")
 OPEN_JOB_STATUSES = ('queued', 'running', 'storage_pending', 'submission_unknown')
 VISUALS_OPEN = ('queued', 'running', 'submitted', 'storage_pending')   # design/45 10.5: a take is open while the provider works on it
 
@@ -3221,7 +3235,10 @@ def build_parser():
     s.add_argument('--passage', type=int, help='direct record: the test passage the operator chose (1, 2 or 3; design/54)')
     s.add_argument('--page', type=int, default=0, help='catalog: 20 voices a page'); s.add_argument('--tab', choices=['explore', 'mine', 'favourites'], help='catalog: the library, my voices or the favourites')
     s.add_argument('--sort', choices=['trending', 'created_date', 'usage_character_count_1y', 'cloned_by_count'], help='catalog: trending (default), latest, most used, most cloned')
-    s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag}; pronounce: a list of {word, say_as, ipa, kind}; inside the run folder')
+    s.add_argument('--file', help='tweak: a JSON list of {passage_id, sentence, tag}, inside the run folder')
+    s.add_argument('--word', help='pronounce: the word to correct, as written in the script (design/194)'); s.add_argument('--say', help='pronounce: how it should sound, a plain respelling')
+    s.add_argument('--hear', action='store_true', help='pronounce: hear it in --voice (a small paid try)'); s.add_argument('--alone', action='store_true', help='pronounce: the word alone, not in its sentence')
+    s.add_argument('--final', action='store_true', help='pronounce: this pronunciation is final for the word'); s.add_argument('--remove', action='store_true', help='pronounce: take the correction away')
     s.add_argument('--scope', default='library'); s.add_argument('--search', default=''); s.add_argument('--cursor', default=''); s.add_argument('--language', default='')
     s.add_argument('--accent', default=''); s.add_argument('--gender', default=''); s.add_argument('--age', default=''); s.add_argument('--use-case', action='append')
     s.add_argument('--high-quality', action='store_true'); s.add_argument('--voice', action='append', default=[]); s.add_argument('--owner')

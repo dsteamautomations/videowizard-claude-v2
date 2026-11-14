@@ -909,21 +909,42 @@ class Pronunciations(Write):   # design/144 V1
     quote: str = Field(min_length=1, max_length=2000)
 
 
-def _client_runs(conn, run):
-    return [dict(r) for r in conn.execute('select id, code from vw2_runs where client_id=%s and id<>%s order by created_at desc', (run.get('client_id') or '', run['id'])).fetchall()]
-
-
 @app.get('/api/runs/{run_id}/voice/pronunciations')
 def get_pronunciations(run_id: UUID, user=User, conn=DB):
-    """design/144 V1: this run's list, and the client's last list to start from (SK: offer it)."""
+    """design/194: the words corrected on this run, each with its state (was design/144 V1: the list and the client's last list to start from)."""
     run = core.load_run(conn, user, run_id)
     store = storage()
-    return Response({'current': voices.pronunciations_of(store, run), 'client_last': voices.last_client_list(store, _client_runs(conn, run))})
+    try:
+        text = voices.script_text(store, core.current_outputs(conn, run['id']))[0]['spoken_text']
+    except Problem:
+        text = None
+    return Response({**voices.words_view(store, run, text), 'current': voices.pronunciations_of(store, run)})
 
 
 @app.post('/api/runs/{run_id}/voice/pronunciations', status_code=201)
 def post_pronunciations(run_id: UUID, body: Pronunciations, user=User, conn=DB):
-    return _voice_write(run_id, body, user, conn, lambda run, outputs: voices.set_pronunciations(storage(), user, run, body.items, body.quote), 201)
+    raise Problem(409, 'RETIRED', voices.RETIRED_LIST)   # design/194 (row 17): the list before the narration is retired by name
+
+
+class Word(Write):   # design/194: one word corrected after listening
+    action: Literal['hear', 'final', 'remove']
+    word: str = Field(min_length=1, max_length=80)
+    say_as: str = Field(default='', max_length=120)
+    voice_id: str = ''
+    alone: bool = False
+
+
+@app.post('/api/runs/{run_id}/voice/word', status_code=201)
+def voice_word(run_id: UUID, body: Word, user=User, conn=DB):
+    """The chat's way to the same three functions the voices page calls (one flow, two front ends)."""
+    def fn(run, outputs):
+        store = storage()
+        if body.action == 'hear':
+            if not body.voice_id:
+                raise Problem(422, 'WORD', 'Name the voice to hear it in (--voice ID).')
+            return voices.try_word(conn, store, user, run, outputs, body.voice_id, body.word, body.say_as, body_dict(body)['request_id'], body.alone)
+        return (voices.finalise_word if body.action == 'final' else voices.remove_word)(store, user, run, outputs, body.word)
+    return _voice_write(run_id, body, user, conn, fn, 201)
 
 
 @app.get('/api/runs/{run_id}/voice/page')

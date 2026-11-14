@@ -7,7 +7,7 @@ import re
 from .errors import Problem
 
 ABOUT_KEYS = ('unit', 'stage', 'beat_id', 'shot_id', 'shot', 'gap_id', 'gap', 'element_id', 'reference_id', 'ref', 'sub_clip_id', 'clip_id', 'job_id', 'job', 'voice_id', 'voice_ids',
-              'slide_no', 'slide', 'decision', 'key', 'value', 'kind')
+              'slide_no', 'slide', 'decision', 'key', 'value', 'kind', 'word', 'say_as')   # design/194: the word corrected and how it is said
 WORD_KEYS = ('quote', 'accepted_quote', 'confirm_quote', 'note', 'notes', 'reason')
 PATH = re.compile(r'^/api/runs/([0-9a-f-]{36})/([a-z_-]+)(?:/(.*))?$')
 PAGE = re.compile(r'^/runs/([A-Za-z0-9_-]+)/(visuals|review|voices2)/act$')   # design/145 L1: the pages' buttons
