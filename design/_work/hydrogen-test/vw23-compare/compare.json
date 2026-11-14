@@ -1,0 +1,1243 @@
+{
+ "old": {
+  "film_s": 299.4,
+  "footage_s": 95.0,
+  "blank_s": 204.4,
+  "footage_share": 31.7,
+  "footage_shots": 29,
+  "blanks": 18,
+  "direct": 25,
+  "b_roll": 2,
+  "library": 2,
+  "answered": {
+   "KEEP": 24,
+   "REJECT": 5
+  },
+  "rejected_then_alternative_kept": 4,
+  "footage_s_kept_as_placed": 75.4,
+  "footage_s_kept_incl_alternative": 89.2,
+  "blank_answers": {
+   "KEEP": 8,
+   "null": 10
+  },
+  "shots_under_3s": 10,
+  "shot_seconds_median": 3.2,
+  "shots_from_inside_a_longer_piece": 8,
+  "different_clips": 29,
+  "clips_used_more_than_once": {},
+  "pieces_offered": 204,
+  "per_scene_footage_s": {
+   "1": 0.0,
+   "2": 4.0,
+   "3": 5.9,
+   "4": 0.0,
+   "5": 14.3,
+   "6": 0.0,
+   "7": 17.6,
+   "8": 20.3,
+   "9": 6.2,
+   "10": 11.4,
+   "11": 0.0,
+   "12": 3.8,
+   "13": 0.0,
+   "14": 11.6,
+   "15": 0.0
+  }
+ },
+ "new": {
+  "film_s": 299.4,
+  "footage_s": 77.4,
+  "blank_s": 222.0,
+  "footage_share": 25.8,
+  "footage_shots": 23,
+  "blanks": 20,
+  "direct": 20,
+  "b_roll": 2,
+  "library": 1,
+  "answered": {
+   "KEEP": 21,
+   "REJECT": 2
+  },
+  "rejected_then_alternative_kept": 1,
+  "footage_s_kept_as_placed": 69.1,
+  "footage_s_kept_incl_alternative": 71.8,
+  "blank_answers": {
+   "KEEP": 12,
+   "null": 8
+  },
+  "shots_under_3s": 9,
+  "shot_seconds_median": 3.1,
+  "shots_from_inside_a_longer_piece": 5,
+  "different_clips": 22,
+  "clips_used_more_than_once": {
+   "C0091_1.": 2
+  },
+  "pieces_offered": 299,
+  "per_scene_footage_s": {
+   "1": 0.0,
+   "2": 0.0,
+   "3": 5.2,
+   "4": 0.0,
+   "5": 12.7,
+   "6": 0.0,
+   "7": 17.6,
+   "8": 20.3,
+   "9": 6.2,
+   "10": 11.4,
+   "11": 0.0,
+   "12": 0.0,
+   "13": 0.0,
+   "14": 4.0,
+   "15": 0.0
+  }
+ },
+ "clips": {
+  "in_both": 15,
+  "only_old": [
+   "C0009_1.",
+   "C0050_1.",
+   "C0057_1.",
+   "C0064_1.",
+   "C0067_1.",
+   "C0079_1.",
+   "C0080_1.",
+   "C0081_1.",
+   "C0084_1.",
+   "C0093_1.",
+   "C0095_1.",
+   "C0101_1.",
+   "C0104_1.",
+   "C0136_02"
+  ],
+  "only_new": [
+   "C0018_1.",
+   "C0055_1.",
+   "C0070_1.",
+   "C0074_1.",
+   "C0088_1.",
+   "C0089_1.",
+   "C0091_1."
+  ]
+ },
+ "sentences": {
+  "count": 42,
+  "footage_in_both": 13,
+  "blank_in_both": 25,
+  "gained_footage": [],
+  "lost_footage": [
+   "BEAT_02.S1",
+   "BEAT_03.S2",
+   "BEAT_12.S1",
+   "BEAT_14.S1"
+  ],
+  "same_clips_both": 4,
+  "two_or_more_shots": {
+   "old": 11,
+   "new": 9
+  }
+ },
+ "new_direct_shots_by_gemini_mark": {
+  "PARTLY": 16,
+  "EXACT": 4
+ },
+ "rows": [
+  {
+   "sentence": "BEAT_01.S1",
+   "scene": 1,
+   "text": "As the demand for housing continues to grow, so does the need for construction methods that are economical, resource-efficient, and environmentally responsible.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_01.S2",
+   "scene": 1,
+   "text": "Traditional reinforced concrete roofs consume large quantities of cement, steel, and aggregates, increasing both costs and environmental impact.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_01.S3",
+   "scene": 1,
+   "text": "Filler Slab Technology offers an innovative alternative—one that combines structural strength, affordability, energy efficiency, and architectural beauty.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_02.S1",
+   "scene": 2,
+   "text": "The concept behind a filler slab is simple yet ingenious.",
+   "old": "footage",
+   "new": "blank",
+   "old_shots": [
+    {
+     "slide": "2.1",
+     "clip": "C0079_1.mp4",
+     "in_s": 0.0,
+     "out_s": 3.98,
+     "match": "b_roll",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_02.S2",
+   "scene": 2,
+   "text": "In a conventional reinforced concrete slab, the lower portion of concrete, known as the tension zone, contributes very little to the structural strength of the roof.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_03.S1",
+   "scene": 3,
+   "text": "Filler slab technology utilizes this principle by replacing the non-structural concrete with lightweight filler materials such as Mangalore tiles, country tiles, hollow clay blocks, lightweight bricks, or other locally available materials.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "3.2",
+     "clip": "C0069_1.mp4",
+     "in_s": 0.0,
+     "out_s": 2.7,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "REJECT",
+     "alt_answer": "KEEP",
+     "what": null
+    },
+    {
+     "slide": "3.4",
+     "clip": "C0080_1.mp4",
+     "in_s": 1.4,
+     "out_s": 4.56,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "3.2",
+     "clip": "C0069_1.mp4",
+     "in_s": 0.3,
+     "out_s": 3.0,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "Slow, smooth high-angle camera push-in over an outdoor ground-level demonstration grid of tied steel reinforcement bars resting on small concrete cover blocks on sandy soil, with alternating grid bays containing paired Mangalore-style clay tiles, clustered half coconut shells, and smooth reddish shallow dome forms.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "3.4",
+     "clip": "C0072_1.mp4",
+     "in_s": 0.2,
+     "out_s": 2.68,
+     "match": "direct",
+     "size": "MCU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A slow, smooth camera drift glides over a static arrangement of stacked terracotta Mangalore tiles, clustered half coconut shells, and smooth reddish-brown circular domes positioned within a tied steel reinforcement bar grid supported by small grey concrete cover blocks on a sandy brown base.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_03.S2",
+   "scene": 3,
+   "text": "The result is a strong and durable roof that uses fewer resources without compromising performance.",
+   "old": "footage",
+   "new": "blank",
+   "old_shots": [
+    {
+     "slide": "3.4",
+     "clip": "C0080_1.mp4",
+     "in_s": 1.4,
+     "out_s": 4.56,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_04.S1",
+   "scene": 4,
+   "text": "Filler slab construction offers multiple benefits.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_04.S2",
+   "scene": 4,
+   "text": "By reducing the volume of concrete used, it lowers the consumption of cement, steel, and aggregates, resulting in significant cost savings.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_04.S3",
+   "scene": 4,
+   "text": "The lighter roof reduces the overall load on the structure, making it suitable for residential and multi-storeyed buildings.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_04.S4",
+   "scene": 4,
+   "text": "The exposed tile ceiling creates an attractive architectural finish, often eliminating the need for plastering.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_04.S5",
+   "scene": 4,
+   "text": "The air pockets formed within the slab improve thermal insulation, keeping interiors cooler during summer and more comfortable throughout the year.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_04.S6",
+   "scene": 4,
+   "text": "Since the technology relies on locally available materials and skills, it also creates livelihood opportunities and promotes sustainable construction practices.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_05.S1",
+   "scene": 5,
+   "text": "The materials required are similar to those used in conventional roofing systems.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_05.S2",
+   "scene": 5,
+   "text": "These include cement, reinforcement steel, coarse sand, crushed stone aggregates, binding wire, clean water, and suitable filler materials such as Mangalore tiles, hollow clay blocks or even coconut shells.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "5.2",
+     "clip": "C0009_1.mp4",
+     "in_s": 6.1,
+     "out_s": 8.6,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "5.3",
+     "clip": "C0023_1.mp4",
+     "in_s": 11.1,
+     "out_s": 13.0,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "5.5",
+     "clip": "C0060_1.mp4",
+     "in_s": 4.3,
+     "out_s": 6.7,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "5.6",
+     "clip": "C0072_1.mp4",
+     "in_s": 0.6,
+     "out_s": 2.28,
+     "match": "direct",
+     "size": "MCU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "5.2",
+     "clip": "C0023_1.mp4",
+     "in_s": 8.16,
+     "out_s": 11.02,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A metal hoe blade enters repeatedly from the upper right, scooping crushed grey stone aggregate and pouring it into a metal mortar pan resting beside a worker's sandaled foot until the pan is heaped full and the hoe is set down in the gravel at 11.1 s.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "5.4",
+     "clip": "C0060_1.mp4",
+     "in_s": 1.8,
+     "out_s": 4.0,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "With the Mangalore clay tile held diagonally in his left hand, the worker uses the blade edge of a metal trowel to strike and break off both raised clay lugs at the lower end of the tile's underside.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "5.5",
+     "clip": "C0070_1.mp4",
+     "in_s": 0.0,
+     "out_s": 2.06,
+     "match": "direct",
+     "size": "MCU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "Static high-angle view of filler slab components arranged on a flat sand bed: a tied steel reinforcement grid elevated on grey concrete cover blocks frames bays filled with stacked pairs of clay Mangalore tiles, halved brown coconut shells convex-side up, and smooth reddish-brown inverted dome fillers. After a brief initial hold (0.0-0.4 s), the camera performs a slow, smooth forward push-in with slight rightward drift until the end of the clip.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_05.S3",
+   "scene": 5,
+   "text": "The choice of filler material depends on local availability, cost, and design requirements.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "5.7",
+     "clip": "C0075_1.mp4",
+     "in_s": 0.0,
+     "out_s": 5.78,
+     "match": "b_roll",
+     "size": "MWS",
+     "answer": "REJECT",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "5.6",
+     "clip": "C0075_1.mp4",
+     "in_s": 1.5,
+     "out_s": 7.1,
+     "match": "b_roll",
+     "size": "MWS",
+     "answer": "REJECT",
+     "alt_answer": null,
+     "what": "A stationary high-angle view holds on a demonstration layout of a steel reinforcement grid supported on concrete cover blocks over sandy earth, with Mangalore tiles, inverted half coconut shells, and three circular terracotta dishes arranged neatly inside the grid bays.",
+     "gemini": "RELATED"
+    }
+   ],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_06.S1",
+   "scene": 6,
+   "text": "Construction begins with the preparation of shuttering using steel or wooden supports.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_06.S2",
+   "scene": 6,
+   "text": "The surface is coated with a thin layer of oil to facilitate easy removal after casting.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_07.S1",
+   "scene": 7,
+   "text": "Reinforcement bars are then placed according to structural design requirements.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "7.1",
+     "clip": "C0032_1.mp4",
+     "in_s": 0.72,
+     "out_s": 5.0,
+     "match": "direct",
+     "size": "WS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "7.1",
+     "clip": "C0032_1.mp4",
+     "in_s": 1.3,
+     "out_s": 5.58,
+     "match": "direct",
+     "size": "WS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "Camera pushes smoothly forward across a shaded courtyard toward two workers bent over a steel rebar grid resting on small spacer blocks on sandy ground, with stacked Mangalore tiles and coconut shells behind the grid. From 0.0 s to 3.6 s the right worker twists/ties at the bottom-right rebar corner while the left worker adjusts along the left wooden edge; from 3.6 s to 6.5 s the left worker picks up a silver L-square, places it at the grid corner to check alignment, and lifts it back up.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_07.S2",
+   "scene": 7,
+   "text": "Main bars and distribution bars are securely tied together, while maintaining the required concrete cover.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "7.2",
+     "clip": "C0031_1.mp4",
+     "in_s": 8.5,
+     "out_s": 12.42,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "7.3",
+     "clip": "C0042_1.mp4",
+     "in_s": 5.9,
+     "out_s": 9.1,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "7.2",
+     "clip": "C0031_1.mp4",
+     "in_s": 7.3,
+     "out_s": 11.22,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "The squatting worker repeatedly pulls and twists the rebar tying hook upward to tighten the binding wire around the steel bar intersection, then tucks/releases the tie at 16.0 s. Meanwhile, from 11.75 s onward, a worker in a pink shirt walks forward from the right background carrying Mangalore tiles toward the tile stack.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "7.3",
+     "clip": "C0042_1.mp4",
+     "in_s": 5.8,
+     "out_s": 9.0,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "Beginning on a clean frame of the rebar grid with the first cover block already in place at right, the foreground worker reaches in at 5.7 s carrying a second light-grey notched concrete cover block. From 6.0 s to 10.6 s, the worker lifts the rebar slightly with the left hand, places the cover block under the middle-left tied intersection, turns and aligns the block so the bar seats firmly into its notch, checks the bar, and withdraws both hands by 11.6 s. From 11.6 s to 12.94 s, the shot holds on both supported intersections while the background worker's hands continue working in the upper-left blur.",
+     "gemini": "EXACT"
+    }
+   ],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_07.S3",
+   "scene": 7,
+   "text": "Proper alignment and levelling at this stage ensure the strength and durability of the finished slab.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "7.4",
+     "clip": "C0024_1.mp4",
+     "in_s": 0.1,
+     "out_s": 3.14,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "7.5",
+     "clip": "C0035_1.mp4",
+     "in_s": 2.9,
+     "out_s": 6.02,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "7.4",
+     "clip": "C0024_1.mp4",
+     "in_s": 0.6,
+     "out_s": 3.64,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "The foreground worker steps up to a marked grid on a concrete pad holding a thin white rod, then bends down and points steadily with his right index finger along the grid lines while inspecting the layout; in the left background, a second worker squats and repeatedly taps or works on a thin steel rod.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "7.5",
+     "clip": "C0035_1.mp4",
+     "in_s": 0.8,
+     "out_s": 3.92,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A stationary close-up view of two orthogonal ribbed steel reinforcement bars tied together with twisted binding wire and resting on a grey concrete cover block on top of a dusty tan shuttering deck, with additional cover blocks and parallel rebar receding into soft background focus. Minor shadow movement from an off-camera subject occurs in the foreground, and a blurred worker's feet shift slightly at the top-right edge.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_08.S1",
+   "scene": 8,
+   "text": "Once the reinforcement is in place, the filler materials are carefully positioned between the steel bars.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "8.1",
+     "clip": "C0063_1.mp4",
+     "in_s": 1.4,
+     "out_s": 4.02,
+     "match": "direct",
+     "size": "MCU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "8.2",
+     "clip": "C0057_1.mp4",
+     "in_s": 1.9,
+     "out_s": 5.3,
+     "match": "direct",
+     "size": "CU",
+     "answer": "REJECT",
+     "alt_answer": "KEEP",
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "8.1",
+     "clip": "C0063_1.mp4",
+     "in_s": 2.0,
+     "out_s": 4.62,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A worker's hands enter from top-left at 2.1 s, place a single terracotta Mangalore tile concave-up inside the empty steel rebar grid cell at 2.4 s, align its position beside the rebar, and lift out of frame at 4.3 s.",
+     "gemini": "EXACT"
+    },
+    {
+     "slide": "8.2",
+     "clip": "C0044_1.mp4",
+     "in_s": 4.3,
+     "out_s": 7.7,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "The worker brings a fourth circular terracotta filler dome down into frame, sets it inside the middle-left bay of the steel rebar grid, carefully adjusts its centering with both hands, and withdraws his hands upward out of frame.",
+     "gemini": "EXACT"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_08.S2",
+   "scene": 8,
+   "text": "The tiles or blocks are arranged in straight rows with uniform spacing, creating the distinctive pattern that will later become visible on the ceiling.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "8.3",
+     "clip": "C0044_1.mp4",
+     "in_s": 8.8,
+     "out_s": 13.36,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "8.4",
+     "clip": "C0067_1.mp4",
+     "in_s": 0.0,
+     "out_s": 4.56,
+     "match": "direct",
+     "size": "WS",
+     "answer": "REJECT",
+     "alt_answer": "KEEP",
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "8.3",
+     "clip": "C0055_1.mp4",
+     "in_s": 19.6,
+     "out_s": 24.16,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "The worker's right hand enters at 18.4 s and places a ninth coconut shell in the third row (18.4-19.6 s) and withdraws briefly. At 20.4 s the hand returns and places a tenth coconut shell in the middle-right position (20.4-21.6 s), withdraws briefly, and then returns at 22.0 s to place an eleventh coconut shell in the back-right corner (22.0-23.0 s) before adjusting the alignment of shells in the middle and back rows through the clip end at 25.44 s.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "8.4",
+     "clip": "C0074_1.mp4",
+     "in_s": 0.0,
+     "out_s": 4.6,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A static high-angle view of a 4x4 steel reinforcement grid supported on small gray cover blocks over compacted sandy earth, containing arranged rows of stacked Mangalore clay tiles, 3x3 clusters of inverted coconut shells, and single inverted round terracotta bowls.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_08.S3",
+   "scene": 8,
+   "text": "Continuous monitoring ensures proper alignment and an aesthetically pleasing finish.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "8.5",
+     "clip": "C0064_1.mp4",
+     "in_s": 0.9,
+     "out_s": 3.06,
+     "match": "direct",
+     "size": "MCU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "8.6",
+     "clip": "C0065_1.mp4",
+     "in_s": 1.4,
+     "out_s": 4.38,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "8.5",
+     "clip": "C0065_1.mp4",
+     "in_s": 0.5,
+     "out_s": 5.6,
+     "match": "b_roll",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "In a static shot, a worker seen from the hips and forearms down holds a wooden straightedge horizontally across the back edge of a rebar grid filled with Mangalore tiles, inverted coconut shells, and round terracotta clay bowls on sandy ground, then lifts the straightedge upward out of the top of the frame between 4.8s and 5.6s.",
+     "gemini": "RELATED"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_09.S1",
+   "scene": 9,
+   "text": "Concrete is prepared using the prescribed mix and poured around the reinforcement and filler materials.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "9.1",
+     "clip": "C0081_1.mp4",
+     "in_s": 29.9,
+     "out_s": 33.06,
+     "match": "direct",
+     "size": "MS",
+     "answer": "REJECT",
+     "alt_answer": "KEEP",
+     "what": null
+    },
+    {
+     "slide": "9.2",
+     "clip": "C0084_1.mp4",
+     "in_s": 2.48,
+     "out_s": 5.52,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "9.1",
+     "clip": "C0018_1.mp4",
+     "in_s": 2.3,
+     "out_s": 5.0,
+     "match": "direct",
+     "size": "CU",
+     "answer": "REJECT",
+     "alt_answer": "KEEP",
+     "what": "With the camera static and framing completely unobstructed, the worker's forearms and hands swing a wide-blade digging hoe down into the top of the dry grey cement-sand mound and pull material toward the right in repeated mixing strokes (striking at approximately 2.0 s, 2.8 s, 3.6 s, 4.5 s, and 5.3 s).",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "9.2",
+     "clip": "C0088_1.mp4",
+     "in_s": 4.1,
+     "out_s": 7.6,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "Full uninterrupted static sequence in which the left worker lowers a metal mortar pan, pours wet concrete onto the filler-slab demonstration bed over Mangalore tiles, coconut shells, and rebar (4.2-6.0 s), lifts the pan clear, picks up a red-handled trowel (7.0-7.6 s), and spreads and levels the concrete (7.8-11.4 s) while the second worker exits right at 8.8-9.4 s.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_10.S1",
+   "scene": 10,
+   "text": "Care is taken to ensure that all gaps are completely filled and properly compacted.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "10.1",
+     "clip": "C0093_1.mp4",
+     "in_s": 0.3,
+     "out_s": 3.02,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "10.2",
+     "clip": "C0090_1.mp4",
+     "in_s": 0.8,
+     "out_s": 3.14,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "10.1",
+     "clip": "C0089_1.mp4",
+     "in_s": 1.9,
+     "out_s": 4.62,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A worker's bare hands rapidly tamp and vibrate a long metal straightedge bar up and down along the top of the left wet concrete rib, compacting the crushed stone aggregate until a smooth wet cement sheen forms along the top surface. In the foreground and flanks, coconut shell halves, Mangalore tiles, steel rebar on spacer blocks, and clay border bricks are clearly laid out.",
+     "gemini": "EXACT"
+    },
+    {
+     "slide": "10.2",
+     "clip": "C0091_1.mp4",
+     "in_s": 0.8,
+     "out_s": 3.14,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A worker's bare hands grip a wooden screed batten and move it back and forth in short sawing and rhythmic vertical tamping motions across the wet concrete surface, settling coarse aggregate and bringing a smooth wet paste sheen to the top.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_10.S2",
+   "scene": 10,
+   "text": "The casting is carried out systematically so that the slab remains uniform and structurally sound.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "10.3",
+     "clip": "C0095_1.mp4",
+     "in_s": 1.5,
+     "out_s": 4.5,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "10.4",
+     "clip": "C0101_1.mp4",
+     "in_s": 0.0,
+     "out_s": 3.38,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "10.3",
+     "clip": "C0090_1.mp4",
+     "in_s": 0.4,
+     "out_s": 3.4,
+     "match": "direct",
+     "size": "MS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A worker standing behind a ground-level filler slab mock-up bends forward and uses a metal masonry trowel in their right hand to press, compact, and smooth the top of wet aggregate concrete laid over steel rebar, red Mangalore tiles, and coconut shells.",
+     "gemini": "PARTLY"
+    },
+    {
+     "slide": "10.4",
+     "clip": "C0091_1.mp4",
+     "in_s": 5.8,
+     "out_s": 9.18,
+     "match": "direct",
+     "size": "CU",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "A worker's hands rhythmically tamp and draw a wooden screed batten across the wet concrete panel toward the foreground edge, consolidating rough aggregate and leaving a smooth, glistening concrete surface behind the batten.",
+     "gemini": "PARTLY"
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_10.S3",
+   "scene": 10,
+   "text": "Although less concrete is used, the roof retains its required strength and stability.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_11.S1",
+   "scene": 11,
+   "text": "After casting, the slab is allowed to set undisturbed.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_11.S2",
+   "scene": 11,
+   "text": "Proper curing is essential for strength development and durability.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_11.S3",
+   "scene": 11,
+   "text": "Water curing is carried out regularly for at least two weeks.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_12.S1",
+   "scene": 12,
+   "text": "Once adequate strength is achieved, the shuttering is removed, revealing the beautiful exposed ceiling pattern created by the filler materials.",
+   "old": "footage",
+   "new": "blank",
+   "old_shots": [
+    {
+     "slide": "12.1",
+     "clip": "C0104_1.mp4",
+     "in_s": 30.6,
+     "out_s": 34.4,
+     "match": "direct",
+     "size": "WS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_12.S2",
+   "scene": 12,
+   "text": "The ceiling may be left natural or enhanced with simple finishing treatments.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_13.S1",
+   "scene": 13,
+   "text": "Beyond cost savings, filler slabs contribute significantly to environmental sustainability.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_13.S2",
+   "scene": 13,
+   "text": "Reduced consumption of cement and steel lowers embodied energy and carbon emissions associated with construction.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_13.S3",
+   "scene": 13,
+   "text": "Better thermal performance reduces dependence on artificial cooling, resulting in long-term energy savings.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_13.S4",
+   "scene": 13,
+   "text": "The combination of functionality, beauty, and sustainability makes filler slab technology a preferred choice for eco-friendly housing.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_14.S1",
+   "scene": 14,
+   "text": "A successful demonstration of this technology can be seen at the Technology Resource Center of Vivekananda Kendra–NARDEP, Kanyakumari.",
+   "old": "footage",
+   "new": "blank",
+   "old_shots": [
+    {
+     "slide": "14.1",
+     "clip": "C0050_1.mp4",
+     "in_s": 40.7,
+     "out_s": 44.3,
+     "match": "direct",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_14.S2",
+   "scene": 14,
+   "text": "The buildings here showcase how traditional wisdom and scientific understanding can come together to create affordable, durable, and environmentally responsible construction solutions.",
+   "old": "footage",
+   "new": "footage",
+   "old_shots": [
+    {
+     "slide": "14.3",
+     "clip": "C0134_02797372.mp4",
+     "in_s": 0.0,
+     "out_s": 4.0,
+     "match": "library",
+     "size": "WS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    },
+    {
+     "slide": "14.4",
+     "clip": "C0136_02799100.mp4",
+     "in_s": 1.6,
+     "out_s": 5.6,
+     "match": "library",
+     "size": "MWS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": null
+    }
+   ],
+   "new_shots": [
+    {
+     "slide": "14.2",
+     "clip": "C0134_02797372.mp4",
+     "in_s": 0.0,
+     "out_s": 4.0,
+     "match": "library",
+     "size": "WS",
+     "answer": "KEEP",
+     "alt_answer": null,
+     "what": "The camera glides forward and pans gently rightward across the front courtyard toward the two-storey Takshashila building, capturing the entrance framed by a stepped corbelled brick arch, circular and triangular brick wall openings, unplastered red brick facades, and surrounding trees.",
+     "gemini": null
+    }
+   ],
+   "same_clips": false,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_15.S1",
+   "scene": 15,
+   "text": "Filler Slab Technology demonstrates that sustainable construction need not be expensive or complicated.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_15.S2",
+   "scene": 15,
+   "text": "By intelligently reducing material consumption while enhancing comfort and aesthetics, it offers a practical pathway towards affordable and environmentally responsible housing.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  },
+  {
+   "sentence": "BEAT_15.S3",
+   "scene": 15,
+   "text": "A simple innovation—creating lasting value for people, communities, and the planet.",
+   "old": "blank",
+   "new": "blank",
+   "old_shots": [],
+   "new_shots": [],
+   "same_clips": true,
+   "same_set_other_order": false
+  }
+ ]
+}
