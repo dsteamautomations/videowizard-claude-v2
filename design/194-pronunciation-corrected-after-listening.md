@@ -10,17 +10,17 @@ On the voices page, Narrations step, each narration's row has two named buttons 
 - **A word sounds wrong** (new)
 - **A sentence's tone or pace** (today's tag control, renamed; row 10)
 
-"A word sounds wrong" opens one panel under the narrations:
+"A word sounds wrong" opens one panel that slides in from the right side of the page (SK, 14 Nov: a floating side panel, not a section inside the page). It takes about a third to half of the screen; the narrations and their play buttons stay visible and usable on the left, so the operator can play the narration again while correcting. It closes with its × or the Escape key; nothing typed is lost by closing. On a narrow screen it takes the full width. Inside, the parts stack from top to bottom:
 
 | Part | What it does | Row or point |
 |---|---|---|
-| The script, left | The accepted script as text. Click a word (drag across two or three for a name of several words). The word is marked in every place it appears. | 16a, c |
-| This word, right | The word, how many places it appears, one box "How should it sound?" for a plain respelling such as "Man-ga-loor", the number of tries so far. | 16b, d, f |
+| The script, at the top | The accepted script as text. Click a word (drag across two or three for a name of several words). The word is marked in every place it appears. | 16a, c |
+| This word, under it | The word, how many places it appears, one box "How should it sound?" for a plain respelling such as "Man-ga-loor", the number of tries so far. | 16b, d, f |
 | Hear it in its sentence | The first sentence that holds the word is read in the voice of that narration, with the respelling. A small paid request. | 16c, a |
 | The word alone | A second button; the page says a word alone can sound different. | a |
 | Pronunciation final for this word | Enabled after the word was heard at least once. | 16e |
 | Corrected words, below | Every corrected word: the word, how it sounds, places, tries, its state, "play the last try", change, remove. | 16f |
-| Narrate again with the final words | At the foot. Enabled when at least one final word is not in that voice's latest narration. The whole script, once. | 16g, b |
+| Narrate again with the final words | At the foot of the page, visible whether the panel is open or closed. Enabled when at least one final word is not in that voice's latest narration. The whole script, once. | 16g, b |
 
 States a word can show: **still trying** (not used in any narration), **final**, **from this client's last film** (applied without a question, removable; point e), and beside any of them **not yet heard in this voice** (point g).
 
@@ -31,7 +31,7 @@ Patterns taken from Mobbin (looked at on 14 Nov):
 - A list of names with their state and an edit on each row: [Profound, name matching](https://mobbin.com/screens/1fb56316-4944-4302-b040-9d791eb7ac71?utm_source=claude&utm_medium=ai-assistant&utm_source_platform=mcp).
 - Remembered words that can be removed one by one: [Voicenotes, names to remember](https://mobbin.com/screens/90a2768c-da52-4584-9c25-0f76abe574d3?utm_source=claude&utm_medium=ai-assistant&utm_source_platform=mcp).
 
-What was deliberately not taken: a separate dictionary screen away from the script (ElevenLabs, Grammarly). The operator finds the word while listening, so the control stays beside the narrations.
+What was deliberately not taken: a separate dictionary screen away from the script, and a dialog in the middle of the screen (ElevenLabs, Grammarly). The operator finds the word while listening, so the panel sits beside the narrations and never covers their play buttons.
 
 ## 2. What changes underneath
 
