@@ -2,7 +2,7 @@
 
 14 Nov 2026. The test of the proposal in [analysis-options-improvement-proposal.md](analysis-options-improvement-proposal.md), after Deepa's decision: Gemini 4 Hydrogen, the look-again way for every clip, high thinking, high picture quality, no cache work, no batch.
 
-Run by Claude's scripts outside the application (`model-test/sentences_vw19_hydrogen.py`, `phase1_vw19.py`, `ab_vw19.py`) on VW-19: 46 clips, 11 sentences, a finished cut. Nothing in the application, the server or any run was changed. Cost: 16.64 US dollars, 53 requests.
+Run by Claude's scripts outside the application (`model-test/sentences_vw19_hydrogen.py`, `phase1_vw19.py`, `ab_vw19.py`) on VW-19: 46 clips, 11 sentences, a finished cut. Nothing in the application, the server or any run was changed. Cost: 16.90 US dollars, 54 requests.
 
 ## In short
 
@@ -97,7 +97,7 @@ For a 3.8-second sentence Gemini often answers "25.0 to 43.2 seconds". It says w
 
 ## Test 3: is the fit steady?
 
-Five clips were sent a second time; four came back (one failed twice).
+Five clips were sent a second time; all five came back (three needed a second try).
 
 | Clip | Pieces, run 1 and 2 | Sentences called EXACT, run 1 | Run 2 | Other fits in both runs | In one run only |
 |---|---|---|---|---|---|
@@ -105,8 +105,9 @@ Five clips were sent a second time; four came back (one failed twice).
 | C0092 | 5 and 5 | 8 | 8 | 5 | 0 |
 | C0102 | 3 and 3 | 8 | 8 | 3 | 3 |
 | C0113 | 3 and 3 | none | none | 3 | 0 |
+| C0114 | 4 and 3 | 3 | 3 | 3 | 1 |
 
-The exact fit was the same in all four. The looser fits (partly, related) moved in two of the four. Four clips is a small number.
+The exact fit was the same in all five. The looser fits (partly, related) moved in three of the five. Five clips is a small number.
 
 ## Test 4: the richer list
 
