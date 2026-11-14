@@ -74,9 +74,9 @@ Row 8, what happened (13 Nov): the operator chose another voice (UD - Narrator) 
 | 18 | The voices page was built poorly from the operator's seat (Deepa). | Decided by Deepa: design this control properly before building it; look at mobbin.com for patterns. The same server step serves the chat, as the working rules require (one flow, two front ends). |
 | 19 | Row 8 (a changed pronunciation list must give a new recording) is what makes rows 16 and 17 work: without it, every test and every new narration returns the stored recording. | Row 8 is built together with row 16, never after it. |
 
-Open points on rows 16 to 19, with the default I would take; awaiting Deepa:
+Points settled on rows 16 to 19: all eight approved by Deepa on 13 Nov 2026.
 
-| # | Open point | Default proposed |
+| # | Point | Decided |
 |---|---|---|
 | a | Is the word heard alone, or inside its sentence? | Inside its sentence, with the word alone as a second button. A word alone often sounds different from the same word in a sentence. |
 | b | After the words are final, is the whole script narrated again, or only the sentences that changed? | The whole script, once, after all words are final. Splicing new sentences into an old recording risks a change of tone at the joins. One more paid narration. |

@@ -39,7 +39,10 @@ Think of a new helper joining a film crew. Before they watch any footage, someon
 
 | Point | Result |
 |---|---|
-| | |
+| The request (T1) | Hydrogen takes the application's request as it is: the same instruction and form, only the model name changed. Checked by fingerprint on two clips. |
+| The 15-second limit (F10, T4) | The look-again way is accepted on clips of 3.8, 8.2, 13.0 and 16.8 seconds. There is no minimum on Hydrogen's side. It costs 2.1 to 2.4 times the plain way. |
+| Which way is better on a short clip | Not known. The two ways disagree on facts (a wooden batten against a fan blade; the direction of a camera move). A person must judge: Part A of the sheet. |
+| A refusal of the look-again way | One clip of 46 (the drone clip, 21 s). It fell back to the plain way and was answered, after 1,033 seconds. The same kind as defect 48. |
 
 ---
 
@@ -79,7 +82,13 @@ From 15.5 to 16.8 seconds his head leaves the picture. The model left that part 
 
 | Point | Result |
 |---|---|
-| | |
+| Cost (T5) | About 0.10 US dollars for a clip watched the plain way, about 0.36 for the look-again way; about 1.2 cents per second of clip either way. 43 clips: 8.11 dollars. |
+| Time (T5) | About 64 seconds a clip the plain way, about 206 the look-again way, with 5 looks on average. |
+| The fields (T6) | 176 field names. 146 filled every time, none empty every time. The 30 sometimes empty are lists and blocks that apply only when something is there. |
+| Fit by paragraph (F5, T13) | All 106 direct fits point at a paragraph of two sentences (paragraphs 2 and 5). The fit never says which sentence. Not corrected in this run. |
+| Pieces (T8) | 116 pieces from 43 clips; 34 clips give more than one. In 13 clips the pieces overlap in time, and in 10 one piece covers nearly the whole clip beside the shorter ones. |
+| Fields read by nothing (F9, T11) | The notes for the editor hold real editing advice in every clip (130 lines). The best frame is given for every piece, the title zone for 106 of 116. The colour-group label is useless: 41 different labels for 43 clips. |
+| Are the facts right (T9) | Not checked yet. Six clips wait for a person: Part B of the sheet. |
 
 ---
 
@@ -117,7 +126,9 @@ Example: VW-23 sent 94 clips, 8 needed a second try, all 94 came through, giving
 
 | Point | Result |
 |---|---|
-| | |
+| Answers (T1) | 43 of 46 clips answered; all 43 ended properly. Two requests stopped before finishing (one succeeded when sent again). Three clips were left unanswered by Deepa's word, among them the two longest (52 and 95 s). |
+| The arrival check (T2) | All 43 answers kept. 116 pieces kept, none thrown out, no note written. The check is the server's own code. |
+| Connection | Thirteen requests failed at once on a lost connection overnight; they cost nothing and were sent again. A fault of this computer, not of the model. |
 
 ---
 
@@ -153,7 +164,9 @@ Extras: the shot size after a crop; whether the last frame may be held as a stil
 
 | Point | Result |
 |---|---|
-| | |
+| Allowed or not (T3) | 105 pieces allowed as they are, 2 with a crop, 5 with the picture refused and the sound kept, 4 refused. |
+| Speaker boxes | No note about a head outside the body or a body too wide. |
+| Defects inside a piece | 17 defects in 16 pieces (5 camera bumps). A piece the model calls "unusable" (a camera bump tail) was still allowed, because the rule reads the grade and the safety flags, not the defects. |
 
 ---
 
@@ -184,7 +197,10 @@ Claude can ask for the full row of one piece, or the full log of one clip. In VW
 
 | Point | Result |
 |---|---|
-| | |
+| One line for every piece (F1, T10) | 107 of 116 pieces sit in clips with several pieces, so the line the placer reads describes another piece. Example: a camera-bump tail is listed as 'a mason packing mortar'. |
+| The "does not show" line (F2, T7) | Hydrogen fills it every time a fit is claimed (112 of 112). It is not on the list today. |
+| Size of the corrected list (T10) | Adding each piece's own description and its 'does not show' line makes the list about 79 % longer (55,646 to 99,458 characters). The tool already splits a long scene file into parts. Not run through the tool. |
+| Nobody opens the full log (F3) | Not tested here; the corrected list would carry the two lines that matter without it. |
 
 ---
 
@@ -213,7 +229,9 @@ The same weakness as step 5 is here. Claude shortlists from the card, not from t
 
 | Point | Result |
 |---|---|
-| | |
+| The library by clip (F4, T12) | In 23 of the 34 clips with several pieces, the pieces differ in what they fit, their chapter or their role. Marking the whole clip is wrong one way or the other for about two thirds of them. Which pieces are true in any film needs a person; not done. |
+| Pauses after the footage (F6, T14) | 68 pieces carry a 'moment that must not be cut', 1.0 to 4.5 seconds long. None outlasts the sentences of its paragraph, so the arithmetic suggests no pause on this film. With a fit by sentence a short pause could show; that cannot be told from these answers. |
+| The first word of a scene (F7) | Not tested: it belongs to the scenes step, not to the analysis. |
 
 ---
 
@@ -243,7 +261,8 @@ Examples: VW-23's cut was refused 9 times before it passed; VW-21's, 5 times. Ma
 
 | Point | Result |
 |---|---|
-| | |
+| The cut and its refusals (F8) | Not tested. This run stops at the analysis answers. |
+| What would change for the placer | Overlapping pieces from one clip (step 2) could be placed twice under two names; the check for a repeated shot should be looked at with Hydrogen's answers. |
 
 ---
 
@@ -279,7 +298,7 @@ Guards: a trim stays inside the usable part, keeps the must-keep moment and does
 
 | Point | Result |
 |---|---|
-| | |
+| The second look and the review | Not tested. This run stops at the analysis answers. |
 
 ---
 
@@ -297,3 +316,30 @@ Guards: a trim stays inside the usable part, keeps the must-keep moment and does
 | F8 | Many refusals of the cut are about the form of the file | 7 |
 | F9 | The model's colour-group label, its notes for the editor, the spoken words, the best frame, the title zone, the graphics ideas and the defects are written and used by nothing | 2 |
 | F10 | The 15-second limit for the look-again way is ours and has never been measured for Hydrogen | 1 |
+
+## After the test (14 Nov 2026)
+
+The test ran 43 of VW-19's 46 clips through Gemini 4 Hydrogen with the application's own request. Results: [hydrogen-test-results.md](hydrogen-test-results.md). What needs a person: [hydrogen-test-for-your-eye.md](hydrogen-test-for-your-eye.md).
+
+| Fault | After the test |
+|---|---|
+| F1 | Confirmed, large: 107 of 116 pieces |
+| F2 | Confirmed: the line is always written, never shown |
+| F3 | Not tested |
+| F4 | Supported: the pieces differ in 23 of 34 clips with several pieces; a person's marking is still needed |
+| F5 | Confirmed: 106 of 106 direct fits point at a paragraph of two sentences |
+| F6 | The arithmetic works, and suggests no pause on this film; needs a fit by sentence to be exact |
+| F7, F8 | Not tested |
+| F9 | Confirmed for the editor's notes, the best frame, the title zone and the defects; the colour-group label is useless as written |
+| F10 | Answered: no minimum on Hydrogen's side; the look-again way costs about twice as much on a short clip; which way is right on the facts is for a person |
+
+New points the test added, to watch in later films:
+
+| # | Point |
+|---|---|
+| N1 | Pieces of one clip overlap in time (13 of 34 clips); one piece often covers nearly the whole clip |
+| N2 | A piece with a defect the model calls unusable is still allowed by the rule |
+| N3 | The plain way and the look-again way disagree on facts for the same clip |
+| N4 | The look-again way was refused for one clip (the drone clip); the fall-back worked but took 17 minutes |
+| N5 | Two requests of 62 stopped before finishing their answer |
+| N6 | A short clip costs about 10 cents; the cost is the long answer, not the video |

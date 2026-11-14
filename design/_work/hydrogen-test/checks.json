@@ -1,0 +1,2250 @@
+{
+ "T1": {
+  "clips": 46,
+  "answered": 43,
+  "by_way": {
+   "STATIC": 28,
+   "AGENTIC": 15
+  },
+  "missing": [
+   "C0065_02730556.mp4",
+   "C0104_02772676.mp4",
+   "C0122_02788948.mp4"
+  ],
+  "failed_requests": [
+   {
+    "clip": "C0139_02800180.mp4",
+    "mode": "STATIC",
+    "error": "incomplete_response",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 171.0
+   },
+   {
+    "clip": "C0091_02755996.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.4
+   },
+   {
+    "clip": "C0065_02730556.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.2
+   },
+   {
+    "clip": "C0112_02780260.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0085_02747380.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0119_02785252.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0099_02766196.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0089_02753020.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0122_02788948.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.1
+   },
+   {
+    "clip": "C0104_02772676.mp4",
+    "mode": "AGENTIC",
+    "error": "connection_error",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 0.2
+   },
+   {
+    "clip": "C0065_02730556.mp4",
+    "mode": "AGENTIC",
+    "error": "incomplete_response",
+    "http_status": null,
+    "provider_error": null,
+    "seconds": 62.4
+   }
+  ],
+  "plain_fallback": [
+   "DJI_20241219103046_0091_D00000000_00000000.mp4"
+  ],
+  "finish_reasons": {
+   "STOP": 43
+  }
+ },
+ "T2": {
+  "answer_status": {
+   "retained": 43
+  },
+  "pieces_kept": 116,
+  "pieces_thrown_out": 0,
+  "thrown_out_reasons": [],
+  "notes_total": 0,
+  "notes": []
+ },
+ "T3": {
+  "allowed_or_not": {
+   "ELIGIBLE_AS_IS": 105,
+   "REJECT_ALL": 4,
+   "REJECT_VIDEO_KEEP_AUDIO_CONTEXT": 5,
+   "ELIGIBLE_WITH_CROP": 2
+  },
+  "speaker_box_notes": 0
+ },
+ "T4": [
+  {
+   "clip": "C0032_02881492.mp4",
+   "seconds_long": 3.84,
+   "STATIC": {
+    "in": 11883,
+    "video_in": 1192,
+    "out": 3700,
+    "thinking": 4931,
+    "usd": 0.0826,
+    "seconds": 58.8,
+    "looks": 0,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 1,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "A 3.84-second low-angle interior shot looking upward at a dimly lit curved red-brick ceiling with a white plastered lattice arch on the left. A grey metal scaffolding pole runs diagonally across the ceiling while a dark brown wooden batten in the immediate foreground shifts to the right relative to the background as the handheld camera drifts slightly. No people or active masonry work are visible in the frame.",
+    "piece_lines": [
+     "0.0-3.8 s, grade C: Upward low-angle view of a dark red-brick vaulted ceiling, a white plastered lattice arch on the left, and a diagonal grey metal pole, while an out-of-focus wooden batten in the lower foreground shifts slightly rightward as the camera drifts gently."
+    ]
+   },
+   "AGENTIC": {
+    "in": 58418,
+    "video_in": 24031,
+    "out": 4142,
+    "thinking": 9868,
+    "usd": 0.1927,
+    "seconds": 77.5,
+    "looks": 3,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 1,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "A dim, low-angle interior shot tilting upward at a curved exposed red-brick vaulted ceiling with a diagonal grey conduit pipe and a stationary dark brown ceiling fan blade in the foreground. Over the first 3.60 seconds, the camera slowly pans left and tilts slightly down, bringing a white-painted circular plaster wall with a geometric lattice arch into the left third of the frame. In the final 0.24 seconds, the camera abruptly accelerates downward and leftward, introducing motion blur as the ceiling fan motor hub and a second blade enter the bottom-right corner.",
+    "piece_lines": [
+     "0.0-3.6 s, grade B: The camera looks upward at a dark exposed red-brick vaulted ceiling crossed diagonally by a grey conduit pipe, with a stationary ceiling fan blade silhouetted in the lower foreground. Slowly panning left and tilting slightly downward, the frame reveals more of a white-painted circular wall and decorative geometric lattice arch on the left."
+    ]
+   }
+  },
+  {
+   "clip": "C0114_02782204.mp4",
+   "seconds_long": 8.170667,
+   "STATIC": {
+    "in": 13112,
+    "video_in": 2392,
+    "out": 5219,
+    "thinking": 4681,
+    "usd": 0.0939,
+    "seconds": 63.9,
+    "looks": 0,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 2,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "A high-angle handheld tracking shot moves slowly forward along the top of a freshly mortared brick wall course built on sandy ground. Red clay bricks are laid on edge with grey cement mortar on top, clearly revealing the continuous rectangular hollow cavities characteristic of Rat-Trap Bond Masonry. Around 00:04.5, a person's foot in a sandal briefly enters the top-left corner while a stack of spare bricks appears in the top-right background.",
+    "piece_lines": [
+     "0.0-4.3 s, grade A: High-angle close tracking shot moving steadily forward along a freshly mortared course of red clay bricks laid on edge, centered vertically in the frame on sandy ground, showcasing the hollow rectangular cavities formed inside the wall before any person enters the frame.",
+     "0.0-8.1 s, grade B: Full-length high-angle handheld tracking shot moving forward along the mortared rat-trap bond brick course on sandy ground; from 00:04.5 onward, dry leaves on the left ground, a bystander's foot in a dark sandal at the top-left edge, and a stack of unused red bricks in the top-right shadow become visible."
+    ]
+   },
+   "AGENTIC": {
+    "in": 31810,
+    "video_in": 9306,
+    "out": 9068,
+    "thinking": 11379,
+    "usd": 0.2011,
+    "seconds": 102.2,
+    "looks": 2,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 3,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "A high-angle handheld shot looks down onto the top of a freshly mortared red-brick wall laid on edge in Rat-Trap Bond, clearly showing rectangular hollow cavities along the center of the wall. Starting nearly still, the camera pulls back slowly along the wall from roughly 0.75 s to 4.50 s, pauses over three cavities while a person's sandaled foot enters the top-left corner around 4.75 s, and then pulls back slightly more at the end to reveal the corner of an adjacent brick stack at top right.",
+    "piece_lines": [
+     "0.0-4.5 s, grade A: No active human or machine work occurs; the camera holds briefly at a steep high angle over a Rat-Trap Bond brick wall course with wet grey mortar on top and pulls back slowly along its length, revealing multiple rectangular hollow cavities between bricks laid on edge.",
+     "4.5-7.2 s, grade B: The camera holds almost still at a steep high angle over three hollow cavities in the mortared Rat-Trap Bond brick wall while a person's left foot in a dark sandal enters and rests at the far top-left corner from around 4.75 s onward, and the base of a brick stack is visible near the top-right edge.",
+     "0.0-8.1 s, grade B: Full clip from start to end: high-angle handheld view looking down at the top of a freshly mortared Rat-Trap Bond brick wall, slowly pulling back along the cavities (0.75-4.50 s), pausing while a sandaled foot enters the top-left corner (~4.75 s), and pulling back slightly more (7.25-8.14 s) to reveal the corner of stacked bricks at top right."
+    ]
+   }
+  },
+  {
+   "clip": "C0113_02781556.mp4",
+   "seconds_long": 12.970667,
+   "STATIC": {
+    "in": 14621,
+    "video_in": 3888,
+    "out": 8455,
+    "thinking": 7535,
+    "usd": 0.1419,
+    "seconds": 88.8,
+    "looks": 0,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 3,
+    "notes": 0,
+    "empty_doubt_fields": 1,
+    "overview": "A static low-angle shot of a newly built three-course rat-trap bond red brick wall with visible hollow cavities and wet mortar joints. At the start, one worker picks up a metal mortar pan with a trowel and exits left while a second worker enters from the right with a natural-fibre hand broom. From 1.50s to 12.00s, the second worker sweeps excess mortar from the ground beside the wall, across the top course, and down the front brick face before lifting the broom out of frame.",
+    "piece_lines": [
+     "0.0-1.5 s, grade B: A worker bends into the left foreground, grasps a metal mortar pan containing a trowel, lifts it, and exits left while a second worker steps up from the right carrying a hand broom.",
+     "1.5-4.3 s, grade B: Standing beside the rat-trap bond brick wall, the worker sweeps loose mortar and sand along the wall base with a hand broom, then lifts the broom to begin brushing the top course of bricks.",
+     "4.6-12.0 s, grade A: The worker sweeps back and forth along the top course of the rat-trap bond brick wall, clearing excess mortar while exposing the bricks laid on edge and the rectangular hollow cavities inside the wall, then brushes down the front brick face and base before lifting the broom out of frame to the left."
+    ]
+   },
+   "AGENTIC": {
+    "in": 98523,
+    "video_in": 51844,
+    "out": 11937,
+    "thinking": 13176,
+    "usd": 0.3361,
+    "seconds": 139.5,
+    "looks": 6,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 4,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "A static low-angle shot outdoors at a construction site shows a three-course red brick corner wall built in Rat-Trap Bond Masonry with bricks laid on edge and hollow rectangular cavities visible along the top course. In the opening 1.4 seconds, one worker finishes tapping with a trowel, lifts a metal mortar pan from the foreground ground, and exits left, while a second worker standing on the right sweeps loose mortar and dust off the top, corner, and side of the wall with a dry straw broom for the remainder of the clip. Brief off-camera Tamil speech occurs from about 2.6 s to 4.2 s and a truncated utterance occurs near 12.45 s, leaving a clean 7.7 s speech-free sweeping sequence from 4.7 s to 12.4 s.",
+    "piece_lines": [
+     "0.0-1.4 s, grade C: Mason 1 taps/scrapes near the wall with a trowel, places the trowel into the foreground metal mortar pan, lifts the pan with one hand while steadying on the wall with the other, and exits frame left as Mason 2 begins sweeping the top of the brick wall from the right.",
+     "1.4-2.6 s, grade B: Mason 2 stands in grey trousers and sandals to the right of the brick wall and sweeps loose mortar crumbs off the vertical front face of the three-course rat-trap bond wall using rhythmic downward and side-to-side strokes of a straw broom.",
+     "2.6-4.2 s, grade B: Mason 2 sweeps along the front brick face toward the left corner, then lifts the broom to brush across the top edge of the rat-trap bond wall while stepping forward.",
+     "4.7-12.4 s, grade A: Mason 2 sweeps back and forth across the top surface, corner, and outer face of the three-course rat-trap bond brick wall with the straw broom, knocking loose mortar crumbs and fine dust off the bricks onto the ground while stepping slightly toward the corner near the end."
+    ]
+   }
+  },
+  {
+   "clip": "C0134_02797372.mp4",
+   "seconds_long": 16.810667,
+   "STATIC": {
+    "in": 15829,
+    "video_in": 5080,
+    "out": 7776,
+    "thinking": 4244,
+    "usd": 0.1139,
+    "seconds": 107.5,
+    "looks": 0,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 3,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "Continuous smooth exterior gimbal tracking shot gliding forward and right past a large two-story terracotta-colored brick building under an overcast sky. The camera starts on a three-quarter front angle showing the arched entrance labeled TAKSHASHILA, circular and arched upper cutouts, and decorative perforated brickwork, then tracks along the side facade past rows of brick-shaded windows and surrounding trees.",
+    "piece_lines": [
+     "0.0-16.8 s, grade A: No people or active construction work are present. The camera executes one continuous, smooth stabilized forward-and-rightward tracking glide past the exterior of a finished two-story terracotta brick building surrounded by trees and a dirt courtyard.",
+     "0.0-8.0 s, grade A: No people present. Camera glides smoothly forward and right from a full three-quarter wide view of the two-story terracotta brick building toward the arched front entrance portico and decorative gable.",
+     "8.0-16.8 s, grade B: No people present. Camera tracks smoothly rightward along the side elevation of the terracotta brick building, showing repeated brick-hooded windows, upper arched terrace parapet, stone foundation plinth, and overhanging green tree branches."
+    ]
+   },
+   "AGENTIC": {
+    "in": 69394,
+    "video_in": 34765,
+    "out": 8581,
+    "thinking": 10911,
+    "usd": 0.2503,
+    "seconds": 105.3,
+    "looks": 5,
+    "finish": "STOP",
+    "plain_fallback": false,
+    "status": "retained",
+    "pieces": 3,
+    "notes": 0,
+    "empty_doubt_fields": 0,
+    "overview": "A smooth, slow gimbal tracking shot moving left-to-right across the exterior of a finished two-story terracotta-painted exposed-brick building labeled TAKSHASHILA on a blue porch sign. The front half of the shot showcases architectural cutouts, decorative brick latticework, a stone plinth, and trees, while the second half tracks past a clean repeating brick wall with shaded windows, an arched upper parapet, a round well, and a shed with brick rubble at the far right. No people or active construction work appear in the clip.",
+    "piece_lines": [
+     "1.0-16.5 s, grade A: The camera tracks smoothly from left to right at eye level along the full facade of the two-story terracotta-painted brick building, passing the foreground trees, solar street lamp, arched entrance porch with TAKSHASHILA sign, rows of shaded windows, stone plinth, and terminating on the right wing next to a cylindrical well and shed.",
+     "0.0-8.5 s, grade A: Starting from a wide three-quarter angle framed by foreground leaves and a solar lamp post, the camera eases into a slow rightward track across the main architectural facade featuring geometric cutouts, decorative brick latticework, and the arched entrance porch with the TAKSHASHILA sign.",
+     "10.0-16.5 s, grade B: After the entrance porch exits left, the camera tracks smoothly rightward across the repeating brick facade of the building's right wing, showing two tiers of windows with angled brick sunshades, an arched parapet terrace, dark stone plinth, and a cylindrical well and shed with brick rubble at the far right."
+    ]
+   }
+  }
+ ],
+ "T5": {
+  "STATIC": {
+   "clips": 28,
+   "usd": 2.77,
+   "usd_per_clip": 0.099,
+   "usd_max": 0.1666,
+   "seconds_per_clip": 64.3,
+   "seconds_max": 106.6,
+   "looks_per_clip": 0,
+   "tokens_in": 368552,
+   "video_in": 68372,
+   "tokens_out": 166580,
+   "thinking": 128768,
+   "usd_per_clip_second": 0.0122
+  },
+  "AGENTIC": {
+   "clips": 15,
+   "usd": 5.34,
+   "usd_per_clip": 0.356,
+   "usd_max": 0.4912,
+   "seconds_per_clip": 206.3,
+   "seconds_max": 1032.8,
+   "looks_per_clip": 5,
+   "tokens_in": 1787181,
+   "video_in": 1144512,
+   "tokens_out": 172051,
+   "thinking": 182513,
+   "usd_per_clip_second": 0.0132
+  },
+  "all_requests_usd": 9.1641,
+  "requests": 62
+ },
+ "T6": {
+  "fields": 176,
+  "always_filled": 146,
+  "always_empty": [],
+  "often_empty": [
+   [
+    "piece.risk_flags",
+    2,
+    114
+   ],
+   [
+    "piece.ocr_text_on_screen",
+    14,
+    102
+   ],
+   [
+    "piece.technical_qc_and_remediation.defects_detected",
+    16,
+    100
+   ],
+   [
+    "piece.people_and_speaker_analysis.speaker_crop_module",
+    20,
+    96
+   ],
+   [
+    "piece.people_and_speaker_analysis.speech_translation_block",
+    33,
+    83
+   ],
+   [
+    "piece.camera_moves",
+    41,
+    75
+   ],
+   [
+    "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts",
+    14,
+    19
+   ],
+   [
+    "piece.people_and_speaker_analysis.speaker_crop_module.settle_buffer_applied_in_tc",
+    1,
+    19
+   ],
+   [
+    "piece.people_and_speaker_analysis.speaker_crop_module.suggested_split_s",
+    4,
+    16
+   ],
+   [
+    "piece.people_and_speaker_analysis.speaker_crop_module.active_speech_tc_range",
+    6,
+    14
+   ],
+   [
+    "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts[].visual_evidence_s",
+    6,
+    8
+   ]
+  ],
+  "table": {
+   "clip.audio_observed": [
+    43,
+    0
+   ],
+   "clip.clip_id": [
+    43,
+    0
+   ],
+   "clip.clip_level_notes_for_editor": [
+    43,
+    0
+   ],
+   "clip.clip_overview": [
+    43,
+    0
+   ],
+   "clip.clip_overview_uncertainty": [
+    43,
+    0
+   ],
+   "clip.color_match_group_id": [
+    43,
+    0
+   ],
+   "clip.contrast_profile": [
+    43,
+    0
+   ],
+   "clip.descriptive_name": [
+    43,
+    0
+   ],
+   "clip.entities": [
+    43,
+    0
+   ],
+   "clip.entities[].basis": [
+    279,
+    0
+   ],
+   "clip.entities[].description": [
+    279,
+    0
+   ],
+   "clip.entities[].first_seen_s": [
+    279,
+    0
+   ],
+   "clip.entities[].kind": [
+    279,
+    0
+   ],
+   "clip.entities[].last_seen_s": [
+    279,
+    0
+   ],
+   "clip.entities[].name": [
+    279,
+    0
+   ],
+   "clip.entities[].uncertainty": [
+    201,
+    78
+   ],
+   "clip.exposure_health": [
+    43,
+    0
+   ],
+   "clip.filename": [
+    43,
+    0
+   ],
+   "clip.lighting_and_weather": [
+    43,
+    0
+   ],
+   "clip.max_safe_zoom_limit": [
+    43,
+    0
+   ],
+   "clip.summary_card_lines": [
+    43,
+    0
+   ],
+   "clip.tc_confidence": [
+    43,
+    0
+   ],
+   "clip.unavailable_or_uncertain": [
+    43,
+    0
+   ],
+   "clip.unavailable_or_uncertain[].field": [
+    142,
+    0
+   ],
+   "clip.unavailable_or_uncertain[].reason": [
+    142,
+    0
+   ],
+   "piece.action_completeness": [
+    116,
+    0
+   ],
+   "piece.audio_and_sfx_plan": [
+    116,
+    0
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals": [
+    59,
+    57
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals[].description": [
+    63,
+    0
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals[].duration_s": [
+    63,
+    0
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals[].in_s": [
+    63,
+    0
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals[].in_tc": [
+    63,
+    0
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals[].out_s": [
+    63,
+    0
+   ],
+   "piece.audio_and_sfx_plan.clean_nat_sound_intervals[].out_tc": [
+    63,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues": [
+    92,
+    24
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].description": [
+    99,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].duration_s": [
+    99,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].end_tc": [
+    99,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].resolved_sfx_file": [
+    99,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].sfx_type": [
+    99,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].start_tc": [
+    99,
+    0
+   ],
+   "piece.audio_and_sfx_plan.creative_sfx_cues[].target_track": [
+    99,
+    0
+   ],
+   "piece.camera_and_optics": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.camera_angle": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.depth_of_field": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.has_3d_parallax": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.has_internal_scene_motion": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.leading_lines": [
+    113,
+    3
+   ],
+   "piece.camera_and_optics.lens_feel": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.movement_direction": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.movement_easing": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.movement_speed": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.movement_type": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.native_shot_size": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.subject_screen_direction": [
+    116,
+    0
+   ],
+   "piece.camera_and_optics.uncertainty": [
+    79,
+    37
+   ],
+   "piece.camera_moves": [
+    41,
+    75
+   ],
+   "piece.camera_moves[].end_s": [
+    45,
+    0
+   ],
+   "piece.camera_moves[].kind": [
+    45,
+    0
+   ],
+   "piece.camera_moves[].start_s": [
+    45,
+    0
+   ],
+   "piece.client_safe": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.beat_fit_basis": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.beat_fit_limits": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.beat_fit_reasoning": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.marketing_value_tag": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.mood_tag": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.outcome_state": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.prerequisite_action": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.primary_fit_for_beats": [
+    69,
+    47
+   ],
+   "piece.continuity_and_story.process_stage": [
+    116,
+    0
+   ],
+   "piece.continuity_and_story.secondary_fit_for_beats": [
+    112,
+    4
+   ],
+   "piece.continuity_and_story.world_landmarks_and_props": [
+    116,
+    0
+   ],
+   "piece.editorial_ideas": [
+    116,
+    0
+   ],
+   "piece.hero_frame_index": [
+    116,
+    0
+   ],
+   "piece.hero_frame_s": [
+    116,
+    0
+   ],
+   "piece.hero_frame_tc": [
+    116,
+    0
+   ],
+   "piece.max_usable_window": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.audio_handle_frames_after": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.audio_handle_frames_before": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.duration_s": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.in_frame": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.in_s": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.in_tc": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.out_frame": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.out_s": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.out_tc": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.video_handle_frames_after": [
+    116,
+    0
+   ],
+   "piece.max_usable_window.video_handle_frames_before": [
+    116,
+    0
+   ],
+   "piece.must_include_action_peak": [
+    68,
+    48
+   ],
+   "piece.must_include_action_peak.duration_s": [
+    68,
+    0
+   ],
+   "piece.must_include_action_peak.in_s": [
+    68,
+    0
+   ],
+   "piece.must_include_action_peak.in_tc": [
+    68,
+    0
+   ],
+   "piece.must_include_action_peak.out_s": [
+    68,
+    0
+   ],
+   "piece.must_include_action_peak.out_tc": [
+    68,
+    0
+   ],
+   "piece.ocr_text_on_screen": [
+    14,
+    102
+   ],
+   "piece.pacing_and_flow": [
+    116,
+    0
+   ],
+   "piece.pacing_and_flow.accent_events": [
+    65,
+    51
+   ],
+   "piece.pacing_and_flow.accent_events[].description": [
+    110,
+    0
+   ],
+   "piece.pacing_and_flow.accent_events[].frame": [
+    110,
+    0
+   ],
+   "piece.pacing_and_flow.accent_events[].s": [
+    110,
+    0
+   ],
+   "piece.pacing_and_flow.accent_events[].tc": [
+    110,
+    0
+   ],
+   "piece.pacing_and_flow.entry_eye_grid": [
+    116,
+    0
+   ],
+   "piece.pacing_and_flow.exit_eye_grid": [
+    116,
+    0
+   ],
+   "piece.pacing_and_flow.kinetic_energy_score": [
+    116,
+    0
+   ],
+   "piece.pacing_and_flow.min_comprehension_hold_s": [
+    116,
+    0
+   ],
+   "piece.pacing_and_flow.natural_cut_points": [
+    101,
+    15
+   ],
+   "piece.pacing_and_flow.natural_cut_points[].description": [
+    166,
+    0
+   ],
+   "piece.pacing_and_flow.natural_cut_points[].frame": [
+    166,
+    0
+   ],
+   "piece.pacing_and_flow.natural_cut_points[].s": [
+    166,
+    0
+   ],
+   "piece.pacing_and_flow.natural_cut_points[].tc": [
+    166,
+    0
+   ],
+   "piece.pacing_and_flow.text_safe_zone": [
+    106,
+    10
+   ],
+   "piece.pacing_and_flow.text_safe_zone.contrast": [
+    106,
+    0
+   ],
+   "piece.pacing_and_flow.text_safe_zone.grid": [
+    106,
+    0
+   ],
+   "piece.pacing_and_flow.text_safe_zone.valid_in_tc": [
+    106,
+    0
+   ],
+   "piece.pacing_and_flow.text_safe_zone.valid_out_tc": [
+    106,
+    0
+   ],
+   "piece.pacing_and_flow.time_manipulation_options": [
+    109,
+    7
+   ],
+   "piece.pairing_constraints": [
+    92,
+    24
+   ],
+   "piece.people_and_speaker_analysis": [
+    116,
+    0
+   ],
+   "piece.people_and_speaker_analysis.audio_nature": [
+    116,
+    0
+   ],
+   "piece.people_and_speaker_analysis.looking_at_lens": [
+    116,
+    0
+   ],
+   "piece.people_and_speaker_analysis.mouth_visible": [
+    116,
+    0
+   ],
+   "piece.people_and_speaker_analysis.people_count": [
+    116,
+    0
+   ],
+   "piece.people_and_speaker_analysis.people_roles": [
+    81,
+    35
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module": [
+    20,
+    96
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.active_speech_tc_range": [
+    6,
+    14
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.active_speech_tc_range.in_tc": [
+    6,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.active_speech_tc_range.out_tc": [
+    6,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.limits": [
+    20,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.must_preserve_action_box": [
+    20,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.settle_buffer_applied_in_tc": [
+    1,
+    19
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.sharp_in_crop_zone": [
+    20,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.speaker_full_body_box": [
+    20,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.speaker_head_mouth_box": [
+    20,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.speaker_moves_during_subclip": [
+    20,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speaker_crop_module.suggested_split_s": [
+    4,
+    16
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block": [
+    33,
+    83
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.english_translation": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts": [
+    14,
+    19
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts[].basis": [
+    14,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts[].fact": [
+    14,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts[].limits": [
+    14,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts[].matches_visual_on_screen": [
+    14,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.extracted_domain_facts[].visual_evidence_s": [
+    6,
+    8
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.soundbite_grade": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.speaker_id": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.speaker_role": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.spoken_language": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.transcription_status": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.speech_translation_block.verbatim_transcript": [
+    33,
+    0
+   ],
+   "piece.people_and_speaker_analysis.uncertainty": [
+    111,
+    5
+   ],
+   "piece.risk_flags": [
+    2,
+    114
+   ],
+   "piece.shot_role": [
+    116,
+    0
+   ],
+   "piece.sub_clip_id": [
+    116,
+    0
+   ],
+   "piece.sub_clip_uncertainty": [
+    114,
+    2
+   ],
+   "piece.tc_confidence": [
+    116,
+    0
+   ],
+   "piece.technical_qc_and_remediation": [
+    116,
+    0
+   ],
+   "piece.technical_qc_and_remediation.defects_detected": [
+    16,
+    100
+   ],
+   "piece.technical_qc_and_remediation.defects_detected[].defect": [
+    17,
+    0
+   ],
+   "piece.technical_qc_and_remediation.defects_detected[].description": [
+    17,
+    0
+   ],
+   "piece.technical_qc_and_remediation.defects_detected[].in_tc": [
+    17,
+    0
+   ],
+   "piece.technical_qc_and_remediation.defects_detected[].out_tc": [
+    17,
+    0
+   ],
+   "piece.technical_qc_and_remediation.dual_mono_channel_fix": [
+    116,
+    0
+   ],
+   "piece.technical_qc_and_remediation.horizon_rotation_deg": [
+    116,
+    0
+   ],
+   "piece.technical_qc_and_remediation.stabilization_needed": [
+    116,
+    0
+   ],
+   "piece.technical_qc_and_remediation.uncertainty": [
+    81,
+    35
+   ],
+   "piece.technical_qc_and_remediation.voice_isolation_recommended": [
+    116,
+    0
+   ],
+   "piece.usability_grade": [
+    116,
+    0
+   ],
+   "piece.vfx_and_graphics_opportunities": [
+    99,
+    17
+   ],
+   "piece.vfx_and_graphics_opportunities[].in_tc": [
+    117,
+    0
+   ],
+   "piece.vfx_and_graphics_opportunities[].out_tc": [
+    117,
+    0
+   ],
+   "piece.vfx_and_graphics_opportunities[].type": [
+    117,
+    0
+   ],
+   "piece.vfx_and_graphics_opportunities[].what_and_why": [
+    117,
+    0
+   ],
+   "piece.visual_action_observed": [
+    116,
+    0
+   ],
+   "piece.visual_action_uncertainty": [
+    106,
+    10
+   ],
+   "piece.why_sliced_here": [
+    116,
+    0
+   ]
+  }
+ },
+ "T7": {
+  "pieces": 116,
+  "pieces_with_a_fit": 112,
+  "fit_without_does_not_show": 0,
+  "direct_fit": 69,
+  "direct_fit_without_does_not_show": 0,
+  "empty_visual_action_uncertainty": 10,
+  "empty_sub_clip_uncertainty": 2,
+  "fit_basis": {
+   "illustrative": 36,
+   "directly_seen": 76
+  }
+ },
+ "T8": {
+  "pieces_per_clip": {
+   "1": 9,
+   "2": 13,
+   "3": 10,
+   "4": 5,
+   "5": 5,
+   "6": 1
+  },
+  "clips_with_several": 34,
+  "most": [
+   [
+    "C0097_02763220.mp4",
+    6
+   ],
+   [
+    "C0088_02751604.mp4",
+    5
+   ],
+   [
+    "C0092_02757244.mp4",
+    5
+   ],
+   [
+    "C0093_02758876.mp4",
+    5
+   ],
+   [
+    "C0095_02761036.mp4",
+    5
+   ]
+  ]
+ },
+ "T10": {
+  "pieces": 116,
+  "pieces_in_clips_with_several": 107,
+  "clips_with_several": 34,
+  "short_list_chars_today": 55646,
+  "chars_added": 43812,
+  "growth_percent": 79,
+  "side_by_side": [
+   {
+    "clip": "C0081_02743972.mp4",
+    "piece": "SUB_62D836CCA85D_01",
+    "window_s": [
+     0.0,
+     1.0
+    ],
+    "today_the_clip_line": "High-angle pan from right to left across a row of red clay bricks stood upright on edge along sandy ground.",
+    "own_description": "High-angle static hold looking down at a row of eleven red clay bricks stood upright on edge on sandy ground in front of a pale grey guide bar.",
+    "does_not_show": "Does not show bricks laid in mortar, hollow wall cavities, compression testing, or building height."
+   },
+   {
+    "clip": "C0081_02743972.mp4",
+    "piece": "SUB_62D836CCA85D_02",
+    "window_s": [
+     1.0,
+     7.5
+    ],
+    "today_the_clip_line": "High-angle pan from right to left across a row of red clay bricks stood upright on edge along sandy ground.",
+    "own_description": "Smooth high-angle handheld or gimbal pan from right to left along a long row of red clay bricks stood upright on edge on sandy ground against a pale grey guide bar.",
+    "does_not_show": "Shows bricks lined up on sandy ground rather than laid with mortar into courses with hollow cavities or undergoing compression testing."
+   },
+   {
+    "clip": "C0081_02743972.mp4",
+    "piece": "SUB_62D836CCA85D_03",
+    "window_s": [
+     7.5,
+     9.58
+    ],
+    "today_the_clip_line": "High-angle pan from right to left across a row of red clay bricks stood upright on edge along sandy ground.",
+    "own_description": "The pan along the row of red clay bricks on edge slows as a person's foot in an open sandal appears briefly at the top-left corner around 00:08, then the camera shifts slightly back right so the foot exits the frame by 00:09.",
+    "does_not_show": "Does not show brick laying in mortar, wall cavities, or compression testing; includes distracting partial foot."
+   },
+   {
+    "clip": "C0085_02747380.mp4",
+    "piece": "SUB_37D6E9613F69_01",
+    "window_s": [
+     0.0,
+     1.16
+    ],
+    "today_the_clip_line": "Ground-level close-up of a mason packing wet cement mortar with a trowel into vertical joints of a row of red clay bricks laid on edge.",
+    "own_description": "A metal mortar pan pours wet cement mortar onto the top of the left-side bricks laid on edge, then is lifted up and out of the top-right frame.",
+    "does_not_show": "Does not show bricks being placed or continuous hollow cavities inside a double-leaf wall."
+   },
+   {
+    "clip": "C0085_02747380.mp4",
+    "piece": "SUB_37D6E9613F69_02",
+    "window_s": [
+     3.3,
+     25.9
+    ],
+    "today_the_clip_line": "Ground-level close-up of a mason packing wet cement mortar with a trowel into vertical joints of a row of red clay bricks laid on edge.",
+    "own_description": "Standing behind the row of red clay bricks laid on edge, the mason uses a pointed metal trowel in his right hand to spread wet mortar across the top and steadily slice and pack it vertically into the joints between consecutive bricks from left to right; between 15.0s and 18.0s he places his left hand on a brick to steady it while packing the joint before continuing rightward.",
+    "does_not_show": "Does not show bricks being lowered into place, material savings, or the continuous hollow cavities of a completed Rat-Trap Bond wall."
+   },
+   {
+    "clip": "C0085_02747380.mp4",
+    "piece": "SUB_37D6E9613F69_03",
+    "window_s": [
+     25.96,
+     26.86
+    ],
+    "today_the_clip_line": "Ground-level close-up of a mason packing wet cement mortar with a trowel into vertical joints of a row of red clay bricks laid on edge.",
+    "own_description": "Mason continues troweling mortar on the far right before the camera abruptly bumps and tilts upward at 26.25s, blurring the frame and briefly exposing the mason's torso and lower face at the top-right edge before dropping slightly back down at clip end.",
+    "does_not_show": "Technical camera bump tail; unusable for any script beat."
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "piece": "SUB_C916A7B16DF4_01",
+    "window_s": [
+     1.0,
+     6.0
+    ],
+    "today_the_clip_line": "Static tripod MWS outdoors in shaded daylight showing a mason laying four red bricks on edge onto an L-shaped mortar course while a helper brings water and bricks.",
+    "own_description": "Mason holds a red clay brick with both hands, turns it, lowers it onto the wet mortar bed near the corner of the L-shaped wall, places it on edge, and adjusts its position with his right hand before releasing.",
+    "does_not_show": "Does not show completed hollow cavities inside the wall from this low oblique camera angle."
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "piece": "SUB_C916A7B16DF4_02",
+    "window_s": [
+     6.0,
+     12.0
+    ],
+    "today_the_clip_line": "Static tripod MWS outdoors in shaded daylight showing a mason laying four red bricks on edge onto an L-shaped mortar course while a helper brings water and bricks.",
+    "own_description": "Mason picks up a second brick from the stack behind the wall, turns it, places it on edge alongside the first brick, and aligns both bricks with two hands while a helper walks past behind him from right to left (8.75-12.00s).",
+    "does_not_show": "Does not clearly reveal the hollow wall cavity from this camera angle; helper walking in background adds minor visual movement."
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "piece": "SUB_C916A7B16DF4_03",
+    "window_s": [
+     12.0,
+     19.76
+    ],
+    "today_the_clip_line": "Static tripod MWS outdoors in shaded daylight showing a mason laying four red bricks on edge onto an L-shaped mortar course while a helper brings water and bricks.",
+    "own_description": "Helper bends down on the left to place a shallow metal pan of water on the ground (12.25-14.50s) and exits left, while the mason picks up a third brick, places it on edge on the mortar bed in front of the previous two bricks, adjusts it, and brushes mortar off his hands (18.00-19.50s).",
+    "does_not_show": "Does not show internal hollow cavities inside the wall from this angle."
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "piece": "SUB_C916A7B16DF4_04",
+    "window_s": [
+     19.76,
+     23.24
+    ],
+    "today_the_clip_line": "Static tripod MWS outdoors in shaded daylight showing a mason laying four red bricks on edge onto an L-shaped mortar course while a helper brings water and bricks.",
+    "own_description": "Helper walks in from the left carrying a stack of five red bricks and bends down to place them upright behind the wall while the mason reaches over to steady the stack and take the end brick.",
+    "does_not_show": "Does not show bricks being laid on edge into the mortar course or hollow cavities."
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "piece": "SUB_C916A7B16DF4_05",
+    "window_s": [
+     23.24,
+     27.5
+    ],
+    "today_the_clip_line": "Static tripod MWS outdoors in shaded daylight showing a mason laying four red bricks on edge onto an L-shaped mortar course while a helper brings water and bricks.",
+    "own_description": "Mason rotates the fourth brick in his hands, lowers it onto the mortar bed on edge beside the third brick, holds and aligns it with his right hand, and releases at 27.25s while the helper walks off-frame to the left (25.50-26.50s).",
+    "does_not_show": "Does not clearly show internal hollow cavities inside the wall from this camera angle."
+   },
+   {
+    "clip": "C0089_02753020.mp4",
+    "piece": "SUB_20DD79ACF050_01",
+    "window_s": [
+     0.0,
+     5.5
+    ],
+    "today_the_clip_line": "Static wide shot under outdoor tree shade of two silent masons building an L-shaped Rat-Trap Bond brick wall with bricks laid on edge, creating rectangular hollow cavities while a third worker brings bricks and observes.",
+    "own_description": "The mason in the beige shirt bends over the right corner of the L-shaped brick wall, adjusts a newly placed brick on edge beside a wooden straightedge, then lifts the wooden straightedge off the wall and sets it on the ground behind him while the worker in the light grey shirt walks in from the left carrying bricks and sets one down beside the mortar pan.",
+    "does_not_show": "Does not show mortar application, active laying of a new brick, material savings, or thermal performance."
+   },
+   {
+    "clip": "C0089_02753020.mp4",
+    "piece": "SUB_20DD79ACF050_02",
+    "window_s": [
+     5.5,
+     17.0
+    ],
+    "today_the_clip_line": "Static wide shot under outdoor tree shade of two silent masons building an L-shaped Rat-Trap Bond brick wall with bricks laid on edge, creating rectangular hollow cavities while a third worker brings bricks and observes.",
+    "own_description": "The mason in the beige shirt picks up his trowel, scoops cement mortar from the metal pan, and spreads it carefully along the narrow top edges of the first course of bricks laid on edge. At 00:09.6, a third man with grey hair walks in from the left carrying two bricks, drops one onto the left brick pile at 00:11.0-00:12.4, and stands watching while the second worker picks up a brick at 00:15.0.",
+    "does_not_show": "Shows mortar spreading rather than laying new bricks onto the course, material savings percentages, or building cooling."
+   },
+   {
+    "clip": "C0089_02753020.mp4",
+    "piece": "SUB_20DD79ACF050_03",
+    "window_s": [
+     17.0,
+     39.2
+    ],
+    "today_the_clip_line": "Static wide shot under outdoor tree shade of two silent masons building an L-shaped Rat-Trap Bond brick wall with bricks laid on edge, creating rectangular hollow cavities while a third worker brings bricks and observes.",
+    "own_description": "The mason in the beige shirt finishes spreading mortar on the wall top (17.0-21.5 s), then both the beige-shirt mason and the light-grey-shirt worker lean over the wall together and sequentially lay multiple red bricks on edge onto the mortar bed along both wythes and the corner, forming visible rectangular hollow cavities inside the second course while the grey-haired worker watches from the left. Ends cleanly at 39.2 s before the beige-shirt mason glances toward the camera at 39.4 s.",
+    "does_not_show": "Does not demonstrate 25 percent brick savings quantification, compressive strength testing, indoor cooling, or 7-day curing."
+   },
+   {
+    "clip": "C0089_02753020.mp4",
+    "piece": "SUB_20DD79ACF050_04",
+    "window_s": [
+     21.5,
+     27.0
+    ],
+    "today_the_clip_line": "Static wide shot under outdoor tree shade of two silent masons building an L-shaped Rat-Trap Bond brick wall with bricks laid on edge, creating rectangular hollow cavities while a third worker brings bricks and observes.",
+    "own_description": "Both masons pick up red bricks and simultaneously lay a pair of opposing bricks on edge onto the fresh mortar bed, visually enclosing a rectangular cavity while the third worker watches silently from the left.",
+    "does_not_show": "Shows a single pair placement rather than multiple courses, material percentage savings, or curing."
+   },
+   {
+    "clip": "C0091_02755996.mp4",
+    "piece": "SUB_15694574B6B0_01",
+    "window_s": [
+     0.0,
+     24.4
+    ],
+    "today_the_clip_line": "High-angle MCU of a mason and helper laying red bricks on edge in Rat-Trap Bond from right to left, forming two complete hollow-cavity units before stepping away.",
+    "own_description": "A mortar helper spreads wet cement mortar onto a brick wall course with a trowel while a mason lays bricks on edge from right to left in Rat-Trap Bond: first placing back and front parallel stretchers and a bridging header, then repeating the sequence (back stretcher, front stretcher forming a hollow cavity, and closing header) before stepping away to the right.",
+    "does_not_show": "Does not show conventional flat brickwork for comparison, does not prove wall strength or 25% material reduction, and only shows two courses rather than a full wall."
+   },
+   {
+    "clip": "C0091_02755996.mp4",
+    "piece": "SUB_15694574B6B0_02",
+    "window_s": [
+     5.0,
+     12.0
+    ],
+    "today_the_clip_line": "High-angle MCU of a mason and helper laying red bricks on edge in Rat-Trap Bond from right to left, forming two complete hollow-cavity units before stepping away.",
+    "own_description": "Mason places a front stretcher brick on edge parallel to a back brick and then seats a perpendicular header brick next to them while a helper smooths mortar on the left with a trowel.",
+    "does_not_show": "Does not show the initial back stretcher placement or the completed clean view without the mortar pan."
+   },
+   {
+    "clip": "C0091_02755996.mp4",
+    "piece": "SUB_15694574B6B0_03",
+    "window_s": [
+     12.5,
+     22.0
+    ],
+    "today_the_clip_line": "High-angle MCU of a mason and helper laying red bricks on edge in Rat-Trap Bond from right to left, forming two complete hollow-cavity units before stepping away.",
+    "own_description": "With the mortar pan cleared from the left, the mason lays one complete Rat-Trap Bond cavity unit from start to finish: placing a back stretcher brick on edge, placing a parallel front stretcher brick on edge to form a clear hollow cavity between them, and seating a transverse header brick to close the unit.",
+    "does_not_show": "Does not show conventional flat masonry side-by-side or full building height."
+   },
+   {
+    "clip": "C0091_02755996.mp4",
+    "piece": "SUB_15694574B6B0_04",
+    "window_s": [
+     22.0,
+     24.4
+    ],
+    "today_the_clip_line": "High-angle MCU of a mason and helper laying red bricks on edge in Rat-Trap Bond from right to left, forming two complete hollow-cavity units before stepping away.",
+    "own_description": "Unobstructed close view of the newly laid Rat-Trap Bond brick course showing bricks on edge and the enclosed hollow cavity between the parallel stretchers, while the mason's feet walk away in the background and a trowel briefly pats mortar on the far left.",
+    "does_not_show": "Short 2.4 s window; shows only the top of the second course without wider wall context."
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "piece": "SUB_6C23C8CB4D43_01",
+    "window_s": [
+     0.0,
+     4.2
+    ],
+    "today_the_clip_line": "Static high-angle MS of two masons laying red clay bricks on edge in rat-trap bond onto mortar and checking alignment with a straightedge; abrupt tilt at 32.22s trimmed out.",
+    "own_description": "Mason on the right adjusts a red clay brick standing on edge at the corner over wet grey mortar while mason on the left picks up a brick from a small vertical stack on the left and brings it toward the mortar bed.",
+    "does_not_show": "Does not show conventional flat-brick masonry for comparison, material savings percentage, indoor thermal performance, or curing."
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "piece": "SUB_6C23C8CB4D43_02",
+    "window_s": [
+     4.2,
+     10.5
+    ],
+    "today_the_clip_line": "Static high-angle MS of two masons laying red clay bricks on edge in rat-trap bond onto mortar and checking alignment with a straightedge; abrupt tilt at 32.22s trimmed out.",
+    "own_description": "Mason on the left lifts a red brick from the vertical stack, places it on edge onto the mortar bed beside the corner brick, and both masons align the paired bricks before the left mason withdraws from the frame at 10.20s-10.50s.",
+    "does_not_show": "Requires source audio to be muted (Mode 3); does not prove 25% brick savings, strength testing, thermal cooling, or 7-day curing."
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "piece": "SUB_6C23C8CB4D43_03",
+    "window_s": [
+     10.5,
+     21.5
+    ],
+    "today_the_clip_line": "Static high-angle MS of two masons laying red clay bricks on edge in rat-trap bond onto mortar and checking alignment with a straightedge; abrupt tilt at 32.22s trimmed out.",
+    "own_description": "Solo mason on the right leans over the corner and methodically nudges and adjusts three consecutive bricks on edge along the right-hand wall section (11.5s-21.0s) to true the line and spacing; a second person's legs walk left-to-right across the upper background at 13.8s-15.6s.",
+    "does_not_show": "Shows adjustment of already-placed bricks rather than lifting and setting a fresh brick onto mortar; does not show cost, heat, brick strength, or curing."
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "piece": "SUB_6C23C8CB4D43_04",
+    "window_s": [
+     21.5,
+     29.0
+    ],
+    "today_the_clip_line": "Static high-angle MS of two masons laying red clay bricks on edge in rat-trap bond onto mortar and checking alignment with a straightedge; abrupt tilt at 32.22s trimmed out.",
+    "own_description": "Solo mason reaches down behind the wall, picks up a red clay brick, sets it cleanly on edge onto the fresh grey mortar bed next to the outer brick-on-edge to form the cavity wall, adjusts its alignment with his right hand, and steps back out of frame right by 29.00s leaving a clear view of the rat-trap bond pattern.",
+    "does_not_show": "Does not show flat-laid conventional brick comparison, 25% brick savings quantification, indoor cooling, brick compression testing, or 7-day curing."
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "piece": "SUB_6C23C8CB4D43_05",
+    "window_s": [
+     29.0,
+     32.2
+    ],
+    "today_the_clip_line": "Static high-angle MS of two masons laying red clay bricks on edge in rat-trap bond onto mortar and checking alignment with a straightedge; abrupt tilt at 32.22s trimmed out.",
+    "own_description": "Mason_right steps out to the right edge by 30.25s, leaving a clean static view of the laid course, then mason_left steps in and lowers a long light-colored straightedge flat onto the top of the bricks-on-edge course (30.60s-32.20s) to check alignment.",
+    "does_not_show": "Short 3.2s window; shows placement of the straightedge rather than extended leveling or finishing."
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "piece": "SUB_8B989F41EFB3_01",
+    "window_s": [
+     0.0,
+     5.5
+    ],
+    "today_the_clip_line": "Static high-angle MS of a silent mason positioning a metal straightedge and aligning red clay bricks laid on edge in a rat-trap bond wall with clearly visible hollow cavities.",
+    "own_description": "The mason holds the metal straightedge flat on the ground along the inner base of the rat-trap bond brick wall with his left hand while reaching forward with his right hand near the bottom-right edge, then lifts his right hand to grip and press a foreground brick laid on edge into alignment (03.80 s to 05.40 s).",
+    "does_not_show": "Does not show conventional flat-laid brickwork for comparison, mortar troweling, or a full-height wall."
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "piece": "SUB_8B989F41EFB3_02",
+    "window_s": [
+     5.5,
+     11.0
+    ],
+    "today_the_clip_line": "Static high-angle MS of a silent mason positioning a metal straightedge and aligning red clay bricks laid on edge in a rat-trap bond wall with clearly visible hollow cavities.",
+    "own_description": "The mason grasps the long metal straightedge with both hands, slides it out from between his feet and the wall base along the sandy ground, lifts it up across the wall, and sets it flush along the top outer edge of the upper brick-on-edge course.",
+    "does_not_show": "Shows straightedge placement prior to brick tapping rather than laying new bricks onto fresh mortar."
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "piece": "SUB_8B989F41EFB3_03",
+    "window_s": [
+     11.0,
+     23.3
+    ],
+    "today_the_clip_line": "Static high-angle MS of a silent mason positioning a metal straightedge and aligning red clay bricks laid on edge in a rat-trap bond wall with clearly visible hollow cavities.",
+    "own_description": "Holding the metal straightedge steadily against the outer face of the upper brick course with one hand, the mason reaches along the wall with his other hand to tap, push, and align bricks laid on edge one after another—first near the far upper-left (12.40 s to 15.20 s), then in the middle (15.40 s to 19.00 s), and finally toward the foreground (19.20 s to 23.20 s)—while the hollow rectangular cavities of the rat-trap bond wall remain clearly visible.",
+    "does_not_show": "Shows aligning bricks already seated on mortar rather than spreading mortar or contrasting against flat-laid conventional brickwork."
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "piece": "SUB_8B989F41EFB3_04",
+    "window_s": [
+     23.3,
+     26.38
+    ],
+    "today_the_clip_line": "Static high-angle MS of a silent mason positioning a metal straightedge and aligning red clay bricks laid on edge in a rat-trap bond wall with clearly visible hollow cavities.",
+    "own_description": "The mason leans down to check and tap the nearest foreground brick against the straightedge while his upper face (forehead, eyes looking down, nose, and mustache) dips briefly into the top-center-right edge of the frame (23.40 s to 25.00 s); he then straightens up out of frame and lifts the straightedge away from the wall as the clip ends.",
+    "does_not_show": "Ends mid-lift of the straightedge and has partial head entry at top frame edge."
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "piece": "SUB_8B989F41EFB3_05",
+    "window_s": [
+     5.5,
+     23.3
+    ],
+    "today_the_clip_line": "Static high-angle MS of a silent mason positioning a metal straightedge and aligning red clay bricks laid on edge in a rat-trap bond wall with clearly visible hollow cavities.",
+    "own_description": "Continuous unbroken sequence combining straightedge placement and full brick alignment: the mason slides the metal straightedge out from the wall base, lifts and sets it along the top outer edge of the upper course, and then systematically taps and nudges each brick on edge along the course into alignment while hollow rectangular cavities remain clearly visible.",
+    "does_not_show": "Does not show mortar spreading, flat-brick comparison, or full building height."
+   },
+   {
+    "clip": "C0095_02761036.mp4",
+    "piece": "SUB_00111C8C2DBF_01",
+    "window_s": [
+     0.0,
+     1.9
+    ],
+    "today_the_clip_line": "Two workers check vertical plumb and straightedge alignment on a two-course L-shaped rat-trap bond brick wall built on sandy soil.",
+    "own_description": "In a static high-angle medium-wide shot, the primary mason releases the corner brick of the rat-trap bond wall, lifts a plumb bob by its string, and steps toward the left end of the wall.",
+    "does_not_show": "Does not show laying a new brick with mortar or the completed plumb check."
+   },
+   {
+    "clip": "C0095_02761036.mp4",
+    "piece": "SUB_00111C8C2DBF_02",
+    "window_s": [
+     2.0,
+     3.4
+    ],
+    "today_the_clip_line": "Two workers check vertical plumb and straightedge alignment on a two-course L-shaped rat-trap bond brick wall built on sandy soil.",
+    "own_description": "The camera pans slowly left as the primary mason positions his hands and plumb bob at the left end of the brick wall and a second worker steps into frame on the left.",
+    "does_not_show": "Too brief and transitional to stand alone."
+   },
+   {
+    "clip": "C0095_02761036.mp4",
+    "piece": "SUB_00111C8C2DBF_03",
+    "window_s": [
+     3.4,
+     8.2
+    ],
+    "today_the_clip_line": "Two workers check vertical plumb and straightedge alignment on a two-course L-shaped rat-trap bond brick wall built on sandy soil.",
+    "own_description": "In a locked-off high-angle medium-wide shot, the primary mason steadies the end brick with his left hand while dangling a plumb bob alongside the brick wall with his right hand to check vertical plumb, then pulls the plumb bob back, steps right, and sets it down on the ground.",
+    "does_not_show": "Shows checking plumb on an already-placed course rather than spreading mortar and laying a new brick, and does not show conventional flat brickwork for comparison."
+   },
+   {
+    "clip": "C0095_02761036.mp4",
+    "piece": "SUB_00111C8C2DBF_04",
+    "window_s": [
+     8.2,
+     15.4
+    ],
+    "today_the_clip_line": "Two workers check vertical plumb and straightedge alignment on a two-course L-shaped rat-trap bond brick wall built on sandy soil.",
+    "own_description": "In a locked-off high-angle medium-wide shot, the second worker holds the leftmost brick while the primary mason brings in a long wooden straightedge, presses it horizontally along the outer face of the upper brick course, and both workers carefully tap and adjust individual bricks on edge flush against the straightedge before lifting it away.",
+    "does_not_show": "Shows aligning bricks already placed on the course rather than laying fresh mortar and placing a brick from scratch."
+   },
+   {
+    "clip": "C0095_02761036.mp4",
+    "piece": "SUB_00111C8C2DBF_05",
+    "window_s": [
+     15.4,
+     17.74
+    ],
+    "today_the_clip_line": "Two workers check vertical plumb and straightedge alignment on a two-course L-shaped rat-trap bond brick wall built on sandy soil.",
+    "own_description": "In a locked-off high-angle medium-wide shot, the primary mason lifts the wooden straightedge, rotates it, and places it flat along the top surface of the upper brick course with both hands to check top levelness until the clip ends.",
+    "does_not_show": "Action cuts off before the mason finishes checking or adjusts any bricks on top."
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "piece": "SUB_1404425CF0C0_01",
+    "window_s": [
+     0.0,
+     5.5
+    ],
+    "today_the_clip_line": "46.54 s high-angle medium shot of a silent mason setting a corner brick on edge and spreading mortar along a two-course rat-trap bond brick wall corner.",
+    "own_description": "The mason uses both hands to press and align a red clay brick on edge at the right-hand corner of the second course, wipes excess wet mortar off the outer brick face with his hand, then takes his trowel and smooths mortar along the top corner joint before turning toward the mortar pan.",
+    "does_not_show": "Does not show conventional flat brickwork for comparison, material percentage savings, indoor thermal comfort, brick testing, or 7-day curing."
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "piece": "SUB_1404425CF0C0_02",
+    "window_s": [
+     5.5,
+     12.2
+    ],
+    "today_the_clip_line": "46.54 s high-angle medium shot of a silent mason setting a corner brick on edge and spreading mortar along a two-course rat-trap bond brick wall corner.",
+    "own_description": "The mason scoops mortar from the metal pan, braces the corner brick on edge with his left hand while packing mortar into the corner joint with his trowel, and then slices vertically into the joint mortar before pulling the trowel back toward the pan.",
+    "does_not_show": "Does not show placing a new brick or any material/thermal/curing outcomes."
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "piece": "SUB_1404425CF0C0_03",
+    "window_s": [
+     12.2,
+     21.0
+    ],
+    "today_the_clip_line": "46.54 s high-angle medium shot of a silent mason setting a corner brick on edge and spreading mortar along a two-course rat-trap bond brick wall corner.",
+    "own_description": "The mason scoops wet mortar from the pan, drops and spreads it onto the top of the inner corner bricks, cuts the joint clean, then scoops a second trowel load and spreads a smooth mortar layer across the corner junction.",
+    "does_not_show": "Does not show placing the next course of bricks, flat-brick comparison, material savings, thermal cooling, or curing."
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "piece": "SUB_1404425CF0C0_04",
+    "window_s": [
+     22.5,
+     29.0
+    ],
+    "today_the_clip_line": "46.54 s high-angle medium shot of a silent mason setting a corner brick on edge and spreading mortar along a two-course rat-trap bond brick wall corner.",
+    "own_description": "Framed from the shoulders down, the mason scoops two trowel loads of mortar from the pan and spreads an even mortar bed along the top of the left-side edge-laid bricks, leaving the hollow cavity along the wall clearly visible.",
+    "does_not_show": "Does not show flat brickwork, 25% savings, indoor cooling, brick strength testing, or 7-day curing."
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "piece": "SUB_1404425CF0C0_05",
+    "window_s": [
+     30.0,
+     37.0
+    ],
+    "today_the_clip_line": "46.54 s high-angle medium shot of a silent mason setting a corner brick on edge and spreading mortar along a two-course rat-trap bond brick wall corner.",
+    "own_description": "The mason scoops mortar twice from the pan and spreads it further along the top of the left-side bricks on edge, smoothing the surface with the flat of his trowel.",
+    "does_not_show": "Does not show brick placement, flat-brick comparison, material savings, thermal cooling, or curing."
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "piece": "SUB_1404425CF0C0_06",
+    "window_s": [
+     37.0,
+     46.54
+    ],
+    "today_the_clip_line": "46.54 s high-angle medium shot of a silent mason setting a corner brick on edge and spreading mortar along a two-course rat-trap bond brick wall corner.",
+    "own_description": "The mason scoops mortar from the pan and spreads it along the top of the outer brick on edge on the right-hand wall return, then scoops another load and spreads mortar along the inner parallel brick on edge, leaving the hollow cavity clearly open between the two parallel rows.",
+    "does_not_show": "Does not show laying a new brick on top of this mortar bed, flat-brick comparison, cost savings, indoor cooling, or 7-day curing."
+   }
+  ]
+ },
+ "T11": {
+  "clips_with_editor_notes": 43,
+  "editor_note_lines": 130,
+  "editor_note_examples": [
+   "C0032_02881492.mp4: Grade C architectural cutaway: noticeably underexposed with a distracting out-of-focus foreground wooden batten and diagonal scaffolding pole.",
+   "C0081_02743972.mp4: SUB_62D836CCA85D_02 (00:00:01:00 to 00:00:07:25) is the cleanest hero B-roll slice: 6.5 s of steady right-to-left pan over red bricks stood on edge before the foot appears at 00:08.",
+   "C0085_02747380.mp4: SUB_37D6E9613F69_02 (00:00:03:15 - 00:00:25:45, 22.6s) is the prime clean Grade-A B-roll window: locked-off, sharp, speech-free, with 105 frames of clean pre-roll handle from 00:00:01:10 after the mortar pan exits.",
+   "C0088_02751604.mp4: Both workers wear clip-on lavalier microphones and ASR logged '00:00 Please help me.' at 00:00 when the mason's head was cropped above the frame; mute source speech track per Mode 3 policy.",
+   "C0089_02753020.mp4: Locked-off 1080p50 tripod wide shot in soft shaded daylight; safe for up to 1.35x digital punch-in or 50% slow motion (50 fps source).",
+   "C0091_02755996.mp4: Automated ASR returned a false-positive transcript ('Are you sure that you want the red pepper?') triggered by trowel-on-metal scraping; direct audio check confirms zero speech in this clip (NAT_SOUND_ONLY).",
+   "C0092_02757244.mp4: All five sub-clips come from the exact same static tripod framing; do not cut directly between non-adjacent sub-clips without a cutaway or different angle to avoid jump cuts.",
+   "C0093_02758876.mp4: No speech occurs anywhere in this clip; the automated ASR string at 00:01 is a false positive triggered by brick/metal scraping noise."
+  ],
+  "pieces_with_spoken_words": 33,
+  "spoken_facts": 14,
+  "spoken_examples": [
+   "C0085_02747380.mp4: [unintelligible truncated utterance at clip start]",
+   "C0085_02747380.mp4: [00:26.0] All this sun/heat... [truncated]",
+   "C0089_02753020.mp4: [Unintelligible off-camera Tamil remark]",
+   "C0089_02753020.mp4: Explain/teach it (unclear off-camera remark)",
+   "C0089_02753020.mp4: [Unintelligible off-camera Tamil remarks]",
+   "C0092_02757244.mp4: (Unintelligible faint off-camera speech)"
+  ],
+  "pieces_with_best_frame": 116,
+  "pieces_with_title_zone": 106,
+  "graphics_ideas": 117,
+  "graphics_examples": [
+   "C0032_02881492.mp4: Dark shaded brick ceiling in the Top_Right quadrant offers clean negative space for white text if this shot is ever used as a brief moody background plate after exposure lift.",
+   "C0081_02743972.mp4: Brief lower-third or clean-sand area label identifying solid clay bricks placed on edge (requires extending via hold or using SUB_62D836CCA85D_02 for longer duration).",
+   "C0081_02743972.mp4: Track a clean dark-text callout or bracket onto the sandy bottom-center area highlighting 'Good quality bricks / Laid on edge' to connect the raw material shot to BEAT_02 or BEAT_04.",
+   "C0085_02747380.mp4: Slow to 50 percent (25p on 50p or frame-blended) to extend the 1.16s mortar pour into a 2.3s cutaway before cutting to troweling.",
+   "C0085_02747380.mp4: Simple callout label pointing to a brick ('Brick laid on edge') and mortar joint ('Mortar packed into joint') to help non-technical viewers see the brick orientation."
+  ],
+  "defects": 17,
+  "defect_kinds": [
+   [
+    "other",
+    11
+   ],
+   [
+    "camera_bump",
+    5
+   ],
+   [
+    "focus_hunt",
+    1
+   ]
+  ],
+  "colour_groups": {
+   "INTERIOR_DIM_BRICK_VAULT_SHADED": 1,
+   "EXT_DAYLIGHT_WARM_SAND_BRICKS": 1,
+   "EXT_DAY_SUNNY_EARTH_BRICK_01": 1,
+   "OUTDOOR_SHADE_DAYLIGHT_MASONRY": 1,
+   "OUTDOOR_SHADE_DAYLIGHT_BRICKYARD": 1,
+   "EXT_DAY_MASONRY_SITE_WARM": 1,
+   "EXT_DAY_SUNLIT_TERRACOTTA_MASONRY": 1,
+   "CMG_DAYLIGHT_OUTDOOR_MASONRY_WARM": 1,
+   "EXT_DAY_SANDY_YARD_BRICKWORK_01": 1,
+   "EXT_SHADE_RAT_TRAP_MASONRY_01": 1,
+   "OUTDOOR_SHADE_DAYLIGHT_01": 2,
+   "EXT_SHADE_MASONRY_DAY_01": 1,
+   "EXT_SHADE_DAY_BRICKWORK": 2,
+   "OUTDOOR_SHADE_DAY_BRICKYARD": 1,
+   "OUTDOOR_SHADE_RED_BRICK_01": 1,
+   "EXT_DAY_SUNLIT_BRICK_SITE": 1,
+   "OUTDOOR_SHADE_DAYLIGHT_BRICKWORK": 1,
+   "OUTDOOR_SHADED_DAYLIGHT_BRICKWALL_01": 1,
+   "CMG_OUTDOOR_SHADE_DAYLIGHT_01": 1,
+   "EXT_OVERCAST_MASONRY_SITE_01": 1,
+   "CMG_OUTDOOR_DAY_WARM_EARTH": 1,
+   "OUTDOOR_DAY_SHADE_MASONRY": 1,
+   "EXT_SHADED_COURTYARD_DAYLIGHT_01": 1,
+   "EXT_SHADE_BRICKYARD_01": 1,
+   "OUTDOOR_SHADE_MASONRY_DAY1": 1,
+   "EXT_SHADE_BRICKWORK_DAY1": 1,
+   "EXT_DAY_BRICKWORK_SHADE_01": 1,
+   "DAYLIGHT_EXT_BRICKWORK_DAPPLED": 1,
+   "OUTDOOR_DAYLIGHT_BRICKWORK_01": 1,
+   "EXT_DAY_OVERCAST_TERRACOTTA_BRICK": 1,
+   "EXT_OVERCAST_TERRACOTTA_DAY_01": 1,
+   "EXT_OVERCAST_RED_BRICK_FACADE": 1,
+   "EXT_RED_BRICK_DIFFUSE_DAYLIGHT": 1,
+   "EXT_OVERCAST_RED_BRICK_01": 1,
+   "EXT_OVERCAST_RED_BRICK_BUILDING": 1,
+   "EXT_OVERCAST_BRICK_BUILDING_01": 1,
+   "EXT_TERRACOTTA_BRICK_SHADE_01": 1,
+   "EXT_DAY_WARM_BRICK_OVERCAST": 1,
+   "EXT_SHADED_DAY_MASONRY_01": 1,
+   "EXT_DAY_SHADED_MASONRY_01": 1,
+   "EXT_DAY_DRONE_SUNNY_TERRACOTTA": 1
+  }
+ },
+ "T12": {
+  "clips_with_several_pieces": 34,
+  "clips_whose_pieces_differ": 23,
+  "examples": [
+   {
+    "clip": "C0085_02747380.mp4",
+    "pieces": 3,
+    "different_kinds": 3,
+    "direct_fits": []
+   },
+   {
+    "clip": "C0088_02751604.mp4",
+    "pieces": 5,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0089_02753020.mp4",
+    "pieces": 4,
+    "different_kinds": 3,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0091_02755996.mp4",
+    "pieces": 4,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0092_02757244.mp4",
+    "pieces": 5,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0093_02758876.mp4",
+    "pieces": 5,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0095_02761036.mp4",
+    "pieces": 5,
+    "different_kinds": 3,
+    "direct_fits": [
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0097_02763220.mp4",
+    "pieces": 6,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0099_02766196.mp4",
+    "pieces": 4,
+    "different_kinds": 4,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0102_02769436.mp4",
+    "pieces": 3,
+    "different_kinds": 3,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0108_02778676.mp4",
+    "pieces": 2,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_02",
+     "BEAT_05"
+    ]
+   },
+   {
+    "clip": "C0109_02779156.mp4",
+    "pieces": 2,
+    "different_kinds": 2,
+    "direct_fits": [
+     "BEAT_05"
+    ]
+   }
+  ]
+ },
+ "T13": {
+  "paragraphs": 7,
+  "with_more_than_one_sentence": 4,
+  "sentences": 11,
+  "sentences_per_paragraph": {
+   "BEAT_01": 1,
+   "BEAT_02": 2,
+   "BEAT_03": 2,
+   "BEAT_04": 2,
+   "BEAT_05": 2,
+   "BEAT_06": 1,
+   "BEAT_07": 1
+  },
+  "direct_fit_pieces_per_paragraph": {
+   "BEAT_05": 59,
+   "BEAT_02": 47
+  },
+  "direct_fits_into_a_paragraph_of_several_sentences": 106
+ },
+ "T14": {
+  "sentence_seconds_per_paragraph": {
+   "BEAT_01": [
+    8.0
+   ],
+   "BEAT_02": [
+    6.64,
+    3.76
+   ],
+   "BEAT_03": [
+    7.44,
+    4.52
+   ],
+   "BEAT_04": [
+    5.02,
+    2.94
+   ],
+   "BEAT_05": [
+    2.32,
+    6.04
+   ],
+   "BEAT_06": [
+    4.66
+   ],
+   "BEAT_07": [
+    7.2
+   ]
+  },
+  "pieces_whose_moment_outlasts_every_sentence": 0,
+  "within_4_s": 0,
+  "within_7_s": 0,
+  "over_7_s": 0,
+  "examples": [],
+  "moments_logged": 68,
+  "moment_seconds": [
+   1.0,
+   1.0,
+   1.0,
+   1.2,
+   1.3,
+   1.3,
+   1.5,
+   1.6,
+   1.6,
+   1.6,
+   1.7,
+   1.8,
+   1.8,
+   2.0,
+   2.0,
+   2.0,
+   2.0,
+   2.0,
+   2.0,
+   2.0,
+   2.2,
+   2.2,
+   2.2,
+   2.3,
+   2.3,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.5,
+   2.6,
+   2.7,
+   2.7,
+   2.7,
+   2.7,
+   2.7,
+   2.8,
+   2.8,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.0,
+   3.5,
+   3.5,
+   4.0,
+   4.5
+  ]
+ },
+ "T9": [
+  {
+   "kind": "a short clip (15 s or less)",
+   "clip": "C0032_02881492.mp4",
+   "seconds": 3.84,
+   "way": "STATIC",
+   "overview": "A 3.84-second low-angle interior shot looking upward at a dimly lit curved red-brick ceiling with a white plastered lattice arch on the left. A grey metal scaffolding pole runs diagonally across the ceiling while a dark brown wooden batten in the immediate foreground shifts to the right relative to the background as the handheld camera drifts slightly. No people or active masonry work are visible in the frame.",
+   "sound": "MOS_SILENT",
+   "pieces": [
+    {
+     "from_to_s": [
+      0.0,
+      3.84
+     ],
+     "what": "Upward low-angle view of a dark red-brick vaulted ceiling, a white plastered lattice arch on the left, and a diagonal grey metal pole, while an out-of-focus wooden batten in the lower foreground shifts slightly rightward as the camera drifts gently.",
+     "not_sure": "Motion between the 1-second sampled keyframes (such as micro-jitter at 50 fps) and the cause of the wooden batten's relative rightward shift are not directly observable.",
+     "does_not_show": "Does not show Rat-Trap Bond wall construction or any of the seven script beats.",
+     "people": 0,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      null,
+      null
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "an action in several pieces",
+   "clip": "C0116_02782900.mp4",
+   "seconds": 4.8,
+   "way": "STATIC",
+   "overview": "A low-angle close-up shot along the top of a newly laid rat-trap bond brick wall covered with fresh grey cement mortar. The camera holds briefly on the foreground corner, executes a smooth lateral arc to the right from roughly 1.0 s to 3.2 s, and settles into an axial view looking down the length of the wall, clearly revealing the bricks laid on edge and the row of rectangular hollow cavities.",
+   "sound": "OFF_CAMERA_SPEECH",
+   "pieces": [
+    {
+     "from_to_s": [
+      0.0,
+      4.78
+     ],
+     "what": "Static masonry environment showing a freshly mortared rat-trap bond brick wall; the camera holds on the foreground corner, pans/arcs smoothly to the right to align with the wall axis, and settles looking straight down the row of hollow cavities.",
+     "not_sure": "The exact transition frames into and out of the camera arc are gradual; the partial figure in the distant upper-left background during the first 1.6 s is out of focus.",
+     "does_not_show": "Does not show the act of a mason placing a brick, thermal insulation performance, or the exact 25 percent brick savings.",
+     "people": 1,
+     "speech": "It can be laid, no problem. Above this, there is this course, lintel and all. In all of this, lintel...",
+     "who_speaks": "SUBJECT_EXPLAINING",
+     "moment_s": [
+      null,
+      null
+     ]
+    },
+    {
+     "from_to_s": [
+      3.2,
+      4.78
+     ],
+     "what": "Static axial close-up looking straight down the top of the rat-trap bond wall, showcasing the parallel rows of bricks on edge, wet mortar bed, and repeating rectangular hollow cavities.",
+     "not_sure": "The start point at 3.2 s marks where the preceding camera arc settles into stillness, which is approximate within a few frames.",
+     "does_not_show": "Does not show bricks being actively laid, material savings percentage, or indoor thermal performance.",
+     "people": 0,
+     "speech": "In all of this, lintel...",
+     "who_speaks": "SUBJECT_EXPLAINING",
+     "moment_s": [
+      null,
+      null
+     ]
+    },
+    {
+     "from_to_s": [
+      1.0,
+      3.2
+     ],
+     "what": "Smooth lateral camera pan/arc right across the wet cement mortar on top of the brick wall, gradually revealing the straight line of hollow cavities.",
+     "not_sure": "Exact entry and exit frames of the camera motion are approximate due to smooth easing.",
+     "does_not_show": "Shows completed lower courses only, not active bricklaying or thermal performance.",
+     "people": 1,
+     "speech": "Above this, there is this course, lintel and all.",
+     "who_speaks": "SUBJECT_EXPLAINING",
+     "moment_s": [
+      null,
+      null
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "speech is heard",
+   "clip": "C0128_02794180.mp4",
+   "seconds": 4.8,
+   "way": "STATIC",
+   "overview": "A low-angle medium shot pushes slowly toward a partially built red brick wall constructed in rat-trap bond masonry outdoors on dirt ground beneath leafy trees. A mason in a beige shirt and dark trousers leans behind the center of the wall, inspecting the bricks and speaking in Tamil while a brief off-camera reply is heard. A long metal straight-edge bar rests diagonally on the dirt in the immediate foreground.",
+   "sound": "MIXED",
+   "pieces": [
+    {
+     "from_to_s": [
+      0.0,
+      4.8
+     ],
+     "what": "The camera performs a slow, continuous low-angle push-in toward a partially built brick wall laid in rat-trap bond with bricks on edge and visible hollow cavities. Behind the wall, a mason leans down looking at the brickwork while speaking in profile; his hands remain hidden behind the wall.",
+     "not_sure": "Whether the mason is physically holding or aligning a brick behind the wall is not visible due to occlusion by the wall.",
+     "does_not_show": "Does not show bricks being actively placed with mortar by hand, nor does it show flat conventional brickwork for side-by-side comparison or finished indoor cooling.",
+     "people": 1,
+     "speech": "[00:00.2] For this one brick, we can take this. [00:02.1] (Off-camera: Ah, okay, okay.) [00:02.7] We can take this, we can take it like this.",
+     "who_speaks": "SUBJECT_EXPLAINING",
+     "moment_s": [
+      1.0,
+      4.0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "flagged for a risk",
+   "clip": "C0136_02799100.mp4",
+   "seconds": 10.56,
+   "way": "STATIC",
+   "overview": "A smooth exterior pull-out shot moves backward and slightly left from an arched brick-faced entrance bearing a blue sign reading TAKSHASHILA to reveal the full two-story facade, stone-patterned plinth, windows with overhangs, concrete benches, a solar light pole on the left, and trees on the right under an overcast sky. No people appear on screen and no speech is observed.",
+   "sound": "MOS_SILENT",
+   "pieces": [
+    {
+     "from_to_s": [
+      0.0,
+      10.56
+     ],
+     "what": "The camera starts on a tight low-angle view of the arched brick entrance and upper gable bearing the TAKSHASHILA plaque, then glides smoothly backward and slightly left to reveal the full two-story brick facade, entrance steps, concrete benches, unpaved courtyard, solar light pole on the left, and surrounding trees, gently decelerating to a near-static wide frame over the final two seconds.",
+     "not_sure": "The transition from active backward movement to settling around 8.5 seconds is gradual rather than an abrupt stop; whether the building uses rat-trap bond internally cannot be determined visually.",
+     "does_not_show": "Does not show rat-trap bond brick coursing on edge, hollow wall cavities, cost savings, or indoor thermal performance.",
+     "people": 0,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      null,
+      null
+     ]
+    },
+    {
+     "from_to_s": [
+      8.5,
+      10.56
+     ],
+     "what": "The settled wide-shot tail showing the full two-story reddish brick-faced Takshashila building, arched entrance steps, concrete benches, solar street light pole on the left, and trees framing the right.",
+     "not_sure": "Residual micro-drift from the preceding pull-out is still subtly present between 00:08:25 and 00:09:25 before nearly stopping.",
+     "does_not_show": "Does not depict rat-trap bond cavities, material savings, or interior temperature.",
+     "people": 0,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      null,
+      null
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "the longest clip",
+   "clip": "C0097_02763220.mp4",
+   "seconds": 46.570667,
+   "way": "AGENTIC",
+   "overview": "A continuous high-angle medium shot of a silent mason bending over an L-shaped corner of a two-course rat-trap bond brick wall on bare dirt ground. From 00:00 to 00:12, he aligns a red brick on edge at the corner and packs mortar into the vertical joint; from 00:12 to 00:46.54, he repeatedly scoops mortar from a metal pan and spreads a mortar bed across the top of the edge-laid bricks while keeping the longitudinal hollow cavities open.",
+   "sound": "MIXED",
+   "pieces": [
+    {
+     "from_to_s": [
+      0.0,
+      5.5
+     ],
+     "what": "The mason uses both hands to press and align a red clay brick on edge at the right-hand corner of the second course, wipes excess wet mortar off the outer brick face with his hand, then takes his trowel and smooths mortar along the top corner joint before turning toward the mortar pan.",
+     "not_sure": "The initial pickup of this corner brick occurred before frame 0.",
+     "does_not_show": "Does not show conventional flat brickwork for comparison, material percentage savings, indoor thermal comfort, brick testing, or 7-day curing.",
+     "people": 1,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      0.5,
+      3.5
+     ]
+    },
+    {
+     "from_to_s": [
+      5.5,
+      12.2
+     ],
+     "what": "The mason scoops mortar from the metal pan, braces the corner brick on edge with his left hand while packing mortar into the corner joint with his trowel, and then slices vertically into the joint mortar before pulling the trowel back toward the pan.",
+     "not_sure": "Exact start of camera tilt between 8.5 s and 10.5 s is approximate.",
+     "does_not_show": "Does not show placing a new brick or any material/thermal/curing outcomes.",
+     "people": 1,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      6.5,
+      8.5
+     ]
+    },
+    {
+     "from_to_s": [
+      12.2,
+      21.0
+     ],
+     "what": "The mason scoops wet mortar from the pan, drops and spreads it onto the top of the inner corner bricks, cuts the joint clean, then scoops a second trowel load and spreads a smooth mortar layer across the corner junction.",
+     "not_sure": "None consequential; the mason's head rises above the top frame edge around 17.5 s.",
+     "does_not_show": "Does not show placing the next course of bricks, flat-brick comparison, material savings, thermal cooling, or curing.",
+     "people": 1,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      14.0,
+      16.5
+     ]
+    },
+    {
+     "from_to_s": [
+      22.5,
+      29.0
+     ],
+     "what": "Framed from the shoulders down, the mason scoops two trowel loads of mortar from the pan and spreads an even mortar bed along the top of the left-side edge-laid bricks, leaving the hollow cavity along the wall clearly visible.",
+     "not_sure": "None consequential; mason's head stays completely above the upper frame edge throughout this window.",
+     "does_not_show": "Does not show flat brickwork, 25% savings, indoor cooling, brick strength testing, or 7-day curing.",
+     "people": 1,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      24.5,
+      27.5
+     ]
+    },
+    {
+     "from_to_s": [
+      30.0,
+      37.0
+     ],
+     "what": "The mason scoops mortar twice from the pan and spreads it further along the top of the left-side bricks on edge, smoothing the surface with the flat of his trowel.",
+     "not_sure": "Around 31.5-32.5 s, a very faint unintelligible off-camera murmur is audible; the mason's mouth does not appear to move.",
+     "does_not_show": "Does not show brick placement, flat-brick comparison, material savings, thermal cooling, or curing.",
+     "people": 1,
+     "speech": "[unintelligible faint off-camera murmur]",
+     "who_speaks": "BACKGROUND_CHATTER",
+     "moment_s": [
+      34.0,
+      36.5
+     ]
+    },
+    {
+     "from_to_s": [
+      37.0,
+      46.54
+     ],
+     "what": "The mason scoops mortar from the pan and spreads it along the top of the outer brick on edge on the right-hand wall return, then scoops another load and spreads mortar along the inner parallel brick on edge, leaving the hollow cavity clearly open between the two parallel rows.",
+     "not_sure": "The clip ends while the mason is still smoothing the mortar along the inner brick edge.",
+     "does_not_show": "Does not show laying a new brick on top of this mortar bed, flat-brick comparison, cost savings, indoor cooling, or 7-day curing.",
+     "people": 1,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      43.5,
+      46.0
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "a clip of middle length watched the look-again way",
+   "clip": "DJI_20241219103046_0091_D00000000_00000000.mp4",
+   "seconds": 21.013333,
+   "way": "AGENTIC",
+   "overview": "A continuous overhead nadir drone shot slowly ascending above a cluster of buildings with terracotta-colored hipped roofs nestled among dense green trees and palms. As the drone pulls out vertically, surrounding dirt access paths, parked vehicles, neighboring structures, and a rooftop with solar panels come further into view.",
+   "sound": "MOS_SILENT",
+   "pieces": [
+    {
+     "from_to_s": [
+      0.0,
+      21.0
+     ],
+     "what": "An overhead nadir drone shot slowly ascends straight up over a tree-shaded compound of terracotta-roofed buildings, gradually revealing more of the surrounding greenery, dirt roads, parked vehicles, and neighboring buildings.",
+     "not_sure": "Motion smoothness between 1-second sampled frames is inferred to be continuous; exact drone altitude is unknown.",
+     "does_not_show": "Does not show brick walls, rat-trap bond cavities, material savings, or interior temperature.",
+     "people": 0,
+     "speech": null,
+     "who_speaks": null,
+     "moment_s": [
+      null,
+      null
+     ]
+    }
+   ]
+  }
+ ]
+}

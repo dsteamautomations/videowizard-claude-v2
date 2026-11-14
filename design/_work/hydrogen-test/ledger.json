@@ -1,0 +1,1891 @@
+{
+ "spent_usd": 9.1641,
+ "requests": [
+  {
+   "clip": "C0032_02881492.mp4",
+   "mode": "STATIC",
+   "duration_s": 3.84,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11883,
+    "candidatesTokenCount": 3700,
+    "totalTokenCount": 20514,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10691
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1192
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3700
+     }
+    ],
+    "thoughtsTokenCount": 4931,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0826,
+   "seconds": 58.8,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0114_02782204.mp4",
+   "mode": "STATIC",
+   "duration_s": 8.170667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13112,
+    "candidatesTokenCount": 5219,
+    "totalTokenCount": 23012,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10720
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2392
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 5219
+     }
+    ],
+    "thoughtsTokenCount": 4681,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0939,
+   "seconds": 63.9,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0113_02781556.mp4",
+   "mode": "STATIC",
+   "duration_s": 12.970667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14621,
+    "candidatesTokenCount": 8455,
+    "totalTokenCount": 30611,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10733
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3888
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 8455
+     }
+    ],
+    "thoughtsTokenCount": 7535,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1419,
+   "seconds": 88.8,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0134_02797372.mp4",
+   "mode": "STATIC",
+   "duration_s": 16.810667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 15829,
+    "candidatesTokenCount": 7776,
+    "totalTokenCount": 27849,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10749
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 5080
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 7776
+     }
+    ],
+    "thoughtsTokenCount": 4244,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1139,
+   "seconds": 107.5,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0032_02881492.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 3.84,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11040,
+    "candidatesTokenCount": 4142,
+    "totalTokenCount": 72428,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11040
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 4142
+     }
+    ],
+    "toolUsePromptTokenCount": 47378,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 23347
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 24031
+     }
+    ],
+    "thoughtsTokenCount": 9868,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1927,
+   "seconds": 77.5,
+   "looks": 3,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0114_02782204.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 8.170667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11053,
+    "candidatesTokenCount": 9068,
+    "totalTokenCount": 52257,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11053
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 9068
+     }
+    ],
+    "toolUsePromptTokenCount": 20757,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11451
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 9306
+     }
+    ],
+    "thoughtsTokenCount": 11379,
+    "serviceTier": "standard"
+   },
+   "usd": 0.2011,
+   "seconds": 102.2,
+   "looks": 2,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0113_02781556.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 12.970667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11047,
+    "candidatesTokenCount": 11937,
+    "totalTokenCount": 123636,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11047
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11937
+     }
+    ],
+    "toolUsePromptTokenCount": 87476,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 35632
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 51844
+     }
+    ],
+    "thoughtsTokenCount": 13176,
+    "serviceTier": "standard"
+   },
+   "usd": 0.3361,
+   "seconds": 139.5,
+   "looks": 6,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0134_02797372.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 16.810667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11046,
+    "candidatesTokenCount": 8581,
+    "totalTokenCount": 88886,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11046
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 8581
+     }
+    ],
+    "toolUsePromptTokenCount": 58348,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 23583
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 34765
+     }
+    ],
+    "thoughtsTokenCount": 10911,
+    "serviceTier": "standard"
+   },
+   "usd": 0.2503,
+   "seconds": 105.3,
+   "looks": 5,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0139_02800180.mp4",
+   "mode": "STATIC",
+   "duration_s": 4.330667,
+   "error": "incomplete_response",
+   "http_status": null,
+   "provider_error": null,
+   "usage": {
+    "promptTokenCount": 11744,
+    "candidatesTokenCount": 540,
+    "totalTokenCount": 19159,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10548
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1156
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 540
+     }
+    ],
+    "thoughtsTokenCount": 6875,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0732,
+   "seconds": 171.0
+  },
+  {
+   "clip": "C0116_02782900.mp4",
+   "mode": "STATIC",
+   "duration_s": 4.8,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12192,
+    "candidatesTokenCount": 8747,
+    "totalTokenCount": 24294,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10702
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1490
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 8747
+     }
+    ],
+    "thoughtsTokenCount": 3355,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1091,
+   "seconds": 69.0,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0128_02794180.mp4",
+   "mode": "STATIC",
+   "duration_s": 4.8,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12192,
+    "candidatesTokenCount": 4283,
+    "totalTokenCount": 21271,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10702
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1490
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 4283
+     }
+    ],
+    "thoughtsTokenCount": 4796,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0864,
+   "seconds": 60.7,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0138_02799940.mp4",
+   "mode": "STATIC",
+   "duration_s": 4.8,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12196,
+    "candidatesTokenCount": 5677,
+    "totalTokenCount": 22302,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10706
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1490
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 5677
+     }
+    ],
+    "thoughtsTokenCount": 4429,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0941,
+   "seconds": 59.3,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0107_02778412.mp4",
+   "mode": "STATIC",
+   "duration_s": 5.290667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12204,
+    "candidatesTokenCount": 3978,
+    "totalTokenCount": 19551,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10708
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1496
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3978
+     }
+    ],
+    "thoughtsTokenCount": 3369,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0734,
+   "seconds": 44.8,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0115_02782612.mp4",
+   "mode": "STATIC",
+   "duration_s": 5.76,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12495,
+    "candidatesTokenCount": 2720,
+    "totalTokenCount": 19325,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10707
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1788
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 2720
+     }
+    ],
+    "thoughtsTokenCount": 4110,
+    "serviceTier": "standard"
+   },
+   "usd": 0.07,
+   "seconds": 38.9,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0209_02861020.mp4",
+   "mode": "STATIC",
+   "duration_s": 5.76,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12503,
+    "candidatesTokenCount": 7274,
+    "totalTokenCount": 26484,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10715
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1788
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 7274
+     }
+    ],
+    "thoughtsTokenCount": 6707,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1236,
+   "seconds": 81.2,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0140_02800396.mp4",
+   "mode": "STATIC",
+   "duration_s": 6.250667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12498,
+    "candidatesTokenCount": 3988,
+    "totalTokenCount": 20446,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10704
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1794
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3988
+     }
+    ],
+    "thoughtsTokenCount": 3960,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0784,
+   "seconds": 56.6,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0202_02858956.mp4",
+   "mode": "STATIC",
+   "duration_s": 6.250667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12498,
+    "candidatesTokenCount": 3424,
+    "totalTokenCount": 19770,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10704
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1794
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3424
+     }
+    ],
+    "thoughtsTokenCount": 3848,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0733,
+   "seconds": 51.2,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0102_02769436.mp4",
+   "mode": "STATIC",
+   "duration_s": 6.72,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12801,
+    "candidatesTokenCount": 9337,
+    "totalTokenCount": 28978,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10715
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2086
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 9337
+     }
+    ],
+    "thoughtsTokenCount": 6840,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1405,
+   "seconds": 85.2,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0129_02794420.mp4",
+   "mode": "STATIC",
+   "duration_s": 6.72,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12801,
+    "candidatesTokenCount": 5435,
+    "totalTokenCount": 19276,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10715
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2086
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 5435
+     }
+    ],
+    "thoughtsTokenCount": 1040,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0678,
+   "seconds": 46.4,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0207_02860228.mp4",
+   "mode": "STATIC",
+   "duration_s": 7.210667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 12810,
+    "candidatesTokenCount": 3849,
+    "totalTokenCount": 22065,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10716
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2094
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3849
+     }
+    ],
+    "thoughtsTokenCount": 5406,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0886,
+   "seconds": 54.5,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0126_02792764.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.130667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13499,
+    "candidatesTokenCount": 5739,
+    "totalTokenCount": 21940,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10807
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2692
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 5739
+     }
+    ],
+    "thoughtsTokenCount": 2702,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0836,
+   "seconds": 59.5,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0130_02794756.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.130667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13412,
+    "candidatesTokenCount": 7789,
+    "totalTokenCount": 25004,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10720
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2692
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 7789
+     }
+    ],
+    "thoughtsTokenCount": 3803,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1071,
+   "seconds": 71.5,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0293_03067588.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.130667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13408,
+    "candidatesTokenCount": 5184,
+    "totalTokenCount": 22099,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10716
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2692
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 5184
+     }
+    ],
+    "thoughtsTokenCount": 3507,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0853,
+   "seconds": 55.2,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0081_02743972.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.6,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13702,
+    "candidatesTokenCount": 7330,
+    "totalTokenCount": 25622,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10722
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2980
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 7330
+     }
+    ],
+    "thoughtsTokenCount": 4590,
+    "serviceTier": "standard"
+   },
+   "usd": 0.11,
+   "seconds": 66.5,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0100_02767780.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.6,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13698,
+    "candidatesTokenCount": 7090,
+    "totalTokenCount": 24928,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10718
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2980
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 7090
+     }
+    ],
+    "thoughtsTokenCount": 4140,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1048,
+   "seconds": 63.6,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0108_02778676.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.6,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13698,
+    "candidatesTokenCount": 6125,
+    "totalTokenCount": 25096,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10718
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2980
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 6125
+     }
+    ],
+    "thoughtsTokenCount": 5273,
+    "serviceTier": "standard"
+   },
+   "usd": 0.106,
+   "seconds": 71.5,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0109_02779156.mp4",
+   "mode": "STATIC",
+   "duration_s": 9.6,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 13706,
+    "candidatesTokenCount": 6532,
+    "totalTokenCount": 25953,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10726
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 2980
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 6532
+     }
+    ],
+    "thoughtsTokenCount": 5715,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1124,
+   "seconds": 71.4,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0111_02779732.mp4",
+   "mode": "STATIC",
+   "duration_s": 10.56,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14010,
+    "candidatesTokenCount": 9962,
+    "totalTokenCount": 33425,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10732
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3278
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 9962
+     }
+    ],
+    "thoughtsTokenCount": 9453,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1666,
+   "seconds": 106.6,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0136_02799100.mp4",
+   "mode": "STATIC",
+   "duration_s": 10.56,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14014,
+    "candidatesTokenCount": 5986,
+    "totalTokenCount": 24270,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10736
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3278
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 5986
+     }
+    ],
+    "thoughtsTokenCount": 4270,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0979,
+   "seconds": 71.3,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0124_02791708.mp4",
+   "mode": "STATIC",
+   "duration_s": 11.050667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14027,
+    "candidatesTokenCount": 6438,
+    "totalTokenCount": 24025,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10737
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3290
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 6438
+     }
+    ],
+    "thoughtsTokenCount": 3560,
+    "serviceTier": "standard"
+   },
+   "usd": 0.096,
+   "seconds": 59.4,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0131_02795212.mp4",
+   "mode": "STATIC",
+   "duration_s": 11.050667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14027,
+    "candidatesTokenCount": 4542,
+    "totalTokenCount": 21754,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10737
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3290
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 4542
+     }
+    ],
+    "thoughtsTokenCount": 3185,
+    "serviceTier": "standard"
+   },
+   "usd": 0.079,
+   "seconds": 50.0,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0288_03064924.mp4",
+   "mode": "STATIC",
+   "duration_s": 12.010667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14329,
+    "candidatesTokenCount": 7696,
+    "totalTokenCount": 26619,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10741
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3588
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 7696
+     }
+    ],
+    "thoughtsTokenCount": 4594,
+    "serviceTier": "standard"
+   },
+   "usd": 0.1137,
+   "seconds": 80.7,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0105_02777428.mp4",
+   "mode": "STATIC",
+   "duration_s": 12.48,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 14320,
+    "candidatesTokenCount": 6535,
+    "totalTokenCount": 27586,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10732
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 3588
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 6535
+     }
+    ],
+    "thoughtsTokenCount": 6731,
+    "serviceTier": "standard"
+   },
+   "usd": 0.121,
+   "seconds": 85.0,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0095_02761036.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 17.770667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11051,
+    "candidatesTokenCount": 12838,
+    "totalTokenCount": 158143,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11051
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 12838
+     }
+    ],
+    "toolUsePromptTokenCount": 124229,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 36542
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 87687
+     }
+    ],
+    "thoughtsTokenCount": 10025,
+    "serviceTier": "standard"
+   },
+   "usd": 0.3744,
+   "seconds": 140.8,
+   "looks": 5,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0135_02798212.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 17.770667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11043,
+    "candidatesTokenCount": 6762,
+    "totalTokenCount": 197903,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11043
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 6762
+     }
+    ],
+    "toolUsePromptTokenCount": 169247,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 50953
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 118294
+     }
+    ],
+    "thoughtsTokenCount": 10851,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4025,
+   "seconds": 140.5,
+   "looks": 8,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0120_02786596.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 19.2,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11056,
+    "candidatesTokenCount": 8644,
+    "totalTokenCount": 91215,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11056
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 8644
+     }
+    ],
+    "toolUsePromptTokenCount": 61855,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 23479
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 38376
+     }
+    ],
+    "thoughtsTokenCount": 9660,
+    "serviceTier": "standard"
+   },
+   "usd": 0.2466,
+   "seconds": 120.8,
+   "looks": 3,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "DJI_20241219103046_0091_D00000000_00000000.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 21.013333,
+   "plain_fallback": true,
+   "usage": {
+    "promptTokenCount": 17105,
+    "candidatesTokenCount": 3954,
+    "totalTokenCount": 23597,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10825
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 6280
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3954
+     }
+    ],
+    "thoughtsTokenCount": 2538,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0743,
+   "seconds": 1032.8,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0091_02755996.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 24.96,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.4
+  },
+  {
+   "clip": "C0065_02730556.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 25.450667,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.2
+  },
+  {
+   "clip": "C0112_02780260.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 25.92,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0093_02758876.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 26.410667,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0085_02747380.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 26.88,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0119_02785252.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 26.88,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0088_02751604.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 28.330667,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0099_02766196.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 31.68,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0092_02757244.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 32.64,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0089_02753020.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 40.32,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0097_02763220.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 46.570667,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0122_02788948.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 51.84,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.1
+  },
+  {
+   "clip": "C0104_02772676.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 95.04,
+   "error": "connection_error",
+   "http_status": null,
+   "provider_error": null,
+   "usage": null,
+   "usd": 0.0,
+   "seconds": 0.2
+  },
+  {
+   "clip": "C0139_02800180.mp4",
+   "mode": "STATIC",
+   "duration_s": 4.330667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11896,
+    "candidatesTokenCount": 3546,
+    "totalTokenCount": 17680,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 10700
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 1196
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 3546
+     }
+    ],
+    "thoughtsTokenCount": 2238,
+    "serviceTier": "standard"
+   },
+   "usd": 0.0612,
+   "seconds": 29.9,
+   "looks": 0,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0091_02755996.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 24.96,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11060,
+    "candidatesTokenCount": 11780,
+    "totalTokenCount": 94002,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11060
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11780
+     }
+    ],
+    "toolUsePromptTokenCount": 63377,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 23429
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 39948
+     }
+    ],
+    "thoughtsTokenCount": 7785,
+    "serviceTier": "standard"
+   },
+   "usd": 0.2584,
+   "seconds": 120.9,
+   "looks": 4,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0065_02730556.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 25.450667,
+   "error": "incomplete_response",
+   "http_status": null,
+   "provider_error": null,
+   "usage": {
+    "promptTokenCount": 11045,
+    "candidatesTokenCount": 260,
+    "totalTokenCount": 85875,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11045
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 260
+     }
+    ],
+    "toolUsePromptTokenCount": 73134,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 23503
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 49631
+     }
+    ],
+    "thoughtsTokenCount": 1436,
+    "serviceTier": "standard"
+   },
+   "usd": 0.139,
+   "seconds": 62.4
+  },
+  {
+   "clip": "C0112_02780260.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 25.92,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11048,
+    "candidatesTokenCount": 14710,
+    "totalTokenCount": 210295,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11048
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 14710
+     }
+    ],
+    "toolUsePromptTokenCount": 171642,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 50511
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 121131
+     }
+    ],
+    "thoughtsTokenCount": 12895,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4811,
+   "seconds": 168.9,
+   "looks": 7,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0093_02758876.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 26.410667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11056,
+    "candidatesTokenCount": 14385,
+    "totalTokenCount": 172291,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11056
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 14385
+     }
+    ],
+    "toolUsePromptTokenCount": 135537,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 36061
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 99476
+     }
+    ],
+    "thoughtsTokenCount": 11313,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4126,
+   "seconds": 158.3,
+   "looks": 5,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0085_02747380.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 26.88,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11060,
+    "candidatesTokenCount": 9301,
+    "totalTokenCount": 108384,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11060
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 9301
+     }
+    ],
+    "toolUsePromptTokenCount": 73861,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 23457
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 50404
+     }
+    ],
+    "thoughtsTokenCount": 14162,
+    "serviceTier": "standard"
+   },
+   "usd": 0.3034,
+   "seconds": 138.8,
+   "looks": 4,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0119_02785252.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 26.88,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11060,
+    "candidatesTokenCount": 13384,
+    "totalTokenCount": 201407,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11060
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 13384
+     }
+    ],
+    "toolUsePromptTokenCount": 158838,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 37860
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 120978
+     }
+    ],
+    "thoughtsTokenCount": 18125,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4912,
+   "seconds": 181.0,
+   "looks": 5,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0088_02751604.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 28.330667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11057,
+    "candidatesTokenCount": 14584,
+    "totalTokenCount": 136689,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11057
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 14584
+     }
+    ],
+    "toolUsePromptTokenCount": 88248,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 24317
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 63931
+     }
+    ],
+    "thoughtsTokenCount": 22800,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4293,
+   "seconds": 153.3,
+   "looks": 5,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0099_02766196.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 31.68,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11060,
+    "candidatesTokenCount": 12259,
+    "totalTokenCount": 180830,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11060
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 12259
+     }
+    ],
+    "toolUsePromptTokenCount": 143644,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 37971
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 105673
+     }
+    ],
+    "thoughtsTokenCount": 13867,
+    "serviceTier": "standard"
+   },
+   "usd": 0.428,
+   "seconds": 149.5,
+   "looks": 6,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0092_02757244.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 32.64,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11056,
+    "candidatesTokenCount": 14500,
+    "totalTokenCount": 125687,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11056
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 14500
+     }
+    ],
+    "toolUsePromptTokenCount": 88187,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 36347
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 51840
+     }
+    ],
+    "thoughtsTokenCount": 11944,
+    "serviceTier": "standard"
+   },
+   "usd": 0.3472,
+   "seconds": 153.1,
+   "looks": 8,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0089_02753020.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 40.32,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11048,
+    "candidatesTokenCount": 13013,
+    "totalTokenCount": 183984,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11048
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 13013
+     }
+    ],
+    "toolUsePromptTokenCount": 148730,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 36476
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 112254
+     }
+    ],
+    "thoughtsTokenCount": 11193,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4212,
+   "seconds": 162.7,
+   "looks": 5,
+   "finish_reason": "STOP"
+  },
+  {
+   "clip": "C0097_02763220.mp4",
+   "mode": "AGENTIC",
+   "duration_s": 46.570667,
+   "plain_fallback": false,
+   "usage": {
+    "promptTokenCount": 11057,
+    "candidatesTokenCount": 13356,
+    "totalTokenCount": 168432,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 11057
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 13356
+     }
+    ],
+    "toolUsePromptTokenCount": 129575,
+    "toolUsePromptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 36100
+     },
+     {
+      "modality": "VIDEO",
+      "tokenCount": 93475
+     }
+    ],
+    "thoughtsTokenCount": 14444,
+    "serviceTier": "standard"
+   },
+   "usd": 0.4194,
+   "seconds": 168.5,
+   "looks": 5,
+   "finish_reason": "STOP"
+  }
+ ]
+}
