@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock-up: a word sounds wrong (voices page, Narrations step)</title>
+<style>
+:root{--bg:#fff;--fg:#1b1b1f;--muted:#6b6b76;--line:#e3e3e8;--card:#f7f7f9;--accent:#2d2a6e;--on:#fff;--ok:#1d7d4f;--warn:#a05a00;--hl:#fff1c2;--sel:#e9e8fb}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;color:var(--fg);background:var(--bg)}
+.wrap{max-width:1120px;margin:0 auto;padding:16px 16px 120px}
+.note{background:#fff8e0;border:1px solid #ecd98a;border-radius:10px;padding:10px 14px;font-size:13.5px;margin-bottom:14px}
+.steps{display:flex;gap:14px;font-size:16px;border-bottom:1px solid var(--line);padding:6px 0 8px;color:var(--muted)}
+.steps b{color:var(--fg);border-bottom:2px solid var(--fg)}
+h2{font-size:13px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin:22px 0 8px}
+table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:9px 12px;background:var(--card);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.ds{color:var(--muted);font-size:12.5px}
+button{font:inherit;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:6px 12px;cursor:pointer}
+button:hover{background:var(--card)}
+button.go{background:var(--accent);color:var(--on);border-color:var(--accent)}
+button.go:disabled{opacity:.45;cursor:default}
+button.link{border:none;background:none;padding:0;color:var(--accent);text-decoration:underline}
+.two{display:flex;gap:8px;flex-wrap:wrap}
+.panel{border:2px solid var(--accent);border-radius:14px;padding:14px 16px;margin-top:14px}
+.panel h3{margin:0 0 4px;font-size:17px}
+.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;margin-top:12px}
+@media(max-width:820px){.cols{grid-template-columns:1fr}}
+.script{border:1px solid var(--line);border-radius:12px;padding:12px 14px;max-height:330px;overflow:auto;line-height:1.9}
+.script span.w{cursor:pointer;border-radius:4px;padding:1px 1px}
+.script span.w:hover{background:var(--sel)}
+.script span.w.on{background:var(--hl);outline:1px solid #e0c255}
+.script span.w.fixed{border-bottom:2px solid var(--ok)}
+.card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+.card .word{font-size:18px;font-weight:700}
+.card input{font:inherit;width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin:6px 0 2px}
+.pill{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12.5px;background:var(--bg)}
+.st{font-size:12.5px;font-weight:600;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.st.final{background:#dff3e8;color:var(--ok)}.st.try{background:#fff1d6;color:var(--warn)}.st.client{background:#e9e8fb;color:var(--accent)}
+.foot{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--line)}
+.foot .in{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.foot .say{flex:1;min-width:220px;font-size:13.5px}
+.msg{min-height:1.4em;font-size:13px;color:var(--ok);margin-top:8px}
+.empty{color:var(--muted);padding:26px 10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="note"><b>Mock-up only.</b> Nothing here calls the server or makes a sound. The text is an invented example. Click a word in the script on the left to try the control; the buttons change the list as the real page would.</div>
+
+<div class="steps"><span>Browse</span>›<span>Try</span>›<b>Narrations</b>›<span>Final</span></div>
+
+<h2>Narrations</h2>
+<table>
+<thead><tr><th>Pick one</th><th>Voice</th><th>Made</th><th>Status</th><th>Play</th><th>Something to change?</th></tr></thead>
+<tbody>
+<tr><td><input type="radio" name="fin"></td><td><b>UD - Narrator</b> <span class="ds">#1 · with the direction tags (8) · pronunciations: none</span></td><td class="ds">2026-11-13 08:12</td><td class="ds">ready · 96 s</td><td><button>▶</button></td>
+<td><div class="two"><button id="open-word" class="go">A word sounds wrong</button><button>A sentence's tone or pace</button></div></td></tr>
+</tbody></table>
+
+<div class="panel" id="panel">
+  <h3>A word sounds wrong</h3>
+  <div class="ds">Click the word in the script. Type how it should sound. Hear it in <span class="pill">UD - Narrator</span>, change it and hear it again as often as needed, then make it final. One correction applies to every place the word appears.</div>
+  <div class="cols">
+    <div>
+      <h2 style="margin-top:4px">The script</h2>
+      <div class="script" id="script"></div>
+      <div class="ds" style="margin-top:6px">Underlined in green: a word with a final pronunciation. Drag across two or three words to pick a name of several words.</div>
+    </div>
+    <div>
+      <h2 style="margin-top:4px">This word</h2>
+      <div class="card" id="card"><div class="empty">Click a word in the script.</div></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+
+  <h2>Corrected words</h2>
+  <table>
+    <thead><tr><th>Word</th><th>Sounds like</th><th>Places</th><th>Tries</th><th>State</th><th>Hear</th><th></th></tr></thead>
+    <tbody id="list"></tbody>
+  </table>
+</div>
+</div>
+
+<div class="foot"><div class="in">
+  <div class="say" id="say"></div>
+  <button class="go" id="again" disabled>Narrate again with the final words · paid, ~2,459 characters</button>
+</div></div>
+
+<script>
+(function(){
+const TEXT="Aquifyr filters are made in Mangaluru, on the coast. Each Aquifyr unit is tested for two weeks before it leaves the plant.\n\nFitting takes four minutes. Turn the collar a quarter turn, then press the Aquifyr cartridge until it clicks. In Mangaluru the first service is free.";
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const key=w=>w.replace(/[^\p{L}\p{N}'-]/gu,'');
+let words={ 'Thirukkural':{say:'Thi-ruk-ku-ral',tries:0,state:'client',places:0,from:"from this client's last film"} };
+let picked=null;
+function count(w){return TEXT.split(/\s+/).filter(x=>key(x)===w).length;}
+function script(){document.getElementById('script').innerHTML=TEXT.split('\n\n').map(p=>'<p style="margin:0 0 10px">'+p.split(/\s+/).map(x=>{const k=key(x),f=words[k]&&words[k].state==='final';return '<span class="w'+(k===picked?' on':'')+(f?' fixed':'')+'" data-w="'+esc(k)+'">'+esc(x)+'</span>';}).join(' ')+'</p>').join('');
+document.querySelectorAll('.w').forEach(s=>s.addEventListener('click',()=>{picked=s.dataset.w;render();}));}
+function card(){const c=document.getElementById('card');if(!picked){c.innerHTML='<div class="empty">Click a word in the script.</div>';return;}
+const w=words[picked]||{say:'',tries:0,state:'new'};
+c.innerHTML='<div class="word">'+esc(picked)+'</div><div class="ds">appears in '+count(picked)+' place'+(count(picked)===1?'':'s')+' of the script</div>'+
+'<label class="ds" style="display:block;margin-top:10px">How should it sound? Write it the way you would say it.</label><input id="say-as" placeholder="for example Man-ga-loor" value="'+esc(w.say)+'">'+
+'<div class="ds">'+(w.tries?w.tries+' tr'+(w.tries===1?'y':'ies')+' so far · each try is a small paid request':'each try is a small paid request (one sentence)')+'</div>'+
+'<div class="two" style="margin-top:10px"><button id="hear">▶ Hear it in its sentence</button><button id="alone">▶ The word alone</button></div>'+
+'<div style="margin-top:12px"><button class="go" id="final" '+(w.tries?'':'disabled')+'>Pronunciation final for this word</button> '+(w.tries?'':'<span class="ds">hear it once first</span>')+'</div>';
+const upd=n=>{const v=document.getElementById('say-as').value.trim();if(!v){msg('Type how it should sound first.');return;}words[picked]={say:v,tries:(w.tries||0)+1,state:'try'};msg(n);render();};
+document.getElementById('hear').addEventListener('click',()=>upd('Playing the sentence with “'+document.getElementById('say-as').value.trim()+'” in UD - Narrator (mock-up: no sound).'));
+document.getElementById('alone').addEventListener('click',()=>upd('Playing the word alone (mock-up: no sound). A word alone can sound different from the same word in a sentence.'));
+const f=document.getElementById('final');if(f)f.addEventListener('click',()=>{words[picked]={...words[picked],state:'final'};msg('“'+picked+'” is final. It will be used in every place of the next narration.');picked=null;render();});}
+function list(){const rows=Object.entries(words);document.getElementById('list').innerHTML=rows.length?rows.map(([k,w])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(w.say)+'</td><td class="ds">'+(w.state==='client'?'not in this script':count(k))+'</td><td class="ds">'+(w.tries||'—')+'</td><td><span class="st '+(w.state==='final'?'final':w.state==='client'?'client':'try')+'">'+(w.state==='final'?'final':w.state==='client'?esc(w.from):'still trying')+'</span></td><td>'+(w.tries?'<button>▶ last try</button>':'<span class="ds">not yet heard in this voice</span>')+'</td><td><button class="link" data-e="'+esc(k)+'">change</button> · <button class="link" data-r="'+esc(k)+'">remove</button></td></tr>').join(''):'<tr><td colspan="7" class="empty">No word corrected yet.</td></tr>';
+document.querySelectorAll('[data-r]').forEach(b=>b.addEventListener('click',()=>{delete words[b.dataset.r];msg('Removed.');render();}));
+document.querySelectorAll('[data-e]').forEach(b=>b.addEventListener('click',()=>{picked=b.dataset.e;render();}));}
+function foot(){const v=Object.values(words),fin=v.filter(w=>w.state==='final').length,tr=v.filter(w=>w.state==='try').length;
+document.getElementById('say').innerHTML=fin||tr?('<b>'+fin+'</b> word'+(fin===1?'':'s')+' final'+(tr?', <b>'+tr+'</b> still trying (not used until made final)':'')+'.'):'No correction yet. The narration above is as the voice read it.';
+document.getElementById('again').disabled=!fin;}
+function msg(t){document.getElementById('msg').textContent=t;}
+function render(){script();card();list();foot();}
+document.getElementById('open-word').addEventListener('click',()=>document.getElementById('panel').scrollIntoView({behavior:'smooth'}));
+document.getElementById('again').addEventListener('click',()=>msg('The whole script is narrated once more with the final words (mock-up: nothing sent). It appears above as narration #2.'));
+render();
+})();
+</script>
+</body>
+</html>
