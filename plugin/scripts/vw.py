@@ -1476,7 +1476,7 @@ def cmd_analysis(a):
         out = write(f'/api/runs/{run}/analysis/start', body)
         source = 'from the media stage' if out.get('camera_audio_source') == 'media' else 'as given'
         waived = f"; risk flags waived from the brief (no safety rules): {', '.join(out['waived_risk_flags'])}" if out.get('waived_risk_flags') else ''   # design/60 L20
-        emit(out, 0, f"Analysis started: one paid Gemini request per clip (model from the analysis stage procedure, gemini-3.8-flash today); "
+        emit(out, 0, f"Analysis started: one paid Gemini request per clip (the model is the one `vw next` names for the analysis stage; this line names none, so it cannot go out of date); "
                      f"camera audio: {out.get('camera_audio')} ({source}){waived}. Tell the operator; wait with `vw analysis status --wait 600`.")
     if a.what == 'status':   # design/42 6.1: wait inside the tool and estimate the time left
         import math
