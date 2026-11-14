@@ -166,7 +166,7 @@ Extras: the shot size after a crop; whether the last frame may be held as a stil
 |---|---|
 | Allowed or not (T3) | 105 pieces allowed as they are, 2 with a crop, 5 with the picture refused and the sound kept, 4 refused. |
 | Speaker boxes | No note about a head outside the body or a body too wide. |
-| Defects inside a piece | 17 defects in 16 pieces (5 camera bumps). A piece the model calls "unusable" (a camera bump tail) was still allowed, because the rule reads the grade and the safety flags, not the defects. |
+| Defects inside a piece | 17 defects in 16 pieces (5 camera bumps). 4 of those pieces are ruled out by their grade; 12 are still allowed, and the defect and its seconds are not passed on. |
 
 ---
 
@@ -197,7 +197,7 @@ Claude can ask for the full row of one piece, or the full log of one clip. In VW
 
 | Point | Result |
 |---|---|
-| One line for every piece (F1, T10) | 107 of 116 pieces sit in clips with several pieces, so the line the placer reads describes another piece. Example: a camera-bump tail is listed as 'a mason packing mortar'. |
+| One line for every piece (F1, T10) | Of the 107 pieces the placer would receive, 97 sit in clips with several pieces (32 of 42 clips), so the line it reads often describes another piece. Example: a piece that shows a pan pouring mortar is listed under 'a mason packing mortar with a trowel'. |
 | The "does not show" line (F2, T7) | Hydrogen fills it every time a fit is claimed (112 of 112). It is not on the list today. |
 | Size of the corrected list (T10) | Adding each piece's own description and its 'does not show' line makes the list about 79 % longer (55,646 to 99,458 characters). The tool already splits a long scene file into parts. Not run through the tool. |
 | Nobody opens the full log (F3) | Not tested here; the corrected list would carry the two lines that matter without it. |
@@ -323,7 +323,7 @@ The test ran 43 of VW-19's 46 clips through Gemini 4 Hydrogen with the applicati
 
 | Fault | After the test |
 |---|---|
-| F1 | Confirmed, large: 107 of 116 pieces |
+| F1 | Confirmed, large: 97 of the 107 pieces the placer would receive |
 | F2 | Confirmed: the line is always written, never shown |
 | F3 | Not tested |
 | F4 | Supported: the pieces differ in 23 of 34 clips with several pieces; a person's marking is still needed |
@@ -338,7 +338,7 @@ New points the test added, to watch in later films:
 | # | Point |
 |---|---|
 | N1 | Pieces of one clip overlap in time (13 of 34 clips); one piece often covers nearly the whole clip |
-| N2 | A piece with a defect the model calls unusable is still allowed by the rule |
+| N2 | 12 of 16 pieces with a logged defect (camera bump, focus hunt) are still allowed, and the defect is not on the placer's list |
 | N3 | The plain way and the look-again way disagree on facts for the same clip |
 | N4 | The look-again way was refused for one clip (the drone clip); the fall-back worked but took 17 minutes |
 | N5 | Two requests of 62 stopped before finishing their answer |

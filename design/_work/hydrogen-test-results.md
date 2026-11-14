@@ -7,7 +7,7 @@
 - **Hydrogen works with the application's request as it is.** 43 of 46 clips were answered. Every answer passed the server's own arrival check, with no piece thrown out and no note.
 - **It costs about 10 cents for a short clip and about 36 cents for a longer one.** The 43 answered clips cost 8.11 US dollars; the whole test cost 9.16.
 - **The look-again way works on short clips**, down to 3.8 seconds. It costs two to two-and-a-half times the plain way. Whether its answers are better needs a person's eye; the two ways disagree on some facts.
-- **The fault "one line for the whole clip" is real and large.** 107 of 116 pieces sit in clips with several pieces, so the placer reads a line that describes another piece.
+- **The fault "one line for the whole clip" is real and large.** Of the 107 pieces the placer would receive, 97 sit in clips with several pieces, so the line it reads often describes another piece.
 - **The script fit by paragraph cannot say which sentence.** All 106 direct fits land in two paragraphs of two sentences each.
 - **Hydrogen fills the "does not show" line every time** a fit is claimed. It is written and not shown to the placer.
 - **The colour-group label is useless for grouping:** 41 different labels for 43 clips.
@@ -160,7 +160,8 @@ Not done. Six clips are ready in Part B of the sheet: a short clip, an action in
 
 | | |
 |---|---|
-| Pieces in clips with several pieces | **107 of 116** |
+| Pieces the placer receives (allowed) | 107 of 116 |
+| Of those, in clips with several allowed pieces | **97, in 32 of 42 clips** |
 | Size of the short list today | 55,646 characters |
 | Added by each piece's own description and "does not show" line | 43,812 characters |
 | Growth | **79 %** |
@@ -170,10 +171,10 @@ Three examples from the answers:
 | Clip, seconds | Today the placer reads | The piece's own description | Does not show |
 |---|---|---|---|
 | C0085, 0.0 to 1.2 | A mason packing wet mortar with a trowel into the joints of bricks laid on edge | A metal pan pours wet mortar onto the bricks, then is lifted out of the frame | Bricks being placed, or cavities inside the wall |
-| C0085, 26.0 to 26.9 | The same line | The camera bumps and tilts up, blurring the frame and showing the mason's lower face | "Technical camera bump tail; unusable for any script beat" |
 | C0088, 6.0 to 12.0 | A mason laying four bricks on edge while a helper brings water and bricks | The mason places the second brick and aligns both with two hands while a helper walks past | The hollow cavity is not clearly seen from this angle |
 
-- **The second example shows the fault at its worst:** a piece the model itself calls unusable is listed to the placer as a mason packing mortar.
+- **In the first example the clip's line is about troweling; the piece shows a pan pouring mortar.** A placer looking for "mortar is poured" would not find it; one looking for "troweling" would be given the wrong seconds.
+- A third piece of this clip (a camera-bump tail) is graded Reject by Hydrogen and ruled out by the server, so it never reaches the list. That part works.
 - **The size limit:** the list grows by about four fifths. The tool already splits a scene's file into parts when it is too long (VW-19's fifth scene is in two parts today), so it will be more parts, not a failure. Not run through the tool.
 
 ### T11: written and read by nothing (faults F3, F9)
@@ -185,7 +186,7 @@ Three examples from the answers:
 | Best frame | 116 of 116 pieces | Ready to use as the piece's picture |
 | Zone for a title | 106 of 116 pieces | Ready for the visuals stage |
 | Graphics ideas | 117 | Mixed: labels and call-outs, some slow-motion advice |
-| Defects | 17 in 16 pieces (5 camera bumps, 1 focus hunt, 11 other) | High: a bump inside a piece should rule the piece out or trim it |
+| Defects | 17 in 16 pieces (5 camera bumps, 1 focus hunt, 11 other) | High: 12 of the 16 pieces are still allowed, and the defect and its seconds are not on the placer's list |
 | Colour-group label | **41 different labels for 43 clips** | None as written: almost every clip gets its own label, so nothing can be grouped by it |
 
 ### T12: the library is marked by clip (fault F4)
@@ -227,6 +228,7 @@ Every direct fit on this film points at a paragraph with two sentences, so the f
 - **The earlier cost guess was wrong.** A short clip costs about 10 cents, not "a few cents".
 - **The run was not finished in one go.** Thirteen requests failed overnight on a lost connection and had to be sent again.
 - **My first field table was wrong** (it called 13 fields "always empty" that are often filled). Corrected before this document; the figures above are from the corrected count.
+- **My first reading of one example was wrong.** I wrote that a piece Hydrogen calls unusable was still offered to the placer. It is graded Reject and ruled out. Checked against the server's rule and corrected; the piece counts for the short list now use only the allowed pieces.
 
 ## Files
 

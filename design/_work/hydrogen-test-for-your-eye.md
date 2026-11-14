@@ -1,6 +1,6 @@
 # Gemini 4 Hydrogen test on VW-19: what needs a person's eye
 
-14 Nov 2026. Made by the check script from Hydrogen's own answers; nothing here is judged yet. Watch the clip, then mark each line right or wrong. The clips are in `C:\Coworkspace\VideoWizard-Operatoruns\VW-19\in\`.
+14 Nov 2026. Made by the check script from Hydrogen's own answers; nothing here is judged yet. Watch the clip, then mark each line right or wrong. The clips are in `C:\Coworkspace\VideoWizard-Operator\runs\VW-19\in\`.
 
 ## Part A: four short clips, watched both ways (check T4)
 
