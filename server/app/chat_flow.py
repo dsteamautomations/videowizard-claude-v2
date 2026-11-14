@@ -660,7 +660,7 @@ def _card_code(card_id, items, summary):
         ch = f"ch:[{','.join(_lit(x) for x in c['ch'])}]," if c.get('ch') else ''
         entries.append(f"{{n:{_lit(c['n'])},c:{c['c']},{ch}{body}}}")
     data = ('{' + f"id:{_lit(card_id)},say:{_lit(CARD_SAY.format(what='gap' if plan else 'line'))},sum:{_lit(summary or '')},auto:1,"
-            + f"dir:{1 if items[0]['id'].startswith('treatment:direction:') else 0},cols:{json.dumps(GAP_COLS)},w:[5,19,13,9,27,27],e:[\n" + ',\n'.join(entries) + ']}')
+            + f"cols:{json.dumps(GAP_COLS)},w:[5,19,13,9,27,27],e:[\n" + ',\n'.join(entries) + ']}')
     data = data.replace('</', '<\\/').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')   # nothing in an entry can end the script or break a line of it
     return Path(__file__).with_name('chat_card.html').read_text(encoding='utf-8').replace('__DATA__', data, 1)
 
@@ -709,7 +709,10 @@ def card_answer(conn, store, user, run, outputs, card_id, answers, one=False):
         V.need(choice == 'accept' or words, f'Entry {n}: say what should change (notes).')
         seen[n] = (choice, words)
     open_ = {i['id']: i for i in _candidates(_ctx(conn, store, user, run, outputs))[0] if i['kind'] in CARD_KINDS}
+    # a card from before 14 Nov 2026 held the direction with the gap lines: its changed direction is still taken once, the old way
     direction_changes = ids[0].startswith('treatment:direction:') and ids[0] in open_ and seen.get(1, ('', ''))[0] == 'change'
+    unanswered = [n for n in range(1, len(ids) + 1) if n not in seen]
+    V.need(direction_changes or not unanswered, f"Answer every entry of the card first; still to answer: {', '.join(map(str, unanswered))}. Nothing was recorded.")
     todo, not_open, held, before = [], [], [], []
     lines, key_of = (session.get('treatment_draft') or {}).get('lines') or {}, lambda iid: iid.split(':')[1]
     for n in sorted(seen):
@@ -763,7 +766,8 @@ def next_item(conn, store, user, run, outputs, one=False):
         pass   # said again when the operator next answers a set
     items, summary, with_assistant = _candidates(_ctx(conn, store, user, run, outputs))
     session = V.session_of(store, run, outputs)
-    if items and not one and len(items) >= 2 and items[0]['kind'] in CARD_KINDS:
+    # SK, 14 Nov 2026: the direction is asked first and alone; every gap line is written from it, so none is shown until it is accepted
+    if items and not one and len(items) >= 2 and items[0]['kind'] in CARD_KINDS and not items[0]['id'].startswith('treatment:direction:'):
         on_card = items if len(items) <= CARD_ALL else items[:CARD_PART]
         card, changed = _card(session, on_card, items[0].get('_summary') or '')
         if changed or session.pop('chat_item', None):
