@@ -30,8 +30,8 @@ def _eye_ok(a, b):
 def _piece(tag, ev, row, policy, refusals, flags=None):
     """The checks every footage piece passes, a shot or an alternative: eligible, client-safe, speaker policy, match and evidence, inside its
     window (G1), its action peak (G2), its hold (G3). Returns False when its frames are unusable (the caller stops there)."""
-    if not row['eligibility'].startswith('ELIGIBLE') or not row['client_safe'] or row['risk_flags']:
-        refusals.append(f'{tag}: G10/Q8 sub-clip is not eligible or not client-safe ({row["eligibility"]}, risk flags {row["risk_flags"]})')
+    if not row['eligibility'].startswith('ELIGIBLE'):   # design/195 (SK, 14 Nov 2026): a flag or a "not safe" mark warns the operator on the shot; it no longer refuses the piece
+        refusals.append(f'{tag}: G10 sub-clip is not eligible ({row["eligibility"]})')
     if row['eligibility'] == ROLL_SPEAKER and not policy.get('show_speaker_video'):
         refusals.append(f'{tag}: Q1 speaker on screen while show_speaker_video is false')
     if ev.get('match') not in ('direct', 'b_roll', 'library') or not str(ev.get('evidence') or '').strip():   # design/147 L4: a library proposal
