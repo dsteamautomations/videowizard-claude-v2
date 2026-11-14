@@ -73,6 +73,12 @@ def _fact_line(f, with_source=False):
     return f"{line} ({f['source']})" if with_source and f.get('source') else line
 
 
+def _drop_sheets(session, element_id):
+    """The sheets of a thing's earlier drawing set stop being references: only the approved, current set is ever sent."""
+    for rid in [rid for rid, r in session['references'].items() if r.get('kind') == 'drawing' and r.get('element_id') == element_id]:
+        del session['references'][rid]
+
+
 def set_drawing(conn, store, user, run, outputs, element_id, description):
     """A helper's drawing set of a thing: its shape is checked in plain words, every view is drawn and stored, and it waits for the operator."""
     session = VS.session_of(store, run, outputs)
@@ -97,6 +103,7 @@ def set_drawing(conn, store, user, run, outputs, element_id, description):
             row[f'{which}_key'], row[f'{which}_sha256'] = key, hashlib.sha256(data).hexdigest()
         views.append(row)
     facts = description.get('facts') or []
+    _drop_sheets(session, element_id)
     rows[element_id] = {'sha256': sha, 'key': k, 'level': description['level'], 'name': description.get('name') or el.get('name') or element_id, 'unit': description['unit'],
                         'views': views, 'facts': [{k2: f[k2] for k2 in ('what', 'value', 'unit', 'source', 'assumed') if k2 in f} for f in facts],
                         'sourced': [_fact_line(f, True) for f in facts if not f.get('assumed')], 'assumed': [_fact_line(f) for f in facts if f.get('assumed')],
@@ -118,6 +125,13 @@ def verdict(conn, store, user, run, outputs, element_id, sha256, approved, quote
     notes = str(notes or '').strip()
     need(approved or notes, 'A correction says what is wrong, in the operator\'s words.')
     row['status'] = 'approved' if approved else 'rejected'
+    _drop_sheets(session, element_id)
+    if approved:   # each plain sheet becomes an approved reference of the film (kind 'drawing'), so it can be a parent of a picture request
+        for v in row['views']:
+            rid = f"drawing-{element_id}-{v['id']}-{row['sha256'][:8]}"
+            session['references'][rid] = {'id': rid, 'kind': 'drawing', 'element_id': element_id, 'status': 'approved', 'key': v['plain_key'], 'sha256': v['plain_sha256'],
+                                          'width': v['width'], 'height': v['height'], 'name': f"{row['name']}: {v['name']}", 'view': v['id'], 'view_kind': v['kind'],
+                                          'drawing_sha256': row['sha256'], 'approval': {'by': user['id'], 'at': now(), 'quote': str(quote).strip()[:500]}}
     row['verdict'] = {'approved': bool(approved), 'quote': str(quote).strip()[:500], 'notes': notes[:2000], 'by': user['id'], 'by_name': user.get('name') or '', 'at': now()}
     VS.save_session(store, run, session)
     return {'element_id': element_id, 'status': row['status'],
@@ -131,7 +145,7 @@ def approved_sheets(session, element_id, most=MOST_SHEETS):
     if not row or row.get('status') != 'approved':
         return []
     views = sorted(row['views'], key=lambda v: v['kind'] not in ANGLED)      # a stable sort: angled views first, the rest as given
-    return [{'id': f"drawing-{element_id}-{v['id']}", 'view': v['id'], 'key': v['plain_key'], 'sha256': v['plain_sha256']} for v in views[:most]]
+    return [{'id': f"drawing-{element_id}-{v['id']}-{row['sha256'][:8]}", 'view': v['id'], 'key': v['plain_key'], 'sha256': v['plain_sha256']} for v in views[:most]]
 
 
 def words(store, session, element_id, first=1, most=MOST_SHEETS):
