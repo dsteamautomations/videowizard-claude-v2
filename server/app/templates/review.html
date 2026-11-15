@@ -151,7 +151,7 @@ function draw(){
   let det='<div>Version '+esc(d.version)+(d.accepted&&d.approved_by&&d.approved_by.slide?' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')':'')   // design/98 D6
     +(d.accepted&&!d.master_built&&d.waiting&&d.waiting.length?' · waiting: '+esc(d.waiting.join(', ')):'')+'</div>';
   const sl=d.second_look;   // design/129 P4: whether the second look ran on this version, and what it changed
-  det+='<div>'+(sl?'Second look (the assistant checked its own cut before showing it): ran '+esc(String(sl.at||'').slice(0,16).replace('T',' '))+' · '+esc(sl.scenes)+' scenes · '+esc(sl.changed.length)+' changed'+(sl.changed.length?' ('+esc(sl.changed.join(', '))+')':'')+
+  det+='<div>'+(sl?'Second look: ran '+esc(String(sl.at||'').slice(0,16).replace('T',' '))+' (the assistant checked its own cut before showing it) · '+esc(sl.scenes)+' scenes · '+esc(sl.changed.length)+' changed'+(sl.changed.length?' ('+esc(sl.changed.join(', '))+')':'')+
     ' · '+esc(Object.keys(sl.unchanged||{}).length)+' unchanged'+(sl.no_fix_file.length?' · no fix file for '+esc(sl.no_fix_file.join(', ')):'')+(sl.edited_after?' · <span class="err">the cut was changed after the second look</span>':'')+
     sl.fixes.map(f=>'<div>Changed by the second look, nothing to approve: '+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')
     :'Second look: not recorded for this version')+'</div>';

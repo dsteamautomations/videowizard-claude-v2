@@ -18,7 +18,7 @@ def test_an_open_defect_is_said_on_its_own_line_in_red():
 
 def test_the_record_is_kept_behind_details_and_closed_by_default():
     assert 'let detOpen=false' in PAGE and "(detOpen?'':' hidden')" in PAGE and "(detOpen?'Hide details':'Details')" in PAGE
-    for needle in ("'<div>Version '+esc(d.version)", 'Options approved by your first answer', 'Second look (the assistant checked its own cut before showing it): ran', "' · waiting: '"):
+    for needle in ("'<div>Version '+esc(d.version)", 'Options approved by your first answer', 'Second look: ran ', "' · waiting: '"):
         assert needle in PAGE, needle
     assert "Version <strong>" not in PAGE and '<details>' not in PAGE
 
