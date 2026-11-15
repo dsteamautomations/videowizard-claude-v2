@@ -104,6 +104,22 @@ def start_policy(policy, production):
     return {**policy, 'waived_risk_flags': list(PPE_WAIVERS), 'waiver_note': 'the brief recorded no brand or safety rules'}
 
 
+def _reusable(conn, store, run, procedure, brief, script, policy, clips):
+    """defect 52: {clip id: the stored study this film takes over} for the skipped clips the client's library holds as the same file."""
+    if not clips or not run.get('client_id'):
+        return {}
+    from . import study_reuse
+    rows = {r['sha256']: dict(r) for r in conn.execute('select sha256, name, films, evidence_key from vw2_library where client_id=%s and sha256 = any(%s) and not missing',
+                                                        (run['client_id'], [c['sha256'] for c in clips])).fetchall()}
+    out = {}
+    for c in clips:
+        if c['sha256'] in rows:
+            got = study_reuse.plan(conn, store, rows[c['sha256']], analysis.build_request(run, procedure, brief, script, c, policy))
+            if got:
+                out[c['id']] = got
+    return out
+
+
 def start(conn, user, run, outputs, policy, again):
     """One job per clip in the media output (minus exclusions). Same inputs → same job reused unless `again`."""
     brief, script, media = _inputs(conn, run, outputs)
@@ -124,13 +140,20 @@ def start(conn, user, run, outputs, policy, again):
         found = brandlib.repeats(conn, storage(), run, clips, settings().FFMPEG_EXECUTABLE)
         skipped = brandlib.duplicates_decision(found, policy.get('duplicates'))
         if skipped:
-            excluded |= set(skipped)
-            clips = [c for c in clips if c['id'] not in excluded]
             conn.execute("update vw2_runs set film = coalesce(film, '{}'::jsonb) || jsonb_build_object('library_skipped', %s::jsonb) where id=%s",
                          (Jsonb([f for f in found if f['clip_id'] in skipped]), run['id']))
     # defect 49 (VW-22, 12 Nov 2026): a clip skipped because the client's library already holds it is left out of this film for good. It is recorded
     # as its own output (as `exclude` records one), so the stage can finish, and a later start does not send it to the model after all (VW-21: 45 paid jobs).
-    library = set() if again else {f['clip_id'] for f in ((conn.execute('select film from vw2_runs where id=%s', (run['id'],)).fetchone() or {}).get('film') or {}).get('library_skipped') or []}
+    was_skipped = [] if again else list(((conn.execute('select film from vw2_runs where id=%s', (run['id'],)).fetchone() or {}).get('film') or {}).get('library_skipped') or [])
+    # defect 52 (VW-24, 15 Nov 2026): a skipped clip that is the same file takes over its stored study, free, and so counts as studied here (a film
+    # whose every clip was skipped had no studied clip at all). One whose study cannot be reused stays skipped, as before.
+    reuse = _reusable(conn, storage(), run, procedure, brief, script, policy, [c for c in clips if c['id'] in {f['clip_id'] for f in was_skipped}])
+    if reuse:
+        conn.execute("update vw2_runs set film = coalesce(film, '{}'::jsonb) || jsonb_build_object('library_skipped', %s::jsonb) where id=%s",
+                     (Jsonb([f for f in was_skipped if f['clip_id'] not in reuse]), run['id']))
+        conn.execute("update vw2_stage_outputs set stale = true where run_id=%s and stage='analysis' and unit = any(%s) and not stale and (summary->>'library_skipped') = 'true'",
+                     (run['id'], sorted(reuse)))   # the "skipped" record of an earlier start gives way to the study
+    library = {f['clip_id'] for f in was_skipped} - set(reuse)
     if library:
         excluded |= library
         clips = [c for c in clips if c['id'] not in library]
@@ -155,11 +178,22 @@ def start(conn, user, run, outputs, policy, again):
         req = analysis.build_request(run, procedure, brief, script, clip, policy_clip, generation=(datetime.now(timezone.utc).isoformat() if again else None))
         existing = conn.execute("select id, status from vw2_jobs where run_id=%s and stage='analysis' and unit=%s and request->>'analysis_key'=%s order by created_at desc limit 1",
                                 (run['id'], clip['id'], req['analysis_key'])).fetchone()
-        if existing and (existing['status'] not in ('rejected', 'failed') or clip['id'] in done) and not again:
+        if existing and (existing['status'] not in ('rejected', 'failed') or (clip['id'] in done and clip['id'] not in reuse)) and not again:
             reused.append(clip['id'])
             continue
         key = f"{run['id']}/analysis/{clip['id']}.request.json"
         store.put(key, json.dumps(req, ensure_ascii=False).encode('utf-8'), 'application/json')
+        if clip['id'] in reuse:   # defect 52: no upload and no model call; the worker reviews the stored answer for this film, as a re-policy does
+            got = reuse[clip['id']]
+            rk = f"{run['id']}/analysis/{clip['id']}.reused.response.json"
+            store.put(rk, got['raw'].encode('utf-8'), 'application/json')
+            row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'analysis',%s,%s,%s, gen_random_uuid()) returning id''',
+                               (run['id'], clip['id'], PROVIDER, Jsonb({'kind': 'analysis', 'analysis_key': req['analysis_key'], 'request_key': key,
+                                                                        'clip': {k: clip.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio')},
+                                                                        'identity': req['identity'], 'policy': policy, 'reuse_response_key': rk,
+                                                                        'reused_from': {'film': got['from'], 'fits': got['fits'], 'look': got.get('look')}}))).fetchone()
+            created.append({'unit': clip['id'], 'job_id': str(row['id']), 'study_from': got['from']})
+            continue
         row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'analysis',%s,%s,%s,%s) returning id''',
                            (run['id'], clip['id'], PROVIDER, Jsonb({'kind': 'analysis', 'analysis_key': req['analysis_key'], 'request_key': key,
                                                                     'clip': {k: clip.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio')},
@@ -168,6 +202,9 @@ def start(conn, user, run, outputs, policy, again):
         created.append({'unit': clip['id'], 'job_id': str(row['id'])})
     conn.execute("update vw2_jobs set request = request || %s where run_id=%s and stage='analysis' and status='queued'", (Jsonb({'policy': policy}), run['id']))
     return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips), 'camera_audio': policy['camera_audio'], 'camera_audio_source': policy['camera_audio_source'],
+            **({'studies_from_the_library': len(reuse), 'paid': len(created) - len(reuse),
+                'note': f"{len(reuse)} of these clips are the same files the client's library already holds: each takes over its stored study, at no cost, and counts as studied "
+                        "here in a moment. A line fit is kept only for a sentence whose words are exactly the same as in the film the clip was studied for."} if reuse else {}),
             **({'waived_risk_flags': list(policy['waived_risk_flags']), 'waiver_note': policy.get('waiver_note') or ''} if policy.get('waived_risk_flags') else {})}
 
 
@@ -440,7 +477,7 @@ def process(job):
                     from .stage2 import looks
                     look = looks.measure(original, clip.get('duration_s'), directory, settings().FFMPEG_EXECUTABLE,
                                          log='log' in str(clip.get('color_transfer') or '').lower() or clip.get('color_transfer') == 'arib-std-b67')
-                    durable(paths['response.json'].parent / 'look.json', json.dumps(look).encode('utf-8'))
+                    durable(SPOOL / f'{jid}.look.json', json.dumps(look).encode('utf-8'))
                 except Exception:   # noqa: BLE001
                     pass
                 attachment = original if request['identity']['understand_audio'] else silent_copy(original, directory)
@@ -504,7 +541,7 @@ def process(job):
         raw_bytes = saved['raw'].encode('utf-8')
         store.put(base + '.response.json', raw_bytes, 'application/json')
         result = {'response_key': base + '.response.json', 'response_sha256': hashlib.sha256(raw_bytes).hexdigest(), 'response_bytes': len(raw_bytes),
-                  'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': {**analysis.summary_of(reviewed, clip), 'look': read_json(paths['response.json'].parent / 'look.json'), **({'plain_fallback': True} if saved.get('plain_fallback') else {})}}
+                  'finish_reason': (saved.get('metadata') or {}).get('finish_reason'), 'summary': {**analysis.summary_of(reviewed, clip), 'look': read_json(SPOOL / f'{jid}.look.json') or (req_meta.get('reused_from') or {}).get('look'), **({'plain_fallback': True} if saved.get('plain_fallback') else {})}}
         if reviewed['status'] == 'retained':
             from .clip_log import gate
             ev = json.dumps(gate.evidence_document(reviewed, request, clip), ensure_ascii=False).encode('utf-8')
@@ -544,7 +581,8 @@ def finalize(conn, user_id, job, status, result, error, cost, retry_in):
             existing = None
         if not existing:
             core.output(conn, user, run, {'stage': 'analysis', 'unit': clip['id'], 'files': files,
-                                          'summary': {**result['summary'], 'cost': cost, 'job_id': str(job['id'])}})
+                                          'summary': {**result['summary'], 'cost': cost, 'job_id': str(job['id']),
+                                                      **({'study_from': job['request']['reused_from']} if job['request'].get('reused_from') else {})}})
             runlog.write(conn, clip_entry(run['id'], clip, result['summary']))   # design/142 R1
     elif set_aside_reason(status, result):
         _set_aside(conn, user_id, job, set_aside_reason(status, result))

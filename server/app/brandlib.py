@@ -85,6 +85,14 @@ def mark(conn, store, user, run, outputs, generic_names, quote, ffmpeg='ffmpeg')
     if run.get('film') is None:
         raise Problem(409, 'LIBRARY', 'This film was started before the library; its clips are not stored (a backfill is a task of its own).')
     rows = candidates(conn, run, outputs)
+    if not rows and (run['film'] or {}).get('library_skipped'):   # defect 52: every clip was skipped as already in the library: nothing new to mark
+        if [n for n in (generic_names or []) if str(n).strip()]:
+            raise Problem(422, 'LIBRARY', 'Every clip of this film is already in the library, so there is nothing new to mark here. To change the mark of a file that is '
+                                          'in the library, use `vw library unmark` (or mark it again) with its name.')
+        note = 'every clip of this film is already in the library: nothing new to store'
+        answer = {'asked': True, 'generic': [], 'quote': quote, 'by': user.get('name') or user.get('id'), 'at': datetime.now(timezone.utc).isoformat(), 'skipped': note}
+        conn.execute("update vw2_runs set film = coalesce(film, '{}'::jsonb) || jsonb_build_object('library', %s::jsonb) where id=%s", (Json(answer), run['id']))
+        return {'stored': 0, 'generic': [], 'skipped': note}
     if not rows:
         raise Problem(409, 'LIBRARY', 'No studied clips yet: the library question comes after the analysis.')
     by_name = {r['name']: r for r in rows}
@@ -176,9 +184,10 @@ def duplicates_decision(found, choice):
     if choice not in ('keep', 'skip'):
         lines = '; '.join(f"{f['name']} is {f['kind']} as {f['library_name']} (from {', '.join(map(str, f['films'] or []))})" for f in found)
         raise Problem(409, 'LIBRARY_REPEATS', f'The client\'s library already holds {len(found)} of these clips: {lines}. Ask the operator once: analyse them anyway, '
-                                              'or skip them? Say the difference plainly: skipped is free, and every skipped clip is offered again in the library round with its description, '
-                                              'to be matched to the scenes by eye, without the model saying which lines it fits; analysed anyway is paid, and the model says which lines '
-                                              'each clip fits. Then `vw analysis start --duplicates keep|skip`.',
+                                              'or skip them? Say the difference plainly: skipped is free. A skipped clip that is the same file takes over the study the library '
+                                              'holds, and keeps its line fits for every sentence whose words are exactly the same as in the film it was studied for; a skipped clip '
+                                              'that only looks the same is offered in the library round with its description, to be matched to the scenes by eye. Analysed anyway '
+                                              'is paid, and the model says afresh which lines each clip fits. Then `vw analysis start --duplicates keep|skip`.',
                       repeats=found)
     return [f['clip_id'] for f in found] if choice == 'skip' else []
 
