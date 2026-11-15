@@ -156,3 +156,11 @@ def test_an_older_paragraph_direction_is_shown_as_text():
     out, store = treat(reasoned(vw12()))
     d = page(store)['lines'][0]
     assert d['rows'] == [] and 'a documentary explainer told from the site' in d['text']
+
+
+def test_the_step_lines_name_the_page_and_do_not_send_the_assistant_to_the_notes_file():
+    import json
+    from pathlib import Path
+    steps = next(s for s in json.loads((Path(__file__).resolve().parents[1] / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')['steps']
+    assert 'intended-visuals' not in steps[0] and 'read prompt.md and gaps.json;' in steps[0]
+    assert '`vw visuals page --record`' in steps[1] and '--send-back' not in steps[1] and 'the card where it cannot be shown' in steps[1]

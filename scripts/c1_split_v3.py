@@ -104,6 +104,8 @@ if __name__ == '__main__':
         prompt = d203(prompt, parts)
         from d204_wording_v3 import apply as d204   # design/204: the treatment answered on a Claude artifact page
         prompt = d204(prompt, parts)
+        from d204b_steps_v3 import apply as d204b   # design/204 hotfix: two step lines (the notes file not read; the treatment on the page)
+        d204b(steps)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))
