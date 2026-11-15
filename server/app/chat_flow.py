@@ -56,9 +56,29 @@ def _changes(changes, n=10):
     return changes[:n] + ([f'and {len(changes) - n} more'] if len(changes) > n else [])
 
 
-def _changed_text(changes):
+def _changed_text(changes, asked=False):
+    """design/202: a line the operator sent back and the assistant rewrote says it was changed as they asked."""
     rows = _changes(changes)
-    return ('**What changed:**\n' + '\n'.join('- ' + r for r in rows) + '\n\n') if rows else ''
+    return (('**Changed as you asked:**\n' if asked else '**What changed:**\n') + '\n'.join('- ' + r for r in rows) + '\n\n') if rows else ''
+
+
+DIRECTION_HELP = ('The direction says what the viewer should understand by the end, and how the film will show it. Every gap\'s line is written from it; '
+                  'no gap is shown until you accept it.')
+
+
+def _shot_rows(e):
+    """design/202: each shot of a treatment line as the operator reads it: how it is made and for how long, what the viewer sees, why the picture
+    fits the words, why it is made this way. A reason that was not written reads 'not given'. A gap of one way with no shots carries them itself."""
+    shots = [s for s in e.get('shots') or [] if isinstance(s, dict)]
+    why = lambda row, k: str(row.get(k) or '').strip() or 'not given'
+    if not shots:
+        return [('Why it fits the words', why(e, 'fits_why')), ('Why this way', why(e, 'way_why'))]
+    rows = []
+    for n, s in enumerate(shots, 1):
+        way = ROUTE_WORDS.get(s.get('route'), s.get('route') or '')
+        rows += [(f'Shot {n}', ', '.join(x for x in (way, f"{float(s['seconds']):g} s" if isinstance(s.get('seconds'), (int, float)) else '') if x)),
+                 (f'Shot {n} · the viewer sees', s.get('picture')), (f'Shot {n} · why it fits the words', why(s, 'fits_why')), (f'Shot {n} · why this way', why(s, 'way_why'))]
+    return rows
 
 
 def _treatment_items(ctx):
@@ -71,6 +91,8 @@ def _treatment_items(ctx):
     totals = draft.get('totals') or {}
     summary = (f"{totals.get('gaps', len(entries))} gaps, {totals.get('images', 0)} picture(s) to make; estimate ₹{draft.get('estimate_inr', 0):g} of the ₹{V.cap_of(session):g} limit"
                + (f"; kept aside for takes made again: ₹{draft['rerun_allowance_inr']:g}" if draft.get('rerun_allowance_inr') else '')
+               + (f"; moving {totals['moving_seconds']:g} s, still {totals['still_seconds']:g} s" if 'still_seconds' in totals else '')   # design/202
+               + (f"; {len(draft['reasons_missing'])} shot(s) with a reason not given" if draft.get('reasons_missing') else '')
                + (f". Warnings: {'; '.join(str(w.get('message') if isinstance(w, dict) else w) for w in (draft.get('warnings') or [])[:4])}" if draft.get('warnings') else ''))
     items = []
     if (lines.get('direction') or {}).get('state') == 'sent_back':   # design/190: every gap line is written again from the direction; none is asked until it is back
@@ -80,23 +102,24 @@ def _treatment_items(ctx):
         if st['state'] != 'to_accept':
             continue
         if key == 'direction':
-            head, body, rows = 'The direction of the film', str(draft.get('direction') or ''), None
+            head, body, rows = 'The direction of the film', DIRECTION_HELP + '\n\n' + str(draft.get('direction') or ''), None   # design/202: named, explained, in full
         else:
             e = entries.get(key) or {}
             head = f'Gap {key}'
             rows = [('The picture', e.get('picture')), ('Made as', ', '.join(ROUTE_WORDS.get(r, r) for r in e.get('routes') or [])), ('Length', f"{float(e.get('seconds') or 0):g} s"),
                     ('Pictures to make', e.get('images')), ('Shows', '; '.join(e.get('depicts') or [])),
-                    ('Held still for', f"{float(e['frozen_seconds']):g} s" if e.get('frozen_seconds') else ''), ('Why', e.get('why') or e.get('reason') or '')]
+                    ('Held still for', f"{float(e['frozen_seconds']):g} s" if e.get('frozen_seconds') else ''), *_shot_rows(e)]   # design/202: each shot's two reasons
             body = '\n'.join(f'- **{k}:** {v}' for k, v in rows if v not in (None, '', []))   # a list: plain line breaks run together in the chat
 
         def run(choice, quote, words, key=key):
             return V.treatment(ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], None, quote, accept=[key] if choice == 'accept' else [],
                                send_back=[key] if choice == 'change' else [], notes=words if choice == 'change' else '')
         items.append(_item(f"treatment:{key}:{st['digest'][:10]}", 'treatment line', f'Treatment, line {n} of {len(order)}',
-                           f"{head}{' (changed since you last saw it)' if st.get('changed') else ''}. Do you accept this line?", run,
+                           f"{head}{' (changed as you asked)' if st.get('asked') else ' (changed since you last saw it)' if st.get('changed') else ''}. "
+                           + ('Do you accept the direction of the film?' if key == 'direction' else 'Do you accept this line?'), run,   # design/202: the Direction is asked by its name
                            [_button('Accept', 'accept'), _button('Change this', 'change', words=True, tell='Ask the operator what to change in this line.')],
-                           text=_changed_text(st.get('changes')) + body))
-        items[-1].update(_key=key, _summary=summary, _card={'n': head, 'c': 1 if st.get('changed') else 0, **({'ch': _changes(st['changes'])} if st.get('changes') else {}),
+                           text=_changed_text(st.get('changes'), bool(st.get('asked'))) + body))
+        items[-1].update(_key=key, _summary=summary, _card={'n': head, 'c': 1 if st.get('changed') else 0, **({'a': 1} if st.get('asked') else {}), **({'ch': _changes(st['changes'])} if st.get('changes') else {}),
                                           **({'t': body} if rows is None else {'r': [[k, str(v)] for k, v in rows if v not in (None, '', [])]})})
     return items, summary, [k for k in order if lines[k]['state'] == 'sent_back']
 
@@ -697,7 +720,7 @@ def _card_code(card_id, items, summary):
         body = (f"t:{_lit(c['t'])}" if 't' in c else 'r:[\n' + ',\n'.join(f'[{_lit(k)},{_lit(v)}]' for k, v in c['r']) + ']' if 'r' in c
                 else f"tot:{_lit(c['tot'])},tb:[\n" + ',\n'.join('[' + ','.join(_lit(x) for x in row) + ']' for row in c['tb']) + ']')
         ch = f"ch:[{','.join(_lit(x) for x in c['ch'])}]," if c.get('ch') else ''
-        entries.append(f"{{n:{_lit(c['n'])},c:{c['c']},{ch}{body}}}")
+        entries.append(f"{{n:{_lit(c['n'])},c:{c['c']},{'a:1,' if c.get('a') else ''}{ch}{body}}}")
     data = ('{' + f"id:{_lit(card_id)},say:{_lit(CARD_SAY.format(what='gap' if plan else 'line'))},sum:{_lit(summary or '')},auto:1,"
             + f"cols:{json.dumps(GAP_COLS)},w:[5,19,13,9,27,27],e:[\n" + ',\n'.join(entries) + ']}')
     data = data.replace('</', '<\\/').replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')   # nothing in an entry can end the script or break a line of it

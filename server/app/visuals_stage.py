@@ -148,7 +148,7 @@ def prepare(conn, store, user, run, outputs):
                'brief': ({**brief['summary'], 'effective_rules': core.effective_rules(conn, run, outputs)} if brief else None),   # design/37 2.7
                'footage_character': footage_view(session, outputs),   # design/88: measured per clip; the operator's correction wins; the texture comes from this
                'script_digest': script['summary'].get('content_digest') if script else None,
-               'intended_visuals': (intake['summary'].get('intended_visuals') if intake else None) or [],   # design/65 S3: the team's pictures per scene
+               'intended_visuals': [],   # design/202 (SK, 15 Nov 2026): the script's visual notes are not considered; the picture is chosen from the narration alone (design/65 S3 retired)
                'script_claims': script_claims(script),   # design/125 S3: the figures the narration rests on, checked or not
                'world_evidence': world, 'plan_schema': __import__('app.visual_contract', fromlist=['Plan']).Plan.model_json_schema(),
                'generator_catalog': video_generators.catalog(),
@@ -675,6 +675,26 @@ def treatment_length_warnings(entry):
     return out
 
 
+REASONS = (('fits_why', 'why the picture fits the words'), ('way_why', 'why it is made this way'))
+REASON_CHARS = 300
+
+
+def reasons_missing(entry):
+    """design/202 (SK, 15 Nov 2026): every shot of the treatment says why its picture fits the words and why it is made this way, one or two
+    sentences each; a gap of one way with no shots says them on its line. A missing reason is named, shown to the operator as not given, and
+    does not stop the draft (design/195: flags warn); a reason over the length is refused."""
+    shots = [s for s in entry.get('shots') or [] if isinstance(s, dict)]
+    rows = [(f"gap {entry['gap_id']}, shot {s.get('id') or n}", s) for n, s in enumerate(shots, 1)] or [(f"gap {entry['gap_id']}", entry)]
+    out = []
+    for where, row in rows:
+        for k, _ in REASONS:
+            need(len(str(row.get(k) or '')) <= REASON_CHARS, f'{where}: {k} is one or two sentences (at most {REASON_CHARS} characters).')
+        lack = [f'{k} ({what})' for k, what in REASONS if not str(row.get(k) or '').strip()]
+        if lack:
+            out.append(f"{where}: say {' and '.join(lack)}.")
+    return out
+
+
 def graphics_runs(entry):
     """design/126 TR1: the plan's G1 warning (design/93) on the treatment: a run of graphic shots over 8 s within the gap, from each shot's route and seconds."""
     out, run_s, ids = [], 0.0, []
@@ -709,7 +729,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
     gaps = session['source']['gaps']
     seen, totals = set(), {'gaps': 0, 'images': 0, 'routes': {}, 'seconds': {}, 'frozen_seconds': 0.0}
-    video_seconds, warnings = 0.0, []
+    video_seconds, warnings, unreasoned, still_s, moving_s = 0.0, [], [], 0.0, 0.0
     for e in entries:
         need(isinstance(e, dict) and e.get('gap_id') in gaps, f"The treatment names an unknown gap: {(e or {}).get('gap_id')!r}.")
         need(e['gap_id'] not in seen, f"gap {e['gap_id']} appears twice in the treatment.")
@@ -743,15 +763,23 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         for r, x in parts:
             totals['seconds'][r] = round(totals['seconds'].get(r, 0.0) + float(x), 2)
         warnings += graphics_runs(e) + treatment_length_warnings(e)   # design/126 TR1, TR3
+        unreasoned += reasons_missing(e)   # design/202
+        still_s += sum(float(x) for r, x in parts if r == 'still')
+        moving_s += sum(float(x) for r, x in parts if r != 'still')
     missing = sorted(set(gaps) - seen)
     need(not missing, 'The treatment covers every gap; missing: ' + ', '.join(missing) + '.')
+    totals['still_seconds'], totals['moving_seconds'] = round(still_s, 2), round(moving_s, 2)   # design/202: how much of the film stands still
     film = film_frames(outputs)   # design/89 B4: the expected frozen share, shown before approval
     if film:
+        limit = float(settings().VISUALS_STILL_SHARE)
+        totals['still_share'] = round(still_s / (film / float(Fraction(str(session['source'].get('fps') or 25)))), 3)
+        if totals['still_share'] > limit + 1e-9:
+            warnings.append({'kind': 'stills_many', 'message': f"Still pictures are {totals['still_share'] * 100:.0f} % of the film: above {limit * 100:.0f} %. Make some of them moving shots."})
         totals['frozen_share'] = round(totals['frozen_seconds'] / (film / float(Fraction(str(session['source'].get('fps') or 25)))), 3)
         totals['frozen_limit'] = float(session.get('frozen_limit') or FROZEN_SHARE)
     pr = prices()
     estimate = round(totals['images'] * image_price_inr(run) + video_seconds * pr['video_inr_per_s'], 2)
-    record = {'gaps': entries, 'totals': totals, 'estimate_inr': estimate, 'rerun_allowance_inr': rerun_allowance(video_seconds, pr), 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
+    record = {'gaps': entries, 'totals': totals, 'reasons_missing': unreasoned, 'estimate_inr': estimate, 'rerun_allowance_inr': rerun_allowance(video_seconds, pr), 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
               **({'direction': str(document['direction']).strip()} if str((document or {}).get('direction') or '').strip() else {})}   # design/124 Change 3
     if not str(quote or '').strip():   # the draft the page shows for approval
         record['lines'] = _carry_lines(session, record)   # design/124 Change 6
@@ -759,7 +787,7 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         if all(v['state'] == 'accepted' for v in record['lines'].values()):   # every line accepted already, word for word
             return _record_lines(store, run, session)
         save_session(store, run, session)
-        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
+        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'reasons_missing': unreasoned, 'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
     session['treatment'] = {**record, 'quote': quote}
     session.pop('treatment_draft', None)
     save_session(store, run, session)
@@ -791,7 +819,8 @@ def _carry_lines(session, record):
     now_gaps = {e.get('gap_id'): e for e in record.get('gaps') or []}
     for k, d in _line_digests(record).items():
         o = old.get(k)
-        lines[k] = dict(o) if o and o['digest'] == d else {'digest': d, 'state': 'to_accept', **({'changed': True} if o else {})}
+        lines[k] = dict(o) if o and o['digest'] == d else {'digest': d, 'state': 'to_accept', **({'changed': True} if o else {}),
+                                                           **({'asked': True} if o and o.get('state') == 'sent_back' else {})}   # design/202: the operator sent it back and it was rewritten
         if o and o['digest'] != d:   # design/191 section 11, B2: what changed in the line, for the question
             changes = ([f'Before: "{_short_text(was.get("direction"), 400)}"'] if was.get('direction') else []) if k == 'direction' else (_diff(was_gaps[k], now_gaps[k], '') if k in was_gaps else [])
             if changes:

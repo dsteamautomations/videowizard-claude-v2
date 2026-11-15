@@ -108,7 +108,8 @@ def test_treatment_is_recorded_with_the_words_totals_and_estimate(monkeypatch):
     out = VS.treatment(store, USER, RUN, [], TREATMENT, 'Yes, this treatment.')
     sess = saved(store)
     assert sess['treatment']['quote'] == 'Yes, this treatment.' and sess['treatment']['by'] == 'u1' and sess['treatment']['digest']
-    assert out['totals'] == {'gaps': 2, 'images': 4, 'routes': {'graphic_sequence': 1, 'video': 1}, 'seconds': {'graphic_sequence': 20.0, 'video': 10.0}, 'frozen_seconds': 0.0}
+    assert out['totals'] == {'gaps': 2, 'images': 4, 'routes': {'graphic_sequence': 1, 'video': 1}, 'seconds': {'graphic_sequence': 20.0, 'video': 10.0}, 'frozen_seconds': 0.0,
+                             'still_seconds': 0.0, 'moving_seconds': 30.0}   # design/202: how much moves and how much stands still
     assert out['estimate_inr'] == 4 * 20.0 + 10 * 8.0 and sess['treatment']['estimate_inr'] == out['estimate_inr']
 
 

@@ -1378,6 +1378,7 @@ WARNING_PLAIN = {
     'build_short': 'This graphic has more points to show than steps to show them in.',
     'graphic_short': 'This graphic is on screen too briefly to be read.',
     'still_long': 'This still picture stays on screen longer than a still should.',
+    'stills_many': 'Still pictures take up a large part of the film.',   # design/202
     'graphic_unbuilt': 'This graphic stays on screen a long time without building up.',
     'state_long': 'One step of this graphic stays on screen too long.',
     'look_only': 'The only change in this video is a look or an expression, which AI video often gets wrong.',

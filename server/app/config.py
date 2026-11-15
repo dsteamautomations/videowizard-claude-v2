@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     MAX_QUOTE_CHARS: int = 2048
     APP_ORIGIN: str = 'http://localhost:8002'  # where operators open /connect and /runs
     CONNECT_MINUTES: int = 10
-    SERVER_VERSION: str = '0.99.3'
+    SERVER_VERSION: str = '0.100.0'
     GEMINI_IMAGE_MODEL: str = 'gemini-3-pro-image'   # design/120: Nano Banana Pro as Google's docs name it; SK's exact id goes in server/.env (VW2_GEMINI_IMAGE_MODEL)
     GEMINI_IMAGE_SIZE: str = '2K'                     # design/120: 1K, 2K or 4K (uppercase K)
     GEMINI_IMAGE_USD: float = 0.134                   # design/120: Google's price per 1K/2K picture, 28 Oct 2026
@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     VISUALS_PRICE_IMAGE_INR: float = 4.0           # a picture whose job has no tokens; with tokens the ledger uses OpenAI's rates (design/82 U2; measured ₹3 to ₹5 on 22 Oct)
     VISUALS_PRICE_VIDEO_INR_PER_S: float = 8.9     # one second of a generated take: Omni 1.1 Flash, 5,792 tokens a second at $17.50/M
     VISUALS_USD_INR: float = 88.0
+    VISUALS_STILL_SHARE: float = 0.10              # design/202: warn when still pictures pass this share of the film (VW-21's 13.5 % would have warned); SK's figure
     VISUALS_CAP_INR: float = 5000.0                # per film, unless the operator raises it with their words (SK, 21 Oct 2026, design/66)
     FFMPEG_EXECUTABLE: str = 'ffmpeg'
     # design/130: the HyperFrames motion route, installed on the VM in phase 0 (pinned CLI, its own HOME with the pinned Chrome, a pinned GSAP)
