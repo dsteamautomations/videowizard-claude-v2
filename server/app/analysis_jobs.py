@@ -6,6 +6,7 @@ Only `retained` records a stage output for the clip. Every phase leaves a local 
 worker resumes at the last phase and never pays twice."""
 import hashlib
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import subprocess
@@ -104,6 +105,10 @@ def start_policy(policy, production):
     return {**policy, 'waived_risk_flags': list(PPE_WAIVERS), 'waiver_note': 'the brief recorded no brand or safety rules'}
 
 
+REUSE_READS = 8   # storage reads and writes at one time while stored studies are taken over
+REUSE_CAP = 3     # stored studies recorded at one time: each takes a second or two, and fifteen at once used up the database's connections (VW-24)
+
+
 def _reusable(conn, store, run, procedure, brief, script, policy, clips):
     """defect 52: {clip id: the stored study this film takes over} for the skipped clips the client's library holds as the same file."""
     if not clips or not run.get('client_id'):
@@ -111,13 +116,17 @@ def _reusable(conn, store, run, procedure, brief, script, policy, clips):
     from . import study_reuse
     rows = {r['sha256']: dict(r) for r in conn.execute('select sha256, name, films, evidence_key from vw2_library where client_id=%s and sha256 = any(%s) and not missing',
                                                         (run['client_id'], [c['sha256'] for c in clips])).fetchall()}
-    out = {}
-    for c in clips:
-        if c['sha256'] in rows:
-            got = study_reuse.plan(conn, store, rows[c['sha256']], analysis.build_request(run, procedure, brief, script, c, policy))
-            if got:
-                out[c['id']] = got
-    return out
+    # defect 52 follow-up (VW-24, 15 Nov 2026): one clip after another took minutes for 94 clips (several storage reads each) and the operator's
+    # tool gave up waiting. The jobs' records are read in one query; the storage reads run eight at a time.
+    keys = [r['evidence_key'] for r in rows.values() if r.get('evidence_key')]
+    jobs_ = {}
+    for j in conn.execute("select request, result from vw2_jobs where stage='analysis' and result->>'evidence_key' = any(%s) order by created_at", (keys,)).fetchall():
+        jobs_[(j['result'] or {}).get('evidence_key')] = j   # the latest job per study wins
+    todo = [c for c in clips if c['sha256'] in rows and rows[c['sha256']].get('evidence_key') in jobs_]
+    one = lambda c: study_reuse.plan(None, store, rows[c['sha256']], analysis.build_request(run, procedure, brief, script, c, policy), job=jobs_[rows[c['sha256']]['evidence_key']])
+    with ThreadPoolExecutor(max_workers=REUSE_READS) as pool:
+        got = list(pool.map(one, todo))
+    return {c['id']: g for c, g in zip(todo, got) if g}
 
 
 def start(conn, user, run, outputs, policy, again):
@@ -172,7 +181,7 @@ def start(conn, user, run, outputs, policy, again):
         raise Problem(409, 'JOB_OPEN', 'Finish or resolve the open analysis jobs before analysing again.', units=[r['unit'] for r in open_jobs])
     done = {o['unit'] for o in outputs if o['stage'] == 'analysis'}
     store = storage()
-    created, reused = [], []
+    created, reused, puts = [], [], []
     for clip in clips:
         policy_clip = {**policy, 'collection': [{'id': c['id'], 'sha256': c['sha256']} for c in clips]}
         req = analysis.build_request(run, procedure, brief, script, clip, policy_clip, generation=(datetime.now(timezone.utc).isoformat() if again else None))
@@ -182,11 +191,12 @@ def start(conn, user, run, outputs, policy, again):
             reused.append(clip['id'])
             continue
         key = f"{run['id']}/analysis/{clip['id']}.request.json"
-        store.put(key, json.dumps(req, ensure_ascii=False).encode('utf-8'), 'application/json')
+        if clip['id'] not in reuse:
+            store.put(key, json.dumps(req, ensure_ascii=False).encode('utf-8'), 'application/json')
         if clip['id'] in reuse:   # defect 52: no upload and no model call; the worker reviews the stored answer for this film, as a re-policy does
             got = reuse[clip['id']]
             rk = f"{run['id']}/analysis/{clip['id']}.reused.response.json"
-            store.put(rk, got['raw'].encode('utf-8'), 'application/json')
+            puts += [(key, json.dumps(req, ensure_ascii=False).encode('utf-8')), (rk, got['raw'].encode('utf-8'))]
             row = conn.execute('''insert into vw2_jobs(run_id, stage, unit, provider, request, request_id) values (%s,'analysis',%s,%s,%s, gen_random_uuid()) returning id''',
                                (run['id'], clip['id'], PROVIDER, Jsonb({'kind': 'analysis', 'analysis_key': req['analysis_key'], 'request_key': key,
                                                                         'clip': {k: clip.get(k) for k in ('id', 'name', 'sha256', 'bytes', 'duration_s', 'has_audio')},
@@ -200,6 +210,9 @@ def start(conn, user, run, outputs, policy, again):
                                                                     'identity': req['identity'], 'policy': policy}),
                             uuid.uuid5(uuid.NAMESPACE_URL, req['analysis_key']))).fetchone()
         created.append({'unit': clip['id'], 'job_id': str(row['id'])})
+    if puts:   # the files of the stored studies, written eight at a time; a job is claimed only after this request has finished
+        with ThreadPoolExecutor(max_workers=REUSE_READS) as pool:
+            list(pool.map(lambda kv: store.put(kv[0], kv[1], 'application/json'), puts))
     conn.execute("update vw2_jobs set request = request || %s where run_id=%s and stage='analysis' and status='queued'", (Jsonb({'policy': policy}), run['id']))
     return {'created': created, 'reused': reused, 'excluded': sorted(excluded), 'clips': len(clips), 'camera_audio': policy['camera_audio'], 'camera_audio_source': policy['camera_audio_source'],
             **({'studies_from_the_library': len(reuse), 'paid': len(created) - len(reuse),
@@ -342,11 +355,15 @@ def claim(conn):
     active = conn.execute("select count(*) from vw2_jobs where provider=%s and status='running' and lease_until > now()", (PROVIDER,)).fetchone()['count']
     if active >= global_cap():
         return None
+    # a stored study taken over (defect 52) or solved again is quick; REUSE_CAP of them run at one time, so their database calls do not pile up
     return conn.execute('''update vw2_jobs set status='running', lease_until = now() + make_interval(mins => %s), attempt = attempt + 1, updated_at = now()
-                           where id = (select j.id from vw2_jobs j where j.provider=%s and (j.status='queued' or (j.status='storage_pending' and (j.lease_until is null or j.lease_until < now()))
+                           where id = (select j.id from vw2_jobs j where j.provider=%s
+                                         and (not (j.request ? 'reuse_response_key') or (select count(*) from vw2_jobs a where a.provider=j.provider and a.status='running'
+                                                and a.lease_until > now() and a.request ? 'reuse_response_key') < %s)
+                                         and (j.status='queued' or (j.status='storage_pending' and (j.lease_until is null or j.lease_until < now()))
                                                                                            or (j.status='running' and j.lease_until < now()))
                                        order by (select count(*) from vw2_jobs a where a.run_id=j.run_id and a.status='running' and a.lease_until > now()), j.created_at limit 1 for update skip locked)
-                           returning *''', (LEASE_MINUTES, PROVIDER)).fetchone()
+                           returning *''', (LEASE_MINUTES, PROVIDER, REUSE_CAP)).fetchone()
 
 
 def renew(job_id, phase):

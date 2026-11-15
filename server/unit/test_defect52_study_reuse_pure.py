@@ -180,3 +180,22 @@ def test_a_film_with_no_studied_clip_and_nothing_skipped_is_still_refused():
     with pytest.raises(Problem) as e:
         B.mark(Rec(), None, {'id': 'u1'}, {**RUN, 'film': {}}, SKIPPED[:1], [], 'none')
     assert 'No studied clips yet' in e.value.message
+
+
+# ---------- follow-up (VW-24): the start was slow and fifteen quick jobs at once used up the database's connections ----------
+
+def test_the_job_record_can_be_handed_in_so_no_query_is_made_per_clip():
+    store, conn = stored()
+    got = R.plan(None, store, ROW, request(OLD), job=conn.job)   # conn is None: a query here would fail
+    assert got['fits'] == {'kept': 'all', 'dropped': 0}
+
+
+def test_stored_studies_are_read_side_by_side_and_recorded_a_few_at_a_time():
+    import inspect
+    from app import analysis_jobs as AJ
+    assert AJ.REUSE_READS == 8 and AJ.REUSE_CAP == 3
+    src = inspect.getsource(AJ._reusable)
+    assert 'ThreadPoolExecutor(max_workers=REUSE_READS)' in src and 'any(%s)' in src   # one query for every job record, the storage reads in threads
+    claim = inspect.getsource(AJ.claim)
+    assert "a.request ? 'reuse_response_key') < %s" in claim and '(LEASE_MINUTES, PROVIDER, REUSE_CAP)' in claim
+    assert 'store.exists' not in inspect.getsource(R.plan)

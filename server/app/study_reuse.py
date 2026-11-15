@@ -63,33 +63,36 @@ def carry(raw, mapping, n_old, n_new):
     return json.dumps(body, ensure_ascii=False), {'kept': kept, 'dropped': dropped}
 
 
-def plan(conn, store, row, request):
+JOB_SQL = "select request, result from vw2_jobs where stage='analysis' and result->>'evidence_key'=%s order by created_at desc limit 1"
+
+
+def plan(conn, store, row, request, job=None):
     """What reusing this library row for `request` (this film's own request for the same file) gives: {'raw', 'from', 'fits'}, or None when the
-    stored study may not be reused."""
+    stored study may not be reused. `job` is the record of the job that made the study, when the caller read it already (then `conn` is not used).
+    A file that is not there is found by reading it: asking first cost a request to storage for each of three files of each clip."""
     ev_key = (row or {}).get('evidence_key')
     if not ev_key or not ev_key.endswith('.evidence.json'):
         return None
     resp_key = ev_key[:-len('.evidence.json')] + '.response.json'
-    if not store.exists(ev_key) or not store.exists(resp_key):
-        return None
     try:
         old_identity = json.loads(store.get(ev_key).decode('utf-8')).get('identity') or {}
-    except (ValueError, AttributeError):
+    except Exception:   # noqa: BLE001  not there, or not readable: no reuse
         return None
     new_identity = request['identity']
     if any(old_identity.get(k) != new_identity.get(k) for k in ('contract_version', 'model', 'schema_digest')):
         return None   # a study made in another form or by another model is not this film's study
-    job = conn.execute("select request, result from vw2_jobs where stage='analysis' and result->>'evidence_key'=%s order by created_at desc limit 1", (ev_key,)).fetchone()
+    job = job or conn.execute(JOB_SQL, (ev_key,)).fetchone()
     old_key = ((job or {}).get('request') or {}).get('request_key')
-    if not old_key or not store.exists(old_key):
+    if not old_key:
         return None
     try:
         old_beats = (json.loads(store.get(old_key).decode('utf-8')).get('project_config') or {}).get('script_beats') or []
-    except (ValueError, AttributeError):
+        stored = store.get(resp_key).decode('utf-8')
+    except Exception:   # noqa: BLE001
         return None
     new_beats = request['project_config']['script_beats']
     by_sentence = old_identity.get('fit_unit') == 'sentence' and new_identity.get('fit_unit') == 'sentence'
-    raw, fits = carry(store.get(resp_key).decode('utf-8'), sentence_map(old_beats, new_beats) if by_sentence else {}, len(old_beats), len(new_beats))
+    raw, fits = carry(stored, sentence_map(old_beats, new_beats) if by_sentence else {}, len(old_beats), len(new_beats))
     if raw is None:
         return None
     look = (((job or {}).get('result') or {}).get('summary') or {}).get('look')   # the clip's colour measure does not depend on the film
