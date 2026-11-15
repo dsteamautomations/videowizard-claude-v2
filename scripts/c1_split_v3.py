@@ -100,6 +100,8 @@ if __name__ == '__main__':
         prompt = d200(prompt, parts)
         from d202_wording_v3 import apply as d202   # design/202: the narration alone; action first; each shot's two reasons; words on the picture by category
         prompt = d202(prompt, parts)
+        from d203_wording_v3 import apply as d203   # design/203: the Direction in six parts; a second Direction that differs in kind
+        prompt = d203(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

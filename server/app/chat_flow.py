@@ -66,6 +66,36 @@ DIRECTION_HELP = ('The direction says what the viewer should understand by the e
                   'no gap is shown until you accept it.')
 
 
+SECOND_DIRECTION_TELL = ('Write a second Direction that differs in viewpoint or approach, not in wording. Keep the first as it is in `direction_parts`; put the second in '
+                         '`direction_alternative` (its six parts, `answers_brief` and `risk`); give the first its own two lines (`direction_answers_brief`, `direction_risk`); '
+                         'send the draft again. The operator then sees both and takes one.')
+
+
+def _direction_rows(draft, outputs):
+    """design/203: the Direction as the operator reads it: from the brief its purpose, audience and tone (so a departure shows at once), then the
+    six headed parts, a part not given reading 'not given'. With a second Direction beside it, both are shown, each with how it answers the brief
+    and what it risks. Empty for a Direction sent as the older paragraph: that one is shown as its text."""
+    parts = draft.get('direction_parts')
+    if not parts:
+        return []
+    rows = []
+    try:
+        brief = next((o for o in outputs or [] if o.get('stage') == 'brief' and o.get('unit') is None), None)
+        if brief:
+            s = brief.get('summary') or {}
+            rows = [(f'From the brief · {k}', ' '.join(str(s.get(k) or '').split()) or 'not recorded') for k in ('purpose', 'audience', 'tone')]
+    except Exception:   # the brief's record cannot be read: its rows are left out; the Direction is still shown
+        rows = []
+    second = draft.get('direction_alternative')
+    if not second:
+        return rows + [(h, parts.get(k) or 'not given') for k, h, _ in V.DIRECTION_PARTS]
+    notes = draft.get('direction_notes') or {}
+    for name, p, lines in (('First', parts, notes), ('Second', second.get('parts') or {}, second)):
+        rows += [(f'{name} · {h}', p.get(k) or 'not given') for k, h, _ in V.DIRECTION_PARTS]
+        rows += [(f'{name} · {what}', lines.get(k) or 'not given') for k, what in V.SECOND_LINES]
+    return rows
+
+
 def _shot_rows(e, reasons_asked=True):
     """design/202: each shot of a treatment line as the operator reads it: how it is made and for how long, what the viewer sees, why the picture
     fits the words, why it is made this way. A reason that was not written reads 'not given'; on a draft saved before the reasons were asked
@@ -104,7 +134,8 @@ def _treatment_items(ctx):
         if st['state'] != 'to_accept':
             continue
         if key == 'direction':
-            head, body, rows = 'The direction of the film', DIRECTION_HELP + '\n\n' + str(draft.get('direction') or ''), None   # design/202: named, explained, in full
+            head, rows = 'The direction of the film', _direction_rows(draft, ctx.get('outputs'))   # design/203: six headed rows, the brief above them
+            body = DIRECTION_HELP + '\n\n' + ('\n'.join(f'- **{k}:** {v}' for k, v in rows) if rows else str(draft.get('direction') or ''))   # design/202: named, explained, in full
         else:
             e = entries.get(key) or {}
             head = f'Gap {key}'
@@ -115,15 +146,22 @@ def _treatment_items(ctx):
             body = '\n'.join(f'- **{k}:** {v}' for k, v in rows if v not in (None, '', []))   # a list: plain line breaks run together in the chat
 
         def run(choice, quote, words, key=key):
-            return V.treatment(ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], None, quote, accept=[key] if choice == 'accept' else [],
-                               send_back=[key] if choice == 'change' else [], notes=words if choice == 'change' else '')
+            if key == 'direction' and choice == 'different':   # design/203: the same path as Change this, with fixed words
+                out = V.treatment(ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], None, quote, send_back=[key], different=True)
+                return {**out, 'tell': SECOND_DIRECTION_TELL}
+            return V.treatment(ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], None, quote, accept=[key] if choice in ('accept', 'accept_second') else [],
+                               send_back=[key] if choice == 'change' else [], notes=words if choice == 'change' else '', use_second=choice == 'accept_second')
+        change = _button('Change this', 'change', words=True, tell='Ask the operator what to change in this line.')
+        another = _button(V.DIFFERENT_DIRECTION, 'different')
+        buttons = ([_button('Accept', 'accept'), change] if key != 'direction'
+                   else [_button('Use the first', 'accept'), _button('Use the second', 'accept_second'), change, another] if draft.get('direction_alternative')
+                   else [_button('Accept', 'accept'), change, another])
         items.append(_item(f"treatment:{key}:{st['digest'][:10]}", 'treatment line', f'Treatment, line {n} of {len(order)}',
                            f"{head}{' (changed as you asked)' if st.get('asked') else ' (changed since you last saw it)' if st.get('changed') else ''}. "
                            + ('Do you accept the direction of the film?' if key == 'direction' else 'Do you accept this line?'), run,   # design/202: the Direction is asked by its name
-                           [_button('Accept', 'accept'), _button('Change this', 'change', words=True, tell='Ask the operator what to change in this line.')],
-                           text=_changed_text(st.get('changes'), bool(st.get('asked'))) + body))
+                           buttons, text=_changed_text(st.get('changes'), bool(st.get('asked'))) + body))
         items[-1].update(_key=key, _summary=summary, _card={'n': head, 'c': 1 if st.get('changed') else 0, **({'a': 1} if st.get('asked') else {}), **({'ch': _changes(st['changes'])} if st.get('changes') else {}),
-                                          **({'t': body} if rows is None else {'r': [[k, str(v)] for k, v in rows if v not in (None, '', [])]})})
+                                          **({'t': body} if not rows else {'r': [[k, str(v)] for k, v in rows if v not in (None, '', [])]})})
     return items, summary, [k for k in order if lines[k]['state'] == 'sent_back']
 
 

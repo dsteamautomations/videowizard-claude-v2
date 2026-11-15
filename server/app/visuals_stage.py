@@ -735,7 +735,77 @@ def graphics_runs(entry):
     return out
 
 
-def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes=''):
+# design/203 (SK, 15 Nov 2026): the Direction in six labelled parts, each short; the idea in one sentence
+DIRECTION_PARTS = (('idea', 'The idea', 160), ('purpose', 'Who it is for and what it must do', 300), ('viewpoint', 'Whose story', 200),
+                   ('feel', 'How it should feel', 300), ('shape', 'How the film moves', 400), ('pictures', 'What each kind of picture does', 500))
+SECOND_LINES = (('answers_brief', 'how it answers the brief'), ('risk', 'what it risks'))
+DIFFERENT_DIRECTION = 'Show me a different direction'
+NOT_IN_PARTS = 'The Direction is not in its six parts.'
+NO_DIRECTION = 'Write the Direction first (direction_parts, six short parts): the idea in one sentence, who it is for and what it must do, whose story, how it should feel, how the film moves, what each kind of picture does.'
+REDO_NOTE = 'Written again from the direction you chose.'
+
+
+def _one_line(v):
+    return ' '.join(v.split()) if isinstance(v, str) else ''
+
+
+def direction_from(parts, who='The Direction'):
+    """design/203: (the Direction as text, the parts given, the headings not given). The text is each given part as "Heading: text", one to a
+    line, in the fixed order, so everything that reads `direction` (the plan's word-for-word check, the line's digest) works as before.
+    A part over its length, and an idea of more than one sentence, is refused; a part not given is named and does not stop the draft."""
+    parts = parts if isinstance(parts, dict) else {}
+    given, missing = {}, []
+    for key, heading, limit in DIRECTION_PARTS:
+        text = _one_line(parts.get(key))
+        need(len(text) <= limit, f'{who}: "{heading}" is at most {limit} characters.')
+        if text:
+            given[key] = text
+        else:
+            missing.append(heading)
+    need(len(re.findall(r'[.!?]', given.get('idea', ''))) <= 1, f'{who}: The idea is one sentence.')
+    return '\n'.join(f'{h}: {given[k]}' for k, h, _ in DIRECTION_PARTS if k in given), given, missing
+
+
+def direction_fields(document):
+    """design/203: the Direction of a sent draft as the record keeps it: `direction` (text), `direction_parts`, the two lines on how it answers
+    the brief and what it risks (`direction_notes`), a second Direction beside it (`direction_alternative`), and `direction_missing`, what was
+    not given. A draft that sends only the older paragraph is taken, flagged as not in its six parts."""
+    out, missing = {}, [NOT_IN_PARTS]
+    text = str(document.get('direction') or '').strip()
+    if isinstance(document.get('direction_parts'), dict):   # when both are sent, the parts win
+        text, given, missing = direction_from(document['direction_parts'])
+        need(given, NO_DIRECTION)
+        out['direction_parts'] = given
+    need(text, NO_DIRECTION)   # design/124 Change 3
+    need(len(text) <= 2000, 'The Direction is a few lines (at most 2000 characters).')
+    out['direction'] = text
+    notes = {k: _one_line(document.get('direction_' + k)) for k, _ in SECOND_LINES}
+    alt = document.get('direction_alternative')
+    if isinstance(alt, dict) and 'direction_parts' in out:
+        atext, agiven, amissing = direction_from(alt, 'The second direction')
+        need(agiven, 'The second direction has none of its six parts.')
+        need(_one_line(atext) != _one_line(text), 'The second direction is the same as the first: write one that differs in viewpoint or approach.')
+        second = {'parts': agiven, 'text': atext, **{k: _one_line(alt.get(k)) for k, _ in SECOND_LINES if _one_line(alt.get(k))}}
+        out['direction_alternative'] = second
+        missing = (missing + [f'The first direction: {what}' for k, what in SECOND_LINES if not notes[k]] + [f'The second direction: {h}' for h in amissing]
+                   + [f'The second direction: {what}' for k, what in SECOND_LINES if k not in second])
+    if any(notes.values()):
+        out['direction_notes'] = {k: v for k, v in notes.items() if v}
+    out['direction_missing'] = missing
+    return out
+
+
+def direction_changes(before_text, before_parts, record):
+    """design/203: what changed in the Direction, named by part when both sides are in parts; else what it was before."""
+    now_parts = record.get('direction_parts')
+    if before_parts and now_parts:
+        heads = {k: h for k, h, _ in DIRECTION_PARTS}
+        changes = _diff({heads[k]: before_parts.get(k, '') for k in heads}, {heads[k]: now_parts.get(k, '') for k in heads}, '')
+        return changes or (['A second direction is shown beside the first.'] if record.get('direction_alternative') else [])
+    return [f'Before: "{_short_text(before_text, 400)}"'] if before_text else []
+
+
+def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes='', use_second=False, different=False):
     """One entry per gap: the team's intended visuals cited or departed from, the picture in a line, the routes, the seconds, the images.
     Without the operator's words the document is kept as the draft the visuals page shows; with them it is recorded (the page records the
     draft with the words given there). `propose` is refused without a record and when a route departs from it.
@@ -744,14 +814,13 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     need_motion_style(run)   # design/179 S3: the film's motion style is asked once, here, recommended from its category
     session = session_of(store, run, outputs)
     if accept or send_back:
-        return _treatment_lines(store, user, run, session, list(accept or []), list(send_back or []), notes, quote)
+        return _treatment_lines(store, user, run, session, list(accept or []), list(send_back or []), notes, quote, use_second=use_second, different=different)
     if document is None:
         document = session.get('treatment_draft')
         need(document, 'No treatment draft on this run: send one first (`vw visuals treatment --file out/visual-treatment.json`).')
+        direction = {k: document[k] for k in ('direction', 'direction_parts', 'direction_notes', 'direction_alternative', 'direction_missing') if k in document}   # the stored draft, as it is
     else:
-        direction = str((document or {}).get('direction') or '').strip()
-        need(direction, 'Write the Direction first (direction, a few lines): what the audience should understand or feel, the point of view, the approach and why.')   # design/124 Change 3
-        need(len(direction) <= 2000, 'The Direction is a few lines (at most 2000 characters).')
+        direction = direction_fields(document if isinstance(document, dict) else {})   # design/203: six parts, or the older paragraph
     entries = (document or {}).get('gaps')
     need(isinstance(entries, list) and entries, 'The treatment is a list of gaps.')
     gaps = session['source']['gaps']
@@ -812,14 +881,15 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     pr = prices()
     estimate = round(totals['images'] * image_price_inr(run) + video_seconds * pr['video_inr_per_s'], 2)
     record = {'gaps': entries, 'totals': totals, 'reasons_missing': unreasoned, 'estimate_inr': estimate, 'rerun_allowance_inr': rerun_allowance(video_seconds, pr), 'warnings': warnings, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'digest': digest(entries),
-              **({'direction': str(document['direction']).strip()} if str((document or {}).get('direction') or '').strip() else {})}   # design/124 Change 3
+              **direction}   # design/124 Change 3; design/203
     if not str(quote or '').strip():   # the draft the page shows for approval
         record['lines'] = _carry_lines(session, record)   # design/124 Change 6
         session['treatment_draft'] = record
         if all(v['state'] == 'accepted' for v in record['lines'].values()):   # every line accepted already, word for word
             return _record_lines(store, run, session)
         save_session(store, run, session)
-        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'reasons_missing': unreasoned, 'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
+        return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'reasons_missing': unreasoned, 'direction_missing': record.get('direction_missing', []),
+                'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
     session['treatment'] = {**record, 'quote': quote}
     session.pop('treatment_draft', None)
     save_session(store, run, session)
@@ -830,7 +900,8 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
 
 def _line_digests(record):
     """The Direction and each gap entry, each a line the operator accepts or sends back on its own."""
-    out = {'direction': digest(' '.join(record['direction'].split()))} if record.get('direction') else {}
+    second = _one_line((record.get('direction_alternative') or {}).get('text'))   # design/203: a second Direction beside the first is part of the line the operator answers
+    out = ({'direction': digest([_one_line(record['direction']), second]) if second else digest(' '.join(record['direction'].split()))}) if record.get('direction') else {}
     out.update({e['gap_id']: digest(e) for e in record.get('gaps') or []})
     return out
 
@@ -857,10 +928,15 @@ def _carry_lines(session, record):
         seen = o.get('was') if asked and o.get('was') is not None else None
         lines[k] = dict(o) if o and o['digest'] == d else {'digest': d, 'state': 'to_accept', **({'changed': True} if o else {}),
                                                            **({'asked': True} if asked else {}), **({'was': seen} if seen is not None else {})}
+        if o and o['digest'] == d and o.get('redo'):   # design/203: sent back because the operator chose the other Direction, and the assistant lets it stand
+            lines[k] = {'digest': d, 'state': 'to_accept'}
         if o and o['digest'] != d:   # design/191 section 11, B2: what changed in the line, for the question
-            before_direction = seen if isinstance(seen, str) else was.get('direction')
-            before_gap = seen if isinstance(seen, dict) else was_gaps.get(k)
-            changes = ([f'Before: "{_short_text(before_direction, 400)}"'] if before_direction else []) if k == 'direction' else (_diff(before_gap, now_gaps[k], '') if before_gap is not None else [])
+            if k == 'direction':   # design/203: named by part; `was` is {'direction', 'parts'} (a text alone on a line sent back before design/203)
+                held = seen if isinstance(seen, dict) else {'direction': seen} if isinstance(seen, str) else {'direction': was.get('direction'), 'parts': was.get('direction_parts')}
+                changes = direction_changes(held.get('direction'), held.get('parts'), record)
+            else:
+                before_gap = seen if isinstance(seen, dict) else was_gaps.get(k)
+                changes = _diff(before_gap, now_gaps[k], '') if before_gap is not None else []
             if changes:
                 lines[k]['changes'] = changes
     return lines
@@ -875,7 +951,10 @@ def _record_lines(store, run, session):
             'next': 'Treatment recorded: every line accepted. The assistant writes the plan to it.'}
 
 
-def _treatment_lines(store, user, run, session, accept, send_back, notes, quote):
+def _treatment_lines(store, user, run, session, accept, send_back, notes, quote, use_second=False, different=False):
+    """design/203: `different` sends the Direction back with fixed words, asking for a second one; `use_second` accepts the second Direction
+    shown beside the first: it becomes the Direction and every gap line goes back to be written again from it."""
+    notes = notes if str(notes or '').strip() or not different else DIFFERENT_DIRECTION
     draft = session.get('treatment_draft')
     need(draft, 'No treatment draft on this run: send one first (`vw visuals treatment --file out/visual-treatment.json`).')
     lines = draft.get('lines') or {k: {'digest': d, 'state': 'to_accept'} for k, d in _line_digests(draft).items()}   # a draft from before Change 6
@@ -885,13 +964,26 @@ def _treatment_lines(store, user, run, session, accept, send_back, notes, quote)
     need(not set(accept) & set(send_back), 'A line is accepted or sent back, not both.')
     need(not send_back or str(notes or '').strip(), 'Say what to change in the line sent back (notes).')
     at = datetime.now(timezone.utc).isoformat()
+    seen_gaps = {e.get('gap_id'): e for e in draft.get('gaps') or []}
     for k in accept:
         lines[k] = {'digest': lines[k]['digest'], 'state': 'accepted', 'quote': said(quote, 'accepted', user), 'by': user['id'], 'at': at}
-    seen_gaps = {e.get('gap_id'): e for e in draft.get('gaps') or []}
+    if 'direction' in accept and draft.get('direction_alternative'):   # design/203: one of the two is taken; the other is dropped
+        second = draft.pop('direction_alternative')
+        if use_second:
+            draft['direction'], draft['direction_parts'] = second['text'], second['parts']
+            draft.pop('direction_notes', None)
+            if any(second.get(k) for k, _ in SECOND_LINES):
+                draft['direction_notes'] = {k: second[k] for k, _ in SECOND_LINES if second.get(k)}
+            for k in lines:   # every gap line was written from the other Direction: back to the assistant
+                if k != 'direction':
+                    lines[k] = {'digest': lines[k]['digest'], 'state': 'sent_back', 'note': REDO_NOTE, 'redo': True, 'by': user['id'], 'at': at,
+                                **({'was': seen_gaps[k]} if k in seen_gaps else {})}
+        draft['direction_missing'] = [m for m in draft.get('direction_missing') or [] if not m.startswith(('The first direction', 'The second direction'))]
+        lines['direction']['digest'] = _line_digests(draft)['direction']
     for k in send_back:
-        was = draft.get('direction') if k == 'direction' else seen_gaps.get(k)   # design/202: what the operator was looking at when they sent it back
+        was = {'direction': draft.get('direction'), 'parts': draft.get('direction_parts')} if k == 'direction' else seen_gaps.get(k)   # design/202: what the operator was looking at
         lines[k] = {'digest': lines[k]['digest'], 'state': 'sent_back', 'note': str(notes).strip(), 'quote': said(quote, 'sent back', user), 'by': user['id'], 'at': at,
-                    **({'was': was} if was is not None else {})}
+                    **({'was': was} if was is not None else {}), **({'different': True} if different and k == 'direction' else {})}
     draft['lines'] = lines
     if all(v['state'] == 'accepted' for v in lines.values()):
         return _record_lines(store, run, session)

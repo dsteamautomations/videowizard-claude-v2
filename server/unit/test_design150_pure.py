@@ -10,7 +10,7 @@ BRIEF = (ROOT.parent / 'plugin' / 'agents' / 'vw-plan-gaps.md').read_text(encodi
 
 
 def test_the_treatment_text_states_the_two_limits_the_server_enforces():
-    assert 'a few lines (at most 2000 characters)' in TREATMENT   # C1: visuals_stage refuses over 2000
+    assert '(160, 300, 200, 300, 400 and 500 characters)' in TREATMENT   # C1, as design/203 states it: the six parts' lengths; the 2000 guard on the whole stays in visuals_stage
     assert "`seconds`, one number, the gap's total" in TREATMENT and 'never a list in `seconds`' in TREATMENT   # C2: visuals_stage refuses a list
     assert "a video gap's segments with theirs);" not in TREATMENT   # the sentence that read as seconds per segment is gone
 
