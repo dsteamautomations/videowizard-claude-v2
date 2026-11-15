@@ -26,6 +26,40 @@ SK approved the requirements on 15 Nov ("Approved the requirement. go ahead with
 
 **Corrected in the text below:** the picture-count instruction was already rewritten for the guide flow before this change; nothing was done there.
 
+### Review of the first build (15 Nov, on SK's word; a reviewer who had not written the code, then fixes with tests first)
+
+| # | Defect found in the first build (commit 40eb67b) | Fixed |
+|---|---|---|
+| 1 | Still seconds were wrong whenever a shot had no numeric seconds, or a gap of several ways had no shots: the whole gap was counted under its first way, so stills were lost or invented and the warning could be false | `still_and_moving`: counted shot by shot; what cannot be told is `unsplit_seconds`, never guessed |
+| 2 | "Changed as you asked" was lost when the assistant sent the draft again before the operator saw the line, and the list of changes was then against a draft the operator never saw | The line keeps `asked` and `was` (what the operator was looking at) until they answer it |
+| 3 | The gap's own `why` was no longer shown; a draft saved before the change read "not given" on every shot | The `Why` row is back; "not given" appears only on a draft made after the reasons were asked |
+| 4 | The still warning could say "10 % of the film: above 10 %", and a share just over the limit could be missed | Compared before rounding; shown rounded up to a tenth |
+| 5 | A reason that was a list, a number or only spaces counted as given and was shown as raw data | Only text counts (`reason_text`) |
+| 6 | A shot's way outside the five was accepted and counted as moving | Refused by name |
+| 7 | The preparation text still said to read the script's notes file first | Rewritten; the wording script now stops if a sentence it removes was reworded |
+| 8 | The card's header still said "Changed since you last saw it" for a line changed as asked | Both the header and the list say "Changed as you asked" |
+| 9 | A shot's way that is not text could break the question | Guarded |
+
+Tests: `server/unit/test_design202_review_pure.py` (18 tests); the whole `server/unit` suite passes (1,653).
+
+**Left as it is, and why:**
+- The first step line of the visuals stage still lists `intended-visuals.json` among the files to read. The file is written empty; the step lines are built by another script's chain, and the change was not worth the risk.
+- Older crashes on the same lines, not from this change: `shots` that is a list of words or a dictionary; an `fps` of `'25 fps'` or `'0'`.
+- A footage frame held still (`frozen_seconds`) is not counted as a still picture; the frozen share already warns on it.
+- A line the assistant rewrites back to exactly what the operator sent back shows as changed with no list.
+
+**Not errors, but risks for a deployment:**
+- **The card is larger.** On VW-21's eight gaps the card grows from about 10,700 to about 15,400 characters, all of which the assistant copies out to show it. A card of ten lines with long reasons may arrive cut or broken. Not seen on a real run.
+- **A run that is at the treatment when this is deployed** (VW-24 was) keeps its draft: its lines show without reasons until the assistant sends the draft again.
+- **How well the assistant writes the two reasons** is seen only on a real treatment.
+
+**The trial artifact page (section 6.1) is not part of this build.** Reviewing it as it stands (`scratchpad/treatment-trial.html`, published privately): it must not be used for a real run before these are fixed:
+1. An answer given to an older text of a line stays shown after the line is rewritten, unless the assistant deletes it in the same write (`for_rev` is stored but not checked by the page).
+2. The page redraws on every change from the database, so the box the operator is typing in loses its place when the assistant updates a line at that moment.
+3. If the Direction is un-accepted after gaps were answered, the gap answers stay in the database; the assistant must ignore them.
+4. A failure to load the answers is silent: the lines read as unanswered.
+5. No limit on the typed text (the server's strictest field is 2,000 characters); no rule yet that only the owner may answer if the page is shared.
+
 ---
 
 **Revision 2 takes in SK's comments of 15 Nov on VW-24** (the latest plugin):

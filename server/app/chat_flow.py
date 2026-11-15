@@ -66,16 +66,18 @@ DIRECTION_HELP = ('The direction says what the viewer should understand by the e
                   'no gap is shown until you accept it.')
 
 
-def _shot_rows(e):
+def _shot_rows(e, reasons_asked=True):
     """design/202: each shot of a treatment line as the operator reads it: how it is made and for how long, what the viewer sees, why the picture
-    fits the words, why it is made this way. A reason that was not written reads 'not given'. A gap of one way with no shots carries them itself."""
+    fits the words, why it is made this way. A reason that was not written reads 'not given'; on a draft saved before the reasons were asked
+    (`reasons_asked` false) the row is left out. A gap of one way with no shots carries them itself."""
     shots = [s for s in e.get('shots') or [] if isinstance(s, dict)]
-    why = lambda row, k: str(row.get(k) or '').strip() or 'not given'
+    why = lambda row, k: V.reason_text(row, k) or ('not given' if reasons_asked else '')
     if not shots:
         return [('Why it fits the words', why(e, 'fits_why')), ('Why this way', why(e, 'way_why'))]
     rows = []
     for n, s in enumerate(shots, 1):
-        way = ROUTE_WORDS.get(s.get('route'), s.get('route') or '')
+        route = s.get('route') if isinstance(s.get('route'), str) else ''
+        way = ROUTE_WORDS.get(route, route)
         rows += [(f'Shot {n}', ', '.join(x for x in (way, f"{float(s['seconds']):g} s" if isinstance(s.get('seconds'), (int, float)) else '') if x)),
                  (f'Shot {n} · the viewer sees', s.get('picture')), (f'Shot {n} · why it fits the words', why(s, 'fits_why')), (f'Shot {n} · why this way', why(s, 'way_why'))]
     return rows
@@ -108,7 +110,8 @@ def _treatment_items(ctx):
             head = f'Gap {key}'
             rows = [('The picture', e.get('picture')), ('Made as', ', '.join(ROUTE_WORDS.get(r, r) for r in e.get('routes') or [])), ('Length', f"{float(e.get('seconds') or 0):g} s"),
                     ('Pictures to make', e.get('images')), ('Shows', '; '.join(e.get('depicts') or [])),
-                    ('Held still for', f"{float(e['frozen_seconds']):g} s" if e.get('frozen_seconds') else ''), *_shot_rows(e)]   # design/202: each shot's two reasons
+                    ('Held still for', f"{float(e['frozen_seconds']):g} s" if e.get('frozen_seconds') else ''), ('Why', e.get('why') or e.get('reason') or ''),
+                    *_shot_rows(e, 'reasons_missing' in draft)]   # design/202: each shot's two reasons; the gap's own why stays (a long graphics run gives its reason there)
             body = '\n'.join(f'- **{k}:** {v}' for k, v in rows if v not in (None, '', []))   # a list: plain line breaks run together in the chat
 
         def run(choice, quote, words, key=key):

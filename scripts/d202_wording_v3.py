@@ -29,6 +29,8 @@ PAIRS = {
         ("and, for more than one route, `shots` with each `route` and `seconds`.", SHOTS),
     ],
 }
+PAIRS['preparation'] = [("Read prompt.md, gaps.json and intended-visuals.json first,", "Read prompt.md and gaps.json first,")]   # the notes file is written empty; it is not read
+APPLIED = "the script's visual notes are not used"   # the sentence that says a removal below was made
 PROMPT = [("the package carries the brief and its rules, the team's intended visuals, the world evidence per clip,", "the package carries the brief and its rules, the world evidence per clip,")]
 
 
@@ -37,8 +39,8 @@ def replace(text, pairs, where):
         if new and new in text:
             continue   # applied before
         if text.count(old) != 1:
-            if not new and old not in text:
-                continue   # a removal applied before
+            if not new and old not in text and APPLIED in text:
+                continue   # a removal applied before: the text already carries design/202's sentence. A reworded anchor stops the script instead
             sys.exit(f'not applied: {where}: not found once: {old[:60]}')
         text = text.replace(old, new)
     return text

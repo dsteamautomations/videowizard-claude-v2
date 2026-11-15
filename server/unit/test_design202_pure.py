@@ -96,7 +96,7 @@ def test_stills_above_the_limit_warn_once_and_at_the_limit_do_not():
     limit = settings().VISUALS_STILL_SHARE
     over = treat_with_film(stills_doc(24.0), 5000)    # 24 s + 5.56 s of 200 s = 14.8 %
     w = [x for x in over['warnings'] if x['kind'] == 'stills_many']
-    assert limit == 0.10 and len(w) == 1 and '15 %' in w[0]['message'] and '10 %' in w[0]['message']
+    assert limit == 0.10 and len(w) == 1 and '14.8 %' in w[0]['message'] and 'above 10 %' in w[0]['message']
     at = reasoned(vw12())
     at['gaps'][1]['shots'][2]['seconds'], at['gaps'][1]['seconds'] = 20.0, 4.0 + 23.92 + 20.0   # 20 s of 200 s: exactly the limit
     assert not [x for x in treat_with_film(at, 5000)['warnings'] if x['kind'] == 'stills_many']
