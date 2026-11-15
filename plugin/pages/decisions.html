@@ -1,0 +1,181 @@
+<title>VideoWizard Decisions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* design/204. Layout: a sticky progress bar, then one block per line of the step; the Direction first and alone, the gaps after it.
+   The page is a form: the lines come from the newest document of `rounds`; the operator's answers are written under that round. */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --fg:#17212b; --muted:#566574; --line:#d6dde3;
+  --accent:#0f6e8c; --accent-soft:#e2f1f5;
+  --ok:#1b6b45; --ok-soft:#e0f3e8; --chg:#8a5200; --chg-soft:#fdf0d6; --stop:#a3261d; --stop-soft:#fbe6e3;
+  --display:"Space Grotesk","Segoe UI",system-ui,sans-serif; --body:"Inter","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#10161c; --surface:#18212a; --fg:#e6edf3; --muted:#9db0c0; --line:#2c3944;
+  --accent:#5cc4e0; --accent-soft:#143440;
+  --ok:#7fd6a6; --ok-soft:#123424; --chg:#f2c063; --chg-soft:#3a2c0c; --stop:#ff9b90; --stop-soft:#42201c; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#10161c; --surface:#18212a; --fg:#e6edf3; --muted:#9db0c0; --line:#2c3944;
+  --accent:#5cc4e0; --accent-soft:#143440;
+  --ok:#7fd6a6; --ok-soft:#123424; --chg:#f2c063; --chg-soft:#3a2c0c; --stop:#ff9b90; --stop-soft:#42201c; color-scheme:dark }
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:900px;margin:0 auto;padding-block:20px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3,h4{font-family:var(--display);margin:0;line-height:1.2;text-wrap:balance}
+h1{font-size:1.6rem} h2{font-size:1.15rem} h4{font-size:.95rem}
+h3{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+p{margin:0}
+.lead{color:var(--muted)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dots{display:flex;gap:6px;flex-wrap:wrap}
+.dot{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:.75rem;font-weight:600;color:var(--muted);background:var(--bg);font-variant-numeric:tabular-nums}
+.dot.ans{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.dot.chg{background:var(--chg-soft);color:var(--chg);border-color:var(--chg)}
+.dot.rec{background:var(--ok);color:var(--surface);border-color:var(--ok)}
+.bar .msg{margin-left:auto;font-size:.9rem;color:var(--muted)}
+#list{display:flex;flex-direction:column;gap:18px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.head{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--bg)}
+.tag{font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.t-open{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.t-ans{background:var(--ok-soft);color:var(--ok)} .t-chg{background:var(--chg-soft);color:var(--chg)}
+.t-rec{background:var(--ok);color:var(--surface)}
+.body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.group{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.kv{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:4px 12px}
+.kv dt{color:var(--muted);font-size:.86rem} .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.changed{background:var(--chg-soft);color:var(--chg);border-radius:8px;padding:10px 12px;font-size:.92rem}
+.changed ul{margin:6px 0 0;padding-left:1.2em}
+.note{background:var(--stop-soft);color:var(--stop);border-radius:8px;padding:10px 12px;font-size:.92rem}
+.acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.edit{flex:1 1 100%;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font-family:var(--body);font-size:.92rem;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.go{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+textarea{width:100%;min-height:76px;font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);box-sizing:border-box}
+.said,.count{font-size:.9rem;color:var(--muted)}
+.state{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--muted);text-align:center}
+@media (max-width:520px){ .kv{grid-template-columns:1fr} .kv dt{margin-top:4px} }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <h3 id="step">VideoWizard</h3>
+    <h1 id="title">Your decisions</h1>
+    <p class="lead">Read each block and choose. You can undo any answer. Nothing is recorded in VideoWizard until you go back to the chat and say <strong>done</strong>.</p>
+    <p class="lead" id="summary"></p>
+  </header>
+  <div class="bar"><div class="dots" id="dots"></div><div class="msg" id="msg">Loading…</div></div>
+  <div id="list"><div class="state">Loading the lines…</div></div>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
+const MAX=2000;
+let db=null, round=null, answers={}, stopAnswers=null, ready=false;
+const editing={}, drafts={}, nodes={};   // per line: the choice being typed for, its text, and the block on screen with what it was drawn from
+
+function tagOf(line,a){
+  if(line.state==='recorded') return a&&a.choice==='reopen'?['t-chg','You reopened it']:['t-rec','Recorded'];
+  if(line.state==='with_assistant') return ['t-chg','With the assistant'];
+  if(!a) return ['t-open','To answer'];
+  const b=(line.buttons||[]).find(x=>x.choice===a.choice);
+  return [b&&b.needs_words||a.choice==='different'?'t-chg':'t-ans','You chose: '+(b?b.label:a.choice)];
+}
+function groups(rows){   // "Shot 1 · why this way", "First · Whose story", "From the brief · tone": one block per shot, direction or source
+  const out=[]; let cur=null;
+  (rows||[]).forEach(r=>{
+    const m=/^(Shot \d+|First|Second|From the brief)(?: · (.+))?$/.exec(String(r[0]));
+    const name=m?m[1]:'';
+    if(!cur||cur.name!==name){cur={name:name,rows:[]};out.push(cur);}
+    cur.rows.push([m?(m[2]||''):r[0],r[1]]);
+  });
+  return out;
+}
+function block(line,n){
+  const a=answers[line.line], box=el('section','item');
+  const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
+  const t=tagOf(line,a); head.appendChild(el('span','tag '+t[0],t[1])); box.appendChild(head);
+  const body=el('div','body');
+  if(line.changes&&line.changes.length){const c=el('div','changed'); c.appendChild(el('strong',null,line.asked?'Changed as you asked':'Changed since you last saw it')); const ul=el('ul'); line.changes.forEach(x=>ul.appendChild(el('li',null,x))); c.appendChild(ul); body.appendChild(c);}
+  if(line.refused) body.appendChild(el('div','note','Not recorded: '+line.refused));
+  if(line.state==='with_assistant') body.appendChild(el('p','lead',line.note?'Your words: “'+line.note+'”. The assistant is rewriting this line.':'The assistant is rewriting this line.'));
+  if(line.text) String(line.text).split('\n').forEach(p=>{ if(p.trim()) body.appendChild(el('p',null,p)); });
+  groups(line.rows).forEach(g=>{
+    const wrap=g.name?el('div','group'):el('div'); if(g.name) wrap.appendChild(el('h4',null,g.name==='First'?'The first direction':g.name==='Second'?'The second direction':g.name));
+    const dl=el('dl','kv'); g.rows.forEach(r=>{ if(r[0]){dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));} else {const p=el('p',null,r[1]); p.style.fontWeight='600'; wrap.appendChild(p);} });
+    wrap.appendChild(dl); body.appendChild(wrap);
+  });
+  if(body.childNodes.length) box.appendChild(body);
+  const acts=el('div','acts');
+  if(editing[line.line]){
+    const wrap=el('div','edit'), ta=el('textarea'); ta.maxLength=MAX; ta.setAttribute('maxlength','2000'); ta.id='ta-'+line.line; ta.placeholder='Say in your own words what should change'; ta.value=drafts[line.line]||'';
+    const count=el('span','count',(ta.value.length)+' of '+MAX+' characters');
+    ta.addEventListener('input',()=>{drafts[line.line]=ta.value; count.textContent=ta.value.length+' of '+MAX+' characters';});
+    const row=el('div','row'), save=el('button','go','Save'), cancel=el('button',null,'Cancel');
+    save.addEventListener('click',()=>{const w=(ta.value||'').trim(); if(!w){ta.focus(); ta.placeholder='Your words are needed here'; return;} const c=editing[line.line]; delete editing[line.line]; delete drafts[line.line]; write(line,c,w);});
+    cancel.addEventListener('click',()=>{delete editing[line.line]; draw(true);});
+    row.appendChild(save); row.appendChild(cancel); row.appendChild(count); wrap.appendChild(ta); wrap.appendChild(row); acts.appendChild(wrap);
+  } else if(a){
+    if(a.notes) acts.appendChild(el('span','said','Your words: “'+a.notes+'”'));
+    const un=el('button',null,'Undo my answer'); un.addEventListener('click',()=>undo(line)); acts.appendChild(un);
+  } else if(line.state==='open'){
+    (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,b.label); btn.addEventListener('click',()=>{ if(b.needs_words){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,''); }); acts.appendChild(btn);});
+  } else if(line.state==='recorded'&&line.reopen){
+    acts.appendChild(el('span','said','This line is recorded in VideoWizard.'));
+    const re=el('button',null,'Reopen'); re.addEventListener('click',()=>{editing[line.line]='reopen'; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();}); acts.appendChild(re);
+  } else if(line.state==='recorded'){ acts.appendChild(el('span','said','This line is recorded in VideoWizard.')); }
+  if(acts.childNodes.length) box.appendChild(acts);
+  return box;
+}
+function draw(force){
+  const list=$('list');
+  if(!ready){return;}
+  if(!round){ list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); list.appendChild(el('div','state','Nothing to decide yet. The assistant writes the lines here when a step is ready.')); $('dots').textContent=''; $('msg').textContent='Nothing to decide yet'; return; }
+  $('step').textContent='VideoWizard · '+(round.run||'')+' · '+(round.step||''); $('title').textContent=(round.step||'Your')+': your decisions'; $('summary').textContent=round.summary||'';
+  const lines=round.lines||[], seen={};
+  if(list.firstChild&&list.firstChild.className==='state') list.textContent='';
+  const dots=$('dots'); dots.textContent=''; let open=0, answered=0;
+  lines.forEach((line,i)=>{
+    const a=answers[line.line];
+    if(line.state==='open'&&!a) open++; if(a) answered++;
+    const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':a?(a.choice==='accept'||a.choice==='accept_second'?'ans':'chg'):''),String(i+1)); d.title=line.title; dots.appendChild(d);
+    const sig=JSON.stringify([i,line,a||null,editing[line.line]||null]);
+    seen[line.line]=1;
+    const old=nodes[line.line];
+    if(old&&old.sig===sig) return;                               // unchanged: left alone, so a box being typed in keeps its text and its place
+    const node=block(line,i+1);
+    if(old) list.replaceChild(node,old.node); else list.appendChild(node);
+    nodes[line.line]={node:node,sig:sig};
+  });
+  Object.keys(nodes).forEach(k=>{ if(!seen[k]){ list.removeChild(nodes[k].node); delete nodes[k]; delete editing[k]; delete drafts[k]; } });
+  lines.forEach((line,i)=>{ const n=nodes[line.line]; if(n&&list.children[i]!==n.node) list.insertBefore(n.node,list.children[i]||null); });   // the film's order; a block already in place is not moved
+  $('msg').textContent = !lines.length ? (round.note||'Nothing to decide') : open ? open+' still to answer. '+(round.note||'') : answered ? 'All answered. Go back to the chat and say done.' : (round.note||'Nothing waits for you here.');
+}
+function fail(e){ $('msg').textContent='Could not save ('+((e&&e.code)||'error')+'). Check that you are signed in to Claude, then try again.'; }
+function ref(line){ return db.doc('rounds/'+round.round+'/answers/'+line.line); }
+function write(line,choice,notes){ if(!db||!round) return; ref(line).set({key:line.key,item:line.item||'',choice:choice,notes:String(notes||'').slice(0,MAX),at:new Date().toISOString()}).catch(fail); draw(true); }
+function undo(line){ if(!db||!round) return; ref(line).delete().catch(fail); }
+function watchAnswers(){
+  if(stopAnswers){stopAnswers(); stopAnswers=null;} answers={};
+  if(!round) return;
+  stopAnswers=db.collection('rounds/'+round.round+'/answers').onSnapshot(s=>{ answers={}; s.docs.forEach(d=>{answers[d.id]=d.data();}); draw(false); }, e=>{ $('msg').textContent='Your saved answers could not be loaded ('+((e&&e.code)||'error')+'). Reload the page before answering.'; });
+}
+async function start(){
+  const use=window.claude&&window.claude.use;
+  db = use ? await window.claude.use('db') : null;
+  if(!db){ ready=true; $('list').textContent=''; $('list').appendChild(el('div','state','Sign in to Claude in this browser to load and save your answers.')); $('msg').textContent='Not connected'; return; }
+  const timer=setTimeout(()=>{ if(!ready) $('msg').textContent='Still loading… check your connection.'; },10000);
+  db.collection('rounds').orderBy('at','desc').limit(1).onSnapshot(s=>{
+    clearTimeout(timer); ready=true;
+    const next=s.docs.length?s.docs[0].data():null, changed=!round||!next||round.round!==next.round;
+    round=next;
+    if(changed){ Object.keys(editing).forEach(k=>delete editing[k]); Object.keys(drafts).forEach(k=>delete drafts[k]); watchAnswers(); }
+    draw(false);
+  }, e=>{ ready=true; $('msg').textContent='Could not load the lines ('+((e&&e.code)||'error')+').'; });
+}
+start();
+})();
+</script>

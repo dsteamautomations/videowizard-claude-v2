@@ -1474,6 +1474,30 @@ def visuals_chat_card(run_id: UUID, body: CardAnswers, user=User, conn=DB):   # 
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: chat_flow.card_answer(conn, storage(), user, run, outputs, body.card, [a.model_dump() for a in body.answers], body.one))
 
 
+class PageAnswer(Strict):   # design/204: one answer the operator gave on the artifact page
+    line: str = Field(default='', max_length=20)
+    key: str = Field(min_length=1, max_length=120)
+    item: str = Field(default='', max_length=200)
+    choice: str = Field(min_length=1, max_length=120)
+    notes: str = Field(default='', max_length=2000)
+
+
+class PageAnswers(Write):
+    answers: list[PageAnswer] = Field(default_factory=list, max_length=80)
+
+
+@app.post('/api/runs/{run_id}/visuals/page')
+def visuals_page(run_id: UUID, body: ChatNext, user=User, conn=DB):   # design/204: the treatment's lines as data, for the artifact page
+    from . import page_flow
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: page_flow.page(conn, storage(), user, run, outputs))
+
+
+@app.post('/api/runs/{run_id}/visuals/page/record')
+def visuals_page_record(run_id: UUID, body: PageAnswers, user=User, conn=DB):   # design/204: every answer given on the page, in one call
+    from . import page_flow
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: page_flow.page_record(conn, storage(), user, run, outputs, [a.model_dump() for a in body.answers]))
+
+
 @app.post('/api/runs/{run_id}/visuals/chat/answer')
 def visuals_chat_answer(run_id: UUID, body: ChatAnswer, user=User, conn=DB):
     from . import chat_flow

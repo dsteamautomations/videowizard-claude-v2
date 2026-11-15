@@ -1805,7 +1805,7 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1813,7 +1813,7 @@ _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
-    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
+    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back'},   # design/177: the page's step-2 actions
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
@@ -2077,6 +2077,53 @@ def cmd_visuals(a):
         except OSError:
             pass
         emit(out, 0, (out.get('then') or 'Recorded.') + ' ' + chat_line(out))
+    if a.what == 'page':   # design/204: the treatment answered on a Claude artifact page; the server stays the record, the page is the form
+        folder = ws / 'work' / 'page'
+        folder.mkdir(parents=True, exist_ok=True)
+        url_file, current = folder / 'url.txt', folder / 'current.txt'
+        if getattr(a, 'url', None):
+            url_file.write_text(a.url.strip() + '\n', encoding='utf-8')
+            emit({'url': a.url.strip()}, 0, 'The page link is kept for this run. Now write the round to the page (step 2 of `how`).')
+
+        def hand(page, more=None):
+            """This round as one file for the page, and what the assistant needs to put it there. Nothing of its content is typed."""
+            rnd = page['round']
+            doc = {'round': rnd, 'at': datetime.now(timezone.utc).isoformat(), 'run': m['code'], 'step': page['step'], 'open': page['open'], 'summary': page.get('summary') or '',
+                   'note': page.get('note') or '', 'lines': page['lines']}
+            (folder / f'{rnd}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+            current.write_text(rnd + '\n', encoding='utf-8')
+            waiting = len([l for l in page['lines'] if l['state'] == 'open'])
+            return {'url': url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else '', 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
+                    'title': page['title'], 'capabilities': page['capabilities'], 'round': rnd, 'round_file': str(folder / f'{rnd}.json'),
+                    'answers_collection': f'rounds/{rnd}/answers', 'answers_dir': str(folder / 'answers'), 'waiting': waiting, 'note': doc['note'], 'how': page['how'], **(more or {})}
+
+        if getattr(a, 'record', False):
+            rnd = current.read_text(encoding='utf-8').strip() if current.is_file() else ''
+            if not rnd:
+                emit({'action': 'refused', 'message': 'No round was written to the page yet: run `vw visuals page` first.'}, 2)
+            answers = []
+            for f in sorted((folder / 'answers' / 'rounds' / rnd / 'answers').glob('*.json')):   # where the list of the page's answers was saved, one file per line
+                d = load_json(f, {})
+                d = d.get('data') if isinstance(d, dict) and isinstance(d.get('data'), dict) else d
+                if isinstance(d, dict) and d.get('key') and d.get('choice'):
+                    answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000]})
+            out = write(base + '/page/record', {'answers': answers})
+            taken = folder / 'answers' / 'rounds' / rnd / 'answers'
+            if taken.is_dir():   # these answers are with the server: set aside, so an answer the operator undid later is never sent from an old file
+                try:
+                    taken.rename(taken.with_name('answers.sent'))
+                except OSError:
+                    pass
+            info = hand(out['page'], {k: out[k] for k in ('recorded', 'stale', 'refused', 'dropped', 'then') if k in out})
+            emit(info, 0, f"{len(answers)} answer(s) read from the page; recorded: {', '.join(out['recorded']) or 'none'}"
+                          + (f"; refused: {'; '.join(r['key'] + ': ' + r['message'] for r in out['refused'])}" if out.get('refused') else '')
+                          + (f"; not recorded, the line changed since: {', '.join(out['stale'])}" if out.get('stale') else '')
+                          + (f"; dropped with the Direction: {', '.join(out['dropped'])}" if out.get('dropped') else '')
+                          + f". {out['then']} New round {info['round']}: write it to the page (step 2 of `how`): {info['round_file']}.")
+        out = write(base + '/page', {'one': False})
+        info = hand(out)
+        emit(info, 0, f"Treatment page: {info['waiting']} line(s) to answer. {info['note']} "
+                      + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ") + f"Round {info['round']}: {info['round_file']}. " + out['how'])
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
         if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
             emit({'action': 'refused', 'message': 'Give the item and the button chosen: `vw visuals decide --item <id from vw visuals next> --choice <the button\'s choice> --quote "<their words>"`.'}, 2)
@@ -3303,6 +3350,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
+    s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')

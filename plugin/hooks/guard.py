@@ -158,6 +158,32 @@ def decide(tool, inp, cwd, vw):
         if target != allowed and allowed not in target.parents:
             return f'Blocked: files may only be read or written inside {allowed}.'
         return None
+    if tool == 'Artifact':   # design/204: the one page the operator answers on; nothing else is published from here
+        page = (vw.parent.parent / 'pages' / 'decisions.html').resolve()
+        action = str(inp.get('action') or 'publish')
+        if action == 'open':
+            return None
+        if action != 'publish' or inp.get('asset') or inp.get('files') or inp.get('type_url'):
+            return f"Blocked: the operator assistant publishes only the plugin's decisions page ({page}), as `vw visuals page` says."
+        target = Path(str(inp.get('file_path') or '')).expanduser()
+        target = (target if target.is_absolute() else cwd / target).resolve()
+        return None if target == page else f"Blocked: only the plugin's decisions page can be published: {page}."
+    if tool == 'ArtifactData':   # design/204: one round written to the page from its file; the operator's answers read into the run folder
+        allowed = active_run(cwd)
+        if allowed is None:
+            return 'Blocked: no active run; the decisions page belongs to a run.'
+        action = str(inp.get('action') or '')
+        if action not in ('set', 'list', 'get'):
+            return 'Blocked: the page is written one round at a time (set, from the round file) and its answers are read (list). Nothing else.'
+        if action == 'set' and (not inp.get('file_path') or inp.get('data')):
+            return 'Blocked: write the round from its file (`file_path` = the `round_file` of `vw visuals page`); never type its content.'
+        for raw in (inp.get('file_path'), inp.get('out_dir')):
+            if raw:
+                target = Path(str(raw)).expanduser()
+                target = (target if target.is_absolute() else cwd / target).resolve()
+                if target != allowed and allowed not in target.parents:
+                    return f'Blocked: the page reads and writes only files inside {allowed}.'
+        return None
     if tool in ALWAYS:
         return None
     if tool in ('Agent', 'Task') and str(inp.get('subagent_type') or '') in VW_HELPERS:
