@@ -48,6 +48,24 @@ def test_options_wait_for_an_approved_scene_split():   # design/139 R4 (SK, 2 No
     assert not hasattr(NR, 'paragraph_scenes')
 
 
+def test_the_refusal_hands_over_what_a_scene_split_is_made_from():   # defect 53 (VW-24, 15 Nov 2026): the word ids were only in files this step had not written yet
+    from app.stage2 import package as PK, stage as ST
+    words = [{'id': 'W1', 'text': 'The'}, {'id': 'W2', 'text': 'slab.'}, {'id': 'W3', 'text': 'Tiles'}, {'id': 'W4', 'text': 'follow.'}]
+    with pytest.raises(Problem) as e:
+        ST.need_scenes(None, words, ['Casting', 'Curing'])
+    x = e.value.extra
+    assert e.value.code == 'SCENES_NOT_APPROVED' and e.value.status == 422
+    assert x['sentences'] == [{'first_word_id': 'W1', 'last_word_id': 'W2', 'text': 'The slab.'}, {'first_word_id': 'W3', 'last_word_id': 'W4', 'text': 'Tiles follow.'}]
+    assert x['shape'] == PK.SCENES_SHAPE and x['process_stages'] == ['Casting', 'Curing']
+    assert '`sentences` in this answer' in e.value.message and 'vw options scenes --file out/scenes.json' in e.value.message and 'work/options' not in e.value.message
+    with pytest.raises(Problem) as e:   # asked without the narration: the plain refusal, as before
+        ST.need_scenes(None)
+    assert e.value.extra == {}
+    import inspect
+    assert "need_scenes(session.get('scenes'), words, production.get('process_stages'))" in inspect.getsource(ST.prepare)
+    assert 'under `sentences` in the refusal of `vw options prepare`' in inspect.getsource(NR.validate_scenes)
+
+
 # ---------- design/60 L18: scenes must name chapters when the brief has them ----------
 
 def test_scenes_without_chapters_are_refused_when_the_brief_has_them():

@@ -157,8 +157,9 @@ def validate_scenes(words, scenes, process_stages=()):
         wid = s.get('first_word_id')
         if wid not in index:   # defect 46 (VW-18): say the key and where the ids are, never "unknown word None"
             said = 'has no first_word_id' if wid is None else f'starts at {wid!r}, which is not a word of the narration'
-            raise ValueError(f"Scene {n} {said}: each scene gives first_word_id, the id of its first word as listed in work/options/words-*.json "
-                             f"(the first word of the film is {words[0]['id']}); the whole scenes shape is in work/options/shapes.json under 'scenes'.")
+            raise ValueError(f"Scene {n} {said}: each scene gives first_word_id, the id of its first word as listed in work/options/words-*.json, "
+                             f"or, before the options are prepared, under `sentences` in the refusal of `vw options prepare` "
+                             f"(the first word of the film is {words[0]['id']}); the whole scenes shape is in work/options/shapes.json under 'scenes', and under `shape` in that refusal.")
         i = index[wid]
         if n == 1 and i != 0:
             raise ValueError(f"Scene 1 must start at the first word ({words[0]['id']}).")

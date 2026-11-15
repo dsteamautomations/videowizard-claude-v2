@@ -140,10 +140,20 @@ def library(conn, store, user, run, outputs):
     return out
 
 
-def need_scenes(approved):
-    """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph."""
+def need_scenes(approved, words=None, process_stages=None):
+    """design/139 R4 (SK, 2 Nov 2026, design/138 A6): the cut waits for a scene split the operator approved; it is never one scene per paragraph.
+    Defect 53 (VW-24, 15 Nov 2026): a scene names its first word by its id, and the ids were only in the options files, which exist after this
+    step has prepared. The refusal now carries what a scene split is made from: every sentence with the id of its first word, the shape of the
+    scenes file, and the brief's chapters."""
     if not approved:
-        fail('No scene split is approved yet: propose the scenes to the operator and record them with `vw options scenes` (with their words), then prepare again.', 'SCENES_NOT_APPROVED')
+        extra = {}
+        if words:
+            extra = {'sentences': [{'first_word_id': words[a]['id'], 'last_word_id': words[b]['id'], 'text': ' '.join(w['text'] for w in words[a:b + 1])} for a, b in NR.sentence_ranges(words)],
+                     'shape': P.SCENES_SHAPE, 'process_stages': list(process_stages or [])}
+        raise Problem(422, 'SCENES_NOT_APPROVED', 'No scene split is approved yet. A scene starts at the first word of a sentence: `sentences` in this answer lists every sentence '
+                      'with the id of its first word (first_word_id) and of its last (for a pause after it), `shape` is the form of out/scenes.json, and `process_stages` '
+                      'are the brief\'s chapters. Propose the scenes to the operator, write out/scenes.json, record it with '
+                      '`vw options scenes --file out/scenes.json --quote "<their words>"`, then prepare again.', **extra)
     return approved
 
 
@@ -164,8 +174,8 @@ def prepare(conn, store, user, run, outputs):
     if not beats:
         fail('The script has no beats; re-record the script on this build.')
     session = session_of(store, run, create=True)
-    approved = need_scenes(session.get('scenes'))
     words = timing['words']
+    approved = need_scenes(session.get('scenes'), words, production.get('process_stages'))
     duration = voice_o['summary'].get('duration_s') or timing['audio']['duration_s']
     try:
         plan, to_tl = NR.plan(words, duration, timeline(run)['fps'], approved['document'].get('pauses') or [])
