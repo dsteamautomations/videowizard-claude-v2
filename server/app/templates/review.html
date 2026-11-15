@@ -8,8 +8,12 @@
 .rv .line strong{color:var(--fg)}
 .rv .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:14px;align-items:start}
 @media (max-width:980px){.rv .grid{grid-template-columns:1fr}}
-.rv .left{position:sticky;top:64px}
-.rv video{width:100%;max-height:70vh;background:#000;border-radius:12px;display:block;will-change:transform}
+/* SK, 15 Nov 2026: the film sits below the page's own top block, whatever its height (it was fixed at 64px and the block is taller, so the film's top was cut);
+   --top-h and --foot-h are measured by fit() below */
+.rv{--top-h:64px;--foot-h:70px}
+.rv .left{position:sticky;top:calc(var(--top-h) + 10px)}
+.rv .row,.rv .head{scroll-margin-top:calc(var(--top-h) + 10px);scroll-margin-bottom:calc(var(--foot-h) + 10px)}
+.rv video{width:100%;max-height:max(180px,min(70vh,calc(100vh - var(--top-h) - var(--foot-h) - 140px)));background:#000;border-radius:12px;display:block;will-change:transform}
 .rv .nofilm{color:var(--muted);padding:40px 12px;font-size:15px;text-align:center;border:1px dashed var(--line);border-radius:12px}
 .rv .nofilm[hidden]{display:none}
 .rv .now{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.3em}
@@ -96,7 +100,7 @@ async function load(){
   if(r.status===401){location.href='/login?next='+encodeURIComponent(base);return;}
   if(!r.ok){msg('The page could not load ('+r.status+').',true);schedule();return;}
   data=await r.json();
-  draw();
+  draw();fit();
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(load,15000);}
 function fmt(s){s=Math.max(0,Math.round(Number(s)||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
@@ -145,7 +149,7 @@ function draw(){
     ' · '+esc(Object.keys(sl.unchanged||{}).length)+' unchanged'+(sl.no_fix_file.length?' · no fix file for '+esc(sl.no_fix_file.join(', ')):'')+(sl.edited_after?' · <span class="err">the cut was changed after the second look</span>':'')+
     (sl.fixes.length?'<details><summary style="cursor:pointer">'+esc(sl.fixes.length)+' fix'+(sl.fixes.length>1?'es':'')+'</summary>'+sl.fixes.map(f=>'<div>'+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')+'</details>':'')
     :'Second look: not recorded for this version')+'</div>';
-  $('line').innerHTML=line;
+  $('line').innerHTML=line;fit();
   clearTimeout(timer);
   if(d.film){
     no.hidden=true;film.hidden=false;
@@ -198,7 +202,7 @@ async function submit(slide){
 async function send(body){
   msg('Recording #'+body.slide+'…',false,true);
   try{const j=await act(body);open=null;msg((j.options_approved?'Options approved by this first answer. ':'')+'#'+j.slide+' '+String(j.action)+' recorded ('+j.decided+' of '+j.of+').');
-    if(j.view){data=j.view;draw();}else{await load();}
+    if(j.view){data=j.view;draw();fit();}else{await load();}
     if(waitingFor===body.slide){resume();}
     return j;}
   catch(err){msg(err.message,true);return null;}   // the film stays paused; nothing is recorded twice (one request at a time)
@@ -223,6 +227,9 @@ $('film').addEventListener('timeupdate',()=>{
       const el=$('slides').querySelector('.row[data-slide="'+CSS.escape(s.slide)+'"]');if(el)el.scrollIntoView({block:'nearest'});break;}
   }
 });
+function fit(){const a=$('app');a.style.setProperty('--top-h',a.querySelector('.top').offsetHeight+'px');a.style.setProperty('--foot-h',a.querySelector('.foot').offsetHeight+'px');}
+if(window.ResizeObserver){const ro=new ResizeObserver(fit);ro.observe($('app').querySelector('.top'));ro.observe($('app').querySelector('.foot'));}
+window.addEventListener('resize',fit);$('app').querySelector('.top').addEventListener('toggle',fit,true);fit();
 load();
 })();
 </script>
