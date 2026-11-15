@@ -124,7 +124,7 @@ VOICES = (APP / 'templates' / 'voices2.html').read_text(encoding='utf-8')
 
 def test_the_review_page_answers_without_an_approval_box_and_the_reason_is_optional():
     assert 'Approve these options with your own words' not in REVIEW and 'do-record' not in REVIEW
-    assert 'your first answer approves these options' in REVIEW and 'Why? (optional)' in REVIEW and 'A reason is required' not in REVIEW
+    assert 'Your first answer approves these options' in REVIEW and 'Why? (optional)' in REVIEW and 'A reason is required' not in REVIEW
     assert 'Options approved by your first answer' in REVIEW
 
 

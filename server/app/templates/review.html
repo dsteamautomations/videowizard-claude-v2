@@ -6,6 +6,11 @@
 .rv .top h1{font-size:20px;margin:0 0 2px}
 .rv .line{font-size:13px;color:var(--muted)}
 .rv .line strong{color:var(--fg)}
+.rv .st{font-size:16px;font-weight:600;color:var(--fg);margin-top:2px}
+.rv .st.err{color:var(--err)}
+.rv .st a{font-weight:400;font-size:12.5px;color:var(--muted);margin-left:12px;cursor:pointer;text-decoration:underline}
+.rv .det{margin-top:4px}
+.rv .det[hidden]{display:none}
 .rv .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:14px;align-items:start}
 @media (max-width:980px){.rv .grid{grid-template-columns:1fr}}
 /* SK, 15 Nov 2026: the film sits below the page's own top block, whatever its height (it was fixed at 64px and the block is taller, so the film's top was cut);
@@ -76,7 +81,7 @@
 const code=document.getElementById('app').dataset.code, base='/runs/'+code+'/review';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let data=null, timer=null, open=null, inflight=false, filmKey=null, current=null, waitingFor=null;
+let detOpen=false, data=null, timer=null, open=null, inflight=false, filmKey=null, current=null, waitingFor=null;
 const passed=new Set();   // shots the viewer chose to play past without answering, this viewing
 // design/127: a footage shot KEEP / REJECT / TRIM; the AI shot of an all-AI scene Keep AI (KEEP) / Find footage (REJECT); an alternative KEEP / REJECT once its shot is rejected
 const CHOICES={shot:[['KEEP','Keep'],['REJECT','Reject'],['TRIM','Trim']],alternative:[['KEEP','Keep'],['REJECT','Reject']],ai:[['KEEP','Keep AI'],['REJECT','Find footage']]};
@@ -136,20 +141,25 @@ function draw(){
     $('line').textContent=d.state==='not_prepared'?'The options stage has not started yet.':d.state==='old_form'?d.message:'No options proposed yet; the assistant proposes them in chat.';
     film.hidden=true;no.hidden=false;no.textContent=$('line').textContent;$('slides').innerHTML='';$('action').innerHTML='';return;
   }
-  let line='Version <strong>'+esc(d.version)+'</strong>';
-  if(!d.accepted&&stage()==='options'){line+=d.film?' · <strong>answer each shot; your first answer approves these options</strong>':' · the review film is not ready yet';}
-  else if(!d.accepted){line+=' · this version is not the recorded one; the assistant proposes or records in chat';}
-  else if(d.master_built){line+=' · answers closed: the master film is built';}
-  else if(d.of&&d.answered>=d.of){line+=' · <strong>all '+d.of+' answered</strong>. The assistant builds the master film from here (vw master build).';}
-  else{line+=' · <strong>'+d.answered+' of '+d.of+'</strong> answered · waiting: '+(d.waiting.length?esc(d.waiting.join(', ')):'none');}
-  if(d.accepted&&d.approved_by&&d.approved_by.slide){line+=' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')';}   // design/98 D6
-  if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+=' · <span class="err">a defect is open on this run; nothing can be recorded until it is fixed</span>';}
+  // SK, 15 Nov 2026: one line the reviewer must read, large; the record of the version, the approval and the second look sits behind Details
+  let st;
+  if(!d.accepted&&stage()==='options'){st=d.film?'Answer each shot. Your first answer approves these options.':'The review film is not ready yet.';}
+  else if(!d.accepted){st='This version is not the recorded one. The assistant proposes or records in chat.';}
+  else if(d.master_built){st='Answers closed. The master film is built.';}
+  else if(d.of&&d.answered>=d.of){st='All '+d.of+' answered. The assistant builds the master film next.';}
+  else{st=d.answered+' of '+d.of+' answered. '+(d.of-d.answered)+' left.';}
+  let det='<div>Version '+esc(d.version)+(d.accepted&&d.approved_by&&d.approved_by.slide?' · Options approved by your first answer (#'+esc(d.approved_by.slide)+', '+esc(String(d.approved_by.at||'').slice(11,16))+')':'')   // design/98 D6
+    +(d.accepted&&!d.master_built&&d.waiting&&d.waiting.length?' · waiting: '+esc(d.waiting.join(', ')):'')+'</div>';
   const sl=d.second_look;   // design/129 P4: whether the second look ran on this version, and what it changed
-  line+='<div class="ds">'+(sl?'Second look: ran '+esc(String(sl.at||'').slice(0,16).replace('T',' '))+' · '+esc(sl.scenes)+' scenes · '+esc(sl.changed.length)+' changed'+(sl.changed.length?' ('+esc(sl.changed.join(', '))+')':'')+
+  det+='<div>'+(sl?'Second look (the assistant checked its own cut before showing it): ran '+esc(String(sl.at||'').slice(0,16).replace('T',' '))+' · '+esc(sl.scenes)+' scenes · '+esc(sl.changed.length)+' changed'+(sl.changed.length?' ('+esc(sl.changed.join(', '))+')':'')+
     ' · '+esc(Object.keys(sl.unchanged||{}).length)+' unchanged'+(sl.no_fix_file.length?' · no fix file for '+esc(sl.no_fix_file.join(', ')):'')+(sl.edited_after?' · <span class="err">the cut was changed after the second look</span>':'')+
-    (sl.fixes.length?'<details><summary style="cursor:pointer">'+esc(sl.fixes.length)+' fix'+(sl.fixes.length>1?'es':'')+'</summary>'+sl.fixes.map(f=>'<div>'+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')+'</details>':'')
+    sl.fixes.map(f=>'<div>Changed by the second look, nothing to approve: '+esc(f.scene)+(f.option?' · option '+esc(f.option):'')+(f.why?': '+esc(f.why):'')+'</div>').join('')
     :'Second look: not recorded for this version')+'</div>';
+  let line='<div class="st">'+esc(st)+'<a id="more" role="button" tabindex="0" aria-expanded="'+(detOpen?'true':'false')+'">'+(detOpen?'Hide details':'Details')+'</a></div>';
+  if(d.run&&d.run.open_defects&&d.run.open_defects.length){line+='<div class="st err">A defect is open on this run. Nothing can be recorded until it is fixed.</div>';}
+  line+='<div class="det"'+(detOpen?'':' hidden')+'>'+det+'</div>';
   $('line').innerHTML=line;fit();
+  const more=$('more'),flip=()=>{detOpen=!detOpen;draw();};more.addEventListener('click',flip);more.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();}});
   clearTimeout(timer);
   if(d.film){
     no.hidden=true;film.hidden=false;
