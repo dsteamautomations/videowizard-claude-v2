@@ -61,3 +61,14 @@ def test_record_before_any_round_is_refused(harness, monkeypatch, capsys):
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: (_ for _ in ()).throw(AssertionError('nothing is sent')))
     code, out, err = run(args(what='page', record=True), capsys)
     assert code == 2 and 'vw visuals page' in out['message']
+
+
+def test_a_direction_sent_alone_prints_what_the_server_says_comes_next(harness, monkeypatch, capsys):
+    """design/205: the Direction alone first; the tool never sends the assistant to the card after it."""
+    ws, _ = harness
+    (ws / 'out').mkdir(exist_ok=True)
+    (ws / 'out' / 'visual-treatment.json').write_text(json.dumps({'direction_parts': {'idea': 'Fewer bricks.'}}), encoding='utf-8')
+    sent = []
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: sent.append(body) or {'draft': True, 'direction_only': True, 'next': 'The Direction alone is with the operator: `vw visuals page`.'})
+    code, out, err = run(args(what='treatment', file='out/visual-treatment.json'), capsys)
+    assert code == 0 and 'gaps' not in sent[0]['document'] and '`vw visuals page`' in err and 'vw visuals next' not in err

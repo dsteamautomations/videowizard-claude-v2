@@ -11,8 +11,8 @@ R = run('gemini')
 
 
 class NoConn:
-    def execute(self, *a, **k):
-        raise AssertionError('the treatment page needs no database')
+    def execute(self, sql, *a, **k):
+        assert sql.startswith('insert into vw2_log'), 'the treatment page needs the database only for its log lines (design/205)'
 
 
 def page(store):

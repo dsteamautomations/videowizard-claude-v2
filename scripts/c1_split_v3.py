@@ -106,6 +106,9 @@ if __name__ == '__main__':
         prompt = d204(prompt, parts)
         from d204b_steps_v3 import apply as d204b   # design/204 hotfix: two step lines (the notes file not read; the treatment on the page)
         d204b(steps)
+        from d205_wording_v3 import apply as d205, apply_steps as d205s   # design/205: the Direction alone first; the motion style on the page; a still that must be read; beats
+        prompt = d205(prompt, parts)
+        d205s(steps)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

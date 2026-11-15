@@ -86,7 +86,8 @@ def need_motion(run):
     if older(run) or motion(run):
         return
     st, order = styles(), recommend_styles(category(run))
-    raise Problem(409, 'FILM_MOTION', f"This film has no motion style yet. Recommend {st[order[0]]['title']} ({st[order[0]]['for']}) for this film's category, name the others in a line "
+    raise Problem(409, 'FILM_MOTION', "This film has no motion style yet. The operator chooses it on the treatment page, its first line (`vw visuals page`). Where the page cannot be shown: "
+                                      f"recommend {st[order[0]]['title']} ({st[order[0]]['for']}) for this film's category, name the others in a line "
                                       f"({'; '.join(st[n]['title'] + ': ' + st[n]['for'] for n in order[1:])}), ask the operator once, and record their answer: "
                                       '`vw motion-style <name> --quote "<their words>"`. A look none of these gives: record the nearest and tell the builder what was asked for.')
 

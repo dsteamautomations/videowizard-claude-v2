@@ -60,3 +60,11 @@ def test_the_page_file_holds_what_the_design_asks():
                    'prefers-color-scheme: dark', 'textContent'):
         assert needed in html, needed
     assert 'innerHTML' not in html   # text only ever goes in as text
+
+
+def test_the_page_can_play_a_sample_of_every_motion_style_the_server_holds():
+    """design/205: "Show me" beside the motion style; a style file added on the server needs its sample here."""
+    html = PAGE.read_text(encoding='utf-8')
+    names = sorted(p.stem for p in (PLUGIN.parent / 'server' / 'motion_styles').glob('*.md'))
+    assert len(names) == 8 and all(f'.stage.m-{n}>' in html for n in names), names
+    assert "'Show me: '+st.title" in html and 'a rough sample' in html and 'prefers-reduced-motion' in html

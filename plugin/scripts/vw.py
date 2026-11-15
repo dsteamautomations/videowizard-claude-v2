@@ -2013,8 +2013,10 @@ def cmd_visuals(a):
         out = write(base + '/treatment', {'document': _json_file(m, a.file), 'quote': a.quote or ''})
         t = out.get('totals') or {}
         figures = f"{t.get('gaps', 0)} gaps, {t.get('images', 0)} images, about ₹{out.get('estimate_inr', 0):,.0f} against the cap ₹{out.get('cap_inr', 0):,.0f}"
+        if out.get('direction_only'):   # design/205: the Direction alone first; the server says what comes next
+            emit(out, 0, out.get('next') or 'The Direction alone is with the operator: `vw visuals page`.')
         if out.get('draft'):
-            emit(out, 0, f"Treatment draft sent ({figures}). Now `vw visuals next`: the server hands the operator one line at a time, in the chat (design/188).")
+            emit(out, 0, f"Treatment draft sent ({figures}). Now `vw visuals page`: the operator answers on the page (design/204); the card, `vw visuals next`, only where the page cannot be shown.")
         emit(out, 0, f"Treatment recorded: {figures}. Now author out/visual-plan.json to it.")
     if a.what == 'sequence':   # design/65 B2': the states of a graphic, approved in one call
         refs = [x for part in (a.refs or []) for x in part.split(',') if x]

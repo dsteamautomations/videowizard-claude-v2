@@ -802,7 +802,7 @@ def direction_changes(before_text, before_parts, record):
         heads = {k: h for k, h, _ in DIRECTION_PARTS}
         changes = _diff({heads[k]: before_parts.get(k, '') for k in heads}, {heads[k]: now_parts.get(k, '') for k in heads}, '')
         return changes or (['A second direction is shown beside the first.'] if record.get('direction_alternative') else [])
-    return [f'Before: "{_short_text(before_text, 400)}"'] if before_text else []
+    return [f'Before: "{_short_text(before_text, 2000)}"'] if before_text else []   # design/205: whole (a Direction is at most 2000 characters)
 
 
 def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes='', use_second=False, different=False):
@@ -811,8 +811,12 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
     draft with the words given there). `propose` is refused without a record and when a route departs from it.
     design/124 Change 3: a sent document starts with its Direction (a few lines). Change 6: accept or send_back names lines of the draft
     (direction, G1, ...); the draft is recorded when every line is accepted."""
-    need_motion_style(run)   # design/179 S3: the film's motion style is asked once, here, recommended from its category
     session = session_of(store, run, outputs)
+    alone = isinstance(document, dict) and not document.get('gaps') and not str(quote or '').strip() and not (accept or send_back)
+    if not (accept or send_back or alone):
+        need_motion_style(run)   # design/179 S3; design/205: asked on the page beside the Direction, so only the whole treatment waits for it
+    if alone:
+        return _direction_alone(store, user, run, session, document)
     if accept or send_back:
         return _treatment_lines(store, user, run, session, list(accept or []), list(send_back or []), notes, quote, use_second=use_second, different=different)
     if document is None:
@@ -888,12 +892,37 @@ def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(
         if all(v['state'] == 'accepted' for v in record['lines'].values()):   # every line accepted already, word for word
             return _record_lines(store, run, session)
         save_session(store, run, session)
+        kinds = ', '.join(sorted({str(w.get('kind')) for w in warnings})) or 'none'
         return {'draft': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'reasons_missing': unreasoned, 'direction_missing': record.get('direction_missing', []),
-                'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines'])}
+                'cap_inr': cap_of(session), 'digest': record['digest'], 'lines': _line_states(record['lines']),
+                'log': f"draft, {len(entries)} gaps, {len([v for v in record['lines'].values() if v['state'] == 'to_accept'])} lines to accept, {len(warnings)} warnings: {kinds}, "
+                       f"reasons missing: {len(unreasoned)}, direction parts not given: {len(record.get('direction_missing', []))}"}   # design/205: the run log says what a draft returned
     session['treatment'] = {**record, 'quote': quote}
     session.pop('treatment_draft', None)
     save_session(store, run, session)
     return {'recorded': True, 'totals': totals, 'estimate_inr': estimate, 'warnings': warnings, 'cap_inr': cap_of(session), 'digest': record['digest']}
+
+
+DIRECTION_ACCEPTED = ('The Direction is accepted. Now write every gap line from it and send the whole treatment (`vw visuals treatment --file out/visual-treatment.json`, '
+                      'the Direction unchanged, word for word), then `vw visuals page` for the gap lines.')
+
+
+def _direction_alone(store, user, run, session, document):
+    """design/205 (SK, 15 Nov 2026): the Direction is written, shown and answered before any gap line is written. A draft that holds only the
+    Direction is kept as the draft with one line; accepting that line never records the treatment."""
+    direction = direction_fields(document)
+    record = {'gaps': [], 'direction_only': True, 'totals': {}, 'estimate_inr': 0, 'warnings': [], 'reasons_missing': [], 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(),
+              'digest': digest([]), **direction}
+    old = session.get('treatment_draft') or {}
+    same = (old.get('lines') or {}).get('direction', {}).get('digest') == _line_digests(record)['direction']
+    need(not (same and old.get('gaps')), 'Nothing changed in the Direction, and this draft would drop the gap lines already written: send the whole treatment (the Direction and its gaps).')
+    record['lines'] = _carry_lines(session, record)
+    session['treatment_draft'] = record
+    save_session(store, run, session)
+    state = record['lines']['direction']['state']
+    return {'draft': True, 'direction_only': True, 'direction_missing': record.get('direction_missing', []), 'lines': _line_states(record['lines']),
+            'next': DIRECTION_ACCEPTED if state == 'accepted' else 'The Direction alone is with the operator: `vw visuals page`. Write no gap line until it is accepted.',
+            'log': f"draft, the Direction alone ({state}), direction parts not given: {len(record.get('direction_missing', []))}"}
 
 
 # ---------- design/124 Change 6: a state per line of the treatment ----------
@@ -986,7 +1015,10 @@ def _treatment_lines(store, user, run, session, accept, send_back, notes, quote,
                     **({'was': was} if was is not None else {}), **({'different': True} if different and k == 'direction' else {})}
     draft['lines'] = lines
     if all(v['state'] == 'accepted' for v in lines.values()):
-        return _record_lines(store, run, session)
+        if not draft.get('direction_only'):
+            return _record_lines(store, run, session)
+        save_session(store, run, session)   # design/205: the Direction alone is never the treatment
+        return {'draft': True, 'direction_only': True, 'lines': _line_states(lines), 'next': DIRECTION_ACCEPTED}
     save_session(store, run, session)
     waiting = [k for k, v in lines.items() if v['state'] != 'accepted']
     back = [k for k, v in lines.items() if v['state'] == 'sent_back']

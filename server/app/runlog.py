@@ -61,7 +61,8 @@ def _entry(run_id, stage, step, body, status, response, run_code=None):
         said = list(response.get('refusals') or []) + list(response.get('act_on') or []) + ([response['error']] if response.get('error') else [])
         return {**entry, 'kind': 'refusal', 'rule': 'check', 'entry': f"{step} rejected: " + _short('; '.join(map(str, said)), 1500)}
     made = ', '.join(f'{k} {response[k]}' for k in ('reference_id', 'job_id', 'job', 'version', 'status') if isinstance(response.get(k), (str, int)))   # `job`: the voices page's narrate-again
-    return {**entry, 'kind': 'step', 'rule': '', 'entry': step + (f' ({made})' if made else '')}
+    said = f": {_short(response['log'], 400)}" if isinstance(response.get('log'), str) and response['log'] else ''   # design/205: what the step returned, in a line
+    return {**entry, 'kind': 'step', 'rule': '', 'entry': step + (f' ({made})' if made else '') + said}
 
 
 def assistant_entry(run_id, stage, body):

@@ -56,6 +56,39 @@ textarea{width:100%;min-height:76px;font:inherit;padding:8px 10px;border-radius:
 .said,.count{font-size:.9rem;color:var(--muted)}
 .state{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--muted);text-align:center}
 @media (max-width:520px){ .kv{grid-template-columns:1fr} .kv dt{margin-top:4px} }
+/* design/205: a rough sample of each motion style, played in a small frame in the film's shape */
+.stage{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--bg);width:100%;max-width:420px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:16px;box-sizing:border-box}
+.stage.tall{aspect-ratio:9/16;max-width:200px}
+.stage .s-title{font-family:var(--display);font-weight:700;font-size:1.05rem;line-height:1.15}
+.stage .s-words{font-size:.82rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.stage .s-bars{display:flex;align-items:flex-end;gap:8px;height:34%}
+.stage .s-bars i{flex:1;background:var(--accent);border-radius:3px 3px 0 0;transform-origin:bottom}
+.stage .s-bars i:nth-child(1){height:45%} .stage .s-bars i:nth-child(2){height:80%} .stage .s-bars i:nth-child(3){height:60%}
+.stage .s-rule{height:2px;background:var(--fg);transform-origin:left}
+.prev{display:flex;flex-direction:column;gap:8px}
+.prev .row button.on{border-color:var(--accent);color:var(--accent)}
+@keyframes mRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes mSide{from{opacity:0;transform:translateX(-46px)}to{opacity:1;transform:none}}
+@keyframes mSlam{from{opacity:0;transform:scale(1.7)}to{opacity:1;transform:none}}
+@keyframes mDraw{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes mMask{from{clip-path:inset(100% 0 0 0);letter-spacing:.12em}to{clip-path:inset(0 0 0 0);letter-spacing:0}}
+@keyframes mDrop{0%{opacity:0;transform:translateY(-60px) scaleY(1.1)}60%{opacity:1;transform:translateY(0) scaleY(.82)}80%{transform:translateY(-8px) scaleY(1.05)}100%{opacity:1;transform:none}}
+@keyframes mGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes mRule{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes mHero{from{opacity:0;transform:scale(1.14)}to{opacity:1;transform:none}}
+@keyframes mPan{from{transform:translateX(0)}to{transform:translateX(-10px)}}
+.stage.m-restrained>*{animation:mRise 1.1s cubic-bezier(.16,1,.3,1) both} .stage.m-restrained>:nth-child(2){animation-delay:1.1s} .stage.m-restrained>:nth-child(3){animation-delay:2.2s} .stage.m-restrained>:nth-child(4){animation-delay:3.3s}
+.stage.m-lively>*{animation:mSide .6s cubic-bezier(.34,1.56,.64,1) both} .stage.m-lively>:nth-child(2){animation-delay:.2s} .stage.m-lively>:nth-child(3){animation-delay:.4s} .stage.m-lively>:nth-child(4){animation-delay:.6s}
+.stage.m-lively .s-bars i{animation:mGrow .5s cubic-bezier(.34,1.56,.64,1) both} .stage.m-lively .s-bars i:nth-child(1){animation-delay:.7s} .stage.m-lively .s-bars i:nth-child(2){animation-delay:.85s} .stage.m-lively .s-bars i:nth-child(3){animation-delay:1s}
+.stage.m-bold>*{animation:mSlam .28s cubic-bezier(.9,0,1,.4) both} .stage.m-bold>:nth-child(2){animation-delay:.35s} .stage.m-bold>:nth-child(3){animation-delay:.7s} .stage.m-bold>:nth-child(4){animation-delay:1.05s} .stage.m-bold .s-title{font-size:1.5rem;text-transform:uppercase}
+.stage.m-technical>*{animation:mDraw .9s linear both} .stage.m-technical>:nth-child(2){animation-delay:.9s} .stage.m-technical>:nth-child(3){animation-delay:1.8s} .stage.m-technical>:nth-child(4){animation-delay:2.7s}
+.stage.m-technical .s-bars i{animation:mGrow .5s linear both} .stage.m-technical .s-bars i:nth-child(1){animation-delay:2.7s} .stage.m-technical .s-bars i:nth-child(2){animation-delay:3.2s} .stage.m-technical .s-bars i:nth-child(3){animation-delay:3.7s}
+.stage.m-editorial>*{animation:mMask 1.5s cubic-bezier(.22,1,.36,1) both} .stage.m-editorial>:nth-child(2){animation-delay:1.6s} .stage.m-editorial>:nth-child(3){animation-delay:3.2s} .stage.m-editorial>:nth-child(4){animation-delay:3.2s} .stage.m-editorial .s-title{font-size:1.35rem}
+.stage.m-playful>*{animation:mDrop .7s cubic-bezier(.3,1.4,.5,1) both} .stage.m-playful>:nth-child(2){animation-delay:.25s} .stage.m-playful>:nth-child(3){animation-delay:.5s} .stage.m-playful>:nth-child(4){animation-delay:.75s}
+.stage.m-data-led>*{animation:mRise .4s ease-out both} .stage.m-data-led .s-rule{animation:mRule .8s cubic-bezier(.16,1,.3,1) .3s both}
+.stage.m-data-led .s-bars i{animation:mGrow 1s cubic-bezier(.16,1,.3,1) both} .stage.m-data-led .s-bars i:nth-child(1){animation-delay:.6s} .stage.m-data-led .s-bars i:nth-child(2){animation-delay:.9s} .stage.m-data-led .s-bars i:nth-child(3){animation-delay:1.2s}
+.stage.m-product>*{animation:mHero 2s cubic-bezier(.45,0,.2,1) both} .stage.m-product>:nth-child(2){animation-delay:.5s} .stage.m-product>:nth-child(3){animation-delay:1s} .stage.m-product>:nth-child(4){animation-delay:1s} .stage.m-product{align-items:center;text-align:center}
+@media (prefers-reduced-motion: reduce){ .stage>*,.stage .s-bars i{animation-duration:.01s !important;animation-delay:0s !important} }
 </style>
 
 <div class="wrap">
@@ -94,6 +127,21 @@ function groups(rows){   // "Shot 1 · why this way", "First · Whose story", "F
   });
   return out;
 }
+function preview(line){   // design/205: "Show me" plays a rough sample of a motion style, with the film's own title and idea
+  const wrap=el('div','prev'), s=line.sample||{};
+  wrap.appendChild(el('h4',null,'See a style'));
+  const stage=el('div','stage'+(s.frame==='9:16'?' tall':''));
+  stage.appendChild(el('div','s-title',s.title||'This film')); stage.appendChild(el('div','s-rule')); stage.appendChild(el('div','s-words',s.words||''));
+  const bars=el('div','s-bars'); bars.appendChild(el('i')); bars.appendChild(el('i')); bars.appendChild(el('i')); stage.appendChild(bars);
+  const row=el('div','row');
+  (line.styles||[]).forEach(st=>{ const b=el('button',null,'Show me: '+st.title); b.addEventListener('click',()=>{
+    Array.prototype.forEach.call(row.children,x=>x.classList.remove('on')); b.classList.add('on');
+    stage.className='stage'+(s.frame==='9:16'?' tall':''); void stage.offsetWidth; stage.classList.add('m-'+st.name);   // the class is taken off and put back so the sample plays again
+    cap.textContent=st.title+': a rough sample of how things appear and move. The film\'s own drawings are made later, in this style.'; }); row.appendChild(b); });
+  const cap=el('p','said','Choose "Show me" to play a rough sample of a style, with this film\'s title and idea.');
+  wrap.appendChild(row); wrap.appendChild(stage); wrap.appendChild(cap);
+  return wrap;
+}
 function block(line,n){
   const a=answers[line.line], box=el('section','item');
   const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
@@ -108,6 +156,7 @@ function block(line,n){
     const dl=el('dl','kv'); g.rows.forEach(r=>{ if(r[0]){dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));} else {const p=el('p',null,r[1]); p.style.fontWeight='600'; wrap.appendChild(p);} });
     wrap.appendChild(dl); body.appendChild(wrap);
   });
+  if(line.state==='open'&&line.styles&&line.styles.length) body.appendChild(preview(line));
   if(body.childNodes.length) box.appendChild(body);
   const acts=el('div','acts');
   if(editing[line.line]){
@@ -122,7 +171,7 @@ function block(line,n){
     if(a.notes) acts.appendChild(el('span','said','Your words: “'+a.notes+'”'));
     const un=el('button',null,'Undo my answer'); un.addEventListener('click',()=>undo(line)); acts.appendChild(un);
   } else if(line.state==='open'){
-    (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,b.label); btn.addEventListener('click',()=>{ if(b.needs_words){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,''); }); acts.appendChild(btn);});
+    (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,(line.key==='motion'?'Use ':'')+b.label); btn.addEventListener('click',()=>{ if(b.needs_words){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,''); }); acts.appendChild(btn);});
   } else if(line.state==='recorded'&&line.reopen){
     acts.appendChild(el('span','said','This line is recorded in VideoWizard.'));
     const re=el('button',null,'Reopen'); re.addEventListener('click',()=>{editing[line.line]='reopen'; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();}); acts.appendChild(re);
