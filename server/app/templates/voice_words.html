@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}A word sounds wrong · {{ run.code }} · VideoWizard{% endblock %}
+{% block body %}
+<style>
+/* design/208: a page of its own for "A word sounds wrong". Two columns; the script is the only part that scrolls. */
+.wf .head{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;padding:10px 0 8px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.wf .head h2{margin:0;font-size:18px}
+.wf .head .back{margin-left:auto;font-size:14px}
+.wf .cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.wf .scr{border:1px solid var(--line);border-radius:12px;padding:12px 16px;height:calc(100vh - 210px);min-height:260px;overflow:auto;line-height:1.95;font-size:15px}
+.wf .scr p{margin:0 0 12px}
+.wf .w{cursor:pointer;border-radius:4px;padding:1px}
+.wf .w:hover{background:var(--hover)}
+.wf .w.on{background:var(--sel);outline:1px solid var(--accent)}
+.wf .w.fx{border-bottom:2px solid var(--ok)}
+.wf .cd{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+.wf .cd .wd{font-size:18px;font-weight:700}
+.wf .stp{font-size:12.5px;color:var(--muted);margin:12px 0 4px;font-weight:600}
+.wf .cd input{width:100%;min-width:0;padding:9px 11px;font-size:15px;box-sizing:border-box}
+.wf button.paid{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);padding:9px 14px;font-size:14px;font-weight:600;border-radius:10px;cursor:pointer;width:100%}
+.wf button.paid:disabled,.wf button:disabled{opacity:.45;cursor:default}
+.wf button.free{padding:8px 12px;border-radius:10px;font-size:14px;cursor:pointer}
+.wf .lk{border:none;background:none;padding:0;color:var(--fg);text-decoration:underline;cursor:pointer;font-size:12.5px}
+.wf .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wf .try{border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin:5px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}
+.wf .try .g{flex:1;min-width:120px}
+.wf .try.hit{outline:2px solid var(--accent)}
+.wf .st{font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap;border:1px solid var(--line)}
+.wf .st.fin{color:var(--ok);border-color:var(--ok)}
+.wf .note{font-size:12.5px;color:var(--muted);margin-top:4px}
+.wf .msg{min-height:18px;font-size:13.5px;margin-top:8px}
+.wf .msg.err{color:var(--err)} .wf .msg.ok{color:var(--ok)}
+.wf details.cw{border:1px solid var(--line);border-radius:12px;padding:8px 14px;margin-top:10px}
+.wf details.cw summary{cursor:pointer;font-size:14px}
+.wf dialog{border:1px solid var(--line);border-radius:14px;padding:18px 20px;max-width:420px;background:var(--bg);color:var(--fg)}
+.wf dialog::backdrop{background:rgba(0,0,0,.45)}
+.wf dialog p{margin:0 0 14px;font-size:15px}
+.wf dialog .row{justify-content:flex-end}
+@media (max-width:900px){.wf .cols{grid-template-columns:minmax(0,1fr)}.wf .scr{height:auto;min-height:0;overflow:visible}}
+</style>
+<div class="wf" id="app" data-code="{{ run.code }}" data-job="{{ job }}">
+<div class="head">
+  <h2>A word sounds wrong</h2>
+  <span class="ds" id="which">loading…</span>
+  <a class="back" id="back" href="/runs/{{ run.code }}/voices2">← Back to the narrations</a>
+</div>
+<div class="msg" id="top"></div>
+<div class="cols" id="cols" hidden>
+  <div>
+    <div class="scr" id="script"></div>
+    <div class="note">Click a word. Underlined: a word with a final pronunciation. For a name of several words, select them with the mouse.</div>
+  </div>
+  <div>
+    <div class="cd" id="card"></div>
+    <div class="msg" id="msg"></div>
+    <details class="cw" id="cw"><summary id="cw-sum">Corrected words (0)</summary><div id="cw-list"></div></details>
+  </div>
+</div>
+<audio id="au" preload="none"></audio>
+<audio id="tp" preload="none"></audio>
+<dialog id="sure" aria-label="Are you sure">
+  <p id="sure-text"></p>
+  <div class="row"><button type="button" class="free" id="sure-no">Cancel</button><button type="button" class="paid" id="sure-yes" style="width:auto">Yes, make it</button></div>
+</dialog>
+</div>
+<script>
+(function(){
+const app=document.getElementById('app'), code=app.dataset.code, job=app.dataset.job, base='/runs/'+code+'/voices2';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const OPEN=['queued','running','storage_pending'];
+let data=null, word=null, place=0, toks=[], stopAt=null, timer=null, hit=null, sending=false;
+
+function wkey(t){return String(t||'').replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'');}
+function msg(t,err){const m=$('msg');m.textContent=t||'';m.className='msg '+(err?'err':'ok');}
+async function act(body){const r=await fetch(base+'/act',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let j=null;try{j=await r.json();}catch(e){}
+  if(!r.ok)throw new Error((j&&(j.message||j.detail))||('The server answered '+r.status+'. Nothing was charged.'));return j;}
+function wordsOf(){return (data.words&&data.words.words)||[];}
+function entry(){return wordsOf().find(x=>x.word===word)||null;}
+
+// every place of the chosen word: runs of script words whose letters match its words, in order
+function places(w){const parts=String(w||'').split(' ').map(wkey).filter(Boolean),out=[];if(!parts.length)return out;
+  for(let i=0;i+parts.length<=toks.length;i++){if(parts.every((p,k)=>toks[i+k]===p))out.push([i,i+parts.length-1]);}return out;}
+
+function renderScript(){const fin=wordsOf().filter(x=>x.final_say_as).flatMap(x=>places(x.word)),on=word?places(word):[];
+  const inAny=(list,i)=>list.some(([a,b])=>i>=a&&i<=b);let i=0;
+  $('script').innerHTML=data.script_text.split(/\n\s*\n/).filter(p=>p.trim()).map(p=>'<p>'+p.trim().split(/\s+/).map(t=>{const n=i++;
+    return `<span class="w ${inAny(on,n)?'on':''} ${inAny(fin,n)?'fx':''}" data-i="${n}">${esc(t)}</span>`;}).join(' ')+'</p>').join('');
+  $('script').querySelectorAll('.w').forEach(s=>s.addEventListener('click',()=>{const sel=String(window.getSelection()).trim().replace(/\s+/g,' ');
+    const many=sel.includes(' ')&&sel.length<=80?sel.split(' ').map(wkey).filter(Boolean).join(' '):'';pick(many&&places(many).length?many:wkey(s.textContent),Number(s.dataset.i));}));}
+
+function pick(w,at){if(!w)return;word=w;const ps=places(w);place=Math.max(0,ps.findIndex(([a,b])=>at>=a&&at<=b));hit=null;msg('');render();}
+function show(i){const el=$('script').querySelector('[data-i="'+i+'"]');if(el)el.scrollIntoView({block:'center',behavior:'smooth'});}
+
+// "Hear it now": the word as it sounds in this narration, a second before to a second after; free
+function hearNow(){const ps=places(word),p=ps[place];if(!p||!data.times.length)return;const au=$('au'),from=Math.max(0,data.times[p[0]][0]-1);stopAt=data.times[p[1]][1]+1;
+  const go=()=>{au.currentTime=from;au.play().catch(()=>msg('The recording could not be played. Try again.',true));};
+  if(!au.src)au.src='/runs/'+code+'/audio/'+data.narration.audio_key;
+  if(au.readyState>=1)go();else{au.addEventListener('loadedmetadata',go,{once:true});au.load();}}
+$('au').addEventListener('timeupdate',()=>{const au=$('au');if(stopAt!=null&&au.currentTime>=stopAt){au.pause();stopAt=null;}});
+$('au').addEventListener('error',()=>msg('The recording could not be played. Try again.',true));
+function playTry(key){const tp=$('tp');$('au').pause();tp.src='/runs/'+code+'/audio/'+key;tp.play().catch(()=>msg('The recording could not be played. Try again.',true));}
+
+function renderCard(){const c=$('card'),closed=data.closed,typing=document.activeElement&&document.activeElement.id==='say';
+  if(!word){c.innerHTML='<div class="ds">Click a word in the script, or select several words for a name.</div>';return;}
+  const ps=places(word),e=entry(),fin=e&&e.final_say_as,mine=data.tries.filter(t=>t.word===word),typed=($('say')&&$('say').dataset.w===word)?$('say').value:((e&&(e.say_as||e.final_say_as))||'');
+  const made=new Date(data.narration.made_at).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const now=data.times.length&&ps.length
+    ?`<div class="row"><button type="button" class="free" id="now">▶ Hear it now · free</button>${ps.length>1?`<button type="button" class="lk" id="prev" aria-label="the place before">‹</button><span class="ds">place ${place+1} of ${ps.length}</span><button type="button" class="lk" id="next" aria-label="the next place">›</button>`:''}</div>`
+      +(data.narration.behind?`<div class="note">As narrated on ${esc(made)}, before the final words.</div>`:'')
+    :'<div class="note">Hear it now · Not available for this narration: use its player on the narrations page.</div>';
+  c.innerHTML=`<div class="wd">${esc(word)}</div><div class="ds">${ps.length} place${ps.length===1?'':'s'} in the script${fin?' · now said as “'+esc(fin)+'”':''}</div>
+    <div class="stp">How it sounds in this narration</div>${now}
+    <div class="stp">1 · Type how it should sound</div><input id="say" data-w="${esc(word)}" value="${esc(typed)}" placeholder="the way you would say it, for example SHUT-er-ing" maxlength="120" ${closed?'disabled':''}>
+    <div class="stp">2 · Make the sound</div><button type="button" class="paid" id="make" ${closed?'disabled':''}></button>
+    <div class="note"><button type="button" class="lk" id="insent" ${closed?'disabled':''}>Hear it inside its sentence instead (paid, one whole sentence)</button></div>
+    <div class="stp">3 · Listen · playing is free</div><div id="tries">${mine.length?mine.map((t,k)=>tryRow(t,k+1,fin,closed)).reverse().join(''):'<div class="ds">No try yet for this word.</div>'}</div>`;
+  const say=$('say'),label=()=>{const n=say.value.trim().length;$('make').textContent='Make the sound · paid'+(n?', about '+(n+1)+' characters':'');};label();
+  if(typing){say.focus();say.setSelectionRange(say.value.length,say.value.length);}   // the page refreshes itself while a try is being made: the typing is kept
+  say.addEventListener('input',()=>{label();msg('');});
+  $('make').addEventListener('click',()=>ask(true));$('insent').addEventListener('click',()=>ask(false));
+  if($('now')){$('now').addEventListener('click',hearNow);if(ps.length>1){const step=d=>{place=(place+d+ps.length)%ps.length;show(ps[place][0]);renderCard();};$('prev').addEventListener('click',()=>step(-1));$('next').addEventListener('click',()=>step(1));}}
+  c.querySelectorAll('[data-play]').forEach(b=>b.addEventListener('click',()=>playTry(b.dataset.play)));
+  c.querySelectorAll('[data-again]').forEach(b=>b.addEventListener('click',()=>{say.value=b.dataset.again;label();ask(b.dataset.alone==='1');}));
+  c.querySelectorAll('[data-final]').forEach(b=>b.addEventListener('click',async()=>{b.disabled=true;try{await act({action:'word-final',word:word,say_as:b.dataset.final});
+    msg('“'+word+'” is final as “'+b.dataset.final+'”. Go back to the narrations and narrate again with the final words.');await load();}catch(err){msg(err.message,true);b.disabled=false;}}));}
+
+function tryRow(t,n,fin,closed){const kind=t.alone?'the word alone':'in its sentence',isFin=fin&&fin===t.say_as;
+  const state=t.status==='ready'&&t.audio_key?`<button type="button" class="free" data-play="${esc(t.audio_key)}" aria-label="play try ${n}">▶ Play</button>`
+    :OPEN.includes(t.status)?'<span class="ds">Being made, about half a minute</span>'
+    :`<span class="ds">This try failed${t.error?': '+esc(String(t.error).slice(0,120)):''}</span> <button type="button" class="lk" data-again="${esc(t.say_as)}" data-alone="${t.alone?1:0}" ${closed?'disabled':''}>Try again</button>`;
+  const use=isFin?'<span class="st fin">final</span>':(t.status==='ready'&&!closed?`<button type="button" class="lk" data-final="${esc(t.say_as)}">Use “${esc(t.say_as)}” as final</button>`:'');
+  return `<div class="try ${hit===t.id?'hit':''}"><div class="g">Try ${n} · <b>${esc(t.say_as)}</b> <span class="ds">· ${kind}</span></div>${state}${use}</div>`;}
+
+// every paid button asks first: the cost is read from the server, then the question; only "Yes, make it" sends
+async function ask(alone){if(sending||data.closed)return;const say=$('say').value.trim();if(!say){msg('Type how it should sound first.',true);$('say').focus();return;}
+  let pre;try{pre=await act({action:'word-cost',voice_id:data.narration.voice_id,word:word,say_as:say,alone:alone});}catch(err){msg(err.message,true);return;}
+  if(pre.already){hit=pre.already;msg('Already made, press Play. Nothing was sent.');await load();return;}
+  $('sure-text').textContent=(alone?'Make the sound for “'+pre.say_as+'”?':'Hear “'+pre.say_as+'” inside its sentence?')+' Paid: about '+pre.characters+' characters.';
+  const d=$('sure'),yes=$('sure-yes'),no=$('sure-no');yes.disabled=false;
+  const close=()=>{yes.onclick=no.onclick=null;d.close();};
+  no.onclick=close;
+  yes.onclick=async()=>{if(sending)return;sending=true;yes.disabled=true;
+    try{const r=await act({action:'word-hear',voice_id:data.narration.voice_id,word:word,say_as:say,alone:alone});hit=r.job;close();
+      msg(r.kept?'Already made, press Play. Nothing was sent.':'Sent (paid, '+r.characters+' characters). It plays in the list in about half a minute.');await load();}
+    catch(err){close();msg(/charged/.test(err.message)?err.message:err.message+' Not sent. Nothing was charged. Try again.',true);}
+    finally{sending=false;}};
+  d.showModal();}
+
+function renderList(){const ws=wordsOf();$('cw-sum').textContent='Corrected words ('+ws.length+')';
+  $('cw-list').innerHTML=ws.length?ws.map(x=>`<div class="try"><div class="g"><b>${esc(x.word)}</b> → ${esc(x.say_as||x.final_say_as||'')}${x.from_run?' <span class="ds">· from '+esc(x.from_run)+'</span>':''}</div><span class="st ${x.state==='final'?'fin':''}">${x.state==='final'?'final':'still trying'}</span><button type="button" class="lk" data-we="${esc(x.word)}">change</button>${data.closed?'':`<button type="button" class="lk" data-wr="${esc(x.word)}">remove</button>`}</div>`).join(''):'<div class="ds">None yet.</div>';
+  $('cw-list').querySelectorAll('[data-we]').forEach(b=>b.addEventListener('click',()=>{const ps=places(b.dataset.we);pick(b.dataset.we,ps.length?ps[0][0]:0);if(ps.length)show(ps[0][0]);}));
+  $('cw-list').querySelectorAll('[data-wr]').forEach(b=>b.addEventListener('click',async()=>{try{await act({action:'word-remove',word:b.dataset.wr});msg('Removed for this film: the voice reads “'+b.dataset.wr+'” as written again.');await load();}catch(err){msg(err.message,true);}}));}
+
+function render(){renderScript();renderCard();renderList();}
+async function load(){const r=await fetch(base+'/words/'+encodeURIComponent(job)+'/data');
+  if(r.status===401){location.href='/login?next='+encodeURIComponent(location.pathname);return;}
+  if(!r.ok){let j=null;try{j=await r.json();}catch(e){}$('cols').hidden=true;$('which').textContent='';
+    $('top').className='msg err';$('top').textContent=((j&&(j.message||j.detail))||'This page could not be opened.')+' Use “Back to the narrations”.';return;}
+  data=await r.json();const n=data.narration;
+  toks=data.script_text.split(/\s+/).filter(Boolean).map(wkey);
+  $('which').textContent=(n.name||'the voice')+' #'+(n.number||'')+' · narrated '+new Date(n.made_at).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  $('top').className='msg';$('top').textContent=data.closed?'The final narration is chosen: this page is for reading and listening only.':'';
+  $('cols').hidden=false;render();
+  clearTimeout(timer);timer=data.tries.some(t=>OPEN.includes(t.status))?setTimeout(()=>load().catch(()=>{}),5000):null;}
+load().catch(err=>{$('top').className='msg err';$('top').textContent=err.message;});
+})();
+</script>
+{% endblock %}

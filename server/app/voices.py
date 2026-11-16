@@ -1,6 +1,7 @@
 """Voices beyond one run (design/52 A, B): compact catalog rows, the account line, the register of favourites, release and
 restore of library copies, the usage directory, and a run's voice page state (shortlist, pick, narrations, final).
 The pure parts take plain dicts; the database and storage parts are below them."""
+import hashlib
 import json
 import re
 from datetime import datetime, timezone
@@ -656,6 +657,44 @@ def _item(doc, word):
     return next((it for it in doc['items'] if it['word'] == word), None)
 
 
+KEPT_STATES = ('ready', 'queued', 'running', 'storage_pending')
+
+
+def _kept_try(conn, run, item, voice_id, word, say_as, alone):
+    """design/208: the job of this same try (word, spelling, voice, alone or in its sentence) when one was made and did not fail, else None. Any earlier
+    try counts, not only the last one, so no spelling is charged twice."""
+    if conn is None:
+        return None
+    last = ((item or {}).get('heard') or {}).get(voice_id) or {}
+    if last.get('job_id') and last.get('say_as') == say_as and bool(last.get('alone')) == bool(alone):
+        row = conn.execute('select id, status from vw2_jobs where id=%s and run_id=%s', (last['job_id'], run['id'])).fetchone()
+        if row and row['status'] in KEPT_STATES:
+            return str(row['id'])
+    row = conn.execute("select id, status from vw2_jobs where run_id=%s and stage='voice' and request->'pronounce'->>'word'=%s and request->'pronounce'->>'say_as'=%s "
+                       "and coalesce((request->'pronounce'->>'alone')::boolean, false)=%s and request->>'voice_id'=%s order by (status='failed'), created_at desc limit 1",
+                       (run['id'], word, say_as, bool(alone), voice_id)).fetchone()
+    return str(row['id']) if row and row['status'] in KEPT_STATES else None
+
+
+def try_preview(conn, store, run, outputs, voice_id, word, say_as, alone=False):
+    """design/208: what a try would send, before it is sent: its characters (the cost shown on the button and in the question), and the job of the same
+    try when it was made before. Sends nothing, charges nothing."""
+    refuse_after_final(outputs)
+    script, _ = script_text(store, outputs)
+    word, say_as = check_word(script['spoken_text'], word, say_as)
+    text = try_text(script['spoken_text'], word, say_as, alone, direction_for(store, run, voice_id))
+    return {'characters': len(text), 'already': _kept_try(conn, run, _item(words_doc(store, run), word), voice_id, word, say_as, alone), 'word': word, 'say_as': say_as}
+
+
+def token_times(timing, text):
+    """design/208 ("Hear it now"): [start_s, end_s] of every word of the script, in the script's order, from a narration's timing; an empty list when the
+    narration has no word times or they are of another script version, so a wrong word is never played."""
+    words = (timing or {}).get('words') or []
+    if not words or len(words) != len(text.split()) or (timing.get('text_sha256') and timing['text_sha256'] != hashlib.sha256(text.encode()).hexdigest()):
+        return []
+    return [[w['start_s'], w['end_s']] for w in words]
+
+
 def try_word(conn, store, user, run, outputs, voice_id, word, say_as, request_id, alone=False):
     """Hear one word in a voice, in its sentence or alone (points a, c, d, f): a small paid request, like a tryout. The same respelling asked again in
     the same voice plays what was kept. The word is 'still trying' until it is made final; a try never reaches a narration."""
@@ -664,11 +703,9 @@ def try_word(conn, store, user, run, outputs, voice_id, word, say_as, request_id
     word, say_as = check_word(script['spoken_text'], word, say_as)
     doc = words_doc(store, run)
     it = _item(doc, word)
-    last = ((it or {}).get('heard') or {}).get(voice_id) or {}
-    if last.get('job_id') and last.get('say_as') == say_as and bool(last.get('alone')) == bool(alone) and conn is not None:
-        kept = conn.execute('select id, status from vw2_jobs where id=%s and run_id=%s', (last['job_id'], run['id'])).fetchone()
-        if kept and kept['status'] in ('ready', 'queued', 'running', 'storage_pending'):
-            return {'job': str(kept['id']), 'kept': True, 'tries': int(it.get('tries') or 0), 'word': word, 'say_as': say_as}
+    kept = _kept_try(conn, run, it, voice_id, word, say_as, alone)
+    if kept:
+        return {'job': kept, 'kept': True, 'tries': int((it or {}).get('tries') or 0), 'word': word, 'say_as': say_as}
     text = try_text(script['spoken_text'], word, say_as, alone, direction_for(store, run, voice_id))
     row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': voice_id, 'text': text, 'model_id': elevenlabs.DEFAULT_MODEL,
                                                        'settings': heard_settings(conn, run, voice_id),
@@ -684,8 +721,9 @@ def try_word(conn, store, user, run, outputs, voice_id, word, say_as, request_id
     return {'job': str(row['id']), 'kept': False, 'tries': it['tries'], 'characters': len(text), 'word': word, 'say_as': say_as}
 
 
-def finalise_word(store, user, run, outputs, word):
-    """'Pronunciation final for this word' (row 16e): from now on every narration says it this way, in every place and every voice."""
+def finalise_word(store, user, run, outputs, word, say_as=None):
+    """'Pronunciation final for this word' (row 16e): from now on every narration says it this way, in every place and every voice.
+    design/208: say_as names the spelling of the try the operator chose on the page; without it, the last one tried (the tool's call)."""
     refuse_after_final(outputs)
     doc = words_doc(store, run)
     it = _item(doc, ' '.join(str(word or '').split()))
@@ -693,6 +731,9 @@ def finalise_word(store, user, run, outputs, word):
         raise Problem(404, 'WORD', 'That word has no correction yet: type how it sounds and hear it first.')
     if not int(it.get('tries') or 0) and not it.get('from_run') and not it.get('final'):
         raise Problem(409, 'WORD', 'Hear it once first; then make it final.')
+    say_as = ' '.join(str(say_as or '').split())
+    if say_as:
+        it['say_as'] = say_as
     if not _is_final(it):
         it['final'] = {'say_as': it.get('say_as') or '', 'ipa': it.get('ipa') or ''}
         _rebuild(store, user, run, doc)
