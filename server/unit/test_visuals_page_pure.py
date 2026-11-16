@@ -75,11 +75,12 @@ def test_the_treatment_and_plan_rows_show_when_each_sentence_is_spoken():
     assert 'function timed(g)' in HTML and HTML.count('+timed(g)+') == 2
 
 
-def test_a_proposed_reuse_waits_on_the_page_for_the_operators_words_and_the_treatment_shows_the_frozen_share():
-    """design/89 H7, B4."""
-    for needle in ('function reuseBox', 'data-a="approve-reuse"', "action:'approve-reuse'", 'Approve the reuse', 'frozen_share', 'of the film (limit'):
+def test_a_reuse_is_no_longer_approved_on_the_page_and_the_treatment_shows_the_frozen_share():
+    """design/89 B4; design/207 (D2): the reuse approval box (design/89 H7) is retired; the reuse fields of a placement stay."""
+    for needle in ('frozen_share', 'of the film (limit', 'function reuseFields', 'function reuseOf'):
         assert needle in HTML, needle
-    assert HTML.count('+reuseBox(s)+') == 2   # the Pictures and the Takes steps
+    for gone in ('function reuseBox', 'approve-reuse', 'Approve the reuse', 'reuseBox(s)'):
+        assert gone not in HTML, gone
 
 
 def test_the_page_places_a_clip_stretch_and_proposes_a_reuse_through_the_server_functions():

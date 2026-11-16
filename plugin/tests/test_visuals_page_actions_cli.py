@@ -186,7 +186,7 @@ def test_own_sends_the_file_and_says_it_is_approved(harness, monkeypatch, capsys
 
 
 @pytest.mark.parametrize('message', [
-    "A person's reference is made from the description; an uploaded photo is not used for people.",   # a person on a kept film
+    "A person's own photo is used only with their permission. Ask the operator; when they say they have it, record their words.",   # design/207 (D1): a person without the recorded permission
     'The picture is larger than 15 MB: choose a smaller file.',
     'That file is not a picture this page can read: use a PNG, JPEG or WebP image.'])
 def test_own_relays_each_refusal_in_the_servers_plain_words(harness, monkeypatch, capsys, message):

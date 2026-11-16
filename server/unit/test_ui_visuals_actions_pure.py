@@ -117,7 +117,7 @@ def test_an_answer_is_refused_in_plain_words_outside_step_2_or_for_an_element_wi
         assert '`' not in e.value.message and 'vw ' not in e.value.message
     with pytest.raises(Problem, match='E2: the answer is Yes, No or Correct it'):
         g(lambda: VS.set_answer(store, USER, NEW, [], 'E2', 'maybe', None, ''))
-    one = frames_only(doc_with(KILN, MASON))   # a round still at step 1
+    one = frames_only(doc_with(KILN))   # a round still at step 1
     VS.round_start(one, USER, NEW, [], [{'element_id': 'E2', 'prompt': 'the kiln'}], conn=FakeConn([]))
     with pytest.raises(Problem, match='not at step 2'):
         g(lambda: VS.set_answer(one, USER, NEW, [], 'E2', 'yes', None, ''))
@@ -632,19 +632,19 @@ def test_another_elements_own_picture_is_refused_as_the_starting_picture():
     assert not sheets(saved(store), 'E2', 'approved')
 
 
-PEOPLE = "A person's reference is made from the description; an uploaded photo is not used for people."
+PEOPLE = VS.own_picture_refused('person', {}, 'P1')   # design/207 (D1): a person's photo needs the operator's recorded yes that they have the permission
 
 
-def test_an_uploaded_photo_is_not_used_for_a_person_until_the_one_condition_is_switched(monkeypatch):
+def test_an_uploaded_photo_is_not_used_for_a_person_until_the_permission_is_recorded():
     store, conn, s = with_sets(doc_with(KILN, MASON))
     n = len(saved(store)['references'])
     with pytest.raises(Problem) as e:
         own(store, conn, 'P1')
-    assert e.value.message == PEOPLE and len(saved(store)['references']) == n
-    monkeypatch.setattr(VS, 'OWN_PICTURE_FOR_PEOPLE', True)   # the one line, switched
+    assert e.value.message == PEOPLE and 'permission' in PEOPLE and len(saved(store)['references']) == n
+    VS.likeness(store, USER, NEW, [], 'P1', 'Yes, I have his permission.', conn=conn)   # the one condition: the record
     photo = own(store, conn, 'P1')
     assert VS.set_answer(store, USER, NEW, [], 'P1', 'yes', photo['id'], '')['answer']['golden'] == photo['id']
-    monkeypatch.setattr(VS, 'OWN_PICTURE_FOR_PEOPLE', False)
+    VS.likeness(store, USER, NEW, [], 'P1', 'A stand-in after all.', conn=conn, stand_in=True)
     for call in (lambda: VS.set_answer(store, USER, NEW, [], 'P1', 'yes', photo['id'], ''),
                  lambda: VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes', 'golden': photo['id']}}, 'This.', conn=conn, partial=True)):
         with pytest.raises(Problem) as e:
@@ -652,8 +652,8 @@ def test_an_uploaded_photo_is_not_used_for_a_person_until_the_one_condition_is_s
         assert e.value.message == PEOPLE
     out = VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes'}}, 'This.', conn=conn, partial=True)   # as before: the full-length front picture
     assert out['approved'] == ['P1'] and saved(store)['golden']['P1'] == min(sheets(saved(store), 'P1', 'approved'))
-    monkeypatch.setattr(VS, 'OWN_PICTURE_FOR_PEOPLE', True)
     store, conn, s = with_sets(doc_with(KILN, MASON))
+    VS.likeness(store, USER, NEW, [], 'P1', 'Yes, I have his permission.', conn=conn)
     photo = own(store, conn, 'P1')
     VS.round_sets(store, USER, NEW, [], {'P1': {'verdict': 'yes', 'golden': photo['id']}}, 'This.', conn=conn, partial=True)
     assert saved(store)['golden']['P1'] == photo['id']

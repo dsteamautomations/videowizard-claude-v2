@@ -611,8 +611,9 @@ def test_clip_fills_a_shot_and_reuse_posts_the_operators_words(harness, monkeypa
                                                                                         'considered': 'a drone view: none', 'crop': [0.1, 0.1, 0.7, 0.7]}
     code, out, err = run(args(what='clip', shot='VS1', clip='c1', quote='this stretch'), capsys)   # finding 8: no --at is a refusal, never a traceback
     assert code == 2 and '--at' in out['message']
-    code, out, err = run(args(what='reuse', shot='VS1', quote='Yes, reuse it.'), capsys)
-    assert code == 0 and posted[-1] == (posted[-1][0], {'shot_id': 'VS1', 'quote': 'Yes, reuse it.'}) and posted[-1][0].endswith('/visuals/reuse')
+    n = len(posted)
+    code, out, err = run(args(what='reuse', shot='VS1', quote='Yes, reuse it.'), capsys)   # design/207 (D2): retired by name; a reuse that passes the checks is kept at the placement
+    assert code == 2 and len(posted) == n and "no longer needs the operator's approval" in out['message']
 
 
 def test_the_prompt_steps_and_doc_carry_timing_movement_and_no_repeats():

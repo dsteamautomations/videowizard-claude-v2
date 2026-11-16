@@ -199,7 +199,7 @@ def test_a_round_posted_again_after_done_keeps_the_sets_and_makes_only_the_missi
     assert s2['round']['elements']['E1']['from_footage'] and s2['round']['elements']['P1']['set']   # untouched
     assert s2['round']['elements']['E2']['prompt'] == 'the kiln, measured: 3 m high' and s2['round']['elements']['E2']['error'] is None and s2['round']['elements']['E2']['set']
     assert sum(1 for r in s2['references'].values() if r.get('kind') == 'sheet' and r['element_id'] == 'P1') == 3   # P1's pictures still there
-    assert 'merged' not in VS.round_start(frames_only(doc), USER, NEW, [], [{'element_id': 'E1', 'prompt': 'x'}], conn=FakeConn([]))   # a first post is a fresh round
+    assert 'merged' not in VS.round_start(frames_only(doc), USER, NEW, [], [{'element_id': 'E1', 'prompt': 'x'}, {'element_id': 'P1', 'prompt': 'kneels'}], conn=FakeConn([]))   # a first post is a fresh round (design/207: every person has its row)
 
 
 def test_a_kept_set_waits_as_one_step_2_item_not_picture_by_picture():   # UI change, 11 Nov 2026 (X1, X2): one item per set, on its element's card (was one item for all sets, on no card)

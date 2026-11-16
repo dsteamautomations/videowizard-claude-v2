@@ -393,6 +393,16 @@ def _round_items(ctx):
         elif not rows and not V._set_rows(session, eid, row.get('set'), ('generating', 'approved')):
             if V.set_cause(session, plan, eid, budget):
                 continue   # something stands in its way (a spec to approve first, the spend limit): that comes in its own turn
+            refused = V._set_state(session, plan, step, eid, row, budget).get('next')   # design/207 (D1): the picture service refused this person's photo
+            if refused:
+                def run_(choice, quote, words, eid=eid, refused=refused):
+                    if choice == 'photo':
+                        return {'for_the_assistant': refused, 'tell': 'Ask the operator for another photo of this person.'}
+                    V.likeness(ctx['store'], ctx['user'], run, ctx['outputs'], eid, words or quote, conn=ctx['conn'], stand_in=True)
+                    return {**V.set_make(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], eid), 'tell': 'This person is a stand-in now: the set is being made from the description. ' + NOTHING}
+                items.append(_item(f'likeness:{eid}:{row.get("set")}', 'reference set to make', where, f"{names[eid]}: the picture service refused this person's photo. Give another photo, or make them a stand-in (made from the description, paid)?", run_,
+                                   [_button('Another photo', 'photo'), _button('A stand-in', 'standin', words=True, tell='Ask the operator to say in their own words that this person is a stand-in now.')]))
+                continue
 
             def run_(choice, quote, words, eid=eid):
                 if choice == 'make':
@@ -513,20 +523,7 @@ def _waiting_items(ctx):
                 return V.correct_spec(store, user, run, outputs, key, words)
             items.append(_item(f"spec:{key}:{V.spec_digest(spec)[:10] if spec else ''}", 'spec', where, f'{what}. Are they right?', run_,
                                [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator which value is wrong and what it should be.')], text=_spec_text(spec)))
-        elif kind == 'reuse to approve':
-            p = (session.get('reuse_pending') or {}).get(group) or {}
-            if (session.get('chat_asked') or {}).get(f'reuse:{group}') == str(p):
-                continue   # the operator said no to this very proposal: the assistant plans another picture; it is not asked twice
-
-            def run_(choice, quote, words, group=group, p=p):
-                if choice == 'yes':
-                    return V.approve_reuse(store, user, run, outputs, group, quote)
-                _asked(store, run, outputs, f'reuse:{group}', str(p))
-                return {'for_the_assistant': words, 'tell': 'Another picture will be planned for this shot.'}
-            items.append(_item(f'reuse:{group}', 'reuse', where, f'{title(group)}: the same picture is shown a second time here. Allow it?', run_,
-                               [_button('Yes, reuse it', 'yes'), _button('No, another picture', 'no', words=True, tell='Ask the operator what they want there instead.')],
-                               text='\n'.join(f'{k}: {v}' for k, v in p.items() if k in ('reason', 'considered') and v)))
-        elif kind == 'take to select':
+        elif kind == 'take to select':   # design/207 (D2): the reuse question is retired; a reuse that passes the checks is kept without the operator
             job = next((j for j in take_rows if str(j['id']) == str(it)), None)
             if not job:
                 continue

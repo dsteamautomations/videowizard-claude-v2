@@ -79,7 +79,7 @@ def test_a_person_still_gets_the_sheet():
     store, conn = frames_only(doc_with(KILN, MASON)), FakeConn([])
     rows = [{'element_id': 'E2', 'prompt': 'the kiln'}, {'element_id': 'P1', 'prompt': 'kneels'}]
     VS.round_start(store, USER, NEW, [], rows, conn=conn)
-    with pytest.raises(Problem, match='not used for people'):
+    with pytest.raises(Problem, match='only with their permission'):   # design/207 (D1): a stand-in until the operator records the permission
         own(store, conn, 'P1')
     out = VS.round_done(store, USER, NEW, [], {r['element_id']: {'verdict': 'approve'} for r in rows}, 'yes', conn=conn)
     assert 'P1' in out['queued']
