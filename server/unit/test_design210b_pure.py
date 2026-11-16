@@ -522,7 +522,7 @@ def test_the_reference_drawings_point_to_the_references_when_they_are_next():
     p = page(store, conn)
     assert p['step'] == P.DRAW_STEP
     r = record(store, conn, [ans(p['lines'][0], 'yes')])
-    assert r['then'] == 'Every reference drawing is approved. ' + P.REFS_GO and '`vw visuals page`' in r['then'] and r['page']['step'] == A
+    assert r['then'] == 'Every reference drawing is approved. ' + P.REFS_HERE and r['page']['step'] == A   # design/210 wording review: the round is in this answer, so no second `vw visuals page`
     store, conn = film(begin=False)
     s = saved(store)
     s['drawings'] = {'E2': {'status': 'proposed', 'sha256': 'b' * 64, 'name': 'Clamp kiln', 'views': [], 'facts': [], 'assumed': []}}
@@ -550,9 +550,7 @@ def test_the_instructions_send_the_round_to_the_page_and_the_chat_is_the_way_bac
     retired = json.loads((root / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     for old in ('The operator answers both steps in the chat, one at a time', "every element's set judged in the chat, one at a time"):
         assert old in retired and old not in part['picture-search'] and old not in part['later']
-    sys.path.insert(0, str(root / 'scripts'))
-    import d210b_wording_v3 as W
-    parts = copy.deepcopy(st['parts'])
-    assert W.apply(st['prompt'], parts) == st['prompt'] and parts == st['parts'], 'applying twice changes nothing'
+    # the design/210 wording review (scripts/d210c_wording_v3.py) changed one of this script's sentences (Done on step 1 is not undone), so "applying twice changes nothing" is
+    # checked on the last script, in test_design210_wording_pure.py; scripts/c1_split_v3.py --check still builds the text through every script in order
     vw = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'the operator answers both steps on the page (`vw visuals page`), each in one visit' in vw and 'the operator answers both steps in the chat, one at a time (`vw visuals next`);' not in vw

@@ -157,7 +157,8 @@ def _log(conn, run, key, choice, words, refused=''):
                         'quote': words, 'request_id': None})
 
 
-PLAN_NEXT = 'Every gap of the plan is accepted. Go on with `vw visuals next`: it gives the next decision.'
+PLAN_DONE = 'Every gap of the plan is accepted. '
+PLAN_NEXT = PLAN_DONE + 'Go on with `vw visuals next`: it gives the next decision.'   # only when nothing of the page is left (`_after`)
 PLAN_BACK = ('No line waits for the operator now: change the plan for the lines that are back with you (their words are on each), propose it again, '
              'then `vw visuals page`.')
 
@@ -261,7 +262,8 @@ def _plan_page(ctx, base):
 
 
 SPEC_STEP = 'Drawings and materials'
-SPEC_NEXT = 'Every drawing and material is approved. Go on with `vw visuals next`: it gives the next decision.'
+SPEC_DONE = 'Every drawing and material is approved. '
+SPEC_NEXT = SPEC_DONE + 'Go on with `vw visuals next`: it gives the next decision.'
 SPEC_BACK = ('No line waits for the operator now: correct the drawings and materials that are back with you (their words are on each) in out/visual-plan.json, '
              'propose the plan again, then `vw visuals page`.')
 
@@ -321,7 +323,8 @@ SPEC_REFUSED = ('The server refused an answer on the page; its reason is in `ref
 
 
 DRAW_STEP = 'Reference drawings'
-DRAW_NEXT = 'Every reference drawing is approved. Go on with `vw visuals next`: it gives the next decision.'
+DRAW_DONE = 'Every reference drawing is approved. '
+DRAW_NEXT = DRAW_DONE + 'Go on with `vw visuals next`: it gives the next decision.'
 DRAW_BACK = ('No line waits for the operator now: redraw the things that are back with you (their words are on each), one thing at a time, and send each set again '
              '(`vw drawing set --element E --file work/drawing/E/set.json`), then `vw visuals page`.')
 DRAW_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
@@ -396,7 +399,9 @@ def _drawing_page(ctx, base, lines):
 REFS_STEP, SETS_STEP = 'References', 'References: the sets'
 REFS_START = ('The references come next: write out/reference-round.json and send it (`vw visuals round --file out/reference-round.json`), then run `vw visuals page`: '
               'the operator answers every person, object and place there, in one visit.')
-REFS_GO = 'The references come next: run `vw visuals page`. The operator answers every person, object and place there, in one visit.'
+REFS_GO = 'The references come next: run `vw visuals page`. The operator answers every person, object and place there, in one visit.'   # only when this answer does not hold their round
+REFS_HERE = ('The references come next, and their round is in this answer: send its pictures and write it to the page (steps 2 and 3 of `how`), then give the operator '
+             'the link. They answer every person, object and place there, in one visit.')
 REFS_KEPT = 'Kept, not recorded yet: the sets are made when every thing is answered. Choose again to change it.'
 SETS_KEPT = 'Kept, not recorded yet: it is recorded when the sets still being made are back. Choose again to change it.'
 SETS_HELD = 'Kept, not recorded yet: the reason is on this line. Choose again to change it.'
@@ -648,6 +653,22 @@ def _round_due(ctx, now):
         return False
 
 
+def _after(ctx, now, lead, end):
+    """design/210 review: what the assistant does once a step of the page has nothing left to answer, the same after the plan, after the
+    drawings and materials and after the reference drawings (`lead` says which was finished): the reference round when it is next, in the
+    words that fit where it stands (in this answer; not started; started and not in this answer). `end` when a line is back with the
+    assistant, or nothing of the page is left."""
+    session = ctx['session']
+    rd = session.get('round') or {}
+    if now['step'] == REFS_STEP:
+        return lead + REFS_HERE
+    if _round_due(ctx, now):
+        return lead + REFS_START
+    if rd.get('kept') and V._round_pass(session, rd) == 1 and not any(l['state'] in ('open', 'with_assistant') for l in now['lines']):
+        return lead + REFS_GO
+    return end
+
+
 def _plan_step(ctx):
     """Which step the page is at once a plan is proposed, with its lines: 'plan' while a gap is open or back with the assistant; 'spec' (the
     drawings and materials, design/209) until each is approved; then 'draw' (the reference drawings, design/210) while a drawing set waits;
@@ -778,7 +799,7 @@ def page_record(conn, store, user, run, outputs, answers):
     answers.sort(key=lambda a: {'motion': 0, 'direction': 1, 'shared': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps
     recorded, stale, refused, dropped, tell = [], [], [], [], ''
     kept = []   # design/210: the answers of the reference round that are kept and not recorded yet
-    relies, corrected, was_draw, was_round = set(), False, False, False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
+    relies, corrected, was, was_draw, was_round = set(), False, '', False, False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
     try:
         first = CF._ctx(conn, store, user, run, outputs)
         was = _plan_step(first)[0] if _at_plan(first) else ''
@@ -875,19 +896,20 @@ def page_record(conn, store, user, run, outputs, answers):
     at_plan, at_spec, at_draw = now['step'] == 'Plan', now['step'] == SPEC_STEP, now['step'] == DRAW_STEP
     at_refs, at_sets = now['step'] == REFS_STEP, now['step'] == SETS_STEP
     rd = V.session_of(store, run, outputs).get('round') or {}   # read again: `page` may have ended the round
-    drawn = 'Every reference drawing is approved. '
+    leads = {'plan': PLAN_DONE, 'spec': SPEC_DONE, 'draw': DRAW_DONE}   # the step this "done" finished
+    after = lambda lead, end: _after(CF._ctx(conn, store, user, run, outputs), now, lead, end)   # design/210 review: one "what next" for the three steps before the references
     then = ('Nothing was answered on the page. ' if not answers else '') + (f'The references are not recorded yet: {stopped} ' if stopped else '') + (
         SPEC_REFUSED + ' ' if at_spec and refused else DRAW_REFUSED + ' ' if at_draw and refused else ROUND_REFUSED + ' ' if (at_refs or at_sets) and [r for r in refused if r['key'] != 'references'] else '') + (
-        drawn + REFS_GO if at_refs and was_draw and not session.get('chat_round') else
+        leads[was] + REFS_HERE if at_refs and was in leads and not session.get('chat_round') else   # the round is in this answer: never a second `vw visuals page` for it
         f"{left} thing(s) still wait for the operator on the page: write the new round to the page and give them the link again. The answers given are kept: nothing is made until every thing is answered." if at_refs and left else
         'Every thing is answered and kept. When what stands in the way is settled, run `vw visuals page --record` again: the step is recorded then.' if at_refs else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if at_sets and left else
         SETS_WAIT if at_sets and any(l['state'] == 'making' for l in now['lines']) else SETS_STAND if at_sets and any(l.get('kept') for l in now['lines']) else SETS_NONE if at_sets else
         ROUND_NEXT if (was_round or kept or any(k.startswith(('ref:', 'set:')) for k in recorded)) and rd.get('kept') and rd.get('pass') == 'complete' else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec or at_draw) and left else
-        DRAW_BACK if at_draw else drawn + REFS_START if was_draw and _round_due(CF._ctx(conn, store, user, run, outputs), now) else DRAW_NEXT if was_draw else
-        SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else SPEC_NEXT if at_spec else
-        PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else PLAN_NEXT if at_plan else
+        DRAW_BACK if at_draw else after(DRAW_DONE, DRAW_NEXT) if was_draw else
+        SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else after(SPEC_DONE, SPEC_NEXT) if at_spec else
+        PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else after(PLAN_DONE, PLAN_NEXT) if at_plan else
         'The treatment is recorded: write the plan to it.' if session.get('treatment') and not draft else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if left else
         V.DIRECTION_ACCEPTED if alone_accepted else

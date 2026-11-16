@@ -1106,8 +1106,9 @@ def cmd_next(a):
         nxt['voice_page_url'] = signed_link(voice_page_url(m['code']))
     if nxt.get('stage') in ('options', 'master'):   # design/62: the operator approves the options and answers the slides on the page
         nxt['review_page_url'] = signed_link(review_page_url(m['code']))
-    if nxt.get('stage') == 'visuals':   # design/188 (SK, 12 Nov 2026): the operator decides in the chat, one thing at a time; no page link is given (was design/65: on the page)
-        nxt['visuals_in_chat'] = "The operator's decisions of this stage are taken in the chat, one at a time: `vw visuals next`."
+    if nxt.get('stage') == 'visuals':   # design/188 (SK, 12 Nov 2026): the later decisions in the chat, one thing at a time; design/204 to 210: the earlier ones on the Claude artifact page
+        nxt['visuals_in_chat'] = ('The treatment, the plan, the drawings and materials, the reference drawings and the two steps of the references are answered on the page (`vw visuals page`); '
+                                  'the stills, the graphics, the AI video and the recording are asked in the chat, one at a time (`vw visuals next`).')
     emit(nxt, 0, next_line(nxt) + (f" Voices page: {nxt['voice_page_url']}" if nxt.get('voice_page_url') else '')
          + (f" Review page: {nxt['review_page_url']}" if nxt.get('review_page_url') else '') + (f" {nxt['visuals_in_chat']}" if nxt.get('visuals_in_chat') else ''))
 
@@ -2527,7 +2528,7 @@ def cmd_visuals(a):
             emit(out, 0, f"Round kept: {len(out.get('queued') or [])} missing set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
                  + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '') + ' Then `vw visuals status --wait 900`; the operator judges every set on step 2.')
         if out.get('kept'):
-            emit(out, 0, f"Reference round posted for {out.get('elements')} elements (the kept method). Now `vw visuals next`, again after every answer: the server hands the operator one element at a time in the chat, then one set at a time (design/188; no page). What happens: "
+            emit(out, 0, f"Reference round posted for {out.get('elements')} elements (the kept method). Now `vw visuals page`: the operator answers step 1 there, in one visit; in the chat (`vw visuals next`) only where the page cannot be shown. What happens: "
                  "step 1 they approve the footage pictures; Done makes every set at once (the server adds the kept preamble, the set line and the four notes to each thing's subject block, and writes each person's sheet from the plan); "
                  "step 2 they judge every set in one shot (Yes with the golden tick, No, or Correct it). Meanwhile write (never generate, never ask) the graphics' answer forms, the drawing and material specs and the drawn layouts for accepted gaps; "
                  "then `vw visuals status --wait 900`; ask nothing per element.")
@@ -2573,6 +2574,8 @@ def cmd_visuals(a):
             if a.what == 'web':
                 body.update(source_url=a.url or '', selection_reply=a.quote or '')
         out = write(base + '/references', body)
+        if a.what == 'frame':   # design/210 review: a footage frame is answered at step 1 of the round, as `frame --file` says
+            emit(out, 0, f"Frame {out['id']} grabbed for {a.element}: it is a candidate for the round (`vw visuals round --file`).")
         emit(out, 0, f"Reference {out['id']} ({out['kind']}) is a candidate; show it to the operator (`vw visuals fetch --ref {out['id']}`) and approve with its sha256.")
     if a.what == 'image':
         if a.file:   # design/45 10.5: several images in one call, in order, stopping at the first refusal
@@ -2749,14 +2752,15 @@ def cmd_visuals(a):
             jobs_ = st.get('jobs') or []
             open_ = [j for j in jobs_ if j.get('status') in VISUALS_OPEN]
             decide = [j for j in jobs_ if j.get('status') in ('failed', 'rejected', 'cancelled', 'submission_unknown')]
-            round_open = (st.get('round') or {}).get('pass') in (1, 2, 'making')   # design/79: the operator is answering the round on the page; design/151: or its sets are being made
+            rd = st.get('round') or {}
+            round_open = rd.get('pass') == 'making' or (not rd.get('kept') and rd.get('pass') in (1, 2))   # design/151: its sets are being made; design/210 review: the wait ends when they are back (the operator's two steps are on the Claude page, not waited for); design/79, kept for an older film's round: the operator is answering it
             if (not open_ and not round_open) or time.monotonic() >= deadline:   # design/106 T5: an old job needing a decision never ends the wait
                 break
             time.sleep(15)
         ready = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') != 'rejected')   # defect 30: a rejected take stays 'ready' as a job
         rejected = sum(1 for j in jobs_ if j.get('status') == 'ready' and j.get('verdict') == 'rejected')
         rd = st.get('round') or {}
-        round_line = (f"; reference round at pass {rd.get('pass')}" + (': the operator answers it in the chat, `vw visuals next`' if rd.get('pass') in (1, 2) else ': the sets are being made, wait' if rd.get('pass') == 'making'
+        round_line = (f"; reference round at pass {rd.get('pass')}" + (': the operator answers it on the page, `vw visuals page`' if rd.get('pass') in (1, 2) else ': the sets are being made, wait' if rd.get('pass') == 'making'
                                                                         else ': complete; the approved sets are the references' if rd.get('kept') else ': read the verdicts and make the sheets')) if rd else ''   # design/151
         if open_:
             images, takes = sum(1 for j in open_ if j.get('provider') in ('openai', 'gemini-image')), sum(1 for j in open_ if j.get('provider') == 'video')   # design/124 A4 item 20: both picture AIs
@@ -2769,9 +2773,10 @@ def cmd_visuals(a):
             line += f"; {len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
-        specs = len([w for w in wt if 'spec to approve' in str(w.get('kind') or '')])   # design/209: the drawings and the materials are approved on the page
-        waiting_line = (f"; {len(wt)} waiting for the operator: " + (f"{specs} of them are drawings and materials, approved on the page in one visit (`vw visuals page`); " if specs else '')
-                        + f"ask {'the others' if specs else 'them'} one at a time with `vw visuals next` (design/188), never from this list") if wt else ''
+        paged = len([w for w in wt if 'spec to approve' in str(w.get('kind') or '') or str(w.get('kind') or '').startswith('set to ')])   # design/209: the drawings and the materials are approved on the page; design/210: the reference sets too
+        on_page = 'answered on the page in one visit (`vw visuals page`): the drawings and materials and the reference sets'
+        waiting_line = (f"; {len(wt)} waiting for the operator: " + (f'all {on_page}' if paged == len(wt) else (f'{paged} of them are {on_page}; ' if paged else '')
+                        + f"ask {'the others' if paged else 'them'} one at a time with `vw visuals next` (design/188), never from this list")) if wt else ''
         due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
         emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':

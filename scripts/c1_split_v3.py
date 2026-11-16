@@ -123,6 +123,8 @@ if __name__ == '__main__':
         from d210b_wording_v3 import apply as d210b, apply_steps as d210bs   # design/210 part 2: the reference round answered on the page, in two visits
         prompt = d210b(prompt, parts)
         d210bs(steps)
+        from d210c_wording_v3 import apply as d210c   # design/210, the wording review: each step sent to where it is answered; the picture search in the order it is done
+        prompt = d210c(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

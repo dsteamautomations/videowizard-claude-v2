@@ -600,6 +600,21 @@ def _drawing_items(ctx):
     return items
 
 
+FRAMES_ON_PAGE = ('The footage pictures are not asked here: the operator answers them with the references, on the page. Write out/reference-round.json and send it '
+                  '(`vw visuals round --file out/reference-round.json`), then run `vw visuals page`. ')
+
+
+def _round_frames(ctx):
+    """design/210 review: the footage pictures that step 1 of the reference round will ask, while no round exists yet on a film whose
+    references are made as sets. The chat does not ask them one by one before the round: the operator would answer each twice. Once the round
+    is sent, the chat asks each thing with its pictures (`_round_items`) where the page cannot be shown."""
+    session, plan = ctx['session'], ctx['plan']
+    if not plan or session.get('round') or not V.is_kept(session, ctx['run']):
+        return set()
+    things = {e['id'] for e in plan.get('elements') or [] if e['id'] != V.STYLE and e.get('kind') not in ('graphic', 'animal', 'style')}   # what the round takes
+    return {r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'candidate' and r.get('element_id') in things}
+
+
 def _waiting_items(ctx):
     session, plan, run, store, user, outputs, conn = ctx['session'], ctx['plan'], ctx['run'], ctx['store'], ctx['user'], ctx['outputs'], ctx['conn']
     if not plan:
@@ -608,7 +623,8 @@ def _waiting_items(ctx):
     names = _names(plan)
     take_rows = V.take_jobs(conn, run)
     rows = V.waiting(session, plan, run.get('code'), take_rows, V._set_budget(run, session, V.visuals_spend(conn, run)))
-    rows = [w for w in rows if w['kind'] not in ('set to judge', 'set to make')]   # the round's own items, above
+    frames = _round_frames(ctx)
+    rows = [w for w in rows if w['kind'] not in ('set to judge', 'set to make') and w['item'] not in frames]   # the round's own items, above; the round's footage pictures, at its step 1
     shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
     title = lambda sid: (shots.get(sid) or {}).get('title') or sid
     items, specs = [], None
@@ -1022,7 +1038,8 @@ def next_item(conn, store, user, run, outputs, one=False):
         flush_sets(conn, store, user, run, outputs)
     except V.Problem:
         pass   # said again when the operator next answers a set
-    items, summary, with_assistant = _candidates(_ctx(conn, store, user, run, outputs))
+    ctx = _ctx(conn, store, user, run, outputs)
+    items, summary, with_assistant = _candidates(ctx)
     session = V.session_of(store, run, outputs)
     # SK, 14 Nov 2026: the direction is asked first and alone; every gap line is written from it, so none is shown until it is accepted
     if items and not one and len(items) >= 2 and items[0]['kind'] in CARD_KINDS and not items[0]['id'].startswith('treatment:direction:'):
@@ -1044,7 +1061,7 @@ def next_item(conn, store, user, run, outputs, one=False):
         V.save_session(store, run, session)
     lines = with_assistant + working(conn, run)
     return {'item': None, 'needed': False, 'working': lines, 'say_last': NOTHING,
-            'how': 'Tell the operator the `working` lines as they are' + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
+            'how': (FRAMES_ON_PAGE if _round_frames(ctx) else '') + 'Tell the operator the `working` lines as they are' + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
 
 
 def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='', one=False):

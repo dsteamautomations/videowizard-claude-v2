@@ -89,7 +89,7 @@ The server cannot cut the model open. Where the inside is the point, build the c
 vw drawing set --element E --file work/drawing/E/set.json
 ```
 
-Free. The server refuses a faulty description in plain words; fix what it names and send again. Then `vw visuals next` shows the operator the labelled sheets, the facts with their sources and the assumed sizes; they answer **Yes** or **Correct it** with their words. Outside the chat: `vw drawing show --element E`, then `vw drawing approve --element E --sha … --quote "<their words>"` or `vw drawing reject … --notes "<what is wrong>" --quote "…"`.
+Free. The server refuses a faulty description in plain words; fix what it names and send again. Then the operator approves the drawings on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown. Either way they see the labelled sheets, the facts with their sources and the assumed sizes, and answer **Yes** or **Correct it** with their words. Outside both: `vw drawing show --element E`, then `vw drawing approve --element E --sha … --quote "<their words>"` or `vw drawing reject … --notes "<what is wrong>" --quote "…"`.
 
 A correction changes one thing in the description, and the set is sent and approved again.
 

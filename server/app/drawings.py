@@ -114,7 +114,7 @@ def set_drawing(conn, store, user, run, outputs, element_id, description):
             'Its set was already made without these drawings: once they are approved, the operator answers that set No or Correct it on step 2 and it is made again with them. ' if slot.get('set') else '')
     return {'element_id': element_id, 'sha256': sha, 'status': 'proposed', **({'late': late.strip()} if late else {}), 'views': [{'id': v['id'], 'name': v['name'], 'kind': v['kind']} for v in views],
             'assumed': rows[element_id]['assumed'],
-            'next': late + f"The drawings are made (free). The operator looks at them in the chat (`vw visuals next`) and approves or corrects them; "
+            'next': late + f"The drawings are made (free). The operator looks at them and approves or corrects them on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown; "
                            f"or `vw drawing show --element {element_id}`, then `vw drawing approve --element {element_id} --sha {sha} --quote \"<the operator's words>\"`."}
 
 

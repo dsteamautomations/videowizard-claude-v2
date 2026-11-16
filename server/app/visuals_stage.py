@@ -2465,10 +2465,17 @@ def answer(store, user, run, outputs, item, words):
     return {**record, 'next': f'Answered: {words}. Work on {item} goes on from this answer.'}
 
 
+NO_UNDO = ('Done on step 1 cannot be undone on this film: its reference sets are ordered, and paid for, as soon as it is said, and they stay. '
+           'The operator answers the sets on the page (`vw visuals page`): a set that is not right is made again there with their words, and a thing whose set was not made can be left out.')
+
+
 def round_undo(store, user, run, outputs, quote):
-    """Done on a pass is undone until the next step used its result: pass 1 until a pick is saved, pass 2 until a sheet was made from the pictures."""
+    """Done on a pass is undone until the next step used its result: pass 1 until a pick is saved, pass 2 until a sheet was made from the pictures.
+    design/210 review: an older film's round only. A round that makes sets (the kept method) is never undone after Done: the sets are ordered and
+    paid at Done, the footage pictures approved and the starting pictures set, and nothing here takes those back."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
+    need(not (rd and rd.get('kept') and rd.get('pass') != 1), NO_UNDO)
     need(rd and rd.get('pass') in (2, 'complete'), 'Nothing to undo: the round is at pass 1 or has not started.')
     searches = session.get('searches') or {}
     own = [sid for r in rd['elements'].values() for sid in _sids(r)]
@@ -3571,7 +3578,7 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
     rd = session.get('round')
     need(rd and rd.get('pass') == 1, 'No reference round is waiting for its first pass.')
     open_ = sorted(eid for eid, d in (session.get('drawings') or {}).items() if d.get('status') in ('proposed', 'rejected') and eid in rd['elements'] and not (verdicts or {}).get(eid, {}).get('verdict') == 'ignore')
-    need(not open_, 'The reference drawings of ' + ', '.join(open_) + ' are not approved yet: the operator answers them first (`vw visuals next`), and a corrected set is sent again (`vw drawing set`). '
+    need(not open_, 'The reference drawings of ' + ', '.join(open_) + ' are not approved yet: the operator answers them first, on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown; and a corrected set is sent again (`vw drawing set`). '
                     'The sets are made with the approved drawings, so Done waits for them.')   # design/200
     quote = said(quote, 'Pass 1 done', user)   # design/99 C6: the click approves the frames
     verdicts = verdicts or {}
@@ -5345,7 +5352,7 @@ def render_drawn(conn, store, user, run, outputs, body):
     spec = shot.get('drawing_spec')
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves it in the chat, in its turn (`vw visuals next`), before the drawing is rendered.")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`), before the drawing is rendered.")
     fps = session['source']['fps']
     res = session['source'].get('resolution') or [1920, 1080]   # defect 33: a run stores [1920, 1080] (the master's summary), the fixtures '1920x1080'; both read, as defect 26 did
     W, H = (int(x) for x in (res if isinstance(res, (list, tuple)) else str(res).lower().split('x')))
@@ -5597,7 +5604,7 @@ def render_motion(conn, store, user, run, outputs, body):
     _no_question(session, shot['id'])   # design/110 rule 0
     if spec:
         need((session.get('spec_approvals') or {}).get(shot['id'], {}).get('digest') == spec_digest(spec),
-             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves it in the chat, in its turn (`vw visuals next`), before the drawing is rendered.")
+             f"the drawing spec of {shot['id']} is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`), before the drawing is rendered.")
     missing = motion.missing_labels(files, request['labels'])
     need(not missing, '; '.join(f'the project does not show the label "{l}" word for word' for l in missing) + ': fix the text in the project or the label in the plan.')
     lost = motion.missing_selectors(files, [c['selector'] for c in (shot.get('scene_motion') or {}).get('cues') or []])

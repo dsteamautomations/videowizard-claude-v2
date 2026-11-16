@@ -73,6 +73,12 @@
     "`vw visuals next` then shows the operator the labelled sheets",
     "The operator answers both steps in the chat, one at a time",
     "every element's set judged in the chat, one at a time",
-    "The operator can add their own picture (`vw visuals supply`)"
+    "The operator can add their own picture (`vw visuals supply`)",
+    "Done on step 1 is undone with `vw visuals round --undo`",
+    "`vw visuals select --gap G --choice C` for an offered choice",
+    "THE OPERATOR'S DECISIONS, ONE AT A TIME, IN THE CHAT",
+    "every line on one card, the Direction first",
+    "until the round is complete; ask nothing per element",
+    "the question shows on the item's card"
   ]
 }
