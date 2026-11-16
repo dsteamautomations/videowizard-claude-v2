@@ -175,6 +175,6 @@ def test_forty_gaps_fit_one_round_and_no_plan_yet_says_so():
 
 def test_the_treatment_page_is_untouched_by_the_plan_lines():
     import inspect
-    src = inspect.getsource(P.page)
+    src = inspect.getsource(P._page)   # design/210: `page` is `_page` with the pictures its lines name
     assert "_plan_page(" in src and "CF._treatment_items(ctx)" in src
-    assert copy.deepcopy(P.CAPABILITIES) == {'db': {'rules': [{'path': 'rounds', 'read': 'view', 'write': 'owner'}]}, 'user': {}}
+    assert copy.deepcopy(P.CAPABILITIES) == {'db': {'rules': [{'path': p, 'read': 'view', 'write': 'owner'} for p in ('rounds', 'pics', 'zoom')]}, 'assets': {}, 'user': {}}   # design/210: the pictures of a line, and the page's file store

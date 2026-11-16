@@ -6,9 +6,13 @@ the operator gave on the page, in one call, through the same decision functions 
 
 The server stays the record. The page is a form: an answer counts only when the operator says "done" in the chat and the assistant sends it here.
 An answer names the item it was given to; an item's id holds its text's digest, so an answer to an older text of a line is ignored by name."""
+import hashlib
 import json
 from collections import Counter
 from datetime import datetime, timezone
+from io import BytesIO
+
+from PIL import Image
 
 from . import chat_flow as CF
 from . import film as F
@@ -19,14 +23,87 @@ from .errors import Problem
 HOW = ('The operator answers this step on a page, not on a card. '
        '1. If `url` is empty, publish the page with the Artifact tool: `file_path` is `page_file`, the title is `title`, `capabilities` exactly as given, an icon of your choice; '
        'then run `vw visuals page --url "<the link it gives>"`. If there is no Artifact tool, or it fails, run `vw visuals next` and show the card instead, and say once that the page is not available. '
-       'If `republish` is true, the page at the link was published by an older tool: publish it again to the same link (the Artifact tool with `file_path` `page_file` and `url` the link), '
-       'then run `vw visuals page --url` with that link. '
-       '2. Write this round to the page with the ArtifactData tool: action "set", `url` the page\'s link, collection "rounds", doc_id `round`, file_path `round_file`. Type none of its content. '
-       '3. Say to the operator, as your own one line: "Open this page, answer each line, then tell me you are done:" and the link. Then wait. Do not post the lines in the chat as well. '
-       '4. When the operator says done: ArtifactData, action "list", collection `answers_collection`, out_dir `answers_dir`; then run `vw visuals page --record`. '
-       '5. It prints what was recorded and writes the next round: do step 2 again with the new `round` and `round_file`, then follow `then`. '
+       'If `republish` is true, the page at the link was published by an older tool: publish it again to the same link (the Artifact tool with `file_path` `page_file`, `url` the link '
+       'and `capabilities` again, exactly as given), then run `vw visuals page --url` with that link. '
+       '2. Send the pictures before the round, when there are any (design/210). For each batch in `picture_batches`: ArtifactData, action "batch", `url` the page\'s link, `writes` the batch, '
+       'unchanged. If a batch fails, send it once more; if it fails again, stop here, run `vw visuals next` and ask this step in the chat. Then for each list in `zoom_uploads`: the Artifact tool, '
+       'action "publish", `url` the page\'s link, `asset` true, `file_paths` the list; save its answer, exactly as it came, to `uploaded_file` with the Write tool, and run '
+       '`vw visuals page --uploaded "<that file>"`: it gives one more batch in `picture_batches`, sent the same way. If an upload fails, go on, and tell the operator that the large pictures '
+       'are not available on the page. '
+       '3. Write this round to the page with the ArtifactData tool: action "set", `url` the page\'s link, collection "rounds", doc_id `round`, file_path `round_file`. Type none of its content. '
+       '4. Say to the operator, as your own one line: "Open this page, answer each line, then tell me you are done:" and the link. Then wait. Do not post the lines in the chat as well. '
+       '5. When the operator says done: ArtifactData, action "list", collection `answers_collection`, out_dir `answers_dir`; then run `vw visuals page --record`. '
+       '6. It prints what was recorded and writes the next round: do steps 2 and 3 again with the new `round` and `round_file`, then follow `then`. '
        'An answer the operator gives in the chat instead is recorded with `vw visuals decide`, as before.')
-CAPABILITIES = {'db': {'rules': [{'path': 'rounds', 'read': 'view', 'write': 'owner'}]}, 'user': {}}   # only the page's owner writes: the lines and the answers
+CAPABILITIES = {'db': {'rules': [{'path': path, 'read': 'view', 'write': 'owner'} for path in ('rounds', 'pics', 'zoom')]}, 'assets': {}, 'user': {}}   # only the page's owner writes: the lines, the answers and the pictures (design/210: `pics` the small pictures, `zoom` the links of the large ones in the file store)
+
+
+# ---------- design/210 (SK, 16 Nov 2026): pictures on the page ----------
+# A line names its pictures: `pics`, a list of `pic(key, label)` in the order to show. `page` then lists once, under `pictures`, the two sizes
+# of every picture on the round's lines: a small one the page shows in a row and a large one it opens on a click. The tool fetches both by
+# their storage keys and the assistant sends them to the page.
+
+PIC_SIZES = {'thumb': ('.page-thumb.jpg', 360, 60), 'zoom': ('.page-zoom.jpg', 1600, 78)}   # per size: where it is stored beside the picture, its long side at most, its JPEG quality
+_MADE = set()   # ponytail: the sizes this process knows are stored, so a page with many pictures asks the storage once each; a shared record if servers multiply
+
+
+def pic_code(key):
+    """A picture's code on the page: the same for the same storage key in every round, so a picture is sent once."""
+    return 'p' + hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]
+
+
+def pic(key, label):
+    """One picture of a line: its code, the label shown under it and, until `page` answers, its storage key."""
+    return {'code': pic_code(key), 'label': str(label), '_key': key}
+
+
+def shrink(data, side, quality):
+    """A picture as a JPEG whose long side is at most `side`: shrunk in its own shape, never cropped, never enlarged; a see-through one on white."""
+    img = Image.open(BytesIO(data))
+    if img.mode not in ('RGB', 'L'):
+        img = img.convert('RGBA')
+        white = Image.new('RGB', img.size, 'white')
+        white.paste(img, mask=img.getchannel('A'))
+        img = white
+    img = img.convert('RGB')
+    img.thumbnail((side, side))
+    out = BytesIO()
+    img.save(out, 'JPEG', quality=quality, optimize=True)
+    return out.getvalue()
+
+
+def sized(store, key, which):
+    """The storage key of a picture's small (`thumb`) or large (`zoom`) size: made from the full picture once, stored beside it, reused after."""
+    suffix, side, quality = PIC_SIZES[which]
+    out = key + suffix
+    if out not in _MADE:
+        if not store.exists(out):
+            store.put(out, shrink(store.get(key), side, quality), 'image/jpeg')
+        _MADE.add(out)
+    return out
+
+
+def _with_pictures(store, page):
+    """The page's answer with `pictures`: for every picture code on its lines, once, the storage keys of its two sizes. A picture that cannot
+    be read or shrunk is marked `missing` on its line and named in `pictures_failed`; the rest of the page is built. A page with no picture
+    is left as it is."""
+    found, failed = {}, []   # ponytail: the sizes are made inside this call, once per picture; a job if a film's first page of many pictures takes too long
+    for line in page['lines']:
+        for p in line.get('pics') or []:
+            key = p.pop('_key', None)
+            if p['code'] not in found:
+                try:
+                    found[p['code']] = {'code': p['code'], 'thumb': sized(store, key, 'thumb'), 'zoom': sized(store, key, 'zoom')}
+                except Exception:   # a broken or half-written picture never fails the page
+                    found[p['code']] = None
+                    failed.append(f"{line.get('title') or line.get('key')}: {p['label']}")
+            if not found[p['code']]:
+                p['missing'] = True
+    if found:
+        page['pictures'] = [v for v in found.values() if v]
+    if failed:
+        page['pictures_failed'] = failed
+    return page
 
 
 def _title(item):
@@ -227,10 +304,84 @@ SPEC_REFUSED = ('The server refused an answer on the page; its reason is in `ref
                 'When the reason is about the answer (no words for a correction), tell the operator and give them the link again.')
 
 
-def _spec_answer(ctx, key, choice, words, item_id):
-    """One answer to a drawing's or a material's line, through the run function of the chat's own item: Yes approves it, Correct it sends it
-    back with the operator's words. None when the line is no longer open with that content (stale)."""
-    item = next((i for i in CF._waiting_items(ctx) if i['kind'] == 'spec' and i['id'] == item_id), None)
+DRAW_STEP = 'Reference drawings'
+DRAW_NEXT = 'Every reference drawing is approved. Go on with `vw visuals next`: it gives the next decision.'
+DRAW_BACK = ('No line waits for the operator now: redraw the things that are back with you (their words are on each), one thing at a time, and send each set again '
+             '(`vw drawing set --element E --file work/drawing/E/set.json`), then `vw visuals page`.')
+DRAW_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
+
+
+def _drawing_lines(ctx):
+    """design/210: the lines of the step after the drawings and materials: every thing's drawing set, while one waits for the operator or is back
+    with the assistant. An open line is the chat's own item (`chat_flow._drawing_items`: the same id, the same buttons) with every labelled
+    sheet as a picture, the facts with where each came from and the assumed sizes on one line; an approved set is `recorded` and keeps its
+    pictures and facts; one sent back is `with_assistant` with the operator's words. Empty when no set waits."""
+    rows = ctx['session'].get('drawings') or {}
+    if not any(r.get('status') in ('proposed', 'rejected') for r in rows.values()):
+        return []
+    items = {i['id']: i for i in CF._drawing_items(ctx)}
+    names = CF._names(ctx['plan'])
+    order = {e['id']: n for n, e in enumerate(ctx['plan'].get('elements') or [])}
+    lines = []
+    for eid, r in sorted(rows.items(), key=lambda row: order.get(row[0], len(order))):   # the things in the plan's order
+        head = {'key': f'drawing:{eid}', 'title': names.get(eid) or r.get('name') or eid}
+        if r.get('status') == 'rejected':
+            lines.append({**head, 'state': 'with_assistant', 'note': (r.get('verdict') or {}).get('notes') or ''})
+            continue
+        item = items.get(f"drawing:{eid}:{r['sha256'][:10]}")
+        if r.get('status') != 'approved' and not item:
+            continue
+        n = len(r['views'])
+        seen = {'pics': [pic(v['labelled_key'], v['name']) for v in r['views']],
+                'facts': [[str(f.get('what') or ''), f"{f.get('value', '')} {f.get('unit') or ''}".strip(), str(f.get('source') or '')] for f in r.get('facts') or [] if not f.get('assumed')],
+                'assumed': '; '.join(r.get('assumed') or [])}
+        seen = {k: v for k, v in seen.items() if v}
+        if item:
+            lines.append({**head, 'state': 'open', 'item': item['id'], 'ask': 'Is the shape and arrangement right?', **seen, 'buttons': _buttons(item),
+                          'text': f"{n} sheet{'' if n == 1 else 's'}. Each sheet says what it shows and what it is for. These drawings go to the picture AI as references, "
+                                  'so check them against what you know of the thing. Choose a picture to see it large.'})
+        else:
+            lines.append({**head, 'state': 'recorded', **seen})
+    return lines
+
+
+def _drawing_page(ctx, base, lines):
+    """The step's round: every thing on one round, so one "done" answers the step. Its pictures are not in the round (the page reads each by its
+    code); a round whose text is over the document's size first leaves out the facts of the recorded lines, then holds the later lines to
+    answer for the next "done", as the plan does."""
+    held = 0
+    while len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) > ROUND_BYTES:
+        read = next((l for l in reversed(lines) if l['state'] == 'recorded' and 'facts' in l), None)
+        open_ = [i for i, l in enumerate(lines) if l['state'] == 'open']
+        if read:
+            del read['facts']
+        elif len(open_) > 1:
+            del lines[open_[-1]]
+            held += 1
+        else:
+            break
+    refused = ctx['session'].get('page_refused') or {}
+    lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if line['key'] in refused and line['state'] == 'open' else {})} for n, line in enumerate(lines, 1)]
+    count = lambda state: len([l for l in lines if l['state'] == state])
+    left = count('open')
+    return {**base, 'step': DRAW_STEP, 'open': bool(left), 'lines': lines,
+            'summary': f"{len(lines)} thing{'' if len(lines) == 1 else 's'}: {left} to answer, {count('recorded')} recorded, {count('with_assistant')} with the assistant" + (f', {held} more after these' if held else '') + '.',
+            'note': f'This list is long: {held} more appear here after you answer these and say done in the chat.' if held else
+                    'Look at each picture, answer each line, then say done in the chat.' if left else 'The assistant is drawing again the things you sent back; they will appear here.'}
+
+
+def _plan_step(ctx):
+    """Which step the page is at once a plan is proposed, with its lines: 'plan' while a gap is open or back with the assistant; 'spec' (the
+    drawings and materials, design/209) until each is approved; then 'draw' (the reference drawings, design/210) while a drawing set waits."""
+    specs = _spec_lines(ctx)
+    draws = _drawing_lines(ctx) if not any(CF._plan_items(ctx)) and all(l['state'] == 'recorded' for l in specs) else []
+    return ('draw', draws) if draws else ('spec', specs) if specs else ('plan', [])
+
+
+def _spec_answer(ctx, key, choice, words, item_id, items=None):
+    """One answer to a drawing's or a material's line (or, with `items`, to a reference drawing's), through the run function of the chat's own
+    item: Yes approves it, Correct it sends it back with the operator's words. None when the line is no longer open with that content (stale)."""
+    item = next((i for i in (items if items is not None else [i for i in CF._waiting_items(ctx) if i['kind'] == 'spec']) if i['id'] == item_id), None)
     if not item:
         return None
     button = next((b for b in item['buttons'] if b['choice'] == choice), None)
@@ -269,6 +420,11 @@ def _plan_answer(ctx, key, choice, words, item_id):
 
 
 def page(conn, store, user, run, outputs):
+    """What the page shows now (`_page`), with the two sizes of every picture its lines name (design/210, `_with_pictures`)."""
+    return _with_pictures(store, _page(conn, store, user, run, outputs))
+
+
+def _page(conn, store, user, run, outputs):
     """What the page shows now, for the treatment and then for the plan (design/206, `_plan_page`): `lines` in the film's order, each `open` (with its rows or text and its buttons), `recorded`
     (accepted; `reopen` while the treatment is still a draft) or `with_assistant` (sent back, with the operator's words). A new `round` each call."""
     ctx = CF._ctx(conn, store, user, run, outputs)
@@ -276,8 +432,8 @@ def page(conn, store, user, run, outputs):
     stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
     base = {'step': 'Treatment', 'round': 'r' + stamp, 'how': HOW, 'capabilities': CAPABILITIES, 'title': f"VideoWizard decisions {run.get('code') or ''}".strip()}
     if _at_plan(ctx):
-        specs = _spec_lines(ctx)   # design/209: after the plan, the drawings and the materials
-        return _spec_page(ctx, base, specs) if specs else _plan_page(ctx, base)
+        step, lines = _plan_step(ctx)   # design/209: after the plan, the drawings and the materials; design/210: then the reference drawings
+        return _drawing_page(ctx, base, lines) if step == 'draw' else _spec_page(ctx, base, lines) if step == 'spec' else _plan_page(ctx, base)
     motion =_motion_line(run, draft)
     first = [motion] if motion else []
     if not draft:
@@ -325,9 +481,10 @@ def page_record(conn, store, user, run, outputs, answers):
     answers = [a for a in answers or [] if isinstance(a, dict)]
     answers.sort(key=lambda a: {'motion': 0, 'direction': 1, 'shared': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps
     recorded, stale, refused, dropped, tell = [], [], [], [], ''
-    relies, corrected = set(), False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
+    relies, corrected, was_draw = set(), False, False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
     try:
         first = CF._ctx(conn, store, user, run, outputs)
+        was_draw = _at_plan(first) and _plan_step(first)[0] == 'draw'   # design/210: this "done" was said on the reference drawings
         if _at_plan(first) and _spec_lines(first):
             relies = {v['key'] for v in CF._spec_views(first) if v['spec'].get('confirmed')}
             answers.sort(key=lambda a: str(a.get('choice') or '') == 'yes')   # the corrections first: a yes may rest on a size corrected in the same visit
@@ -341,11 +498,13 @@ def page_record(conn, store, user, run, outputs, answers):
         said = words
         try:
             if _at_plan(ctx):   # design/206: a plan line; design/209: after the plan, a drawing's or a material's line
-                at_spec = bool(_spec_lines(ctx))
+                step = _plan_step(ctx)[0]
+                at_spec = step == 'spec'
                 if at_spec and choice == 'yes' and corrected and key in relies:   # it rested on a size another line gave, and a line was corrected in this visit: asked again
                     stale.append(key)
                     continue
-                got = (_spec_answer if at_spec else _plan_answer)(ctx, key, choice, words, a.get('item'))
+                got = (_spec_answer(ctx, key, choice, words, a.get('item'), [i for i in CF._drawing_items(ctx) if i['id'].startswith('drawing:')]) if step == 'draw' else   # design/210: a thing's drawing set
+                       (_spec_answer if at_spec else _plan_answer)(ctx, key, choice, words, a.get('item')))
                 corrected = corrected or (at_spec and bool(got) and choice != 'yes')
                 if not got:
                     stale.append(key)
@@ -391,9 +550,10 @@ def page_record(conn, store, user, run, outputs, answers):
     left = len([l for l in now['lines'] if l['state'] == 'open'])
     draft = session.get('treatment_draft') or {}
     alone_accepted = bool(draft.get('direction_only')) and (draft.get('lines') or {}).get('direction', {}).get('state') == 'accepted'
-    at_plan, at_spec = now['step'] == 'Plan', now['step'] == SPEC_STEP
-    then = ('Nothing was answered on the page. ' if not answers else '') + (SPEC_REFUSED + ' ' if at_spec and refused else '') + (
-        f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec) and left else
+    at_plan, at_spec, at_draw = now['step'] == 'Plan', now['step'] == SPEC_STEP, now['step'] == DRAW_STEP
+    then = ('Nothing was answered on the page. ' if not answers else '') + (SPEC_REFUSED + ' ' if at_spec and refused else DRAW_REFUSED + ' ' if at_draw and refused else '') + (
+        f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec or at_draw) and left else
+        DRAW_BACK if at_draw else DRAW_NEXT if was_draw else
         SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else SPEC_NEXT if at_spec else
         PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else PLAN_NEXT if at_plan else
         'The treatment is recorded: write the plan to it.' if session.get('treatment') and not draft else

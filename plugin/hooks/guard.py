@@ -163,6 +163,16 @@ def decide(tool, inp, cwd, vw):
         action = str(inp.get('action') or 'publish')
         if action == 'open':
             return None
+        if action == 'publish' and inp.get('asset') is True:   # design/210: the run's large pictures, uploaded to the page's file store, and nothing else
+            run = active_run(cwd)
+            paths = inp.get('file_paths') if 'file_paths' in inp else [inp.get('file_path')]
+            zoom = run / 'work' / 'page' / 'zoom' if run else None
+            inside = lambda raw: isinstance(raw, str) and raw and zoom in (Path(raw).expanduser() if Path(raw).expanduser().is_absolute() else cwd / raw).resolve().parents
+            if (zoom and inp.get('url') and isinstance(paths, list) and paths and all(inside(x) for x in paths)
+                    and not (inp.get('files') or inp.get('type_url') or inp.get('from_url') or inp.get('asset_ids'))):
+                return None
+            return (f"Blocked: only the large pictures of the active run (files inside its work/page/zoom/ folder) are uploaded, to the run's decisions page (`url`), "
+                    'as `vw visuals page` lists them.')
         if action != 'publish' or inp.get('asset') or inp.get('files') or inp.get('type_url'):
             return f"Blocked: the operator assistant publishes only the plugin's decisions page ({page}), as `vw visuals page` says."
         target = Path(str(inp.get('file_path') or '')).expanduser()
@@ -173,6 +183,13 @@ def decide(tool, inp, cwd, vw):
         if allowed is None:
             return 'Blocked: no active run; the decisions page belongs to a run.'
         action = str(inp.get('action') or '')
+        if action == 'batch':   # design/210: the pictures of a round, each written from its file in the run folder to the page's two picture collections
+            writes = inp.get('writes')
+            ok = isinstance(writes, list) and writes and all(
+                isinstance(w, dict) and w.get('op') == 'set' and w.get('collection') in ('pics', 'zoom') and 'data' not in w and isinstance(w.get('file_path'), str) and w['file_path']
+                and allowed in (Path(w['file_path']).expanduser() if Path(w['file_path']).expanduser().is_absolute() else cwd / w['file_path']).resolve().parents for w in writes)
+            return None if ok else ('Blocked: a batch only writes picture files to the page: every entry is `op` "set", collection "pics" or "zoom", with a `file_path` '
+                                    f'inside {allowed} and no typed `data`, as `vw visuals page` gives them.')
         if action not in ('set', 'list', 'get'):
             return 'Blocked: the page is written one round at a time (set, from the round file) and its answers are read (list). Nothing else.'
         if action == 'set' and (not inp.get('file_path') or inp.get('data')):
