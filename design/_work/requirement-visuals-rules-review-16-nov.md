@@ -394,3 +394,19 @@ Assumptions: AI video shots of 5 s, one take each in the estimate; stills of 4 s
 - The other findings of the eight-stage odd-rules review (taken up separately, as you said).
 - The reference steps on the artifact page (your first question there is still open).
 - Nothing here was run against a real plan. The VW-24 explanations (the water, the four rounds) are read from the code, not from that run's log.
+
+---
+
+## Decisions settled by SK on 16 Nov 2026 (approval to build: "i agree with all your recommendations. go ahead")
+
+| # | Settled as |
+|---|---|
+| D1 | Each person is one of two kinds. **Own likeness:** the operator gives a photo and answers once, with a recorded yes, that they have the person's permission; the sheet is made from the photo. **Stand-in:** no photo; the AI makes the person from the description. If the picture model refuses the photo, the operator can give another photo at once or switch the person to a stand-in. A real, named person shown as a stand-in gives the operator one plain line, not a refusal |
+| D2 | A footage reuse no longer waits for the operator's approval. The assistant's reason stays on record; the other checks stay. "60 s apart" becomes 60 s or a quarter of the film, whichever is shorter |
+| D3 | Every named person gets a character sheet, up to ten named people in a scene (SK: "keep it as professional as possible") |
+| D4 | A living extra (dog, cat, bird) is carried by words (exact kind and size): no sheet, nothing to approve |
+| D5 | No trial and no second way. SK corrected the analysis: the guide is drawn in Blender, which can move anything. The gap is the scene description, which gives a path to a person only. Change: a thing may travel along a timed path, as a person does |
+| D6 | Cost limit: ₹750 a minute of film, lowest ₹1,500; the owner can set another figure for one film |
+| D7 | The three framing warnings go to the assistant only |
+
+This build is design/207.
