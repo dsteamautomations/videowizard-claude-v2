@@ -24,7 +24,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-16T05:12:16.190544+00:00",
+   "at": "2026-11-16T06:15:35.649635+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -193,12 +193,12 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-16T05:12:16.192559+00:00",
+   "at": "2026-11-16T06:15:35.649635+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
      "corrections": [],
-     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
+     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. This film keeps the older limit. Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -238,7 +238,7 @@
     },
     "E2": {
      "corrections": [],
-     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
+     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. This film keeps the older limit. Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -260,7 +260,7 @@
     },
     "P1": {
      "corrections": [],
-     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
+     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. This film keeps the older limit. Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -444,7 +444,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-16T05:12:16.192559+00:00",
+     "at": "2026-11-16T06:15:35.649635+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

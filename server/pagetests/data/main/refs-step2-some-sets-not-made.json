@@ -24,7 +24,7 @@
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-16T05:12:15.173088+00:00",
+   "at": "2026-11-16T06:15:35.265979+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
@@ -193,12 +193,12 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-16T05:12:15.173088+00:00",
+   "at": "2026-11-16T06:15:35.265979+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
      "corrections": [],
-     "error": "the material spec of BRICK is not approved, or changed since: approve it on the References step (or `vw visuals spec --element BRICK`) before a picture shows it.",
+     "error": "the material spec of BRICK is not approved, or changed since: the operator approves it first (`vw visuals spec --element BRICK`), before a picture shows it.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -243,7 +243,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-16T05:12:15.179599+00:00",
+      "at": "2026-11-16T06:15:35.271077+00:00",
       "photo": null,
       "specs": {}
      },
@@ -266,7 +266,7 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-16T05:12:15.181610+00:00",
+      "at": "2026-11-16T06:15:35.272089+00:00",
       "photo": null,
       "specs": {}
      },
@@ -556,7 +556,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-16T05:12:15.173088+00:00",
+     "at": "2026-11-16T06:15:35.265979+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

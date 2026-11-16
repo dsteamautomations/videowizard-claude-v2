@@ -116,8 +116,8 @@ def gaps_source(store, outputs):
 # ---------- direction ----------
 
 def prepare(conn, store, user, run, outputs):
-    new = not store.exists(key(run, 'session.json'))
     session = session_of(store, run, outputs, create=True)
+    new = not session.get('updated_at') and not session.get('cap_inr') and not session.get('cap_from')   # never saved (save_session stamps it) and no limit yet: read from the session itself, never from a second storage call that may fail
     if new or session.get('cap_from') == 'length':   # design/207: a new film's limit follows its length and only ever rises with it; a film in progress and the owner's figure are left alone
         session.update(cap_inr=max(float(session.get('cap_inr') or 0), cap_for(film_seconds(session, outputs))), cap_from='length')
     mark_kept(session, run)   # design/151 hotfix: the kept decision from the first step
@@ -315,7 +315,7 @@ def _counted_shots(gap):
     """The shots of a gap the film counts: its scenes, or those of the recommended way (else the first), as routes() counts them."""
     scenes = gap.get('scenes') or []
     if gap.get('choices'):
-        scenes = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])['scenes']
+        scenes = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0]).get('scenes') or []
     return [sh for sc in scenes for sh in sc['shots']]
 
 
@@ -333,16 +333,32 @@ def _ways_departed(session, plan):
     return out
 
 
+def stand_in_shots(session, plan):
+    """design/207 (D1): {shot id: [names]}: the first counted shot that shows each real, named person (`speaker`) as a stand-in: no permission is
+    recorded for them and the shot is not their own footage. Read from the session as it stands now, so the line goes once the permission is recorded."""
+    real = {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or [] if e.get('kind') == 'person' and e.get('speaker') and not likeness_of(session, e['id'])}
+    out, told = {}, set()
+    for gap in plan.get('gaps') or []:
+        for sh in _counted_shots(gap):
+            for eid in sh.get('element_ids') or []:
+                if eid in real and eid not in told and sh['visual_type'] != 'footage':   # their own footage is them, not a stand-in
+                    told.add(eid)
+                    out.setdefault(sh['id'], []).append(real[eid])
+    return out
+
+
 def carried_warnings(session, run, plan, outputs):
     """design/207: what the treatment settled, carried to the plan. Warnings, never refusals, the same from the check and the proposal:
     a gap with more still seconds than the operator accepted for it (half a second of tolerance; seconds whose way the treatment never told
     are not guessed as moving); still pictures over their share of the film, on the first gap that has one; a card of words in a documentary
-    or an explaining film; a real speaker made by the AI from words while no permission for their own likeness is recorded."""
+    or an explaining film (never on a film with no category recorded); a real speaker made by the AI from words while no permission for their
+    own likeness is recorded; on a film whose reference round compares people, every pair of people whose descriptions read alike, in one
+    technical warning (`people_alike`), before the round refuses them pair by pair. A gap the treatment gave as footage may show a frame as a still."""
     fps = float(Fraction(str(session['source'].get('fps') or 25)))
     agreed = {e.get('gap_id'): e for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
-    real = {e['id']: e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e.get('speaker') and e['id'] not in (session.get('likeness') or {})}
-    words_spoken = film.category(run) == 'documentary-explainer'   # a film with no category gets no warning
-    out, pictures, first, told = [], 0.0, None, set()
+    words_spoken = not film.older(run) and film.category(run) == 'documentary-explainer'   # a film with no category recorded (an older film too) gets no warning
+    stand_ins = stand_in_shots(session, plan)
+    out, pictures, first = [], 0.0, None
     for gap in plan['gaps']:
         shots = _counted_shots(gap)
         secs = lambda sh: (sh['end_frame'] - sh['start_frame']) / fps
@@ -351,7 +367,7 @@ def carried_warnings(session, run, plan, outputs):
             still, _moving, unsplit = still_and_moving(agreed[gap['gap_id']], list(agreed[gap['gap_id']].get('routes') or []))
         except (KeyError, IndexError, TypeError, ValueError):
             still = unsplit = None   # no treatment entry for this gap, or one that cannot be read: nothing to compare
-        if still is not None and planned > still + unsplit + 0.5:
+        if still is not None and 'footage' not in (agreed[gap['gap_id']].get('routes') or []) and planned > still + unsplit + 0.5:   # a frame of the footage shown in the film is a still in the plan (_ways_departed allows it)
             out.append({'kind': 'still_more_than_agreed', 'gap_id': gap['gap_id'],
                         'message': f"gap {gap['gap_id']}: the plan has {round(planned, 1):g} s of still pictures; {round(still, 1):g} s were accepted in the treatment. "
                                    'Make some of them moving shots, or record the treatment again.'})
@@ -362,12 +378,15 @@ def carried_warnings(session, run, plan, outputs):
                 out.append({'kind': 'text_card', 'shot_id': sh['id'],
                             'message': f"shot {sh['id']} is a card of words. In a documentary or an explaining film the words are said by the voice and the picture shows the thing: "
                                        'plan a picture here, or say why the card is needed.'})
-            for eid in sh.get('element_ids') or []:
-                if eid in real and eid not in told and sh['visual_type'] != 'footage':   # their own footage is them, not a stand-in
-                    told.add(eid)
-                    out.append({'kind': 'stand_in_real', 'shot_id': sh['id'],
-                                'message': f"shot {sh['id']} shows {real[eid].get('name') or eid}, a real person, as a stand-in: the picture is made from the description, not from their own photo. "
-                                           'To show them as they are, the operator gives a photo and records their permission.'})
+            for name in stand_ins.get(sh['id']) or []:
+                out.append({'kind': 'stand_in_real', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']} shows {name}, a real person, as a stand-in: the picture is made from the description, not from their own photo. "
+                                       'To show them as they are, the operator gives a photo and records their permission.'})
+    alike = alike_people(plan) if is_kept(session, run) else []   # the reference round of such a film refuses them, one pair at a time: here they are named together, before it
+    if alike:
+        out.append({'kind': 'people_alike',
+                    'message': 'These people read alike in their descriptions (age, build, hair, face): ' + '; '.join(f'{a} and {b}' for a, b in alike) + '. The reference round refuses people who cannot be told apart. '
+                               "Write each person's age, build, hair and face in their `description`, so that every pair differs in at least one."})
     length, limit = film_seconds(session, outputs), float(settings().VISUALS_STILL_SHARE)
     if length and first and pictures / length > limit + 1e-9:   # the treatment's own warning and sentence, worked out again from the plan
         out.append({'kind': 'stills_many', 'gap_id': first,
@@ -725,7 +744,7 @@ def film_seconds(session, outputs):
 def set_cap(conn, store, user, run, outputs, inr, quote):
     """design/207: the owner sets another cost limit for this one film, with their words. A later `prepare` never changes it."""
     if (user or {}).get('role') != 'Admin':
-        raise Problem(403, 'NOT_ALLOWED', 'Only the owner can set the cost limit of a film.')
+        raise Problem(403, 'NOT_ALLOWED', "Only the owner can set the cost limit of a film, from their own sign-in. This sign-in is not the owner's: tell the operator to ask the owner.")
     quote = ' '.join(str(quote or '').split())
     need(quote, "The owner's words are needed to set the cost limit: `vw visuals cap --inr N --quote \"<the owner's words>\"`.")
     need(isinstance(inr, (int, float)) and not isinstance(inr, bool) and inr > 0, 'The cost limit is a number of rupees above zero.')
@@ -749,8 +768,9 @@ def check_cap(conn, run, session, estimate_inr, what):
     """Before any paid call: refuse when the spend so far plus this call would pass the film's cap."""
     spent, cap = visuals_spend(conn, run)['spent_inr'], cap_of(session)
     if spent + float(estimate_inr) > cap + 1e-9:
+        how = {'length': "The limit follows the film's length. ", 'owner': 'The owner set this limit. '}.get(session.get('cap_from'), 'This film keeps the older limit. ')
         raise Problem(409, 'VISUALS_CAP', f"₹{spent:,.0f} spent of ₹{cap:,.0f} on this film's visuals; {what} needs about ₹{float(estimate_inr):,.0f}. "
-                                          "Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
+                                          "Stop and tell the operator the spend. " + how + "Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.",
                       spent_inr=spent, cap_inr=cap, estimate_inr=float(estimate_inr))
 
 
@@ -1199,7 +1219,7 @@ def page_view(conn, store, run, outputs, code, repair=True):
         if plan:
             gap = next((x for x in plan['gaps'] if x['gap_id'] == gid), None)
             if gap:
-                entry['warnings'] = plain_warnings(session, gap)   # design/124 Change 8
+                entry['warnings'] = plain_warnings(session, gap, plan)   # design/124 Change 8
                 if gap.get('choices'):
                     entry['choices'] = {'options': [{'id': c['id'], 'title': c['title'], 'why': c['why']} for c in gap['choices']], 'recommended': gap.get('recommended_choice'),
                                         'selected': (session['choice_selections'].get(gid) or {}).get('choice_id')}
@@ -1279,14 +1299,31 @@ def facts_line(plan, shot):
     return ' · '.join(parts)
 
 
-def plain_warnings(session, gap):
-    """design/124 Change 8: the current plan's warnings on this gap that the operator sees, in plain words, with the assistant's answer."""
-    version = next((v for v in reversed(session['versions']) if v.get('plan_digest') == session.get('current')), None)
-    scenes = all_scenes(gap)
-    shots, scene_ids = {sh['id'] for sc in scenes for sh in sc['shots']}, {sc['id'] for sc in scenes}
-    return [{'kind': w['kind'], **({'shot_id': w['shot_id']} if w.get('shot_id') else {}), 'plain': WARNING_PLAIN[w['kind']], **({'answer': w['answer']} if w.get('answer') else {})}
-            for w in (version or {}).get('warnings') or [] if w.get('kind') in WARNING_PLAIN
-            and (w.get('shot_id') in shots or w.get('scene_id') in scene_ids or (w.get('gap_id') == gap['gap_id'] and not w.get('shot_id')))]
+def _every_scene(gap):
+    """all_scenes, for a line shown to the operator: a way with no scenes written yet gives none, never an error."""
+    return [sc for c in gap.get('choices') or [] for sc in c.get('scenes') or []] or gap.get('scenes') or []
+
+
+def plain_warnings(session, gap, plan=None):
+    """design/124 Change 8: the current plan's warnings on this gap that the operator sees, in plain words, with the assistant's answer.
+    design/207: with the plan, the stand-in line is worked out now, not read from the stored proposal: it goes once the permission is recorded."""
+    version = next((v for v in reversed(session.get('versions') or []) if v.get('plan_digest') == session.get('current')), None)
+    scenes = _every_scene(gap)
+    shots, scene_ids = {sh['id'] for sc in scenes for sh in sc['shots']}, {sc['id'] for sc in scenes if sc.get('id')}
+    stored =[w for w in (version or {}).get('warnings') or [] if w.get('kind') in WARNING_PLAIN
+              and (w.get('shot_id') in shots or w.get('scene_id') in scene_ids or (w.get('gap_id') == gap['gap_id'] and not w.get('shot_id')))]
+    if plan:
+        answers = {w['shot_id']: w.get('answer') for w in stored if w['kind'] == 'stand_in_real'}
+        stored = [w for w in stored if w['kind'] != 'stand_in_real'] + [
+            {'kind': 'stand_in_real', 'shot_id': sid, **({'answer': answers[sid]} if answers.get(sid) else {})} for sid in stand_in_shots(session, plan) if sid in shots]
+    return [{'kind': w['kind'], **({'shot_id': w['shot_id']} if w.get('shot_id') else {}), 'plain': WARNING_PLAIN[w['kind']], **({'answer': w['answer']} if w.get('answer') else {})} for w in stored]
+
+
+def warning_lines(session, gap, plan):
+    """design/207: the plain sentences of a gap as the operator reads them on the plan page and in the chat, each once; a shot's sentence is led by
+    the shot's title. From the same function the server's page uses (one flow, two front ends)."""
+    titles = {sh['id']: sh.get('title') or sh['id'] for sc in _every_scene(gap) for sh in sc['shots']}
+    return list(dict.fromkeys((f"{titles[w['shot_id']]}: " if w.get('shot_id') in titles else '') + w['plain'] for w in plain_warnings(session, gap, plan)))
 
 
 # ---------- design/65 B2': the graphic sequence ----------
@@ -1951,13 +1988,17 @@ def traits(text):
     return frozenset(name for name, rx in TRAIT_WORDS if re.search(rx, text, re.I))
 
 
-def distinct_people(plan):
-    """design/151 part 2: every pair of people differs on at least one compared trait, side workers included; alike pairs are refused by name before any payment."""
+def alike_people(plan):
+    """Every pair of people whose descriptions carry the same compared traits (age band, build, hair, face), as (id, id), in the plan's order."""
     people = [e for e in plan.get('elements') or [] if e.get('kind') == 'person']
-    for i, a in enumerate(people):
-        for b in people[i + 1:]:
-            need(traits(a.get('description')) != traits(b.get('description')),
-                 f"{a['id']} and {b['id']} are alike on every compared trait (age, build, hair, face): change one description so they can be told apart, side workers included.")
+    return [(a['id'], b['id']) for i, a in enumerate(people) for b in people[i + 1:] if traits(a.get('description')) == traits(b.get('description'))]
+
+
+def distinct_people(plan):
+    """design/151 part 2: every pair of people differs on at least one compared trait, whoever they are in the film; an alike pair is refused by name
+    before any payment. design/207: the plan check names every such pair together first (carried_warnings, `people_alike`)."""
+    for a, b in alike_people(plan)[:1]:
+        need(False, f"{a} and {b} are alike on every compared trait (age, build, hair, face): change one description so they can be told apart; this holds for every person of the film.")
 
 
 def _place_look(plan):
@@ -2018,11 +2059,16 @@ def person_prompt(plan, run, element, why='', photo=False):
     return '\n'.join(lines)
 
 
-def with_faces(session, parents, people):
+def with_faces(session, parents, people, room=None, faces=None):
     """design/151 Q3: a person's full-length front (picture 1 of the set, the golden) brings the face close-up (picture 3) into a shot's prompt by default;
-    the other poses go in by name. Returns the parents and the job lines of the pictures added."""
+    the other poses go in by name. Returns the parents and the job lines of the pictures added. room, faces: how many more pictures the picture
+    service takes in all, and of people (None: no limit). A face beyond either is left out: the person's full-length picture and written description
+    carry them, and no line says a picture is attached when it is not."""
     parents, lines = list(parents), []
+    limit = min((n for n in (room, faces) if n is not None), default=None)
     for p in list(parents):
+        if limit is not None and len(lines) >= limit:
+            break
         if p and p.get('kind') == 'sheet' and p.get('set') and int(p.get('set_n') or 1) == 1 and p.get('element_id') in people:
             face = session['references'].get(f"{p['set']}-3")
             if face and face.get('status') == 'approved' and all(q['id'] != face['id'] for q in parents if q):
@@ -2452,14 +2498,32 @@ def own_picture_refused(kind, session=None, element_id=None):
     if kind != 'person' or likeness_of(session, element_id):
         return None
     return ("A person's own photo is used only with their permission. Ask the operator; when they say they have it, record their words: "
-            f'`vw visuals likeness --element {element_id} --quote "<their words>"` (on the page: the permission line on the person\'s card). Then give the photo again. '
+            f'`vw visuals likeness --element {element_id} --quote "<their words>"`. Then give the photo again. '
             'Without it the person is a stand-in, made from the description.')
+
+
+def person_picture_refused(session, people, row):
+    """design/124 decision 5, design/207 (D1): the one test, for every door to the picture AI (a picture's parents, the pictures an end image
+    inherits from its start, a guide's still and its look). Why this picture is not sent, or None: a web picture of a person never; a footage
+    frame or the operator's own photo of a person only with the recorded permission. people: {person element id: name}."""
+    if not (row and row.get('kind') in ('frame', 'web', 'supplied') and row.get('element_id') in people and (row['kind'] == 'web' or not likeness_of(session, row['element_id']))):
+        return None
+    what = {'frame': 'a footage frame', 'web': 'a web picture', 'supplied': "the operator's own picture"}[row['kind']]
+    return (f"{row['id']} is {what} of {people[row['element_id']]} ({row['element_id']}), a person: " + (
+        'a picture of a person from the web is never sent to the picture AI.' if row['kind'] == 'web' else
+        f"a picture of a real person goes to the picture AI only with their permission, recorded in the operator's words (`vw visuals likeness --element {row['element_id']} --quote \"<their words>\"`).")
+        + " Leave it out; without the permission the person's sheet is written from the description (build, age, posture, garments, hair).")
+
+
+def people_of(plan):
+    return {e['id']: e.get('name') or e['id'] for e in plan.get('elements') or [] if e.get('kind') == 'person'}
 
 
 def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=False):
     """design/207 (D1): the operator's yes, once per person, in their own words: they have this person's permission to make AI pictures of them. With it the
     person's own photo (or footage frame) is the source of their sheet. stand_in: the record is removed; the person is made from the description again and a
-    sheet made from the photo is out of date (_spec_changed). One run-log line either way, with the words."""
+    set made from the photo is rejected (its golden picture with it; a complete round is open again for this person). One run-log line either way, with
+    the words; a stand-in asked for a person who has no record changes nothing and logs nothing."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     element = next((e for e in plan['elements'] if e['id'] == element_id), None)
@@ -2467,11 +2531,24 @@ def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=F
     need(element.get('kind') == 'person', f"{element_id} is a {element.get('kind')}: the permission is recorded for a person only.")
     quote = ' '.join(str(quote or '').split())
     need(quote, "Give the operator's own words (--quote): " + ('why this person is a stand-in now.' if stand_in else "their yes that they have this person's permission to make AI pictures of them."))
+    if stand_in and not likeness_of(session, element_id):   # nothing to remove: no record, no log line
+        return {'element_id': element_id, 'likeness': False, 'next': f'{element_id} is already a stand-in: no permission is recorded for this person. Nothing was changed.'}
     name = element.get('name') or element_id
     if stand_in:
         (session.get('likeness') or {}).pop(element_id, None)
         if (session['references'].get(golden_of(session, element_id) or '') or {}).get('kind') in ('supplied', 'frame'):   # the photo is no longer the starting picture
             session['golden'].pop(element_id)
+        rd = session.get('round') or {}
+        row = (rd.get('elements') or {}).get(element_id) or {}
+        if rd.get('kept') and (row.get('made') or {}).get('photo'):   # the set made from the photo is no longer in use: rejected, its golden picture gone, the round open again for this person
+            stamp = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'notes': 'the permission was removed after this set was made from the photo; the set is made again from the description'}
+            for r in _set_rows(session, element_id, row.get('set'), ('candidate', 'approved')):
+                r.update(status='rejected', rejection=stamp)
+                if golden_of(session, element_id) == r['id']:
+                    session['golden'].pop(element_id)
+            row.pop('answer', None)
+            if rd.get('pass') == 'complete':
+                rd['pass'] = 2
         if not kept(session):   # an older film: its sheet made from a picture is marked as design/110 marks it
             for r in session['references'].values():
                 if r.get('kind') == 'sheet' and r.get('element_id') == element_id and r.get('status') != 'rejected' and (r.get('generation') or {}).get('parents'):
@@ -2485,7 +2562,7 @@ def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=F
                             'entry': f'{name} is a stand-in, made from the description; the permission record is removed' if stand_in else f"the operator has {name}'s permission to make AI pictures of them",
                             'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': quote, 'request_id': None})
     return {'element_id': element_id, 'likeness': not stand_in,
-            'next': (f'{element_id} is a stand-in again: the sheet is made from the description. A sheet made from the photo is out of date: make it again (`vw visuals round --make {element_id}`).' if stand_in else
+            'next': (f'{element_id} is a stand-in again: the sheet is made from the description. A sheet made from the photo is no longer used: make it again (`vw visuals round --make {element_id}`).' if stand_in else
                      f"The permission is recorded for {element_id}. Give the person's photo (`vw visuals own --element {element_id} --file <photo>`); their sheet is made from it.")}
 
 
@@ -2788,6 +2865,8 @@ def add_reference(conn, store, user, run, outputs, body, content):
     plan = guarded(lambda: current_plan(store, session))
     element = next((e for e in plan['elements'] if e['id'] == body['element_id']), None)
     need(element, 'Reference must identify an element in the current plan.')
+    refused = own_picture_refused(element.get('kind'), session, body['element_id']) if body['kind'] == 'supplied' else None   # design/207 (D1): a person's photo, by this door too
+    need(not refused, refused)
     ref_id = digest({'run': str(run['id']), 'request': body['request_id']})[:32]
     if ref_id in session['references']:
         return session['references'][ref_id]
@@ -3090,7 +3169,8 @@ def round_start(store, user, run, outputs, elements, conn=None):
             prompt = ' '.join(str((row or {}).get('prompt') or '').split())
             need(prompt, f'{eid}: give its prompt (the subject block of a thing: what the picture must represent; the why line of a person).')
             rows[eid].update(prompt=prompt, corrections=[], set=None, round=0)
-    missing = [eid for eid, k in kinds.items() if k == 'person' and eid not in rows] if kept_ else []   # design/207 (D3)
+    made = {eid for gap in plan['gaps'] for sc in all_scenes(gap) for sh in sc['shots'] if sh.get('visual_type') != 'footage' for eid in sh.get('element_ids') or []}
+    missing = [eid for eid, k in kinds.items() if k == 'person' and eid not in rows and eid in made] if kept_ else []   # design/207 (D3): every person a picture is made of; one seen only in their own footage needs none
     need(not missing, f"Every person gets a character sheet: add a row for {', '.join(missing)} (element_id and the why line; no picture is needed, the sheet is made from the description).")
     session['round'] = {'pass': 1, 'at': datetime.now(timezone.utc).isoformat(), 'by': user['id'], 'elements': rows, 'quote': None, **({'kept': True} if kept_ else {})}
     save_session(store, run, session)
@@ -3245,6 +3325,8 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
         rows = _set_rows(session, eid, r.get('set'))
         if v['verdict'] == 'yes':
             need(rows, f"{eid}: its set did not come back ({r.get('error') or 'no picture'}); say no or correct it to make it again.")
+            need(not (kinds.get(eid) == 'person' and (r.get('made') or {}).get('photo') and not likeness_of(session, eid)),   # design/207 (D1): for the page and the chat alike
+                 f"{eid}: this set was made from the person's photo and the permission is no longer recorded: it cannot be approved. Make it again (`vw visuals round --make {eid}`); it is then made from the description.")
             if kinds.get(eid) != 'person':
                 need(v.get('golden'), f'{eid}: tick the golden picture of its set, the one every shot of {eid} starts from.')
             if v.get('golden') and (kinds.get(eid) != 'person' or (session['references'].get(v['golden']) or {}).get('kind') == 'supplied'):   # U19: or the operator's own picture of this element
@@ -3409,10 +3491,12 @@ def set_make(conn, store, user, run, outputs, element_id):
     """R17: one set that was not made (refused before the call, or it did not come back) is made now; also a set whose spec changed after it was made
     (E14). Refused in plain words while its cause stands; a set already being made is left alone."""
     session = session_of(store, run, outputs)
-    row = _round_row(session, element_id, (2, 'making'))
+    row = _round_row(session, element_id, (2, 'making', 'complete'))
     if _set_rows(session, element_id, row.get('set'), ('generating',)):
         return {'element_id': element_id, 'queued': False, 'next': f'{element_id}: its set is already being made.'}
     plan = guarded(lambda: current_plan(store, session))
+    need(session['round']['pass'] != 'complete' or _photo_changed(session, plan, element_id, row),   # design/207 (D1): a complete round opens again only for a person whose photo or permission changed
+         'The reference round is not at the step where its sets are made: there is nothing to make now.')
     old = [x['id'] for x in _set_rows(session, element_id, row.get('set'), ('candidate', 'approved'))]
     need(not old or _spec_changed(session, plan, element_id, row), f'{element_id} has its set: judge it (Yes, No or Correct it).')
     cause = set_cause(session, plan, element_id, _set_budget(run, session, visuals_spend(conn, run)))
@@ -3579,7 +3663,7 @@ def _set_state(session, plan, step, eid, row, budget):
     cause that stands now (R12, R18) or the word that it is settled."""
     answer, discarded = _answer_of(row)
     out = {'answer': answer, **({'answer_discarded': True} if discarded else {})}
-    if not plan or step not in (1, 2, 'making') or row.get('ignored') or row.get('from_footage'):
+    if not plan or row.get('ignored') or row.get('from_footage') or (step not in (1, 2, 'making') and not (step == 'complete' and _photo_changed(session, plan, eid, row))):   # design/207 (D1): a complete round still says that a person's photo or permission changed
         return out
     kind = next((e.get('kind') for e in plan.get('elements') or [] if e['id'] == eid), None)
     frames = row.get('frames') or [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
@@ -3595,7 +3679,7 @@ def _set_state(session, plan, step, eid, row, budget):
     mark = {**({'spec_changed': True} if changed else {}), **({'photo_changed': True} if changed and _photo_changed(session, plan, eid, row) else {})}   # design/207 (D1): the page says which
     if not error and failed and not cause:   # F4: the call itself failed; its reason is on the set's picture, said in one plain sentence
         problem = _fail_words(failed[-1].get('error'))
-        if problem == 'The picture service refused the request.' and (row.get('made') or {}).get('photo') and row['made']['photo'] == likeness_photo(session, eid):   # design/207 (D1): the person's photo, the one that still stands, was refused
+        if problem in ('The picture service refused the request.', 'The model returned no picture.') and (row.get('made') or {}).get('photo') and row['made']['photo'] == likeness_photo(session, eid):   # design/207 (D1): the person's photo, the one that still stands, was refused
             return {**out, 'cause': None, 'settled': None, 'problem': problem + ' ' + LIKENESS_REFUSED, **mark,
                     'next': f"The picture service refused the photo of {eid}. Ask the operator: give another photo (`vw visuals own --element {eid} --file <photo>`), or make the person a stand-in "
                             f'(`vw visuals likeness --element {eid} --stand-in --quote "<their words>"`); then make the sheet again (`vw visuals round --make {eid}`).'}
@@ -3676,14 +3760,9 @@ def generate_image(conn, store, user, run, outputs, body):
         if p and p.get('status') == 'rejected':
             need(False, f"{p['id']} was rejected: it is never a parent; " + ('make the next state from the last approved state.' if body['kind'] == 'state' else
                                                                               'start from an approved picture (an end image from its approved start).'))   # design/124 A4 item 12
-    people = {e['id']: e.get('name') or e['id'] for e in plan['elements'] if e.get('kind') == 'person'}
+    people = people_of(plan)
     for p in parents:   # design/124 decision 5, design/207 (D1): a web picture of a person is never sent to the picture AI; a footage frame or the operator's own photo only with the recorded permission
-        if p and p.get('kind') in ('frame', 'web', 'supplied') and p.get('element_id') in people and (p['kind'] == 'web' or not likeness_of(session, p['element_id'])):
-            what = {'frame': 'a footage frame', 'web': 'a web picture', 'supplied': "the operator's own picture"}[p['kind']]
-            need(False, f"{p['id']} is {what} of {people[p['element_id']]} ({p['element_id']}), a person: " + (
-                'a picture of a person from the web is never sent to the picture AI.' if p['kind'] == 'web' else
-                f"a picture of a real person goes to the picture AI only with their permission, recorded in the operator's words (`vw visuals likeness --element {p['element_id']} --quote \"<their words>\"`).")
-                + " Leave it out; without the permission the person's sheet is written from the description (build, age, posture, garments, hair).")
+        need(not person_picture_refused(session, people, p), person_picture_refused(session, people, p))
     gold = golden_of(session, body['element_id'])
     if body.get('golden'):   # design/111 F11: the golden picture, written on the server's cue after the sheet (and the spec) are approved
         need(not kept(session), 'retired on this film (the kept method): the golden picture is the picture of the set the operator ticks (Yes on the References step); no separate golden call on this film.')
@@ -3713,6 +3792,7 @@ def generate_image(conn, store, user, run, outputs, body):
             for inherited in (start.get('generation') or {}).get('parents') or []:
                 row = session['references'].get(inherited.get('id'))
                 if row and row['status'] == 'approved' and all(p['id'] != row['id'] for p in parents):
+                    need(not person_picture_refused(session, people, row), person_picture_refused(session, people, row))   # design/207 (D1): the same test on what the start brings with it
                     parents.append(row)
     need(len(parents) <= MAX_INPUTS, f'{len(parents)} input pictures after the start\'s own references are added; GPT Image takes at most {MAX_INPUTS}. Name fewer.')   # design/71 P2
     if provider_of(run) == 'gemini':   # design/120: fourteen at most, counted by kind (Google's limits for the Pro image model)
@@ -3727,8 +3807,10 @@ def generate_image(conn, store, user, run, outputs, body):
     for k, p in enumerate(parents[named_n:], named_n + 1):   # F21: the server names the pictures it added itself (the start's own sheets)
         if p:
             body = {**body, 'prompt': with_composed(body['prompt'], f"Image {k} is the approved {p.get('kind') or 'reference'} of {p.get('element_id')}: take identity from it, nothing else.")}
-    if body['kind'] == 'keyframe' and kept(session):   # design/151 Q3
-        parents, lines_ = with_faces(session, parents, people)
+    if body['kind'] == 'keyframe' and kept(session):   # design/151 Q3; design/207: only while the picture service has room (its limits were checked above, before the faces)
+        gem = provider_of(run) == 'gemini'
+        parents, lines_ = with_faces(session, parents, people, (GEMINI_MAX_INPUTS if gem else MAX_INPUTS) - len(parents),
+                                     GEMINI_KIND_CAPS['character'] - len([p for p in parents if p and p.get('kind') != 'style' and p.get('element_id') in people]) if gem else None)
         for line in lines_:
             body = {**body, 'prompt': with_composed(body['prompt'], line)}
     if parents and not body.get('fix_of'):   # F21: one job line per picture
@@ -3840,7 +3922,7 @@ def generate_image(conn, store, user, run, outputs, body):
         if nl:
             body = {**body, 'prompt': with_composed(body['prompt'], nl)}
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
-        need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: approve it on the References step (or `vw visuals spec --element {m['id']}`) before a picture shows it.")
+        need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: the operator approves it first (`vw visuals spec --element {m['id']}`), before a picture shows it.")
         try:
             library.check_material_prompt(material_words(writer_prompt, subject_words, is_set))
         except ValueError as exc:
@@ -4009,7 +4091,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     for sh in shots:
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: approve the specs as one table (`vw visuals spec`, or on the page)")   # design/124 A4 item 19
+            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: the operator approves the specs as one table (`vw visuals spec`)")   # design/124 A4 item 19
     return _dedupe(lines + label_lines), warns
 
 

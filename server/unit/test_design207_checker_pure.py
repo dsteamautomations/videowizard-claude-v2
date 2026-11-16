@@ -292,7 +292,7 @@ def test_illustrative_no_longer_needs_four_sources_tried(long_shots):
     assert not hasattr(VC, 'FOUR_SOURCES')
     assert 'shot DG1: a size is unknown: set illustrative true; the drawing then carries "not to scale" and shows no figure for that size.' in said(
         drawing({**SPEC, 'illustrative': False}))
-    assert 'nothing is unknown: drop illustrative' in said(drawing({**SPEC, 'dimensions': [SPEC['dimensions'][0]], 'label': ''}))
+    assert said(drawing({**SPEC, 'dimensions': [SPEC['dimensions'][0]]})) == ''   # the review of design/207: "not to scale" with every size known is taken (was: "nothing is unknown: drop illustrative")
     assert 'record the sources tried' in said(drawing({**SPEC, 'dimensions': [SPEC['dimensions'][0], {**two, 'tried': ''}]}))   # an unknown size still says what was tried
 
 

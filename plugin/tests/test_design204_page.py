@@ -68,6 +68,8 @@ def test_the_page_draws_a_plan_gaps_shots_as_a_table_and_each_offered_way():
     for needed in ('function shots(cols,src)', "if(line.table) body.appendChild(shots(line.cols,line))", '(line.ways||[]).forEach', "' (advised)'", 'table.shots thead{display:none}',
                    "td.setAttribute('data-l'", 'scrollIntoView', "indexOf('way:')===0", 'Saved on this page.'):
         assert needed in html, needed
+    # design/207: a gap's plain lines (`line.warnings`) are drawn above its shots, as text
+    assert html.index("line.warnings.forEach(x=>ul.appendChild(el('li',null,x)))") < html.index('if(line.table) body.appendChild(shots(line.cols,line))') and 'Read before you answer' in html
 
 
 def test_the_page_can_play_a_sample_of_every_motion_style_the_server_holds():

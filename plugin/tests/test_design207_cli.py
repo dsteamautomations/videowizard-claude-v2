@@ -27,7 +27,7 @@ def test_cap_takes_only_its_own_flags_and_the_budget_line_says_how_the_limit_is_
     assert code == 2 and 'does not take --gap' in out['message']
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'spent_inr': 900.0, 'cap_inr': 1000.0, 'left_inr': 100.0, 'images': 6, 'planned': {'inr': 500.0}})
     code, out, err = run(args(what='budget'), capsys)
-    assert "the limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`" in err and 'builder' not in err
+    assert 'Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.' in err and 'builder' not in err   # the review: who runs it, and no claim about how an older film's limit was set
 def posts(monkeypatch, answer):
     sent = []
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: sent.append((path, body)) or answer)

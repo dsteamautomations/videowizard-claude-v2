@@ -47,7 +47,7 @@ class Element(Model):
     required_views: list[str] = Field(default_factory=list, max_length=20)
     size: list['Dimension'] = Field(default_factory=list, max_length=20)   # design/103 A5: real size, each with its source and status, never invented
     material_spec: 'MaterialSpec | None' = None   # design/111 F10
-    description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (build, age, skin, hair, posture, garment types and how worn), in every prompt
+    description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (face, build, age, skin, hair), in every prompt; design/207: the clothes belong to the scene's outfit
     signs_of_use: list['SignOfUse'] = Field(default_factory=list, max_length=30)   # design/111 F18: a place's traces of use, two written per shot
     staged_clean: str = Field(default='', max_length=1000)   # design/124-b item 4: why this place is shown clean and unused (a handover, a showroom); then no signs of use
     speaker: bool = False   # design/207 (SK, 16 Nov 2026): only marks a real, named person; the footage-only rule is gone and the field stays so stored plans load (was design/124-b decision (c))
@@ -137,7 +137,7 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     relationships: list[str] = Field(default_factory=list, max_length=30)
     label: str = Field(default='', max_length=200)
     proportions: list[str] = Field(default_factory=list, max_length=20)   # design/106 D2: the ratios that matter, always, even on an illustrative drawing
-    illustrative: bool = False   # design/111 F19; design/207 (SK, 16 Nov 2026): true when a size is unknown, dropped when none is; the four-sources test is gone
+    illustrative: bool = False   # design/111 F19; design/207 (SK, 16 Nov 2026): true when a size is unknown, or when the drawing is not drawn to scale; the four-sources test is gone
     view: Literal['', 'cutaway', 'plan', 'side', 'elevation'] = ''   # design/111 F19: which view the drawing is; a section defaults to cutaway
     view_reason: str = Field(default='', max_length=500)
 
@@ -188,7 +188,7 @@ class Group(Model):   # design/111 F17: several of a kind in frame, all alike fo
     count: int = Field(ge=2)
     mode: Literal['same', 'different', 'varied']   # design/207 (SK, 16 Nov 2026): varied is retired and refused by name in the check (use different); the word stays so the refusal can say so
     reason: str = Field(default='', max_length=500)   # same: why they are alike
-    items: list[str] = Field(default_factory=list, max_length=30)   # different: one trait each
+    items: list[str] = Field(default_factory=list, max_length=100)   # different: one trait each (was 30: with `varied` retired a group of 40 could not be planned)
 
 
 GROUP_WORDS = re.compile(r'\b(people|workers|labourers|villagers|onlookers|bystanders|crowd|men|women|children|boys|girls|cows|goats|chickens|dogs|animals)\b', re.I)
@@ -418,16 +418,14 @@ def _dimension_needs(label, dims, research=True):
 
 
 def _illustrative_needs(label, spec):
-    """design/111 F19; design/207 (SK, 16 Nov 2026): 'illustrative' goes with an unknown size and is never claimed when nothing is unknown.
-    The test that four sources were tried first is gone; an unknown size still says what was tried (_dimension_needs)."""
+    """design/111 F19; design/207 (SK, 16 Nov 2026): a drawing with an unknown size is 'illustrative' (it carries "not to scale"). A drawing that is
+    simply not drawn to scale may say so too, with every size known. An unknown size still says what was tried (_dimension_needs)."""
     if any(d.status == 'unknown' for d in spec.dimensions):
         need(spec.illustrative, f'{label}: a size is unknown: set illustrative true; the drawing then carries "not to scale" and shows no figure for that size.')
-    else:
-        need(not spec.illustrative, f'{label}: nothing is unknown: drop illustrative.')
 
 
 def spec_research_needs(label, spec):
-    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size says what was tried, illustrative set only with an unknown size."""
+    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size says what was tried, illustrative set whenever a size is unknown."""
     _dimension_needs(label, spec.dimensions)
     _illustrative_needs(label, spec)
 
@@ -821,7 +819,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                     scene_ids.add(scene.id)
                     landmarks = unique(scene.landmarks, 'id', 'landmark')
                     for pid in sorted({eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'person'}):   # design/111 F16: the fixed layer and this scene's colours
-                        need(next(e.description.strip() for e in plan.elements if e.id == pid), f'{pid} is a person: give description (build, age, skin, hair, posture, garment types and how worn), the fixed layer every prompt carries.')
+                        need(next(e.description.strip() for e in plan.elements if e.id == pid), f"{pid} is a person: give description, the fixed layer every prompt carries: the face, build, age, skin and hair. The clothes belong to each scene's outfit.")
                         need((scene.outfit.get(pid) or '').strip(), f'scene {scene.id} shows {pid}: give outfit[{pid}], the garment colours of this scene.')
                         if pid in last_outfit and not same_outfit(last_outfit[pid], scene.outfit[pid]):   # design/149 B2: the garments and colours, not the sentence
                             need(scene.time_jump.strip(), f'scene {scene.id} changes the colours of {pid} ({last_outfit[pid]} -> {scene.outfit[pid]}): give time_jump: what changed in time (later the same day, another day, another season, years later), from the script or from the scene\'s own time, or keep the colours.')   # design/207
@@ -948,6 +946,8 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                                          'for example a box about 3 : 2 : 1, both sides the same thickness; "illustrative" means no numbers printed, never free proportions'})
                                     if any(d.status == 'unknown' for d in spec.dimensions):
                                         need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
+                                    elif spec.illustrative:   # design/207: not drawn to scale with every size known: the same words on it
+                                        need('not to scale' in spec.label.lower(), f'shot {shot.id}: the drawing is marked illustrative (not drawn to scale): its label carries the words "not to scale".')
                             if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
                                 _recalled_on_screen_needs(shot)   # design/149 B10: a figure confirmed on the operator's word alone shapes the drawing, never a label
                                 svg_needs(shot, seconds, new_film)
@@ -1133,6 +1133,8 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                 last_states.pop(sub_.element_id, None)
                 except _Collected:   # design/148 A1: a failure of the scene's own lines is recorded; the next scene runs
                     broken = True
+                    if scene.shots:   # from the end of the skipped scene, so its neighbour is not blamed for the frames it never read
+                        cursor = scene.shots[-1].end_frame
                     continue
             last = scenes[-1].shots[-1].id if scenes and scenes[-1].shots else None   # design/91 N16
             try:
@@ -1195,7 +1197,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
         if hit:
             warnings.append({'shot_id': later.id, 'kind': 'same_setup', 'message': f'shot {later.id} shows {hit[0]} at {hit[1]} in the same clothes and at the same size ({later.size}) as {hit[2].id}: '
                              'change the angle, the distance or the moment and say what differs (differs_by), or name the return (return_of)'})
-    untried = [s.id for s in said if s.recipe == 'other']   # design/207 (SK, 16 Nov 2026): a kind of moving shot not tried here is taken; the operator is told once, on the first such shot
+    untried = [s.id for s in said if s.recipe == 'other' and s.visual_type == 'video']   # design/207 (SK, 16 Nov 2026): a kind of moving shot not tried here is taken; the operator is told once, on the first such shot
     if untried:
         warnings.append({'shot_id': untried[0], 'kind': 'video_untried', 'message': f"{', '.join(untried)}: this kind of moving shot has not been tried here; the first take is a trial and may need a second; the operator is told"})
     # design/65 B4: graphics back to back, inside a gap or across two gaps with no footage between; a gap of several shots that is all graphics
@@ -1392,7 +1394,7 @@ def course_warnings(plan, fps, drawn_in_run=True):
                 for e in shot.element_ids:
                     seen[e] = min(seen.get(e, 99), SIZE_ORDER.index(shot.size))
                 sizes.append(shot.size)
-            before = seen
+            before = seen or before   # a scene of graphics only, or of unsized shots, showed nothing: what was shown before it still counts
         if run_s > 8:
             out.append(_graphics_run(gap.gap_id, run_ids, run_s))
     return out
@@ -1432,7 +1434,8 @@ WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missi
                      'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'spec_unresearched', 'state_changed', 'style_missing',
                      'technique_unnamed', 'container_unnamed', 'script_person_missing',   # design/149 B5, B9; design/151 Q4
                      'size_open', 'size_repeat', 'size_close_first', 'look_alike', 'look_only',   # design/207 (SK, 16 Nov 2026): moved from the operator's list; look_only and passer_by are no longer raised, kept so old answers load
-                     'material_bare', 'compare_not_person', 'view_missing', 'look_wide', 'extra_repeated', 'animals_many', 'same_setup')
+                     'material_bare', 'compare_not_person', 'view_missing', 'look_wide', 'extra_repeated', 'animals_many', 'same_setup',
+                     'people_alike')   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
 
 
 def answer_warnings(plan, warnings):

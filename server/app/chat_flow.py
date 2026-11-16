@@ -262,7 +262,7 @@ def _plan_items(ctx):
             again = bool(changes) and gid not in pending
             items.append(_item(f"gap:{gid}:{V.gap_digest(plan, gap)[:10]}", 'plan gap', where, f"{title}{' (changed since you accepted it)' if again else ''}. Do you accept the shots planned for this gap?", run,
                                [_button('Accept', 'accept'), _button('Change this', 'change', words=True, tell='Ask the operator what to change in this gap.')],
-                               text=_changed_text(changes) + _gap_text(session, gap)))
+                               text=_changed_text(changes) + ''.join(f'**Read before you answer:** {w}\n\n' for w in V.warning_lines(session, gap, plan)) + _gap_text(session, gap)))   # design/207: the plain lines, in the chat too
             rows, total = _gap_rows(session, gap)
             items[-1].update(_key=gid, _card={'n': title, 'c': 1 if again else 0, **({'ch': _changes(changes)} if changes else {}), 'tot': total, 'tb': rows})
     items.sort(key=lambda i: {'plan shared': 0, 'plan choice': 1}.get(i['kind'], 2))   # design/191: the shared change first; design/190: then a gap's offered choice, one at a time; the gaps then come on one card

@@ -190,7 +190,7 @@ def decide(tool, inp, cwd, vw):
         return None
     if tool == 'Skill':
         name = str(inp.get('skill') or '')
-        return None if name in VW_SKILLS else f'Blocked: only the vw:vw and vw:motion skills are available here, not {name!r}.'
+        return None if name in VW_SKILLS else f"Blocked: only these skills are available here: {', '.join(s for s in VW_SKILLS if ':' in s)}; not {name!r}."
     return NOT_HERE.format(tool=tool)
 
 

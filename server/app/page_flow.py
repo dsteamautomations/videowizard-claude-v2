@@ -90,7 +90,8 @@ def _buttons(item):
 def _plan_page(ctx, base):
     """design/206 (SK, 16 Nov 2026): the plan on the page. Every plan question is on this one round, so one "done" answers the step: the shared
     rules first (design/191), then the gaps in the film's order. A gap to accept shows its shots as a table, its totals and what changed since it
-    was accepted; a gap offered two ways shows each way with its own shots, and taking a way accepts the gap; an accepted gap is `recorded`
+    was accepted, and above the table its `warnings`, the plain lines to read before answering (design/207; a film-wide one is on the gap it is
+    attached to); a gap offered two ways shows each way with its own shots, and taking a way accepts the gap; an accepted gap is `recorded`
     (`reopen` while the plan is open); one sent back is `with_assistant` with the operator's words."""
     session, plan, store = ctx['session'], ctx['plan'], ctx['store']
     items, revising = CF._plan_items(ctx)
@@ -124,6 +125,9 @@ def _plan_page(ctx, base):
         entry = agreed.get(gid) or {}
         accepted = [[k, str(v)] for k, v in (CF._shot_rows(entry, 'reasons_missing' in treated) if entry else []) if v not in (None, '', [])]   # design/207: the shots and the two reasons accepted at the treatment
         seen = {**({'text': f"What you accepted in the treatment: {entry['picture']}"} if entry.get('picture') else {}), **({'rows': accepted} if accepted else {})}
+        warned = V.warning_lines(session, gap, plan)   # design/207: the plain lines the operator reads before answering, from the function the server's page uses
+        if warned:
+            seen['warnings'] = warned
         if gid in revisions:
             lines.append({**head, 'state': 'with_assistant', 'note': revisions[gid].get('notes') or ''})
         elif ask and ask['kind'] == 'plan choice':

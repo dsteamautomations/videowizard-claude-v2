@@ -282,7 +282,7 @@ def test_prepare_writes_the_files_and_prints_the_page_link(harness, monkeypatch,
     monkeypatch.setattr(vw, 'call', lambda method, path, wait=None, **kw: {'version': 'vwlib-x', 'always': [], 'steps': {}, 'compliance': None, 'map': '', 'field_sources': ''})   # design/68 L4
     fake_client(monkeypatch, {'source': {'gaps': {'G1': {'start_frame': 0, 'end_frame': 100}}}, 'prompt': 'p', 'plan_schema': {}, 'world_evidence': [], 'intended_visuals': [], 'generator_catalog': []})
     code, out, err = run(args(what='prepare'), capsys)
-    assert code == 0 and out['visuals_page_url'] == 'https://x.example/runs/VW-9/visuals' and 'work/visuals/' in err and 'https://x.example/runs/VW-9/visuals' in err
+    assert code == 0 and 'visuals_page_url' not in out and 'work/visuals/' in err and 'https://x.example' not in err   # the review of design/207: no link to the server's visuals page (the name of this test is from before)
     assert any(f['file'] == 'work/visuals/prompt.md' for f in out['files'])
     assert 'Read prompt.md, then part-preparation.md (what to read first).' in err and 'gaps.json and intended-visuals.json first' not in err   # design/126 VI1
 
@@ -821,7 +821,7 @@ def test_status_lists_each_waiting_item_with_its_label_and_link(harness, monkeyp
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: st)
     monkeypatch.setattr(vw, 'server_url', lambda: 'https://vw.test')
     code, out, err = run(args(what='status'), capsys)
-    assert '2 waiting for the operator: Still · DG1 https://vw.test/runs/VW-9/visuals#pictures/DG1/K1; Take · VS1 https://vw.test/runs/VW-9/visuals#takes/VS1/j1' in err
+    assert '2 waiting for the operator: ask them one at a time with `vw visuals next` (design/188), never from this list' in err and 'https://vw.test' not in err   # design/188 retired the labels and links (the name of this test is from before)
 
 
 @pytest.mark.parametrize('what, extra', [('approve', {'ref': 'K1', 'sha': 's'}), ('reject', {'ref': 'K1', 'notes': 'n'}), ('sequence', {'shot': 'AN1'}),
@@ -835,10 +835,10 @@ def test_a_verdict_prints_what_happens_next(harness, monkeypatch, capsys, what, 
 
 
 def test_the_procedure_gives_the_label_and_the_link():
-    """design/97 W4."""
+    """design/97 W4, retired by the review of design/207: `vw visuals status` prints no label and link (design/188), and the server's visuals page is not
+    the operator's. The command text and instruction version 3 no longer ask for them; version 2's text (read here) is left as it is."""
     vsteps, doc = ' '.join(STAGES['visuals']['steps']), (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    for text in (vsteps, doc):
-        assert 'the label and the link' in text
+    assert 'the label and the link' in vsteps and 'the label and the link' not in doc
 
 def test_the_procedure_says_the_first_answer_approves_a_reason_is_optional_and_the_final_needs_no_words():
     """design/98."""

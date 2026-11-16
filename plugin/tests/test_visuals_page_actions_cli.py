@@ -38,7 +38,7 @@ def test_round_answer_stores_one_answer_of_step_2(harness, monkeypatch, capsys):
     sent = posts(monkeypatch, {'element_id': 'E2', 'stored': True, 'answer': {'verdict': 'yes', 'golden': 'R5', 'words': ''}})
     code, out, err = run(args(what='round', answer='E2', verdict='yes', golden='R5'), capsys)
     assert code == 0 and sent == [('/api/runs/run-1/visuals/round/answer', {'element_id': 'E2', 'verdict': 'yes', 'golden': 'R5', 'words': ''})]
-    assert err.strip() == 'Answer stored for E2: yes, starting picture R5. It is not recorded yet: Done on the page records it, or `vw visuals round --sets <file>` (a stored answer stands for an element the file leaves out).'
+    assert err.strip() == 'Answer stored for E2: yes, starting picture R5. It is not recorded yet: `vw visuals round --sets <file>` records it (a stored answer stands for an element the file leaves out).'
     sent = posts(monkeypatch, {'element_id': 'P1', 'stored': True, 'answer': {'verdict': 'correct', 'golden': None, 'words': 'older, grey hair'}})
     code, out, err = run(args(what='round', answer='P1', verdict='correct', words='older, grey hair'), capsys)
     assert code == 0 and sent[0][1] == {'element_id': 'P1', 'verdict': 'correct', 'golden': None, 'words': 'older, grey hair'} and 'Answer stored for P1: correct ("older, grey hair").' in err
@@ -122,7 +122,7 @@ def test_round_sets_prints_the_answers_held_at_the_spend_cap(harness, monkeypatc
     code, out, err = run(args(what='round', sets='out/sets.json', quote='As said.'), capsys)
     assert code == 0 and sent[0][0].endswith('/visuals/round/sets') and out['held'] == held
     assert err.strip() == ('Sets recorded: 1 approved, 0 being made again; the round is 2. Held: E2: the spend cap of ₹2,000 is reached (₹1,980 spent): the set is not made again; '
-                           'its answer is kept and waits. Tell the operator the spend; the owner can set another limit for this film with `vw visuals cap`.')
+                           'its answer is kept and waits. Tell the operator the spend. Only the owner can set another limit for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.')
     posts(monkeypatch, {'pass': 'complete', 'queued': [], 'errors': {}, 'approved': ['E1'], 'held': {}})   # nothing held: the line of before
     code, out, err = run(args(what='round', sets='out/sets.json'), capsys)
     assert code == 0 and err.strip() == 'Sets recorded: 1 approved, 0 being made again; the round is complete.'

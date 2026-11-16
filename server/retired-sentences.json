@@ -59,6 +59,14 @@
     "(kind material, or `repeating: true`",
     "never send the operator to any other page",
     "then every decision of this stage is the operator's, in the chat",
-    "the builder changes the cap"
+    "the builder changes the cap",
+    "give the operator the page link and the footage line",
+    "their correction (the page, or `vw visuals footage`) wins",
+    "give them the label and the link that `vw visuals status` prints",
+    "(`vw visuals spec` with no --shot, or the page)",
+    "tell the operator the page's plain warnings",
+    "In chat: `vw visuals round --verdicts out/round-verdicts.json --quote`",
+    "`illustrative: true` when nothing is unknown or missing when something is",
+    "in a video shot a living holder moves a body-length by the end"
   ]
 }

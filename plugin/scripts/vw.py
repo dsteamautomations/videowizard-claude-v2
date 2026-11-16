@@ -1807,7 +1807,7 @@ def _round_one(a, base):
             emit(out, 0, out.get('next') or f'{eid}: the answer was not stored.')
         ans = out.get('answer') or {}
         emit(out, 0, f"Answer stored for {eid}: {ans.get('verdict')}" + (f", starting picture {ans['golden']}" if ans.get('golden') else '') + (' ("%s")' % ans['words'] if ans.get('words') else '')
-             + '. It is not recorded yet: Done on the page records it, or `vw visuals round --sets <file>` (a stored answer stands for an element the file leaves out).')
+             + '. It is not recorded yet: `vw visuals round --sets <file>` records it (a stored answer stands for an element the file leaves out).')
     if what == 'make':
         out = write(base + '/round/make', {'element_id': eid})
         emit(out, 0, (out.get('next') or f'{eid}: its set is being made.')
@@ -1978,7 +1978,6 @@ def cmd_visuals(a):
         out = write(base + '/prepare', {})
         files = download_visuals_package(m, out['package']['key'])   # design/65 B12: one file per section
         files += visuals_library_files(ws, call('GET', base + '/library'))   # design/68 L4: the library per step
-        url = visuals_page_url(m['code'])
         told = (f"Tell the operator in one line, never ask: {out['footage']}; they correct it by saying so (`vw visuals footage --camera … --support … --look … --quote`). "
                 if out.get('footage') else '')   # design/88 F4
         parts = [f['file'].rsplit('/', 1)[1] for f in files if f['file'].startswith('work/visuals/part-')]   # design/124 C1
@@ -1987,7 +1986,7 @@ def cmd_visuals(a):
         emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0,   # design/188: no page link; the operator decides in the chat
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, then part-preparation.md (what to read first). "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
-             f"Visuals page (give the operator this link): {url}. " + cap_line(out) + told)
+             + cap_line(out) + told)   # no page link: the server's visuals page is not the operator's; they get the footage line
     if a.what == 'footage':   # design/88 F4: the measured footage, told; a correction only with the operator's words
         if not (a.camera or a.support or a.look):
             f = call('GET', base).get('footage') or {}
@@ -2042,7 +2041,7 @@ def cmd_visuals(a):
         p = out.get('planned') or {}
         over = (out.get('spent_inr', 0) + p.get('inr', 0)) > out.get('cap_inr', 0)
         emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); images: {out.get('images', 0) - out.get('fixes', 0)} requested + {out.get('fixes', 0)} fixes; the current plan still needs about ₹{p.get('inr', 0):,.0f}"
-             + (" — over the cap: narrow the plan and tell the operator the spend; the limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`." if over else '.'))   # design/74 L26; design/207
+             + (" — over the cap: narrow the plan and tell the operator the spend. Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner." if over else '.'))   # design/74 L26; design/207
     if a.what == 'cap':   # design/207: the owner sets another cost limit for this one film, with their words
         try:
             inr = float(getattr(a, 'inr', None))
@@ -2202,7 +2201,7 @@ def cmd_visuals(a):
             errs = out.get('errors') or {}
             emit(out, 0, f"Sets recorded: {len(out.get('approved') or [])} approved, {len(out.get('queued') or [])} being made again; the round is {out.get('pass')}."
                  + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '')
-                 + (' Held: ' + '; '.join(f'{k}: {v}' for k, v in out['held'].items()) + '. Tell the operator the spend; the owner can set another limit for this film with `vw visuals cap`.' if out.get('held') else ''))   # design/177: a remake the spend cap holds
+                 + (' Held: ' + '; '.join(f'{k}: {v}' for k, v in out['held'].items()) + '. Tell the operator the spend. Only the owner can set another limit for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.' if out.get('held') else ''))   # design/177: a remake the spend cap holds
         if a.picks:
             pk = _json_file(m, a.picks)
             ignore = pk.pop('ignore', []) if isinstance(pk, dict) else []   # design/121 change 1: {"<search id>": [{n, note}], "ignore": ["E2"]}

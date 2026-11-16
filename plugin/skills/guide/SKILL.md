@@ -90,7 +90,7 @@ Metres. X to the right, Y away from the camera's side, Z up. One JSON object:
 
 ### A thing on a path
 
-A piece of the set, or a prop that nobody holds, may travel as a person does: give it `"path"`, timed points of the middle of its foot. It stays at the first point until that time, moves straight between points, and stays at the last. A bottle moving along a line, with nobody in view:
+A piece of the set, or a prop that nobody holds, may travel as a person does: give it `"path"`, timed points of the middle of its foot. A prop is always in the first frame, on a path or not (refused otherwise: the still is made from the first frame). Only a piece of the set may start out of frame. It stays at the first point until that time, moves straight between points, and stays at the last. A bottle moving along a line, with nobody in view:
 
 ```json
 {
@@ -116,7 +116,7 @@ A piece of the set, or a prop that nobody holds, may travel as a person does: gi
 - The thing points along its path: build it pointing the way it first moves, and it turns where the path bends. `"facing": [x, y]` on the thing stops that: it keeps pointing as built for the whole shot. A prop does not turn.
 - A thing on a path may also `spin` (a wheel, a product turning on a moving line).
 - A thing made of several pieces (a van and its wheels): give every piece the same moves, each from its own foot, and keep the path straight; each piece turns about its own middle.
-- A thing has no speed limit. Start it in the first frame when you can: the still is made from the first frame, so a thing that comes in later is warned on.
+- A thing has no speed limit. Start it in the first frame when you can: the still is made from the first frame. A piece of the set on a path that starts out of frame is warned on; a prop that is not in the first frame is refused.
 - A prop has `held` or `path`, never both.
 
 ### Rules the server refuses on
@@ -132,7 +132,7 @@ The rules about a person (the right hand, reach, posture, the exact count) apply
 
 ### Rules the server warns on
 
-A shot marked `other` (not tried here; the first take is a trial); a person faster than 2.5 m/s (a run has failed with a camera that follows: keep the camera fixed, expect a second take); people who overlap in the picture while one moves (they have come out as copies: keep the paths apart, or expect a second take); nothing moving at all (a still costs less); a thing on a path that is not in the first frame. The first four are repeated to the operator on the ready-to-shoot card.
+A shot marked `other` (not tried here; the first take is a trial); a person faster than 2.5 m/s (a run has failed with a camera that follows: keep the camera fixed, expect a second take); people who overlap in the picture while one moves (they have come out as copies: keep the paths apart, or expect a second take); nothing moving at all (a still costs less); a piece of the set on a path that starts out of frame (a prop is always in the first frame: refused otherwise). The first four are repeated to the operator on the ready-to-shoot card.
 
 A beat shorter than a person takes; a person within 0.5 m of the edge of the ground they stand on; a post within 0.5 m of where someone stops; an action that ends more than a second before the clip does (in a still tail the model undoes the action: let the action fill the clip); pale or look-alike colours (use dark, strongly contrasting colours, one per thing).
 

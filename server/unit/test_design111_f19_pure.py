@@ -27,7 +27,7 @@ def test_illustrative_goes_with_an_unknown_size_and_four_sources_are_no_longer_a
     assert 'a size is unknown: set illustrative true' in said(base({**SPEC, 'illustrative': False, 'dimensions': [SPEC['dimensions'][0], unknown]}))
     assert said(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0], unknown]})) == ''   # design/207 (SK, 16 Nov 2026): two sources tried is enough (was: all four, or warned)
     assert said(base(SPEC)) == ''
-    assert 'nothing is unknown: drop illustrative' in said(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0]], 'label': ''}))
+    assert said(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0]]})) == ''   # design/207 review: a drawing not to scale may say so with every size known (was: "nothing is unknown: drop illustrative")
 
 
 def test_a_drawing_names_its_view_with_a_reason_and_a_section_defaults_to_cutaway():

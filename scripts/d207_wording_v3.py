@@ -166,15 +166,63 @@ PAIRS = [   # (where: common or a part's name, the old sentence, the new one)
      'narration states is always shown as stated. It has a `drawing_spec` (warned without;'),
     ('plan', 'and `view` with `view_reason` (refused without; a section defaults to cutaway)', 'and `view` with `view_reason` (give both; a section defaults to cutaway)'),
     ('plan', 'an `unknown` size without all four sources in `tried`,', 'an `unknown` size that does not say in `tried` what was tried,'),
+    # the review of design/207 (16 Nov 2026), written against the text the pairs above leave
+    # the operator is never sent to the server's visuals page: their page is the decisions page (`vw visuals page`), everything else is in the chat
+    ('preparation', 'their correction (the page, or `vw visuals footage`) wins.', 'their correction, said in the chat (`vw visuals footage`), wins.'),
+    ('later', 'When anything waits for the operator, give them the label and the link that `vw visuals status` prints for it (for example "Still · B01_S2" and its link), never only '
+              '"on the page"; after each verdict, tell them the line the server answers with (what happens next, with the film time).',
+     'After each verdict, tell the operator the line the server answers with (what happens next, with the film time).'),
+    ('plan', '(`vw visuals spec` with no --shot, or the page)', '(`vw visuals spec` with no --shot)'),
+    ('plan', "tell the operator the page's plain warnings, never the technical ones.",
+     "the operator reads the plain warnings on the plan page, above each gap's shots; never tell them the technical ones."),
+    ('picture-search', 'In chat: `vw visuals round --verdicts out/round-verdicts.json --quote` ({element: {verdict: approve|ignore}}), then `vw visuals round --sets out/round-sets.json '
+                       '--quote` ({element: {verdict: yes|no|correct, words, golden}}).',
+     'The operator answers both steps in the chat, one at a time (`vw visuals next`, section E). `vw visuals round --verdicts out/round-verdicts.json --quote` ({element: {verdict: '
+     'approve|ignore}}) and `vw visuals round --sets out/round-sets.json --quote` ({element: {verdict: yes|no|correct, words, golden}}) only record answers the operator has already '
+     'given in their own words: never use them to answer for the operator.'),
+    # "not to scale" with every size known is taken
+    ('plan', 'and `illustrative: true` when nothing is unknown or missing when something is, are warned in the plan',
+     'and `illustrative: true` missing when a size is unknown, are warned in the plan'),
+    # who sets the cost limit
+    ('common', 'Only the owner sets another figure for a film (`vw visuals cap --inr N --quote "<the owner\'s words>"`).',
+     'Only the owner sets another figure for a film, and runs the command from their own sign-in (`vw visuals cap --inr N --quote "<the owner\'s words>"`); from an operator\'s sign-in it '
+     'is refused: tell the operator to ask the owner.'),
+    # when the permission can be recorded
+    ('plan', 'then `vw visuals own --element E --file <photo>`); the sheet is made from the photo.',
+     'then `vw visuals own --element E --file <photo>`); the sheet is made from the photo. Both commands need a proposed plan: record the permission and give the photo after the plan is '
+     "proposed; the operator's line about a stand-in goes away once the permission is recorded."),
+    # people who read alike are named together at the check
+    ('plan', 'every person has a `description`;',
+     'every person has a `description` that gives their age, build, hair and face, so that no two people read alike (the check names every pair that does, `people_alike`: fix them all '
+     'at once; the reference round refuses them);'),
+    # a refusal the server does not make
+    ('plan', 'a still one holds, with `hold_reason`, unchanged; in a video shot a living holder moves a body-length by the end unless `hold_reason` names small life (breathing, chewing, '
+             'the head, the hands, the tail, the ears) and it is not standing in a normal or busy scene (refused otherwise).',
+     'a still one holds, with `hold_reason`, unchanged.'),
+    ('later', 'write it at once with every source as a parent (a person: from your description, no picture parents);',
+     'write it at once with every source as a parent (a person: from your description, no picture parents unless the permission is recorded);'),
 ]
+STEP = (0, 'give the operator the page link and the footage line.', 'tell the operator the footage line.')   # the review: no link to the server's visuals page
+
+
+def apply_steps(steps):
+    i, old, new = STEP
+    if new not in steps[i]:
+        if steps[i].count(old) != 1:
+            sys.exit('not applied: step %d: not found once: %s' % (i, old[:60]))
+        steps[i] = steps[i].replace(old, new)
+    return steps
 
 
 def apply(prompt, parts):
     """The visuals text with design/207's sentences: the common part is returned, the parts are changed in place. Applying twice changes nothing."""
-    for where, old, new in PAIRS:
+    for n, (where, old, new) in enumerate(PAIRS):
         part = None if where == 'common' else next(p for p in parts if p['name'] == where)
         text = prompt if part is None else part['text']
-        if (new and new in text) or (not new and old not in text):
+        later = new   # the sentence as the later pairs of the same part leave it (the review's pairs change words inside earlier sentences)
+        for w, a, b in PAIRS[n + 1:]:
+            later = later.replace(a, b) if w == where else later
+        if (new and (new in text or later in text)) or (not new and old not in text):
             continue
         if text.count(old) != 1:
             sys.exit('not applied: %s: not found once: %s' % (where, old[:60]))
@@ -191,6 +239,7 @@ def main():
     d = json.loads(raw.decode('utf-8'))
     st = next(s for s in d['stages'] if s['name'] == 'visuals')
     st['prompt'] = apply(st['prompt'], st['parts'])
+    apply_steps(st['steps'])
     P.write_text(json.dumps(d, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\r\n' if b'\r\n' in raw else '\n')   # the file keeps its line ends
     print('visuals: design/207, the visuals rules after the review')
     print('words in the visuals stage:', sum(len(t.split()) for t in [st.get('prompt') or '', *(st.get('steps') or []), *(p['text'] for p in st.get('parts') or [])]))

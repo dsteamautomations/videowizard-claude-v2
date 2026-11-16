@@ -212,14 +212,16 @@ def _render_ready(g):
     return r
 
 
-def _input(store, run, session, shot_id, p):
-    """One input picture of a still: an approved reference of the film, or an approved still of this film's guides (a crop of the scene's first still)."""
+def _input(store, run, session, shot_id, p, people):
+    """One input picture of a still: an approved reference of the film, or an approved still of this film's guides (a crop of the scene's first still).
+    design/207 (D1): a picture of a person goes in only as it would into any other picture (VS.person_picture_refused; people: {person id: name})."""
     pid = p.get('id')
     row = (session.get('references') or {}).get(pid)
     if row is None:
         row = next((s for g in (session.get('guides') or {}).values() for s in g.get('stills') or [] if s['id'] == pid), None)
     need(row is not None, f'{pid} is not a picture of this film.')
     need(row.get('status') == 'approved' and row.get('key'), f'{pid} is not approved; only approved pictures go into a still.')
+    need(not VS.person_picture_refused(session, people, row), VS.person_picture_refused(session, people, row))
     need(str(p.get('job') or '').strip(), f'{pid}: say what the picture is for, in a few words (for example "the father: copy his face, hair, build and clothes").')
     return VS.cropped_parent(store, run, row, p.get('crop')), str(p['job']).strip()
 
@@ -249,9 +251,10 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         need(isinstance(parents, list), 'parents: a list of {"id", "job", "crop"?}.')
         d = _ensure_drawing(store, run, session, g, spec)   # design/200, Area B
         need(d['status'] == 'approved', NOT_APPROVED.format(shot=shot_id, sha=g['sha256']))
-        pairs = [_input(store, run, session, shot_id, p) for p in parents]
+        people = VS.people_of(VS.guarded(lambda: VS.current_plan(store, session)))
+        pairs = [_input(store, run, session, shot_id, p, people) for p in parents]
         sheets = [{'id': f"shot-drawing-{v['id']}-{g['sha256'][:12]}", 'key': v['plain_key'], 'sha256': v['plain_sha256']} for v in d['views']]
-        looks = [_input(store, run, session, shot_id, {'id': look, 'job': 'a look reference'})[0]] if look else []
+        looks = [_input(store, run, session, shot_id, {'id': look, 'job': 'a look reference'}, people)[0]] if look else []
         inputs = [{'id': 'guide-frame-' + g['sha256'][:12], 'key': render['frame1_key'], 'sha256': render['frame1_sha256']}] + sheets + [a for a, _ in pairs] + looks
         jobs_ = [j for _, j in pairs]
         need(len(inputs) <= still['max_inputs'], f"{len(inputs)} input pictures; GPT image takes at most {still['max_inputs']}, the guide's frame and the shot's two drawings included.")

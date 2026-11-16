@@ -276,7 +276,8 @@ def test_a_card_of_words_warns_in_a_documentary_or_explaining_film_only():
 
 
 def test_a_real_speaker_shown_without_their_recorded_permission_gives_one_line_on_their_first_made_shot():
-    people = [{'id': 'P1', 'name': 'Asha Rao', 'kind': 'person', 'speaker': True}, {'id': 'P2', 'name': 'A passer-by', 'kind': 'person'}]
+    people = [{'id': 'P1', 'name': 'Asha Rao', 'kind': 'person', 'speaker': True, 'description': 'a woman of about forty, short black hair'},
+              {'id': 'P2', 'name': 'A passer-by', 'kind': 'person', 'description': 'a tall man of about sixty, bald'}]   # told apart, so the check's people_alike line stays out of this test
     plan = small_plan([{'id': 'F1', 'visual_type': 'footage', 'start_frame': 0, 'end_frame': 50, 'element_ids': ['P1']}, still('IM1', 50, 60, element_ids=['P1', 'P2']),
                        still('IM2', 60, 70, element_ids=['P1'])], people)
     ws = carried(plan, run={**RUN, **FILM})
@@ -324,7 +325,7 @@ def test_prepare_gives_a_new_film_its_limit_by_length(monkeypatch, frames, cap):
 
 
 def test_prepare_never_lowers_a_running_films_limit_and_never_touches_the_owners_figure(monkeypatch):
-    store = store_with(session())   # a film in progress: its session exists and holds no limit
+    store = store_with(session(updated_at='2026-11-01T00:00:00+00:00'))   # a film in progress: its session was saved before (the stamp every save writes) and holds no limit
     out = prepared(monkeypatch, store, 1500)
     assert 'cap_inr' not in saved(store) and out['cap_inr'] == 5000.0
     store = store_with(session(cap_inr=900.0, cap_from='owner', cap_quote='keep this one under nine hundred'))
@@ -342,7 +343,7 @@ def test_only_the_owner_sets_another_limit_with_their_words_and_it_is_logged():
     store, conn, admin = store_with(session(cap_inr=1500.0, cap_from='length')), H.Conn(), {**USER, 'role': 'Admin'}
     with pytest.raises(Problem) as exc:
         g(lambda: VS.set_cap(conn, store, {**USER, 'role': 'Member'}, RUN, [], 3000, 'raise it'))
-    assert exc.value.status == 403 and exc.value.message == 'Only the owner can set the cost limit of a film.'
+    assert exc.value.status == 403 and exc.value.message.startswith('Only the owner can set the cost limit of a film, from their own sign-in.')
     for inr, quote, said in ((3000, '  ', "The owner's words are needed"), (0, 'free', 'above zero'), (-5, 'less', 'above zero'), ('many', 'more', 'above zero'), (True, 'yes', 'above zero')):
         with pytest.raises(Problem, match=said):
             g(lambda: VS.set_cap(conn, store, admin, RUN, [], inr, quote))
@@ -356,9 +357,9 @@ def test_only_the_owner_sets_another_limit_with_their_words_and_it_is_logged():
 
 def test_the_refusal_at_the_limit_says_how_the_limit_is_set():
     with pytest.raises(Problem) as exc:
-        VS.check_cap(FakeConn([]), RUN, session(cap_inr=10.0), 40.0, 'a 5 s take')
+        VS.check_cap(FakeConn([]), RUN, session(cap_inr=10.0, cap_from='length'), 40.0, 'a 5 s take')
     assert exc.value.message == ("₹0 spent of ₹10 on this film's visuals; a 5 s take needs about ₹40. Stop and tell the operator the spend. "
-                                 "The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.")
+                                 "The limit follows the film's length. Only the owner can set another figure for this film, from their own sign-in (`vw visuals cap`): tell the operator to ask the owner.")
 
 
 def test_the_settings_and_the_route():

@@ -109,7 +109,7 @@ def test_a_stand_in_removes_the_record_and_marks_the_sheet_made_from_the_photo_o
     out = yes(store, conn, quote='He would rather not be shown.', stand_in=True)
     s = saved(store)
     assert out['likeness'] is False and 'P1' not in s['likeness'] and 'P1' not in s['golden'] and VS.likeness_photo(s, 'P1') is None
-    assert view(store, conn)['round']['elements']['P1']['photo_changed'] is True
+    assert not sheets(s, 'P1') and any('the permission was removed' in r['rejection']['notes'] for r in s['references'].values() if r.get('status') == 'rejected' and r['element_id'] == 'P1')   # the review of design/207: the set made from the photo is rejected, not only marked out of date
     n0 = len(conn.inserted)
     VS.set_make(conn, store, USER, NEW, [], 'P1')
     req = _req(conn.inserted[n0])
@@ -199,6 +199,7 @@ def test_a_stand_ins_failed_set_says_only_what_failed():
 
 def test_every_person_gets_a_row_in_the_round_a_background_person_with_no_picture_too():
     doc = doc_with(KILN, MASON, PASSER)
+    doc['gaps'][0]['scenes'][0]['shots'][0]['element_ids'] = ['E1', 'P1', 'P2']   # both are in a picture the AI makes (a person seen only in their own footage needs no row)
     store, conn = frames_only(doc), FakeConn([])
     rows = [{'element_id': 'E1', 'frames': ['F1'], 'prompt': 'the plinth top'}, {'element_id': 'E2', 'prompt': 'the kiln'}, {'element_id': 'P1', 'prompt': 'kneels'}]
     said = refused(lambda: VS.round_start(store, USER, NEW, [], rows, conn=conn))

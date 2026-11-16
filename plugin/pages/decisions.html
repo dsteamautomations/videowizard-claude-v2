@@ -44,7 +44,7 @@ p{margin:0}
 .kv{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:4px 12px}
 .kv dt{color:var(--muted);font-size:.86rem} .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .changed{background:var(--chg-soft);color:var(--chg);border-radius:8px;padding:10px 12px;font-size:.92rem}
-.changed ul{margin:6px 0 0;padding-left:1.2em}
+.changed ul,.note ul{margin:6px 0 0;padding-left:1.2em}
 .note{background:var(--stop-soft);color:var(--stop);border-radius:8px;padding:10px 12px;font-size:.92rem}
 .acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
 .edit{flex:1 1 100%;display:flex;flex-direction:column;gap:8px}
@@ -180,6 +180,7 @@ function block(line,n){
     const dl=el('dl','kv'); g.rows.forEach(r=>{ if(r[0]){dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));} else {const p=el('p',null,r[1]); p.style.fontWeight='600'; wrap.appendChild(p);} });
     wrap.appendChild(dl); body.appendChild(wrap);
   });
+  if(line.warnings&&line.warnings.length){const w=el('div','note'); w.appendChild(el('strong',null,'Read before you answer')); const ul=el('ul'); line.warnings.forEach(x=>ul.appendChild(el('li',null,x))); w.appendChild(ul); body.appendChild(w);}   // design/207: the plain lines of this gap, above its shots
   if(line.table) body.appendChild(shots(line.cols,line));
   (line.ways||[]).forEach(w=>{   // a gap offered two ways: each way with what it is, why, its cost and its own shots
     const g=el('div','group'); g.appendChild(el('h4',null,w.title+(w.recommended?' (advised)':'')));
