@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:45.205846+00:00",
+   "at": "2026-11-16T05:12:17.337287+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -110,29 +121,29 @@
   },
   "searches": [
    {
-    "at": "2026-11-12T05:38:45.216734+00:00",
+    "at": "2026-11-16T05:12:17.350385+00:00",
     "by": "u1",
     "element_id": "E2",
     "keywords": "unfindable kiln words",
     "pair": [
-     "59ab1049ecdc"
+     "eafac24a4f91"
     ],
     "picked": [],
     "quote": "Search again.",
-    "search_id": "59ab1049ecdc",
+    "search_id": "eafac24a4f91",
     "results": []
    },
    {
-    "at": "2026-11-12T05:38:45.215118+00:00",
+    "at": "2026-11-16T05:12:17.347371+00:00",
     "by": "u1",
     "element_id": "E2",
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "863eb7fc03a2"
+     "fe3217b654d5"
     ],
     "picked": [],
     "quote": "Yes, search for the kiln.",
-    "search_id": "863eb7fc03a2",
+    "search_id": "fe3217b654d5",
     "results": [
      {
       "download": "picture",
@@ -171,7 +182,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-12T05:38:45.206850+00:00",
+   "at": "2026-11-16T05:12:17.337287+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -190,9 +201,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "unfindable kiln words",
-     "search_id": "59ab1049ecdc",
+     "search_id": "eafac24a4f91",
      "search_ids": [
-      "59ab1049ecdc"
+      "eafac24a4f91"
      ],
      "source": "",
      "verdict": "search",
@@ -252,6 +263,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -309,6 +321,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,

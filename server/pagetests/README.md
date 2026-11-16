@@ -89,7 +89,7 @@ picture still "generating". `FakeConn` answers all three; `build_states.py` adds
 
 A builder may return a fourth item, the run's outputs (the media stage's clips, for the clip form). The states named `controls-…`
 exist for one control that appears in no other state; four more edge-case states were added for layer 3. Also set by hand in them:
-`reuse_pending` (the reuse gate writes it) and `footage` (prepare measures the clips).
+`reuse_pending` (a waiting reuse left from before design/207, which retired the approval) and `footage` (prepare measures the clips).
 
 `data/main` is built with the server code of the working tree; `data/live` with the server code of `ed8dcb9` (the live version).
 The two differ where the server differs: on live the waiting list holds one item per set, a footage-backed element still gets an

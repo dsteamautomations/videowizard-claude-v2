@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:43.126087+00:00",
+   "at": "2026-11-16T05:12:16.190544+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -182,12 +193,12 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-12T05:38:43.128102+00:00",
+   "at": "2026-11-16T05:12:16.192559+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
      "corrections": [],
-     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word.",
+     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -227,7 +238,7 @@
     },
     "E2": {
      "corrections": [],
-     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word.",
+     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -249,7 +260,7 @@
     },
     "P1": {
      "corrections": [],
-     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word.",
+     "error": "₹120 spent of ₹100 on this film's visuals; one image needs about ₹35. Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
      "frames": [],
      "ignored": false,
      "keywords": "",
@@ -316,6 +327,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -373,6 +385,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -431,7 +444,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:43.129098+00:00",
+     "at": "2026-11-16T05:12:16.192559+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

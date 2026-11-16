@@ -378,7 +378,7 @@ def test_steps_and_command_text_carry_the_new_flow():
     assert 'hand-made' not in joined and 'shall the editor' not in joined and 'on their instruction only' in joined   # the operator's file stays, never planned
     md = (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
     assert 'vw guide scene' in md and 'guide shoot' in md and 'take --shots all' not in md and 'status --wait' in md and 'still --shot' in md and 'record --gaps all' in md and 'hand-made' not in md
-    assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap' not in md and 'visuals page' in md and 'vw visuals reject' in md and 'vw visuals feedback' in md
+    assert 'vw visuals treatment' in md and 'vw visuals sequence' in md and 'vw visuals cap --inr N --quote' in md and 'vw visuals likeness --element E --quote' in md and 'visuals page' in md and 'vw visuals reject' in md and 'vw visuals feedback' in md
 
 
 # ---------- design/71: the VideoWizard answer form (F1), a face is a look reference (P5), a retry from the approved picture (P6) ----------
@@ -623,7 +623,7 @@ def test_the_prompt_steps_and_doc_carry_timing_movement_and_no_repeats():
     assert 'A still moves 5 %' in prompt and 'return_of' in prompt and "narration's pauses" in prompt and 'vw visuals clip' in prompt
     for needle in ('never inside a word', 'graphics push_in only', 'at most 4 s, a frozen one 3 s', 'reimagined shot', 'at least 60 s', 'safe enlargement', 'vw visuals reuse --shot S', 'frozen_seconds'):
         assert needle in steps, needle
-    assert 'vw visuals clip --shot S' in doc and 'vw visuals reuse --shot S' in doc and 'return_of' in doc
+    assert 'vw visuals clip --shot S' in doc and 'vw visuals reuse' not in doc and 'is kept when it passes the checks' in doc and 'return_of' in doc   # design/207 (D2): the reuse approval is retired
 
 
 def test_packet_before_bind_says_bind_first_and_bind_names_packet(harness, monkeypatch, capsys):

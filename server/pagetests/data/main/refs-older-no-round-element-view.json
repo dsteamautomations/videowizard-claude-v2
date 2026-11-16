@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:42.307439+00:00",
+   "at": "2026-11-16T05:12:15.384232+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -110,19 +121,19 @@
   },
   "searches": [
    {
-    "at": "2026-11-12T05:38:42.312973+00:00",
+    "at": "2026-11-16T05:12:15.390981+00:00",
     "by": "u1",
     "element_id": "E2",
     "failed": [],
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "bff9ebcb4bae"
+     "d1cf8c177610"
     ],
     "picked": [
      1
     ],
     "quote": "Yes, search for the kiln.",
-    "search_id": "bff9ebcb4bae",
+    "search_id": "d1cf8c177610",
     "results": [
      {
       "download": "picture",
@@ -161,7 +172,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-12T05:38:42.308449+00:00",
+   "at": "2026-11-16T05:12:15.384232+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -181,9 +192,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "bff9ebcb4bae",
+     "search_id": "d1cf8c177610",
      "search_ids": [
-      "bff9ebcb4bae"
+      "d1cf8c177610"
      ],
      "source": "",
      "verdict": "search",
@@ -236,6 +247,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -293,6 +305,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -324,7 +337,7 @@
   ],
   "references": [
    {
-    "id": "740c6f249b321665f7d36c4497555f3f",
+    "id": "780e5f89b3f671cc34653c43bd1ac7b4",
     "name": "web-E2-1",
     "kind": "web",
     "element_id": "E2",
@@ -346,12 +359,12 @@
     "edit": null,
     "locked": null,
     "shot_id": null,
-    "url": "/runs/VW-9/file/run-1/visuals/references/740c6f249b321665f7d36c4497555f3f.png",
+    "url": "/runs/VW-9/file/run-1/visuals/references/780e5f89b3f671cc34653c43bd1ac7b4.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.316153+00:00",
+     "at": "2026-11-16T05:12:15.394995+00:00",
      "quote": "This one, colour only."
     },
     "rejection": null,
@@ -392,7 +405,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.313976+00:00",
+     "at": "2026-11-16T05:12:15.391988+00:00",
      "quote": "Yes: the first frame."
     },
     "rejection": null,

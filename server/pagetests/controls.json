@@ -689,8 +689,8 @@
   "id": "C-3.8-99",
   "section": "3.8",
   "row": "99",
-  "control": "Pictures: reuse words and Approve the reuse",
-  "test": "test_controls_steps.py::test_approve_the_reuse"
+  "control": "Pictures: no reuse approval (retired by design/207; an older waiting reuse shows nothing)",
+  "test": "test_controls_steps.py::test_a_reuse_waits_for_no_approval"
  },
  {
   "id": "C-3.8-100",
@@ -724,8 +724,8 @@
   "id": "C-3.9-104",
   "section": "3.9",
   "row": "104",
-  "control": "Takes: spec, clip, reuse and question controls",
-  "test": "test_controls_steps.py::test_spec_clip_reuse_and_question_on_a_take_card"
+  "control": "Takes: spec, clip and question controls",
+  "test": "test_controls_steps.py::test_spec_clip_and_question_on_a_take_card"
  },
  {
   "id": "C-3.10-105",

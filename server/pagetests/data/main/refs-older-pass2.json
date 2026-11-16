@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:42.293366+00:00",
+   "at": "2026-11-16T05:12:15.375193+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -110,16 +121,16 @@
   },
   "searches": [
    {
-    "at": "2026-11-12T05:38:42.298901+00:00",
+    "at": "2026-11-16T05:12:15.379711+00:00",
     "by": "u1",
     "element_id": "E2",
     "keywords": "clamp kiln Tamil Nadu",
     "pair": [
-     "1d86f39a4869"
+     "cfc7bc82abaa"
     ],
     "picked": [],
     "quote": "Yes, search for the kiln.",
-    "search_id": "1d86f39a4869",
+    "search_id": "cfc7bc82abaa",
     "results": [
      {
       "download": "picture",
@@ -158,7 +169,7 @@
    }
   ],
   "round": {
-   "at": "2026-11-12T05:38:42.293366+00:00",
+   "at": "2026-11-16T05:12:15.375193+00:00",
    "by": "u1",
    "elements": {
     "E1": {
@@ -178,9 +189,9 @@
      "frames": [],
      "ignored": false,
      "keywords": "clamp kiln Tamil Nadu",
-     "search_id": "1d86f39a4869",
+     "search_id": "cfc7bc82abaa",
      "search_ids": [
-      "1d86f39a4869"
+      "cfc7bc82abaa"
      ],
      "source": "",
      "verdict": "search",
@@ -231,6 +242,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -288,6 +300,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -346,7 +359,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.298901+00:00",
+     "at": "2026-11-16T05:12:15.379711+00:00",
      "quote": "Yes: the first frame."
     },
     "rejection": null,

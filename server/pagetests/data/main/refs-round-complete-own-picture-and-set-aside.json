@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:46.570883+00:00",
+   "at": "2026-11-16T05:12:17.841988+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -182,12 +193,12 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-12T05:38:46.577477+00:00",
+   "at": "2026-11-16T05:12:17.842985+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
      "aside": {
-      "at": "2026-11-12T05:38:46.605079+00:00",
+      "at": "2026-11-16T05:12:17.858055+00:00",
       "by": "u1",
       "words": ""
      },
@@ -197,7 +208,8 @@
      "ignored": true,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:46.593903+00:00",
+      "at": "2026-11-16T05:12:17.853580+00:00",
+      "photo": null,
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -255,7 +267,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:46.598721+00:00",
+      "at": "2026-11-16T05:12:17.856487+00:00",
+      "photo": null,
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -281,7 +294,7 @@
   "questions": {},
   "golden": {
    "E1": "F1",
-   "E2": "c95b75640eaaaefcb35ab8bd76dbe77e",
+   "E2": "81883197873ec8f8c96a7895e8067d4c",
    "P1": "be070e7d69133e3b67d5d1a91bc9fe9e"
   },
   "illustrative": {
@@ -320,6 +333,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -377,6 +391,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -408,6 +423,47 @@
   ],
   "references": [
    {
+    "id": "81883197873ec8f8c96a7895e8067d4c",
+    "name": "my-kiln.png",
+    "kind": "supplied",
+    "element_id": "E2",
+    "status": "approved",
+    "sha256": "bd4dff19f47601e4cd53bf2ac252216c6da2fd7fd6a127bcf69fd4a6c306565d",
+    "job_id": null,
+    "width": 64,
+    "height": 48,
+    "check_pending": null,
+    "set": null,
+    "set_n": null,
+    "notes": null,
+    "sources": null,
+    "note": "",
+    "from_thumbnail": false,
+    "sources_changed": false,
+    "golden": true,
+    "from_golden": null,
+    "edit": null,
+    "locked": "This picture is recorded as the starting picture; it can no longer be changed here.",
+    "shot_id": null,
+    "url": "/runs/VW-20/file/run-1/visuals/references/81883197873ec8f8c96a7895e8067d4c.png",
+    "prompt": null,
+    "parents": [],
+    "approval": {
+     "by": "u1",
+     "at": "2026-11-16T05:12:17.846141+00:00",
+     "quote": "Added by the operator on the page"
+    },
+    "rejection": null,
+    "checklist": null,
+    "check": null,
+    "pending_end": false,
+    "end_queued": null,
+    "role": null,
+    "fix_of": null,
+    "fix_queued": null,
+    "fix_for": null
+   },
+   {
     "id": "F1",
     "name": "F1",
     "kind": "frame",
@@ -435,7 +491,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:46.582348+00:00",
+     "at": "2026-11-16T05:12:17.846141+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -481,7 +537,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:46.608200+00:00",
+     "at": "2026-11-16T05:12:17.858055+00:00",
      "quote": "Yes."
     },
     "rejection": null,
@@ -527,7 +583,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:46.608200+00:00",
+     "at": "2026-11-16T05:12:17.858055+00:00",
      "quote": "Yes."
     },
     "rejection": null,
@@ -573,49 +629,8 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:46.608200+00:00",
+     "at": "2026-11-16T05:12:17.858055+00:00",
      "quote": "Yes."
-    },
-    "rejection": null,
-    "checklist": null,
-    "check": null,
-    "pending_end": false,
-    "end_queued": null,
-    "role": null,
-    "fix_of": null,
-    "fix_queued": null,
-    "fix_for": null
-   },
-   {
-    "id": "c95b75640eaaaefcb35ab8bd76dbe77e",
-    "name": "my-kiln.png",
-    "kind": "supplied",
-    "element_id": "E2",
-    "status": "approved",
-    "sha256": "bd4dff19f47601e4cd53bf2ac252216c6da2fd7fd6a127bcf69fd4a6c306565d",
-    "job_id": null,
-    "width": 64,
-    "height": 48,
-    "check_pending": null,
-    "set": null,
-    "set_n": null,
-    "notes": null,
-    "sources": null,
-    "note": "",
-    "from_thumbnail": false,
-    "sources_changed": false,
-    "golden": true,
-    "from_golden": null,
-    "edit": null,
-    "locked": "This picture is recorded as the starting picture; it can no longer be changed here.",
-    "shot_id": null,
-    "url": "/runs/VW-20/file/run-1/visuals/references/c95b75640eaaaefcb35ab8bd76dbe77e.png",
-    "prompt": null,
-    "parents": [],
-    "approval": {
-     "by": "u1",
-     "at": "2026-11-12T05:38:46.582348+00:00",
-     "quote": "Added by the operator on the page"
     },
     "rejection": null,
     "checklist": null,

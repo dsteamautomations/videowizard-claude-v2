@@ -638,13 +638,6 @@ def _record_items(ctx):
     return items
 
 
-def _asked(store, run, outputs, key, value):
-    """Remember that the operator answered this, where the server keeps no state of its own for the answer, so it is not asked twice."""
-    s = V.session_of(store, run, outputs)
-    s.setdefault('chat_asked', {})[key] = value
-    V.save_session(store, run, s)
-
-
 def flush_sets(conn, store, user, run, outputs, quote=''):
     """Record every whole answer kept on a reference set (the operator gave each one in the chat). None while a set is still being made, or when
     there is nothing to record: the answers stay kept. Any other refusal of the server is raised as it is."""
@@ -723,7 +716,7 @@ SAYS = {'Accept': 'Take it as it is', 'Change this': 'I will ask you what to cha
         'None of these': 'None is right; the set is made again', 'Select': 'Use it in the film', 'Reject': 'I will ask you what is wrong with it', 'Approve': 'It is right; go on',
         'Shoot': 'Make the take now (paid)', 'Send it again': 'Send the same request once more (paid)', 'Not yet': 'I will ask you what should change first', 'Record it': 'Put this gap into the film',
         'Leave it out': 'This thing gets no reference', 'Make it': 'Make the set now (paid)', 'Yes, use it': 'Use the footage picture', 'Yes, make one': 'Have a set made (paid)',
-        'Take the effect away': 'Make the drawing again without the added effect', 'Yes, reuse it': 'Show the same picture again here', 'No, another picture': 'I will ask you what you want there'}
+        'Take the effect away': 'Make the drawing again without the added effect'}
 
 
 def _says(label):

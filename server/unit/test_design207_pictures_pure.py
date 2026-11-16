@@ -407,3 +407,11 @@ def test_the_page_data_carries_the_permission_records():
     assert view(store, conn)['likeness'] == {}
     yes(store, conn)
     assert view(store, conn)['likeness']['P1']['quote'] == WORDS
+
+
+def test_the_elements_answer_leaves_out_an_animal_and_names_it_as_needing_no_reference():
+    """design/207 (D4): `vw visuals elements` lists what the reference round takes; a living extra is carried by its words."""
+    plan = {'elements': [MASON, KILN, DOG, {'id': 'G1', 'name': 'Chart', 'kind': 'graphic'}]}
+    out = VS.elements_answer(plan, [])
+    assert [e['id'] for e in out['elements']] == [MASON['id'], KILN['id']] and out['graphics'] == ['G1'] and out['no_reference'] == ['DOG']
+    assert set(out['matches']) == {MASON['id'], KILN['id']}

@@ -112,6 +112,8 @@ if __name__ == '__main__':
         from d206_wording_v3 import apply as d206, apply_steps as d206s   # design/206: the plan answered on the page in one visit
         prompt = d206(prompt, parts)
         d206s(steps)
+        from d207_wording_v3 import apply as d207   # design/207: the visuals rules after the review (any kind of AI video, the world, likeness, the page, the cost limit by length)
+        prompt = d207(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

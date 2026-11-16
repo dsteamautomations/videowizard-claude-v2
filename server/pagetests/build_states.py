@@ -487,7 +487,7 @@ def _():
     return store, conn, NEW
 
 
-@state('controls-pictures-many', 'pictures', note='reuse_pending is set directly: the reuse gate writes it when a placement repeats footage already on screen')
+@state('controls-pictures-many', 'pictures', note='reuse_pending is set directly: a waiting reuse left by a session from before design/207 (the approval is retired; the page shows nothing for it)')
 def _():
     _, store, conn = complete()
     edit(store, lambda s: s['references'].update(K0={**keyframe('K0', 'IM1', 'rejected'), 'rejection': {'notes': 'the mark reads 320 mm', 'quote': 'No.', 'by': 'u1'}}, K1=keyframe('K1', 'IM1'),
@@ -544,7 +544,7 @@ def _():
     return store, conn, NEW
 
 
-@state('controls-takes-two-takes', 'takes', note='reuse_pending is set directly, as in controls-pictures-many')
+@state('controls-takes-two-takes', 'takes')
 def _():
     _, store, conn = complete()
     edit(store, lambda s: s['references'].update(K0={**keyframe('K0', 'VS1', 'rejected', role='start'), 'rejection': {'notes': 'too dark', 'quote': 'No.', 'by': 'u1'}},

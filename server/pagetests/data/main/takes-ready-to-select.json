@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:42.748490+00:00",
+   "at": "2026-11-16T05:12:15.835415+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -182,7 +193,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-12T05:38:42.749496+00:00",
+   "at": "2026-11-16T05:12:15.836415+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -192,7 +203,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:42.757554+00:00",
+      "at": "2026-11-16T05:12:15.842497+00:00",
+      "photo": null,
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -235,7 +247,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:42.763073+00:00",
+      "at": "2026-11-16T05:12:15.845500+00:00",
+      "photo": null,
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -257,7 +270,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:42.766593+00:00",
+      "at": "2026-11-16T05:12:15.848021+00:00",
+      "photo": null,
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -332,6 +346,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -400,10 +415,12 @@
         "selected": false,
         "checklist": null,
         "check": null,
-        "sheet_url": null
+        "sheet_url": null,
+        "pair_url": null
        }
       ],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -467,7 +484,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -513,7 +530,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -554,7 +571,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.751007+00:00",
+     "at": "2026-11-16T05:12:15.837415+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,
@@ -637,7 +654,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -683,7 +700,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -729,7 +746,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -775,7 +792,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -821,7 +838,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,
@@ -867,7 +884,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:42.768602+00:00",
+     "at": "2026-11-16T05:12:15.849790+00:00",
      "quote": "Pass one."
     },
     "rejection": null,

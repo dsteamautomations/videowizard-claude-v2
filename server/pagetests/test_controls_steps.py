@@ -261,16 +261,12 @@ def test_use_a_stretch_of_a_clip(open_page, _id):
 
 
 @ident('C-3.8-99')
-def test_approve_the_reuse(open_page, _id):
+def test_a_reuse_waits_for_no_approval(open_page, _id):
+    """design/207 (D2): the reuse approval is retired. A session that still holds a waiting reuse from before shows no approval box."""
     put = open_page('controls-pictures-many')
     show(put, 'IM1')
-    assert 'Clip C0120 is already on screen in G1 at 0:04.' in put.text('#card-IM1')
-    put.click('#card-IM1 button[data-a="approve-reuse"]')
-    assert put.red_line() == 'Say in your words why the same footage is right here.'
-    no_post(put)
-    put.page.fill('[id="rw-IM1"]', 'It is the same wall, later.')
-    put.click('#card-IM1 button[data-a="approve-reuse"]')
-    assert only_post(put) == {'action': 'approve-reuse', 'shot_id': 'IM1', 'quote': 'It is the same wall, later.'}
+    assert put.page.locator('#card-IM1 button[data-a="approve-reuse"]').count() == 0 and put.page.locator('[id="rw-IM1"]').count() == 0
+    assert 'is already on screen in' not in put.text('#card-IM1')
 
 
 @ident('C-3.8-100')
@@ -318,7 +314,7 @@ def test_play(open_page, _id):
 
 
 @ident('C-3.9-104')
-def test_spec_clip_reuse_and_question_on_a_take_card(open_page, _id):
+def test_spec_clip_and_question_on_a_take_card(open_page, _id):
     spec = open_page('pictures-drawing-specs-waiting-drawn-only-film', tab='takes')
     show(spec, 'DG2')
     spec.click('#card-DG2 button[data-a="approve-spec"]')
@@ -327,11 +323,6 @@ def test_spec_clip_reuse_and_question_on_a_take_card(open_page, _id):
     show(q, 'VS1')
     q.page.locator('#card-VS1 button[data-a="answer"]', has_text='A hose').click()
     assert only_post(q) == {'action': 'answer', 'item': 'VS1', 'answer': 'A hose'}
-    reuse = open_page('controls-takes-two-takes')
-    show(reuse, 'VS1')
-    reuse.page.fill('[id="rw-VS1"]', 'The same pour, closer.')
-    reuse.click('#card-VS1 button[data-a="approve-reuse"]')
-    assert only_post(reuse) == {'action': 'approve-reuse', 'shot_id': 'VS1', 'quote': 'The same pour, closer.'}
     clip = open_page('controls-takes-two-takes')
     show(clip, 'VS1')
     clip.page.locator('#card-VS1 details', has_text='Use a stretch of a clip instead').last.locator('summary').first.click()

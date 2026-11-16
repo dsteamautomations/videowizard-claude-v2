@@ -25,10 +25,10 @@ def test_the_round_and_pick_lines_make_a_persons_sheet_from_words(harness, monke
     assert code == 0 and "a person's from words" in err and 'design/' not in err
 
 
-def test_the_elements_line_names_the_operators_picture_then_google_on_their_yes(harness, monkeypatch, capsys):
+def test_the_elements_line_names_the_operators_picture_then_the_round(harness, monkeypatch, capsys):   # design/207: was "then Google on their yes, or the sheet from words"
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'elements': [{'id': 'E1', 'name': 'Kadapari'}], 'matches': {}})
     code, out, err = run(args(what='elements'), capsys)
-    assert code == 0 and "the operator's own picture (`supply`)" in err and 'Google on their yes' in err
+    assert code == 0 and "the operator's own picture (`vw visuals own`), else its set is made in the round" in err and 'Google' not in err
 
 
 def test_the_continuity_refusal_speaks_of_the_shot_not_two_frames(harness, capsys):

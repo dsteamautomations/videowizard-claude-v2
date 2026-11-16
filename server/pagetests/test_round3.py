@@ -7,7 +7,7 @@ import io
 
 from kit import answer_all, card, golden, ident, last_of, no_post, only_post, opened, panel, press_done, show, verdict
 
-PEOPLE = "A person's reference is made from the description; an uploaded photo is not used for people."
+PEOPLE = "With their permission you can upload their photo and their sheet is made from it. Without it this person is a stand-in, made from the description."   # design/207 (D1): the line under the permission box, while no permission is recorded
 REFUSED = 'The plan, references or generator changed since this take was prepared; prepare a current take.'
 
 
@@ -162,6 +162,7 @@ def test_upload_my_own_picture_is_on_the_card_of_a_thing_or_a_place_and_not_of_a
         show(put, 'P1')
         assert card(put, 'P1').locator('[data-own], input[type=file], button[data-a="supply"]').count() == 0, f'{state}: a person\'s card offers an upload'
         assert PEOPLE in card(put, 'P1').inner_text(), f'{state}: the person\'s card does not say why there is no upload'
+        assert card(put, 'P1').locator('[data-own-no="P1"] button[data-a="likeness"][data-el="P1"]').count() == 1, f'{state}: no permission line on the person\'s card'   # design/207 (D1)
     put = open_page('refs-sets-being-made')   # nothing to choose between yet
     assert put.page.locator('#s-references [data-own]').count() == 0
 

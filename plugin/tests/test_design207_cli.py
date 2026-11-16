@@ -64,3 +64,20 @@ def test_reuse_is_retired_by_name_and_sends_nothing(harness, monkeypatch, capsys
     sent = posts(monkeypatch, {})
     code, out, err = run(args(what='reuse', shot='VS1', quote='Yes, reuse it.'), capsys)
     assert code == 2 and not sent and "no longer needs the operator's approval" in out['message'] and '--reuse' in out['message'] and '--considered' in out['message']
+
+
+def test_elements_says_how_each_unseen_thing_gets_its_reference_and_that_an_animal_has_none(harness, monkeypatch, capsys):
+    """design/207 (D3, D4): every person gets a sheet (a stand-in from the description, or their own photo with permission); an animal has no reference."""
+    monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'elements': [{'id': 'P1', 'kind': 'person'}, {'id': 'E1', 'kind': 'object'}], 'graphics': [], 'no_reference': ['DOG'], 'matches': {}})
+    code, out, err = run(args(what='elements'), capsys)
+    assert code == 0 and 'sheet from words' not in err and '`search`' not in err
+    assert 'P1: not seen in the footage: the character sheet is made from the description (a stand-in), or from their own photo with their permission (`vw visuals likeness`, then `vw visuals own`)' in err
+    assert "E1: not seen in the footage: the operator's own picture (`vw visuals own`), else its set is made in the round" in err
+    assert 'No reference for DOG: a living extra is carried by its words.' in err
+
+
+def test_prepare_says_the_cost_limit_and_where_it_comes_from():
+    assert vw.cap_line({'cap_inr': 2250.0, 'cap_from': 'length'}) == "The cost limit of this film's visuals is ₹2,250, from the film's length: tell the operator. "
+    assert vw.cap_line({'cap_inr': 3000.0, 'cap_from': 'owner'}) == "The cost limit of this film's visuals is ₹3,000, set by the owner: tell the operator. "
+    assert vw.cap_line({'cap_inr': 5000.0, 'cap_from': 'older'}) == "The cost limit of this film's visuals is ₹5,000: tell the operator. "
+    assert vw.cap_line({}) == ''   # an older server

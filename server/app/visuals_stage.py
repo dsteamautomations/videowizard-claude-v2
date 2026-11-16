@@ -2830,6 +2830,15 @@ def _words(text):
     return {(w[:-1] if w.endswith('s') and len(w) > 4 else w) for w in re.findall(r'[a-z]{4,}', str(text or '').lower()) if w not in STOP}   # bricks and brick are one word
 
 
+def elements_answer(plan, world):
+    """design/73 R1; design/207 (D4): what `vw visuals elements` answers: the elements the reference round takes and where the footage shows each. A graphic is
+    drawn and a living extra (kind animal) is carried by its words, so neither is listed; the animals are named in `no_reference`."""
+    listed = [e for e in plan['elements'] if e['kind'] not in ('graphic', 'animal')]
+    matches = element_matches(plan, world)
+    return {'elements': listed, 'graphics': [e['id'] for e in plan['elements'] if e['kind'] == 'graphic'],   # L43: graphics are drawn, never searched
+            'no_reference': [e['id'] for e in plan['elements'] if e['kind'] == 'animal'], 'matches': {e['id']: matches[e['id']] for e in listed}}
+
+
 def element_matches(plan, world):
     """design/73 R1: where each person, object or place element is seen in the footage, from the clip logs' entities, by word overlap and kind; best first."""
     out = {}

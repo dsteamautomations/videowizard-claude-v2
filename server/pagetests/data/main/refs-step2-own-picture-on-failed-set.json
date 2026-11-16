@@ -19,14 +19,18 @@
   "versions": 1,
   "footage": null,
   "reuse_pending": {},
+  "likeness": {},
   "clips": [],
   "graphic_style": null,
   "measurements": [],
   "treatment": {
-   "at": "2026-11-12T05:38:46.406521+00:00",
+   "at": "2026-11-16T05:12:17.770380+00:00",
    "by": "u1",
    "digest": "b8d62c8d7f654e35e8de0d5572d9f35682cd383dcdedde09e4acd941e029e04a",
    "direction": "technical record with scenes of work",
+   "direction_missing": [
+    "The Direction is not in its six parts."
+   ],
    "estimate_inr": 103.58,
    "gaps": [
     {
@@ -54,10 +58,16 @@
     }
    ],
    "quote": "Yes, this treatment.",
+   "reasons_missing": [
+    "gap G1: say fits_why (why the picture fits the words) and way_why (why it is made this way).",
+    "gap G2: say fits_why (why the picture fits the words) and way_why (why it is made this way)."
+   ],
+   "rerun_allowance_inr": 24.0,
    "totals": {
     "frozen_seconds": 0.0,
     "gaps": 2,
     "images": 2,
+    "moving_seconds": 10.0,
     "routes": {
      "still": 1,
      "video": 1
@@ -65,7 +75,8 @@
     "seconds": {
      "still": 20.0,
      "video": 10.0
-    }
+    },
+    "still_seconds": 20.0
    },
    "warnings": []
   },
@@ -182,7 +193,7 @@
   },
   "searches": [],
   "round": {
-   "at": "2026-11-12T05:38:46.409536+00:00",
+   "at": "2026-11-16T05:12:17.772384+00:00",
    "by": "u1",
    "elements": {
     "BRICK": {
@@ -193,7 +204,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:46.422172+00:00",
+      "at": "2026-11-16T05:12:17.776396+00:00",
+      "photo": null,
       "specs": {
        "BRICK": "beac3e74ea20e9e310950ac5898aef354d5c41d211493f3aa283eb7eef0be6c9"
       }
@@ -235,7 +247,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:46.436341+00:00",
+      "at": "2026-11-16T05:12:17.778732+00:00",
+      "photo": null,
       "specs": {}
      },
      "prompt": "the kiln during firing",
@@ -257,7 +270,8 @@
      "ignored": false,
      "keywords": "",
      "made": {
-      "at": "2026-11-12T05:38:46.446839+00:00",
+      "at": "2026-11-16T05:12:17.780763+00:00",
+      "photo": null,
       "specs": {}
      },
      "prompt": "kneels all day",
@@ -282,7 +296,7 @@
   "kept": true,
   "questions": {},
   "golden": {
-   "BRICK": "760efde35cfd16a70b721c877da9686c",
+   "BRICK": "36728fbc7b54f2713b5fbe83eb54335b",
    "E1": "F1"
   },
   "illustrative": {
@@ -338,6 +352,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -395,6 +410,7 @@
       "asset": null,
       "takes": [],
       "prepared": false,
+      "guide": null,
       "changes": [],
       "motion": null,
       "pair_check": null,
@@ -510,7 +526,7 @@
     "fix_for": null
    },
    {
-    "id": "760efde35cfd16a70b721c877da9686c",
+    "id": "36728fbc7b54f2713b5fbe83eb54335b",
     "name": "my-brick.png",
     "kind": "supplied",
     "element_id": "BRICK",
@@ -532,12 +548,12 @@
     "edit": null,
     "locked": "This picture is recorded as the starting picture; it can no longer be changed here.",
     "shot_id": null,
-    "url": "/runs/VW-20/file/run-1/visuals/references/760efde35cfd16a70b721c877da9686c.png",
+    "url": "/runs/VW-20/file/run-1/visuals/references/36728fbc7b54f2713b5fbe83eb54335b.png",
     "prompt": null,
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:46.465959+00:00",
+     "at": "2026-11-16T05:12:17.784760+00:00",
      "quote": "Added by the operator on the page"
     },
     "rejection": null,
@@ -578,7 +594,7 @@
     "parents": [],
     "approval": {
      "by": "u1",
-     "at": "2026-11-12T05:38:46.411047+00:00",
+     "at": "2026-11-16T05:12:17.772384+00:00",
      "quote": "Yes, the frame."
     },
     "rejection": null,

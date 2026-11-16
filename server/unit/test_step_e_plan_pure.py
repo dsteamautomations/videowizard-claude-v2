@@ -101,4 +101,4 @@ def test_the_instructions_say_fifteen_seconds_the_guide_and_no_longer_teach_the_
     assert '`vw:guide` skill' in text and '`vw guide shoot --shot S --quote' in text and 'vw guide cause' in text and 'one still per AI video shot' in text
     for gone in ('3 to 10 s', '2 to 10 s', 'makes 3 to 10 seconds', 'vw visuals prepare-take --shot S --start', 'vw visuals take --shots all', 'never a start image before the packet', 'clip-from-frame'):
         assert gone not in text, gone
-    assert 'not yet available as AI video' in text and 'two rejected takes from one camera' in text
+    assert 'not yet available' not in text and 'Any kind of shot may be an AI video' in text and '`recipe: other`' in text and 'two rejected takes from one camera' in text   # design/207: any kind of shot

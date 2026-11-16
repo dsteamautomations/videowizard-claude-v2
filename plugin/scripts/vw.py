@@ -1080,6 +1080,14 @@ def review_page_url(code):
     return f"{server_url()}/runs/{code}/review"   # design/62: the review film with each slide's buttons; approve the options and decide there
 
 
+def cap_line(out):
+    """design/207: the film's cost limit as `vw visuals prepare` says it, from the server's answer; nothing from a server that does not send it."""
+    if not out.get('cap_inr'):
+        return ''
+    how = {'length': ", from the film's length", 'owner': ', set by the owner'}.get(out.get('cap_from'), '')
+    return f"The cost limit of this film's visuals is ₹{out['cap_inr']:,.0f}{how}: tell the operator. "
+
+
 def visuals_page_url(code):
     return f"{server_url()}/runs/{code}/visuals"   # design/65: the treatment, the pictures, the sequences and the takes, approved by click
 
@@ -1979,7 +1987,7 @@ def cmd_visuals(a):
         emit({**out, 'files': files, 'not_shareable': NOT_SHAREABLE}, 0,   # design/188: no page link; the operator decides in the chat
              f"Visuals package for reading in work/visuals/ ({len(files)} files, listed in `files`); gaps: {out['gaps']}. Read prompt.md, then part-preparation.md (what to read first). "
              f"Settle the treatment with the operator and record it before any plan. The image prompt library is in work/visuals/library/: read always/ once, and a step's folder once before its first prompt (steps.json maps them). "
-             f"Visuals page (give the operator this link): {url}. " + told)
+             f"Visuals page (give the operator this link): {url}. " + cap_line(out) + told)
     if a.what == 'footage':   # design/88 F4: the measured footage, told; a correction only with the operator's words
         if not (a.camera or a.support or a.look):
             f = call('GET', base).get('footage') or {}
@@ -2161,7 +2169,9 @@ def cmd_visuals(a):
         lines = []
         for e in out.get('elements') or []:
             hits = (out.get('matches') or {}).get(e['id']) or []
-            lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else "not seen in the footage: the operator's own picture (`supply`), Google on their yes (`search`), or the sheet from words"))
+            lines.append(f"{e['id']}: " + (f"seen in {hits[0]['clip']} at {hits[0].get('seconds')} s ({hits[0].get('entity')})" + (f" and {len(hits) - 1} more clip(s)" if len(hits) > 1 else '') if hits else 'not seen in the footage: the character sheet is made from the description (a stand-in), or from their own photo with their permission (`vw visuals likeness`, then `vw visuals own`)'
+                         if e.get('kind') == 'person' else "not seen in the footage: the operator's own picture (`vw visuals own`), else its set is made in the round"))   # design/207 (D3)
+        lines += [f'No reference for {eid}: a living extra is carried by its words.' for eid in out.get('no_reference') or []]   # design/207 (D4)
         emit({'file': 'work/visuals/elements.json', 'elements': len(out.get('elements') or [])}, 0, 'Elements against the footage (work/visuals/elements.json): ' + '; '.join(lines))
     if a.what == 'ask':   # design/110 rule 0: the question is a server state on the item
         choices = [c.strip() for c in str(a.choices or '').split('|') if c.strip()]
