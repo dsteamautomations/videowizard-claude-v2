@@ -83,9 +83,13 @@ def description(spec, things=None):
         else:
             piece = {'shape': 'box', 'min': list(lo), 'max': list(hi)}
         add(s['id'], s['name'], s['colour'], lo, hi, piece, s.get('drawn_as'), s.get('turn'))
+        if s.get('path'):   # design/207: the drawing shows the moment the take starts
+            notes.append(f"{s['name']} ({s['id']}) moves in this shot; it is drawn where it starts.")
     for pr in spec.get('props') or []:
         lo, hi = G.prop_box(spec, pr, 0.0)
         add(pr['id'], pr['name'], pr['colour'], lo, hi, {'shape': 'box', 'min': list(lo), 'max': list(hi)}, pr.get('drawn_as'), pr.get('turn'))
+        if pr.get('path'):
+            notes.append(f"{pr['name']} ({pr['id']}) moves in this shot; it is drawn where it starts.")
     people = []
     for p in spec.get('people') or []:
         if not _in_front(spec, G.person_corners(p, 0.0)):

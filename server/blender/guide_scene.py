@@ -7,7 +7,7 @@
 # What the building blocks reproduce (the consultant's finished film and our own runs): box people with black face and chest marks
 # (front = local -Y), bar arms from the shoulder to the hand point, a prop keyed to the hand that holds it on every frame, a walk bob,
 # a camera held still with a tiny handheld drift, a sun and a plain sky. Positions at every moment come from guide_spec, the same module
-# the checks before spend use.
+# the checks before spend use. A piece of the set on a `path` (design/207) is keyed on every frame as a walker's root is.
 import json
 import math
 import os
@@ -94,8 +94,8 @@ def main():
             o.data.materials.append(mat(s['colour']))
         else:
             o = box(s['id'], s['min'], s['max'], s['colour'])
-        if s.get('spin'):
-            spun.append((o, s['spin'], tuple(o.rotation_euler)))
+        if s.get('spin') or s.get('path'):
+            spun.append((o, s, tuple(o.location), tuple(o.rotation_euler)))
 
     # ---- the people: boxes with face and chest marks; arms as bars ----
     people = []
@@ -158,11 +158,17 @@ def main():
         for pr, o in props:
             o.location = G.prop_at(spec, pr, t)
             o.keyframe_insert('location', frame=f)
-        for o, spin, rest in spun:
-            keys = [{'t': k['t'], 'at': (k['deg'], 0, 0)} for k in spin['keys']]
-            deg = G._keys(keys, t)[0]
+        for o, s, at, rest in spun:
             r = list(rest)
-            r['XYZ'.index(spin['axis'])] += math.radians(deg)
+            if s.get('spin'):
+                spin = s['spin']
+                keys = [{'t': k['t'], 'at': (k['deg'], 0, 0)} for k in spin['keys']]
+                deg = G._keys(keys, t)[0]
+                r['XYZ'.index(spin['axis'])] += math.radians(deg)
+            if s.get('path'):   # design/207: the thing travels; its place and heading are keyed like a walker's root
+                o.location = G._add(at, G._sub(G._keys(s['path'], t), s['path'][0]['at']))
+                o.keyframe_insert('location', frame=f)
+                r[2] += G._turn(s, t)
             o.rotation_euler = r
             o.keyframe_insert('rotation_euler', frame=f)
         p_ = cpos + shake(t, 0.003, 0.7)

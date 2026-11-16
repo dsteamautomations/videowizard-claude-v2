@@ -354,14 +354,17 @@ def set_prompt(conn, store, user, run, outputs, shot_id, prompt):
 
 
 def ready_card(session, shot_id, price_per_s):
-    """What the operator sees before any video is paid for, and what is still missing."""
+    """What the operator sees before any video is paid for, and what is still missing. design/207: the scene's warnings that matter before a paid
+    take (an untried kind, a run, people whose paths overlap, nothing moving) are repeated here, in the line both front ends already show."""
     g = entry_of(session, shot_id)
+    warnings = [r['message'] for r in g.get('checks') or [] if r.get('before_take')]
     still = next((s for s in g.get('stills') or [] if s.get('status') == 'approved' and s.get('guide_sha256') == g['sha256']), None)
     missing = [what for ok, what in (((g.get('render') or {}).get('status') == 'ready', 'the rendered guide'), (still is not None, 'an approved still made from this guide'),
                                      (bool(still and still.get('overlay_key')), 'the overlay'), (bool(g.get('take_prompt')), "the take's words")) if not ok]
     return {'shot_id': shot_id, 'ready': not missing, 'missing': missing, 'seconds': g['seconds'], 'cost_inr': round(g['seconds'] * price_per_s, 2),
             'guide_key': (g.get('render') or {}).get('guide_key'), 'strip_key': (g.get('frames') or {}).get('strip_key'), 'still': still,
-            'prompt': effective_prompt(g, g['take_prompt']['prompt']) if g.get('take_prompt') else None, 'look_for': 'On the overlay: every person and thing of the still sits on the red outlines of the guide.'}
+            'prompt': effective_prompt(g, g['take_prompt']['prompt']) if g.get('take_prompt') else None, 'warnings': warnings,
+            'look_for': 'On the overlay: every person and thing of the still sits on the red outlines of the guide.' + (' Before you pay: ' + ' '.join(warnings) if warnings else '')}
 
 
 def shoot(conn, store, user, run, outputs, shot_id, quote, again=False):

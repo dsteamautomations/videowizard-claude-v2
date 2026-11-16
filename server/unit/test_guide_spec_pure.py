@@ -99,7 +99,7 @@ def test_the_two_fixtures_have_no_shape_problems_and_pass_every_refusal():
 
 
 @pytest.mark.parametrize('change, word', [
-    (lambda s: s.update(recipe='crowd'), 'not yet available'),
+    (lambda s: s.update(recipe='crowd'), 'one of walker, one_action_close, transfer_close, other'),   # design/207: a fourth word, other
     (lambda s: s.update(process_note='He walks.'), 'process_note'),
     (lambda s: s.update(seconds=16), 'whole number from 3 to 15'),
     (lambda s: s.update(seconds=2), 'whole number from 3 to 15'),
@@ -171,18 +171,18 @@ def test_a_path_through_a_wall_is_refused_and_a_person_standing_on_a_floor_is_no
     assert 'the father passes through' in said(G.checks(spec), 'clash')
 
 
-def test_a_box_faster_than_the_top_speed_is_refused_and_a_pace_off_its_band_is_warned():
+def test_a_box_faster_than_a_walk_is_warned_and_a_pace_off_its_band_is_warned():
     spec = home_walk()
     spec['people'][0]['path'][1]['at'] = [-2.2 + 3.0 * 5, -0.8, 0.0]
-    assert '3.00 m/s' in said(G.checks(spec), 'speed')
+    assert '3.00 m/s' in said(G.checks(spec), 'speed', 'warn') and not said(G.checks(spec), 'speed')   # design/207: a run warns, it is no longer refused
     spec['people'][0]['path'][1]['at'] = [-2.2 + 1.7 * 5, -0.8, 0.0]
     assert levels(G.checks(spec), 'speed') == [] and 'stroll' in said(G.checks(spec), 'pace', 'warn')
 
 
-def test_a_walker_passing_in_front_of_somebody_is_refused():
+def test_a_walker_passing_in_front_of_somebody_is_warned():
     spec = home_walk()
     spec['people'][0]['path'] = [{'t': 0, 'at': [2.5, -0.8, 0.0]}, {'t': 5, 'at': [6.5, -0.8, 0.0]}]   # the father walks past the mother, between her and the camera
-    assert 'the father and the mother overlap in the picture' in said(G.checks(spec), 'crossing')
+    assert 'the father and the mother overlap in the picture' in said(G.checks(spec), 'crossing', 'warn') and not said(G.checks(spec), 'crossing')   # design/207
 
 
 def test_two_people_in_place_who_overlap_are_a_warning_only():

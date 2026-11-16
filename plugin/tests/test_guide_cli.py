@@ -146,7 +146,12 @@ def test_the_helpers_and_the_skill_exist_and_the_checker_cannot_run_anything():
     skill = (PLUGIN / 'skills' / 'guide' / 'SKILL.md').read_text(encoding='utf-8')
     assert 'name: vw-guide-scene' in scene and 'vw:guide' in scene and 'never run Blender' in scene
     assert 'name: vw-guide-check' in check and 'tools: Read, Write, Glob' in check and 'did not build it' in check
-    assert 'name: guide' in skill and 'not yet available' in skill and 'ONE action only' in skill and "only on the operator's word" in skill
+    assert 'name: guide' in skill and 'ONE action only' in skill and "only on the operator's word" in skill
+    # design/207: any kind of shot may be an AI video; three kinds are proven here; a thing travels along a timed path
+    assert 'not yet available' not in skill and 'not yet available' not in scene
+    for word in ('Any kind of shot may be an AI video', 'proven here', '`other`', 'has not been tried here', 'A thing on a path', '"path"', 'Nobody is in view', 'lips will not match'):
+        assert word in skill, word
+    assert '`other`' in scene and 'trial' in scene
     for text in (PLUGIN / 'operator-CLAUDE.md', PLUGIN / 'commands' / 'vw.md'):
         assert 'vw-guide-scene' in text.read_text(encoding='utf-8') and 'vw-guide-check' in text.read_text(encoding='utf-8')
 

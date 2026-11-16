@@ -146,9 +146,9 @@ def test_the_same_scene_again_queues_nothing(film):
 
 
 @pytest.mark.parametrize('change, word', [
-    (lambda s: s.update(recipe='crowd'), 'not yet available'),
+    (lambda s: s.update(recipe='crowd'), 'one of walker, one_action_close, transfer_close, other'),
     (lambda s: (s.clear(), s.update(home_walk())), "the shot's slot is 10.0 s"),   # a 5 s guide for a 10 s slot
-    (lambda s: s['people'][0]['path'].__setitem__(1, {'t': 10, 'at': [40.0, -0.8, 0.0]}), 'm/s'),
+    (lambda s: s['people'][0]['path'].__setitem__(1, {'t': 10, 'at': [2.0, 3.0, 0.0]}), 'passes through'),
 ])
 def test_a_scene_is_refused_before_anything_is_rendered(film, change, word):
     store, conn = film
@@ -156,6 +156,22 @@ def test_a_scene_is_refused_before_anything_is_rendered(film, change, word):
     change(spec)
     assert word in refused(lambda: scene(store, conn, spec))
     assert conn.queued == [] and 'guides' not in saved(store) and conn.rows == []
+
+
+def test_a_runner_and_a_shot_of_another_kind_are_taken_and_their_warnings_reach_the_assistant_and_the_card(film):
+    """design/207: a run and an untried kind warn; the warnings come back with the scene and are repeated on the ready-to-shoot card."""
+    store, conn = film
+    spec = spec10()
+    spec['recipe'] = 'other'
+    spec['people'][0]['path'][1] = {'t': 10, 'at': [40.0, -0.8, 0.0]}
+    out = scene(store, conn, spec)
+    said = ' '.join(out['warnings'])
+    assert 'has not been tried here' in said and 'm/s' in said and 'A run has failed' in said and 'not yet available' not in said
+    s = saved(store)
+    assert s['guides']['VS1']['recipe'] == 'other' and len(conn.queued) == 1
+    card = GD.ready_card(s, 'VS1', 8.0)
+    assert len(card['warnings']) >= 2 and 'Before you pay: ' in card['look_for'] and 'has not been tried here' in card['look_for']
+    assert 'has not been tried here' in GD.view(s, 'VS1', lambda k: k)['card']['look_for']
 
 
 def test_a_guide_is_only_for_an_ai_video_shot(film):
