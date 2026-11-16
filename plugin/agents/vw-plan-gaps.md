@@ -32,4 +32,4 @@ Before you write, every shot and scene carries (the check refuses or warns witho
 
 Nothing in the frame vanishes: everything in the shot at its start is accounted for at its end, still there at a stated place or gone by a stated action of someone; anything that moves or is moved is a named subject or prop of the shot.
 
-The main assistant joins the files (`vw visuals plan-join`) and runs the check; a gap it sends back to you is revised in your gap file the same way (the joined plan is never edited by hand). Write your file before your closing report: the file is the proof you finished when the report does not arrive.
+The main assistant joins the files (`vw visuals plan-join`) and runs the check; a gap it sends back to you, before or after the plan is proposed, is revised in your gap file the same way (never in the joined plan: the join carries your file onto the plan and keeps the corrections already in it). Change only what was asked: a part you rewrite that was also corrected in the plan is refused at the join. Write your file before your closing report: the file is the proof you finished when the report does not arrive.

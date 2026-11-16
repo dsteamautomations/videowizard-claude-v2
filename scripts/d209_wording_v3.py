@@ -22,6 +22,11 @@ PAIRS = [   # (where: common or a part's name, the old sentence, the new one)
     ('later', 'it is shown on the References step beside the sheet and approved once (`vw visuals spec --element E`; a correction: `vw visuals spec --element E --notes`);',
      'it is approved once, on the page with the drawings (`vw visuals page`, after the plan is accepted; in the chat only where the page cannot be shown; a correction said in the '
      'chat: `vw visuals spec --element E --notes`);'),
+    ('plan', 'fix what it names in the gap file (its helper for a judgement, you for a field or a spelling), join again, check again; out/visual-plan.json is never edited by '
+             'hand (the join refuses to overwrite one that was; `--rebuild` drops the edits).',
+     'fix what it names in the gap file (its helper for a judgement, you for a field or a spelling) or, for a shared part, in out/plan-base.json; join again, check again, '
+     "before a proposal and after one: after a proposal the join carries your changes onto the server's plan and keeps what was corrected there. A hand edit of "
+     'out/visual-plan.json is never overwritten: the join says what to do (`--rebuild` drops the hand edits).'),
 ]
 STEP = (2, 'the operator answers every gap on the page, recorded on their done (`vw visuals page --record`), the card where it cannot be shown;',
         'the operator answers every gap on the page, then the drawings and the materials, recorded on their done (`vw visuals page --record`), the card where it cannot be shown;')
