@@ -1911,9 +1911,71 @@ def _swap_ids(value, ids):
     return ids.get(value, value) if isinstance(value, str) else value
 
 
-def plan_join(ws, base_rel, gaps_rel, rebuild=False):
+PLAN_RECORD = 'out/.plan-join.json'   # VW-24: `sha` of out/visual-plan.json as the tool last wrote it; `pending` the last join of the files alone; `old` the join of the files the proposed plan was made from
+PLAN_WAY = ('Run `vw visuals plan` (the server\'s current plan into out/visual-plan.json), make the change in out/visual-plan.json itself, '
+            'then `vw visuals check --file out/visual-plan.json` and `vw visuals propose --file out/visual-plan.json`.')
+_GONE = object()
+
+
+def _plan_record(ws):
+    try:
+        rec = json.loads((ws / PLAN_RECORD).read_text(encoding='utf-8'))
+        return rec if isinstance(rec, dict) else {}
+    except (OSError, ValueError):   # a run folder from before the record, or the record unreadable: the join falls back (see plan_join)
+        return {}
+
+
+def _plan_sha(ws):
+    p = ws / 'out' / 'visual-plan.json'
+    return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+
+
+def _plan_written(ws, **change):
+    """Every command that writes out/visual-plan.json (or sends it as the proposal) calls this: the file as it is now is the tool's, not a hand edit."""
+    save_json(ws / PLAN_RECORD, {**_plan_record(ws), **change, 'sha': _plan_sha(ws)})
+
+
+def _server_plan(base):
+    """The server's current plan ({version, plan}) or None when none is proposed; any other outcome ends the command as it always does."""
+    payload, code = request('GET', base + '/plan')
+    if code == 0:
+        return payload
+    if code == 2 and any(x in str(payload.get('message')) for x in ('Propose a visual plan first', 'vw visuals prepare')):
+        return None
+    finish(payload, code)
+
+
+def _by_id(v):
+    keys = [(x.get('gap_id') or x.get('id')) if isinstance(x, dict) else None for x in v] if isinstance(v, list) else [None]
+    return dict(zip(keys, v)) if all(isinstance(k, str) and k for k in keys) and len(set(keys)) == len(keys) else None
+
+
+def _merge3(old, mine, theirs, path, clashes):
+    """The changes of the files (old -> mine) carried onto the server's plan (theirs): what only the server changed stays, what only the files changed
+    goes in; a part both changed differently is named in `clashes` and left as the server has it. Lists of things with ids go by id, in the files' order."""
+    if mine is old or mine == old or mine == theirs:
+        return theirs
+    if theirs == old:
+        return mine
+    if all(isinstance(v, dict) for v in (old, mine, theirs)):
+        out = {k: _merge3(old.get(k, _GONE), mine.get(k, _GONE), theirs.get(k, _GONE), path + [k], clashes) for k in list(theirs) + [k for k in mine if k not in theirs]}
+        return {k: v for k, v in out.items() if v is not _GONE}
+    o, m, t = _by_id(old), _by_id(mine), _by_id(theirs)
+    if o is not None and m is not None and t is not None:
+        out = [_merge3(o.get(k, _GONE), m.get(k, _GONE), t.get(k, _GONE), path + [k], clashes) for k in list(m) + [k for k in t if k not in m]]
+        return [v for v in out if v is not _GONE]
+    if all(isinstance(v, str) for v in (old, mine, theirs)) and old.strip() and theirs.endswith(old.strip()):   # design/207: the server put the Direction at the head of the text; the head stays
+        return theirs[:len(theirs) - len(old.strip())] + mine
+    clashes.append('/'.join(path))
+    return theirs
+
+
+def plan_join(ws, base_rel, gaps_rel, rebuild=False, server=None):
     """design/124 Change 9: out/plan-base.json (the shared parts; its gaps the film's gap ids in order) and one file per helper in the gaps folder
     (a gap, or {"gaps": [...]}, each with its "new_elements") joined into out/visual-plan.json: the gaps in film order, the new things merged once by name.
+    VW-24 (16 Nov 2026): the base and the gap files are where a change is made, before a proposal and after one. A hand edit is the plan file differing
+    from what the tool last wrote (PLAN_RECORD), never a file time. Once a plan is proposed (`server`: the server's {version, plan}) the changes of the
+    files since the proposal are carried onto the server's plan (_merge3), so a correction folded in there is never dropped.
     Returns (payload, code, line) for emit."""
     if not base_rel or not gaps_rel:
         return {'action': 'refused', 'message': 'Give both: --base out/plan-base.json --gaps out/plan-gaps/'}, 2, None
@@ -1922,12 +1984,24 @@ def plan_join(ws, base_rel, gaps_rel, rebuild=False):
     folder = ws / gaps_rel
     if not order or not folder.is_dir():
         return {'action': 'refused', 'message': f"The base lists no gaps, or {gaps_rel} is not a folder."}, 2, None
-    plan_file = ws / 'out' / 'visual-plan.json'   # design/149 B7 (SK): the gap files are the master; a joined plan edited after the last join is never overwritten in silence
+    plan_file = ws / 'out' / 'visual-plan.json'   # design/149 B7 (SK): the files are the master; a joined plan edited after the last join is never overwritten in silence
+    rec = _plan_record(ws)
+    old = rec.get('old') if server and isinstance(rec.get('old'), dict) else None
+    again = f'`vw visuals plan-join --base {base_rel} --gaps {gaps_rel} --rebuild`'
+    if server and old is None and not rebuild:   # proposed by an older tool, or on another computer: which changes of the files are new is not known
+        return {'action': 'refused', 'message': 'A plan is proposed and this run folder holds no record of the join it was made from, so the join cannot tell your new changes from what the '
+                                                "server's plan already holds; nothing is joined. " + PLAN_WAY + ' Only when you are sure nothing was corrected in the plan after it was first joined: '
+                                                + again + " builds it from the base and the gap files alone and drops what is only in the server's plan."}, 2, None
     if plan_file.exists() and not rebuild:
-        newest_gap = max((f.stat().st_mtime for f in folder.glob('*.json')), default=0.0)
-        if plan_file.stat().st_mtime > newest_gap:
-            return {'action': 'refused', 'message': 'out/visual-plan.json was edited after the last join; put the edits into the gap files under ' + gaps_rel
-                                                    + ' and join again, or `vw visuals plan-join --rebuild` to drop them.'}, 2, None
+        if rec.get('sha'):
+            edited = _plan_sha(ws) != rec['sha']
+        else:   # no record (an older tool joined it, or the record is unreadable): the old time test, the base among the files; it may refuse a file nobody edited, never overwrite one somebody did
+            edited = plan_file.stat().st_mtime > max([(ws / base_rel).stat().st_mtime] + [f.stat().st_mtime for f in folder.glob('*.json')])
+        if edited:
+            proposed = (' If the edits are a correction you mean to propose, propose them first (`vw visuals check --file out/visual-plan.json`, then `vw visuals propose --file out/visual-plan.json`) '
+                        'and join again: the join keeps what the server holds.' if server else '')
+            return {'action': 'refused', 'message': 'out/visual-plan.json was edited after the last join, by hand; nothing is joined. Put those edits into ' + base_rel + ' (the shared parts) or the gap files under '
+                                                    + gaps_rel + ', then ' + again + ': it drops the hand edits of out/visual-plan.json and builds it from the files.' + proposed}, 2, None
     elements = list(base.get('elements') or [])
     by_name = {str(e.get('name') or '').strip().lower(): e['id'] for e in elements}
     found, added = {}, []   # design/148 A2: the helpers' new things, to name the ones still to complete
@@ -1957,13 +2031,28 @@ def plan_join(ws, base_rel, gaps_rel, rebuild=False):
     if missing:
         return {'action': 'refused', 'message': f"No helper wrote gap {', '.join(missing)}; write it before the join."}, 2, None
     olds = {g['gap_id']: g for g in base.get('gaps') or [] if isinstance(g, dict)}
-    plan = {**base, 'elements': elements, 'gaps': [{**olds.get(gid, {}), **found[gid][1]} for gid in order]}
+    files = plan = {**base, 'elements': elements, 'gaps': [{**olds.get(gid, {}), **found[gid][1]} for gid in order]}
+    if old is not None:   # a plan is proposed: the changes of the files since then, onto the server's plan
+        clashes = []
+        plan = _merge3(old, files, server['plan'], [], clashes)
+        if clashes:
+            return {'action': 'refused', 'message': "Changed in your files and, differently, in the server's plan since the last proposal: " + ', '.join(clashes) + '. The join cannot choose; nothing is joined. '
+                                                    + PLAN_WAY + ' Make the same change in your files too, so the next join agrees.'}, 2, None
     (ws / 'out').mkdir(exist_ok=True)
-    (ws / 'out' / 'visual-plan.json').write_text(json.dumps(plan, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
-    incomplete = [e['id'] for e in added if not all(e.get(k) for k in ('kind', 'identity', 'requirements'))]   # design/148 A2: a helper's new thing is id and name; the check wants the rest
+    plan_file.write_text(json.dumps(plan, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+    _plan_written(ws, pending=files)
+    now = {e.get('id'): e for e in plan.get('elements') or [] if isinstance(e, dict)}
+    incomplete = [e['id'] for e in added if not all(now.get(e['id'], e).get(k) for k in ('kind', 'identity', 'requirements'))]   # design/148 A2: a helper's new thing is id and name; the check wants the rest
     todo = f" {len(incomplete)} new thing{'s' if len(incomplete) != 1 else ''} need{'' if len(incomplete) != 1 else 's'} kind, identity and requirements before check: {', '.join(incomplete)}." if incomplete else ''
-    return ({'file': 'out/visual-plan.json', 'gaps': order, 'elements': len(elements), 'incomplete': incomplete}, 0,
-            f"Joined {len(order)} gaps into out/visual-plan.json ({len(elements)} things).{todo} Now `vw visuals check --file out/visual-plan.json`.")
+    told = ''
+    if rebuild:
+        told = ' Rebuilt: the hand edits of out/visual-plan.json are dropped.'
+    if server and old is None:
+        told += " The plan is the base and the gap files alone: what was only in the server's plan (a correction folded in there) is dropped."
+    elif server:
+        told += f" Your changes in the base and the gap files are carried onto the server's plan (version {server.get('version')}); what was folded in there is kept."
+    return ({'file': 'out/visual-plan.json', 'gaps': order, 'elements': len(now), 'incomplete': incomplete}, 0,
+            f"Joined {len(order)} gaps into out/visual-plan.json ({len(now)} things).{told}{todo} Now `vw visuals check --file out/visual-plan.json`" + (', then `vw visuals propose --file out/visual-plan.json`.' if server else '.'))
 
 
 def cmd_visuals(a):
@@ -2011,6 +2100,9 @@ def cmd_visuals(a):
             line += f"; {len(out['warnings'])} warning(s), {open_} unanswered: answer each in its shot's warning_answers (kind and answer), never in the purpose"
         if out.get('shared_change'):   # design/191: one question for every gap whose own shots are unchanged
             line += '; ' + out['shared_change']
+        if a.what == 'propose' and out.get('status') != 'rejected' and a.file and (ws / a.file).resolve() == (ws / 'out' / 'visual-plan.json').resolve():
+            rec = _plan_record(ws)   # VW-24: the server holds this file now, so it is no hand edit; the join it was made from is the one later joins compare with
+            _plan_written(ws, old=rec.get('pending') or rec.get('old'), pending=None)
         if a.what == 'propose' and out.get('status') != 'rejected':   # design/206: the plan is answered on the page
             line += '. Now `vw visuals page`: the operator answers the plan on the page (design/206); the card, `vw visuals next`, only where the page cannot be shown'
         emit(out, 0 if out.get('status') != 'rejected' else 2, line)
@@ -2024,7 +2116,7 @@ def cmd_visuals(a):
         out = write(base + '/treatment', {'accept': acc, 'send_back': back, 'notes': a.notes or '', 'quote': a.quote or ''})
         emit(out, 0, out.get('next') or '')
     if a.what == 'plan-join':   # design/124 Change 9: the helpers' gaps joined into one plan, nothing sent
-        emit(*plan_join(ws, getattr(a, 'base', None), (a.gaps or [None])[0], bool(getattr(a, 'rebuild', False))))
+        emit(*plan_join(ws, getattr(a, 'base', None), (a.gaps or [None])[0], bool(getattr(a, 'rebuild', False)), _server_plan(base)))
     if a.what == 'treatment':   # design/65 B6: the treatment as a record
         out = write(base + '/treatment', {'document': _json_file(m, a.file), 'quote': a.quote or ''})
         t = out.get('totals') or {}
@@ -2391,6 +2483,7 @@ def cmd_visuals(a):
         out = call('GET', base + '/plan')
         p = ws / 'out' / 'visual-plan.json'
         save_json(p, out['plan'])
+        _plan_written(ws, pending=None)   # VW-24: written by the tool, not a hand edit; a join not yet proposed is not in it
         emit({'version': out.get('version'), 'plan_digest': out.get('plan_digest'), 'file': str(p)}, 0,
              f"Plan version {out.get('version')} written to out/visual-plan.json: fold the correction into it, then `vw visuals propose --file out/visual-plan.json` (accepted gaps stay accepted; the operator approves the spec again).")
     if a.what == 'scene':   # design/117 P2: the SVG scene of a drawn shot, one file named by the plan through its sha256; --download: the scene as the loop left it
@@ -3398,7 +3491,7 @@ def build_parser():
     s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
-    s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')
+    s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the base and the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')
     s.add_argument('--again', action='store_true', help='approve: a rejected picture approved after all (design/177)')
     s.add_argument('--golden', nargs='?', const=True, default=False, help="image: the element's golden picture (design/111 F11); round --answer: the starting picture's id (design/177)"); s.add_argument('--region', help='image: an edit\'s region left,top,width,height (design/111 F11)'); s.add_argument('--end-region', dest='end_region', help='image: the end\'s region, written with the start')
