@@ -9,6 +9,7 @@ An answer names the item it was given to; an item's id holds its text's digest, 
 import hashlib
 import json
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from io import BytesIO
 
@@ -26,7 +27,8 @@ HOW = ('The operator answers this step on a page, not on a card. '
        'If `republish` is true, the page at the link was published by an older tool: publish it again to the same link (the Artifact tool with `file_path` `page_file`, `url` the link '
        'and `capabilities` again, exactly as given), then run `vw visuals page --url` with that link. '
        '2. Send the pictures before the round, when there are any (design/210). For each batch in `picture_batches`: ArtifactData, action "batch", `url` the page\'s link, `writes` the batch, '
-       'unchanged. If a batch fails, send it once more; if it fails again, stop here, run `vw visuals next` and ask this step in the chat. Then for each list in `zoom_uploads`: the Artifact tool, '
+       'unchanged. If a batch fails, or a picture stays grey on the page, run `vw visuals page --pictures-again` and send what it gives; if that fails too, stop here, '
+       'run `vw visuals next` and ask this step in the chat. Then for each list in `zoom_uploads`: the Artifact tool, '
        'action "publish", `url` the page\'s link, `asset` true, `file_paths` the list; save its answer, exactly as it came, to `uploaded_file` with the Write tool, and run '
        '`vw visuals page --uploaded "<that file>"`: it gives one more batch in `picture_batches`, sent the same way. If an upload fails, go on, and tell the operator that the large pictures '
        'are not available on the page. '
@@ -47,6 +49,7 @@ CAPABILITIES = {'db': {'rules': [{'path': path, 'read': 'view', 'write': 'owner'
 
 PIC_SIZES = {'thumb': ('.page-thumb.jpg', 360, 60), 'zoom': ('.page-zoom.jpg', 1600, 78)}   # per size: where it is stored beside the picture, its long side at most, its JPEG quality
 _MADE = set()   # ponytail: the sizes this process knows are stored, so a page with many pictures asks the storage once each; a shared record if servers multiply
+PIC_WORKERS = 8   # pictures whose sizes are made at one time: the storage reads and writes at once, as `analysis_jobs.REUSE_READS`
 
 
 def pic_code(key):
@@ -89,18 +92,29 @@ def _with_pictures(store, page):
     """The page's answer with `pictures`: for every picture code on its lines, once, the storage keys of its two sizes. A picture that cannot
     be read or shrunk is marked `missing` on its line and named in `pictures_failed`; the rest of the page is built. A page with no picture
     is left as it is."""
-    found, failed = {}, []   # ponytail: the sizes are made inside this call, once per picture; a job if a film's first page of many pictures takes too long
+    keys = {}   # each picture once, in the order of the lines
     for line in page['lines']:
         for p in line.get('pics') or []:
-            key = p.pop('_key', None)
-            if p['code'] not in found:
-                try:
-                    found[p['code']] = {'code': p['code'], 'thumb': sized(store, key, 'thumb'), 'zoom': sized(store, key, 'zoom')}
-                except Exception:   # a broken or half-written picture never fails the page
-                    found[p['code']] = None
-                    failed.append(f"{line.get('title') or line.get('key')}: {p['label']}")
+            keys.setdefault(p['code'], p.pop('_key', None))
+
+    def both(item):
+        code, key = item
+        try:
+            return {'code': code, 'thumb': sized(store, key, 'thumb'), 'zoom': sized(store, key, 'zoom')}
+        except Exception:   # a broken or half-written picture never fails the page
+            return None
+    found, failed = {}, []
+    if keys:   # ponytail: the sizes are made inside this call, PIC_WORKERS pictures at a time; a job if a film's first page of many pictures still takes too long
+        with ThreadPoolExecutor(max_workers=PIC_WORKERS) as pool:
+            found = dict(zip(keys, pool.map(both, keys.items())))
+    named = set()
+    for line in page['lines']:
+        for p in line.get('pics') or []:
             if not found[p['code']]:
                 p['missing'] = True
+                if p['code'] not in named:   # named once, on the first line that shows it
+                    named.add(p['code'])
+                    failed.append(f"{line.get('title') or line.get('key')}: {p['label']}")
     if found:
         page['pictures'] = [v for v in found.values() if v]
     if failed:
@@ -389,7 +403,8 @@ SETS_HELD = 'Kept, not recorded yet: the reason is on this line. Choose again to
 SETS_WAIT = 'The sets are being made. Wait for them (`vw visuals status --wait 900`), then run `vw visuals page`: the operator judges the sets there, in one visit.'
 SETS_STAND = ('No set waits for the operator now, and none is being made: the answers kept wait, and the reason is on each line. Tell the operator; when it is settled, '
               'run `vw visuals page`.')
-ROUND_NEXT = 'The reference round is complete. Go on with `vw visuals next`: it gives the next decision (the stills and the graphics are not on the page yet).'
+SETS_NONE = 'No set waits for the operator on the page now. Go on with `vw visuals next`: it gives the next decision.'
+ROUND_NEXT ='The reference round is complete. Go on with `vw visuals next`: it gives the next decision (the stills and the graphics are not on the page yet).'
 ROUND_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
 OWN_PERMISSION = "A real person's photo is used only with their permission. Write in the box on this line that you have it, then add the photo again."
 OWN_MISSING = 'Your own picture did not reach VideoWizard. Add it again on this line, or give it to the assistant in the chat.'
@@ -615,7 +630,8 @@ def _round_answer(ctx, a, choice, words):
         V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in buttons) + '.')
         V.need(not button['needs_words'] or words, 'Say what should change in this line, in your own words.')
         label = button['label']
-        out = item['_run'](choice, label, words) or {}
+        again = choice == 'no' and words and item['id'].startswith('set:')   # design/210 review: a paid remake asked for with words is made with them, as "Correct it" is; the log keeps the button pressed
+        out = item['_run']('correct' if again else choice, label, words) or {}
     hold = (out.get('held') or {}).get(eid)   # the limit holds a set made again: the answer is kept and its line says why
     V.need(not hold, f'{hold[:1].upper()}{hold[1:]}.' if hold else '')
     return label + (f': {words}' if words else ''), out, step1 or (item['id'].startswith('set:') and 'pass' not in out)
@@ -695,8 +711,9 @@ def page(conn, store, user, run, outputs):
 def _page(conn, store, user, run, outputs):
     """What the page shows now, for the treatment and then for the plan (design/206, `_plan_page`): `lines` in the film's order, each `open` (with its rows or text and its buttons), `recorded`
     (accepted; `reopen` while the treatment is still a draft) or `with_assistant` (sent back, with the operator's words). A new `round` each call."""
+    ended = False
     try:
-        CF.flush_sets(conn, store, user, run, outputs, 'Answered on the page')   # design/210: an answer kept on a set while others were being made is recorded once they are back, as `vw visuals next` does
+        ended = (CF.flush_sets(conn, store, user, run, outputs, 'Answered on the page') or {}).get('pass') == 'complete'   # design/210: an answer kept on a set while others were being made is recorded once they are back, as `vw visuals next` does; a round with nothing left to judge ends here
     except (ValueError, Problem):
         pass   # said on its line when the operator next answers
     ctx = CF._ctx(conn, store, user, run, outputs)
@@ -710,6 +727,8 @@ def _page(conn, store, user, run, outputs):
         out = _drawing_page(ctx, base, lines) if step == 'draw' else _spec_page(ctx, base, lines) if step == 'spec' else _plan_page(ctx, base)
         if _round_due(ctx, out):
             out['then'] = REFS_START   # nothing waits on the page and the round is not started: what the assistant does next
+        elif ended:
+            out['then'] = ROUND_NEXT   # the round ended in this call: said once
         return out
     motion =_motion_line(run, draft)
     first = [motion] if motion else []
@@ -855,7 +874,7 @@ def page_record(conn, store, user, run, outputs, answers):
     alone_accepted = bool(draft.get('direction_only')) and (draft.get('lines') or {}).get('direction', {}).get('state') == 'accepted'
     at_plan, at_spec, at_draw = now['step'] == 'Plan', now['step'] == SPEC_STEP, now['step'] == DRAW_STEP
     at_refs, at_sets = now['step'] == REFS_STEP, now['step'] == SETS_STEP
-    rd = session.get('round') or {}
+    rd = V.session_of(store, run, outputs).get('round') or {}   # read again: `page` may have ended the round
     drawn = 'Every reference drawing is approved. '
     then = ('Nothing was answered on the page. ' if not answers else '') + (f'The references are not recorded yet: {stopped} ' if stopped else '') + (
         SPEC_REFUSED + ' ' if at_spec and refused else DRAW_REFUSED + ' ' if at_draw and refused else ROUND_REFUSED + ' ' if (at_refs or at_sets) and [r for r in refused if r['key'] != 'references'] else '') + (
@@ -863,7 +882,7 @@ def page_record(conn, store, user, run, outputs, answers):
         f"{left} thing(s) still wait for the operator on the page: write the new round to the page and give them the link again. The answers given are kept: nothing is made until every thing is answered." if at_refs and left else
         'Every thing is answered and kept. When what stands in the way is settled, run `vw visuals page --record` again: the step is recorded then.' if at_refs else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if at_sets and left else
-        SETS_WAIT if at_sets and any(l['state'] == 'making' for l in now['lines']) else SETS_STAND if at_sets else
+        SETS_WAIT if at_sets and any(l['state'] == 'making' for l in now['lines']) else SETS_STAND if at_sets and any(l.get('kept') for l in now['lines']) else SETS_NONE if at_sets else
         ROUND_NEXT if (was_round or kept or any(k.startswith(('ref:', 'set:')) for k in recorded)) and rd.get('kept') and rd.get('pass') == 'complete' else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec or at_draw) and left else
         DRAW_BACK if at_draw else drawn + REFS_START if was_draw and _round_due(CF._ctx(conn, store, user, run, outputs), now) else DRAW_NEXT if was_draw else

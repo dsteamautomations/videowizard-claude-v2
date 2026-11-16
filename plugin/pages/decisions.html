@@ -219,7 +219,8 @@ function spec(line){   // design/209: a drawing's parts and sizes, or a material
 // row is near the screen; the large one is a file of the page's file store whose link is the document zoom/<code> ({url}), read on a click.
 const picData={}, picSeen={}, zoomUrl={};   // per code: the promise of its small picture, whether it has shown ('ok' or 'bad'), the promise of its large picture's link
 let zoomed=null;
-function picDoc(coll,code,field){ return db.doc(coll+'/'+code).get().then(s=>{ const d=s&&s.exists?s.data():null; return d&&typeof d[field]==='string'?d[field]:''; }).catch(()=>''); }
+function docId(coll,code){ const m=round&&round[coll==='pics'?'pic_docs':'zoom_docs'], id=m&&m[code]; return typeof id==='string'&&/^p[0-9a-f]{12}-[0-9]{1,4}$/.test(id)?id:code; }   // a picture sent again is in another document; the round says which
+function picDoc(coll,code,field){ return db.doc(coll+'/'+docId(coll,code)).get().then(s=>{ const d=s&&s.exists?s.data():null; return d&&typeof d[field]==='string'?d[field]:''; }).catch(()=>''); }
 function loadThumb(p,btn,onChange,tries){
   if(!picData[p.code]) picData[p.code]=picDoc('pics',p.code,'data');
   picData[p.code].then(src=>{
@@ -424,7 +425,7 @@ function draw(force){
     const yes=a&&(a.choice==='accept'||a.choice==='accept_second'||a.choice==='yes'||String(a.choice).indexOf('way:')===0||a.choice==='approve'||a.choice==='own'||a.choice==='make'||String(a.choice).indexOf('use:')===0);
     const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':line.state==='making'?'mak':a?(yes?'ans':'chg'):line.kept?'ans':''),String(i+1)); d.title=line.title; dots.appendChild(d);
     d.addEventListener('click',()=>{ const n=nodes[line.line]; if(n) n.node.scrollIntoView({block:'start'}); });   // design/206: a number jumps to its block
-    const sig=JSON.stringify([i,line,a||null,editing[line.line]||null]);
+    const sig=JSON.stringify([i,line,a||null,editing[line.line]||null,(line.pics||[]).map(p=>docId('pics',p.code))]);   // a picture moved to another document is drawn again
     seen[line.line]=1;
     const old=nodes[line.line];
     if(old&&old.sig===sig) return;                               // unchanged: left alone, so a box being typed in keeps its text and its place

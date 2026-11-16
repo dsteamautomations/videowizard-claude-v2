@@ -25,6 +25,8 @@ import httpx
 REPUBLISH = ('The page at this link was published by an older tool and cannot draw these lines: publish it again to the same link first (Artifact tool: `file_path` the '
              '`page_file`, `url` the link, `capabilities` again, exactly as given), then `vw visuals page --url "<the link>"`. ')
 PIC_BATCH, PIC_BATCH_BYTES, ZOOM_UPLOAD = 40, 900_000, 25   # design/210: under the page's limits (50 writes and 1 MiB a batch; 25 files an upload)
+PAGE_PATHS, PAGE_WAIT = ('/visuals/page', '/visuals/page/record'), 300   # design/210 review: the page calls may make both sizes of many pictures, so they wait this long (seconds)
+PAGE_SLOW = 'The page is still preparing its pictures on the server. Run `vw visuals page` again in a minute: nothing is lost.'
 
 
 def plugin_version():
@@ -492,6 +494,8 @@ def request(method, path, wait=None, **kw):
                 r = c.request(method, path, **({'timeout': wait} if wait else {}), **kw)
             break
         except httpx.ReadTimeout:
+            if wait and path.endswith(PAGE_PATHS):   # design/210 review: the sizes already made are kept on the server, so the same call is quicker next time
+                return {'action': 'wait', 'message': PAGE_SLOW}, 2
             if wait:
                 return {'action': 'refused', 'message': f'The server is still working on this after {wait} s. It may finish on its own: check status in a minute before repeating.'}, 2
             if method != 'GET':   # design/92: a write the server may still be doing; never repeated blindly, never a defect
@@ -1715,26 +1719,42 @@ def _fetch_to(url, part, size):
         list(pool.map(one, ranges))
 
 
-def _batches(collection, files):
-    """design/210: files as ready-made `writes` lists for ArtifactData's batch, each a document named by its file's stem: at most PIC_BATCH
-    writes and PIC_BATCH_BYTES of files in one."""
+def _batches(collection, files, suffix=''):
+    """design/210: files as ready-made `writes` lists for ArtifactData's batch, each a document named by its file's stem (and `suffix`, for
+    pictures offered again: a document that exists is never written a second time): at most PIC_BATCH writes and PIC_BATCH_BYTES of files in one."""
     out, size = [[]], 0
     for f in files:
         n = f.stat().st_size
         if out[-1] and (len(out[-1]) >= PIC_BATCH or size + n > PIC_BATCH_BYTES):
             out.append([])
             size = 0
-        out[-1].append({'op': 'set', 'collection': collection, 'doc_id': f.stem, 'file_path': str(f)})
+        out[-1].append({'op': 'set', 'collection': collection, 'doc_id': f.stem + suffix, 'file_path': str(f)})
         size += n
     return [b for b in out if b]
 
 
 def _pictures_sent(folder):
     """design/210: what this run folder knows it handed over for the page: the small pictures offered (`thumbs`) and each large one's id in
-    the page's file store (`zoom`)."""
+    the page's file store (`zoom`), since the pictures were last offered again; `again` counts those times (`--pictures-again`)."""
     d = load_json(folder / 'pictures.json', {})
     d = d if isinstance(d, dict) else {}
-    return {'thumbs': [str(c) for c in d.get('thumbs') or []], 'zoom': {str(k): str(v) for k, v in (d.get('zoom') or {}).items()}}
+    return {'again': int(d.get('again') or 0), 'thumbs': [str(c) for c in d.get('thumbs') or []], 'zoom': {str(k): str(v) for k, v in (d.get('zoom') or {}).items()}}
+
+
+def _doc_suffix(sent):
+    """design/210 review: the page's database refuses a second write to a document that exists, so pictures offered again go to new
+    documents: `<code>-<n>` the n-th time. The first send is the code alone."""
+    return f"-{sent['again']}" if sent['again'] else ''
+
+
+def _pic_codes(pictures):
+    """The codes of a round's pictures, each once; a code names a file here, so one that is not a code is left out."""
+    codes = []
+    for p in pictures or []:
+        code = str(p.get('code') or '')
+        if re.fullmatch(r'p[0-9a-f]{12}', code) and code not in codes:
+            codes.append(code)
+    return codes
 
 
 def _zoom_uploads(folder, sent):
@@ -1748,13 +1768,12 @@ def page_pictures(m, folder, pictures):
     becomes a database document `pics/<code>.json` ({"code", "data"}, the JPEG as a data link), the large one a file `zoom/<code>.jpg`. Returns
     what the assistant sends, and only what was not handed over before: `picture_batches` for ArtifactData, `zoom_uploads` for the Artifact
     tool's asset upload, and `uploaded_file`, where the upload's answer is saved. Nothing when the round has no picture."""
-    codes = []
+    codes = _pic_codes(pictures)
     for p in pictures or []:
         code = str(p.get('code') or '')
-        if not re.fullmatch(r'p[0-9a-f]{12}', code) or code in codes:   # a code names a file here
-            continue
-        codes.append(code)
         doc = folder / 'pics' / f'{code}.json'
+        if code not in codes:
+            continue
         if not doc.is_file():
             small = Path(_download(m, p['thumb'], f'work/page/pics/{code}.jpg'))
             doc.write_text(json.dumps({'code': code, 'data': 'data:image/jpeg;base64,' + base64.b64encode(small.read_bytes()).decode('ascii')}), encoding='utf-8')
@@ -1768,7 +1787,7 @@ def page_pictures(m, folder, pictures):
     sent['thumbs'] += new
     (folder / 'pictures.json').write_text(json.dumps(sent, indent=1) + '\n', encoding='utf-8')
     uploads = _zoom_uploads(folder, sent)
-    return {**({'picture_batches': _batches('pics', [folder / 'pics' / f'{c}.json' for c in new])} if new else {}),
+    return {**({'picture_batches': _batches('pics', [folder / 'pics' / f'{c}.json' for c in new], _doc_suffix(sent))} if new else {}),
             **({'zoom_uploads': uploads, 'uploaded_file': str(folder / 'uploaded.txt')} if uploads else {})}
 
 
@@ -1805,7 +1824,7 @@ def page_uploaded(folder, text):
         sent['zoom'][code] = ident
     if matched:
         (folder / 'pictures.json').write_text(json.dumps(sent, indent=1) + '\n', encoding='utf-8')
-    return {'matched': list(matched), 'refused': refused, 'not_uploaded': sorted(known - set(sent['zoom'])), **({'picture_batches': _batches('zoom', docs)} if docs else {})}
+    return {'matched': list(matched), 'refused': refused, 'not_uploaded': sorted(known - set(sent['zoom'])), **({'picture_batches': _batches('zoom', docs, _doc_suffix(sent))} if docs else {})}
 
 
 OWN_TYPES = ('.png', '.jpg', '.jpeg', '.webp')   # what the server's own-picture path reads
@@ -2364,8 +2383,10 @@ def cmd_visuals(a):
         folder = ws / 'work' / 'page'
         folder.mkdir(parents=True, exist_ok=True)
         url_file, current, made_by = folder / 'url.txt', folder / 'current.txt', folder / 'page-version.txt'   # design/206: which tool's page file is published at the link
-        if getattr(a, 'pictures_again', False) or (getattr(a, 'url', None) and url_file.is_file() and url_file.read_text(encoding='utf-8').strip() != a.url.strip()):
+        if getattr(a, 'url', None) and url_file.is_file() and url_file.read_text(encoding='utf-8').strip() != a.url.strip():
             (folder / 'pictures.json').unlink(missing_ok=True)   # design/210: a page published anew holds no picture yet: every picture is offered again
+        elif getattr(a, 'pictures_again', False):   # design/210 review: the same page: every picture is offered again, under new document names (the page refuses a second write to a document that exists)
+            (folder / 'pictures.json').write_text(json.dumps({'again': _pictures_sent(folder)['again'] + 1, 'thumbs': [], 'zoom': {}}, indent=1) + '\n', encoding='utf-8')
         if getattr(a, 'url', None):
             url_file.write_text(a.url.strip() + '\n', encoding='utf-8')
             made_by.write_text(plugin_version() + '\n', encoding='utf-8')
@@ -2374,8 +2395,10 @@ def cmd_visuals(a):
         def hand(page, more=None):
             """This round as one file for the page, and what the assistant needs to put it there. Nothing of its content is typed."""
             rnd = page['round']
+            suffix = _doc_suffix(_pictures_sent(folder))
+            names = {c: c + suffix for c in _pic_codes(page.get('pictures'))} if suffix else {}   # design/210 review: pictures offered again are in other documents; the round says which
             doc = {'round': rnd, 'at': datetime.now(timezone.utc).isoformat(), 'run': m['code'], 'step': page['step'], 'open': page['open'], 'summary': page.get('summary') or '',
-                   'note': page.get('note') or '', 'lines': page['lines']}
+                   'note': page.get('note') or '', 'lines': page['lines'], **({'pic_docs': names, 'zoom_docs': names} if names else {})}
             (folder / f'{rnd}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
             current.write_text(rnd + '\n', encoding='utf-8')
             waiting = len([l for l in page['lines'] if l['state'] == 'open'])
@@ -2419,25 +2442,27 @@ def cmd_visuals(a):
                     answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000],
                                     **({'own': d['own']} if isinstance(d.get('own'), dict) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {})})
             answers, own_fetch = page_own(folder, base, answers)   # design/210 part 2: the operator's own pictures reach the server before their lines are recorded
-            out = write(base + '/page/record', {'answers': answers})
+            out = write(base + '/page/record', {'answers': answers}, wait=PAGE_WAIT)
             taken = folder / 'answers' / 'rounds' / rnd / 'answers'
             if taken.is_dir():   # these answers are with the server: set aside, so an answer the operator undid later is never sent from an old file
                 try:
                     taken.rename(taken.with_name('answers.sent'))
                 except OSError:
                     pass
-            info = hand(out['page'], {**{k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out},
-                                      **({'own_fetch': own_fetch, 'own_dir': str(folder / 'own')} if own_fetch else {})})
-            fetch_line = (f"{len(own_fetch)} picture(s) the operator added on the page are still to fetch. For each id, the Artifact tool: action \"read\", `url` {info['url'] or 'the page link'}, "
-                          f"`path` the id, `out_dir` {folder / 'own'}. The ids: " + ', '.join(f'`path` {i}' for i in own_fetch) + '. Then run `vw visuals page --record` again: their lines '
-                          'are recorded then. Nothing is recorded for those lines yet. ' if own_fetch else '')
-            emit(info, 0, f"{len(answers)} answer(s) read from the page; recorded: {', '.join(out['recorded']) or 'none'}"
-                          + (f"; kept, not recorded yet: {', '.join(out['kept'])}" if out.get('kept') else '')
-                          + (f"; refused: {'; '.join(r['key'] + ': ' + r['message'] for r in out['refused'])}" if out.get('refused') else '')
-                          + (f"; not recorded, the line changed since: {', '.join(out['stale'])}" if out.get('stale') else '')
-                          + (f"; dropped with the Direction: {', '.join(out['dropped'])}" if out.get('dropped') else '')
-                          + f". {fetch_line}{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
-        out = write(base + '/page', {'one': False})
+            done = (f"{len(answers)} answer(s) read from the page; recorded: {', '.join(out['recorded']) or 'none'}"
+                    + (f"; kept, not recorded yet: {', '.join(out['kept'])}" if out.get('kept') else '')
+                    + (f"; refused: {'; '.join(r['key'] + ': ' + r['message'] for r in out['refused'])}" if out.get('refused') else '')
+                    + (f"; not recorded, the line changed since: {', '.join(out['stale'])}" if out.get('stale') else '')
+                    + (f"; dropped with the Direction: {', '.join(out['dropped'])}" if out.get('dropped') else '') + '. ')
+            if own_fetch:   # design/210 review: one instruction only. The server's "what next" and the new round wait for the second `--record`: the operator is not sent back to the page for a line they answered
+                link = url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else ''
+                emit({**{k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped') if k in out}, 'url': link, 'own_fetch': own_fetch, 'own_dir': str(folder / 'own')}, 0,
+                     done + f"{len(own_fetch)} picture(s) the operator added on the page are still to fetch. For each id, the Artifact tool: action \"read\", `url` {link or 'the page link'}, "
+                            f"`path` the id, `out_dir` {folder / 'own'}. The ids: " + ', '.join(f'`path` {i}' for i in own_fetch) + '. Then run `vw visuals page --record` again: their lines '
+                            'are recorded then. Nothing is recorded for those lines yet.')
+            info = hand(out['page'], {k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out})
+            emit(info, 0, done + f"{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
+        out = write(base + '/page', {'one': False}, wait=PAGE_WAIT)
         info = hand(out, {'then': out['then']} if out.get('then') else None)   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
         emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} " + (out['then'] + ' ' if out.get('then') else '')
                       + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ")
@@ -3682,7 +3707,7 @@ def build_parser():
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
-    s.add_argument('--pictures-again', dest='pictures_again', action='store_true', help='page: offer every picture of the round again, for a page published anew (design/210)')
+    s.add_argument('--pictures-again', dest='pictures_again', action='store_true', help='page: offer every picture of the round again, under new document names: for a batch that failed or a picture that stays grey on the page (design/210)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the base and the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')

@@ -32,6 +32,16 @@ The plan SK saw: `design/_work/reference-screens-on-the-page-plan.md`. Screens 4
 
 Where: `server/app/page_flow.py`, `server/app/chat_flow.py`, `plugin/scripts/vw.py`, `plugin/pages/decisions.html`, `plugin/hooks/guard.py`, `scripts/d210_wording_v3.py`, `scripts/d210b_wording_v3.py`. Old ways 101 and 102 are in `design/35-decision-log.md`.
 
+## Review fixes (16 Nov 2026, same versions, not deployed)
+
+1. **Step 2 always ends.** When the last answer is "Leave it out" or the operator's own picture, no set is left to judge: the round is completed by the server's own test (`round_sets`), in `chat_flow.flush_sets`, which the page and the chat both pass through. A round that stalled before is ended by the next `vw visuals page` or `vw visuals next`. "The answers kept wait" is said only when an answer is kept.
+2. **A paid remake carries the words.** On the page, "No" or "None of these" given with words in the comment box makes the set again with those words, as "Correct it" does. The log keeps the button pressed and the words. In the chat nothing changes.
+3. **Pictures sent again.** The page's database refuses a second write to a document that exists. `vw visuals page --pictures-again` offers every picture again under new document names (`<code>-1`, then `-2`), and the round names the document of each picture (`pic_docs`, `zoom_docs`); the page reads it from there. The instructions name the flag as the way out; "send it once more" is gone. The large pictures are uploaded again too.
+4. **One instruction while own pictures are fetched.** The first `vw visuals page --record` then says only what to fetch; the server's next step and the new round come with the second one.
+5. **The first visit.** The server makes the sizes of eight pictures at a time; the tool waits 300 s for the page calls and, when that is not enough, says to run `vw visuals page` again in a minute (the sizes already made are kept).
+
+Not covered by these fixes: a round element the plan no longer names still holds step 2 open; a "None of these" with words that is kept while other sets are being made shows as "Kept: Correct it"; a page already published is not asked to be published again by this change alone, because the version did not change (the versions change at the release).
+
 ## Decisions taken by default (SK asked to start; say if either should change)
 
 - A click on a button that shows its price, followed by "done", is the operator's word for that spend. The priced label is logged as their words.
@@ -41,7 +51,7 @@ Where: `server/app/page_flow.py`, `server/app/chat_flow.py`, `plugin/scripts/vw.
 
 - The page on claude.ai with a real film, and the whole loop on an operator's machine. Both builders ran the page in a headless browser on local copies (34 and 49 checks).
 - The page's own upload to its file store (`assets.upload`): run against a stand-in only.
-- How long the first visit takes on a film with many pictures: both sizes are made at that moment.
+- How long the first visit takes on a film with many pictures: both sizes are made at that moment, eight pictures at a time (not timed on the live server).
 - The database tests were not run.
 
 ## Not covered

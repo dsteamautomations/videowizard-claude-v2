@@ -775,7 +775,8 @@ def _record_items(ctx):
 
 def flush_sets(conn, store, user, run, outputs, quote=''):
     """Record every whole answer kept on a reference set (the operator gave each one in the chat). None while a set is still being made, or when
-    there is nothing to record: the answers stay kept. Any other refusal of the server is raised as it is."""
+    there is nothing to record: the answers stay kept. Any other refusal of the server is raised as it is. With no answer kept and no set left
+    to judge at step 2, the round is completed here: the chat (`next_item`) and the page (`page_flow._page`) both pass through this."""
     s = V.session_of(store, run, outputs)
     rd = s.get('round')
     if not (rd and rd.get('kept') and s.get('current')):
@@ -783,7 +784,12 @@ def flush_sets(conn, store, user, run, outputs, quote=''):
     kinds = _kinds(V.current_plan(store, s))
     kept = {e: a for e, r in rd['elements'].items() if e in kinds and not r.get('ignored') for a in [V._answered(s, kinds, e, r)] if a and V._set_rows(s, e, r.get('set'))}
     if not kept:
-        return None
+        if V._round_pass(s, rd) != 2:
+            return None
+        try:   # design/210 review: the last answer was "Leave it out" or the operator's own picture, so no set is left to judge: the round completes by the server's own test, as after a Yes
+            return V.round_sets(store, user, run, outputs, {}, quote or rd.get('quote') or '', conn=conn, partial=True)
+        except (ValueError, V.Problem):
+            return None   # a set still waits for its answer
     try:
         return V.round_sets(store, user, run, outputs, kept, quote, conn=conn, partial=True)
     except (ValueError, V.Problem) as exc:   # a refusal written with `need` is a ValueError until the API wraps it
