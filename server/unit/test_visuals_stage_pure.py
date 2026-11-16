@@ -815,13 +815,14 @@ def test_treatment_takes_routes_from_the_shots_when_one_is_named_and_refuses_an_
         g(lambda: VS.treatment(store_with(session()), USER, RUN, [], {**TREATMENT, 'gaps': [TREATMENT['gaps'][0], several]}, 'yes'))
 
 
-def test_the_cap_message_tells_the_operator_the_spend_and_names_the_builder(monkeypatch):
-    """design/74 L26: no front end raises the cap; the builder changes the setting on SK's word."""
+def test_the_cap_message_tells_the_operator_the_spend_and_names_the_owners_command(monkeypatch):
+    """design/207 (SK, 16 Nov 2026): the limit follows the film's length and the owner sets another figure with `vw visuals cap`
+    (before, design/74 L26: no front end raised the cap; the builder changed the setting on SK's word)."""
     monkeypatch.setattr(VS, 'prices', lambda: {'image_inr': 20.0, 'video_inr_per_s': 8.0})
     with pytest.raises(Problem) as exc:
         VS.check_cap(FakeConn([job('openai') for _ in range(49)]), RUN, session(cap_inr=1000.0), 40.0, 'a 5 s take')
-    assert 'tell the operator the spend' in exc.value.message and 'builder' in exc.value.message and 'vw visuals cap' not in exc.value.message
-    assert not hasattr(VS, 'set_cap')
+    assert 'tell the operator the spend' in exc.value.message and 'builder' not in exc.value.message and 'vw visuals cap' in exc.value.message
+    assert hasattr(VS, 'set_cap')
 
 
 def test_page_view_carries_each_pictures_checklist_the_takes_checklist_and_a_rejected_status(monkeypatch):

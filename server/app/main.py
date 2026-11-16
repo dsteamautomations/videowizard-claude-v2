@@ -1867,6 +1867,16 @@ def visuals_budget(run_id: UUID, user=User, conn=DB):
     return Response(visuals_stage.guarded(lambda: visuals_stage.budget(conn, storage(), run, core.current_outputs(conn, run['id']))))
 
 
+class CapBody(Write):
+    inr: float = Field(gt=0)
+    quote: str = Field(min_length=1, max_length=2048)
+
+
+@app.post('/api/runs/{run_id}/visuals/cap')
+def visuals_cap(run_id: UUID, body: CapBody, user=User, conn=DB):   # design/207: the owner sets another cost limit for one film, with their words
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_cap(conn, storage(), user, run, outputs, body.inr, body.quote))
+
+
 @app.post('/api/runs/{run_id}/visuals/still')
 def visuals_still(run_id: UUID, body: StillBody, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.still_from_reference(storage(), user, run, outputs, body.shot_id, body.reference_id, body.quote,

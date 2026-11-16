@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     VISUALS_PRICE_VIDEO_INR_PER_S: float = 8.9     # one second of a generated take: Omni 1.1 Flash, 5,792 tokens a second at $17.50/M
     VISUALS_USD_INR: float = 88.0
     VISUALS_STILL_SHARE: float = 0.10              # design/202: warn when still pictures pass this share of the film (VW-21's 13.5 % would have warned); SK's figure
-    VISUALS_CAP_INR: float = 5000.0                # per film, unless the operator raises it with their words (SK, 21 Oct 2026, design/66)
+    VISUALS_CAP_INR_PER_MIN: float = 750.0         # design/207 (SK, 16 Nov 2026): a new film's cost limit follows its length, this much a minute of film
+    VISUALS_CAP_FLOOR_INR: float = 1500.0          # design/207: the lowest limit a film gets, however short
+    VISUALS_CAP_INR: float = 5000.0                # the older figure, kept for a film begun before design/207 whose session holds no limit; the owner sets another figure for one film with `vw visuals cap`
     FFMPEG_EXECUTABLE: str = 'ffmpeg'
     # design/130: the HyperFrames motion route, installed on the VM in phase 0 (pinned CLI, its own HOME with the pinned Chrome, a pinned GSAP)
     MOTION_CLI: str = '/opt/vw2/hyperframes/node_modules/.bin/hyperframes'

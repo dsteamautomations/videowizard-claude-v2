@@ -316,10 +316,10 @@ def test_treatment_sequence_cap_and_budget_post_what_the_server_expects(harness,
     code, out, err = run(args(what='sequence', shot='AN1', refs=['R1,R2,R3'], quote='Yes, these states.'), capsys)
     assert code == 0 and posted[-1][0].endswith('/visuals/sequence') and posted[-1][1] == {'shot_id': 'AN1', 'reference_ids': ['R1', 'R2', 'R3'], 'quote': 'Yes, these states.'}
     assert '3 states' in err
-    assert 'cap' not in vw.VISUALS_WHAT   # design/74 L26: no front end raises the cap
+    assert 'cap' in vw.VISUALS_WHAT   # design/207: the owner sets another limit for one film with `vw visuals cap` (before, design/74 L26: no front end raised the cap)
     monkeypatch.setattr(vw, 'call', lambda method, path, **kw: {'spent_inr': 120.0, 'cap_inr': 1000.0, 'left_inr': 880.0, 'images': 6, 'take_seconds': 0.0, 'planned': {'images': 40, 'video_seconds': 41.0, 'inr': 1128.0}, 'prices': {}})
     code, out, err = run(args(what='budget'), capsys)
-    assert code == 0 and '₹120' in err and '₹1,000' in err and '₹1,128' in err and 'over the cap' in err and 'builder' in err and 'raise it' not in err
+    assert code == 0 and '₹120' in err and '₹1,000' in err and '₹1,128' in err and 'over the cap' in err and '`vw visuals cap`' in err and 'builder' not in err
 
 
 def test_check_line_prints_routes_images_and_cost(harness, monkeypatch, capsys):

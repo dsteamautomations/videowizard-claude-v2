@@ -185,6 +185,29 @@ def _gap_rows(session, gap, selection=None):
     return rows, f'{len(rows)} shots, {total:.1f} s in all.'
 
 
+def _world_rows(plan, n=400):
+    """design/207 (SK, 16 Nov 2026): the world of the film as [label, text] rows, read only, the same for the page and the chat: the look, each
+    rule of the world, what is not shown, each specification, the graphic style, then each person, place, thing and material with its
+    description and known sizes. The Direction is left out (accepted at the treatment); so is a graphic (it is a shot's drawing). A long cell
+    is cut at `n` characters. A plan with nothing written about the world gives no rows."""
+    f = (plan or {}).get('foundation') or {}
+    style = f.get('graphic_style') or {}
+    rows = ([['The look', f.get('appearance')]]
+            + [[label, r.get('statement')] for label, k in (('The world', 'world'), ('Not shown', 'exclusions'), ('Specification', 'specifications')) for r in f.get(k) or []]
+            + [['The graphic style', '; '.join(f"{k.replace('_', ' ')}: {v}" for k, v in ((k, style.get(k)) for k in ('palette', 'line_weight', 'labels', 'background', 'frame_fill')) if v)]])
+    rows = [r for r in rows if r[1]]
+    if not rows:
+        return []
+    for e in plan.get('elements') or []:
+        if e.get('kind') == 'graphic':
+            continue
+        name = e.get('name') or e.get('id')
+        sizes = V.size_sentence({'name': name, 'size': (e.get('size') or []) + ((e.get('material_spec') or {}).get('dimensions') or [])})
+        text = ' '.join(str(e.get('description') or e.get('requirements') or '').split()).rstrip('.')
+        rows.append([f"{str(e.get('kind') or 'thing').capitalize()} · {name}", '. '.join(x for x in (text, 'Known sizes: ' + sizes[len(str(name)) + 2:] if sizes else '') if x)])
+    return [[label, V._short_text(text, n)] for label, text in rows]
+
+
 def _gap_text(session, gap):
     rows, total = _gap_rows(session, gap)
     return '\n'.join(['| ' + ' | '.join(GAP_COLS) + ' |', '|---|---|---|---|---|---|'] + [f'| {r[0]} | **{r[1]}** | ' + ' | '.join(r[2:]) + ' |' for r in rows]) + f'\n\n{total}'
