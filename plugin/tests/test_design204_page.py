@@ -84,3 +84,12 @@ def test_the_list_of_differences_is_folded_unless_the_operator_asked_for_the_cha
     """SK, 16 Nov 2026: 'Changed since you last saw it' confused; it is a folded line now, open only for a change the operator asked for."""
     html = PAGE.read_text(encoding='utf-8')
     assert "el('details','changed')" in html and 'c.open=!!line.asked' in html and "el('summary'" in html
+
+
+def test_the_world_of_the_film_is_grouped_under_one_heading_per_kind():
+    """SK, 16 Nov 2026: 'Not shown' was repeated on every row. The page groups the world's rows under one heading each, with the rules listed
+    under it; people, places and things are grouped by kind; the block is read, not answered."""
+    html = PAGE.read_text(encoding='utf-8')
+    for needed in ('function world(rows)', "if(line.key==='world') body.appendChild(world(line.rows)); else", "Person:'People'", "label==='The graphic style'",
+                   "el('details','group')", "return ['t-open','To read']", 'For reading only: nothing to answer here.'):
+        assert needed in html, needed

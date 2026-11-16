@@ -126,6 +126,7 @@ let db=null, round=null, answers={}, stopAnswers=null, ready=false;
 const editing={}, drafts={}, nodes={};   // per line: the choice being typed for, its text, and the block on screen with what it was drawn from
 
 function tagOf(line,a){
+  if(line.key==='world') return ['t-open','To read'];   // the world of the film is read, not answered
   if(line.state==='recorded') return a&&a.choice==='reopen'?['t-chg','You reopened it']:['t-rec','Recorded'];
   if(line.state==='with_assistant') return ['t-chg','With the assistant'];
   if(!a) return ['t-open','To answer'];
@@ -166,6 +167,28 @@ function shots(cols,src){   // design/206: the shots of a gap (or of one offered
   t.appendChild(tb); tw.appendChild(t); wrap.appendChild(tw);
   return wrap;
 }
+const KINDS={Person:'People',Place:'Places',Object:'Things',Material:'Materials',Animal:'Animals',Process:'Processes',Technique:'Techniques'};
+function world(rows){   // SK, 16 Nov 2026: one heading per kind of rule with its rules listed under it, each group folding; no label repeated on every row
+  const wrap=el('div'), order=[], by={}; wrap.style.display='flex'; wrap.style.flexDirection='column'; wrap.style.gap='10px';
+  (rows||[]).forEach(r=>{
+    const label=String(r[0]||''), cut=label.indexOf(' · '), kind=cut>0?label.slice(0,cut):'';
+    const title=kind?(KINDS[kind]||kind):(label==='Specification'?'Specifications':label);
+    if(!by[title]){by[title]=[]; order.push(title);}
+    if(kind) by[title].push([label.slice(cut+3),String(r[1]||'')]);
+    else if(label==='The graphic style') String(r[1]||'').split('; ').forEach(x=>{ if(x.trim()) by[title].push(['',x.trim()]); });
+    else by[title].push(['',String(r[1]||'')]);
+  });
+  order.forEach(title=>{
+    const items=by[title], d=el('details','group'); d.open=true;
+    const sm=el('summary',null,title+(items.length>1?' ('+items.length+')':'')); sm.style.fontFamily='var(--display)'; sm.style.fontWeight='600'; sm.style.cursor='pointer'; d.appendChild(sm);
+    if(items.length===1&&!items[0][0]) d.appendChild(el('p',null,items[0][1]));
+    else { const ul=el('ul'); ul.style.margin='0'; ul.style.paddingLeft='1.2em'; ul.style.display='flex'; ul.style.flexDirection='column'; ul.style.gap='6px';
+      items.forEach(it=>{ const li=el('li'); if(it[0]){ const b=el('strong',null,it[0]+': '); li.appendChild(b); } li.appendChild(document.createTextNode(it[1])); ul.appendChild(li); });
+      d.appendChild(ul); }
+    wrap.appendChild(d);
+  });
+  return wrap;
+}
 function block(line,n){
   const a=answers[line.line], box=el('section','item');
   const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
@@ -178,6 +201,7 @@ function block(line,n){
   if(line.refused) body.appendChild(el('div','note','Not recorded: '+line.refused));
   if(line.state==='with_assistant') body.appendChild(el('p','lead',line.note?'Your words: “'+line.note+'”. The assistant is rewriting this line.':'The assistant is rewriting this line.'));
   if(line.text) String(line.text).split('\n').forEach(p=>{ if(p.trim()) body.appendChild(el('p',null,p)); });
+  if(line.key==='world') body.appendChild(world(line.rows)); else
   groups(line.rows).forEach(g=>{
     const wrap=g.name?el('div','group'):el('div'); if(g.name) wrap.appendChild(el('h4',null,g.name==='First'?'The first direction':g.name==='Second'?'The second direction':g.name));
     const dl=el('dl','kv'); g.rows.forEach(r=>{ if(r[0]){dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));} else {const p=el('p',null,r[1]); p.style.fontWeight='600'; wrap.appendChild(p);} });
@@ -210,7 +234,8 @@ function block(line,n){
   } else if(line.state==='recorded'&&line.reopen){
     acts.appendChild(el('span','said','This line is recorded in VideoWizard.'));
     const re=el('button',null,'Reopen'); re.addEventListener('click',()=>{editing[line.line]='reopen'; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();}); acts.appendChild(re);
-  } else if(line.state==='recorded'){ acts.appendChild(el('span','said','This line is recorded in VideoWizard.')); }
+  } else if(line.key==='world'){ acts.appendChild(el('span','said','For reading only: nothing to answer here. The assistant follows these in every picture.')); }
+  else if(line.state==='recorded'){ acts.appendChild(el('span','said','This line is recorded in VideoWizard.')); }
   if(acts.childNodes.length) box.appendChild(acts);
   return box;
 }
