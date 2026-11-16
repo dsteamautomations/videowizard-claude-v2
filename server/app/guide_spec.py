@@ -18,7 +18,7 @@ REACH = 0.62                                # m, shoulder to hand; SK's instruct
 TOP_SPEED = 2.5                             # m/s for a person's box (rule 45); set on street walks
 BODY_W, BODY_D, HEAD = 0.44, 0.26, 0.22     # the consultant's box person
 SHOULDER_OUT, SHOULDER_DOWN = 0.20, 0.30
-RECIPES = ('walker', 'one_action_close', 'transfer_close')
+RECIPES = ('walker', 'one_action_close', 'transfer_close', 'other')   # design/207 (SK, 16 Nov 2026): three kinds proven here; `other` is any other kind of shot, taken with a warning
 PACES = {'stroll': (0.6, 1.1), 'everyday': (1.1, 1.5), 'brisk': (1.5, 1.9), 'hurried': (1.9, 2.5)}   # m/s (08-blender §5); a warning when the box is outside its band
 HEAD_TURN, BEHIND = 45.0, 0.05                # design/200 (SK, 14 Nov 2026): the head turns this far from the body, degrees (Claude's figure, not a tested limit); a hand this far behind the shoulders, metres, is behind
 BEATS = {'lift': 1.0, 'pass': 1.0, 'set_down': 1.0}   # the shortest real length of a beat, seconds (learning L4)
@@ -136,13 +136,48 @@ def person_corners(p, t):
     return out
 
 
-def piece_box(s):
-    """(min, max) of a set piece or prop at rest."""
+def _rest(s):
+    """(min, max) of a set piece where it was built."""
     if s.get('shape') == 'cylinder':
         c, r, d = s['centre'], s['radius'], s['depth'] / 2
         e = {'X': (d, r, r), 'Y': (r, d, r), 'Z': (r, r, d)}[s.get('axis', 'Z')]
         return _sub(c, e), _add(c, e)
     return tuple(s['min']), tuple(s['max'])
+
+
+def _foot(lo, hi):
+    return ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2])
+
+
+def _turn(s, t):
+    """How far a thing on a path has turned at t, radians about Z (design/207). It is built pointing the way it first moves and turns where its
+    path bends; a `facing` fixes the way it points, so it never turns."""
+    legs = [(a['t'], _heading_of_path([a, b])) for a, b in zip(s['path'], s['path'][1:]) if list(a['at'][:2]) != list(b['at'][:2])]
+    if s.get('facing') or not legs:
+        return 0.0
+    now = ([d for at, d in legs if at <= t] or [legs[0][1]])[-1]   # ponytail: the heading snaps at a bend, as a walker's does; ease it if a turning vehicle reads badly
+    return math.atan2(now[1], now[0]) - math.atan2(legs[0][1][1], legs[0][1][0])
+
+
+def piece_corners(s, t=0.0):
+    """The eight corners of a set piece at t: where it was built; on a `path` (design/207), moved with the path from its first point and turned about its own middle."""
+    lo, hi = _rest(s)
+    if not s.get('path'):
+        return _corners(lo, hi)
+    off, turn, c = _sub(_keys(s['path'], t), s['path'][0]['at']), _turn(s, t), _foot(lo, hi)
+    out = []
+    for x, y, z in _corners(lo, hi):
+        rx, ry = _rot(turn, x - c[0], y - c[1])
+        out.append((c[0] + rx + off[0], c[1] + ry + off[1], z + off[2]))
+    return out
+
+
+def piece_box(s, t=0.0):
+    """(min, max) of a set piece at t: where it was built when it has no `path`."""
+    if not s.get('path'):
+        return _rest(s)
+    cs = piece_corners(s, t)
+    return tuple(min(c[i] for c in cs) for i in range(3)), tuple(max(c[i] for c in cs) for i in range(3))
 
 
 def _corners(lo, hi):
@@ -154,8 +189,12 @@ def people_by_id(spec):
 
 
 def prop_at(spec, prop, t):
-    """The centre of a prop: in the hand that holds it during a hold; where it was let go after one; its rest place before the first."""
+    """The centre of a prop: in the hand that holds it during a hold; where it was let go after one; its rest place before the first.
+    A prop nobody holds may travel along a `path` of its foot (design/207)."""
     size = prop['size']
+    if prop.get('path'):
+        c = _keys(prop['path'], t)
+        return (c[0], c[1], c[2] + size[2] / 2)
     centre = (prop['at'][0], prop['at'][1], prop['at'][2] + size[2] / 2)
     people = people_by_id(spec)
     for h in sorted(prop.get('held') or [], key=lambda h: h['from']):
@@ -241,7 +280,7 @@ def problems(spec):
     if not isinstance(spec, dict):
         return ['The scene description is one JSON object.']
     if spec.get('recipe') not in RECIPES:
-        out.append('recipe: one of ' + ', '.join(RECIPES) + '. Any other kind of shot is not yet available.')
+        out.append('recipe: one of ' + ', '.join(RECIPES) + '. Use `other` for a shot that is none of the first three.')
     note = spec.get('process_note')
     if not isinstance(note, str) or len(note.split()) < 12:
         out.append('process_note: two to four lines on how the real thing works: what moves, how far, how fast, in what order.')
@@ -276,6 +315,21 @@ def problems(spec):
             out.append(f'{i}: colour is [red, green, blue], each from 0 to 1.')
         return i
 
+    def travels(x, i, foot):
+        """design/207: a thing on a path, checked as a person's path is; `foot` is the middle of the thing's foot where it stands, when that is known."""
+        path = x.get('path')
+        if path is None:
+            return
+        if not isinstance(path, list) or len(path) < 2:
+            out.append(f'{i} path: give at least two timed points {{"t": seconds, "at": [x, y, z]}}: where the thing starts and where it ends. A thing that stays in place has no path.')
+            return
+        n = len(out)
+        _timed(path, sec, f'{i} path', out)
+        if len(out) == n and foot is not None and _len(_sub(path[0]['at'], foot)) > 0.01:
+            out.append(f'{i} path: it starts where the thing stands: the first point is the middle of its foot, {[round(v, 3) for v in foot]}.')
+        if x.get('facing') is not None and not (_vec(x['facing'], 2) and abs(x['facing'][0]) + abs(x['facing'][1]) > 0):
+            out.append(f'{i}: facing is [x, y]: the thing keeps pointing as it was built for the whole shot. Without it, the thing points along its path.')
+
     pieces = spec.get('set')
     if not isinstance(pieces, list) or not pieces:
         out.append('set: the pieces of the place, at least the ground.')
@@ -284,6 +338,7 @@ def problems(spec):
         i = name(s, 'set')
         if not i:
             continue
+        n = len(out)
         if s.get('shape') == 'cylinder':
             if not (_vec(s.get('centre')) and isinstance(s.get('radius'), (int, float)) and s['radius'] > 0 and isinstance(s.get('depth'), (int, float)) and s['depth'] > 0 and s.get('axis', 'Z') in ('X', 'Y', 'Z')):
                 out.append(f'{i}: a cylinder has centre, radius, depth and axis (X, Y or Z).')
@@ -293,6 +348,7 @@ def problems(spec):
         if spin is not None and not (isinstance(spin, dict) and spin.get('axis') in ('X', 'Y', 'Z') and isinstance(spin.get('keys'), list) and spin['keys']
                                      and all(isinstance(k, dict) and isinstance(k.get('t'), (int, float)) and isinstance(k.get('deg'), (int, float)) for k in spin['keys'])):
             out.append(f'{i}: spin is {{"axis": "X", "keys": [{{"t": seconds, "deg": degrees}}]}}.')
+        travels(s, i, _foot(*_rest(s)) if len(out) == n else None)
     people = spec.get('people')
     if not isinstance(people, list):
         out.append('people: a list (empty when nobody is in the shot).')
@@ -333,6 +389,9 @@ def problems(spec):
             continue
         if not (_vec(pr.get('size')) and all(x > 0 for x in pr['size']) and _vec(pr.get('at'))):
             out.append(f'{i}: a prop has size [x, y, z] and "at": [x, y, z], the middle of its foot where it rests.')
+        travels(pr, i, pr['at'] if _vec(pr.get('at')) else None)
+        if pr.get('path') is not None and pr.get('held'):
+            out.append(f'{i}: a prop on a path is held by nobody: give it "held" or "path", not both.')
         for h in pr.get('held') or []:
             ok = isinstance(h, dict) and isinstance(h.get('from'), (int, float)) and isinstance(h.get('to'), (int, float)) and 0 <= h['from'] < h['to'] <= sec + 1e-6 and isinstance(h.get('by'), str)
             who, _, side = (h.get('by') or '').partition('.') if ok else ('', '', '')
@@ -385,8 +444,12 @@ def checks(spec, subjects=None):
     level: 'refuse' (the rule is proven or SK's decision and the consultant's film kept it in every shot), 'warn', or 'info'.
     subjects: the ids the plan puts in this shot, when known (every one needs a box)."""
     rows, people, props, pieces = [], spec.get('people') or [], spec.get('props') or [], spec['set']
-    boxes = [(s, *piece_box(s)) for s in pieces]
+    boxes = [(s, *piece_box(s)) for s in pieces]   # where every piece stands at the start
     ts = times(spec, step=3)
+    travelling = any(s.get('path') for s in pieces)
+
+    def boxes_at(t):   # design/207: a piece on a path is where its path puts it
+        return [(s, *piece_box(s, t)) for s in pieces] if travelling else boxes
     names = {x['id']: x['name'] for x in people + props + pieces}
 
     # everything rests on something (rule 104, SK's instruction)
@@ -464,7 +527,7 @@ def checks(spec, subjects=None):
             if _dot(_sub(start, pos), right_of(yaw)) < -0.05:
                 rows.append(_row('right_hand', 'refuse', f"{pr['name']} is picked up from {by[who]['name']}'s left side. Put it on the person's right, within reach."))
 
-    # nobody passes through anything (rule 62); nobody faster than 2.5 m/s (rule 45)
+    # nobody passes through anything (rule 62); faster than 2.5 m/s (rule 45) is a run: a warning since design/207. A thing on a path has no speed limit.
     for p in people:
         hit, fastest = None, 0.0
         for t in ts:
@@ -472,20 +535,21 @@ def checks(spec, subjects=None):
             fastest = max(fastest, speed)
             if hit:
                 continue
-            for s, lo, hi in boxes:
+            for s, lo, hi in boxes_at(t):
                 if min(hi[2], pos[2] + p['height']) - max(lo[2], pos[2]) > 0.02 and lo[0] - BODY_D / 2 < pos[0] < hi[0] + BODY_D / 2 and lo[1] - BODY_D / 2 < pos[1] < hi[1] + BODY_D / 2 and not (p.get('seated') and s.get('seat')):
                     hit = (s, t)
                     break
         if hit:
             rows.append(_row('clash', 'refuse', f"{p['name']} passes through {hit[0]['name']} at {hit[1]:.1f} s. Move the path clear of it."))
         if fastest > TOP_SPEED + 1e-6:
-            rows.append(_row('speed', 'refuse', f"{p['name']} moves at {fastest:.2f} m/s; a person's box stays at {TOP_SPEED} m/s or slower. A run is not yet available."))
+            rows.append(_row('speed', 'warn', f"{p['name']} moves at {fastest:.2f} m/s, faster than a walk ({TOP_SPEED} m/s). A run has failed with a camera that follows the runner: "
+                             f"keep the camera fixed, and expect a second take.", before_take=True))
         elif p.get('path') and p.get('pace'):
             lo_, hi_ = PACES[p['pace']]
             if fastest and not lo_ - 0.05 <= fastest <= hi_ + 0.05:
                 rows.append(_row('pace', 'warn', f"{p['name']} is planned at a {p['pace']} pace ({lo_} to {hi_} m/s) but the box moves at {fastest:.2f} m/s."))
 
-    # nobody crosses or overlaps anybody on screen (rule 77, SK: "for now")
+    # people who overlap on screen (rule 77): a warning since design/207, never a refusal
     said = set()
     for t in ts:
         rs = [(p, rect(spec, person_corners(p, t)), person_at(p, t)[2]) for p in people]
@@ -495,8 +559,9 @@ def checks(spec, subjects=None):
                     continue
                 said.add((a['id'], b['id']))
                 moving = sa > 0.05 or sb > 0.05
-                rows.append(_row('crossing', 'refuse' if moving else 'warn',
-                                 f"{a['name']} and {b['name']} overlap in the picture at {t:.1f} s" + ('. Paths do not cross and nobody passes in front of anybody in one shot: move a path, or make it two shots.' if moving else '; neither moves. Check that both read clearly, or move one.')))
+                rows.append(_row('crossing', 'warn',
+                                 f"{a['name']} and {b['name']} overlap in the picture at {t:.1f} s" + (' while one moves. People whose paths overlap have come out as copies: keep the paths apart, or expect a second take.' if moving
+                                                                                                    else '; neither moves. Check that both read clearly, or move one.'), **({'before_take': True} if moving else {})))
 
     # everybody and everything that matters is in the first frame, or walks in from the frame's edge (rules 43, 55, 75)
     for p in people:
@@ -513,12 +578,20 @@ def checks(spec, subjects=None):
     for pr in props:
         if share_in_frame(rect(spec, _corners(*prop_box(spec, pr, 0.0)))) == 0:
             rows.append(_row('first_frame', 'refuse', f"{pr['name']} is not in the first frame; the still is made from it, so the thing would be invented later."))
+    for s in pieces:
+        if s.get('path') and share_in_frame(rect(spec, piece_corners(s, 0.0))) == 0:
+            rows.append(_row('first_frame', 'warn', f"{s['name']} is not in the first frame; the still is made from it, so the take invents how the thing looks when it comes in. Start it in view, or expect a second take."))
     if subjects is not None:
         have = {x.get('element_id') or x['id'] for x in people + props}
         for missing in [s for s in subjects if s not in have]:
             rows.append(_row('boxes', 'refuse', f"The plan puts {missing} in this shot and the scene has no box for it. Every person and thing of the shot is a box; words do not place anybody."))
 
     # warnings: rules on trial or never tested
+    if spec['recipe'] == 'other':   # design/207: an untried kind warns, it is never refused
+        rows.append(_row('untried', 'warn', 'This kind of shot has not been tried here; the first take is a trial and may need a second. '
+                                            'The guide is made of boxes: it cannot draw water, smoke or cloth.', before_take=True))
+    if not anything_moves(spec):
+        rows.append(_row('still', 'warn', 'Nothing moves in this shot; a still costs less.', before_take=True))
     for b in spec.get('beats') or []:
         if b['to'] - b['from'] < BEATS[b['kind']] - 1e-6:
             rows.append(_row('beat', 'warn', f"A {b['kind'].replace('_', ' ')} from {b['from']} to {b['to']} s is shorter than a person takes (about {BEATS[b['kind']]:.0f} s or more). The guide's timing is copied."))
@@ -544,6 +617,13 @@ def checks(spec, subjects=None):
     return rows
 
 
+def anything_moves(spec):
+    """Whether anything moves in the shot (design/207): a person on a path or with a working hand, a thing on a path, a thing that turns."""
+    keyed = [x['path'] for x in (spec.get('people') or []) + spec['set'] + (spec.get('props') or []) if x.get('path')]
+    keyed += [keys for p in spec.get('people') or [] for keys in (p.get('hands') or {}).values()]
+    return any(len({tuple(k['at']) for k in keys}) > 1 for keys in keyed) or any(len({k['deg'] for k in s['spin']['keys']}) > 1 for s in spec['set'] if s.get('spin'))
+
+
 def refusals(rows):
     return [r for r in rows if r['level'] == 'refuse']
 
@@ -559,7 +639,7 @@ def _pct(v):
 
 
 def layout(spec, t=0.0):
-    """Where each person, prop and set piece sits in the first frame, in per cent of the picture, clipped to it. Things outside it are left out."""
+    """Where each person, prop and set piece sits in the first frame (or at t), in per cent of the picture, clipped to it. Things outside it are left out."""
     rows = []
 
     def add(kind, x, corners):
@@ -575,7 +655,7 @@ def layout(spec, t=0.0):
         add('prop', pr, _corners(*prop_box(spec, pr, t)))
     for s in spec['set']:
         if not s.get('ground'):
-            add('set', s, _corners(*piece_box(s)))
+            add('set', s, piece_corners(s, t))
     return rows
 
 
