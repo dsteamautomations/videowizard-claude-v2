@@ -78,3 +78,9 @@ def test_the_page_can_play_a_sample_of_every_motion_style_the_server_holds():
     names = sorted(p.stem for p in (PLUGIN.parent / 'server' / 'motion_styles').glob('*.md'))
     assert len(names) == 8 and all(f'.stage.m-{n}>' in html for n in names), names
     assert "'Show me: '+st.title" in html and 'a rough sample' in html and 'prefers-reduced-motion' in html
+
+
+def test_the_list_of_differences_is_folded_unless_the_operator_asked_for_the_change():
+    """SK, 16 Nov 2026: 'Changed since you last saw it' confused; it is a folded line now, open only for a change the operator asked for."""
+    html = PAGE.read_text(encoding='utf-8')
+    assert "el('details','changed')" in html and 'c.open=!!line.asked' in html and "el('summary'" in html

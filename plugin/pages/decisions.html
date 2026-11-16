@@ -171,7 +171,10 @@ function block(line,n){
   const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
   const t=tagOf(line,a); head.appendChild(el('span','tag '+t[0],t[1])); box.appendChild(head);
   const body=el('div','body');
-  if(line.changes&&line.changes.length){const c=el('div','changed'); c.appendChild(el('strong',null,line.asked?'Changed as you asked':'Changed since you last saw it')); const ul=el('ul'); line.changes.forEach(x=>ul.appendChild(el('li',null,x))); c.appendChild(ul); body.appendChild(c);}
+  if(line.changes&&line.changes.length){   // SK, 16 Nov 2026: folded, so the list of differences does not confuse; open when the operator asked for the change
+    const c=el('details','changed'); c.open=!!line.asked;
+    const sm=el('summary',null,(line.asked?'Changed as you asked':'Changed since you last saw it')+' ('+line.changes.length+')'); sm.style.fontWeight='600'; sm.style.cursor='pointer'; c.appendChild(sm);
+    const ul=el('ul'); line.changes.forEach(x=>ul.appendChild(el('li',null,x))); c.appendChild(ul); body.appendChild(c);}
   if(line.refused) body.appendChild(el('div','note','Not recorded: '+line.refused));
   if(line.state==='with_assistant') body.appendChild(el('p','lead',line.note?'Your words: “'+line.note+'”. The assistant is rewriting this line.':'The assistant is rewriting this line.'));
   if(line.text) String(line.text).split('\n').forEach(p=>{ if(p.trim()) body.appendChild(el('p',null,p)); });
