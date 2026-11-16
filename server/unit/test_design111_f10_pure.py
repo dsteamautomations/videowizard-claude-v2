@@ -46,8 +46,7 @@ def check(d):
 def test_a_repeating_material_needs_its_spec_with_sourced_sizes_a_laying_a_pattern_and_proportions():
     out, _ = check(doc_with())
     assert out['elements'][1]['material_spec']['laid'] == 'on edge, header ends to the camera' and out['elements'][1]['material_spec']['not_this'] == []
-    with pytest.raises(ValueError, match='BRICK is a repeating material: give its material_spec'):
-        check(doc_with({**BRICK, 'material_spec': None}))
+    check(doc_with({**BRICK, 'material_spec': None}))   # design/207 (SK, 16 Nov 2026): a material with no spec is not laid in units (water, sand); unit sizes are asked only where a spec is given (was: refused)
     with pytest.raises(ValueError, match=r'`repeating` is retired \(design/149\)'):   # design/149 B3 (SK): the flag is gone; kind material says it
         check(doc_with({**BRICK, 'kind': 'object', 'repeating': True, 'material_spec': None}))
     bad = copy.deepcopy(BRICK)

@@ -50,14 +50,14 @@ class Element(Model):
     description: str = Field(default='', max_length=3000)   # design/111 F16: a person's fixed layer (build, age, skin, hair, posture, garment types and how worn), in every prompt
     signs_of_use: list['SignOfUse'] = Field(default_factory=list, max_length=30)   # design/111 F18: a place's traces of use, two written per shot
     staged_clean: str = Field(default='', max_length=1000)   # design/124-b item 4: why this place is shown clean and unused (a handover, a showroom); then no signs of use
-    speaker: bool = False   # design/124-b decision (c): a real person speaking to camera in the footage; never an AI picture, every shot of them is footage
+    speaker: bool = False   # design/207 (SK, 16 Nov 2026): only marks a real, named person; the footage-only rule is gone and the field stays so stored plans load (was design/124-b decision (c))
 
 
 class Position(Model):
     landmark_id: str = Field(min_length=1, max_length=80)
     relation: str = Field(min_length=1, max_length=1000)
     amount: float | None = None   # design/110 F2: the measured distance from the landmark, in a unit the picture shows
-    unit: str = Field(default='', max_length=40)   # bricks, paces, body-lengths, hands, a doorway
+    unit: str = Field(default='', max_length=40)   # paces, body-lengths, hands, a doorway
 
 
 class Heading(Model):   # design/110 F6: which way the front points, against a landmark and a frame edge, and the side toward the camera
@@ -99,7 +99,7 @@ class Beat(Model):
     start: State
     end: State
     min_s: float = Field(default=0, ge=0)   # design/91 N2: the realistic minimum time for this action, from the facts of the process
-    done: str = Field(default='', max_length=3000)   # design/110 F1: the action in the past tense ('set the third brick on edge beside the second'); the server never invents verb forms
+    done: str = Field(default='', max_length=3000)   # design/110 F1: the action in the past tense ('set the third cup on the tray beside the second'); the server never invents verb forms
 
 
 class Subject(Model):
@@ -137,7 +137,7 @@ class DrawingSpec(Model):   # design/89 D1: the parts, the sizes with their sour
     relationships: list[str] = Field(default_factory=list, max_length=30)
     label: str = Field(default='', max_length=200)
     proportions: list[str] = Field(default_factory=list, max_length=20)   # design/106 D2: the ratios that matter, always, even on an illustrative drawing
-    illustrative: bool = False   # design/111 F19: earned per unknown value, only after all four sources were tried
+    illustrative: bool = False   # design/111 F19; design/207 (SK, 16 Nov 2026): true when a size is unknown, dropped when none is; the four-sources test is gone
     view: Literal['', 'cutaway', 'plan', 'side', 'elevation'] = ''   # design/111 F19: which view the drawing is; a section defaults to cutaway
     view_reason: str = Field(default='', max_length=500)
 
@@ -186,7 +186,7 @@ class SignOfUse(Model):   # design/111 F18: a trace of work or living at one of 
 class Group(Model):   # design/111 F17: several of a kind in frame, all alike for a reason or no two alike with a trait each
     kind: str = Field(min_length=1, max_length=80)   # an element id, or the frame's own word (workers, people, cows)
     count: int = Field(ge=2)
-    mode: Literal['same', 'different', 'varied']   # design/124-b decision (a): varied, a crowd, a few traits used in turn
+    mode: Literal['same', 'different', 'varied']   # design/207 (SK, 16 Nov 2026): varied is retired and refused by name in the check (use different); the word stays so the refusal can say so
     reason: str = Field(default='', max_length=500)   # same: why they are alike
     items: list[str] = Field(default_factory=list, max_length=30)   # different: one trait each
 
@@ -330,7 +330,7 @@ class Shot(Model):
     transition_out: Literal['', 'cut', 'dissolve', 'match'] = ''   # only on a gap's last shot: into the footage after the gap
     transition_reason: str = Field(default='', max_length=500)
     size: Literal['', 'EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU'] = ''   # design/103 A3: the footage analysis's own words
-    recipe: Literal['', 'walker', 'one_action_close', 'transfer_close'] = ''   # integration step E: the kind of an AI video shot; any other kind is not yet available
+    recipe: Literal['', 'walker', 'one_action_close', 'transfer_close', 'other'] = ''   # integration step E: the kind of an AI video shot; design/207 (SK, 16 Nov 2026): other, a kind not tried here yet, taken with one plain warning
     size_reason: str = Field(default='', max_length=500)   # a stated reveal or repeat
     camera_reason: str = Field(default='', max_length=1000)   # design/103 A4: what the viewer should feel or read, and why this camera gives it
     claim: Literal['', 'visible', 'invisible'] = ''   # design/103 G2: a claim a camera could film, or one it cannot
@@ -356,7 +356,7 @@ class Scene(Model):
     light: str = Field(default='', max_length=1000)   # design/103 A1: the sources against the landmarks, the main one, hard or soft, colour, strength
     air: str = Field(default='', max_length=500)   # design/103 A2: what hangs in the air, lit by that light, or 'clean'
     outfit: dict[str, str] = Field(default_factory=dict)   # design/111 F16: person element id -> the garment colours of this scene
-    time_jump: str = Field(default='', max_length=500)   # design/111 F16: the script's words when the colours change from the scene before
+    time_jump: str = Field(default='', max_length=500)   # design/111 F16; design/207 (SK, 16 Nov 2026): what changed in time when the colours change from the scene before (later the same day, another day, another season, years later), from the script or the scene's own time
     continues_footage: bool = False   # design/124-b item 11: the scene continues the place of the footage beside the gap, which is its wider view
 
 
@@ -417,24 +417,17 @@ def _dimension_needs(label, dims, research=True):
         need(d.status == 'unknown' or d.source.strip(), f'{label}: {d.part} {d.measure} is {d.status}: give its source (the client, the footage, a standard).')
 
 
-FOUR_SOURCES = [('the client material', re.compile(r'client|brochure|material', re.I)), ('the footage frames', re.compile(r'footage|frame|clip', re.I)),
-                ('a standard or a maker figure', re.compile(r'standard|maker|manufacturer|datasheet|catalogue|\bIS\b', re.I)), ('an approved picture', re.compile(r'picture|reference|sheet', re.I))]   # design/111 F19
-
-
 def _illustrative_needs(label, spec):
-    """design/111 F19: 'illustrative' is earned, per unknown value, only after all four sources were tried; never claimed when nothing is unknown."""
-    unknown = [d for d in spec.dimensions if d.status == 'unknown']
-    if unknown:
-        need(spec.illustrative, f'{label}: a size is unknown: the drawing is illustrative only when illustrative is true, earned by trying all four sources for each unknown value.')
-        for d in unknown:
-            missing = [name for name, pat in FOUR_SOURCES if not pat.search(d.tried)]
-            need(not missing, f"{label}: {d.part} {d.measure}: 'illustrative' is earned only after all four sources were tried; tried does not name: {', '.join(missing)}.")
+    """design/111 F19; design/207 (SK, 16 Nov 2026): 'illustrative' goes with an unknown size and is never claimed when nothing is unknown.
+    The test that four sources were tried first is gone; an unknown size still says what was tried (_dimension_needs)."""
+    if any(d.status == 'unknown' for d in spec.dimensions):
+        need(spec.illustrative, f'{label}: a size is unknown: set illustrative true; the drawing then carries "not to scale" and shows no figure for that size.')
     else:
         need(not spec.illustrative, f'{label}: nothing is unknown: drop illustrative.')
 
 
 def spec_research_needs(label, spec):
-    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size tried in all four sources, illustrative earned."""
+    """design/124 C2: the research a drawing or material spec needs before approval: every unknown size says what was tried, illustrative set only with an unknown size."""
     _dimension_needs(label, spec.dimensions)
     _illustrative_needs(label, spec)
 
@@ -470,7 +463,8 @@ SIZE_WORDS = re.compile(r'\b(small|smaller|smallest|large|larger|largest|big|big
 SMALL_LIFE = re.compile(r'\b(breath\w*|chew\w*|blink\w*|nod\w*|head|hands?|fingers?|tail|ears?|shifts?|sways?)\b', re.I)   # design/124-b item 3
 GAZE_CAMERA = 'camera'   # design/124-b item 17
 NEGATED = re.compile(r'(?:\bno|\bwithout|\bempty of|\bbefore the)\s+(?:\w+\s+)?$', re.I)   # design/124-b item 9
-CROWD = 3   # design/124-b decision (a): up to three background people are named; more are a crowd
+NAMED_BACKGROUND_MAX = 10   # design/207 (SK, 16 Nov 2026): up to ten background people are named, each with their own description; was CROWD = 3 (design/124-b decision (a))
+LOOK_WORDS = re.compile(r'\b(look|looks|gaze|glance|expression|eyes|smile)\b', re.I)   # design/111 F7's words; design/207 (SK, 16 Nov 2026): a shot about a look is framed close
 
 
 OUTFIT_GARMENTS = re.compile(r'\b(shirt|kurta|t-?shirt|blouse|saree|sari|dupatta|salwar|kameez|dress|frock|skirt|trousers?|pants|jeans|shorts|lungi|dhoti|veshti|mundu|'
@@ -593,8 +587,7 @@ PAUSE_GAP_S = 0.12                         # design/89 A3: a silence between wor
 CUT_TOLERANCE_S = 0.3                      # a cut further than this from a pause is warned
 WORD_TOLERANCE_S = 0.5                     # a picture that starts more than this after its words is warned
 VIDEO_MIN_ON_SCREEN_S = 1   # integration step E (SK, 10 Nov 2026: cut shots): a shot may be one of several short cuts, each made at the take's 3 s and trimmed; under 1 s it is one picture. Was 2 (design/139 R9)
-PEOPLE_NEAR_MAX = 4   # the method's rule 5: a default, not a proven limit; a crowd is a kind of shot that is not yet available
-CIRCLING = re.compile(r'\b(orbit\w*|circl\w*|arcs? (?:a)?round|around (?:him|her|them|the (?:person|subject|man|woman|worker)))\b', re.I)
+PEOPLE_NEAR_MAX = 4   # the method's rule 5: a default, not a proven limit; design/207 (SK, 16 Nov 2026): above it the operator is warned (people_many), nothing is refused
 
 
 def _default_generator():
@@ -768,19 +761,21 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
     for e in plan.elements:   # review 27 Oct: an element's sizes (design/103 A5) are checked like a drawing spec's
         try:
             _dimension_needs(f'element {e.id}', e.size)
-            need(not e.speaker or e.kind == 'person', f'element {e.id}: speaker marks a real person speaking to camera; {e.id} is a {e.kind}.')   # design/124-b decision (c)
-            if e.kind == 'material':   # design/111 F10: one measured spec per repeating material; design/149 B3: the kind says it, `repeating` is retired
-                need(e.material_spec is not None, f'element {e.id} is a repeating material: give its material_spec (unit sizes with sources, laid, joint, pattern, proportions), made like a drawing spec, never typed by the operator.')
+            need(not e.speaker or e.kind == 'person', f'element {e.id}: speaker marks a real, named person; {e.id} is a {e.kind}.')   # design/124-b decision (c); design/207
+            if e.kind == 'material' and e.material_spec is not None:   # design/111 F10; design/207 (SK, 16 Nov 2026): unit sizes are asked only of a material laid as repeating units (it has a material_spec); a liquid or a loose material has none
                 need(not e.size, f'element {e.id}: its sizes live in its material_spec, not in size.')
                 _dimension_needs(f'material spec of {e.id}', e.material_spec.dimensions, research=False)
                 spec_warnings += _research_warning(f'material spec of {e.id}', e.material_spec, element_id=e.id)   # design/111 F19; design/124 C2: refused at approval
                 need(e.material_spec.dimensions, f'material spec of {e.id}: give the unit sizes (length, width, height) with their sources.')
                 need(e.material_spec.proportions, f'material spec of {e.id}: give the proportions that matter.')
+            elif e.kind == 'material' and e.requirements.strip(' .').lower() in ('', e.name.strip(' .').lower()):
+                # ponytail: design/207 (SK, 16 Nov 2026): the amount is free words in requirements, so the only test is that they say more than the name; a word test for an amount if bricks slip through
+                spec_warnings.append({'element_id': e.id, 'kind': 'material_bare', 'message': f'element {e.id} is a material with no unit sizes: say how much of it is used or how much of the surface it covers '
+                                      '(requirements), or give its unit sizes (material_spec) if it is laid in repeating units'})
         except _Collected:
             continue
     unique(plan.visual_facts, 'id', 'fact')   # design/91 N6
     facts, ekind = {f.id: f for f in plan.visual_facts}, {e.id: e.kind for e in plan.elements}
-    speakers = {e.id for e in plan.elements if e.speaker}
     for f in plan.visual_facts:
         try:
             need(f.status == 'unknown' or f.source.strip(), f'fact {f.id} is {f.status}: give its source (the client, the footage with clip and time, a standard).')
@@ -797,6 +792,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
     graphic_seen = False   # design/89 C2
     last_outfit = {}   # design/111 F16: the colours each person wore last, in film order
     place_marks = {}   # design/111 F18: the landmarks of the scenes that show each place
+    scene_of = {}   # design/207 (SK, 16 Nov 2026): the scene of each counted shot, for the notes that compare two shots
     for gap in plan.gaps:
         try:
             need(gap.gap_id in source_gaps, 'Plan names an unknown first-cut gap.')
@@ -818,6 +814,8 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
             gap_shots = []
             broken = False   # design/148 A1: a scene of this gap failed; its cover check would only repeat that
             for scene in scenes:
+                for pid in {eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'place'}:   # design/111 F18; design/207 (SK, 16 Nov 2026): before the scene's own checks, so a broken scene does not blame its place's signs of use
+                    place_marks.setdefault(pid, set()).update(l.id for l in scene.landmarks)
                 try:
                     need(scene.id not in scene_ids, 'Duplicate scene identity.')
                     scene_ids.add(scene.id)
@@ -826,15 +824,13 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                         need(next(e.description.strip() for e in plan.elements if e.id == pid), f'{pid} is a person: give description (build, age, skin, hair, posture, garment types and how worn), the fixed layer every prompt carries.')
                         need((scene.outfit.get(pid) or '').strip(), f'scene {scene.id} shows {pid}: give outfit[{pid}], the garment colours of this scene.')
                         if pid in last_outfit and not same_outfit(last_outfit[pid], scene.outfit[pid]):   # design/149 B2: the garments and colours, not the sentence
-                            need(scene.time_jump.strip(), f'scene {scene.id} changes the colours of {pid} ({last_outfit[pid]} -> {scene.outfit[pid]}): give time_jump, the script\'s words for the time that passed, or keep the colours.')
+                            need(scene.time_jump.strip(), f'scene {scene.id} changes the colours of {pid} ({last_outfit[pid]} -> {scene.outfit[pid]}): give time_jump: what changed in time (later the same day, another day, another season, years later), from the script or from the scene\'s own time, or keep the colours.')   # design/207
                         last_outfit[pid] = scene.outfit[pid]
                     for pid in scene.outfit:
                         need(ekind.get(pid) == 'person', f'scene {scene.id}: outfit names {pid}, which is not a person element.')
-                    for pid in {eid for s in scene.shots for eid in s.element_ids if ekind.get(eid) == 'place'}:   # design/111 F18
-                        place_marks.setdefault(pid, set()).update(landmarks)
                     background = sorted({sub.element_id for s in scene.shots for sub in s.subjects if sub.role == 'background' and ekind.get(sub.element_id) == 'person'})
-                    need(len(background) <= CROWD, f"scene {scene.id} names {len(background)} background people ({', '.join(background)}): up to {CROWD} are named workers with beats; "
-                                                   "more are a crowd: the scene's ambient line plus one groups entry (count, mode varied, a few traits used in turn), not named elements.")   # design/124-b decision (a)
+                    need(len(background) <= NAMED_BACKGROUND_MAX, f"scene {scene.id} names {len(background)} background people ({', '.join(background)}): up to {NAMED_BACKGROUND_MAX} background people are named, "
+                         f'each with their own description; beyond {NAMED_BACKGROUND_MAX}, each further person is described one by one in a groups entry with mode different (one trait per head).')   # design/207 (SK, 16 Nov 2026); was three, then a loose group
                     if scenes is counted and any(s.visual_type not in GRAPHIC_TYPES + ('drawn', 'footage') for s in scene.shots):   # design/91 N4: life in the frame; design/124-b item 1: footage has its own
                         if not scene.activity_level:
                             warnings.append({'scene_id': scene.id, 'kind': 'activity_missing', 'message': f'scene {scene.id}: state its activity level (activity_level: quiet, normal or busy) '
@@ -843,287 +839,299 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                               and not (scene.ambient.strip() and any(s.groups for s in scene.shots))
                               and not any(s.visual_type == 'video' for s in scene.shots)):   # integration step E: a scene with an AI video shot is not asked for more people; every person there is a box in the guide   # design/124-b decision (a): a crowd is the ambient line plus a group
                             warnings.append({'scene_id': scene.id, 'kind': 'life_missing', 'message': f'scene {scene.id} is {scene.activity_level} but shows one subject and no background '
-                                             'activity: add who else is there and what they do (secondary or background subjects with beats) and the working equipment'})
+                                             'activity: add who else is there and what they do (secondary or background subjects with beats) and the things in use around them'})
                     last_states = {}
                     for shot in scene.shots:
-                        need(shot.id not in shot_ids, 'Duplicate shot identity.')
-                        shot_ids.add(shot.id)
-                        need(shot.start_frame == cursor and shot.end_frame > cursor,
-                             'Shots must cover their gap in order, without overlaps or missing frames.')
-                        cursor = shot.end_frame
-                        seconds = (shot.end_frame - shot.start_frame) / float(fps) if fps else None
-                        for sp in sorted(speakers & set(shot.element_ids)):   # design/124-b decision (c)
-                            need(shot.visual_type == 'footage', f'shot {shot.id}: {sp} is a real person speaking to camera: never an AI picture or take of them; '
-                                                                'their other angles come from their own footage: plan the shot as footage (visual_type footage).')
-                        placed.append((gap.gap_id, shot.id, shot.visual_type, shot.start_frame, shot.end_frame))
-                        if scenes is counted:
-                            said.append(shot)
-                        if shot.visual_type == 'animation' and len(shot.claims) > len(shot.states):   # design/91 N12: a build shows every claim it covers
-                            warnings.append({'shot_id': shot.id, 'kind': 'build_short', 'message': f'shot {shot.id} covers {len(shot.claims)} claims in {len(shot.states)} states: '
-                                             'give each claim its state, so the build shows all of them'})
-                        if shot.visual_type == 'animation':   # design/65: a graphic sequence of states
-                            if len(shot.states) == 1:
-                                need(False, f'shot {shot.id}: one state is a diagram still: plan it as a diagram, or add a state.')
-                            need(2 <= len(shot.states) <= 4, f'shot {shot.id}: an animation shot is a graphic sequence of two to four states (`states`).')
+                        try:
+                            need(shot.id not in shot_ids, 'Duplicate shot identity.')
+                            shot_ids.add(shot.id)
+                            if scenes is counted:   # a return names a shot the film shows: the recommended choice, never the alternative; design/207 (SK, 16 Nov 2026): recorded first, so a return to a broken shot is no second fault
+                                starts[shot.id] = shot.start_frame
+                            need(shot.start_frame == cursor and shot.end_frame > cursor,
+                                 'Shots must cover their gap in order, without overlaps or missing frames.')
+                            cursor = shot.end_frame
+                            seconds = (shot.end_frame - shot.start_frame) / float(fps) if fps else None
+                            placed.append((gap.gap_id, shot.id, shot.visual_type, shot.start_frame, shot.end_frame))
+                            if scenes is counted:
+                                said.append(shot)
+                                scene_of[shot.id] = scene
+                            if shot.visual_type == 'animation' and len(shot.claims) > len(shot.states):   # design/91 N12: a build shows every claim it covers
+                                warnings.append({'shot_id': shot.id, 'kind': 'build_short', 'message': f'shot {shot.id} covers {len(shot.claims)} claims in {len(shot.states)} states: '
+                                                 'give each claim its state, so the build shows all of them'})
+                            if shot.visual_type == 'animation':   # design/65: a graphic sequence of states
+                                if len(shot.states) == 1:
+                                    need(False, f'shot {shot.id}: one state is a diagram still: plan it as a diagram, or add a state.')
+                                need(2 <= len(shot.states) <= 4, f'shot {shot.id}: an animation shot is a graphic sequence of two to four states (`states`).')
+                                for n, st in enumerate(shot.states, 1):
+                                    need(st.hold_s >= MIN_STATE_S, f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s; a state holds at least {MIN_STATE_S} s.')
+                                if seconds is not None:
+                                    total = sum(st.hold_s for st in shot.states)
+                                    need(abs(total - seconds) <= 0.2, f"shot {shot.id}: the states' holds add up to {total:.1f} s; the shot is {seconds:.1f} s.")
+                            else:
+                                need(not shot.states, f'states belong to an animation shot (shot {shot.id} is a {shot.visual_type}).')
+                            if shot.visual_type in GRAPHIC_TYPES and scenes is counted and (any(d.status != 'unknown' and d.value is not None for d in (shot.drawing_spec.dimensions if shot.drawing_spec else []))
+                                                                                            or any(re.search(r'\d', c) for c in shot.claims)):   # design/113 E6: a warning until SK approves the sample (answer 6)
+                                need(False, f'shot {shot.id} is a {shot.visual_type} with exact sizes or numbers: the drawn route is the default for technical diagrams, charts, maps and timelines '
+                                            + ('(visual_type drawn, a HyperFrames project named by scene_motion, rendered free and reviewed on the Takes step)' if labels_drawn else
+                                               '(visual_type drawn, an uploaded SVG scene named by scene_svg, rendered free and reviewed on the Takes step)')
+                                            + '; an AI-painted graphic is for a look, never for a figure.')
+                            if labels_drawn and shot.visual_type in GRAPHIC_TYPES and shot.carries_text and scenes is counted:   # SK, 1 Nov 2026 (design/130 §12): the blind test picked HyperFrames for every labelled diagram
+                                need(False, f'shot {shot.id} is a {shot.visual_type} that carries text: on this film a labelled diagram, chart, map or timeline is drawn with HyperFrames '
+                                            '(visual_type drawn, a project named by scene_motion with its labels word for word); an AI-painted graphic is for a picture without words.')
+                            if seconds is not None and shot.visual_type in GRAPHIC_TYPES + ('drawn',) and seconds < MIN_GRAPHIC_S:
+                                warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
+                            if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
+                                need(shot.visual_type not in GRAPHIC_TYPES or shot.motion in ('push_in', 'none'), f'shot {shot.id}: a graphic moves closer only (push_in) or not at all, so its labels never slide out of frame.')
+                                need(not shot.carries_text or shot.motion in ('push_in', 'none'), f'shot {shot.id} carries text (a label, a title, a caption): it moves by push_in or not at all, never a pan; no crop or pan cuts into its words.')
+                                need(shot.motion != 'none' or shot.motion_reason.strip(), f'shot {shot.id}: motion none needs a reason (motion_reason).')
+                                if seconds is not None and shot.motion == 'none' and scenes is counted:
+                                    frozen += seconds
+                            if (seconds is not None and seconds < STILL_MOVING_MAX_S and scenes is counted and not ROUTE_REASON.search(shot.purpose)   # design/112 K1: a short shot with no visible action is a moving still first
+                                    and shot.visual_type == 'video' and not any(s.behaviour == 'acts' and s.beats for s in shot.subjects)):   # a graphic build is never under 4 s (a state holds 3 s)
+                                what = 'AI video'
+                                warnings.append({'shot_id': shot.id, 'kind': 'short_route', 'message': f'shot {shot.id} is {seconds:.1f} s of {what} with no visible action: under {STILL_MOVING_MAX_S} s the default is a moving still '
+                                                 f"(a footage frame or an AI still with a push or a pan); say why this shot needs {what} in its warning_answers (kind short_route), or make it a still"})
+                            if seconds is not None and shot.visual_type == 'image':   # design/89 B1 (SK): 4 s moving, 3 s frozen
+                                limit = STILL_FROZEN_MAX_S if shot.motion == 'none' else STILL_MOVING_MAX_S
+                                if seconds > limit + 0.04:
+                                    warnings.append({'shot_id': shot.id, 'kind': 'still_long', 'message': f"shot {shot.id} is a {'frozen ' if shot.motion == 'none' else ''}still of {seconds:.1f} s: at most {limit} s; "
+                                                     'fill the stretch with several different stills or a moving shot (a clip stretch or a take)'})
+                            if seconds is not None and shot.visual_type == 'diagram' and shot.graphic_kind not in ('title', 'text') and seconds > GRAPHIC_BUILD_S + 0.04:   # design/124-b item 7
+                                warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
+                                                 '(an animation shot) or a drawn animation'})
+                            for fid in shot.fact_ids:   # design/91 N6
+                                need(fid in facts, f'shot {shot.id} names the fact {fid}, which the plan does not have.')
+                            rests_on = {fid: facts[fid] for fid in shot.fact_ids} | {f.id: f for f in plan.visual_facts if f.about and f.about in shot.element_ids}
+                            if shot.size in CLOSE_SIZES or re.search(r'\bclose[- ]?up\b', shot.framing, re.I):   # design/124-b item 8: a close shot, on its subject's facts
+                                subj_ = {s.element_id for s in shot.subjects} or set(shot.element_ids[:1])
+                                for f in [facts[fid] for fid in shot.fact_ids] + [f for f in plan.visual_facts if f.about in subj_]:
+                                    need(f.status != 'unknown', f'shot {shot.id} is close on what fact {f.id} describes, and that fact is unknown: it is never invented; '
+                                                               'frame the shot wider, or ask the operator.')
+                            if any(ekind.get(e) in ('material', 'process') for e in shot.element_ids) and not rests_on:
+                                warnings.append({'shot_id': shot.id, 'kind': 'facts_missing', 'message': f'shot {shot.id} shows a material or a process: give the facts it rests on (visual_facts, '
+                                                 'fact_ids): how it looks and is done, with the source'})
+                            if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and shot.narration.strip():   # design/91 N8, N17
+                                if not shot.claims and not shot.claims_left_out and not shot.descriptors:
+                                    warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims and the descriptive words spoken over it (claims, '
+                                                     'descriptors); the picture never shows their opposite'})
+                                if shot.claims and not shot.evidence.strip():
+                                    warnings.append({'shot_id': shot.id, 'kind': 'evidence_missing', 'message': f'shot {shot.id}: say how its picture shows its claims (evidence): a test, a table, '
+                                                     'or the result in a scene, never an unrelated picture'})
+                            process = any(s.behaviour == 'acts' for sh_ in [shot] + gap_shots[-1:] for s in sh_.subjects)   # design/124-b item 20: a process has acting subjects
+                            if process and (re.match(r'\s*(then|next|after (that|this)|once)\b', shot.narration, re.I) or re.search(r'\bon top of\b', shot.narration, re.I)) and not shot.carries_over:
+                                warnings.append({'shot_id': shot.id, 'kind': 'carries_over_missing', 'message': f'shot {shot.id} is the next step of a process: name what the step before left that '
+                                                 'must still be visible (carries_over)'})   # design/91 N14
+                            if shot.visual_type in GRAPHIC_TYPES + ('drawn',):   # design/89 C1, D1, D3; design/113: a drawn shot too
+                                if not shot.depicts.strip():   # design/91 N10
+                                    warnings.append({'shot_id': shot.id, 'kind': 'depicts_missing', 'message': f'shot {shot.id}: say what the graphic depicts (depicts), in the subject\'s own form, '
+                                                     'or an alternative labelled as the contrast; the operator approves it with the treatment'})
+                                graphic_seen = True
+                                if shot.narration.strip() and not shot.claims and not shot.claims_left_out:
+                                    warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
+                                                     'or name one left out on purpose with the reason (claims_left_out)'})
+                                if shot.drawing_spec is None:
+                                    real = any(ekind.get(e) in ('object', 'material') for e in shot.element_ids) or any(FIGURE.search(c) for c in shot.claims)   # design/124-b item 19: an idea graphic draws no real object
+                                    if real and shot.graphic_kind not in ('title', 'text') and not NO_SPEC_WORDS.search(shot.production_method):   # defect 35: the words the message asks for are read
+                                        warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
+                                                         'its sources, and so does a chart or a timeline that carries figures; a title or a label alone needs none: say so in production_method'})   # design/124 A4 item 16
+                                else:
+                                    spec = shot.drawing_spec
+                                    _stated_figure_needs(shot, spec)   # design/149 B6 (SK): a figure the film states is confirmed from the script, never unknown
+                                    _dimension_needs(f'shot {shot.id}', spec.dimensions, research=False)
+                                    warnings += _research_warning(f'shot {shot.id}', spec, shot_id=shot.id)   # design/111 F19; design/124 C2: refused at approval
+                                    section = 'section' in (shot.depicts + ' ' + shot.purpose + ' ' + shot.title).lower()   # F19: a wall section defaults to cutaway
+                                    if (not spec.view and not section) or (spec.view and not spec.view_reason.strip()):   # design/207 (SK, 16 Nov 2026): a note to the assistant, was a refusal
+                                        warnings.append({'shot_id': shot.id, 'kind': 'view_missing', 'message': f'shot {shot.id}: give view (cutaway, plan, side or elevation) and view_reason: which view shows what the drawing is for'})
+                                    real_object = shot.graphic_kind == 'diagram' and any(ekind.get(e) in ('object', 'material') for e in shot.element_ids)   # design/124 C2: not a chart, map or day strip
+                                    if not spec.proportions and real_object:   # design/106 D2
+                                        warnings.append({'shot_id': shot.id, 'kind': 'spec_proportions_missing', 'message': f'shot {shot.id}: give the proportions that matter (proportions), '
+                                                         'for example a box about 3 : 2 : 1, both sides the same thickness; "illustrative" means no numbers printed, never free proportions'})
+                                    if any(d.status == 'unknown' for d in spec.dimensions):
+                                        need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
+                            if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
+                                _recalled_on_screen_needs(shot)   # design/149 B10: a figure confirmed on the operator's word alone shapes the drawing, never a label
+                                svg_needs(shot, seconds, new_film)
+                                motion_needs(shot, seconds)   # design/130
                             for n, st in enumerate(shot.states, 1):
-                                need(st.hold_s >= MIN_STATE_S, f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s; a state holds at least {MIN_STATE_S} s.')
-                            if seconds is not None:
-                                total = sum(st.hold_s for st in shot.states)
-                                need(abs(total - seconds) <= 0.2, f"shot {shot.id}: the states' holds add up to {total:.1f} s; the shot is {seconds:.1f} s.")
-                        else:
-                            need(not shot.states, f'states belong to an animation shot (shot {shot.id} is a {shot.visual_type}).')
-                        if shot.visual_type in GRAPHIC_TYPES and scenes is counted and (any(d.status != 'unknown' and d.value is not None for d in (shot.drawing_spec.dimensions if shot.drawing_spec else []))
-                                                                                        or any(re.search(r'\d', c) for c in shot.claims)):   # design/113 E6: a warning until SK approves the sample (answer 6)
-                            need(False, f'shot {shot.id} is a {shot.visual_type} with exact sizes or numbers: the drawn route is the default for technical diagrams, charts, maps and timelines '
-                                        + ('(visual_type drawn, a HyperFrames project named by scene_motion, rendered free and reviewed on the Takes step)' if labels_drawn else
-                                           '(visual_type drawn, an uploaded SVG scene named by scene_svg, rendered free and reviewed on the Takes step)')
-                                        + '; an AI-painted graphic is for a look, never for a figure.')
-                        if labels_drawn and shot.visual_type in GRAPHIC_TYPES and shot.carries_text and scenes is counted:   # SK, 1 Nov 2026 (design/130 §12): the blind test picked HyperFrames for every labelled diagram
-                            need(False, f'shot {shot.id} is a {shot.visual_type} that carries text: on this film a labelled diagram, chart, map or timeline is drawn with HyperFrames '
-                                        '(visual_type drawn, a project named by scene_motion with its labels word for word); an AI-painted graphic is for a picture without words.')
-                        if seconds is not None and shot.visual_type in GRAPHIC_TYPES + ('drawn',) and seconds < MIN_GRAPHIC_S:
-                            warnings.append({'shot_id': shot.id, 'kind': 'graphic_short', 'message': f'shot {shot.id} is a graphic of {seconds:.1f} s: at least {MIN_GRAPHIC_S} s to read it'})
-                        if shot.visual_type in STILL_TYPES + ('animation',):   # design/89 B2: graphics move closer only; a frozen still says why
-                            need(shot.visual_type not in GRAPHIC_TYPES or shot.motion in ('push_in', 'none'), f'shot {shot.id}: a graphic moves closer only (push_in) or not at all, so its labels never slide out of frame.')
-                            need(not shot.carries_text or shot.motion in ('push_in', 'none'), f'shot {shot.id} carries text (a label, a title, a caption): it moves by push_in or not at all, never a pan; no crop or pan cuts into its words.')
-                            need(shot.motion != 'none' or shot.motion_reason.strip(), f'shot {shot.id}: motion none needs a reason (motion_reason).')
-                            if seconds is not None and shot.motion == 'none' and scenes is counted:
-                                frozen += seconds
-                        if (seconds is not None and seconds < STILL_MOVING_MAX_S and scenes is counted and not ROUTE_REASON.search(shot.purpose)   # design/112 K1: a short shot with no visible action is a moving still first
-                                and shot.visual_type == 'video' and not any(s.behaviour == 'acts' and s.beats for s in shot.subjects)):   # a graphic build is never under 4 s (a state holds 3 s)
-                            what = 'AI video'
-                            warnings.append({'shot_id': shot.id, 'kind': 'short_route', 'message': f'shot {shot.id} is {seconds:.1f} s of {what} with no visible action: under {STILL_MOVING_MAX_S} s the default is a moving still '
-                                             f"(a footage frame or an AI still with a push or a pan); say why this shot needs {what} in its warning_answers (kind short_route), or make it a still"})
-                        if seconds is not None and shot.visual_type == 'image':   # design/89 B1 (SK): 4 s moving, 3 s frozen
-                            limit = STILL_FROZEN_MAX_S if shot.motion == 'none' else STILL_MOVING_MAX_S
-                            if seconds > limit + 0.04:
-                                warnings.append({'shot_id': shot.id, 'kind': 'still_long', 'message': f"shot {shot.id} is a {'frozen ' if shot.motion == 'none' else ''}still of {seconds:.1f} s: at most {limit} s; "
-                                                 'fill the stretch with several different stills or a moving shot (a clip stretch or a take)'})
-                        if seconds is not None and shot.visual_type == 'diagram' and shot.graphic_kind not in ('title', 'text') and seconds > GRAPHIC_BUILD_S + 0.04:   # design/124-b item 7
-                            warnings.append({'shot_id': shot.id, 'kind': 'graphic_unbuilt', 'message': f'shot {shot.id} is one graphic held {seconds:.1f} s: over {GRAPHIC_BUILD_S} s a graphic is a build of 2 to 4 states '
-                                             '(an animation shot) or a drawn animation'})
-                        for fid in shot.fact_ids:   # design/91 N6
-                            need(fid in facts, f'shot {shot.id} names the fact {fid}, which the plan does not have.')
-                        rests_on = {fid: facts[fid] for fid in shot.fact_ids} | {f.id: f for f in plan.visual_facts if f.about and f.about in shot.element_ids}
-                        if shot.size in CLOSE_SIZES or re.search(r'\bclose[- ]?up\b', shot.framing, re.I):   # design/124-b item 8: a close shot, on its subject's facts
-                            subj_ = {s.element_id for s in shot.subjects} or set(shot.element_ids[:1])
-                            for f in [facts[fid] for fid in shot.fact_ids] + [f for f in plan.visual_facts if f.about in subj_]:
-                                need(f.status != 'unknown', f'shot {shot.id} is close on what fact {f.id} describes, and that fact is unknown: it is never invented; '
-                                                           'frame the shot wider, or ask the operator.')
-                        if any(ekind.get(e) in ('material', 'process') for e in shot.element_ids) and not rests_on:
-                            warnings.append({'shot_id': shot.id, 'kind': 'facts_missing', 'message': f'shot {shot.id} shows a material or a process: give the facts it rests on (visual_facts, '
-                                             'fact_ids): how it looks and is done, with the source'})
-                        if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and shot.narration.strip():   # design/91 N8, N17
-                            if not shot.claims and not shot.claims_left_out and not shot.descriptors:
-                                warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims and the descriptive words spoken over it (claims, '
-                                                 'descriptors); the picture never shows their opposite'})
-                            if shot.claims and not shot.evidence.strip():
-                                warnings.append({'shot_id': shot.id, 'kind': 'evidence_missing', 'message': f'shot {shot.id}: say how its picture shows its claims (evidence): a test, a table, '
-                                                 'or the result in a scene, never an unrelated picture'})
-                        process = any(s.behaviour == 'acts' for sh_ in [shot] + gap_shots[-1:] for s in sh_.subjects)   # design/124-b item 20: a process has acting subjects
-                        if process and (re.match(r'\s*(then|next|after (that|this)|once)\b', shot.narration, re.I) or re.search(r'\bon top of\b', shot.narration, re.I)) and not shot.carries_over:
-                            warnings.append({'shot_id': shot.id, 'kind': 'carries_over_missing', 'message': f'shot {shot.id} is the next step of a process: name what the step before left that '
-                                             'must still be visible (carries_over)'})   # design/91 N14
-                        if shot.visual_type in GRAPHIC_TYPES + ('drawn',):   # design/89 C1, D1, D3; design/113: a drawn shot too
-                            if not shot.depicts.strip():   # design/91 N10
-                                warnings.append({'shot_id': shot.id, 'kind': 'depicts_missing', 'message': f'shot {shot.id}: say what the graphic depicts (depicts), in the subject\'s own form, '
-                                                 'or an alternative labelled as the contrast; the operator approves it with the treatment'})
-                            graphic_seen = True
-                            if shot.narration.strip() and not shot.claims and not shot.claims_left_out:
-                                warnings.append({'shot_id': shot.id, 'kind': 'claims_missing', 'message': f'shot {shot.id}: list the claims spoken over this graphic (claims), each a must line on its checklist, '
-                                                 'or name one left out on purpose with the reason (claims_left_out)'})
-                            if shot.drawing_spec is None:
-                                real = any(ekind.get(e) in ('object', 'material') for e in shot.element_ids) or any(FIGURE.search(c) for c in shot.claims)   # design/124-b item 19: an idea graphic draws no real object
-                                if real and shot.graphic_kind not in ('title', 'text') and not NO_SPEC_WORDS.search(shot.production_method):   # defect 35: the words the message asks for are read
-                                    warnings.append({'shot_id': shot.id, 'kind': 'spec_missing', 'message': f'shot {shot.id}: a drawing of a real object (a section, a part, a profile) needs a drawing_spec with '
-                                                     'its sources, and so does a chart or a timeline that carries figures; a title or a label alone needs none: say so in production_method'})   # design/124 A4 item 16
-                            else:
-                                spec = shot.drawing_spec
-                                _stated_figure_needs(shot, spec)   # design/149 B6 (SK): a figure the film states is confirmed from the script, never unknown
-                                _dimension_needs(f'shot {shot.id}', spec.dimensions, research=False)
-                                warnings += _research_warning(f'shot {shot.id}', spec, shot_id=shot.id)   # design/111 F19; design/124 C2: refused at approval
-                                section = 'section' in (shot.depicts + ' ' + shot.purpose + ' ' + shot.title).lower()   # F19: a wall section defaults to cutaway
-                                need(spec.view or section, f'shot {shot.id}: give view (cutaway, plan, side or elevation) and view_reason: which view shows what the drawing is for.')
-                                need(not spec.view or spec.view_reason.strip(), f'shot {shot.id}: view {spec.view}: give view_reason.')
-                                real_object = shot.graphic_kind == 'diagram' and any(ekind.get(e) in ('object', 'material') for e in shot.element_ids)   # design/124 C2: not a chart, map or day strip
-                                if not spec.proportions and real_object:   # design/106 D2
-                                    warnings.append({'shot_id': shot.id, 'kind': 'spec_proportions_missing', 'message': f'shot {shot.id}: give the proportions that matter (proportions), '
-                                                     'for example a brick about 3 : 1.5 : 1, both leaves the same thickness; "illustrative" means no numbers printed, never free proportions'})
-                                if any(d.status == 'unknown' for d in spec.dimensions):
-                                    need('not to scale' in spec.label.lower(), f'shot {shot.id}: a size is unknown, so the drawing is labelled "illustrative, not to scale" (label) and shows no figure for it.')
-                        if shot.visual_type == 'drawn':   # design/117 P2 (after the spec's own checks, so a spec fault is named first)
-                            _recalled_on_screen_needs(shot)   # design/149 B10: a figure confirmed on the operator's word alone shapes the drawing, never a label
-                            svg_needs(shot, seconds, new_film)
-                            motion_needs(shot, seconds)   # design/130
-                        for n, st in enumerate(shot.states, 1):
-                            if st.hold_s > STATE_MAX_S + 0.04:
-                                warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state'})
-                        if scenes is counted:   # a return names a shot the film shows: the recommended choice, never the alternative
-                            starts[shot.id] = shot.start_frame
-                        returns.append(shot)
-                        gap_shots.append(shot)
-                        if shot.visual_type == 'video' and seconds is not None:   # design/45 10.7; design/124 A4 decision 5: refused, Omni only
-                            omni = _default_generator()
-                            need(seconds <= omni['max_seconds'] + 1e-6, f"shot {shot.id} is {seconds:.1f} s; an AI video take is {omni['min_seconds']}–{omni['max_seconds']} s: "
-                                                                        'split it into shots of up to that, cut where an action begins or ends')
-                            need(seconds >= VIDEO_MIN_ON_SCREEN_S - 1e-6, f"shot {shot.id} is {seconds:.1f} s of AI video; a take is made at {omni['min_seconds']} s and cut to at least "
-                                                                          f"{VIDEO_MIN_ON_SCREEN_S} s on screen: under that, use a single picture (a still)")
-                            people = [s.element_id for s in shot.subjects if ekind.get(s.element_id) == 'person']
-                            need(len(people) <= PEOPLE_NEAR_MAX, f'shot {shot.id} has {len(people)} people; an AI video shot holds at most {PEOPLE_NEAR_MAX}: a crowd is not yet available. '
-                                                                 'Take people out of the shot, or make it footage or a still.')
-                            need(not CIRCLING.search(shot.camera_move or ''), f'shot {shot.id}: a camera that circles a person is not made (the place is rebuilt between angles). Use a fixed camera, or a pan that follows a walker.')
-                            if shot.recipe == 'transfer_close':
-                                need(shot.size in CLOSE_SIZES, f'shot {shot.id}: a transfer (a pour, a pick-up, a hand-over) is its own close shot: give it the size MCU, CU or ECU.')
-                                down = [p.element_id for p in shot.props if p.end.where == 'set_down']
-                                need(not down, f"shot {shot.id}: a transfer ends before the set-down: {', '.join(down)} ends in the hand (in_hand); the set-down is another shot, or is left out.")
-                        need(set(shot.element_ids) <= elements, 'Shot names an unknown reference element.')
-                        subjects = unique(shot.subjects, 'element_id', 'visible subject')
-                        need(subjects <= set(shot.element_ids), 'Every visible subject must be a required shot element.')
-                        for subject in shot.subjects:
-                            states = [subject.start, subject.end]
-                            previous = last_states.get(subject.element_id)
-                            if previous and previous != subject.start.model_dump() and not subject.continuity_note.strip():
-                                warnings.append({'shot_id': shot.id, 'element_id': subject.element_id, 'kind': 'state_changed',
-                                                 'message': 'Subject state changed between shots; explain the movement, elapsed time or intended discontinuity.'})
-                            living = shot.visual_type == 'video' and ekind.get(subject.element_id) in ('person', 'animal')
-                            if subject.behaviour == 'holds':
-                                need(not subject.beats and subject.hold_reason.strip(), 'A held subject needs its reason, not invented beats.')
-                                small_life = SMALL_LIFE.search(subject.hold_reason) and not ('stand' in subject.start.pose.lower() and scene.activity_level in ('normal', 'busy'))   # design/124-b item 3
-                                if living:   # design/110 F6: a living thing that is not the actor still gets its own small change
-                                    pass   # integration step E: no forced move. A person who stays put is the safest case of a guide-made shot (the method's rule 9); small life is welcome, never required
-                                    need(subject.start.pose == subject.end.pose and subject.start.holding == subject.end.holding and subject.start.progress == subject.end.progress,
-                                         'A held subject cannot change what it holds or its progress.')
+                                if st.hold_s > STATE_MAX_S + 0.04:
+                                    warnings.append({'shot_id': shot.id, 'kind': 'state_long', 'message': f'state {n} of shot {shot.id} holds {st.hold_s:.1f} s: a graphic state holds at most {STATE_MAX_S} s; add a state'})
+                            returns.append(shot)
+                            gap_shots.append(shot)
+                            if shot.visual_type == 'video' and seconds is not None:   # design/45 10.7; design/124 A4 decision 5: refused, Omni only
+                                omni = _default_generator()
+                                need(seconds <= omni['max_seconds'] + 1e-6, f"shot {shot.id} is {seconds:.1f} s; an AI video take is {omni['min_seconds']}–{omni['max_seconds']} s: "
+                                                                            'split it into shots of up to that, cut where an action begins or ends')
+                                need(seconds >= VIDEO_MIN_ON_SCREEN_S - 1e-6, f"shot {shot.id} is {seconds:.1f} s of AI video; a take is made at {omni['min_seconds']} s and cut to at least "
+                                                                              f"{VIDEO_MIN_ON_SCREEN_S} s on screen: under that, use a single picture (a still)")
+                                people = [s.element_id for s in shot.subjects if ekind.get(s.element_id) == 'person']
+                                if len(people) > PEOPLE_NEAR_MAX:   # design/207 (SK, 16 Nov 2026): told to the operator, not refused; the circling refusal that stood here is gone too
+                                    warnings.append({'shot_id': shot.id, 'kind': 'people_many', 'message': f'shot {shot.id} has {len(people)} people; an AI video shot with more than {PEOPLE_NEAR_MAX} often needs a second take: '
+                                                     'the operator is told; take people out of the shot if it does not need them'})
+                                if shot.recipe == 'transfer_close':
+                                    need(shot.size in CLOSE_SIZES, f'shot {shot.id}: a transfer (a pour, a pick-up, a hand-over) is its own close shot: give it the size MCU, CU or ECU.')
+                                    down = [p.element_id for p in shot.props if p.end.where == 'set_down']
+                                    need(not down, f"shot {shot.id}: a transfer ends before the set-down: {', '.join(down)} ends in the hand (in_hand); the set-down is another shot, or is left out.")
+                            need(set(shot.element_ids) <= elements, 'Shot names an unknown reference element.')
+                            subjects = unique(shot.subjects, 'element_id', 'visible subject')
+                            need(subjects <= set(shot.element_ids), 'Every visible subject must be a required shot element.')
+                            for subject in shot.subjects:
+                                states = [subject.start, subject.end]
+                                previous = last_states.get(subject.element_id)
+                                if previous and previous != subject.start.model_dump() and not subject.continuity_note.strip():
+                                    warnings.append({'shot_id': shot.id, 'element_id': subject.element_id, 'kind': 'state_changed',
+                                                     'message': 'Subject state changed between shots; explain the movement, elapsed time or intended discontinuity.'})
+                                living = shot.visual_type == 'video' and ekind.get(subject.element_id) in ('person', 'animal')
+                                if subject.behaviour == 'holds':
+                                    need(not subject.beats and subject.hold_reason.strip(), 'A held subject needs its reason, not invented beats.')
+                                    small_life = SMALL_LIFE.search(subject.hold_reason) and not ('stand' in subject.start.pose.lower() and scene.activity_level in ('normal', 'busy'))   # design/124-b item 3
+                                    if living:   # design/110 F6: a living thing that is not the actor still gets its own small change
+                                        pass   # integration step E: no forced move. A person who stays put is the safest case of a guide-made shot (the method's rule 9); small life is welcome, never required
+                                        need(subject.start.pose == subject.end.pose and subject.start.holding == subject.end.holding and subject.start.progress == subject.end.progress,
+                                             'A held subject cannot change what it holds or its progress.')
+                                    else:
+                                        need(subject.start == subject.end, 'A held subject cannot change position or progress.')
                                 else:
-                                    need(subject.start == subject.end, 'A held subject cannot change position or progress.')
-                            else:
-                                need(bool(subject.beats), 'Every acting subject, including background subjects, needs beats.')
-                            end = shot.start_frame
-                            state = subject.start
-                            for beat in subject.beats:
-                                need(beat.id not in beat_ids, 'Duplicate beat identity.')
-                                beat_ids.add(beat.id)
-                                need(end <= beat.start_frame < beat.end_frame <= shot.end_frame,
-                                     'A subject cannot perform overlapping beats or actions outside its shot.')
-                                need(beat.start == state, "Beat starting state must continue this subject's preceding state: "
-                                     f"shot {shot.id}, subject {subject.element_id}, beat {beat.id} differs in {_differs(state, beat.start)} "
-                                     "(the first beat starts exactly in the subject's start state, a later one in the previous beat's end).")
-                                need(beat.target in landmarks or beat.target in elements, f"shot {shot.id}: beat {beat.id}'s target is a landmark of the scene or an element of the plan "
-                                     f"('{beat.target}' is neither): name the thing the action heads for; describe it in path and result.")
-                                need(beat.target in landmarks or beat.target in shot.element_ids, f"shot {shot.id}: beat {beat.id} heads for {beat.target}, which is not in the shot: "
-                                     'add it to the shot\'s element_ids so it is in the start picture.')
-                                states.extend([beat.start, beat.end])
-                                state, end = beat.end, beat.end_frame
-                            if subject.beats:
-                                need(state == subject.end, "Final beat must leave the subject in the shot's ending state: "
-                                     f"shot {shot.id}, subject {subject.element_id}, beat {subject.beats[-1].id} differs in {_differs(subject.end, state)} "
-                                     "(the last beat ends exactly in the subject's end state).")
-                            for state in states:
-                                need(state.position.landmark_id in landmarks, 'Subject positions must refer to a named scene landmark.')
-                                need(set(state.holding) <= elements, 'Held objects must have element identities.')
-                                if shot.visual_type == 'video':   # design/110 F2: landmark + measured amount in a visible unit; a vague relation alone is refused
-                                    pos = state.position
-                                    need(not VAGUE_PLACE.fullmatch(pos.relation.strip()), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation}" alone says nothing a picture can place: '
-                                         'name the landmark and how far from it.')
-                                    need(pos.amount is not None and pos.unit.strip(), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation} {pos.landmark_id}" needs a measured amount and a '
-                                         'visible unit (amount, unit: bricks, paces, body-lengths, a hand, a doorway).')
-                            if shot.visual_type == 'video':   # design/110 F4, F6: counted objects; a heading on every state
-                                for state in states:
-                                    need(isinstance(state.facing, Heading), f'shot {shot.id}: {subject.element_id}\'s facing is a heading: landmark_id, edge (left, right, top, bottom, toward camera, away from camera) '
-                                         'and camera_side, the side that faces the camera.')
-                                    need(state.facing.landmark_id in landmarks, f'shot {shot.id}: {subject.element_id}\'s heading names a landmark of the scene.')
-                                    for o in state.objects:
-                                        need(o.element_id in elements, f'shot {shot.id}: {subject.element_id}\'s objects name elements of the plan ({o.element_id} is not one).')
-                                        need(o.place.landmark_id in landmarks, f'shot {shot.id}: the place of {o.element_id} names a landmark of the scene.')
-                                before = {o.element_id: o.count for o in subject.start.objects}
-                                after = {o.element_id: o.count for o in subject.end.objects}
-                                for eid in set(before) | set(after):
-                                    if before.get(eid, 0) != after.get(eid, 0):
-                                        name_ = next((e.name for e in plan.elements if e.id == eid), eid).lower()
-                                        need(any(eid.lower() in ch.what.lower() or name_ in ch.what.lower() for ch in shot.changes),
-                                             f'shot {shot.id}: {subject.element_id}\'s {eid} goes from {before.get(eid, 0)} to {after.get(eid, 0)} between the start and the end; name the change that does it '
-                                             '(changes), so the counts agree with the action.')
-                            if shot.visual_type == 'video' and ekind.get(subject.element_id) == 'person' and shot.face_in_frame:   # design/111 F7: the eyes have a state too
-                                for state in states:
-                                    need(state.gaze is not None, f'shot {shot.id}: {subject.element_id} is a person with the face in frame: give gaze (target, head_turn, mouth) on every state, or set face_in_frame false for a back view or hands in close.')
-                                    need(state.gaze.target in landmarks or state.gaze.target in elements or state.gaze.target == GAZE_CAMERA, f'shot {shot.id}: {subject.element_id}\'s gaze target is a landmark of the scene or a named element, or the camera ({state.gaze.target} is none of them).')   # design/124-b item 17
-                            if shot.visual_type == 'video':   # design/110 F1: the past tense comes from the plan, never from the server
+                                    need(bool(subject.beats), 'Every acting subject, including background subjects, needs beats.')
+                                end = shot.start_frame
+                                state = subject.start
                                 for beat in subject.beats:
-                                    need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third brick on edge beside the second").')
-                            last_states[subject.element_id] = subject.end.model_dump()
-                        if shot.visual_type == 'video':   # design/111 F17: several of a kind are a group, same or different
-                            several = {o.element_id for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for o in stt.objects if o.count > 1}
-                            text_ = shot.framing + ' ' + shot.appearance
-                            several |= {m.group(0).lower() for m in GROUP_WORDS.finditer(text_) if not NEGATED.search(text_[:m.start()])}   # design/124-b item 9: "no workers yet" asks for none
-                            have_ = {g.kind.lower() for g in shot.groups}
-                            for k_ in sorted(several):
-                                need(k_.lower() in have_, f'shot {shot.id} shows several {k_} (more than one in frame): give groups an entry for it, mode same with the reason or different with one trait each.')
-                            for g in shot.groups:
-                                if g.mode == 'same':
-                                    need(g.reason.strip(), f'shot {shot.id}: the {g.kind} are all alike: give the reason (one batch, one uniform).')
-                                elif g.mode == 'varied':   # design/124-b decision (a): a crowd, a few traits used in turn, never one per head
-                                    need(len([i for i in g.items if i.strip()]) >= 2, f'shot {shot.id}: the {g.kind} are a varied crowd: give a few traits (two or more) in items, used in turn.')
-                                else:
-                                    need(len([i for i in g.items if i.strip()]) >= g.count, f'shot {shot.id}: the {g.kind} are {g.count} and different: give one trait each in items.')
-                        if shot.visual_type == 'video':   # design/111 F14: every technique the beats name is an element, so it gets its reference like a person or a tool
-                            names_ = {e.name.lower() for e in plan.elements if e.kind == 'technique'} | {e.id.lower() for e in plan.elements if e.kind == 'technique'}
-                            for s in shot.subjects:
-                                for b in s.beats:
-                                    for tech in technique_words(b.action + ' ' + b.done):
-                                        if tech not in names_:   # design/149 B5 (SK): the film's techniques are named once at plan-base; a stray verb warns, never refuses
-                                            warnings.append({'shot_id': shot.id, 'kind': 'technique_unnamed', 'message': f"shot {shot.id}: the technique '{tech}' (beat {b.id}: {b.action}) is not among the film's techniques: "
-                                                             f"add it (kind technique, id {tech.upper()}) so it gets its own reference picture, or say why this film needs none for it"})
-                        if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and SIZE_WORDS.search(' '.join(shot.claims)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message; design/124-b item 6: a graphic shows size by its figures; design/149 B4 (SK): a size word in descriptors describes
-                            subj = shot.subjects[0].element_id if shot.subjects else shot.element_ids[0]
-                            el = next((e for e in plan.elements if e.id == subj), None)
-                            sized_ = bool(el) and any(d.value is not None for d in (el.size or []) + list((el.material_spec.dimensions if el.material_spec else [])))
-                            need(sized_, f"shot {shot.id}: its claim is about size ({SIZE_WORDS.search(' '.join(shot.claims)).group(0)}): give the subject a size value and name compare_to, a thing in frame to read it against.")
-                            need(shot.compare_to.strip(), f'shot {shot.id}: size is the message: name compare_to, the thing in frame the size of {subj} is read against.')
-                            need(shot.compare_to in shot.element_ids and shot.compare_to != subj, f'shot {shot.id}: compare_to names an element in frame other than the subject ({shot.compare_to} is not).')
-                        if shot.visual_type == 'video' and shot.subjects:   # design/111 F8: three fixed things of the place, from the landmarks, never an element (a shot with an action: it gets an end or a take)
-                            wanted = min(3, len(landmarks))
-                            close_ = shot.size in CLOSE_SIZES   # design/124-b item 16: at MCU or closer, only the landmarks in frame, down to none
-                            need(len(set(shot.fixed)) == len(shot.fixed) and (len(shot.fixed) <= wanted if close_ else len(shot.fixed) == wanted),
-                                 f'shot {shot.id}: names three fixed things of the background in fixed (landmark ids; all of them when the scene has fewer than three; at MCU or closer, only those in frame).')
-                            for lid in shot.fixed:
-                                need(lid in landmarks, f'shot {shot.id}: {lid} is not a landmark of the scene (fixed names landmarks only).')
-                                need(lid not in elements, f'shot {shot.id}: {lid} is an element, a thing that can be carried: it belongs to objects, not to fixed.')
-                            if shot.visual_type != 'video' and shot.changes and all(re.search(r'\b(look|looks|gaze|glance|expression|eyes|smile)\b', ch.what, re.I) for ch in shot.changes):   # F7's planning rule
-                                warnings.append({'shot_id': shot.id, 'kind': 'look_only', 'message': f'shot {shot.id}: its only change is a look or an expression, a weak point of the picture models; prefer a '
-                                                 'profile, a view from behind or the hands in close, so the shot does not depend on it'})
-                        if shot.visual_type == 'video':   # design/149 B9 (SK): nothing in the frame vanishes; a container that brings a thing is a named prop
-                            warnings += container_warnings(shot, plan.elements, scene.landmarks)
-                        if shot.visual_type == 'video':   # design/110 F5: every held thing is a prop with a holder and an end
-                            held = {h for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for h in stt.holding}
-                            props = {p.element_id: p for p in shot.props}
-                            for h in held:
-                                need(h in props, f'shot {shot.id}: {h} is held but has no props entry (element_id, holder, start position, end: in_hand, set_down with its position, or carried_out with its cause).')
-                            for p in shot.props:
-                                need(p.holder in {s.element_id for s in shot.subjects}, f'shot {shot.id}: the holder of {p.element_id} is a subject of the shot.')
-                                need(p.start.landmark_id in landmarks and (p.end.position is None or p.end.position.landmark_id in landmarks), f'shot {shot.id}: the places of {p.element_id} name landmarks of the scene.')
-                                need(p.end.where != 'set_down' or p.end.position is not None, f'shot {shot.id}: {p.element_id} set down needs its position (against a landmark).')
-                                need(p.end.where != 'carried_out' or p.end.cause.strip(), f'shot {shot.id}: {p.element_id} carried out needs its cause (who carries it, where).')
-                        if shot.visual_type == 'video':   # design/91 N1, N2
-                            own = {b.id: b for s in shot.subjects for b in s.beats}
-                            for ch in shot.changes:
-                                need(ch.beat_id in own, f"shot {shot.id}: the change '{ch.what}' names {ch.beat_id}, which is not a beat of this shot.")
-                            if not shot.changes and any(s.behaviour == 'acts' for s in shot.subjects):   # design/124-b item 10: an ambient-only shot changes nothing; no end_state warning on the default
-                                warnings.append({'shot_id': shot.id, 'kind': 'changes_missing', 'message': f'shot {shot.id}: list what the action changes and the beat that '
-                                                 'causes each (changes); the take, and the pair where there is one, is checked against it'})   # design/124 A4 item 23
-                            acting = [s for s in shot.subjects if s.behaviour == 'acts']
-                            if fps:
-                                f, length = float(fps), (shot.end_frame - shot.start_frame) / float(fps)
-                                for s in acting:
-                                    need_s = sum(b.min_s for b in s.beats)
-                                    need(need_s <= length + 0.04, f'shot {shot.id}: the actions of {s.element_id} need {need_s:.1f} s but the shot has {length:.1f} s: drop an action or split the shot.')
+                                    need(beat.id not in beat_ids, 'Duplicate beat identity.')
+                                    beat_ids.add(beat.id)
+                                    need(end <= beat.start_frame < beat.end_frame <= shot.end_frame,
+                                         'A subject cannot perform overlapping beats or actions outside its shot.')
+                                    need(beat.start == state, "Beat starting state must continue this subject's preceding state: "
+                                         f"shot {shot.id}, subject {subject.element_id}, beat {beat.id} differs in {_differs(state, beat.start)} "
+                                         "(the first beat starts exactly in the subject's start state, a later one in the previous beat's end).")
+                                    need(beat.target in landmarks or beat.target in elements, f"shot {shot.id}: beat {beat.id}'s target is a landmark of the scene or an element of the plan "
+                                         f"('{beat.target}' is neither): name the thing the action heads for; describe it in path and result.")
+                                    need(beat.target in landmarks or beat.target in shot.element_ids, f"shot {shot.id}: beat {beat.id} heads for {beat.target}, which is not in the shot: "
+                                         'add it to the shot\'s element_ids so it is in the start picture.')
+                                    states.extend([beat.start, beat.end])
+                                    state, end = beat.end, beat.end_frame
+                                if subject.beats:
+                                    need(state == subject.end, "Final beat must leave the subject in the shot's ending state: "
+                                         f"shot {shot.id}, subject {subject.element_id}, beat {subject.beats[-1].id} differs in {_differs(subject.end, state)} "
+                                         "(the last beat ends exactly in the subject's end state).")
+                                for state in states:
+                                    need(state.position.landmark_id in landmarks, 'Subject positions must refer to a named scene landmark.')
+                                    need(set(state.holding) <= elements, 'Held objects must have element identities.')
+                                    if shot.visual_type == 'video':   # design/110 F2: landmark + measured amount in a visible unit; a vague relation alone is refused
+                                        pos = state.position
+                                        need(not VAGUE_PLACE.fullmatch(pos.relation.strip()), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation}" alone says nothing a picture can place: '
+                                             'name the landmark and how far from it.')
+                                        need(pos.amount is not None and pos.unit.strip(), f'shot {shot.id}: {subject.element_id}\'s position "{pos.relation} {pos.landmark_id}" needs a measured amount and a '
+                                             'visible unit (amount, unit: paces, body-lengths, a hand, a doorway).')
+                                if shot.visual_type == 'video':   # design/110 F4, F6: counted objects; a heading on every state
+                                    for state in states:
+                                        need(isinstance(state.facing, Heading), f'shot {shot.id}: {subject.element_id}\'s facing is a heading: landmark_id, edge (left, right, top, bottom, toward camera, away from camera) '
+                                             'and camera_side, the side that faces the camera.')
+                                        need(state.facing.landmark_id in landmarks, f'shot {shot.id}: {subject.element_id}\'s heading names a landmark of the scene.')
+                                        for o in state.objects:
+                                            need(o.element_id in elements, f'shot {shot.id}: {subject.element_id}\'s objects name elements of the plan ({o.element_id} is not one).')
+                                            need(o.place.landmark_id in landmarks, f'shot {shot.id}: the place of {o.element_id} names a landmark of the scene.')
+                                    before = {o.element_id: o.count for o in subject.start.objects}
+                                    after = {o.element_id: o.count for o in subject.end.objects}
+                                    for eid in set(before) | set(after):
+                                        if before.get(eid, 0) != after.get(eid, 0):
+                                            name_ = next((e.name for e in plan.elements if e.id == eid), eid).lower()
+                                            need(any(eid.lower() in ch.what.lower() or name_ in ch.what.lower() for ch in shot.changes),
+                                                 f'shot {shot.id}: {subject.element_id}\'s {eid} goes from {before.get(eid, 0)} to {after.get(eid, 0)} between the start and the end; name the change that does it '
+                                                 '(changes), so the counts agree with the action.')
+                                if shot.visual_type == 'video' and ekind.get(subject.element_id) == 'person' and shot.face_in_frame:   # design/111 F7: the eyes have a state too
+                                    for state in states:
+                                        need(state.gaze is not None, f'shot {shot.id}: {subject.element_id} is a person with the face in frame: give gaze (target, head_turn, mouth) on every state, or set face_in_frame false for a back view or hands in close.')
+                                        need(state.gaze.target in landmarks or state.gaze.target in elements or state.gaze.target == GAZE_CAMERA, f'shot {shot.id}: {subject.element_id}\'s gaze target is a landmark of the scene or a named element, or the camera ({state.gaze.target} is none of them).')   # design/124-b item 17
+                                if shot.visual_type == 'video':   # design/110 F1: the past tense comes from the plan, never from the server
+                                    for beat in subject.beats:
+                                        need(beat.done.strip(), f'shot {shot.id}: beat {beat.id} needs done, its action in the past tense ("set the third cup on the tray beside the second").')
+                                last_states[subject.element_id] = subject.end.model_dump()
+                            for g in shot.groups:   # design/207 (SK, 16 Nov 2026): the loose way is retired (design/35), refused by name on every kind of shot
+                                need(g.mode != 'varied', f'shot {shot.id}: groups mode `varied` is retired: describe the {g.kind} one by one with mode different, one trait each in items.')
+                            if shot.visual_type in ('video', 'image'):   # design/111 F17: several of a kind are a group, same or different; design/207 (SK, 16 Nov 2026): a camera still too
+                                several = {o.element_id for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for o in stt.objects if o.count > 1}
+                                text_ = shot.framing + ' ' + shot.appearance
+                                several |= {m.group(0).lower() for m in GROUP_WORDS.finditer(text_) if not NEGATED.search(text_[:m.start()])}   # design/124-b item 9: "no workers yet" asks for none
+                                have_ = {g.kind.lower() for g in shot.groups}
+                                for k_ in sorted(several):
+                                    need(k_.lower() in have_, f'shot {shot.id} shows several {k_} (more than one in frame): give groups an entry for it, mode same with the reason or different with one trait each.')
+                                for g in shot.groups:
+                                    if g.mode == 'same':
+                                        need(g.reason.strip(), f'shot {shot.id}: the {g.kind} are all alike: give the reason (one batch, one uniform).')
+                                    else:
+                                        need(len([i for i in g.items if i.strip()]) >= g.count, f'shot {shot.id}: the {g.kind} are {g.count} and different: give one trait each in items.')
+                            if shot.visual_type == 'video':   # design/111 F14: every technique the beats name is an element, so it gets its reference like a person or a tool
+                                names_ = {e.name.lower() for e in plan.elements if e.kind == 'technique'} | {e.id.lower() for e in plan.elements if e.kind == 'technique'}
+                                for s in shot.subjects:
                                     for b in s.beats:
-                                        have = (b.end_frame - b.start_frame) / f
-                                        need(have >= b.min_s - 0.04, f'shot {shot.id}: beat {b.id} ({b.action}) has {have:.1f} s for an action that needs {b.min_s:g} s: give it the time or drop it.')
-                            if any(not b.min_s for s in acting for b in s.beats):
-                                warnings.append({'shot_id': shot.id, 'kind': 'min_s_missing', 'message': f'shot {shot.id}: give every beat its min_s, the realistic time its action takes, so the shot '
-                                                 'holds only what fits its seconds'})
-                        if not shot.subjects and shot.visual_type != 'footage':   # design/124 C2: footage is filmed, not composed
-                            need(shot.information_progression.strip(), f'shot {shot.id}: describe the composition or information progression for a shot without acting subjects.')
-                except _Collected:   # design/148 A1: this scene's first failure is recorded; the next scene runs
+                                        for tech in technique_words(b.action + ' ' + b.done):
+                                            if tech not in names_:   # design/149 B5 (SK): the film's techniques are named once at plan-base; a stray verb warns, never refuses
+                                                warnings.append({'shot_id': shot.id, 'kind': 'technique_unnamed', 'message': f"shot {shot.id}: the technique '{tech}' (beat {b.id}: {b.action}) is not among the film's techniques: "
+                                                                 f"add it (kind technique, id {tech.upper()}) so it gets its own reference picture, or say why this film needs none for it"})
+                            if shot.visual_type not in GRAPHIC_TYPES + ('drawn',) and SIZE_WORDS.search(' '.join(shot.claims)) and (shot.subjects or shot.element_ids):   # design/111 F15: size as the message; design/124-b item 6: a graphic shows size by its figures; design/149 B4 (SK): a size word in descriptors describes
+                                subj = shot.subjects[0].element_id if shot.subjects else shot.element_ids[0]
+                                el = next((e for e in plan.elements if e.id == subj), None)
+                                sized_ = bool(el) and any(d.value is not None for d in (el.size or []) + list((el.material_spec.dimensions if el.material_spec else [])))
+                                order_ = 'a person in frame first; with no person, a thing whose size is generally fixed (a door, a chair, a hand tool)'   # design/207 (SK, 16 Nov 2026)
+                                need(sized_, f"shot {shot.id}: its claim is about size ({SIZE_WORDS.search(' '.join(shot.claims)).group(0)}): give the subject a size value and name compare_to: {order_}.")
+                                need(shot.compare_to.strip(), f'shot {shot.id}: size is the message: name compare_to, what the size of {subj} is read against: {order_}.')
+                                need(shot.compare_to in shot.element_ids and shot.compare_to != subj, f'shot {shot.id}: compare_to names an element in frame other than the subject ({shot.compare_to} is not): {order_}.')
+                                person_ = next((e for e in shot.element_ids if ekind.get(e) == 'person' and e != subj), None)
+                                if person_ and ekind.get(shot.compare_to) != 'person':
+                                    warnings.append({'shot_id': shot.id, 'kind': 'compare_not_person', 'message': f'shot {shot.id}: size is the message and a person is in the shot ({person_}): '
+                                                     f'read the size against the person (compare_to {person_}), not against {shot.compare_to}'})
+                            if shot.visual_type == 'video' and shot.subjects:   # design/111 F8: three fixed things of the place, from the landmarks, never an element (a shot with an action: it gets an end or a take)
+                                wanted = min(3, len(landmarks))
+                                close_ = shot.size in CLOSE_SIZES   # design/124-b item 16: at MCU or closer, only the landmarks in frame, down to none
+                                need(len(set(shot.fixed)) == len(shot.fixed) and (len(shot.fixed) <= wanted if close_ else len(shot.fixed) == wanted),
+                                     f'shot {shot.id}: names three fixed things of the background in fixed (landmark ids; all of them when the scene has fewer than three; at MCU or closer, only those in frame).')
+                                for lid in shot.fixed:
+                                    need(lid in landmarks, f'shot {shot.id}: {lid} is not a landmark of the scene (fixed names landmarks only).')
+                                    need(lid not in elements, f'shot {shot.id}: {lid} is an element, a thing that can be carried: it belongs to objects, not to fixed.')
+                            if shot.changes and all(LOOK_WORDS.search(ch.what) for ch in shot.changes) and shot.size not in CLOSE_SIZES:   # design/207 (SK, 16 Nov 2026): replaces look_only, which never fired and advised the opposite
+                                warnings.append({'shot_id': shot.id, 'kind': 'look_wide', 'message': f'shot {shot.id}: this shot is about a look or an expression: frame it MCU or closer with the face in frame'})
+                            if shot.visual_type in ('image', 'video'):   # design/207 (SK, 16 Nov 2026): a living extra is used lightly: one kind of animal in a picture
+                                animals = sorted({e.name for e in plan.elements if e.kind == 'animal' and e.id in shot.element_ids})
+                                if len(animals) > 1:
+                                    warnings.append({'shot_id': shot.id, 'kind': 'animals_many', 'message': f"shot {shot.id} names more than one kind of animal ({', '.join(animals)}): one shot carries one kind of animal"})
+                            if shot.visual_type == 'video':   # design/149 B9 (SK): nothing in the frame vanishes; a container that brings a thing is a named prop
+                                warnings += container_warnings(shot, plan.elements, scene.landmarks)
+                            if shot.visual_type == 'video':   # design/110 F5: every held thing is a prop with a holder and an end
+                                held = {h for s in shot.subjects for stt in [s.start, s.end] + [x for b in s.beats for x in (b.start, b.end)] for h in stt.holding}
+                                props = {p.element_id: p for p in shot.props}
+                                for h in held:
+                                    need(h in props, f'shot {shot.id}: {h} is held but has no props entry (element_id, holder, start position, end: in_hand, set_down with its position, or carried_out with its cause).')
+                                for p in shot.props:
+                                    need(p.holder in {s.element_id for s in shot.subjects}, f'shot {shot.id}: the holder of {p.element_id} is a subject of the shot.')
+                                    need(p.start.landmark_id in landmarks and (p.end.position is None or p.end.position.landmark_id in landmarks), f'shot {shot.id}: the places of {p.element_id} name landmarks of the scene.')
+                                    need(p.end.where != 'set_down' or p.end.position is not None, f'shot {shot.id}: {p.element_id} set down needs its position (against a landmark).')
+                                    need(p.end.where != 'carried_out' or p.end.cause.strip(), f'shot {shot.id}: {p.element_id} carried out needs its cause (who carries it, where).')
+                            if shot.visual_type == 'video':   # design/91 N1, N2
+                                own = {b.id: b for s in shot.subjects for b in s.beats}
+                                for ch in shot.changes:
+                                    need(ch.beat_id in own, f"shot {shot.id}: the change '{ch.what}' names {ch.beat_id}, which is not a beat of this shot.")
+                                if not shot.changes and any(s.behaviour == 'acts' for s in shot.subjects):   # design/124-b item 10: an ambient-only shot changes nothing; no end_state warning on the default
+                                    warnings.append({'shot_id': shot.id, 'kind': 'changes_missing', 'message': f'shot {shot.id}: list what the action changes and the beat that '
+                                                     'causes each (changes); the take, and the pair where there is one, is checked against it'})   # design/124 A4 item 23
+                                acting = [s for s in shot.subjects if s.behaviour == 'acts']
+                                if fps:
+                                    f, length = float(fps), (shot.end_frame - shot.start_frame) / float(fps)
+                                    for s in acting:
+                                        need_s = sum(b.min_s for b in s.beats)
+                                        need(need_s <= length + 0.04, f'shot {shot.id}: the actions of {s.element_id} need {need_s:.1f} s but the shot has {length:.1f} s: drop an action or split the shot.')
+                                        for b in s.beats:
+                                            have = (b.end_frame - b.start_frame) / f
+                                            need(have >= b.min_s - 0.04, f'shot {shot.id}: beat {b.id} ({b.action}) has {have:.1f} s for an action that needs {b.min_s:g} s: give it the time or drop it.')
+                                if any(not b.min_s for s in acting for b in s.beats):
+                                    warnings.append({'shot_id': shot.id, 'kind': 'min_s_missing', 'message': f'shot {shot.id}: give every beat its min_s, the realistic time its action takes, so the shot '
+                                                     'holds only what fits its seconds'})
+                            if not shot.subjects and shot.visual_type != 'footage':   # design/124 C2: footage is filmed, not composed
+                                need(shot.information_progression.strip(), f'shot {shot.id}: describe the composition or information progression for a shot without acting subjects.')
+                        except _Collected:   # design/207 (SK, 16 Nov 2026): one fault per shot, not per scene; the next shot runs from this shot's end, without this shot's half-read states
+                            broken = True
+                            cursor = shot.end_frame
+                            for sub_ in shot.subjects:
+                                last_states.pop(sub_.element_id, None)
+                except _Collected:   # design/148 A1: a failure of the scene's own lines is recorded; the next scene runs
                     broken = True
                     continue
             last = scenes[-1].shots[-1].id if scenes and scenes[-1].shots else None   # design/91 N16
@@ -1142,6 +1150,22 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
             if not broken:
                 need(cursor == window['end_frame'], 'Planned pictures must cover the exact approved working gap duration. Propose a timing revision before changing it.')
             warnings += timing_warnings(gap.gap_id, gap_shots, window.get('timing'), fps)   # design/89 A3
+    # design/207 (SK, 16 Nov 2026): the checks that came one a round after everything else are recorded with the rest, one fault per place and per returning shot
+    for e in plan.elements:   # design/111 F18: a place the film shows carries its signs of use, each at a landmark of a scene that shows it
+        if e.id in place_marks and not e.staged_clean.strip():   # design/124-b item 4: a place staged clean, with its reason, carries none
+            try:
+                need(len(e.signs_of_use) >= 2, f'{e.id} is a place the film shows: give signs_of_use, two or more traces of work or living, each at one of its landmarks.')
+                for s in e.signs_of_use:
+                    need(s.landmark_id in place_marks[e.id], f'{e.id}: {s.landmark_id} is not a landmark of a scene that shows {e.id} (signs_of_use).')
+            except _Collected:
+                continue
+    for shot in returns:   # design/89 H7: a return is reimagined, with what differs
+        if shot.return_of:
+            try:
+                need(shot.return_of in starts and starts[shot.return_of] < shot.start_frame, f'shot {shot.id}: return_of names an earlier shot of this plan ({shot.return_of} is not one).' + _nearest(shot.return_of, starts))
+                need(shot.differs_by.strip(), f'shot {shot.id} returns to {shot.return_of}: say what differs (differs_by): the angle, the distance or the moment.')
+            except _Collected:
+                continue
     _raise_collected()   # design/148 A1: every item's first failure, together; the cross-plan checks below wait for a plan whose items pass
     said.sort(key=lambda s: s.start_frame)   # design/91 N11: one message once, unless the later shot says what it adds
     words = [set(_tokens(s.message)) - STOP_WORDS for s in said]
@@ -1155,16 +1179,30 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                 warnings.append({'shot_id': later.id, 'kind': 'message_repeated', 'message': f'shot {later.id} carries the message of {said[i].id} again '
                                  f"('{later.message}'): merge them into one shot in context, or say what it adds (adds: a number, a cause, a consequence)"})
                 break
+    for a, b in zip(said, said[1:]):   # design/207 (SK, 16 Nov 2026): a living extra is not in two shots in a row, unless it carries on inside one scene
+        again = [e for e in b.element_ids if ekind.get(e) == 'animal' and e in a.element_ids]
+        if again and scene_of[a.id] is not scene_of[b.id] and a.visual_type in ('image', 'video') and b.visual_type in ('image', 'video'):
+            warnings.append({'shot_id': b.id, 'kind': 'extra_repeated', 'message': f"shot {b.id} shows {', '.join(again)} again straight after {a.id}, in another scene: a living extra is not in two shots in a row "
+                             'unless it carries on from the shot before; take it out of one, or say why it stays'})
+    # ponytail: design/207 (SK, 16 Nov 2026): the same set-up twice is read from plan fields only (the person, the scene's outfit words, the place element, the size), against every earlier shot;
+    # it cannot see the angle or the picture: compare the pictures themselves if this misses or cries wolf
+    for j, later in enumerate(said):
+        if later.visual_type not in ('image', 'video') or not later.size or later.return_of or later.differs_by.strip():   # footage is what was filmed; a graphic has no set-up
+            continue
+        hit = next(((p, pl, earlier) for earlier in said[:j] if earlier.size == later.size
+                    for p in later.element_ids if ekind.get(p) == 'person' and p in earlier.element_ids and same_outfit(scene_of[earlier.id].outfit.get(p), scene_of[later.id].outfit.get(p))
+                    for pl in later.element_ids if ekind.get(pl) == 'place' and pl in earlier.element_ids), None)
+        if hit:
+            warnings.append({'shot_id': later.id, 'kind': 'same_setup', 'message': f'shot {later.id} shows {hit[0]} at {hit[1]} in the same clothes and at the same size ({later.size}) as {hit[2].id}: '
+                             'change the angle, the distance or the moment and say what differs (differs_by), or name the return (return_of)'})
+    untried = [s.id for s in said if s.recipe == 'other']   # design/207 (SK, 16 Nov 2026): a kind of moving shot not tried here is taken; the operator is told once, on the first such shot
+    if untried:
+        warnings.append({'shot_id': untried[0], 'kind': 'video_untried', 'message': f"{', '.join(untried)}: this kind of moving shot has not been tried here; the first take is a trial and may need a second; the operator is told"})
     # design/65 B4: graphics back to back, inside a gap or across two gaps with no footage between; a gap of several shots that is all graphics
     placed.sort(key=lambda p: p[3])
     for prev, cur in zip(placed, placed[1:]):
         if prev[2] in GRAPHIC_TYPES and cur[2] in GRAPHIC_TYPES and (prev[0] == cur[0] or prev[4] == cur[3]):
             warnings.append({'shot_id': cur[1], 'kind': 'graphics_back_to_back', 'message': f"shots {prev[1]} and {cur[1]} are graphics back to back: say why the second stays a graphic in its warning_answers (kind graphics_back_to_back)"})
-    for e in plan.elements:   # design/111 F18: a place the film shows carries its signs of use, each at a landmark of a scene that shows it
-        if e.id in place_marks and not e.staged_clean.strip():   # design/124-b item 4: a place staged clean, with its reason, carries none
-            need(len(e.signs_of_use) >= 2, f'{e.id} is a place the film shows: give signs_of_use, two or more traces of work or living, each at one of its landmarks.')
-            for s in e.signs_of_use:
-                need(s.landmark_id in place_marks[e.id], f'{e.id}: {s.landmark_id} is not a landmark of a scene that shows {e.id} (signs_of_use).')
     for gap in plan.gaps:
         own = [p for p in placed if p[0] == gap.gap_id]
         if len(own) > 1 and all(p[2] in GRAPHIC_TYPES for p in own):
@@ -1172,10 +1210,6 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
     if graphic_seen and plan.foundation.graphic_style is None:   # design/89 C2
         warnings.append({'kind': 'style_missing', 'message': 'the plan has graphics: give foundation.graphic_style (palette from the client card, line weight, labels, background, how the frame '
                                                            'is filled); the operator approves it once as a style sheet picture and every graphic\'s first picture is made from it'})   # design/124 A4 item 24
-    for shot in returns:   # design/89 H7: a return is reimagined, with what differs
-        if shot.return_of:
-            need(shot.return_of in starts and starts[shot.return_of] < shot.start_frame, f'shot {shot.id}: return_of names an earlier shot of this plan ({shot.return_of} is not one).' + _nearest(shot.return_of, starts))
-            need(shot.differs_by.strip(), f'shot {shot.id} returns to {shot.return_of}: say what differs (differs_by): the angle, the distance or the moment.')
     if film_frames and fps and frozen / (film_frames / float(fps)) > frozen_limit:   # design/89 B4
         share = frozen / (film_frames / float(fps))
         warnings.append({'kind': 'frozen_share', 'message': f'{frozen:.1f} s of frozen pictures, {share:.0%} of the film: over {frozen_limit:.0%}; give the stills movement, '
@@ -1263,7 +1297,6 @@ SIZE_ORDER = ['EWS', 'WS', 'MWS', 'MS', 'MCU', 'CU', 'ECU']
 
 
 FOOTAGE_CITED = re.compile(r'\b(footage|clips?)\b', re.I)   # design/119 rule 7; design/124-b item 21: a door frame is no footage
-PASSER_BY = re.compile(r'passer|passing by|walk(?:s|ing)? by|in the background|background person', re.I)   # design/119 rule 9
 
 
 def _get(o, name, default=None):
@@ -1301,26 +1334,26 @@ def script_people_warnings(plan):
                         continue
                     seen.add(w)
                     out.append({'shot_id': shot['id'], 'kind': 'script_person_missing', 'word': w,
-                                'message': f"shot {shot['id']}: its words act with {w} and the plan has no person element for them: add the element (a worker with a beat is named, with a description) or answer this warning with the reason"})
+                                'message': f"shot {shot['id']}: its words act with {w} and the plan has no person element for them: add the element (a person with a beat is named, with a description) or answer this warning with the reason"})
     return out
 
 
 def course_warnings(plan, fps, drawn_in_run=True):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
-    acting = {s.element_id for g in plan.gaps for sc in list(g.scenes) + [x for c in g.choices for x in c.scenes] for sh in sc.shots for s in sh.subjects if s.beats}
+    kind_of = {e.id: e.kind for e in plan.elements}
+    counted = lambda gap: next((c.scenes for c in gap.choices if c.id == gap.recommended_choice), []) if gap.choices else gap.scenes
     for e in plan.elements:   # A5
         if e.kind not in ('person', 'graphic') and e.identity != 'exact' and footage_cited(e, plan.visual_facts):   # design/119 rule 7
             out.append({'element_id': e.id, 'kind': 'footage_identity', 'message': f'element {e.id}: its fact or size cites the footage ({footage_cited(e, plan.visual_facts)[:80]}): a thing the footage shows is '
                                                                                    'identity exact with an approved footage frame as its identity; set identity exact and approve a frame of it before any picture'})
-        if e.kind == 'person' and e.id not in acting and PASSER_BY.search(f'{e.requirements} {e.description}'):   # design/119 rule 9; design/124-b decision (a): a worker with beats is named on purpose
-            out.append({'element_id': e.id, 'kind': 'passer_by', 'message': f'element {e.id} reads as a passer-by: a background person who only passes is never a named element with a sheet; '
-                                                                            "describe them in each scene's own words, different every time"})
+        # design/207 (SK, 16 Nov 2026): the passer_by note that stood here is gone (every named person may be an element); its kind is still taken as an answer
         if e.kind in ('person', 'object', 'animal') and not e.size and not e.material_spec:   # defect 35: a material's sizes live in its material_spec (design/111 F10), never in a size list
             out.append({'element_id': e.id, 'kind': 'element_size_missing', 'message': f'element {e.id} ({e.kind}): give its real size (size: height, width, depth or length, '
                                                                                        'each with its source and status: confirmed, measured or unknown); never invent one'})
-    for gap in plan.gaps:
-        scenes = next((c.scenes for c in gap.choices if c.id == gap.recommended_choice), []) if gap.choices else gap.scenes
+    before = {}   # design/207 (SK, 16 Nov 2026): the widest size each element was seen at in the scene just before, in film order, across scenes and gaps
+    for gap in sorted(plan.gaps, key=lambda g: min((sh.start_frame for sc in counted(g) for sh in sc.shots), default=0)):
+        scenes = counted(gap)
         run_s, run_ids = 0.0, []
         for scene in scenes:
             if any(s.visual_type not in GRAPHIC_TYPES + ('drawn', 'footage') for s in scene.shots) and not scene.light.strip():   # A1; design/124-b item 1: footage has its own light; C2: a drawing none
@@ -1329,6 +1362,7 @@ def course_warnings(plan, fps, drawn_in_run=True):
             seen, sizes = {}, []   # A3: the widest size each element was seen at so far in the scene; the sizes in order
             if scene.continues_footage:   # design/124-b item 11: the footage beside the gap showed the place and its subjects wider
                 seen, sizes = {e: 0 for sh in scene.shots for e in sh.element_ids}, ['footage']
+            shown_wide = any(before.get(e, 99) <= SIZE_ORDER.index('MWS') for sh in scene.shots for e in sh.element_ids if kind_of.get(e) == 'place')   # design/207: the scene just before showed this place wide
             for shot in scene.shots:
                 if shot.visual_type in GRAPHIC_TYPES + (('drawn',) if drawn_in_run else ()):   # design/126 TR1b: a drawn shot is a graphic in the run (VW-12 keeps today's rule)
                     run_s += (shot.end_frame - shot.start_frame) / float(fps) if fps else 0
@@ -1347,17 +1381,18 @@ def course_warnings(plan, fps, drawn_in_run=True):
                     sizes.append(None)
                     continue
                 reason = shot.size_reason.strip()
-                if not sizes and shot.size not in OPEN_SIZES and not reason:   # A3 (1)
+                if not sizes and shot.size not in OPEN_SIZES and not reason and not shown_wide:   # A3 (1)
                     out.append({'shot_id': shot.id, 'kind': 'size_open',
                                 'message': f'shot {shot.id} opens scene {scene.id} at {shot.size}: a new place opens wide or medium-wide, unless a reveal is stated (size_reason)'})
                 if len(sizes) >= 2 and sizes[-1] == sizes[-2] == shot.size and not reason and shot.visual_type != 'video':   # A3 (2); integration step E: not for AI video (hand actions are a run of close shots)
                     out.append({'shot_id': shot.id, 'kind': 'size_repeat', 'message': f'shot {shot.id}: three {shot.size} shots in a row; change the size, or say why (size_reason)'})
-                if shot.size in CLOSE_SIZES and not reason and shot.visual_type != 'video' and shot.element_ids and not any(seen.get(e, 99) < SIZE_ORDER.index('MCU') for e in shot.element_ids):   # A3 (3); not for AI video
+                if shot.size in CLOSE_SIZES and not reason and shot.visual_type != 'video' and shot.element_ids and not any(min(seen.get(e, 99), before.get(e, 99)) < SIZE_ORDER.index('MCU') for e in shot.element_ids):   # A3 (3); not for AI video; design/207: or seen wider in the scene just before
                     out.append({'shot_id': shot.id, 'kind': 'size_close_first',
-                                'message': f'shot {shot.id} is a {shot.size} of a subject not seen wider in this scene yet; show it wider first, or state the reveal (size_reason)'})
+                                'message': f'shot {shot.id} is a {shot.size} of a subject not seen wider in this scene or the one just before; show it wider first, or state the reveal (size_reason)'})
                 for e in shot.element_ids:
                     seen[e] = min(seen.get(e, 99), SIZE_ORDER.index(shot.size))
                 sizes.append(shot.size)
+            before = seen
         if run_s > 8:
             out.append(_graphics_run(gap.gap_id, run_ids, run_s))
     return out
@@ -1379,23 +1414,25 @@ WARNING_PLAIN = {
     'graphic_short': 'This graphic is on screen too briefly to be read.',
     'still_long': 'This still picture stays on screen longer than a still should.',
     'stills_many': 'Still pictures take up a large part of the film.',   # design/202
+    'still_more_than_agreed': 'This gap has more still picture than you accepted in the treatment.',   # design/207 (SK, 16 Nov 2026): this and the next two are raised by other parts of the server
+    'text_card': "This is a card of words; this kind of film carries no words on the picture beyond a diagram's labels.",
+    'stand_in_real': 'This person is real and named, but the picture will be a made-up stand-in.',
+    'people_many': 'This moving shot has more than four people; expect a second take.',
+    'video_untried': 'This kind of moving shot has not been tried here; the first take is a trial and may need a second.',
     'graphic_unbuilt': 'This graphic stays on screen a long time without building up.',
     'state_long': 'One step of this graphic stays on screen too long.',
-    'look_only': 'The only change in this video is a look or an expression, which AI video often gets wrong.',
     'message_repeated': 'This shot says again what an earlier shot already said.',
     'graphics_back_to_back': 'Two graphics follow each other with no camera picture between them.',
     'all_graphics': 'Every shot of this gap is a graphic, with nothing from the footage or a scene.',
     'graphics_run': 'Graphics run for more than 8 seconds here without a camera picture.',
     'claim_visible_graphic': 'This graphic shows something a camera could film.',
-    'size_open': 'This scene opens close in, before the place has been seen.',
-    'size_repeat': 'Three shots in a row are framed at the same size.',
-    'size_close_first': 'This close-up comes before the subject has been seen wider.',
-    'look_alike': 'This picture looks like another one in the film.',
 }
 WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missing', 'carries_over_missing', 'changes_missing', 'claims_missing', 'depicts_missing',
                      'element_size_missing', 'end_state', 'evidence_missing', 'facts_missing', 'footage_identity', 'frozen_share', 'light_missing', 'min_s_missing',
                      'passer_by', 'short_route', 'spec_missing', 'spec_proportions_missing', 'spec_unresearched', 'state_changed', 'style_missing',
-                     'technique_unnamed', 'container_unnamed', 'script_person_missing')   # design/149 B5, B9; design/151 Q4
+                     'technique_unnamed', 'container_unnamed', 'script_person_missing',   # design/149 B5, B9; design/151 Q4
+                     'size_open', 'size_repeat', 'size_close_first', 'look_alike', 'look_only',   # design/207 (SK, 16 Nov 2026): moved from the operator's list; look_only and passer_by are no longer raised, kept so old answers load
+                     'material_bare', 'compare_not_person', 'view_missing', 'look_wide', 'extra_repeated', 'animals_many', 'same_setup')
 
 
 def answer_warnings(plan, warnings):

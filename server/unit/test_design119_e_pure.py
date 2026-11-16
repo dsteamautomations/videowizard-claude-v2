@@ -35,12 +35,11 @@ def test_the_plan_warns_when_a_things_fact_or_size_cites_the_footage_and_it_is_n
     assert ('PL', 'footage_identity') in kinds(d)   # the fact cites it
 
 
-def test_the_plan_warns_when_a_person_element_is_a_passer_by():
+def test_a_person_element_who_only_passes_by_is_no_longer_warned():
     d = two_videos()
     d['elements'].append({'id': 'PB', 'name': 'Passer-by', 'kind': 'person', 'identity': 'representative', 'requirements': 'a man walking by in the background'})
-    assert ('PB', 'passer_by') in kinds(d)
-    d['elements'][-1]['requirements'] = 'the mason who lays the wall'
-    assert ('PB', 'passer_by') not in kinds(d)
+    assert ('PB', 'passer_by') not in kinds(d)   # design/207 (SK, 16 Nov 2026): every named person may be an element with a sheet (was: warned)
+    assert 'passer_by' in VC.WARNING_TECHNICAL   # an answer recorded before still loads
 
 
 def cited_store(with_frame, value=450):

@@ -139,8 +139,7 @@ def test_an_unresearched_size_is_warned_in_the_plan_and_refused_at_spec_approval
     assert not saved(store).get('spec_approvals')   # nothing half-approved
     half = {**SPEC, 'dimensions': [SPEC['dimensions'][0], {**UNTRIED, 'tried': 'not in the client brochure; no footage frame shows it'}]}
     doc['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec'] = half
-    with pytest.raises(Problem, match="'illustrative' is earned only after all four sources were tried"):
-        g(lambda: VS.approve_spec(spec_store(doc, sess), USER, RUN, [], 'DG1', ''))
+    assert VS.approve_spec(spec_store(doc, sess), USER, RUN, [], 'DG1', '')['shot_id'] == 'DG1'   # design/207 (SK, 16 Nov 2026): two sources tried is enough (was: refused until all four were named)
     doc['gaps'][0]['scenes'][0]['shots'][0]['drawing_spec'] = SPEC
     assert VS.approve_spec(spec_store(doc, sess), USER, RUN, [], 'DG1', '')['shot_id'] == 'DG1'
 

@@ -21,13 +21,12 @@ def check(d):
     return VC.validate_plan(d, GAPS, Fraction(25))
 
 
-def test_illustrative_is_earned_only_after_all_four_sources_were_tried():
+def test_illustrative_goes_with_an_unknown_size_and_four_sources_are_no_longer_asked():
     unknown = {**SPEC['dimensions'][1], 'tried': 'not in the client brochure; no footage frame shows the cavity'}
     said = lambda d: ' | '.join(w['message'] for w in check(d)[1] if w['kind'] == 'spec_unresearched')   # design/124 C2: warned in the plan, refused at spec approval
-    assert 'a size is unknown: the drawing is illustrative only when illustrative is true' in said(base({**SPEC, 'illustrative': False, 'dimensions': [SPEC['dimensions'][0], unknown]}))
-    assert "cavity width: 'illustrative' is earned only after all four sources were tried; tried does not name: a standard or a maker figure, an approved picture" in said(
-        base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0], unknown]}))
-    assert said(base(SPEC)) == ''   # the shared fixture names all four
+    assert 'a size is unknown: set illustrative true' in said(base({**SPEC, 'illustrative': False, 'dimensions': [SPEC['dimensions'][0], unknown]}))
+    assert said(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0], unknown]})) == ''   # design/207 (SK, 16 Nov 2026): two sources tried is enough (was: all four, or warned)
+    assert said(base(SPEC)) == ''
     assert 'nothing is unknown: drop illustrative' in said(base({**SPEC, 'illustrative': True, 'dimensions': [SPEC['dimensions'][0]], 'label': ''}))
 
 
@@ -36,12 +35,11 @@ def test_a_drawing_names_its_view_with_a_reason_and_a_section_defaults_to_cutawa
     check(d)
     sh = d['gaps'][0]['scenes'][0]['shots'][0]
     assert VS.spec_view(sh) == ('cutaway', 'a section is shown cut through')   # design/124 A4 item 26
-    with pytest.raises(ValueError, match='give view \\(cutaway, plan, side or elevation\\) and view_reason'):
-        check(base({**SPEC, 'view': '', 'view_reason': ''}, depicts='the brick'))
-    with pytest.raises(ValueError, match='view_reason'):
-        check(base({**SPEC, 'view': 'plan', 'view_reason': ''}, depicts='the brick'))
+    noted = lambda d: [w['message'] for w in check(d)[1] if w['kind'] == 'view_missing']   # design/207 (SK, 16 Nov 2026): a note to the assistant (was: refused)
+    assert 'give view (cutaway, plan, side or elevation) and view_reason' in noted(base({**SPEC, 'view': '', 'view_reason': ''}, depicts='the brick'))[0]
+    assert 'view_reason' in noted(base({**SPEC, 'view': 'plan', 'view_reason': ''}, depicts='the brick'))[0]
     d = base({**SPEC, 'view': 'plan', 'view_reason': 'the bond pattern reads from above'}, depicts='the brick')
-    check(d)
+    assert noted(d) == []
     sh = d['gaps'][0]['scenes'][0]['shots'][0]
     assert VS.spec_view(sh) == ('plan', 'the bond pattern reads from above')
     assert VS.view_line(sh) == {'check': 'view: plan', 'pass_when': 'the drawing is a plan view (the bond pattern reads from above)', 'weight': 'must'}
