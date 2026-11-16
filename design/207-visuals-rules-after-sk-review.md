@@ -59,3 +59,18 @@ Server `server/unit`: 1,835 pass (new: `test_design207_checker_pure.py`, `test_d
 - A thing passing through another thing is not checked in the guide, only a person against a thing.
 - Instruction version 2 (older films) still carries the old sentences.
 - The visuals instructions grew by 1,031 words.
+
+## The critic's review before the deploy (16 Nov, asked by SK)
+
+Three read-only reviewers checked the build before any deploy: the instructions against the server and the tool, the requirement against what was built, and the merged code for defects. No crash on real data was found. 22 findings were fixed in commit 18b5458, each with a test (`server/unit/test_design207_review_pure.py`, `plugin/tests/test_design207_review.py`). The four that could not wait:
+
+1. A storage hiccup could rewrite a running film's cost limit, including the owner's figure.
+2. The guide checker's brief was not updated: a shot with nobody in it failed its checks and was never drawn.
+3. "Not to scale" with every size known was told by the instructions and refused by the server.
+4. A real person's footage frame could reach the picture service with no recorded permission, through an AI video's starting picture.
+
+Also fixed: the dead end when a photo is given after the reference step is complete; the operator's plain lines now shown on the plan page ("Read before you answer"); texts that sent the operator to the server's page; who runs `vw visuals cap`; when a permission can be recorded; people who read alike named at the check, all pairs at once; and twelve small ones.
+
+Left open on purpose: a film already in progress meets two of the new refusals on its next proposal (the current films are test runs); the world of the film is not on the chat card; `session_of(create=True)` returns an empty session when the read itself fails (an older weakness, not from this change).
+
+Released together with design/208 (the word page, from the stage-fixes thread; its old-way rows are 91 to 96).
