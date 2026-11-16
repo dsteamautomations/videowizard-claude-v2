@@ -154,7 +154,9 @@ def _plan_page(ctx, base):
     count = lambda state: len([l for l in lines if l['state'] == state and l['key'] not in ('shared', 'world')])
     left = len([l for l in lines if l['state'] == 'open'])
     try:   # design/207: the plan's estimate against the film's limit, by the sum the check uses; left out when it cannot be worked out (a film with no picture AI named)
-        cost = f"; estimate ₹{V.plan_estimate(ctx['run'], V.routes(plan, V._fps(session) or 25)):g} of the ₹{V.cap_of(session):g} limit"
+        sets = V.set_estimate(ctx['run'], session, plan)   # design/209: what the reference sets may cost, beside the shots
+        cost = (f"; estimate ₹{V.plan_estimate(ctx['run'], V.routes(plan, V._fps(session) or 25)):g} "
+                + (f"for the shots, and up to ₹{sets['inr']:g} for {sets['sets']} reference set{'' if sets['sets'] == 1 else 's'}, " if sets['sets'] else '') + f"of the ₹{V.cap_of(session):g} limit")
     except (Problem, KeyError, TypeError, ValueError):
         cost = ''
     return {**base, 'step': 'Plan', 'open': bool(left), 'lines': lines,
@@ -163,6 +165,73 @@ def _plan_page(ctx, base):
             'note': f'This plan is long: {held} more gap(s) appear here after you answer these and say done in the chat.' if held else
                     'Answer each line, then say done in the chat.' if left else 'The assistant is changing the lines you sent back; they will appear here.' if plan_open
                     else 'Every gap of the plan is accepted. Nothing more to answer here.'}
+
+
+SPEC_STEP = 'Drawings and materials'
+SPEC_NEXT = 'Every drawing and material is approved. Go on with `vw visuals next`: it gives the next decision.'
+SPEC_BACK = ('No line waits for the operator now: correct the drawings and materials that are back with you (their words are on each) in out/visual-plan.json, '
+             'propose the plan again, then `vw visuals page`.')
+
+
+def _spec_lines(ctx):
+    """design/209 (SK, 16 Nov 2026): the lines of the step after the plan: once no plan line is open or back with the assistant, every material's
+    facts and every drawing's parts and sizes, the materials first. An open line is the chat's own waiting item (the same id, the same buttons)
+    with the plain parts of `chat_flow._spec_views`; an approved one is `recorded` and keeps its parts, to be read back; one sent back is
+    `with_assistant` with the operator's words. Empty while the plan is open, or when the film has no such spec."""
+    if any(CF._plan_items(ctx)):
+        return []
+    views = CF._spec_views(ctx)
+    items = {i['id']: i for i in CF._waiting_items(ctx) if i['kind'] == 'spec'} if any(v['state'] == 'open' for v in views) else {}
+    lines = []
+    for v in views:
+        head = {'key': v['key'], 'title': v['title']}
+        if v['state'] == 'with_assistant':
+            lines.append({**head, 'state': 'with_assistant', 'note': v['note']})
+        elif v['state'] == 'recorded':
+            lines.append({**head, 'state': 'recorded', 'spec': v['spec']})
+        elif v['item'] in items:
+            lines.append({**head, 'state': 'open', 'item': v['item'], 'ask': v['ask'], 'spec': v['spec'], 'buttons': _buttons(items[v['item']])})
+    return lines
+
+
+def _spec_page(ctx, base, lines):
+    """The step's round: every line on one round, so one "done" answers the step. A round over the document's size first leaves out the parts of
+    the recorded lines, then holds the later lines to answer for the next "done", as the plan does."""
+    many = lambda n, word: f"{n} {word}{'' if n == 1 else 's'}"
+    kinds = [many(n, word) for n, word in ((len([l for l in lines if l['key'].startswith('element:')]), 'material'),
+                                           (len([l for l in lines if not l['key'].startswith('element:')]), 'drawing')) if n]
+    held = 0
+    while len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) > ROUND_BYTES:
+        read = next((l for l in reversed(lines) if l['state'] == 'recorded' and 'spec' in l), None)
+        open_ = [i for i, l in enumerate(lines) if l['state'] == 'open']
+        if read:
+            del read['spec']
+        elif len(open_) > 1:
+            del lines[open_[-1]]
+            held += 1
+        else:
+            break
+    refused = ctx['session'].get('page_refused') or {}
+    lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if line['key'] in refused and line['state'] == 'open' else {})} for n, line in enumerate(lines, 1)]
+    count = lambda state: len([l for l in lines if l['state'] == state])
+    left = count('open')
+    return {**base, 'step': SPEC_STEP, 'open': bool(left), 'lines': lines,
+            'summary': f"{' and '.join(kinds)}: {left} to answer, {count('recorded')} recorded, {count('with_assistant')} with the assistant" + (f', {held} more after these' if held else '') + '.',
+            'note': f'This list is long: {held} more appear here after you answer these and say done in the chat.' if held else
+                    'Answer each line, then say done in the chat.' if left else 'The assistant is correcting the lines you sent back; they will appear here.' if count('with_assistant')
+                    else 'Every drawing and material is approved. Nothing more to answer here.'}
+
+
+def _spec_answer(ctx, key, choice, words, item_id):
+    """One answer to a drawing's or a material's line, through the run function of the chat's own item: Yes approves it, Correct it sends it
+    back with the operator's words. None when the line is no longer open with that content (stale)."""
+    item = next((i for i in CF._waiting_items(ctx) if i['kind'] == 'spec' and i['id'] == item_id), None)
+    if not item:
+        return None
+    button = next((b for b in item['buttons'] if b['choice'] == choice), None)
+    V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in item['buttons']) + '.')
+    V.need(not button.get('needs_words') or words, 'Say what should change in this line, in your own words.')
+    return words or button['label'], item['_run'](choice, button['label'], words)
 
 
 def _plan_answer(ctx, key, choice, words, item_id):
@@ -202,8 +271,9 @@ def page(conn, store, user, run, outputs):
     stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
     base = {'step': 'Treatment', 'round': 'r' + stamp, 'how': HOW, 'capabilities': CAPABILITIES, 'title': f"VideoWizard decisions {run.get('code') or ''}".strip()}
     if _at_plan(ctx):
-        return _plan_page(ctx, base)
-    motion = _motion_line(run, draft)
+        specs = _spec_lines(ctx)   # design/209: after the plan, the drawings and the materials
+        return _spec_page(ctx, base, specs) if specs else _plan_page(ctx, base)
+    motion =_motion_line(run, draft)
     first = [motion] if motion else []
     if not draft:
         done = bool(session.get('treatment'))
@@ -257,8 +327,8 @@ def page_record(conn, store, user, run, outputs, answers):
         state = (draft.get('lines') or {}).get(key, {}).get('state')
         said = words
         try:
-            if _at_plan(ctx):   # design/206: a plan line
-                got = _plan_answer(ctx, key, choice, words, a.get('item'))
+            if _at_plan(ctx):   # design/206: a plan line; design/209: after the plan, a drawing's or a material's line
+                got = (_spec_answer if _spec_lines(ctx) else _plan_answer)(ctx, key, choice, words, a.get('item'))
                 if not got:
                     stale.append(key)
                     continue
@@ -303,9 +373,10 @@ def page_record(conn, store, user, run, outputs, answers):
     left = len([l for l in now['lines'] if l['state'] == 'open'])
     draft = session.get('treatment_draft') or {}
     alone_accepted = bool(draft.get('direction_only')) and (draft.get('lines') or {}).get('direction', {}).get('state') == 'accepted'
-    at_plan = now['step'] == 'Plan'
+    at_plan, at_spec = now['step'] == 'Plan', now['step'] == SPEC_STEP
     then = ('Nothing was answered on the page. ' if not answers else '') + (
-        f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if at_plan and left else
+        f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec) and left else
+        SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else SPEC_NEXT if at_spec else
         PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else PLAN_NEXT if at_plan else
         'The treatment is recorded: write the plan to it.' if session.get('treatment') and not draft else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if left else

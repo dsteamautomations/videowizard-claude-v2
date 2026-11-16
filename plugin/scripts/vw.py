@@ -2003,7 +2003,9 @@ def cmd_visuals(a):
                      f"{r.get('still', 0)} still ({secs.get('still', 0):.0f} s); {r.get('images_estimated', 0)} images")
             b = out.get('budget') or {}
             if b.get('planned_inr') is not None:
-                line += f", about ₹{b['planned_inr']:,.0f} against cap ₹{b.get('cap_inr', 0):,.0f}" + (' (over the cap)' if b['planned_inr'] > (b.get('cap_inr') or 0) else '')
+                sets = (f" for the shots, and up to ₹{b.get('sets_inr', 0):,.0f} for {b['sets']} reference set{'' if b['sets'] == 1 else 's'},"
+                        if b.get('sets') else '')   # design/209: the reference sets, said beside the shots
+                line += f", about ₹{b['planned_inr']:,.0f}{sets} against cap ₹{b.get('cap_inr', 0):,.0f}" + (' (over the cap)' if b['planned_inr'] > (b.get('cap_inr') or 0) else '')
         if out.get('warnings'):
             open_ = sum(1 for w in out['warnings'] if not w.get('answered'))
             line += f"; {len(out['warnings'])} warning(s), {open_} unanswered: answer each in its shot's warning_answers (kind and answer), never in the purpose"
@@ -2076,7 +2078,9 @@ def cmd_visuals(a):
         (ws / 'work' / 'chat').mkdir(parents=True, exist_ok=True)
         paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show
         item['show_files'] = paths
-        return (f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
+        on_page = ('The drawings and the materials are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
+                   if item.get('kind') == 'spec' else '')   # design/209
+        return (on_page + f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
         out = write(base + '/chat/next', {'one': bool(a.one)})
@@ -2455,7 +2459,9 @@ def cmd_visuals(a):
             line += f"; {len(decide)} need a decision: " + ', '.join(f"{j['id']} ({j['status']}: {(j.get('error') or '')[:60]})" for j in decide)
         readable_json(ws / 'work' / 'visuals' / 'status.json', st)   # design/81: the whole answer in the run folder, read in parts
         wt = st.get('waiting') or []   # design/97 W4: give the operator the label and the link, never only "on the page"
-        waiting_line = (f"; {len(wt)} waiting for the operator: ask them one at a time with `vw visuals next` (design/188), never from this list") if wt else ''
+        specs = len([w for w in wt if 'spec to approve' in str(w.get('kind') or '')])   # design/209: the drawings and the materials are approved on the page
+        waiting_line = (f"; {len(wt)} waiting for the operator: " + (f"{specs} of them are drawings and materials, approved on the page in one visit (`vw visuals page`); " if specs else '')
+                        + f"ask {'the others' if specs else 'them'} one at a time with `vw visuals next` (design/188), never from this list") if wt else ''
         due_line = f"; {st['round_due']}" if st.get('round_due') else ''   # design/151 hotfix: a kept film's round is next, said before the waiting specs
         emit(_short_status(st, a.shot, a.gap), 0, 'Visuals: ' + line + round_line + due_line + waiting_line + '; one line per job above, the whole status in work/visuals/status.json')
     if a.what == 'fetch':

@@ -418,7 +418,9 @@ def check(store, run, outputs, document):
                                             float(Fraction(str(_fps(session) or 25))))
         except ValueError:
             continue
-    return {'status': 'valid', 'warnings': warnings, 'routes': r, 'split': split, 'plan_digest': digest(plan), 'budget': {'planned_inr': planned, 'cap_inr': cap_of(session)}, 'look_alike': alike}   # design/45 10.2
+    sets = set_estimate(run, session, plan)   # design/209: the reference sets, beside the shots
+    return {'status': 'valid', 'warnings': warnings, 'routes': r, 'split': split, 'plan_digest': digest(plan),
+            'budget': {'planned_inr': planned, 'cap_inr': cap_of(session), 'sets': sets['sets'], 'sets_inr': sets['inr']}, 'look_alike': alike}   # design/45 10.2
 
 
 def propose(conn, store, user, run, outputs, document):
@@ -762,6 +764,19 @@ def set_cap(conn, store, user, run, outputs, inr, quote):
 def plan_estimate(run, r):
     """What a plan's pictures and takes are likely to cost, from its counted routes: the one sum the check, the budget and the plan page show."""
     return round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * prices()['video_inr_per_s'], 2)
+
+
+def set_estimate(run, session, plan):
+    """design/209 (SK, 16 Nov 2026): the reference sets a plan may need and what they cost at most, said beside the plan's estimate: one set for
+    each thing the round makes one for (not a graphic, an animal or the style), less the things the round has left out or kept from a footage
+    picture. None on a film whose references are not made as sets."""
+    if not is_kept(session, run):
+        return {'sets': 0, 'inr': 0.0}
+    rows = (session.get('round') or {}).get('elements') or {}
+    # ponytail: "up to": before the round nobody knows which things have a footage picture of their own; a set already made is still counted
+    n = len([e for e in plan.get('elements') or [] if e['id'] != STYLE and e.get('kind') not in ('graphic', 'animal', 'style')
+             and not (rows.get(e['id']) or {}).get('ignored') and not (rows.get(e['id']) or {}).get('from_footage')])
+    return {'sets': n, 'inr': round(n * image_price_inr(run, provider='gemini') * SET_MAX, 2)}
 
 
 def check_cap(conn, run, session, estimate_inr, what):
@@ -3922,7 +3937,7 @@ def generate_image(conn, store, user, run, outputs, body):
         if nl:
             body = {**body, 'prompt': with_composed(body['prompt'], nl)}
     for m in materials_of(plan, body['element_id'], named):   # design/111 F10: the spec approved first, the words in numbers, the sentence and the line
-        need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: the operator approves it first (`vw visuals spec --element {m['id']}`), before a picture shows it.")
+        need(material_approved(session, m), f"the material spec of {m['id']} is not approved, or changed since: the operator approves it first, on the page (`vw visuals page`), before a picture shows it.")
         try:
             library.check_material_prompt(material_words(writer_prompt, subject_words, is_set))
         except ValueError as exc:
@@ -4091,7 +4106,7 @@ def _graphic_lines(session, plan, body, parents, answer, named=None):
     for sh in shots:
         spec = sh.get('drawing_spec')
         if spec and (session.get('spec_approvals') or {}).get(sh['id'], {}).get('digest') != spec_digest(spec):
-            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: the operator approves the specs as one table (`vw visuals spec`)")   # design/124 A4 item 19
+            warns.append(f"the drawing spec of {sh['id']} is not approved, or changed since: the operator approves the drawings and the materials on the page (`vw visuals page`)")   # design/124 A4 item 19
     return _dedupe(lines + label_lines), warns
 
 

@@ -67,6 +67,8 @@
     "tell the operator the page's plain warnings",
     "In chat: `vw visuals round --verdicts out/round-verdicts.json --quote`",
     "`illustrative: true` when nothing is unknown or missing when something is",
-    "in a video shot a living holder moves a body-length by the end"
+    "in a video shot a living holder moves a body-length by the end",
+    "they approve the run's specs in one table",
+    "it is shown on the References step beside the sheet and approved once"
   ]
 }
