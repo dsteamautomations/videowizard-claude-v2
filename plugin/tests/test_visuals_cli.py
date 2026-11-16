@@ -23,6 +23,7 @@ def args(**kw):
 def harness(monkeypatch, tmp_path):
     monkeypatch.setattr(vw, 'active', lambda: {'code': 'VW-9', 'run_id': 'run-1', 'files': []})
     monkeypatch.setattr(vw, 'RUNS', tmp_path / 'runs')
+    monkeypatch.setattr(vw, 'request', lambda *a, **k: ({'action': 'refused', 'status': 409, 'message': 'Propose a visual plan first.'}, 2))   # no server: nothing proposed (plan-join asks)
     (tmp_path / 'runs' / 'VW-9' / 'out').mkdir(parents=True)
     (tmp_path / 'runs' / 'VW-9' / 'work').mkdir(parents=True)
     clock = [0.0]
