@@ -63,7 +63,9 @@ def test_repeating_is_refused_by_name_and_a_material_is_its_kind():
     d['elements'][-1].pop('repeating')
     check(d)   # an object with no spec is fine
     d['elements'][-1]['kind'] = 'material'
-    with pytest.raises(ValueError, match='BRICK is a repeating material: give its material_spec'):
+    check(d)   # design/207 (SK, 16 Nov 2026): a material with no spec is not laid in units; nothing asked (was: refused for its material_spec)
+    d['elements'][-1]['material_spec'] = {'laid': 'on edge', 'pattern': 'alternating'}
+    with pytest.raises(ValueError, match='material spec of BRICK: give the unit sizes'):   # a material that is laid in units still gives them
         check(d)
 
 

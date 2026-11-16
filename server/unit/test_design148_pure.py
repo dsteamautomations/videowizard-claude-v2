@@ -29,14 +29,15 @@ def test_a_valid_plan_is_unchanged():
 def test_errors_in_two_elements_and_two_gaps_come_back_together():
     doc, gaps = two_gaps([{**pic('V1', 0, 1000), 'states': [{'what_appears': 's', 'hold_s': 4}]}],      # states on a still
                          [{**pic('V3', 1000, 1500), 'states': [{'what_appears': 's', 'hold_s': 4}]}, pic('V4', 1500, 2000)])
-    doc['elements'] += [{'id': 'M1', 'name': 'Brick', 'kind': 'material', 'identity': 'representative', 'requirements': 'r'},            # a material without its spec
+    doc['elements'] += [{'id': 'M1', 'name': 'Brick', 'kind': 'material', 'identity': 'representative', 'requirements': 'r',            # a material whose spec gives no unit sizes (design/207: a material with no spec at all is not laid in units and passes)
+                         'material_spec': {'laid': 'on edge', 'pattern': 'alternating'}},
                         {'id': 'P1', 'name': 'Mason', 'kind': 'person', 'identity': 'representative', 'requirements': 'r', 'speaker': True, 'description': ''}]
     doc['elements'][2]['kind'] = 'object'   # a speaker that is not a person
     with pytest.raises(ValueError) as exc:
         VC.validate_plan(doc, gaps, Fraction(25))
     text = str(exc.value)
     assert text.startswith('4 things to fix:')
-    assert 'element M1 is a repeating material' in text and 'element P1: speaker marks a real person' in text
+    assert 'material spec of M1: give the unit sizes' in text and 'element P1: speaker marks a real, named person' in text
     assert 'states belong to an animation shot (shot V1 is a image)' in text and 'states belong to an animation shot (shot V3 is a image)' in text
     assert exc.value.errors == [line.split('. ', 1)[1] for line in text.split('\n')[1:]]   # the list, one message each, word for word
 

@@ -75,7 +75,7 @@ def test_a_footage_shot_takes_a_clip_or_a_footage_frame_and_never_a_take():
 
 # ---------- decision (a), item 2: a busy scene ----------
 
-def test_more_than_three_background_people_are_a_crowd():
+def test_four_background_people_are_named_like_any_other():
     d = base()
     d['elements'] += [person(f'P{n}') for n in range(1, 5)]
     im = d['gaps'][0]['scenes'][0]['shots'][1]
@@ -85,36 +85,35 @@ def test_more_than_three_background_people_are_a_crowd():
     check(d)   # three named workers
     im['element_ids'].append('P4')
     im['subjects'].append(held('P4'))
-    with pytest.raises(ValueError, match='4 background people .* a crowd: .*ambient.* groups'):
-        check(d)
+    check(d)   # design/207 (SK, 16 Nov 2026): up to ten are named (was: a fourth refused as a crowd); the limit itself is in test_design207_checker_pure
 
 
-def test_a_crowd_is_one_varied_group_with_a_few_traits_and_life_missing_accepts_it():
+def test_many_of_a_kind_are_described_one_by_one_and_life_missing_accepts_the_group():
     d = base()
     scene(d)['activity_level'] = 'busy'
     vs1(d)['subjects'] = vs1(d)['subjects'][:1]   # the mason alone, the cow gone
     vs1(d)['element_ids'] = ['E1', 'TROWEL', 'BRICK']
     assert ('SC1', 'life_missing') not in kinds(d)   # integration step E (SK, 12 Nov 2026): a scene with an AI video shot is not asked for more people: every person is a box in the guide (was: warned)
     scene(d)['ambient'] = 'workers mixing and carrying in the background'
-    vs1(d)['groups'].append({'kind': 'workers', 'count': 20, 'mode': 'varied', 'items': ['a red cap']})
-    with pytest.raises(ValueError, match='a few traits'):
+    vs1(d)['groups'].append({'kind': 'workers', 'count': 20, 'mode': 'varied', 'items': ['a red cap', 'a towel on the shoulder', 'a head pan']})
+    with pytest.raises(ValueError, match='groups mode `varied` is retired: describe the workers one by one with mode different'):   # design/207 (SK, 16 Nov 2026): the loose way is retired by name (was: taken with a few traits)
         check(d)
-    vs1(d)['groups'][-1]['items'] = ['a red cap', 'a towel on the shoulder', 'a head pan']
-    assert ('SC1', 'life_missing') not in kinds(d)
-    lines = VS.group_lines(d, vs1(d))
+    lines = VS.group_lines(d, vs1(d))   # the server's own lines for a plan stored before design/207
     assert lines[-1] == '20 workers, varied, the traits in turn: a red cap; a towel on the shoulder; a head pan.'
     rule = {l['check']: l for l in VS.group_rule_lines(d, vs1(d))}
     assert 'a red cap' in rule['group alike: workers']['pass_when'] and rule['group count: workers']['pass_when'].startswith('about 20 workers')
+    vs1(d)['groups'][-1].update(mode='different', count=3)
+    assert ('SC1', 'life_missing') not in kinds(d)
     del scene(d)['ambient']
     assert ('SC1', 'life_missing') not in kinds(d)   # integration step E: no life_missing in a scene with an AI video shot (was: warned; the group alone was not the crowd)
 
 
-def test_passer_by_does_not_fire_on_an_element_with_beats():
+def test_passer_by_does_not_fire_on_any_named_person():
     d = base()
     d['elements'][0]['requirements'] = 'a mason laying bricks in the background'
     d['elements'].append(person('P9', requirements='a man walking by'))
     found = kinds(d)
-    assert ('E1', 'passer_by') not in found and ('P9', 'passer_by') in found
+    assert ('E1', 'passer_by') not in found and ('P9', 'passer_by') not in found   # design/207 (SK, 16 Nov 2026): no longer raised (was: P9 warned)
 
 
 # ---------- item 3: a living thing that holds ----------
@@ -330,11 +329,10 @@ def test_the_thirty_second_cap_is_gone():
 
 # ---------- decision (c): a real speaker is never an AI picture ----------
 
-def test_a_real_speaker_is_never_an_ai_still_or_take():
+def test_the_speaker_mark_is_kept_on_a_person_and_no_longer_holds_them_to_footage():
     d = base()
     d['elements'][0]['speaker'] = True
-    with pytest.raises(ValueError, match='E1 is a real person speaking to camera: .*footage'):
-        check(d)
+    check(d)   # design/207 (SK, 16 Nov 2026): a real, named person may be pictured (was: every shot of them refused unless footage)
     d = plan([pshot('FT1', 0, 1000, 'footage')])
     d['elements'][0].update(kind='person', description='the client, about sixty', speaker=True)
     d['gaps'][0]['scenes'][0]['outfit'] = {'E1': 'white shirt'}

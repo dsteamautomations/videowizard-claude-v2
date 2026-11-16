@@ -30,27 +30,27 @@ def test_every_ai_video_shot_counts_one_still_whatever_its_end_state():
     assert VC.routes(doc)['images_estimated'] == plain   # no end picture, no start shared with the shot before
 
 
-def test_a_camera_that_circles_a_person_is_refused_and_a_pan_is_not():
+def test_a_camera_that_circles_a_person_is_planned_like_a_pan():
     d = base()
     vs1(d)['camera_move'] = 'a slow orbit around the mason'
-    assert 'a camera that circles a person is not made' in refused(d)
+    check(d)   # design/207 (SK, 16 Nov 2026): the circling refusal is removed (was: refused)
     vs1(d)['camera_move'] = 'it turns slowly to the left to follow her'
     check(d)
 
 
-def test_more_than_four_people_in_one_ai_video_shot_is_refused():
+def test_more_than_four_people_in_one_ai_video_shot_warns_the_operator():
     d = base()
     person = next(e for e in d['elements'] if e.get('kind') == 'person')
     mason = next(s for s in vs1(d)['subjects'] if s['element_id'] == person['id'])
     for n in range(4):
         d['elements'].append({**copy.deepcopy(person), 'id': f'W{n}', 'name': f'Worker {n}'})
-        vs1(d)['subjects'].append({**copy.deepcopy(mason), 'element_id': f'W{n}', 'role': 'secondary'})
+        vs1(d)['subjects'].append({**copy.deepcopy(mason), 'element_id': f'W{n}', 'role': 'secondary', 'behaviour': 'holds', 'hold_reason': 'watches', 'beats': [], 'end': copy.deepcopy(mason['start'])})   # design/207: the shot is now checked past its people count, so the four stand and watch
         vs1(d)['element_ids'].append(f'W{n}')
         for sc in [sc for g in d['gaps'] for sc in g.get('scenes') or []]:
             if sc.get('outfit') is not None:
                 sc['outfit'][f'W{n}'] = sc['outfit'].get(person['id'], 'a grey cotton shirt')
-    said = refused(d)
-    assert 'has 5 people; an AI video shot holds at most 4' in said and 'a crowd is not yet available' in said
+    said = [w['message'] for w in check(d)[1] if w['kind'] == 'people_many']   # design/207 (SK, 16 Nov 2026): a plain warning (was: refused)
+    assert len(said) == 1 and 'has 5 people; an AI video shot with more than 4 often needs a second take' in said[0] and 'people_many' in VC.WARNING_PLAIN
 
 
 def test_a_transfer_is_its_own_close_shot_and_ends_in_the_hand():

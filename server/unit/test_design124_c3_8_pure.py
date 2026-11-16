@@ -170,18 +170,18 @@ def test_every_warning_kind_is_plain_or_technical_once():
     found = set(re.findall(r"'kind': '([a-z_]+)'(?:, 'message'|,$)", src, re.M)) | set(re.findall(r"'kind': '(look_alike)'", src))
     assert len(found) >= 40 and 'look_alike' in found and 'cut_off_pause' in found
     assert found <= set(VC.WARNING_PLAIN) | set(VC.WARNING_TECHNICAL) and not set(VC.WARNING_PLAIN) & set(VC.WARNING_TECHNICAL)
-    assert 'size_close_first' in VC.WARNING_PLAIN and 'camera_reason_missing' in VC.WARNING_TECHNICAL
+    assert 'message_repeated' in VC.WARNING_PLAIN and 'camera_reason_missing' in VC.WARNING_TECHNICAL and 'size_close_first' in VC.WARNING_TECHNICAL   # design/207 (SK, 16 Nov 2026): the framing notes go to the assistant only
     assert all(s[0].isupper() and s.endswith('.') and '_' not in s for s in VC.WARNING_PLAIN.values())
 
 
 def test_the_page_shows_the_plain_sentence_with_its_gap_and_never_a_technical_kind():
     doc = plan_doc([shot('IM1', 0, 500, 'image')], [shot('VS1', 900, 1150, 'video')])
-    warns = [{'shot_id': 'VS1', 'kind': 'size_close_first', 'message': 'technical', 'answered': True, 'answer': 'a reveal'},
-             {'shot_id': 'VS1', 'kind': 'camera_reason_missing', 'message': 'technical', 'answered': False},
+    warns = [{'shot_id': 'VS1', 'kind': 'message_repeated', 'message': 'technical', 'answered': True, 'answer': 'a reveal'},   # design/207: size_close_first is technical now, so it stands with the kinds never shown
+             {'shot_id': 'VS1', 'kind': 'camera_reason_missing', 'message': 'technical', 'answered': False}, {'shot_id': 'VS1', 'kind': 'size_close_first', 'message': 'technical', 'answered': False},
              {'gap_id': 'G1', 'kind': 'graphics_run', 'message': 'technical', 'answered': False}]
     sess = session(versions=[{'version': 1, 'file': {'key': 'run-1/visuals/plan-v1.json'}, 'plan_digest': 'd1', 'warnings': warns}], current='d1')
     view = VS.page_view(FakeConn([]), store_with(sess, doc), RUN, [], 'VW-9')
     g1, g2 = view['gaps']
-    assert g2['warnings'] == [{'kind': 'size_close_first', 'shot_id': 'VS1', 'plain': VC.WARNING_PLAIN['size_close_first'], 'answer': 'a reveal'}]
+    assert g2['warnings'] == [{'kind': 'message_repeated', 'shot_id': 'VS1', 'plain': VC.WARNING_PLAIN['message_repeated'], 'answer': 'a reveal'}]
     assert [w['kind'] for w in g1['warnings']] == ['graphics_run']
     assert 'g.warnings' in PAGE and 'w.plain' in PAGE
