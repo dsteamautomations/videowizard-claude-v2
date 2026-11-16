@@ -109,6 +109,9 @@ if __name__ == '__main__':
         from d205_wording_v3 import apply as d205, apply_steps as d205s   # design/205: the Direction alone first; the motion style on the page; a still that must be read; beats
         prompt = d205(prompt, parts)
         d205s(steps)
+        from d206_wording_v3 import apply as d206, apply_steps as d206s   # design/206: the plan answered on the page in one visit
+        prompt = d206(prompt, parts)
+        d206s(steps)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

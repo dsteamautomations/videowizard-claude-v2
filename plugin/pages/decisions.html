@@ -56,6 +56,21 @@ textarea{width:100%;min-height:76px;font:inherit;padding:8px 10px;border-radius:
 .said,.count{font-size:.9rem;color:var(--muted)}
 .state{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--muted);text-align:center}
 @media (max-width:520px){ .kv{grid-template-columns:1fr} .kv dt{margin-top:4px} }
+/* design/206: a plan gap's shots as a table; on a narrow screen each shot becomes a small block with its labels */
+.item{scroll-margin-top:76px}
+.dot{cursor:pointer}
+.totals{font-weight:600}
+.tw{overflow-x:auto}
+table.shots{width:100%;border-collapse:collapse;font-size:.9rem}
+table.shots th,table.shots td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+table.shots th{font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+table.shots td:nth-child(1){color:var(--muted);font-variant-numeric:tabular-nums} table.shots td:nth-child(2){font-weight:600}
+table.shots td:nth-child(3),table.shots td:nth-child(4){white-space:nowrap;font-variant-numeric:tabular-nums}
+table.shots tr:last-child td{border-bottom:0}
+@media (max-width:640px){
+  table.shots thead{display:none} table.shots tr{display:block;padding:8px 0;border-bottom:1px solid var(--line)} table.shots tr:last-child{border-bottom:0}
+  table.shots td{display:grid;grid-template-columns:104px 1fr;gap:8px;border:0;padding:2px 0;white-space:normal !important}
+  table.shots td::before{content:attr(data-l);color:var(--muted);font-size:.8rem;font-weight:400} }
 /* design/205: a rough sample of each motion style, played in a small frame in the film's shape */
 .stage{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--bg);width:100%;max-width:420px;aspect-ratio:16/9;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:16px;box-sizing:border-box}
 .stage.tall{aspect-ratio:9/16;max-width:200px}
@@ -142,6 +157,15 @@ function preview(line){   // design/205: "Show me" plays a rough sample of a mot
   wrap.appendChild(row); wrap.appendChild(stage); wrap.appendChild(cap);
   return wrap;
 }
+function shots(cols,src){   // design/206: the shots of a gap (or of one offered way) as a table, under their totals
+  const wrap=el('div'); wrap.style.display='flex'; wrap.style.flexDirection='column'; wrap.style.gap='8px';
+  wrap.appendChild(el('p','totals',[src.total,src.mix].filter(Boolean).join(' ')));
+  const tw=el('div','tw'), t=el('table','shots'), hr=el('tr'); (cols||[]).forEach(c=>hr.appendChild(el('th',null,c)));
+  const th=el('thead'); th.appendChild(hr); t.appendChild(th);
+  const tb=el('tbody'); (src.table||[]).forEach(r=>{ const tr=el('tr'); r.forEach((c,i)=>{ const td=el('td',null,c); td.setAttribute('data-l',(cols||[])[i]||''); tr.appendChild(td); }); tb.appendChild(tr); });
+  t.appendChild(tb); tw.appendChild(t); wrap.appendChild(tw);
+  return wrap;
+}
 function block(line,n){
   const a=answers[line.line], box=el('section','item');
   const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
@@ -155,6 +179,12 @@ function block(line,n){
     const wrap=g.name?el('div','group'):el('div'); if(g.name) wrap.appendChild(el('h4',null,g.name==='First'?'The first direction':g.name==='Second'?'The second direction':g.name));
     const dl=el('dl','kv'); g.rows.forEach(r=>{ if(r[0]){dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));} else {const p=el('p',null,r[1]); p.style.fontWeight='600'; wrap.appendChild(p);} });
     wrap.appendChild(dl); body.appendChild(wrap);
+  });
+  if(line.table) body.appendChild(shots(line.cols,line));
+  (line.ways||[]).forEach(w=>{   // a gap offered two ways: each way with what it is, why, its cost and its own shots
+    const g=el('div','group'); g.appendChild(el('h4',null,w.title+(w.recommended?' (advised)':'')));
+    const dl=el('dl','kv'); (w.rows||[]).forEach(r=>{dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));}); g.appendChild(dl);
+    g.appendChild(shots(line.cols,w)); body.appendChild(g);
   });
   if(line.state==='open'&&line.styles&&line.styles.length) body.appendChild(preview(line));
   if(body.childNodes.length) box.appendChild(body);
@@ -170,6 +200,7 @@ function block(line,n){
   } else if(a){
     if(a.notes) acts.appendChild(el('span','said','Your words: “'+a.notes+'”'));
     const un=el('button',null,'Undo my answer'); un.addEventListener('click',()=>undo(line)); acts.appendChild(un);
+    acts.appendChild(el('span','said','Saved on this page. It is recorded in VideoWizard when you say done in the chat.'));
   } else if(line.state==='open'){
     (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,(line.key==='motion'?'Use ':'')+b.label); btn.addEventListener('click',()=>{ if(b.needs_words){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,''); }); acts.appendChild(btn);});
   } else if(line.state==='recorded'&&line.reopen){
@@ -190,7 +221,8 @@ function draw(force){
   lines.forEach((line,i)=>{
     const a=answers[line.line];
     if(line.state==='open'&&!a) open++; if(a) answered++;
-    const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':a?(a.choice==='accept'||a.choice==='accept_second'?'ans':'chg'):''),String(i+1)); d.title=line.title; dots.appendChild(d);
+    const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':a?(a.choice==='accept'||a.choice==='accept_second'||String(a.choice).indexOf('way:')===0?'ans':'chg'):''),String(i+1)); d.title=line.title; dots.appendChild(d);
+    d.addEventListener('click',()=>{ const n=nodes[line.line]; if(n) n.node.scrollIntoView({block:'start'}); });   // design/206: a number jumps to its block
     const sig=JSON.stringify([i,line,a||null,editing[line.line]||null]);
     seen[line.line]=1;
     const old=nodes[line.line];

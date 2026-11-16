@@ -72,3 +72,31 @@ def test_a_direction_sent_alone_prints_what_the_server_says_comes_next(harness, 
     monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: sent.append(body) or {'draft': True, 'direction_only': True, 'next': 'The Direction alone is with the operator: `vw visuals page`.'})
     code, out, err = run(args(what='treatment', file='out/visual-treatment.json'), capsys)
     assert code == 0 and 'gaps' not in sent[0]['document'] and '`vw visuals page`' in err and 'vw visuals next' not in err
+
+
+def test_a_page_published_by_an_older_tool_is_published_again_before_the_plan(harness, monkeypatch, capsys):
+    """design/206: the link was kept by a tool whose page file cannot draw a gap's table; the tool says to publish again to the same link."""
+    ws, _ = harness
+    plan = {**page('r3'), 'step': 'Plan'}
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: plan)
+    folder = ws / 'work' / 'page'
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / 'url.txt').write_text('https://claude.ai/artifact/abc\n', encoding='utf-8')   # kept before this release: no page-version.txt
+    code, out, err = run(args(what='page', record=False), capsys)
+    assert code == 0 and out['republish'] is True and err.startswith('Plan page: 1 line(s) to answer.') and 'publish it again to the same link' in err
+    run(args(what='page', url='https://claude.ai/artifact/abc', record=False), capsys)
+    assert (folder / 'page-version.txt').read_text(encoding='utf-8').strip() == vw.plugin_version()
+    code, out, err = run(args(what='page', record=False), capsys)
+    assert 'republish' not in out and 'publish it again' not in err
+
+
+def test_a_proposed_plan_points_to_the_page(harness, monkeypatch, capsys):
+    ws, _ = harness
+    (ws / 'out').mkdir(parents=True, exist_ok=True)
+    (ws / 'out' / 'visual-plan.json').write_text('{}', encoding='utf-8')
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'status': 'proposed'})
+    code, out, err = run(args(what='propose', file='out/visual-plan.json'), capsys)
+    assert code == 0 and 'Now `vw visuals page`' in err
+    monkeypatch.setattr(vw, 'write', lambda path, body, wait=None: {'status': 'rejected'})
+    code, out, err = run(args(what='propose', file='out/visual-plan.json'), capsys)
+    assert code == 2 and 'vw visuals page' not in err

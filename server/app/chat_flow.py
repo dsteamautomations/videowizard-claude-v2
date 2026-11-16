@@ -172,11 +172,12 @@ def _seconds(shot, fps):
 GAP_COLS = ['#', 'Shot', 'Made as', 'Length', 'What it shows', 'Over the words']
 
 
-def _gap_rows(session, gap):
-    """A gap's shots as rows of GAP_COLS, and its totals line: the same for the chat's table and for the card."""
+def _gap_rows(session, gap, selection=None):
+    """A gap's shots as rows of GAP_COLS, and its totals line: the same for the chat's table, the card and the page. `selection` names one
+    offered way (design/206: the page shows the shots of each way before one is taken)."""
     fps, rows, total = session['source'].get('fps') or 25, [], 0.0
     cell = lambda v: ' '.join(str(v or '').split()).replace('|', '/')   # one line, no column break
-    for sc in V.chosen_scenes(gap, session['choice_selections'].get(gap['gap_id'])):
+    for sc in V.chosen_scenes(gap, selection or session['choice_selections'].get(gap['gap_id'])):
         for s in sc['shots']:
             kind = ROUTE_WORDS.get(V.route_of(s), V.route_of(s))
             rows.append([str(len(rows) + 1), cell(s.get('title') or s['id']), kind, f'{_seconds(s, fps):.1f} s', cell(s.get('purpose')), cell(s.get('narration'))[:220]])

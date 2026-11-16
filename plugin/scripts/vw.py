@@ -21,6 +21,10 @@ from pathlib import Path
 
 import httpx
 
+REPUBLISH = ('The page at this link was published by an older tool and cannot draw these lines: publish it again to the same link first (Artifact tool: `file_path` the '
+             '`page_file`, `url` the link), then `vw visuals page --url "<the link>"`. ')
+
+
 def plugin_version():
     """design/95 F5: this plugin's own version from its plugin.json (the environment variable only for the server tests' old-plugin case)."""
     if os.environ.get('VW2_PLUGIN_VERSION'):
@@ -1997,6 +2001,8 @@ def cmd_visuals(a):
             line += f"; {len(out['warnings'])} warning(s), {open_} unanswered: answer each in its shot's warning_answers (kind and answer), never in the purpose"
         if out.get('shared_change'):   # design/191: one question for every gap whose own shots are unchanged
             line += '; ' + out['shared_change']
+        if a.what == 'propose' and out.get('status') != 'rejected':   # design/206: the plan is answered on the page
+            line += '. Now `vw visuals page`: the operator answers the plan on the page (design/206); the card, `vw visuals next`, only where the page cannot be shown'
         emit(out, 0 if out.get('status') != 'rejected' else 2, line)
     if a.what == 'treatment' and (getattr(a, 'accept', None) or getattr(a, 'send_back', None)):   # design/124 Change 6: the operator's verdict per line
         acc = [x.strip() for x in (getattr(a, 'accept', None) or '').split(',') if x.strip()]
@@ -2079,12 +2085,13 @@ def cmd_visuals(a):
         except OSError:
             pass
         emit(out, 0, (out.get('then') or 'Recorded.') + ' ' + chat_line(out))
-    if a.what == 'page':   # design/204: the treatment answered on a Claude artifact page; the server stays the record, the page is the form
+    if a.what == 'page':   # design/204: the treatment answered on a Claude artifact page; design/206: the plan too; the server stays the record, the page is the form
         folder = ws / 'work' / 'page'
         folder.mkdir(parents=True, exist_ok=True)
-        url_file, current = folder / 'url.txt', folder / 'current.txt'
+        url_file, current, made_by = folder / 'url.txt', folder / 'current.txt', folder / 'page-version.txt'   # design/206: which tool's page file is published at the link
         if getattr(a, 'url', None):
             url_file.write_text(a.url.strip() + '\n', encoding='utf-8')
+            made_by.write_text(plugin_version() + '\n', encoding='utf-8')
             emit({'url': a.url.strip()}, 0, 'The page link is kept for this run. Now write the round to the page (step 2 of `how`).')
 
         def hand(page, more=None):
@@ -2095,7 +2102,10 @@ def cmd_visuals(a):
             (folder / f'{rnd}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
             current.write_text(rnd + '\n', encoding='utf-8')
             waiting = len([l for l in page['lines'] if l['state'] == 'open'])
-            return {'url': url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else '', 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
+            link = url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else ''
+            old = bool(link) and (made_by.read_text(encoding='utf-8').strip() if made_by.is_file() else '') != plugin_version()   # published from an older page file: it cannot draw today's lines
+            more = {**(more or {}), **({'republish': True} if old else {})}
+            return {'url': link, 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
                     'title': page['title'], 'capabilities': page['capabilities'], 'round': rnd, 'round_file': str(folder / f'{rnd}.json'),
                     'answers_collection': f'rounds/{rnd}/answers', 'answers_dir': str(folder / 'answers'), 'waiting': waiting, 'note': doc['note'], 'how': page['how'], **(more or {})}
 
@@ -2121,11 +2131,12 @@ def cmd_visuals(a):
                           + (f"; refused: {'; '.join(r['key'] + ': ' + r['message'] for r in out['refused'])}" if out.get('refused') else '')
                           + (f"; not recorded, the line changed since: {', '.join(out['stale'])}" if out.get('stale') else '')
                           + (f"; dropped with the Direction: {', '.join(out['dropped'])}" if out.get('dropped') else '')
-                          + f". {out['then']} New round {info['round']}: write it to the page (step 2 of `how`): {info['round_file']}.")
+                          + f". {out['then']} " + (REPUBLISH if info.get('republish') else '') + f"New round {info['round']}: write it to the page (step 2 of `how`): {info['round_file']}.")
         out = write(base + '/page', {'one': False})
         info = hand(out)
-        emit(info, 0, f"Treatment page: {info['waiting']} line(s) to answer. {info['note']} "
-                      + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ") + f"Round {info['round']}: {info['round_file']}. " + out['how'])
+        emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} "
+                      + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ")
+                      + (REPUBLISH if info.get('republish') else '') + f"Round {info['round']}: {info['round_file']}. " + out['how'])
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
         if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
             emit({'action': 'refused', 'message': 'Give the item and the button chosen: `vw visuals decide --item <id from vw visuals next> --choice <the button\'s choice> --quote "<their words>"`.'}, 2)

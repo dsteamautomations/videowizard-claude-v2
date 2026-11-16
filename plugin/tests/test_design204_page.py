@@ -62,6 +62,14 @@ def test_the_page_file_holds_what_the_design_asks():
     assert 'innerHTML' not in html   # text only ever goes in as text
 
 
+def test_the_page_draws_a_plan_gaps_shots_as_a_table_and_each_offered_way():
+    """design/206: the plan on the page: a gap's shots as a table under their totals, a gap offered two ways with each way's shots, a number that jumps to its block."""
+    html = PAGE.read_text(encoding='utf-8')
+    for needed in ('function shots(cols,src)', "if(line.table) body.appendChild(shots(line.cols,line))", '(line.ways||[]).forEach', "' (advised)'", 'table.shots thead{display:none}',
+                   "td.setAttribute('data-l'", 'scrollIntoView', "indexOf('way:')===0", 'Saved on this page.'):
+        assert needed in html, needed
+
+
 def test_the_page_can_play_a_sample_of_every_motion_style_the_server_holds():
     """design/205: "Show me" beside the motion style; a style file added on the server needs its sample here."""
     html = PAGE.read_text(encoding='utf-8')

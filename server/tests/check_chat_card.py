@@ -31,7 +31,7 @@ def save_session(store, run, session):
     STATE['session'] = copy.deepcopy(session)
 
 
-def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes=''):
+def treatment(store, user, run, outputs, document, quote, accept=(), send_back=(), notes='', use_second=False):
     CALLS.append(('treatment', list(accept), list(send_back), notes))
     s = STATE['session']
     lines = s['treatment_draft']['lines']
