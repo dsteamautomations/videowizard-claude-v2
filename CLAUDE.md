@@ -24,6 +24,7 @@ VideoWizard is built for **every category of video**: documentaries and explaine
 - Never print, paste or commit secrets. `server/.env` stays out of git and out of chat; move it only as a file.
 - Never modify `videowizard-beta` (the v1 system).
 - Run only the tests for what changed.
+- Evidence stays out of the repository (SK, 16 Nov 2026). Pictures, videos, audio and one-time test data of an experiment go to the builder's archive folder (`vw2-archive/<date>/` beside the repository on the builder PC), never into git; a design note links to them there. The repository holds the code, the tests with the data they need, the instructions and the text of the design notes.
 - One flow, two front ends (SK, 20 Oct 2026, after defect 16). The operator's chat path (the `vw` tool) and the web pages are two front ends on the same server steps. Anything a page does for the operator (saving a library voice before an audition, applying the recorded direction, recording with the operator's words) lives in the server function both paths call, never as an instruction the assistant must remember on the chat side. When a page gains a step, the same server function serves `vw`; when `vw` gains a step, the page calls it too. A procedure step may describe the behaviour; it must never be the only place it exists.
 
 ## The defect loop

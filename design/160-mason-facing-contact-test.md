@@ -52,3 +52,5 @@ Reference speeds for the pace rule (first entries): a brick set down 0.8–1.0 s
 - One run per variant on one scene; nine runs on the scene in all (design/157–160).
 - Judged on half-second stills at 240 px; SK has both videos.
 - No footage on either side, no narration, no scene over 10 s.
+
+> The pictures and videos of this note (`160-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

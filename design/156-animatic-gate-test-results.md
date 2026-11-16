@@ -55,3 +55,5 @@ Measured with ffprobe and ffmpeg's scene-change score; judged by eye on the key-
 - The stills were 640×360 thread outputs, not a set from our round.
 - No dialogue, no scene longer than 10 s, no documentary footage on either side of the clip.
 - The outputs are in the scratchpad and were sent to SK; they are not in the repository.
+
+> The pictures and videos of this note (`156-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

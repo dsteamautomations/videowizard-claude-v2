@@ -147,3 +147,5 @@ Nothing was found in the intake steps. `scripts/d194b_wording_v3.py` holds the i
 - Whether Eleven v4 obeys a plain respelling for every word, and whether a try and a full narration sound alike: only a paid test on a real voice shows it.
 - Splicing a corrected sentence into an old recording (decided against: point b).
 - A shared dictionary across clients.
+
+> The pictures and videos of this note (`194-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

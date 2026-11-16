@@ -51,3 +51,5 @@ One odd pair: the text alone produced the cut at 3.5 s and the cartoon-guided ru
 
 - One run per variant; judged on half-second sheets; SK has both videos.
 - The counts above are mine from stills at 480 px; the exact plank and row counts are SK's to confirm.
+
+> The pictures and videos of this note (`166-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

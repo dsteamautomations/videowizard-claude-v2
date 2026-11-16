@@ -47,3 +47,5 @@ SK closes the testing as closed-ended on this; build step one (D14 (i): the `one
 
 - One run per scene; judged on half-second sheets at 480 px; SK has all four videos.
 - The scenes were not placed between the film's real footage.
+
+> The pictures and videos of this note (`169-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

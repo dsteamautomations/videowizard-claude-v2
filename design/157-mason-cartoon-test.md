@@ -44,3 +44,5 @@ Two runs, thirteen pictures each, 14,952 input tokens (≈ ₹2) on top of the t
 - No footage on either side of the clip; no narration timing; no scene longer than 10 s.
 - The reference pictures came straight from the image model with no round and no operator approval; in the real flow they would be a set (design/151).
 - The outputs were sent to SK and stay in the scratchpad; not in the repository.
+
+> The pictures and videos of this note (`157-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

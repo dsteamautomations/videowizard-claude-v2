@@ -111,3 +111,5 @@ SK: "not safe" means the kinds of shot Omni 1.1 kept getting wrong, which we agr
 - No run yet; this note gathers and plans.
 - Seedance via OpenRouter: model ids, prices and an API key still to come.
 - Google's page was read whole except its code samples, which repeat the REST shape our runner already uses.
+
+> The pictures and videos of this note (`156-assets/`, `165-assets/`, `169-assets/`, `176-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

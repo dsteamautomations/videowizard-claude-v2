@@ -96,3 +96,5 @@ SK asked for a very simple prompt for Wan's website **agent** option: the refere
 
 - Only one scene described; the kiln (two people, a hand-over) and the pointing (hands only, close) follow once this one proves itself.
 - Rigging and walking are the assistant's work in Blender; the figure may be a mannequin, the walk may be simple, as long as the feet stay down and the bend and facing are as written.
+
+> The pictures and videos of this note (`172-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

@@ -45,3 +45,5 @@ The reference-speed table for the drawing rules, first entries: a brick set down
 - One run per path on one scene; the comparison is consistent with design/158's two video runs and two frame runs, which makes five video and four frame runs in all on this scene, but no success rate.
 - Brick counts were judged on quarter-second stills at 240 px, not counted frame by frame.
 - Whether the API accepts more than eighteen pictures was not tested; eighteen was accepted.
+
+> The pictures and videos of this note (`159-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

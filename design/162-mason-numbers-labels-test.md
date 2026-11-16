@@ -35,3 +35,5 @@ Same cartoon, two changes: shot 2 and shot 3 become one continuous shot (a push-
 
 - One run; judged on half-second stills at 320 px; SK has the video.
 - Whether labels leak at larger sizes or on a closer shot: not tested.
+
+> The pictures and videos of this note (`162-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

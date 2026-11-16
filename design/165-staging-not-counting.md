@@ -86,3 +86,5 @@ Thirteen runs on the mason scene (design/157–165) and six on the park. The car
 
 - One run per test (two for T5); judged on half-second sheets at 480 px; SK has every video.
 - The API's refusal of T4 with frames: not diagnosed.
+
+> The pictures and videos of this note (`165-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

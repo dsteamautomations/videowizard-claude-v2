@@ -39,3 +39,5 @@ Redraw shot 3 only: twelve bricks in the pan, placements at a human pace, a clos
 - Still two runs per path on one scene.
 - The video runs were judged on quarter-second stills, not watched; SK has both files.
 - The model's "invented cut" at 9.33 s in V2 was not investigated beyond cause 2.
+
+> The pictures and videos of this note (`157-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

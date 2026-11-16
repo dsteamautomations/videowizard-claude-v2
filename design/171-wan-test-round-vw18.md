@@ -97,3 +97,5 @@ What this says:
 - 1080P, 9:16, audio inputs, `--videos` (a footage stretch as reference): not run.
 - One run per scenario except W1 (two); no repeat runs to measure variance.
 - The mp4s are not in git (SK has them); the strips are.
+
+> The pictures and videos of this note (`171-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

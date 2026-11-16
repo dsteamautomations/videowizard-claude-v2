@@ -39,3 +39,5 @@ SK's decision after design/162: try it without the cut. The side view (the squat
 
 - One run; judged on stills at 320 px; SK has the video and the count of bricks on the pile is his to confirm.
 - The pace fix (point 2) is not yet run.
+
+> The pictures and videos of this note (`163-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

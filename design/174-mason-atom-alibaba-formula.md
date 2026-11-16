@@ -63,3 +63,5 @@ SK, after M1: every upcoming prompt stages for the right hand. The revision keep
 ## Not covered
 
 - The place picture is VW-18's rat-trap site set, not the morning's scene (which had no place picture): a wall on edge, as SK named it, in place of the three-course plinth wall of the shot list.
+
+> The pictures and videos of this note (`174-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.

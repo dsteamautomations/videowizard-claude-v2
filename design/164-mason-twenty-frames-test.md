@@ -24,3 +24,5 @@ SK's test before commenting on design/163: the same cartoon (the no-cut one) cut
 ## Not covered
 
 - One run; judged on stills; SK has the video and the counts are his to confirm.
+
+> The pictures and videos of this note (`164-assets/`) were moved out of the repository on 16 Nov 2026. They are kept on the builder PC in `vw2-archive/2026-11-16/design/`; their earlier versions also remain in the repository's history.
