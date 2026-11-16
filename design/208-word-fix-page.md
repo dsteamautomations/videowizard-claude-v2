@@ -160,6 +160,43 @@ Tests, run by Claude on this PC with Python 3.12: 11 new tests in `unit-local/te
 
 Cannot be settled without a real voice (to try on the first film after deploy): whether the narration says an approved word as its try sounded; whether "Hear it now" finds the word in a narration made with approved words; item F.
 
+## J. Third part: help with the spelling, and words checked before the first narration (built 16 Nov, on SK's "yes for all 4 … you can start building it")
+
+SK asked what Alias, IPA and CMU are in the ElevenLabs application, which spelling the team should use, and whether the Google "sounds like" box could help. The application sends Alias rules only: the voice reads the spelling typed. So the spelling needs no standard; it needs to sound right in our voice.
+
+| # | What | How it works |
+|---|---|---|
+| J1 | "Look it up on Google" on the word card | A link. The operator's own browser opens Google with "how to pronounce <word> in english" in a new tab. The application sends nothing and fetches nothing: Google's box cannot be shown inside our page. |
+| J2 | One line on how to write a spelling | "Write it as it sounds: syllables with hyphens, the stressed one in capitals. Google shows vi · vay · **kaa** · nuhnd: type vi-vay-KAA-nuhnd." |
+| J3 | Words checked before the first narration | On the Try step, under the tryouts: "Check words first", one link per voice with a ready tryout. It opens the word page for that voice (`/runs/<code>/voices2/words/v-<voice id>`). There a word is heard as the script has it ("Hear it as written", paid, the word's letters plus one), then corrected and approved as usual. The first full narration already has the approved words. |
+| J4 | "Suggest spellings (free)" on the word card | Up to three spellings in the house style for the picked word, from one small text request to the server's Gemini pool. A click puts one in the box; nothing is sent to the voice until "Make the sound". They are marked as guesses. |
+
+Edge cases and how each is handled:
+
+| Case | What happens |
+|---|---|
+| The page is opened for a voice that was not tried | Refused with a line; "Back to the voices page". |
+| "Hear it as written" asked twice | The second time plays the one kept; nothing is sent. |
+| "Hear it as written" and then nothing else | No entry in the word list, no try counted, nothing to approve: it is listening, not a correction. |
+| A word refused (not in the script, an empty spelling) | Nothing is written and nothing is sent. |
+| A word list begun before the first narration | It starts from the client's remembered words, as the first narration would have started it, so they are not lost. |
+| A narration without word times, opened from its row | "Hear it as written" is offered there too, beside the line that "Hear it now" is not available. |
+| Suggestions: no key, the provider down, or nothing usable back | One line: "No suggestion could be made now. Type your own spelling, or look the word up." Everything else works. |
+| Suggestions with phonetic symbols, the word itself, a repeat, or over 60 letters | Dropped. Only letters, hyphens, spaces and apostrophes are kept. |
+| The operator picks another word while suggestions are being made | The answer is kept for its own word and shown when that word is picked again. |
+| The voice stage is final | The page reads and plays; every paid button and "Suggest" is off. |
+
+Where: `server/app/spelling_hints.py` (new), `server/app/voices.py` (`try_word` and `try_preview` with `as_written`, `suggest_spellings`, `sentence_of`), `server/app/web.py` (the action `word-suggest`, the page for `v-<voice id>`), `templates/voice_words.html`, `templates/voices2.html`. Decision row 123; old-ways rows 97 and 98. Server only; no plugin change, no migration, no instruction text change.
+
+Tests, run by Claude on this PC with Python 3.12: 12 new tests in `unit-local/test_d208c.py`; all of `unit-local` 169 pass; `server/unit` 1,864 pass, 1 skipped, none fail. Tried in the built-in browser on local copies with a stand-in server: the page before a first narration (its header, bar and back link), "Hear it as written" with its question and its line in the tries, no approve on it, the Google link's address, the suggestions filling the box, the failure line, and "Check words first" on the Try step.
+
+Not covered in this part:
+
+- The suggestion request has not been sent to the real model: the model's name is the one the picture check uses (`gemini-3.8-flash`), and what it returns for Indian names is unknown until tried.
+- A voice the operator "already knows" and narrates without a tryout has no "Check words first" link; it needs one tryout first.
+- The chat tool has neither the suggestions nor "as written". The assistant still proposes no spelling in the chat.
+- Whether a word heard alone, as written, sounds as it does inside the narration.
+
 ## G. Not covered
 
 - The search for an earlier try (`_kept_try`) and the page's data query are SQL that only a real database runs; the unit tests use a stand-in.
