@@ -604,10 +604,17 @@ def _voice_words_state(conn, store, run, job_id):
     from . import core, voices
     outputs = core.current_outputs(conn, run['id'])
     state = voices.page_state(store, run)
-    narr = next((n for n in state.get('narrations') or [] if str(n.get('job_id')) == job_id), None)
-    job = conn.execute("select id, status, request, result, created_at from vw2_jobs where id::text=%s and run_id=%s and stage='voice'", (job_id, run['id'])).fetchone() if narr else None
-    if not job or job['status'] != 'ready':
-        raise Problem(404, 'NO_NARRATION', 'That narration is not on this film, or is not ready. Open the word page from a narration\'s row.')
+    pre = job_id.startswith('v-')   # design/208 J3: opened for a tried voice, before its first narration ("Check words first" on the Try step)
+    if pre:
+        tried = next((t for t in state.get('tried') or [] if t.get('voice_id') == job_id[2:]), None)
+        if not tried:
+            raise Problem(404, 'NO_NARRATION', 'That voice was not tried on this film. Open the word page from the Try step or from a narration\'s row.')
+        narr, job = {'voice_id': tried['voice_id'], 'name': tried.get('name')}, {'request': {'voice_id': tried['voice_id']}, 'result': {}, 'created_at': None}
+    else:
+        narr = next((n for n in state.get('narrations') or [] if str(n.get('job_id')) == job_id), None)
+        job = conn.execute("select id, status, request, result, created_at from vw2_jobs where id::text=%s and run_id=%s and stage='voice'", (job_id, run['id'])).fetchone() if narr else None
+        if not job or job['status'] != 'ready':
+            raise Problem(404, 'NO_NARRATION', 'That narration is not on this film, or is not ready. Open the word page from a narration\'s row.')
     script, _ = voices.script_text(store, outputs)
     text = script['spoken_text']
     result = job['result'] or {}
@@ -618,18 +625,19 @@ def _voice_words_state(conn, store, run, job_id):
     voice_id = job['request'].get('voice_id')
     rows = conn.execute("select id, status, request, result, error, created_at from vw2_jobs where run_id=%s and stage='voice' and request->'pronounce' is not null "
                         "and request->>'voice_id'=%s order by created_at", (run['id'], voice_id)).fetchall()
-    tries = [{'id': str(j['id']), 'status': j['status'], **{k: j['request']['pronounce'].get(k) for k in ('word', 'say_as', 'alone')},
+    tries = [{'id': str(j['id']), 'status': j['status'], **{k: j['request']['pronounce'].get(k) for k in ('word', 'say_as', 'alone', 'as_written')},
               'audio_key': (j['result'] or {}).get('audio_key'), 'error': j['error'], 'created_at': j['created_at'].isoformat()} for j in rows]
     words = voices.words_view(store, run, text)
     closed = any(o['stage'] == 'voice' and o['unit'] is None for o in outputs)
     said = voices.words_doc(store, run)
-    newest = [n for n in state.get('narrations') or [] if n.get('voice_id') == narr.get('voice_id')][-1]   # design/208: a newer narration of this voice that already has the words
-    newer = {'job_id': newest['job_id'], 'number': newest.get('number')} if newest['job_id'] != job_id and not voices.narration_behind(newest, said) else None
+    own = [n for n in state.get('narrations') or [] if n.get('voice_id') == narr.get('voice_id')]
+    newest = own[-1] if own else None   # design/208: a newer narration of this voice that already has the words
+    newer = {'job_id': newest['job_id'], 'number': newest.get('number')} if newest and newest['job_id'] != job_id and not voices.narration_behind(newest, said) else None
     making = bool(conn.execute("select 1 from vw2_jobs where run_id=%s and stage='voice' and request->>'kind'='narration' and status = any(%s) limit 1",
                                (run['id'], ['queued', 'running', 'storage_pending'])).fetchone())
-    return {'run': {'code': run['code'], 'title': run.get('title')}, 'closed': closed, 'script_text': text, 'words': words, 'tries': tries, 'times': times, 'making': making,
-            'narration': {'job_id': job_id, 'voice_id': voice_id, 'name': narr.get('name'), 'number': narr.get('number'), 'made_at': job['created_at'].isoformat(),
-                          'audio_key': result.get('audio_key'), 'behind': voices.narration_behind(narr, said), 'newer': newer}}
+    return {'run': {'code': run['code'], 'title': run.get('title')}, 'closed': closed, 'script_text': text, 'words': words, 'tries': tries, 'times': times, 'making': making, 'pre': pre,
+            'narration': {'job_id': job_id, 'voice_id': voice_id, 'name': narr.get('name'), 'number': narr.get('number'), 'made_at': job['created_at'].isoformat() if job['created_at'] else None,
+                          'audio_key': result.get('audio_key'), 'behind': (not pre) and voices.narration_behind(narr, said), 'newer': newer}}
 
 
 @router.get('/runs/{code}/voices2/words/{job}/data')
@@ -717,9 +725,11 @@ def _voices2_act(code, vw2_session, body):
             row = voices.narrate(conn, store, user, run, outputs, body['voice_id'], rid, 'page', list(body.get('tweaks') or []) or None)
             return JSONResponse({'job': str(row['id'])})
         if action == 'word-hear':   # design/194: the same three functions `vw voice pronounce` calls
-            return JSONResponse(voices.try_word(conn, store, user, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), rid, bool(body.get('alone'))))
+            return JSONResponse(voices.try_word(conn, store, user, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), rid, bool(body.get('alone')), bool(body.get('as_written'))))
         if action == 'word-cost':   # design/208: what a try would cost and whether it was made before; nothing is sent
-            return JSONResponse(voices.try_preview(conn, store, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), bool(body.get('alone'))))
+            return JSONResponse(voices.try_preview(conn, store, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), bool(body.get('alone')), bool(body.get('as_written'))))
+        if action == 'word-suggest':   # design/208 J4: spellings to start from; nothing is sent to the voice
+            return JSONResponse(voices.suggest_spellings(store, outputs, body.get('word')))
         if action == 'word-final':
             return JSONResponse(voices.finalise_word(store, user, run, outputs, body.get('word'), body.get('say_as')))
         if action == 'word-remove':

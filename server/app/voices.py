@@ -710,11 +710,28 @@ def _kept_try(conn, run, item, voice_id, word, say_as, alone):
     return str(row['id']) if row and row['status'] in KEPT_STATES else None
 
 
-def try_preview(conn, store, run, outputs, voice_id, word, say_as, alone=False):
+def sentence_of(text, word):
+    """The first sentence of the script that holds the word, or '' (for a suggestion's context)."""
+    pattern = word_pattern(word)
+    return next((r['text'] for r in VD.sentences_of(text) if pattern.search(r['text'])), '')
+
+
+def suggest_spellings(store, outputs, word):
+    """design/208 J4: up to three spellings to start from, asked for by the operator on the word page. Guesses; nothing is sent to the voice."""
+    from . import spelling_hints
+    text = script_text(store, outputs)[0]['spoken_text']
+    word, _ = check_word(text, word)
+    return {'word': word, 'spellings': spelling_hints.suggest(word, sentence_of(text, word))}
+
+
+def try_preview(conn, store, run, outputs, voice_id, word, say_as, alone=False, as_written=False):
     """design/208: what a try would send, before it is sent: its characters (the cost shown on the button and in the question), and the job of the same
-    try when it was made before. Sends nothing, charges nothing."""
+    try when it was made before. Sends nothing, charges nothing. as_written (J3): the word exactly as the script has it, alone."""
     refuse_after_final(outputs)
     script, _ = script_text(store, outputs)
+    if as_written:
+        word, _ = check_word(script['spoken_text'], word)
+        return {'characters': len(word) + 1, 'already': _kept_try(conn, run, None, voice_id, word, word, True), 'word': word, 'say_as': word}
     word, say_as = check_word(script['spoken_text'], word, say_as)
     text = try_text(script['spoken_text'], word, say_as, alone, direction_for(store, run, voice_id))
     return {'characters': len(text), 'already': _kept_try(conn, run, _item(words_doc(store, run), word), voice_id, word, say_as, alone), 'word': word, 'say_as': say_as}
@@ -729,12 +746,26 @@ def token_times(timing, text):
     return [[w['start_s'], w['end_s']] for w in words]
 
 
-def try_word(conn, store, user, run, outputs, voice_id, word, say_as, request_id, alone=False):
+def try_word(conn, store, user, run, outputs, voice_id, word, say_as, request_id, alone=False, as_written=False):
     """Hear one word in a voice, in its sentence or alone (points a, c, d, f): a small paid request, like a tryout. The same respelling asked again in
-    the same voice plays what was kept. The word is 'still trying' until it is made final; a try never reaches a narration."""
+    the same voice plays what was kept. The word is 'still trying' until it is made final; a try never reaches a narration.
+    design/208 J3: as_written reads the word exactly as the script has it, alone, to hear how the voice says it before any narration: it corrects
+    nothing, so it makes no entry and counts as no try."""
     refuse_after_final(outputs)
     script, _ = script_text(store, outputs)
-    word, say_as = check_word(script['spoken_text'], word, say_as)
+    word, say_as = check_word(script['spoken_text'], word, None if as_written else say_as)   # a refused try changes nothing
+    try:   # J3: a list begun before the first narration starts from the client's remembered words, as the first narration would have
+        ensure_client_words(conn, store, user, run, script['spoken_text'])
+    except Problem:
+        pass
+    if as_written:
+        kept = _kept_try(conn, run, None, voice_id, word, word, True)
+        if kept:
+            return {'job': kept, 'kept': True, 'word': word, 'say_as': word}
+        row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'audition', 'voice_id': voice_id, 'text': word + '.', 'model_id': elevenlabs.DEFAULT_MODEL,
+                                                           'settings': heard_settings(conn, run, voice_id),
+                                                           'pronounce': {'word': word, 'say_as': word, 'alone': True, 'as_written': True}}, request_id, store=store)
+        return {'job': str(row['id']), 'kept': False, 'characters': len(word) + 1, 'word': word, 'say_as': word}
     doc = words_doc(store, run)
     it = _item(doc, word)
     kept = _kept_try(conn, run, it, voice_id, word, say_as, alone)
