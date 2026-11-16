@@ -2508,7 +2508,7 @@ def cmd_visuals(a):
                 errs = out.get('errors') or {}
                 emit(out, 0, f"Step 1 recorded: {len(out.get('queued') or [])} set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
                      + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) + ' (fix what it names, then `vw visuals round --verdicts` again).' if errs else '')
-                     + ' Then `vw visuals next`: the server hands the operator one set at a time, in the chat (design/188).')
+                     + ' Wait for the sets (`vw visuals status --wait 900`), then `vw visuals page`: the operator judges the sets there, in one visit; in the chat (`vw visuals next`) only where the page cannot be shown.')
             emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} searched thing(s) go to pass 2; the round is at pass {out.get('pass')}.")
         if a.sets:   # design/151: the one-shot verdicts from chat: {element: {verdict: yes|no|correct, words, golden}}
             out = write(base + '/round/sets', {'verdicts': _json_file(m, a.sets), 'quote': a.quote})
