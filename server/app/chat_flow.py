@@ -314,48 +314,98 @@ def _round_kept(held, stamps):
     return {e: v for e, v in (held or {}).items() if isinstance(v, dict) and e in stamps and v.get('frames') == stamps[e]}
 
 
-def _round_items(ctx):
+def _round1(session, plan):
+    """Step 1 of the round: every row of it, the rows of the things the plan names (what the operator is asked about), each thing's footage
+    pictures, their stamps, and the answers kept so far that still stand."""
+    kinds = _kinds(plan)
+    everything = list(session['round']['elements'].items())
+    elements = [(eid, row) for eid, row in everything if eid in kinds]
+    frames_of = {eid: row.get('frames') or [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
+                 for eid, row in elements}
+    stamps = {eid: ','.join(map(str, f)) for eid, f in frames_of.items()}
+    return everything, elements, frames_of, stamps, _round_kept(session.get('chat_round'), stamps)   # design/191 section 11, B4: kept through a round posted again, while that thing's footage pictures are the same
+
+
+def round_close(conn, store, user, run, outputs, quote):
+    """Step 1 recorded, once, when every thing of the round has its answer: the server records the first step for every element of the round at
+    once (one the plan no longer names is left out) and the sets are queued. None while a thing is unanswered, or when the round is not at
+    step 1: nothing is recorded. design/210: a thing answered with the operator's own picture (the page) takes that picture as its reference:
+    its footage pictures are set aside first, and put back if the server refuses the step."""
+    s = V.session_of(store, run, outputs)
+    rd = s.get('round')
+    if not (rd and rd.get('kept') and rd.get('pass') == 1 and s.get('current')):
+        return None
+    plan = V.current_plan(store, s)
+    everything, elements, frames_of, _stamps, held = _round1(s, plan)
+    if not elements or any(e not in held for e, _ in elements):
+        return None
+    kinds = _kinds(plan)
+    owns = {e: held[e]['own'] for e, _ in elements if held[e].get('own') and kinds.get(e) != 'person' and held[e]['verdict'] == 'approve'}
+    aside = [f for e in owns for f in frames_of[e] if (s['references'].get(f) or {}).get('status') == 'candidate']
+    for f in aside:
+        s['references'][f].update(status='rejected', rejection={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote, 'notes': "the operator's own picture is used instead"})
+    if aside:
+        V.save_session(store, run, s)
+    verdicts = {e: {'verdict': held[e]['verdict'] if e in held else 'ignore'} for e, _ in everything}
+    try:
+        out = V.round_done(store, user, run, outputs, verdicts, quote, conn=conn)
+    except (ValueError, V.Problem):
+        s = V.session_of(store, run, outputs)
+        for f in aside:
+            s['references'][f]['status'] = 'candidate'
+            s['references'][f].pop('rejection', None)
+        if aside:
+            V.save_session(store, run, s)
+        raise
+    s = V.session_of(store, run, outputs)
+    s.pop('chat_round', None)
+    for e, mine in owns.items():
+        if s['round']['elements'][e].get('from_footage'):
+            s.setdefault('golden', {})[e] = mine   # the picture the operator gave on this line, not an older one of theirs
+    V.save_session(store, run, s)
+    return {**out, 'tell': (f"{len(out.get('queued') or [])} reference set(s) are now being made, about ₹{out.get('cost_inr', 0):g}. " if out.get('queued') else '') + NOTHING}
+
+
+def _round_items(ctx, every=False):
+    """The reference round's questions. The chat asks one at a time and leaves out what is answered or waits on something else. `every`
+    (design/210, the page): every thing of step 1, the answered ones too, each answer only kept (the page closes the step once, after the last
+    answer of a visit: `round_close`); at step 2 every set that is back, an answered one too, and every set that was not made, one a cause
+    holds too. An item then says what the page shows beside it: `_eid`, `_person`, `_frames`, `_makes` (a paid set follows a yes), `_kept`
+    (the answer kept so far), `_rows` (a set's pictures), `_cause`."""
     session, plan, run = ctx['session'], ctx['plan'], ctx['run']
     rd = session.get('round')
     if not (rd and plan and rd.get('kept')):
         return []
     step, names, kinds, items = V._round_pass(session, rd), _names(plan), _kinds(plan), []
-    everything = list(rd['elements'].items())
-    elements = [(eid, row) for eid, row in everything if eid in kinds]   # what the operator is asked about: the things the plan names
+    elements = [(eid, row) for eid, row in rd['elements'].items() if eid in kinds]   # what the operator is asked about: the things the plan names
     if step == 1:
-        frames_of = {eid: row.get('frames') or [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('element_id') == eid and r.get('status') in ('candidate', 'approved')]
-                     for eid, row in elements}
-        stamps = {eid: ','.join(map(str, f)) for eid, f in frames_of.items()}
-        held = _round_kept(session.get('chat_round'), stamps)   # design/191 section 11, B4: kept through a round posted again, while that thing's footage pictures are the same
+        _everything, elements, frames_of, stamps, held = _round1(session, plan)
         open_ = [(eid, row) for eid, row in elements if eid not in held]
-        for eid, row in open_[:1]:
-            n = len(elements) - len(open_) + 1
+        for eid, row in (elements if every else open_[:1]):
+            n = (elements.index((eid, row)) if every else len(elements) - len(open_)) + 1
             frames = frames_of[eid]
             person = kinds.get(eid) == 'person'
+            mine = not frames and not person and bool(V._own_pictures(session, eid))   # the operator's own approved picture is its reference, as a footage picture is
+            makes = person or (session.get('drawings') or {}).get(eid, {}).get('status') == 'approved' or not (frames or mine)   # as `visuals_stage._from_footage` decides
             if frames:
                 q = (f"{names[eid]}: this is how {'this person' if person else 'it'} looks in your footage. "
                      + ('Use these pictures to make the reference set?' if person else 'Use this picture from your footage as the reference?'))
                 yes = 'Yes, use it'
+            elif mine:
+                q, yes = f"{names[eid]}: your own picture is its reference. Use it?", 'Yes, use it'
             else:
                 q, yes = f"{names[eid]}: your footage has no picture of {'this person' if person else 'it'}. Have a reference set made (paid)?", 'Yes, make one'
 
-            def run_(choice, quote, words, eid=eid):
+            def run_(choice, quote, words, eid=eid, own=None):
                 s = V.session_of(ctx['store'], run, ctx['outputs'])
-                got = {**held, eid: {'verdict': choice, 'quote': quote, 'frames': stamps[eid]}}
+                got = {**held, eid: {'verdict': choice, 'quote': quote, 'frames': stamps[eid], **({'own': own} if own else {})}}
                 s['chat_round'] = got
                 V.save_session(ctx['store'], run, s)
-                left = [e for e, _ in elements if e not in got]
-                if left:
-                    return {'stored': eid, 'left': len(left)}
-                # the server records the first step for every element of the round at once; one the plan no longer names is left out
-                verdicts = {e: {'verdict': got[e]['verdict'] if e in got else 'ignore'} for e, _ in everything}
-                out = V.round_done(ctx['store'], ctx['user'], run, ctx['outputs'], verdicts, quote, conn=ctx['conn'])
-                s = V.session_of(ctx['store'], run, ctx['outputs'])
-                s.pop('chat_round', None)
-                V.save_session(ctx['store'], run, s)
-                return {**out, 'tell': (f"{len(out.get('queued') or [])} reference set(s) are now being made, about ₹{out.get('cost_inr', 0):g}. " if out.get('queued') else '') + NOTHING}
+                out = None if every else round_close(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], quote)
+                return out if out is not None else {'stored': eid, 'left': len([e for e, _ in elements if e not in got])}
             items.append(_item(f'round1:{eid}', 'reference', f'References, {n} of {len(elements)}', q, run_,
                                [_button(yes, 'approve'), _button('Leave it out', 'ignore')], show=[_pic(run, f, f'{eid}-footage-{i + 1}') for i, f in enumerate(frames[:4])]))
+            items[-1].update(_eid=eid, _person=person, _frames=frames, _makes=makes, _kept=held.get(eid))
         return items
     if step not in (2, 'making'):
         return []
@@ -364,10 +414,10 @@ def _round_items(ctx):
     for n, (eid, row) in enumerate(todo, 1):
         rows = sorted(V._set_rows(session, eid, row.get('set')), key=lambda r: int(r.get('set_n') or 1))
         where = f'Reference sets, {n} of {len(todo)}'
-        if rows and not V._answered(session, kinds, eid, row):
-            person = kinds.get(eid) == 'person'
+        person = kinds.get(eid) == 'person'
+        if rows and (every or not V._answered(session, kinds, eid, row)):
             show = [_pic(run, r['id'], f'{eid}-{LETTERS[i]}') for i, r in enumerate(rows[:len(LETTERS)])]
-            sheet = sheet_of(ctx['store'], run, rows[:len(LETTERS)]) if not items else None
+            sheet = sheet_of(ctx['store'], run, rows[:len(LETTERS)]) if not items and not every else None   # the page shows each picture alone
             if sheet:
                 show.insert(0, {'key': sheet, 'name': f'{eid}-side-by-side.jpg'})
 
@@ -390,8 +440,10 @@ def _round_items(ctx):
                 more = uses[3:] + [_button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')]
                 q = f'{names[eid]}: which picture is the reference?'
             items.append(_item(f"set:{eid}:{row.get('set')}", 'reference set', where, q, run_, buttons, show=show, more=more))
+            items[-1].update(_eid=eid, _person=person, _rows=rows[:len(LETTERS)], _kept=V._answered(session, kinds, eid, row))
         elif not rows and not V._set_rows(session, eid, row.get('set'), ('generating', 'approved')):
-            if V.set_cause(session, plan, eid, budget):
+            cause = V.set_cause(session, plan, eid, budget)
+            if cause and not every:
                 continue   # something stands in its way (a spec to approve first, the spend limit): that comes in its own turn
             refused = V._set_state(session, plan, step, eid, row, budget).get('next')   # design/207 (D1): the picture service refused this person's photo
             if refused:
@@ -402,6 +454,7 @@ def _round_items(ctx):
                     return {**V.set_make(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], eid), 'tell': 'This person is a stand-in now: the set is being made from the description. ' + NOTHING}
                 items.append(_item(f'likeness:{eid}:{row.get("set")}', 'reference set to make', where, f"{names[eid]}: the picture service refused this person's photo. Give another photo, or make them a stand-in (made from the description, paid)?", run_,
                                    [_button('Another photo', 'photo'), _button('A stand-in', 'standin', words=True, tell='Ask the operator to say in their own words that this person is a stand-in now.')]))
+                items[-1].update(_eid=eid, _person=person)
                 continue
 
             def run_(choice, quote, words, eid=eid):
@@ -410,6 +463,7 @@ def _round_items(ctx):
                 return V.set_aside(ctx['store'], ctx['user'], run, ctx['outputs'], eid, words or quote)
             items.append(_item(f'setmake:{eid}', 'reference set to make', where, f'{names[eid]}: its reference set was not made. Make it now (paid)?', run_,
                                [_button('Make it', 'make'), _button('Leave it out', 'aside')]))
+            items[-1].update(_eid=eid, _person=person, _cause=(cause or {}).get('text'), _error=row.get('error'))
     return items
 
 
@@ -732,7 +786,7 @@ def flush_sets(conn, store, user, run, outputs, quote=''):
         return None
     try:
         return V.round_sets(store, user, run, outputs, kept, quote, conn=conn, partial=True)
-    except V.Problem as exc:
+    except (ValueError, V.Problem) as exc:   # a refusal written with `need` is a ValueError until the API wraps it
         if 'still being made' in str(getattr(exc, 'message', '') or exc):
             return None
         raise

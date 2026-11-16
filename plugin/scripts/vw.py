@@ -1808,6 +1808,67 @@ def page_uploaded(folder, text):
     return {'matched': list(matched), 'refused': refused, 'not_uploaded': sorted(known - set(sent['zoom'])), **({'picture_batches': _batches('zoom', docs)} if docs else {})}
 
 
+OWN_TYPES = ('.png', '.jpg', '.jpeg', '.webp')   # what the server's own-picture path reads
+
+
+def page_own(folder, base, answers):
+    """design/210 part 2: the operator's own pictures among the page's answers (choice `own`, with `own`: the picture's id in the page's file
+    store). The assistant fetches each picture into work/page/own/ (the Artifact tool's read names the file by its id); a picture that is
+    there is handed to the server through the same calls as `vw visuals likeness` (a person, with the operator's words of permission) and
+    `vw visuals own`, and its answer then carries `own_ref`, the picture's id on the server. A picture not fetched yet makes its answer wait
+    in pending.json for the next `--record`, once; whatever cannot be handed over (no id, never fetched, a wrong type, too large, a refusal
+    of the server) travels as `own_error`, so the server says it on that line. Returns (the answers to send, the ids still to fetch)."""
+    own_dir = folder / 'own'
+    waited = load_json(own_dir / 'pending.json', [])
+    new = {a['key'] for a in answers}
+    todo = [(a, False) for a in answers] + [(a, True) for a in (waited if isinstance(waited, list) else []) if isinstance(a, dict) and a.get('key') not in new]   # an answer given again replaces the one that waited
+    out, fetch, wait = [], [], []
+    for a, again in todo:
+        a = dict(a)
+        own, words = a.pop('own', None), ' '.join(str(a.pop('permission', '') or '').split())
+        if a.get('choice') != 'own':
+            out.append(a)
+            continue
+        ident = str((own or {}).get('id') or '') if isinstance(own, dict) else ''
+        error = ''
+        if not re.fullmatch(r'[0-9a-f]{32}', ident):   # an id names a file here
+            error = 'the page gave no picture with this answer'
+        else:
+            files = sorted(own_dir.glob(ident + '.*'))
+            if not files and not again:
+                wait.append({**a, 'own': own, 'permission': words})
+                fetch.append(ident)
+                continue
+            if not files:
+                error = 'the picture could not be fetched from the page'
+            elif files[0].suffix.lower() not in OWN_TYPES:
+                error = 'the file is not a PNG, JPEG or WebP picture'
+            elif files[0].stat().st_size > OWN_PICTURE_MAX:
+                error = 'the picture is larger than 15 MB: choose a smaller file'
+            else:   # ponytail: handed over before the line is recorded; a crash between the two leaves one more approved picture of the thing, as a second `vw visuals own` would
+                eid = str(a.get('key') or '').split(':', 1)[-1]
+                calls = ([('/likeness', {'element_id': eid, 'quote': words, 'stand_in': False})] if words else []) + [
+                    ('/own', {'element_id': eid, 'content_base64': base64.b64encode(files[0].read_bytes()).decode('ascii'), 'url': '', 'name': str((own or {}).get('name') or '')[:80]})]
+                for path, body in calls:
+                    payload, code = request('POST', base + path, json={'request_id': str(uuid.uuid4()), **body})
+                    if code == 401:
+                        finish(payload, code)
+                    if code:
+                        error = str((payload or {}).get('message') or 'the server did not take the picture')[:500]
+                        break
+                    if path == '/own':
+                        a['own_ref'] = str(payload.get('id') or '')
+        if error:
+            a['own_error'] = error
+        out.append(a)
+    if wait:
+        own_dir.mkdir(parents=True, exist_ok=True)
+        (own_dir / 'pending.json').write_text(json.dumps(wait, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    else:
+        (own_dir / 'pending.json').unlink(missing_ok=True)
+    return out, fetch
+
+
 def _dropped(key, exc):
     """design/129 D39: the network dropped and stayed down through the retries: the operator runs the same command again; never a defect."""
     emit({'action': 'unreachable', 'message': f"Download of {key} stopped: this computer's network connection dropped ({exc.__class__.__name__}). "
@@ -2270,7 +2331,9 @@ def cmd_visuals(a):
         on_page = ('The drawings and the materials are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
                    if item.get('kind') == 'spec' else   # design/209
                    'The reference drawings are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
-                   if str(item.get('id') or '').startswith('drawing:') else '')   # design/210
+                   if str(item.get('id') or '').startswith('drawing:') else   # design/210
+                   'The references are answered on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
+                   if str(item.get('id') or '').startswith(('round1:', 'set:', 'setmake:', 'likeness:')) else '')   # design/210 part 2
         return (on_page + f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
@@ -2353,7 +2416,9 @@ def cmd_visuals(a):
                 d = load_json(f, {})
                 d = d.get('data') if isinstance(d, dict) and isinstance(d.get('data'), dict) else d
                 if isinstance(d, dict) and d.get('key') and d.get('choice'):
-                    answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000]})
+                    answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000],
+                                    **({'own': d['own']} if isinstance(d.get('own'), dict) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {})})
+            answers, own_fetch = page_own(folder, base, answers)   # design/210 part 2: the operator's own pictures reach the server before their lines are recorded
             out = write(base + '/page/record', {'answers': answers})
             taken = folder / 'answers' / 'rounds' / rnd / 'answers'
             if taken.is_dir():   # these answers are with the server: set aside, so an answer the operator undid later is never sent from an old file
@@ -2361,15 +2426,20 @@ def cmd_visuals(a):
                     taken.rename(taken.with_name('answers.sent'))
                 except OSError:
                     pass
-            info = hand(out['page'], {k: out[k] for k in ('recorded', 'stale', 'refused', 'dropped', 'then') if k in out})
+            info = hand(out['page'], {**{k: out[k] for k in ('recorded', 'kept', 'stale', 'refused', 'dropped', 'then') if k in out},
+                                      **({'own_fetch': own_fetch, 'own_dir': str(folder / 'own')} if own_fetch else {})})
+            fetch_line = (f"{len(own_fetch)} picture(s) the operator added on the page are still to fetch. For each id, the Artifact tool: action \"read\", `url` {info['url'] or 'the page link'}, "
+                          f"`path` the id, `out_dir` {folder / 'own'}. The ids: " + ', '.join(f'`path` {i}' for i in own_fetch) + '. Then run `vw visuals page --record` again: their lines '
+                          'are recorded then. Nothing is recorded for those lines yet. ' if own_fetch else '')
             emit(info, 0, f"{len(answers)} answer(s) read from the page; recorded: {', '.join(out['recorded']) or 'none'}"
+                          + (f"; kept, not recorded yet: {', '.join(out['kept'])}" if out.get('kept') else '')
                           + (f"; refused: {'; '.join(r['key'] + ': ' + r['message'] for r in out['refused'])}" if out.get('refused') else '')
                           + (f"; not recorded, the line changed since: {', '.join(out['stale'])}" if out.get('stale') else '')
                           + (f"; dropped with the Direction: {', '.join(out['dropped'])}" if out.get('dropped') else '')
-                          + f". {out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
+                          + f". {fetch_line}{out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
         out = write(base + '/page', {'one': False})
-        info = hand(out)
-        emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} "
+        info = hand(out, {'then': out['then']} if out.get('then') else None)   # design/210 part 2: what the assistant does when nothing waits on the page (start the round; wait for the sets)
+        emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} " + (out['then'] + ' ' if out.get('then') else '')
                       + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ")
                       + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"Round {info['round']}: {info['round_file']}. " + out['how'])
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server

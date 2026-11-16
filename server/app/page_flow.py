@@ -33,6 +33,8 @@ HOW = ('The operator answers this step on a page, not on a card. '
        '3. Write this round to the page with the ArtifactData tool: action "set", `url` the page\'s link, collection "rounds", doc_id `round`, file_path `round_file`. Type none of its content. '
        '4. Say to the operator, as your own one line: "Open this page, answer each line, then tell me you are done:" and the link. Then wait. Do not post the lines in the chat as well. '
        '5. When the operator says done: ArtifactData, action "list", collection `answers_collection`, out_dir `answers_dir`; then run `vw visuals page --record`. '
+       'If it lists pictures the operator added on the page (`own_fetch`), fetch each one: the Artifact tool, action "read", `url` the page\'s link, `path` the picture\'s id, '
+       '`out_dir` `own_dir`; then run `vw visuals page --record` again: their lines are recorded then (design/210). '
        '6. It prints what was recorded and writes the next round: do steps 2 and 3 again with the new `round` and `round_file`, then follow `then`. '
        'An answer the operator gives in the chat instead is recorded with `vw visuals decide`, as before.')
 CAPABILITIES = {'db': {'rules': [{'path': path, 'read': 'view', 'write': 'owner'} for path in ('rounds', 'pics', 'zoom')]}, 'assets': {}, 'user': {}}   # only the page's owner writes: the lines, the answers and the pictures (design/210: `pics` the small pictures, `zoom` the links of the large ones in the file store)
@@ -370,12 +372,278 @@ def _drawing_page(ctx, base, lines):
                     'Look at each picture, answer each line, then say done in the chat.' if left else 'The assistant is drawing again the things you sent back; they will appear here.'}
 
 
+# ---------- design/210 part 2 (SK, 16 Nov 2026): the reference round on the page, in two screens ----------
+# "References" is the round's step 1: every person, object and place in one visit; each answer is kept and the step is recorded once, when
+# every thing has its answer (`chat_flow.round_close`). "References: the sets" is step 2: every set that is back, that was not made, that is
+# being made and that is approved. Each open line is the chat's own item (`chat_flow._round_items(ctx, every=True)`): the same id, the same
+# buttons, the same run function; a button that leads to a paid set says so with the price of one set, and that label is logged as the
+# operator's word.
+
+REFS_STEP, SETS_STEP = 'References', 'References: the sets'
+REFS_START = ('The references come next: write out/reference-round.json and send it (`vw visuals round --file out/reference-round.json`), then run `vw visuals page`: '
+              'the operator answers every person, object and place there, in one visit.')
+REFS_GO = 'The references come next: run `vw visuals page`. The operator answers every person, object and place there, in one visit.'
+REFS_KEPT = 'Kept, not recorded yet: the sets are made when every thing is answered. Choose again to change it.'
+SETS_KEPT = 'Kept, not recorded yet: it is recorded when the sets still being made are back. Choose again to change it.'
+SETS_HELD = 'Kept, not recorded yet: the reason is on this line. Choose again to change it.'
+SETS_WAIT = 'The sets are being made. Wait for them (`vw visuals status --wait 900`), then run `vw visuals page`: the operator judges the sets there, in one visit.'
+SETS_STAND = ('No set waits for the operator now, and none is being made: the answers kept wait, and the reason is on each line. Tell the operator; when it is settled, '
+              'run `vw visuals page`.')
+ROUND_NEXT = 'The reference round is complete. Go on with `vw visuals next`: it gives the next decision (the stills and the graphics are not on the page yet).'
+ROUND_REFUSED = 'The server refused an answer on the page; its reason is in `refused` and on the line: tell the operator and give them the link again.'
+OWN_PERMISSION = "A real person's photo is used only with their permission. Write in the box on this line that you have it, then add the photo again."
+OWN_MISSING = 'Your own picture did not reach VideoWizard. Add it again on this line, or give it to the assistant in the chat.'
+KIND_WORDS = {'person': 'a person', 'place': 'a place', 'object': 'an object', 'material': 'a material', 'process': 'a process', 'technique': 'a technique'}
+OWN_FILE = 'a PNG, JPEG or WebP file up to 15 MB'
+
+
+def _money(ctx):
+    """(spent, the film's limit, the price of one set) and the words a paid button carries."""
+    budget = V._set_budget(ctx['run'], ctx['session'], V.visuals_spend(ctx['conn'], ctx['run']))
+    return budget, f'paid, about ₹{budget[2]:,.0f}'
+
+
+def _drawn(session, eid):
+    return (session.get('drawings') or {}).get(eid, {}).get('status') == 'approved'
+
+
+def _round_buttons(item, paid):
+    """The chat item's own buttons, every one of them, for the page: one that leads to a paid set says so, with the price of one set."""
+    def label(b):
+        if b['choice'] in ('no', 'correct'):
+            return f"{b['label']} ({paid}: the set is made again)"
+        return f"{b['label']} ({paid})" if b['choice'] in ('make', 'standin') or (b['choice'] == 'approve' and item.get('_makes')) else b['label']
+    return [{'label': label(b), 'choice': b['choice'], 'needs_words': bool(b.get('needs_words'))} for b in item['buttons'] + list(item.get('other_choices') or [])]
+
+
+def _own_line(ctx, item, paid):
+    """"Use my own picture" on a thing's line: its label (with the price when a set is made from the picture), whether the thing is a person,
+    whether the permission is already recorded, and what the picture then does, in plain words."""
+    session, eid, person, step1 = ctx['session'], item['_eid'], item['_person'], item['id'].startswith('round1:')
+    drawn = step1 and _drawn(session, eid)
+    text = (f"Add this person's own photo, {OWN_FILE}: their set is made from it. A real person's photo is used only with their permission: write first, in your own words, that you have it." if person else
+            f'When the footage picture is not right, add your own, {OWN_FILE}: its set is made from your picture and the drawings.' if drawn else
+            f'When the footage picture is not right, or there is none, add your own, {OWN_FILE}: it becomes the reference of this thing, and no picture is made.' if step1 else
+            f'When none of these is right, add your own picture, {OWN_FILE}: every shot of this thing then starts from it.' if item['id'].startswith('set:') else
+            f'Add your own picture, {OWN_FILE}: it becomes the reference of this thing, and no set is made.')
+    return {'label': 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else ''), 'person': person,
+            'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text}
+
+
+def _thing(plan, eid):
+    e = next(x for x in plan['elements'] if x['id'] == eid)
+    return f"{e.get('name') or eid} ({KIND_WORDS.get(e.get('kind'), 'a thing')})"
+
+
+def _ask(item):
+    q = CF._split(item['question'])[1]
+    return q[:1].upper() + q[1:]
+
+
+def _refs_lines(ctx):
+    """The lines of step 1, in the plan's order, and how many sets a yes to every thing would make: one line per thing, its footage pictures
+    (up to four, as the chat shows them), what a yes does in plain words, the chat item's buttons, a comment box and "Use my own picture".
+    A thing answered at an earlier "done" stays open, to be changed, and says what is kept."""
+    session, plan, run = ctx['session'], ctx['plan'], ctx['run']
+    items = {i['_eid']: i for i in CF._round_items(ctx, every=True)}
+    _budget, paid = _money(ctx)
+    lines = []
+    for eid in [e['id'] for e in plan['elements'] if e['id'] in items]:
+        item = items[eid]
+        person, drawn = item['_person'], _drawn(session, eid)
+        live = [f for f in item['_frames'] if (session['references'].get(f) or {}).get('status') in ('candidate', 'approved')][:4]
+        seen = ('This is how {x} looks in your footage. ' if live else 'Your footage has no picture of {x}. ').format(x='this person' if person else 'it')
+        text = (seen + f"A reference set is made for every person{', even with footage' if live else ''} ({paid}): from the description, or from their photo when you have their permission." if person else
+                seen + f'It has approved reference drawings, so a reference set is made from them, even with footage ({paid}).' if drawn else
+                seen + 'A yes takes the footage picture as its reference: no picture is made and nothing is paid.' if live else
+                seen + f'A yes has a reference set of three pictures made ({paid}).' if item['_makes'] else
+                'Your own picture is its reference: no picture is made and nothing is paid.')
+        kept = item['_kept']
+        lines.append({'key': f'ref:{eid}', 'title': _thing(plan, eid), 'state': 'open', 'item': item['id'], 'ask': _ask(item), 'text': text + (' Choose a picture to see it large.' if live else ''),
+                      **({'pics': [pic(CF._ref_key(run, f), f'Footage picture {n}') for n, f in enumerate(live, 1)]} if live else {}),
+                      'buttons': _round_buttons(item, paid), 'comment': True, 'own': _own_line(ctx, item, paid),
+                      **({'kept': str(kept.get('quote') or kept.get('verdict')), 'kept_note': REFS_KEPT} if kept else {})})
+    return lines, len([i for i in items.values() if i['_makes']])
+
+
+def _sets_lines(ctx):
+    """The lines of step 2, in the plan's order: a set that is back (its three pictures, each alone, lettered; a thing's picture carries the
+    choice that takes it as the starting picture), a set that was not made (with the cause the server gives), a set being made, and an
+    approved set, which keeps its pictures."""
+    session, plan, run = ctx['session'], ctx['plan'], ctx['run']
+    rd = session['round']
+    items = {i['_eid']: i for i in CF._round_items(ctx, every=True)}
+    _budget, paid = _money(ctx)
+    by_n = lambda rows: sorted(rows, key=lambda r: int(r.get('set_n') or 1))
+    lines = []
+    for eid in [e['id'] for e in plan['elements'] if e['id'] in rd['elements']]:
+        row, item = rd['elements'][eid], items.get(eid)
+        if row.get('ignored') or row.get('from_footage'):
+            continue
+        head = {'key': f'set:{eid}', 'title': _thing(plan, eid)}
+        if item and item['id'].startswith('set:'):
+            person, buttons, a = item['_person'], _round_buttons(item, paid), item['_kept']
+            choice = None if not a else ('use:' + a['golden']) if a.get('golden') else a['verdict']
+            said = next((b['label'] for b in buttons if b['choice'] == choice), 'Use my own picture' if a and a.get('golden') else choice)
+            lines.append({**head, 'state': 'open', 'item': item['id'], 'ask': _ask(item),
+                          'text': (f"Three pictures of the same {'person' if person else 'thing'}. Choose a picture to see it large."
+                                   + ('' if person else ' Choose the one every shot starts from: under the picture, or with a button below.')),
+                          'pics': [{**pic(CF._ref_key(run, r['id']), CF.LETTERS[n]), **({} if person else {'choice': 'use:' + r['id']})} for n, r in enumerate(item['_rows'])],
+                          'buttons': buttons, 'comment': True, 'own': _own_line(ctx, item, paid),
+                          **({'kept': said, 'kept_note': SETS_KEPT if V._round_pass(session, rd) == 'making' else SETS_HELD} if a else {})})
+        elif item:   # its set was not made, or the picture service refused a person's photo
+            cause = item.get('_cause')
+            lines.append({**head, 'state': 'open', 'item': item['id'], 'ask': _ask(item), 'buttons': _round_buttons(item, paid), 'comment': True, 'own': _own_line(ctx, item, paid),
+                          'text': "The picture service refused this person's photo." if item['id'].startswith('likeness:') else
+                                  'Its reference set was not made' + (f': {cause}. It can be made when that is settled.' if cause else
+                                                                      f": {V._fail_words(item.get('_error')).rstrip('.').lower()}." if item.get('_error') else '.')})
+        elif V._set_rows(session, eid, row.get('set'), ('generating',)):
+            lines.append({**head, 'state': 'making', 'note': 'Its set is being made.'})
+        else:
+            done = by_n(V._set_rows(session, eid, row.get('set'), ('approved',)))
+            if not done:
+                continue
+            gold = V.golden_of(session, eid)
+            mine = session['references'].get(gold) if gold and not any(r['id'] == gold for r in done) else None
+            lines.append({**head, 'state': 'recorded',
+                          'pics': [pic(CF._ref_key(run, r['id']), CF.LETTERS[n] + (' (the starting picture)' if r['id'] == gold else '')) for n, r in enumerate(done[:len(CF.LETTERS)])]
+                                  + ([pic(mine.get('key') or CF._ref_key(run, gold), 'Your own picture (the starting picture)')] if mine else [])})
+    return lines
+
+
+def _round_page(ctx, base, step):
+    """One screen of the reference round as a round of the page. Its pictures are not in the round; a round whose text is over the document's
+    size first leaves out the pictures of the approved sets, then the things already kept, then holds the later lines to answer for the next
+    "done". Step 1 is recorded only when every thing of the round is answered, the held ones too, and the page says so."""
+    session = ctx['session']
+    (spent, cap, one), paid = _money(ctx)
+    sets = 0
+    if step == 'refs':
+        lines, sets = _refs_lines(ctx)
+    else:
+        lines = _sets_lines(ctx)
+    waits = lambda l: l['state'] == 'open' and not l.get('kept')
+    count = lambda test: len([l for l in lines if test(l)])
+    total, kept, making, done = len(lines), count(lambda l: bool(l.get('kept'))), count(lambda l: l['state'] == 'making'), count(lambda l: l['state'] == 'recorded')
+    held = 0
+    while len(json.dumps(lines, ensure_ascii=False).encode('utf-8')) > ROUND_BYTES:
+        read = next((l for l in reversed(lines) if l['state'] == 'recorded' and 'pics' in l), None)
+        old = next((i for i, l in enumerate(lines) if l.get('kept')), None)
+        open_ = [i for i, l in enumerate(lines) if waits(l)]
+        if read:
+            del read['pics']
+        elif old is not None and open_:
+            del lines[old]
+        elif len(open_) > 1:
+            del lines[open_[-1]]
+            held += 1
+        else:
+            break
+    refused = session.get('page_refused') or {}
+    lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if line['key'] in refused and line['state'] == 'open' else {})} for n, line in enumerate(lines, 1)]
+    left = len([l for l in lines if waits(l)])
+    more = f', {held} more after these' if held else ''
+    many = lambda n, word: f"{n} {word}{'' if n == 1 else 's'}"
+    if step == 'refs':
+        stopped = refused.get('references')
+        return {**base, 'step': REFS_STEP, 'open': bool(left), 'lines': lines,
+                'summary': f"{many(total, 'thing')}: {total - kept} to answer, {kept} kept{more}; up to {many(sets, 'set')}, about ₹{sets * one:,.0f}, of the ₹{cap:,.0f} limit; spent so far ₹{spent:,.0f}.",
+                'note': f'Not recorded: {stopped}' if stopped else
+                        f'This list is long: {held} more things appear here after you answer these and say done in the chat. Nothing is made until after the last one.' if held else
+                        'Look at each picture, answer each thing, then say done in the chat. Nothing is made until every thing is answered.' if left else
+                        'Every thing is answered. Say done in the chat.'}
+    return {**base, 'step': SETS_STEP, 'open': bool(left), 'lines': lines,
+            'summary': f"{many(total, 'set')}: {total - kept - making - done} to answer, {kept} kept, {making} being made, {done} approved{more}. "
+                       f'A set made again costs about ₹{one:,.0f}; spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit.',
+            'note': f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
+                    'Look at each set, answer each line, then say done in the chat.' if left else
+                    'The sets are being made; they appear here when they are back.' if making else 'Nothing more to answer here now.',
+            **({} if left or not making else {'then': SETS_WAIT})}
+
+
+def _sets_asked(ctx, items):
+    """How many paid sets the kept answers of step 1 ask for, as `visuals_stage._from_footage` will decide."""
+    return len([i for i in items if i['_kept']['verdict'] == 'approve'
+                and (i['_person'] or _drawn(ctx['session'], i['_eid']) if i['_kept'].get('own') else i['_makes'])])
+
+
+def _round_close(ctx):
+    """Step 1 recorded from the page, once every thing is answered: nothing half made. When the film's limit has no room for every set the
+    answers ask for, the whole step is refused in a plain sentence and nothing is queued. None while a thing is unanswered."""
+    items = CF._round_items(ctx, every=True)
+    if not items or not items[0]['id'].startswith('round1:') or not all(i['_kept'] for i in items):
+        return None
+    n = _sets_asked(ctx, items)
+    (spent, cap, one), _paid = _money(ctx)
+    V.need(spent + n * one <= cap + 1e-9, f"The answers ask for {n} set{'' if n == 1 else 's'}, about ₹{n * one:,.0f}, and ₹{spent:,.0f} is spent of the ₹{cap:,.0f} limit of this film. "
+                                          'Nothing was made and nothing is recorded: the answers are kept. Leave some things out, or ask the owner to set another limit for this film; then say done again.')
+    return CF.round_close(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], 'Done, on the page')
+
+
+def _round_answer(ctx, a, choice, words):
+    """One answer to a line of the reference round, through the run function of the chat's own item. Returns (what the operator said, the
+    function's answer, whether the answer is only kept so far), or None when the line is no longer open with that content (stale: a set made
+    again has a new id). The operator's own picture reached the server before this call (`own_ref`); a picture that did not is refused on
+    its line (`own_error` is the tool's reason)."""
+    session = ctx['session']
+    item = next((i for i in CF._round_items(ctx, every=True) if i['id'] == a.get('item')), None)
+    if not item:
+        eid, mine = str(a.get('key') or '').split(':', 1)[-1], str(a.get('own_ref') or '')
+        row = ((session.get('round') or {}).get('elements') or {}).get(eid) or {}
+        if choice == 'own' and mine and row.get('own') and V.golden_of(session, eid) == mine:   # its set was not made: the server's own-picture path already took the picture as its reference
+            return 'Use my own picture' + (f': {words}' if words else ''), {}, False
+        return None
+    eid, person, step1 = item['_eid'], item['_person'], item['id'].startswith('round1:')
+    _budget, paid = _money(ctx)
+    if choice == 'own':
+        V.need(not (person and not V.likeness_of(session, eid)), OWN_PERMISSION)
+        V.need(not a.get('own_error'), f"Your own picture was not used: {' '.join(str(a.get('own_error')).split())}")
+        mine = str(a.get('own_ref') or '')
+        V.need(V._own_golden(session, eid, mine), OWN_MISSING)
+        label = _own_line(ctx, item, paid)['label']
+        if step1:
+            out = item['_run']('approve', label, words, own=mine)
+        elif person:   # the sheet made before the photo is out of date: it is made again from the photo, as `vw visuals round --make` does
+            out = V.set_make(ctx['conn'], ctx['store'], ctx['user'], ctx['run'], ctx['outputs'], eid)
+        elif item['id'].startswith('set:'):
+            out = item['_run']('use:' + mine, label, '')
+        else:
+            out = {}
+    else:
+        buttons = _round_buttons(item, paid)
+        button = next((b for b in buttons if b['choice'] == choice), None)
+        V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in buttons) + '.')
+        V.need(not button['needs_words'] or words, 'Say what should change in this line, in your own words.')
+        label = button['label']
+        out = item['_run'](choice, label, words) or {}
+    hold = (out.get('held') or {}).get(eid)   # the limit holds a set made again: the answer is kept and its line says why
+    V.need(not hold, f'{hold[:1].upper()}{hold[1:]}.' if hold else '')
+    return label + (f': {words}' if words else ''), out, step1 or (item['id'].startswith('set:') and 'pass' not in out)
+
+
+def _round_due(ctx, now):
+    """The reference round is the next thing and is not started: no line of the page waits or is back with the assistant, the film's
+    references are made as sets, the plan names a thing the round takes, and no round exists."""
+    if any(l['state'] in ('open', 'with_assistant') for l in now['lines']) or ctx['session'].get('round'):
+        return False
+    try:
+        return V.set_estimate(ctx['run'], ctx['session'], ctx['plan'])['sets'] > 0
+    except (Problem, KeyError, TypeError, ValueError):
+        return False
+
+
 def _plan_step(ctx):
     """Which step the page is at once a plan is proposed, with its lines: 'plan' while a gap is open or back with the assistant; 'spec' (the
-    drawings and materials, design/209) until each is approved; then 'draw' (the reference drawings, design/210) while a drawing set waits."""
+    drawings and materials, design/209) until each is approved; then 'draw' (the reference drawings, design/210) while a drawing set waits;
+    then the reference round: 'refs' at its step 1, 'sets' at its step 2 and while a set is being made (the lines are built by `_round_page`)."""
     specs = _spec_lines(ctx)
-    draws = _drawing_lines(ctx) if not any(CF._plan_items(ctx)) and all(l['state'] == 'recorded' for l in specs) else []
-    return ('draw', draws) if draws else ('spec', specs) if specs else ('plan', [])
+    quiet = not any(CF._plan_items(ctx)) and all(l['state'] == 'recorded' for l in specs)
+    draws = _drawing_lines(ctx) if quiet else []
+    if draws:
+        return 'draw', draws
+    rd = ctx['session'].get('round') or {}
+    at = V._round_pass(ctx['session'], rd) if quiet and rd.get('kept') else None
+    return ('refs', []) if at == 1 else ('sets', []) if at in (2, 'making') else ('spec', specs) if specs else ('plan', [])
 
 
 def _spec_answer(ctx, key, choice, words, item_id, items=None):
@@ -427,13 +695,22 @@ def page(conn, store, user, run, outputs):
 def _page(conn, store, user, run, outputs):
     """What the page shows now, for the treatment and then for the plan (design/206, `_plan_page`): `lines` in the film's order, each `open` (with its rows or text and its buttons), `recorded`
     (accepted; `reopen` while the treatment is still a draft) or `with_assistant` (sent back, with the operator's words). A new `round` each call."""
+    try:
+        CF.flush_sets(conn, store, user, run, outputs, 'Answered on the page')   # design/210: an answer kept on a set while others were being made is recorded once they are back, as `vw visuals next` does
+    except (ValueError, Problem):
+        pass   # said on its line when the operator next answers
     ctx = CF._ctx(conn, store, user, run, outputs)
     session, draft = ctx['session'], ctx['session'].get('treatment_draft')
     stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
     base = {'step': 'Treatment', 'round': 'r' + stamp, 'how': HOW, 'capabilities': CAPABILITIES, 'title': f"VideoWizard decisions {run.get('code') or ''}".strip()}
     if _at_plan(ctx):
-        step, lines = _plan_step(ctx)   # design/209: after the plan, the drawings and the materials; design/210: then the reference drawings
-        return _drawing_page(ctx, base, lines) if step == 'draw' else _spec_page(ctx, base, lines) if step == 'spec' else _plan_page(ctx, base)
+        step, lines = _plan_step(ctx)   # design/209: after the plan, the drawings and the materials; design/210: then the reference drawings, then the reference round
+        if step in ('refs', 'sets'):
+            return _round_page(ctx, base, step)
+        out = _drawing_page(ctx, base, lines) if step == 'draw' else _spec_page(ctx, base, lines) if step == 'spec' else _plan_page(ctx, base)
+        if _round_due(ctx, out):
+            out['then'] = REFS_START   # nothing waits on the page and the round is not started: what the assistant does next
+        return out
     motion =_motion_line(run, draft)
     first = [motion] if motion else []
     if not draft:
@@ -481,10 +758,12 @@ def page_record(conn, store, user, run, outputs, answers):
     answers = [a for a in answers or [] if isinstance(a, dict)]
     answers.sort(key=lambda a: {'motion': 0, 'direction': 1, 'shared': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps
     recorded, stale, refused, dropped, tell = [], [], [], [], ''
-    relies, corrected, was_draw = set(), False, False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
+    kept = []   # design/210: the answers of the reference round that are kept and not recorded yet
+    relies, corrected, was_draw, was_round = set(), False, False, False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
     try:
         first = CF._ctx(conn, store, user, run, outputs)
-        was_draw = _at_plan(first) and _plan_step(first)[0] == 'draw'   # design/210: this "done" was said on the reference drawings
+        was = _plan_step(first)[0] if _at_plan(first) else ''
+        was_draw, was_round = was == 'draw', was in ('refs', 'sets')   # design/210: this "done" was said on the reference drawings, or on the reference round
         if _at_plan(first) and _spec_lines(first):
             relies = {v['key'] for v in CF._spec_views(first) if v['spec'].get('confirmed')}
             answers.sort(key=lambda a: str(a.get('choice') or '') == 'yes')   # the corrections first: a yes may rest on a size corrected in the same visit
@@ -497,7 +776,18 @@ def page_record(conn, store, user, run, outputs, answers):
         state = (draft.get('lines') or {}).get(key, {}).get('state')
         said = words
         try:
-            if _at_plan(ctx):   # design/206: a plan line; design/209: after the plan, a drawing's or a material's line
+            if _at_plan(ctx) and key.startswith(('ref:', 'set:')):   # design/210: a line of the reference round, whatever the page shows now
+                got = _round_answer(ctx, a, choice, words)
+                if not got:
+                    stale.append(key)
+                    continue
+                said, out, waits = got
+                tell = tell or str((out or {}).get('tell') or '')
+                if waits:
+                    kept.append(key)
+                    _log(conn, run, key, choice, said)
+                    continue
+            elif _at_plan(ctx):   # design/206: a plan line; design/209: after the plan, a drawing's or a material's line
                 step = _plan_step(ctx)[0]
                 at_spec = step == 'spec'
                 if at_spec and choice == 'yes' and corrected and key in relies:   # it rested on a size another line gave, and a line was corrected in this visit: asked again
@@ -543,17 +833,40 @@ def page_record(conn, store, user, run, outputs, answers):
         if key == 'direction' and choice != 'accept':
             dropped = [str(x.get('key') or '') for x in answers[n + 1:]]
             break
+    stopped = ''
+    try:   # design/210: step 1 of the reference round is recorded once, when every thing has its answer and no drawing is in its way
+        ctx = CF._ctx(conn, store, user, run, outputs)
+        if _at_plan(ctx) and (_plan_step(ctx)[0] == 'refs' or any(k.startswith('ref:') for k in kept)):
+            closed = _round_close(ctx)
+            if closed:
+                done = ['ref:' + e['id'] for e in ctx['plan']['elements'] if e['id'] in ctx['session']['round']['elements']]
+                recorded, kept = recorded + [k for k in done if k not in recorded], [k for k in kept if k not in done]
+                tell = tell or str(closed.get('tell') or '')
+    except (ValueError, Problem) as exc:
+        stopped = str(getattr(exc, 'message', '') or exc)
+        refused.append({'key': 'references', 'message': stopped})
+        _log(conn, run, 'references', 'done', 'Done, on the page', refused=stopped)
     session = V.session_of(store, run, outputs)
     session['page_refused'] = {r['key']: r['message'] for r in refused}   # shown on the line until it is answered again
     V.save_session(store, run, session)
     now = page(conn, store, user, run, outputs)
-    left = len([l for l in now['lines'] if l['state'] == 'open'])
+    left = len([l for l in now['lines'] if l['state'] == 'open' and not l.get('kept')])
     draft = session.get('treatment_draft') or {}
     alone_accepted = bool(draft.get('direction_only')) and (draft.get('lines') or {}).get('direction', {}).get('state') == 'accepted'
     at_plan, at_spec, at_draw = now['step'] == 'Plan', now['step'] == SPEC_STEP, now['step'] == DRAW_STEP
-    then = ('Nothing was answered on the page. ' if not answers else '') + (SPEC_REFUSED + ' ' if at_spec and refused else DRAW_REFUSED + ' ' if at_draw and refused else '') + (
+    at_refs, at_sets = now['step'] == REFS_STEP, now['step'] == SETS_STEP
+    rd = session.get('round') or {}
+    drawn = 'Every reference drawing is approved. '
+    then = ('Nothing was answered on the page. ' if not answers else '') + (f'The references are not recorded yet: {stopped} ' if stopped else '') + (
+        SPEC_REFUSED + ' ' if at_spec and refused else DRAW_REFUSED + ' ' if at_draw and refused else ROUND_REFUSED + ' ' if (at_refs or at_sets) and [r for r in refused if r['key'] != 'references'] else '') + (
+        drawn + REFS_GO if at_refs and was_draw and not session.get('chat_round') else
+        f"{left} thing(s) still wait for the operator on the page: write the new round to the page and give them the link again. The answers given are kept: nothing is made until every thing is answered." if at_refs and left else
+        'Every thing is answered and kept. When what stands in the way is settled, run `vw visuals page --record` again: the step is recorded then.' if at_refs else
+        f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if at_sets and left else
+        SETS_WAIT if at_sets and any(l['state'] == 'making' for l in now['lines']) else SETS_STAND if at_sets else
+        ROUND_NEXT if (was_round or kept or any(k.startswith(('ref:', 'set:')) for k in recorded)) and rd.get('kept') and rd.get('pass') == 'complete' else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec or at_draw) and left else
-        DRAW_BACK if at_draw else DRAW_NEXT if was_draw else
+        DRAW_BACK if at_draw else drawn + REFS_START if was_draw and _round_due(CF._ctx(conn, store, user, run, outputs), now) else DRAW_NEXT if was_draw else
         SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else SPEC_NEXT if at_spec else
         PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else PLAN_NEXT if at_plan else
         'The treatment is recorded: write the plan to it.' if session.get('treatment') and not draft else
@@ -561,6 +874,6 @@ def page_record(conn, store, user, run, outputs, answers):
         V.DIRECTION_ACCEPTED if alone_accepted else
         'Write the Direction alone, send it (`vw visuals treatment --file out/visual-treatment.json`, no `gaps` in it), then `vw visuals page`.' if not draft else
         'No line waits for the operator now: revise the lines that are back with you (their words are on each), send the draft again, then `vw visuals page`.')
-    said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
-    return {'recorded': recorded, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
+    said = '; '.join(f"{name} {', '.join(keys)}" for name, keys in (('recorded', recorded), ('kept', kept), ('stale', stale), ('refused', [r['key'] for r in refused]), ('dropped', dropped)) if keys)
+    return {'recorded': recorded, 'kept': kept, 'stale': stale, 'refused': refused, 'dropped': dropped, 'open': left, **({'tell': tell} if tell else {}), 'then': (tell + ' ' if tell else '') + then, 'page': now,
             'log': said or 'nothing answered'}   # design/205: the record call's own log line

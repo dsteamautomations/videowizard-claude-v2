@@ -163,6 +163,16 @@ def decide(tool, inp, cwd, vw):
         action = str(inp.get('action') or 'publish')
         if action == 'open':
             return None
+        if action == 'read':   # design/210 part 2: a picture the operator added on the page, fetched by its id into the run's own-picture folder, and nothing else
+            run = active_run(cwd)
+            own = (run / 'work' / 'page' / 'own').resolve() if run else None
+            raw = inp.get('out_dir')
+            into = (Path(raw).expanduser() if Path(raw).expanduser().is_absolute() else cwd / raw).resolve() if isinstance(raw, str) and raw else None
+            if (own and into == own and inp.get('url') and isinstance(inp.get('path'), str) and re.fullmatch(r'[0-9a-f]{32}', inp['path'])
+                    and not (inp.get('paths') or inp.get('page') or inp.get('type_url'))):
+                return None
+            return ("Blocked: the only thing read from the run's decisions page (`url`) is a picture the operator added there: `path` its id (32 hex characters), `out_dir` "
+                    f"{own or 'work/page/own/ of the active run'}, as `vw visuals page --record` lists them.")
         if action == 'publish' and inp.get('asset') is True:   # design/210: the run's large pictures, uploaded to the page's file store, and nothing else
             run = active_run(cwd)
             paths = inp.get('file_paths') if 'file_paths' in inp else [inp.get('file_path')]
