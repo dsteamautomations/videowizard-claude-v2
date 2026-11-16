@@ -96,8 +96,15 @@ def _plan_page(ctx, base):
     items, revising = CF._plan_items(ctx)
     pending, revisions = session.get('shared_pending') or {}, session.get('revisions') or {}
     waits = [g['gap_id'] for g in plan['gaps'] if g['gap_id'] in pending]
-    picture = {e.get('gap_id'): e.get('picture') for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
+    treated = session.get('treatment') or {}
+    agreed = {e.get('gap_id'): e for e in treated.get('gaps') or [] if isinstance(e, dict)}
     plan_open, lines = bool(items or revising), []
+    for n in (400, 160, 80, 40):   # design/207: the world of the film first, read only; a very large one has its cells cut shorter, so the gaps keep their room in the round
+        world = CF._world_rows(plan, n)
+        if len(json.dumps(world, ensure_ascii=False).encode('utf-8')) <= ROUND_BYTES // 2:
+            break
+    if world:
+        lines.append({'key': 'world', 'title': 'The world of this film', 'state': 'recorded', 'rows': world})
     shared = next((i for i in items if i['kind'] == 'plan shared'), None)
     if shared:
         try:
@@ -114,7 +121,9 @@ def _plan_page(ctx, base):
         gid = gap['gap_id']
         head = {'key': gid, 'title': f'Gap {gid}' + (f" · {gap['title']}" if gap.get('title') else '')}
         ask = next((i for i in items if i['id'].startswith((f'gap:{gid}:', f'choice:{gid}:'))), None)
-        seen = {'text': f'What you accepted in the treatment: {picture[gid]}'} if picture.get(gid) else {}
+        entry = agreed.get(gid) or {}
+        accepted = [[k, str(v)] for k, v in (CF._shot_rows(entry, 'reasons_missing' in treated) if entry else []) if v not in (None, '', [])]   # design/207: the shots and the two reasons accepted at the treatment
+        seen = {**({'text': f"What you accepted in the treatment: {entry['picture']}"} if entry.get('picture') else {}), **({'rows': accepted} if accepted else {})}
         if gid in revisions:
             lines.append({**head, 'state': 'with_assistant', 'note': revisions[gid].get('notes') or ''})
         elif ask and ask['kind'] == 'plan choice':
@@ -138,11 +147,15 @@ def _plan_page(ctx, base):
         held += 1
     refused = session.get('page_refused') or {}
     lines = [{'line': f'l{n:02d}', **line, **({'refused': refused[line['key']]} if line['key'] in refused else {})} for n, line in enumerate(lines, 1)]
-    count = lambda state: len([l for l in lines if l['state'] == state and l['key'] != 'shared'])
+    count = lambda state: len([l for l in lines if l['state'] == state and l['key'] not in ('shared', 'world')])
     left = len([l for l in lines if l['state'] == 'open'])
+    try:   # design/207: the plan's estimate against the film's limit, by the sum the check uses; left out when it cannot be worked out (a film with no picture AI named)
+        cost = f"; estimate ₹{V.plan_estimate(ctx['run'], V.routes(plan, V._fps(session) or 25)):g} of the ₹{V.cap_of(session):g} limit"
+    except (Problem, KeyError, TypeError, ValueError):
+        cost = ''
     return {**base, 'step': 'Plan', 'open': bool(left), 'lines': lines,
             'summary': f"{len(plan['gaps'])} gaps: {count('open')} to answer, {count('recorded')} recorded, {count('with_assistant')} with the assistant"
-                       + (f", {len(waits)} behind the shared rules" if waits else '') + (f", {held} more after these" if held else '') + '.',
+                       + (f", {len(waits)} behind the shared rules" if waits else '') + (f", {held} more after these" if held else '') + cost + '.',
             'note': f'This plan is long: {held} more gap(s) appear here after you answer these and say done in the chat.' if held else
                     'Answer each line, then say done in the chat.' if left else 'The assistant is changing the lines you sent back; they will appear here.' if plan_open
                     else 'Every gap of the plan is accepted. Nothing more to answer here.'}

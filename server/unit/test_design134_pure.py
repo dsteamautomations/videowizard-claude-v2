@@ -148,7 +148,9 @@ def test_12_routes_carry_the_generated_seconds_and_the_previews_use_them():
     r = VC.routes(plan, 25)
     assert r['seconds']['video'] == 32.0 and r['video_take_seconds'] == 40
     src = inspect.getsource(VS)
-    assert src.count("r['video_take_seconds']") >= 2 and 'take_seconds(float(x))' in inspect.getsource(VS.treatment)
+    assert "r.get('video_take_seconds', 0)" in inspect.getsource(VS.plan_estimate) and 'take_seconds(float(x))' in inspect.getsource(VS.treatment)
+    assert 'plan_estimate(run, r)' in inspect.getsource(VS.check) and 'plan_estimate(run, r)' in inspect.getsource(VS.budget)   # design/207: the check and the budget share the one sum
+    assert src.count('plan_estimate(') >= 3
 
 
 # ---------- 17: the older delivery rebuild ----------

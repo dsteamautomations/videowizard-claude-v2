@@ -122,7 +122,7 @@ def test_round_sets_prints_the_answers_held_at_the_spend_cap(harness, monkeypatc
     code, out, err = run(args(what='round', sets='out/sets.json', quote='As said.'), capsys)
     assert code == 0 and sent[0][0].endswith('/visuals/round/sets') and out['held'] == held
     assert err.strip() == ('Sets recorded: 1 approved, 0 being made again; the round is 2. Held: E2: the spend cap of ₹2,000 is reached (₹1,980 spent): the set is not made again; '
-                           'its answer is kept and waits. Tell the operator the spend; the builder changes the cap.')
+                           'its answer is kept and waits. Tell the operator the spend; the owner can set another limit for this film with `vw visuals cap`.')
     posts(monkeypatch, {'pass': 'complete', 'queued': [], 'errors': {}, 'approved': ['E1'], 'held': {}})   # nothing held: the line of before
     code, out, err = run(args(what='round', sets='out/sets.json'), capsys)
     assert code == 0 and err.strip() == 'Sets recorded: 1 approved, 0 being made again; the round is complete.'

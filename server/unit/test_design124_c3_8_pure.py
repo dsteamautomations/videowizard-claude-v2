@@ -47,15 +47,17 @@ def test_a_treatment_without_a_direction_is_refused_and_the_direction_is_kept():
     assert saved(store)['treatment']['direction'] == DIRECTION
 
 
-def test_propose_checks_the_plans_treatment_starts_from_the_direction():
+def test_propose_places_the_direction_at_the_head_of_the_plans_treatment():
+    """design/207: the older refusal ("starts from the treatment's Direction, word for word") is retired; the server places the Direction."""
     doc = plan_doc([shot('AN1', 0, 500, 'animation', states=[{'what_appears': 'a', 'hold_s': 5}, {'what_appears': 'b', 'hold_s': 5}, {'what_appears': 'c', 'hold_s': 5}, {'what_appears': 'd', 'hold_s': 5}])],
                    [shot('VS1', 900, 1150, 'video')])
     store = store_with(session())
     VS.treatment(store, USER, RUN, [], {**TREATMENT, 'direction': 'Show the hollow inside the wall.'}, 'yes')
-    with pytest.raises(Problem, match='Direction'):
-        g(lambda: VS.propose(FakeConn(), store, USER, RUN, [], doc))
-    doc['foundation']['treatment'] = 'Show the hollow  inside the wall.\nThen the rest of the brief.'   # starts from it; spacing is not a difference
     assert VS.propose(FakeConn(), store, USER, RUN, [], doc)['version'] == 1
+    assert json.loads(store.files['run-1/visuals/plan-v1.json'])['document']['foundation']['treatment'].startswith('Show the hollow inside the wall.\n\n')
+    doc['foundation']['treatment'] = 'Show the hollow  inside the wall.\nThen the rest of the brief.'   # starts from it; spacing is not a difference
+    assert VS.propose(FakeConn(), store, USER, RUN, [], doc)['version'] == 2
+    assert json.loads(store.files['run-1/visuals/plan-v2.json'])['document']['foundation']['treatment'] == 'Show the hollow  inside the wall.\nThen the rest of the brief.'
 
 
 def test_a_treatment_recorded_before_the_direction_still_lets_propose_through():

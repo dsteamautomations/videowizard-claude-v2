@@ -116,7 +116,10 @@ def gaps_source(store, outputs):
 # ---------- direction ----------
 
 def prepare(conn, store, user, run, outputs):
+    new = not store.exists(key(run, 'session.json'))
     session = session_of(store, run, outputs, create=True)
+    if new or session.get('cap_from') == 'length':   # design/207: a new film's limit follows its length and only ever rises with it; a film in progress and the owner's figure are left alone
+        session.update(cap_inr=max(float(session.get('cap_inr') or 0), cap_for(film_seconds(session, outputs))), cap_from='length')
     mark_kept(session, run)   # design/151 hotfix: the kept decision from the first step
     session.setdefault('library_version', library.latest())   # design/68 L2: the library a run reads, kept like the procedure version
     procedure = core._stage(core.stage_table(run['procedure_version']), STAGE)
@@ -158,6 +161,7 @@ def prepare(conn, store, user, run, outputs):
     save_session(store, run, session)
     pk = save_json(store, key(run, 'package.json'), package)
     return {'package': pk, 'gaps': list(session['source']['gaps']), 'library_version': session['library_version'], 'footage': (footage_view(session, outputs) or {}).get('line'),
+            'cap_inr': cap_of(session), 'cap_from': session.get('cap_from') or 'older',   # design/207: the film's cost limit, told here so no instruction types a figure
             'next': 'settle the treatment with the operator and record it (`vw visuals treatment`), then write the plan (out/visual-plan.json, `vw visuals check`)'}   # design/124 A4 item 1
 
 
@@ -290,19 +294,104 @@ def library_pack(store, run, outputs):
     return library.steps(library_version_of(session), category_of(run))
 
 
+def _with_direction(session, document):
+    """design/207 (SK, 16 Nov 2026): the server puts the recorded treatment's Direction at the head of the plan's foundation.treatment (the
+    Direction, a blank line, then the text as sent) unless the text already starts from it (spacing is not a difference). The check and the
+    proposal both call this before they read the plan, so both store the same document. No recorded Direction: nothing is placed."""
+    direction = str((session.get('treatment') or {}).get('direction') or '').strip()
+    if not direction or not isinstance(document, dict) or not isinstance(document.get('foundation'), dict):
+        return document
+    text = document['foundation'].get('treatment')
+    text = text if isinstance(text, str) else ''
+    if ' '.join(text.split()).startswith(' '.join(direction.split())):
+        return document
+    placed = (direction + '\n\n' + text).strip()
+    need(len(placed) <= 16000, f"foundation.treatment is {len(placed):,} characters once the server places the treatment's Direction at its head; at most 16,000. "
+                               'Shorten your own text there: you do not copy the Direction, the server places it.')
+    return {**document, 'foundation': {**document['foundation'], 'treatment': placed}}
+
+
+def _counted_shots(gap):
+    """The shots of a gap the film counts: its scenes, or those of the recommended way (else the first), as routes() counts them."""
+    scenes = gap.get('scenes') or []
+    if gap.get('choices'):
+        scenes = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])['scenes']
+    return [sh for sc in scenes for sh in sc['shots']]
+
+
+def _ways_departed(session, plan):
+    """A gap made a way the recorded treatment did not name, one sentence per gap: a fault of the check (design/207) and a refusal of the proposal."""
+    out = []
+    for gap in plan['gaps']:
+        said = set()
+        for e in session['treatment']['gaps']:
+            if e['gap_id'] == gap['gap_id']:
+                said = set(e['routes']) | ({'still'} if 'footage' in e['routes'] else set())   # a frame shown in the film is a still in the plan
+        used = {route_of(sh) for sh in _counted_shots(gap)}
+        if not used <= said:
+            out.append(f"gap {gap['gap_id']}: the plan uses {sorted(used)} but the treatment says {sorted(said)}; record a new treatment with the reason, or change the plan.")
+    return out
+
+
+def carried_warnings(session, run, plan, outputs):
+    """design/207: what the treatment settled, carried to the plan. Warnings, never refusals, the same from the check and the proposal:
+    a gap with more still seconds than the operator accepted for it (half a second of tolerance; seconds whose way the treatment never told
+    are not guessed as moving); still pictures over their share of the film, on the first gap that has one; a card of words in a documentary
+    or an explaining film; a real speaker made by the AI from words while no permission for their own likeness is recorded."""
+    fps = float(Fraction(str(session['source'].get('fps') or 25)))
+    agreed = {e.get('gap_id'): e for e in (session.get('treatment') or {}).get('gaps') or [] if isinstance(e, dict)}
+    real = {e['id']: e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e.get('speaker') and e['id'] not in (session.get('likeness') or {})}
+    words_spoken = film.category(run) == 'documentary-explainer'   # a film with no category gets no warning
+    out, pictures, first, told = [], 0.0, None, set()
+    for gap in plan['gaps']:
+        shots = _counted_shots(gap)
+        secs = lambda sh: (sh['end_frame'] - sh['start_frame']) / fps
+        planned = sum(secs(sh) for sh in shots if route_of(sh) == 'still')
+        try:
+            still, _moving, unsplit = still_and_moving(agreed[gap['gap_id']], list(agreed[gap['gap_id']].get('routes') or []))
+        except (KeyError, IndexError, TypeError, ValueError):
+            still = unsplit = None   # no treatment entry for this gap, or one that cannot be read: nothing to compare
+        if still is not None and planned > still + unsplit + 0.5:
+            out.append({'kind': 'still_more_than_agreed', 'gap_id': gap['gap_id'],
+                        'message': f"gap {gap['gap_id']}: the plan has {round(planned, 1):g} s of still pictures; {round(still, 1):g} s were accepted in the treatment. "
+                                   'Make some of them moving shots, or record the treatment again.'})
+        for sh in shots:
+            if sh['visual_type'] == 'image':
+                pictures, first = pictures + secs(sh), first or gap['gap_id']
+            if words_spoken and sh.get('graphic_kind') in ('title', 'text'):
+                out.append({'kind': 'text_card', 'shot_id': sh['id'],
+                            'message': f"shot {sh['id']} is a card of words. In a documentary or an explaining film the words are said by the voice and the picture shows the thing: "
+                                       'plan a picture here, or say why the card is needed.'})
+            for eid in sh.get('element_ids') or []:
+                if eid in real and eid not in told and sh['visual_type'] != 'footage':   # their own footage is them, not a stand-in
+                    told.add(eid)
+                    out.append({'kind': 'stand_in_real', 'shot_id': sh['id'],
+                                'message': f"shot {sh['id']} shows {real[eid].get('name') or eid}, a real person, as a stand-in: the picture is made from the description, not from their own photo. "
+                                           'To show them as they are, the operator gives a photo and records their permission.'})
+    length, limit = film_seconds(session, outputs), float(settings().VISUALS_STILL_SHARE)
+    if length and first and pictures / length > limit + 1e-9:   # the treatment's own warning and sentence, worked out again from the plan
+        out.append({'kind': 'stills_many', 'gap_id': first,
+                    'message': f"Still pictures are {math.ceil(pictures / length * 1000 - 1e-6) / 10:g} % of the film: above {limit * 100:g} %. Make some of them moving shots."})
+    return answer_warnings(plan, out)
+
+
 def check(store, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # design/89 A1, finding 3
     try:
+        document = _with_direction(session, document)   # design/207: placed by the server, as the proposal places it
         plan, warnings = validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
                                        drawn_route(run) == 'motion', not film.older(run))   # design/89 B4; design/124-b item 13; design/130 §12; design/139 R3
     except (ValueError, KeyError, TypeError) as exc:
         return {'status': 'rejected', 'error': str(exc), 'errors': list(getattr(exc, 'errors', None) or [str(exc)])}   # design/148 A1: every item's first failure, as a list too
+    departed = _ways_departed(session, plan) if session.get('treatment') else []   # design/207: what only the proposal refused before, so a clean check means the proposal is taken
+    if departed:
+        return {'status': 'rejected', 'error': '\n'.join(departed), 'errors': departed}
     r = routes(plan, _fps(session) or 25)
-    pr = prices()
-    planned = round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * pr['video_inr_per_s'], 2)   # design/134 12: r['video_take_seconds']   # design/65 B7: the cost against the cap, before anything is paid
+    planned = plan_estimate(run, r)   # design/134 12: r['video_take_seconds']   # design/65 B7: the cost against the cap, before anything is paid
     alike = look_alike_placed(store, session)   # design/89 H6: the pictures already placed that look alike
     warnings += answer_warnings(plan, [{'kind': 'look_alike', 'shot_id': p['b'], 'message': f"{p['a']} ({p['a_at_s']} s) and {p['b']} ({p['b_at_s']} s) look alike: reimagine one (another angle, distance or moment)"} for p in alike])   # design/124 Change 7
+    warnings += carried_warnings(session, run, plan, outputs)   # design/207
     split = {}
     for gap in plan['gaps']:   # design/97 G3: a gap with choices is split by its recommended choice
         try:
@@ -316,22 +405,12 @@ def check(store, run, outputs, document):
 def propose(conn, store, user, run, outputs, document):
     session = session_of(store, run, outputs)
     ensure_timing(store, run, session)   # saved with the proposal
-    plan, warnings = guarded(lambda: validate_plan(document, session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
-                                                   drawn_route(run) == 'motion', not film.older(run)))   # design/130 §12; design/139 R3
+    plan, warnings = guarded(lambda: validate_plan(_with_direction(session, document), session['source']['gaps'], _fps(session), film_frames(outputs), session.get('frozen_limit') or FROZEN_SHARE, bool(media_clips(outputs)), drawn_in_run(run),
+                                                   drawn_route(run) == 'motion', not film.older(run)))   # design/130 §12; design/139 R3; design/207: the Direction is placed by the server (the older refusal "starts from the treatment's Direction, word for word" is retired)
     need(session.get('treatment'), 'Record the treatment first (`vw visuals treatment`).')   # design/65 B6
-    direction = ' '.join(str(session['treatment'].get('direction') or '').split())   # design/124 Change 3: a treatment recorded before it has none
-    need(not direction or ' '.join(plan['foundation']['treatment'].split()).startswith(direction),
-         "foundation.treatment starts from the treatment's Direction, word for word: " + direction)
-    for gap in plan['gaps']:   # a route that departs from the recorded treatment needs a new treatment, with the reason
-        said = set()
-        for e in session['treatment']['gaps']:
-            if e['gap_id'] == gap['gap_id']:
-                said = set(e['routes']) | ({'still'} if 'footage' in e['routes'] else set())   # a frame shown in the film is a still in the plan
-        scenes = gap.get('scenes') or []
-        if gap.get('choices'):   # as routes() counts: the recommended choice, else the first
-            scenes = next((c for c in gap['choices'] if c['id'] == gap.get('recommended_choice')), gap['choices'][0])['scenes']
-        used = {route_of(sh) for sc in scenes for sh in sc['shots']}
-        need(used <= said, f"gap {gap['gap_id']}: the plan uses {sorted(used)} but the treatment says {sorted(said)}; record a new treatment with the reason, or change the plan.")
+    departed = _ways_departed(session, plan)   # a route that departs from the recorded treatment needs a new treatment, with the reason
+    need(not departed, '\n'.join(departed))
+    warnings = warnings + carried_warnings(session, run, plan, outputs)   # design/207: the same as the check returns
     new = new_version(store, run, session, plan, user, warnings)
     version, identity = new['version'], new['plan_digest']
     save_session(store, run, session)
@@ -628,7 +707,42 @@ def visuals_spend(conn, run):
 
 
 def cap_of(session):
-    return float(session.get('cap_inr') or settings().VISUALS_CAP_INR)
+    return float(session.get('cap_inr') or settings().VISUALS_CAP_INR)   # no figure in the session: a film begun before design/207 keeps the older one
+
+
+def cap_for(seconds):
+    """design/207 (SK, 16 Nov 2026): a film's cost limit from its length: so much a minute of film, never under the lowest figure, to the rupee."""
+    s = settings()
+    return float(round(max(float(s.VISUALS_CAP_FLOOR_INR), float(s.VISUALS_CAP_INR_PER_MIN) * float(seconds or 0) / 60)))
+
+
+def film_seconds(session, outputs):
+    """The film's length in seconds, from the first cut's frames (as the still-share warning reads it); None when it is not known."""
+    frames = film_frames(outputs)
+    return frames / float(Fraction(str(session['source'].get('fps') or 25))) if frames else None
+
+
+def set_cap(conn, store, user, run, outputs, inr, quote):
+    """design/207: the owner sets another cost limit for this one film, with their words. A later `prepare` never changes it."""
+    if (user or {}).get('role') != 'Admin':
+        raise Problem(403, 'NOT_ALLOWED', 'Only the owner can set the cost limit of a film.')
+    quote = ' '.join(str(quote or '').split())
+    need(quote, "The owner's words are needed to set the cost limit: `vw visuals cap --inr N --quote \"<the owner's words>\"`.")
+    need(isinstance(inr, (int, float)) and not isinstance(inr, bool) and inr > 0, 'The cost limit is a number of rupees above zero.')
+    session = session_of(store, run, outputs)
+    was = cap_of(session)
+    session.update(cap_inr=float(inr), cap_from='owner', cap_by=user['id'], cap_at=datetime.now(timezone.utc).isoformat(), cap_quote=quote)
+    save_session(store, run, session)
+    from . import runlog
+    runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': 'the cost limit', 'rule': 'visuals/cap',
+                        'entry': f"the cost limit of this film's visuals set by the owner: ₹{was:,.0f} → ₹{float(inr):,.0f}", 'by_kind': 'operator', 'by_name': str(user.get('name') or ''),
+                        'quote': quote, 'request_id': None})
+    return {'cap_inr': float(inr), 'was_inr': was, 'cap_from': 'owner', 'log': f'cost limit ₹{was:,.0f} → ₹{float(inr):,.0f}'}
+
+
+def plan_estimate(run, r):
+    """What a plan's pictures and takes are likely to cost, from its counted routes: the one sum the check, the budget and the plan page show."""
+    return round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * prices()['video_inr_per_s'], 2)
 
 
 def check_cap(conn, run, session, estimate_inr, what):
@@ -636,7 +750,7 @@ def check_cap(conn, run, session, estimate_inr, what):
     spent, cap = visuals_spend(conn, run)['spent_inr'], cap_of(session)
     if spent + float(estimate_inr) > cap + 1e-9:
         raise Problem(409, 'VISUALS_CAP', f"₹{spent:,.0f} spent of ₹{cap:,.0f} on this film's visuals; {what} needs about ₹{float(estimate_inr):,.0f}. "
-                                          "Stop and tell the operator the spend; the cap is a setting the builder changes on SK's word.",
+                                          "Stop and tell the operator the spend. The limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`.",
                       spent_inr=spent, cap_inr=cap, estimate_inr=float(estimate_inr))
 
 
@@ -647,8 +761,7 @@ def budget(conn, store, run, outputs):
     planned = {'images': 0, 'video_seconds': 0.0, 'inr': 0.0}
     if session.get('current'):
         r = routes(current_plan(store, session), _fps(session) or 25)
-        planned = {'images': r['images_estimated'], 'video_seconds': r['seconds']['video'],
-                   'inr': round(r['images_estimated'] * image_price_inr(run) + r.get('video_take_seconds', 0) * sp['prices']['video_inr_per_s'], 2)}   # r['video_take_seconds']
+        planned = {'images': r['images_estimated'], 'video_seconds': r['seconds']['video'], 'inr': plan_estimate(run, r)}
     cap = cap_of(session)
     return {**sp, 'cap_inr': cap, 'left_inr': round(cap - sp['spent_inr'], 2), 'planned': planned}
 

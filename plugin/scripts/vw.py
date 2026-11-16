@@ -1809,14 +1809,14 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page', 'cap']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
 _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
-    'prepare': set(), 'budget': set(), 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
+    'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back'},   # design/177: the page's step-2 actions
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
@@ -2033,7 +2033,16 @@ def cmd_visuals(a):
         p = out.get('planned') or {}
         over = (out.get('spent_inr', 0) + p.get('inr', 0)) > out.get('cap_inr', 0)
         emit(out, 0, f"Visuals spend ₹{out.get('spent_inr', 0):,.0f} of cap ₹{out.get('cap_inr', 0):,.0f} (₹{out.get('left_inr', 0):,.0f} left); images: {out.get('images', 0) - out.get('fixes', 0)} requested + {out.get('fixes', 0)} fixes; the current plan still needs about ₹{p.get('inr', 0):,.0f}"
-             + (" — over the cap: narrow the plan and tell the operator the spend; the cap is a setting the builder changes on SK's word." if over else '.'))   # design/74 L26
+             + (" — over the cap: narrow the plan and tell the operator the spend; the limit follows the film's length; the owner can set another figure for this film with `vw visuals cap`." if over else '.'))   # design/74 L26; design/207
+    if a.what == 'cap':   # design/207: the owner sets another cost limit for this one film, with their words
+        try:
+            inr = float(getattr(a, 'inr', None))
+        except (TypeError, ValueError):
+            inr = 0
+        if inr <= 0 or not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': 'Give the figure in rupees and the owner\'s words: `vw visuals cap --inr N --quote "<the owner\'s words>"`. Nothing was sent.'}, 2)
+        out = write(base + '/cap', {'inr': inr, 'quote': a.quote})
+        emit(out, 0, f"The cost limit of this film's visuals is now ₹{out.get('cap_inr', 0):,.0f} (it was ₹{out.get('was_inr', 0):,.0f}), set by the owner.")
     if a.what == 'reject':   # design/74 L7: a wrong picture, with the operator's words; the next one starts from the approved picture
         out = write(f"{base}/references/{a.ref}/reject", {'notes': a.notes or '', 'quote': a.quote or ''})   # design/99 C3: the reason is optional
         emit(out, 0, out.get('next') or f'Reference {a.ref} rejected.')   # design/97 A4; design/124 A4 item 12: the server says the next step by kind
@@ -2182,7 +2191,7 @@ def cmd_visuals(a):
             errs = out.get('errors') or {}
             emit(out, 0, f"Sets recorded: {len(out.get('approved') or [])} approved, {len(out.get('queued') or [])} being made again; the round is {out.get('pass')}."
                  + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '')
-                 + (' Held: ' + '; '.join(f'{k}: {v}' for k, v in out['held'].items()) + '. Tell the operator the spend; the builder changes the cap.' if out.get('held') else ''))   # design/177: a remake the spend cap holds
+                 + (' Held: ' + '; '.join(f'{k}: {v}' for k, v in out['held'].items()) + '. Tell the operator the spend; the owner can set another limit for this film with `vw visuals cap`.' if out.get('held') else ''))   # design/177: a remake the spend cap holds
         if a.picks:
             pk = _json_file(m, a.picks)
             ignore = pk.pop('ignore', []) if isinstance(pk, dict) else []   # design/121 change 1: {"<search id>": [{n, note}], "ignore": ["E2"]}
