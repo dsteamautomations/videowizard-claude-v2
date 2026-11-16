@@ -630,25 +630,59 @@ def _is_final(item):
 def words_view(store, run, text=None):
     """The corrected words as the page and the chat show them: each with its state, its tries, its places in the script and where it was heard."""
     doc = words_doc(store, run)
-    return {'version': doc.get('version') or 0,
+    taken = {it['word'] for it in doc['items']}
+    return {'version': doc.get('version') or 0, 'digest': doc.get('digest'),
             'words': [{'word': it['word'], 'say_as': it.get('say_as') or '', 'final_say_as': (it.get('final') or {}).get('say_as') or (it.get('final') or {}).get('ipa') or None,
                        'state': 'final' if _is_final(it) else 'trying', 'tries': int(it.get('tries') or 0), 'places': places(text, it['word']) if text is not None else None,
+                       'also': other_form(text, it['word'], taken) if text is not None else None,
                        'from_run': it.get('from_run'), 'heard': it.get('heard') or {}} for it in doc['items']]}
 
 
-def _rebuild(store, user, run, doc):
-    """The dictionary of the final words, one version up; narrations made with an earlier list are marked. A refused dictionary changes nothing."""
+def other_form(text, word, taken=()):
+    """design/208 F: the same word with its first letter in the other case (the start of a sentence), when the script has it and it is not corrected on its
+    own: {'form', 'places'}, else None. The voice's rule matches a word exactly as written, so this form gets the same correction."""
+    alt = word[:1].swapcase() + word[1:]
+    n = places(text, alt) if alt != word and alt not in taken else 0
+    return {'form': alt, 'places': n} if n else None
+
+
+def words_digest(doc):
+    """design/208 I: what identifies the approved words a narration is made with: set when the list is rebuilt; None for a list from before this change
+    (the counter decides then) and for a run with no list."""
+    return (doc or {}).get('digest')
+
+
+def narration_behind(narration, doc):
+    """design/208 I: True when the approved words are not the ones this narration was made with. Decided by the words themselves, so a word approved
+    and removed again leaves the narration up to date; a narration or a list from before this change is judged by the counter."""
+    then, now = (narration or {}).get('pronunciations_digest'), words_digest(doc)
+    if then is not None and now is not None:
+        return then != now
+    return int((narration or {}).get('pronunciations_version') or 0) != int((doc or {}).get('version') or 0)
+
+
+def _rebuild(store, user, run, doc, text=None):
+    """The dictionary of the final words, one version up; narrations made with other words are marked. A refused dictionary changes nothing.
+    design/208: with the script's text, the capitalised form of a word gets the same rule (F); the same words as an earlier time get that time's
+    dictionary again, so nothing is made or charged twice (I)."""
     finals = [{'word': it['word'], 'say_as': it['final'].get('say_as') or '', 'ipa': it['final'].get('ipa') or '', 'kind': it.get('kind') or 'other'}
               for it in doc['items'] if it.get('final') and (it['final'].get('say_as') or it['final'].get('ipa'))]
+    if text is not None:
+        taken = {it['word'] for it in doc['items']}
+        finals += [{**f, 'word': alt['form']} for f in list(finals) for alt in [other_form(text, f['word'], taken)] if alt]
+    rules = pronunciation_rules(finals)
+    digest = hashlib.sha256(json.dumps(rules, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest() if rules else ''
     version = int(doc.get('version') or 0) + 1
-    dictionary = make_dictionary(f"vw2-{run.get('code') or run['id']}-v{version}", pronunciation_rules(finals)) if finals else None
-    doc.update(version=version, dictionary=dictionary, by=user.get('name'), at=datetime.now(timezone.utc).isoformat())
+    kept = doc.setdefault('dictionaries', {})
+    dictionary = (kept.get(digest) or make_dictionary(f"vw2-{run.get('code') or run['id']}-v{version}", rules)) if rules else None
+    if dictionary:
+        kept[digest] = dictionary
+    doc.update(version=version, dictionary=dictionary, digest=digest, by=user.get('name'), at=datetime.now(timezone.utc).isoformat())
     save_doc(store, run, 'pronunciations.json', doc)
     state = page_state(store, run)
     if state.get('narrations'):
         for n in state['narrations']:
-            if n.get('pronunciations_version') != version:
-                n['made_before_pronunciations_change'] = True
+            n['made_before_pronunciations_change'] = narration_behind(n, doc)
         save_doc(store, run, 'page.json', state)
     return doc
 
@@ -734,10 +768,11 @@ def finalise_word(store, user, run, outputs, word, say_as=None):
     say_as = ' '.join(str(say_as or '').split())
     if say_as:
         it['say_as'] = say_as
+    text = script_text(store, outputs)[0]['spoken_text']
     if not _is_final(it):
         it['final'] = {'say_as': it.get('say_as') or '', 'ipa': it.get('ipa') or ''}
-        _rebuild(store, user, run, doc)
-    return words_view(store, run)
+        _rebuild(store, user, run, doc, text)
+    return words_view(store, run, text)
 
 
 def remove_word(store, user, run, outputs, word):
@@ -747,15 +782,16 @@ def remove_word(store, user, run, outputs, word):
     it = _item(doc, ' '.join(str(word or '').split()))
     if not it:
         raise Problem(404, 'WORD', 'That word has no correction.')
+    text = script_text(store, outputs)[0]['spoken_text']
     doc['items'].remove(it)
     if it.get('final'):
-        _rebuild(store, user, run, doc)
+        _rebuild(store, user, run, doc, text)
     else:
         save_doc(store, run, 'pronunciations.json', doc)
-    return words_view(store, run)
+    return words_view(store, run, text)
 
 
-def ensure_client_words(conn, store, user, run):
+def ensure_client_words(conn, store, user, run, text=None):
     """Point e: when a run has no list yet, the final words of the client's newest film that has some are copied in, once, and become this run's
     dictionary. A run with no client, or a client with no words, gets an empty list (so this is not asked again)."""
     if conn is None or not run.get('client_id') or store.exists(_key(run, 'pronunciations.json')):
@@ -771,7 +807,7 @@ def ensure_client_words(conn, store, user, run):
                              'final': {'say_as': f.get('say_as') or '', 'ipa': f.get('ipa') or ''}, 'tries': 0, 'heard': {}, 'from_run': r['code']} for it, f in finals]
             break
     if doc['items']:
-        return _rebuild(store, user, run, doc)
+        return _rebuild(store, user, run, doc, text)
     save_doc(store, run, 'pronunciations.json', doc)
     return doc
 
@@ -798,18 +834,19 @@ def refuse_after_final(outputs):
 def narrate(conn, store, user, run, outputs, voice_id, request_id, by='page', tweaks=None):
     """A full narration in one voice with the run's direction; every narration is kept on the page state."""
     refuse_after_final(outputs)
+    script, _ = script_text(store, outputs)
     try:   # design/194 (point e): the client's final words, applied at the first narration without a question
-        ensure_client_words(conn, store, user, run)
+        ensure_client_words(conn, store, user, run, script['spoken_text'])
     except Problem:   # the narration goes ahead without them; the page lists none
         pass
     if tweaks is not None:
         set_tweaks(store, run, outputs, voice_id, tweaks)
-    script, _ = script_text(store, outputs)
     state = page_state(store, run)
     row = jobs.submit_voice(conn, user, run, outputs, {'kind': 'narration', 'voice_id': voice_id, 'text': script['spoken_text'], 'model_id': elevenlabs.DEFAULT_MODEL,
                                                        'settings': heard_settings(conn, run, voice_id)}, request_id, store=store)
     add_narration(state, {'job_id': str(row['id']), 'voice_id': row['request']['voice_id'], 'name': row['request'].get('name'), 'model_id': row['request'].get('model_id'),
                           'direction_number': (direction_of(store, run) or {}).get('number'), 'pronunciations_version': row['request'].get('pronunciations_version'),   # design/144 V1, V3
+                          'pronunciations_digest': row['request'].get('pronunciations_digest'),   # design/208 I: the approved words it was made with
                           'settings': row['request'].get('settings'), 'direction_digest': row['request'].get('direction_digest'), 'tweaks': row['request'].get('tweaks') or [],
                           'by': user['name'], 'at': datetime.now(timezone.utc).isoformat(), 'from': by})
     save_doc(store, run, 'page.json', state)
@@ -912,20 +949,19 @@ def voice_do_next(state, direction, words):
     if not narrations:
         return ('Next, on the voices page (give the operator the link): they try voices on the test passage and narrate up to three; a voice they already know needs no tryout. '
                 'Nothing is asked in the chat meanwhile, and no pronunciation question.')
-    version = int((words or {}).get('version') or 0)
     rows = (words or {}).get('words') or []
     trying = sum(1 for w in rows if w.get('state') != 'final')
     final = sum(1 for w in rows if w.get('final_say_as'))
     latest = {}
     for n in narrations:
         latest[n.get('voice_id')] = n
-    behind = bool(version) and any(int(n.get('pronunciations_version') or 0) != version for n in latest.values())
+    behind = any(narration_behind(n, words) for n in latest.values())   # design/208 I: by the approved words themselves
     out = ["Next, on the voices page: the operator listens to each narration. A word that sounds wrong is corrected there ('A word sounds wrong'), never by a question in the chat; "
            "a sentence's tone or pace with 'A sentence's tone or pace'."]
     if final or trying:
-        out.append(f"Words: {final} final" + (f", {trying} still being tried (in no narration until made final)" if trying else '') + '.')
+        out.append(f"Words: {final} approved" + (f", {trying} still being tried (in no narration until approved)" if trying else '') + '.')   # design/208 D: a word is approved, a narration is final
     if behind:
-        out.append("The final words changed since the last narration: 'Narrate again with the final words' on the page.")
+        out.append("The approved words changed since the last narration: 'Narrate again with the approved words' on that narration's row.")
     out.append('Then they make one narration final there; after that, `vw next`.')
     return ' '.join(out)
 

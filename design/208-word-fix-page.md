@@ -122,6 +122,44 @@ Tests, run by Claude on this PC with Python 3.12:
 - One local test that pinned the side panel was changed (`unit-local/test_d194.py`).
 - The page was tried in the built-in browser on a local copy with a stand-in server (`unit-local/make_word_page_harness.py`): picking a word, "Hear it now" (starts 1 s before the word), the arrows, the empty box refused, the question and Cancel, one request on a double click, "Being made" then Play, "Already made", the sentence link, final on a chosen try, remove, one scroll bar at 1280 px and at 800 px.
 
+## I. Second part: from the corrected word to the narration made again (built 16 Nov, on SK's "Yes, build A to K")
+
+SK, 16 Nov: "I somehow feel there is a gap in the flow … simulate a real user." The walk-through found six gaps (A to E below answer them); a critic's pass on that proposal found six more (F to K).
+
+| # | Change | The gap it closes |
+|---|---|---|
+| A | On the word page, when approved words are not in this narration: a bar "n corrected words are not in this narration yet" with "Narrate again with these words (paid, the whole script)", asked with the Are-you-sure question; then back to Narrations. | The word page never offered the next step. |
+| B | The same button on the narration's own row, for that row's voice. The one in the bottom bar is removed. | The button was hidden when the bar was minimised; it could name another voice; two buttons for one action. |
+| C | When the new narration is ready, its row shows "Check the corrected words": the word page listing each corrected word with "Hear it now" from the new narration, free. A word still wrong is corrected again from there. | No quick way to verify; the operator would listen to the whole narration again. |
+| D | On the page a word is "approved" ("Approve this spelling", "Approved words"). "Final" is said of a narration only. The server's next-step line says "approved words" too. The tool's flag `--final` keeps its name. | Two different things were both called final. |
+| E | One line on the word page: "Correct every word first, then narrate once. Each narration reads the whole script and is charged in full." | No advice on cost. |
+| F | The same word with a capital (at the start of a sentence) is corrected with it. The card says so: "also 'Shuttering', 1 place". | The rule sent to the voice matches the word exactly as written, so a capitalised place stayed wrong and was not counted. To be confirmed with a real voice. |
+| G | The Are-you-sure question for a narration names what is left out: "1 word is still being tried and will not be in it: Kendra." | A word tried but not approved is silently absent from the narration. |
+| H | While a narration is being made, the word page says: "A narration is being made with the words approved so far. A word approved now will not be in it." | A word approved in those minutes makes the new narration out of date the moment it arrives. |
+| I | "Not in this narration yet" is decided by the approved words themselves, not by a counter. Approving a word and removing it again leaves the narration up to date. | A paid narration could be offered, and made, that would sound exactly the same. |
+| J | On Narrations, a narration made before the approved words is marked "older: without the corrected words", and picking it as the final narration asks once: "This narration does not have the corrected words. Make it final anyway?" | After a fix there are two rows of the same voice; the wrong one could be made final. |
+| K | The card says an approved word is remembered for this client's next films, and can be removed there. | Approving has an effect beyond this film that the page did not say. |
+
+Looked at and left as they are:
+
+- Two ways of asking "are you sure" (the popup on the word page, the two-click Confirm on Narrations). SK asked for the popup on the word page alone.
+- Other forms of a word (a plural, a possessive) are separate words; the operator corrects each.
+- Narrations in several voices: each row has its own button and each is charged in full; the question says so.
+
+Built as listed, with these points worth knowing:
+
+- **I** is done with a digest of the rules sent to the voice, kept on the list and on each narration. The same approved words get the dictionary they had before, so a narration asked again with nothing changed is refused as the same recording and nothing is charged. A narration or a list made before this change has no digest and is judged by the counter, as before.
+- **F**: the other-case form gets a rule only when the script has it and it is not corrected on its own. On the page the two forms count as one word.
+- **A**: when a newer narration of the voice already has the words, the bar points to it instead of offering a paid narration.
+- **J** uses the browser's own yes/no box. **B** keeps the two-click Confirm that the page's other narration buttons use.
+- **D**: the instruction text and `vw.md` still say "final" for a word; only the pages and the server's next-step line changed. The assistant may therefore say "final word" in the chat.
+
+Where: `server/app/voices.py` (`narration_behind`, `words_digest`, `other_form`, `_rebuild`, `voice_do_next`), `server/app/jobs.py` (`same_recording`, the narration's digest), `server/app/web.py` (each narration's `behind`, the word page's `making` and `newer`), `templates/voice_words.html`, `templates/voices2.html`. Decision row 122; old-ways rows 84 to 86.
+
+Tests, run by Claude on this PC with Python 3.12: 11 new tests in `unit-local/test_d208b.py`; all of `unit-local` 157 pass; `server/unit` 1,834 pass, none fail (one test changed: it pinned the retired wording "made before the pronunciations changed"); the plugin was not touched. Both pages were tried in the built-in browser on local copies with a stand-in server: the bar and its question (Cancel sends nothing, yes sends once, the word still being tried is named), "approved" on the try and in the list, the capitalised form counted and highlighted, the list's play buttons, one scroll bar at 1280 px; on Narrations the row's button with its note, the older mark, "Check the corrected words" on the new row, and the yes/no box before an older narration is made final.
+
+Cannot be settled without a real voice (to try on the first film after deploy): whether the narration says an approved word as its try sounded; whether "Hear it now" finds the word in a narration made with approved words; item F.
+
 ## G. Not covered
 
 - The search for an earlier try (`_kept_try`) and the page's data query are SQL that only a real database runs; the unit tests use a stand-in.
