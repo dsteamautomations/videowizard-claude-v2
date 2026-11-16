@@ -104,6 +104,16 @@ table.shots tr:last-child td{border-bottom:0}
 .stage.m-data-led .s-bars i{animation:mGrow 1s cubic-bezier(.16,1,.3,1) both} .stage.m-data-led .s-bars i:nth-child(1){animation-delay:.6s} .stage.m-data-led .s-bars i:nth-child(2){animation-delay:.9s} .stage.m-data-led .s-bars i:nth-child(3){animation-delay:1.2s}
 .stage.m-product>*{animation:mHero 2s cubic-bezier(.45,0,.2,1) both} .stage.m-product>:nth-child(2){animation-delay:.5s} .stage.m-product>:nth-child(3){animation-delay:1s} .stage.m-product>:nth-child(4){animation-delay:1s} .stage.m-product{align-items:center;text-align:center}
 @media (prefers-reduced-motion: reduce){ .stage>*,.stage .s-bars i{animation-duration:.01s !important;animation-delay:0s !important} }
+/* design/210: a line's pictures as a row of small ones (the row wraps); one opens large over the page. Nothing here moves, so reduced motion needs no rule. */
+button:disabled{opacity:.5;cursor:default}
+.pics{display:flex;flex-wrap:wrap;gap:10px}
+.pic{display:flex;flex-direction:column;gap:6px;padding:6px;width:156px;max-width:100%;font-size:.82rem;font-weight:500;text-align:left;overflow-wrap:anywhere}
+.pic .ph{display:grid;place-items:center;height:110px;border-radius:6px;background:var(--line);color:var(--muted);overflow:hidden}
+.pic img{display:block;max-width:100%;max-height:110px;object-fit:contain;background:#fff}
+.zoom{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;box-sizing:border-box}
+.zoom img{max-width:100%;max-height:calc(100% - 130px);object-fit:contain;background:#fff;border-radius:6px}
+.zoom p{color:#fff;text-align:center;font-size:.92rem;overflow-wrap:anywhere}
+.zoom .row{justify-content:center}
 </style>
 
 <div class="wrap">
@@ -188,6 +198,80 @@ function spec(line){   // design/209: a drawing's parts and sizes, or a material
   list('',s.other);
   return wrap;
 }
+// design/210: pictures. A line's `pics` are [{code,label}]; the small picture of a code is the document pics/<code> ({data}), read only when its
+// row is near the screen; the large one is a file of the page's file store whose link is the document zoom/<code> ({url}), read on a click.
+const picData={}, picSeen={}, zoomUrl={};   // per code: the promise of its small picture, whether it has shown ('ok' or 'bad'), the promise of its large picture's link
+let zoomed=null;
+function picDoc(coll,code,field){ return db.doc(coll+'/'+code).get().then(s=>{ const d=s&&s.exists?s.data():null; return d&&typeof d[field]==='string'?d[field]:''; }).catch(()=>''); }
+function loadThumb(p,btn,onChange,tries){
+  if(!picData[p.code]) picData[p.code]=picDoc('pics',p.code,'data');
+  picData[p.code].then(src=>{
+    if(!btn.isConnected) return;
+    const bad=()=>{ picSeen[p.code]='bad'; btn.firstChild.textContent='Not available'; onChange(); };
+    if(!/^data:image\/(jpeg|png|webp);base64,/.test(src)){   // not on the page yet: asked again for a minute, then named as missing
+      delete picData[p.code];
+      if(tries<12) setTimeout(()=>loadThumb(p,btn,onChange,tries+1),5000); else bad();
+      return; }
+    const img=el('img'); img.alt=p.label;
+    img.onload=()=>{ picSeen[p.code]='ok'; btn.disabled=false; onChange(); };
+    img.onerror=bad;
+    btn.firstChild.textContent=''; btn.firstChild.appendChild(img); img.src=src;
+  });
+}
+function thumbs(line,onChange){   // a line's pictures as a row of small ones, each a grey box with its label until it arrives; a click or Enter opens it large
+  const row=el('div','pics'), pics=line.pics||[];
+  pics.forEach((p,i)=>{
+    const btn=el('button','pic'); btn.type='button'; btn.disabled=true; btn.title='See it large';
+    btn.appendChild(el('span','ph',p.missing?'Not available':'Loading…')); btn.appendChild(el('span',null,p.label));
+    btn.addEventListener('click',()=>openZoom(pics,i,btn));
+    row.appendChild(btn);
+  });
+  const fill=()=>pics.forEach((p,i)=>{ if(!p.missing) loadThumb(p,row.children[i],onChange||(()=>{}),0); });
+  if('IntersectionObserver' in window){ const io=new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ io.disconnect(); fill(); } },{rootMargin:'300px'}); io.observe(row); }
+  else setTimeout(fill,0);
+  return row;
+}
+function closeZoom(){
+  if(!zoomed) return;
+  const z=zoomed; zoomed=null;
+  document.removeEventListener('keydown',z.key,true); z.box.remove();
+  const opener=z.opener; if(opener&&opener.isConnected) opener.focus();
+}
+function openZoom(pics,i,opener){   // the large picture over the page: next and previous move through the pictures of the same line; Esc, Close or a click outside closes it
+  closeZoom();
+  const box=el('div','zoom'); box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true'); box.setAttribute('aria-label','The picture, large');
+  const img=el('img'), cap=el('p'), miss=el('p',null,'The large picture is not available.'), row=el('div','row');
+  const prev=el('button',null,'Previous'), next=el('button',null,'Next'), close=el('button','go','Close');
+  const show=n=>{
+    i=(n+pics.length)%pics.length; const p=pics[i], here=()=>zoomed&&zoomed.box===box&&pics[i]===p;
+    cap.textContent=p.label+(pics.length>1?' ('+(i+1)+' of '+pics.length+')':''); img.alt=p.label; img.onerror=null; img.removeAttribute('src'); miss.hidden=true;
+    const small=()=>{ if(!here()) return; img.onerror=null; miss.hidden=false; (picData[p.code]||Promise.resolve('')).then(src=>{ if(here()&&src) img.src=src; }); };   // no link, or it did not load: the small picture, enlarged
+    if(!zoomUrl[p.code]) zoomUrl[p.code]=picDoc('zoom',p.code,'url');
+    zoomUrl[p.code].then(u=>{ if(!here()) return;
+      if(!/^\/_blob\/[0-9a-f]{32}$/.test(u)){ delete zoomUrl[p.code]; small(); return; }
+      img.onerror=small; img.src=u; });
+  };
+  prev.addEventListener('click',()=>show(i-1)); next.addEventListener('click',()=>show(i+1)); close.addEventListener('click',closeZoom);
+  box.addEventListener('click',e=>{ if(e.target===box) closeZoom(); });
+  if(pics.length>1){ row.appendChild(prev); row.appendChild(next); } row.appendChild(close);
+  box.appendChild(img); box.appendChild(cap); box.appendChild(miss); box.appendChild(row);
+  const key=e=>{
+    if(e.key==='Escape'){ e.preventDefault(); closeZoom(); }
+    else if(e.key==='ArrowRight'&&pics.length>1) show(i+1);
+    else if(e.key==='ArrowLeft'&&pics.length>1) show(i-1);
+    else if(e.key==='Tab'){ const b=Array.prototype.slice.call(row.children), at=b.indexOf(document.activeElement); e.preventDefault(); b[(at+(e.shiftKey?-1:1)+b.length)%b.length].focus(); }   // the focus stays in the view
+  };
+  zoomed={box:box,key:key,opener:opener};
+  document.addEventListener('keydown',key,true); document.body.appendChild(box); close.focus(); show(i);
+}
+function pictures(line,onChange){   // a line with pictures: the row, the facts with where each came from, the assumed sizes on one line; a recorded line's are folded, to look back
+  const rec=line.state==='recorded', wrap=el(rec?'details':'div','group');
+  if(rec){ const sm=el('summary',null,'What you approved'); sm.style.fontWeight='600'; sm.style.cursor='pointer'; wrap.appendChild(sm); }
+  wrap.appendChild(thumbs(line,onChange));
+  if(line.facts&&line.facts.length){ wrap.appendChild(el('h4',null,'Facts, and where each came from')); wrap.appendChild(grid(['Fact','Value','From'],line.facts)); }
+  if(line.assumed) wrap.appendChild(el('p','changed','Assumed, with no source (say if any is wrong): '+line.assumed));
+  return wrap;
+}
 const KINDS={Person:'People',Place:'Places',Object:'Things',Material:'Materials',Animal:'Animals',Process:'Processes',Technique:'Techniques'};
 function world(rows){   // SK, 16 Nov 2026: one heading per kind of rule with its rules listed under it, each group folding; no label repeated on every row
   const wrap=el('div'), order=[], by={}; wrap.style.display='flex'; wrap.style.flexDirection='column'; wrap.style.gap='10px';
@@ -212,6 +296,11 @@ function world(rows){   // SK, 16 Nov 2026: one heading per kind of rule with it
 }
 function block(line,n){
   const a=answers[line.line], box=el('section','item');
+  const pics=line.pics||[], gate=[], gmsg=el('span','said','');   // design/210: the buttons of a line with pictures work only when every one of them has shown
+  const check=()=>{ if(!gate.length) return;
+    const bad=pics.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=pics.filter(p=>picSeen[p.code]!=='ok').length;
+    gate.forEach(b=>{ b.disabled=!!(bad.length||wait); });
+    gmsg.textContent=bad.length?'A picture is missing: '+bad.join(', ')+'. This line cannot be answered here: tell the assistant in the chat.':wait?'The buttons work when every picture of this line has shown.':''; };
   const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
   const t=tagOf(line,a); head.appendChild(el('span','tag '+t[0],t[1])); box.appendChild(head);
   const body=el('div','body');
@@ -236,6 +325,7 @@ function block(line,n){
     g.appendChild(shots(line.cols,w)); body.appendChild(g);
   });
   if(line.spec) body.appendChild(spec(line));
+  if(line.pics&&line.pics.length) body.appendChild(pictures(line,check));
   if(line.ask&&line.state==='open') body.appendChild(el('p','totals',line.ask));   // design/209: the question of this line, in plain words
   if(line.state==='open'&&line.styles&&line.styles.length) body.appendChild(preview(line));
   if(body.childNodes.length) box.appendChild(body);
@@ -253,7 +343,8 @@ function block(line,n){
     const un=el('button',null,'Undo my answer'); un.addEventListener('click',()=>undo(line)); acts.appendChild(un);
     acts.appendChild(el('span','said','Saved on this page. It is recorded in VideoWizard when you say done in the chat.'));
   } else if(line.state==='open'){
-    (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,(line.key==='motion'?'Use ':'')+b.label); btn.addEventListener('click',()=>{ if(b.needs_words){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,''); }); acts.appendChild(btn);});
+    (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,(line.key==='motion'?'Use ':'')+b.label); btn.addEventListener('click',()=>{ if(b.needs_words){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,''); }); acts.appendChild(btn); if(pics.length) gate.push(btn);});
+    if(gate.length){ acts.appendChild(gmsg); check(); }
   } else if(line.state==='recorded'&&line.reopen){
     acts.appendChild(el('span','said','This line is recorded in VideoWizard.'));
     const re=el('button',null,'Reopen'); re.addEventListener('click',()=>{editing[line.line]='reopen'; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();}); acts.appendChild(re);

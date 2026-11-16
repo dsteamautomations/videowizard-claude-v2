@@ -271,9 +271,9 @@ def test_forty_drawings_are_held_under_the_size_of_one_round():
 
 def test_the_treatment_and_the_plan_pages_are_as_before():
     import inspect
-    src = inspect.getsource(P.page)
+    src = inspect.getsource(P._page)   # design/210: `page` is `_page` with the pictures its lines name
     assert '_plan_page(' in src and 'CF._treatment_items(ctx)' in src and '_spec_page(' in src
-    assert copy.deepcopy(P.CAPABILITIES) == {'db': {'rules': [{'path': 'rounds', 'read': 'view', 'write': 'owner'}]}, 'user': {}}
+    assert copy.deepcopy(P.CAPABILITIES) == {'db': {'rules': [{'path': p, 'read': 'view', 'write': 'owner'} for p in ('rounds', 'pics', 'zoom')]}, 'assets': {}, 'user': {}}   # design/210: the pictures of a line, and the page's file store
     assert not hasattr(C, '_spec_text') or 'for k, v in (spec or {}).items()' not in inspect.getsource(C._spec_text), 'the field-by-field listing is gone'
 
 

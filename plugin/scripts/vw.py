@@ -6,6 +6,7 @@ take over, tell builder) · 3 the server needs a user decision · 1 unexpected e
 Stage scripts (later slices) call `output`; this file holds only the generic run plumbing.
 """
 import argparse
+import base64
 import hashlib
 import json
 import re
@@ -22,7 +23,8 @@ from pathlib import Path
 import httpx
 
 REPUBLISH = ('The page at this link was published by an older tool and cannot draw these lines: publish it again to the same link first (Artifact tool: `file_path` the '
-             '`page_file`, `url` the link), then `vw visuals page --url "<the link>"`. ')
+             '`page_file`, `url` the link, `capabilities` again, exactly as given), then `vw visuals page --url "<the link>"`. ')
+PIC_BATCH, PIC_BATCH_BYTES, ZOOM_UPLOAD = 40, 900_000, 25   # design/210: under the page's limits (50 writes and 1 MiB a batch; 25 files an upload)
 
 
 def plugin_version():
@@ -1713,6 +1715,99 @@ def _fetch_to(url, part, size):
         list(pool.map(one, ranges))
 
 
+def _batches(collection, files):
+    """design/210: files as ready-made `writes` lists for ArtifactData's batch, each a document named by its file's stem: at most PIC_BATCH
+    writes and PIC_BATCH_BYTES of files in one."""
+    out, size = [[]], 0
+    for f in files:
+        n = f.stat().st_size
+        if out[-1] and (len(out[-1]) >= PIC_BATCH or size + n > PIC_BATCH_BYTES):
+            out.append([])
+            size = 0
+        out[-1].append({'op': 'set', 'collection': collection, 'doc_id': f.stem, 'file_path': str(f)})
+        size += n
+    return [b for b in out if b]
+
+
+def _pictures_sent(folder):
+    """design/210: what this run folder knows it handed over for the page: the small pictures offered (`thumbs`) and each large one's id in
+    the page's file store (`zoom`)."""
+    d = load_json(folder / 'pictures.json', {})
+    d = d if isinstance(d, dict) else {}
+    return {'thumbs': [str(c) for c in d.get('thumbs') or []], 'zoom': {str(k): str(v) for k, v in (d.get('zoom') or {}).items()}}
+
+
+def _zoom_uploads(folder, sent):
+    """The large pictures in the run folder that have no id in the page's file store yet, as lists for one upload each."""
+    paths = [str(f) for f in sorted((folder / 'zoom').glob('*.jpg')) if f.stem not in sent['zoom']]
+    return [paths[i:i + ZOOM_UPLOAD] for i in range(0, len(paths), ZOOM_UPLOAD)]
+
+
+def page_pictures(m, folder, pictures):
+    """design/210: the pictures of a round, for the page. Each picture not yet in the run folder is fetched in its two sizes: the small one
+    becomes a database document `pics/<code>.json` ({"code", "data"}, the JPEG as a data link), the large one a file `zoom/<code>.jpg`. Returns
+    what the assistant sends, and only what was not handed over before: `picture_batches` for ArtifactData, `zoom_uploads` for the Artifact
+    tool's asset upload, and `uploaded_file`, where the upload's answer is saved. Nothing when the round has no picture."""
+    codes = []
+    for p in pictures or []:
+        code = str(p.get('code') or '')
+        if not re.fullmatch(r'p[0-9a-f]{12}', code) or code in codes:   # a code names a file here
+            continue
+        codes.append(code)
+        doc = folder / 'pics' / f'{code}.json'
+        if not doc.is_file():
+            small = Path(_download(m, p['thumb'], f'work/page/pics/{code}.jpg'))
+            doc.write_text(json.dumps({'code': code, 'data': 'data:image/jpeg;base64,' + base64.b64encode(small.read_bytes()).decode('ascii')}), encoding='utf-8')
+            small.unlink()
+        if not (folder / 'zoom' / f'{code}.jpg').is_file():
+            _download(m, p['zoom'], f'work/page/zoom/{code}.jpg')
+    if not codes:
+        return {}
+    sent = _pictures_sent(folder)
+    new = [c for c in codes if c not in sent['thumbs']]
+    sent['thumbs'] += new
+    (folder / 'pictures.json').write_text(json.dumps(sent, indent=1) + '\n', encoding='utf-8')
+    uploads = _zoom_uploads(folder, sent)
+    return {**({'picture_batches': _batches('pics', [folder / 'pics' / f'{c}.json' for c in new])} if new else {}),
+            **({'zoom_uploads': uploads, 'uploaded_file': str(folder / 'uploaded.txt')} if uploads else {})}
+
+
+def page_uploaded(folder, text):
+    """design/210: the answer of an upload of large pictures, read line by line. A line is matched to its picture by the FILE NAME (the code),
+    never by its place; its id must be 32 hex characters. A name that is not one of this run's pictures, a code with two different ids and a
+    line that cannot be read are refused by name and nothing is written for them. Each match becomes `zoomdocs/<code>.json`
+    ({"code", "url"}) and is kept in the record; the batch that writes them to the page is returned."""
+    known = {f.stem for f in (folder / 'zoom').glob('*.jpg')}
+    got, refused = {}, []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith('-'):
+            continue
+        path, blob = re.search(r'"([^"]+)"', line), re.search(r'/_blob/([^"\s)]+)', line)
+        name = re.split(r'[\\/]+', path.group(1))[-1] if path else line[:80]
+        code = name[:-4] if name.lower().endswith('.jpg') else name
+        why = ('this line of the answer could not be read' if not path else 'the line gives no link for it: it was not uploaded' if not blob else
+               'it is not a picture of this run' if code not in known else 'its id is not 32 hex characters' if not re.fullmatch(r'[0-9a-f]{32}', blob.group(1)) else
+               'it appears twice, with two different ids' if got.get(code, blob.group(1)) != blob.group(1) else '')
+        if why:
+            refused.append({'name': name, 'why': why})
+            if why.startswith('it appears twice'):
+                got[code] = ''   # neither id is trusted
+        else:
+            got[code] = blob.group(1)
+    matched = {c: i for c, i in sorted(got.items()) if i}
+    sent = _pictures_sent(folder)
+    docs = []
+    for code, ident in matched.items():
+        (folder / 'zoomdocs').mkdir(exist_ok=True)
+        docs.append(folder / 'zoomdocs' / f'{code}.json')
+        docs[-1].write_text(json.dumps({'code': code, 'url': '/_blob/' + ident}), encoding='utf-8')
+        sent['zoom'][code] = ident
+    if matched:
+        (folder / 'pictures.json').write_text(json.dumps(sent, indent=1) + '\n', encoding='utf-8')
+    return {'matched': list(matched), 'refused': refused, 'not_uploaded': sorted(known - set(sent['zoom'])), **({'picture_batches': _batches('zoom', docs)} if docs else {})}
+
+
 def _dropped(key, exc):
     """design/129 D39: the network dropped and stayed down through the retries: the operator runs the same command again; never a defect."""
     emit({'action': 'unreachable', 'message': f"Download of {key} stopped: this computer's network connection dropped ({exc.__class__.__name__}). "
@@ -1825,7 +1920,7 @@ _PLACE = {'file', 'element', 'name', 'clip', 'at', 'url', 'quote'}
 _REUSE = {'reuse', 'considered', 'crop'}
 VISUALS_FLAGS = {
     'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
-    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
+    'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record', 'uploaded', 'pictures_again'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
     'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back'},   # design/177: the page's step-2 actions
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
@@ -2173,7 +2268,9 @@ def cmd_visuals(a):
         paths = [_download(m, f['key'], f"work/chat/{re.sub(r'[^A-Za-z0-9._-]', '-', f['name'])}") for f in item.get('show') or []]   # the pictures and takes to show
         item['show_files'] = paths
         on_page = ('The drawings and the materials are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
-                   if item.get('kind') == 'spec' else '')   # design/209
+                   if item.get('kind') == 'spec' else   # design/209
+                   'The reference drawings are approved on the page, in one visit: run `vw visuals page` instead; ask here only where the page cannot be shown. '
+                   if str(item.get('id') or '').startswith('drawing:') else '')   # design/210
         return (on_page + f"{item['position']}. Post `message` as it is, then ask `ask`: \"{item.get('ask') or item['question']}\" " + (f"Files to show, in this order: {'; '.join(paths)}. " if paths else '')
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
@@ -2204,10 +2301,12 @@ def cmd_visuals(a):
         folder = ws / 'work' / 'page'
         folder.mkdir(parents=True, exist_ok=True)
         url_file, current, made_by = folder / 'url.txt', folder / 'current.txt', folder / 'page-version.txt'   # design/206: which tool's page file is published at the link
+        if getattr(a, 'pictures_again', False) or (getattr(a, 'url', None) and url_file.is_file() and url_file.read_text(encoding='utf-8').strip() != a.url.strip()):
+            (folder / 'pictures.json').unlink(missing_ok=True)   # design/210: a page published anew holds no picture yet: every picture is offered again
         if getattr(a, 'url', None):
             url_file.write_text(a.url.strip() + '\n', encoding='utf-8')
             made_by.write_text(plugin_version() + '\n', encoding='utf-8')
-            emit({'url': a.url.strip()}, 0, 'The page link is kept for this run. Now write the round to the page (step 2 of `how`).')
+            emit({'url': a.url.strip()}, 0, 'The page link is kept for this run. Now send the pictures, when the round has any (step 2 of `how`), and write the round to the page (step 3).')
 
         def hand(page, more=None):
             """This round as one file for the page, and what the assistant needs to put it there. Nothing of its content is typed."""
@@ -2219,11 +2318,32 @@ def cmd_visuals(a):
             waiting = len([l for l in page['lines'] if l['state'] == 'open'])
             link = url_file.read_text(encoding='utf-8').strip() if url_file.is_file() else ''
             old = bool(link) and (made_by.read_text(encoding='utf-8').strip() if made_by.is_file() else '') != plugin_version()   # published from an older page file: it cannot draw today's lines
-            more = {**(more or {}), **({'republish': True} if old else {})}
+            more = {**(more or {}), **({'republish': True} if old else {}), **page_pictures(m, folder, page.get('pictures')),   # design/210: the round's pictures, fetched and ready to send
+                    **({'pictures_failed': page['pictures_failed']} if page.get('pictures_failed') else {})}
             return {'url': link, 'page_file': str(Path(__file__).resolve().parents[1] / 'pages' / 'decisions.html'),
                     'title': page['title'], 'capabilities': page['capabilities'], 'round': rnd, 'round_file': str(folder / f'{rnd}.json'),
                     'answers_collection': f'rounds/{rnd}/answers', 'answers_dir': str(folder / 'answers'), 'waiting': waiting, 'note': doc['note'], 'how': page['how'], **(more or {})}
 
+        def pictures_line(info):
+            """design/210: what the assistant sends before the round, in words."""
+            n, z = sum(len(b) for b in info.get('picture_batches') or []), sum(len(u) for u in info.get('zoom_uploads') or [])
+            return ((f"Pictures first (step 2 of `how`): {n} small in {len(info.get('picture_batches') or [])} batch(es), {z} large in {len(info.get('zoom_uploads') or [])} upload(s). " if n or z else '')
+                    + (f"These pictures could not be prepared, so their lines cannot be answered on the page: {'; '.join(info['pictures_failed'])}; tell the operator, and ask those lines "
+                       'in the chat (`vw visuals next`). ' if info.get('pictures_failed') else ''))
+
+        if getattr(a, 'uploaded', None):   # design/210: the answer of an upload of large pictures, saved by the assistant as it came
+            path = Path(a.uploaded) if Path(a.uploaded).is_absolute() else ws / a.uploaded
+            if not path.is_file():
+                emit({'action': 'refused', 'message': f"No such file: {path}. Save the upload's answer there first, exactly as it came."}, 2)
+            out = page_uploaded(folder, path.read_text(encoding='utf-8', errors='replace'))
+            rnd = current.read_text(encoding='utf-8').strip() if current.is_file() else ''
+            emit({**out, 'round': rnd, 'round_file': str(folder / f'{rnd}.json')}, 0,
+                 f"{len(out['matched'])} large picture(s) matched by file name"
+                 + (f"; refused: {'; '.join(r['name'] + ': ' + r['why'] for r in out['refused'])}" if out['refused'] else '')
+                 + (f"; not uploaded: {', '.join(out['not_uploaded'])}: for these the large pictures are not available on the page (it shows the small one enlarged); they are offered "
+                    'again with the next round' if out['not_uploaded'] else '')
+                 + ('. Send the batch in `picture_batches` (ArtifactData, action "batch", `writes` the batch, unchanged), then' if out.get('picture_batches') else '. Now')
+                 + f" write the round to the page (step 3 of `how`): {folder / f'{rnd}.json'}.")
         if getattr(a, 'record', False):
             rnd = current.read_text(encoding='utf-8').strip() if current.is_file() else ''
             if not rnd:
@@ -2246,12 +2366,12 @@ def cmd_visuals(a):
                           + (f"; refused: {'; '.join(r['key'] + ': ' + r['message'] for r in out['refused'])}" if out.get('refused') else '')
                           + (f"; not recorded, the line changed since: {', '.join(out['stale'])}" if out.get('stale') else '')
                           + (f"; dropped with the Direction: {', '.join(out['dropped'])}" if out.get('dropped') else '')
-                          + f". {out['then']} " + (REPUBLISH if info.get('republish') else '') + f"New round {info['round']}: write it to the page (step 2 of `how`): {info['round_file']}.")
+                          + f". {out['then']} " + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"New round {info['round']}: write it to the page (step 3 of `how`): {info['round_file']}.")
         out = write(base + '/page', {'one': False})
         info = hand(out)
         emit(info, 0, f"{out.get('step') or 'Decisions'} page: {info['waiting']} line(s) to answer. {info['note']} "
                       + ('Publish the page first (step 1 of `how`). ' if not info['url'] else f"Page: {info['url']}. ")
-                      + (REPUBLISH if info.get('republish') else '') + f"Round {info['round']}: {info['round_file']}. " + out['how'])
+                      + (REPUBLISH if info.get('republish') else '') + pictures_line(info) + f"Round {info['round']}: {info['round_file']}. " + out['how'])
     if a.what == 'decide':   # design/188: the operator's answer to that one decision; any other item is refused by the server
         if not (getattr(a, 'item', None) and getattr(a, 'choice', None)):
             emit({'action': 'refused', 'message': 'Give the item and the button chosen: `vw visuals decide --item <id from vw visuals next> --choice <the button\'s choice> --quote "<their words>"`.'}, 2)
@@ -3487,11 +3607,12 @@ def build_parser():
     s = sub.add_parser('planning'); s.add_argument('rest', nargs=argparse.REMAINDER); s.set_defaults(fn=lambda a: retired('planning'))   # design/35 row 2: version 1 retired
     s = sub.add_parser('visuals'); s.add_argument('what', choices=VISUALS_WHAT)
     for flag in ('--inr', '--file', '--gap', '--choice', '--quote', '--element', '--name', '--clip', '--at', '--url', '--kind', '--prompt', '--parents', '--size', '--quality', '--ref', '--sha', '--shot', '--provider', '--model', '--start', '--end', '--motion', '--continuity', '--seconds', '--job', '--decision', '--notes', '--timing', '--answer', '--variants', '--end-answer', '--camera', '--support', '--look', '--reuse', '--considered', '--crop', '--question',
-                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
+                 '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s', '--uploaded'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
     s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
+    s.add_argument('--pictures-again', dest='pictures_again', action='store_true', help='page: offer every picture of the round again, for a page published anew (design/210)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the base and the gap files (design/149 B7)')
     s.add_argument('--download', action='store_true', help='scene: bring back the shot\'s scene as the server last rendered it (design/117)')
