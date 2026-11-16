@@ -252,3 +252,23 @@ def test_the_server_not_reached_stops_the_join_and_writes_nothing(harness, monke
     box['down'] = True
     code, out, err = join(capsys)
     assert code == 2 and out['action'] == 'unreachable' and not (ws / 'out' / 'visual-plan.json').exists()
+
+
+def test_a_field_the_files_add_after_a_proposal_is_not_a_clash_with_the_servers_default():
+    """The critic's check: the server stores a plan with its defaults for fields the files never carried (a material spec of null, an empty
+    list). A field the files add after the proposal is theirs to add: it goes in, and nothing is named as changed on both sides."""
+    old = {'elements': [{'id': 'E1', 'name': 'Panel'}], 'gaps': [{'gap_id': 'G1', 'scenes': [{'id': 'S1', 'shots': [{'id': 'SH1', 'title': 'a'}]}]}]}
+    mine = {'elements': [{'id': 'E1', 'name': 'Panel', 'material_spec': {'laid': 'flat'}, 'signs_of_use': ['scuffed']}],
+            'gaps': [{'gap_id': 'G1', 'scenes': [{'id': 'S1', 'outfit': {'P1': 'blue'}, 'shots': [{'id': 'SH1', 'title': 'a', 'camera_move': 'fixed'}]}]}]}
+    theirs = {'elements': [{'id': 'E1', 'name': 'Panel', 'material_spec': None, 'signs_of_use': [], 'description': ''}],
+              'gaps': [{'gap_id': 'G1', 'scenes': [{'id': 'S1', 'outfit': {}, 'shots': [{'id': 'SH1', 'title': 'a', 'camera_move': ''}]}]}]}
+    clashes = []
+    out = vw._merge3(old, mine, theirs, [], clashes)
+    assert clashes == []
+    e, scene = out['elements'][0], out['gaps'][0]['scenes'][0]
+    assert e['material_spec'] == {'laid': 'flat'} and e['signs_of_use'] == ['scuffed'] and e['description'] == ''   # the server's own default for a field the files do not name stays
+    assert scene['outfit'] == {'P1': 'blue'} and scene['shots'][0]['camera_move'] == 'fixed'
+    clashes = []   # a part both sides really changed is still named, and so is a field the files add where the server holds a real value (a correction folded in)
+    vw._merge3({'a': 1}, {'a': 2}, {'a': 3}, [], clashes)
+    vw._merge3({}, {'spec': {'x': 1}}, {'spec': {'x': 2}}, [], clashes)
+    assert clashes == ['a', 'spec']

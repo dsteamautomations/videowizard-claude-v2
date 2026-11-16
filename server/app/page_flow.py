@@ -222,6 +222,11 @@ def _spec_page(ctx, base, lines):
                     else 'Every drawing and material is approved. Nothing more to answer here.'}
 
 
+SPEC_REFUSED = ('The server refused an answer on the page; its reason is in `refused` and on the line. When the reason is about the drawing itself (a size with nothing '
+                'tried, a missing "not to scale"), it is yours to fix, not the operator\'s: complete that drawing in the plan, check, propose again, then `vw visuals page`. '
+                'When the reason is about the answer (no words for a correction), tell the operator and give them the link again.')
+
+
 def _spec_answer(ctx, key, choice, words, item_id):
     """One answer to a drawing's or a material's line, through the run function of the chat's own item: Yes approves it, Correct it sends it
     back with the operator's words. None when the line is no longer open with that content (stale)."""
@@ -320,6 +325,14 @@ def page_record(conn, store, user, run, outputs, answers):
     answers = [a for a in answers or [] if isinstance(a, dict)]
     answers.sort(key=lambda a: {'motion': 0, 'direction': 1, 'shared': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps
     recorded, stale, refused, dropped, tell = [], [], [], [], ''
+    relies, corrected = set(), False   # design/209: the lines that showed a size only as "Already confirmed", as the operator saw them
+    try:
+        first = CF._ctx(conn, store, user, run, outputs)
+        if _at_plan(first) and _spec_lines(first):
+            relies = {v['key'] for v in CF._spec_views(first) if v['spec'].get('confirmed')}
+            answers.sort(key=lambda a: str(a.get('choice') or '') == 'yes')   # the corrections first: a yes may rest on a size corrected in the same visit
+    except Problem:
+        pass
     for n, a in enumerate(answers):
         key, choice, words = str(a.get('key') or ''), str(a.get('choice') or ''), ' '.join(str(a.get('notes') or '').split())
         ctx = CF._ctx(conn, store, user, run, outputs)   # the session as the answer before left it
@@ -328,7 +341,12 @@ def page_record(conn, store, user, run, outputs, answers):
         said = words
         try:
             if _at_plan(ctx):   # design/206: a plan line; design/209: after the plan, a drawing's or a material's line
-                got = (_spec_answer if _spec_lines(ctx) else _plan_answer)(ctx, key, choice, words, a.get('item'))
+                at_spec = bool(_spec_lines(ctx))
+                if at_spec and choice == 'yes' and corrected and key in relies:   # it rested on a size another line gave, and a line was corrected in this visit: asked again
+                    stale.append(key)
+                    continue
+                got = (_spec_answer if at_spec else _plan_answer)(ctx, key, choice, words, a.get('item'))
+                corrected = corrected or (at_spec and bool(got) and choice != 'yes')
                 if not got:
                     stale.append(key)
                     continue
@@ -374,7 +392,7 @@ def page_record(conn, store, user, run, outputs, answers):
     draft = session.get('treatment_draft') or {}
     alone_accepted = bool(draft.get('direction_only')) and (draft.get('lines') or {}).get('direction', {}).get('state') == 'accepted'
     at_plan, at_spec = now['step'] == 'Plan', now['step'] == SPEC_STEP
-    then = ('Nothing was answered on the page. ' if not answers else '') + (
+    then = ('Nothing was answered on the page. ' if not answers else '') + (SPEC_REFUSED + ' ' if at_spec and refused else '') + (
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec) and left else
         SPEC_BACK if at_spec and any(l['state'] == 'with_assistant' for l in now['lines']) else SPEC_NEXT if at_spec else
         PLAN_BACK if at_plan and any(l['state'] == 'with_assistant' for l in now['lines']) else PLAN_NEXT if at_plan else

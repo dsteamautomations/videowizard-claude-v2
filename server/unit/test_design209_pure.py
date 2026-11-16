@@ -339,3 +339,29 @@ def test_the_instructions_send_the_drawings_and_materials_to_the_page_and_the_ch
     assert W.apply(st['prompt'], parts) == st['prompt'] and parts == st['parts'], 'applying twice changes nothing'
     src = Path(V.__file__).read_text(encoding='utf-8')   # the tool's own lines point to the page first
     assert 'approves the specs as one table' not in src and 'approves the drawings and the materials on the page (`vw visuals page`)' in src
+
+
+def test_a_yes_that_relied_on_a_size_corrected_in_the_same_visit_is_not_recorded():
+    """The critic's check: the drawing showed the panel's length only as "Already confirmed", the operator corrected that length on the material
+    and said yes on the drawing in the same visit. The yes is not recorded: the drawing is asked again once the material is right."""
+    store, conn = start(plan_with([drawing(PANEL), drawing([dim('box', 'length', 600)])], PANEL))
+    m, relies, own = page(store, conn)['lines']
+    assert relies['spec'].get('confirmed') and 'confirmed' not in own['spec']
+    r = record(store, conn, [ans(relies, 'yes'), ans(own, 'yes'), ans(m, 'correct', 'the panel is 400 long, not 410')])   # sent in any order: the correction is recorded first
+    assert r['recorded'] == ['element:panel', 'G2-S1'] and r['stale'] == ['G1-S1']
+    assert 'G1-S1' not in (V.session_of(store, H.RUN, {}).get('spec_approvals') or {})
+    now = by_key(r['page'])
+    assert now['element:panel']['state'] == 'with_assistant' and now['G1-S1']['state'] == 'open' and now['G2-S1']['state'] == 'recorded'
+    store, conn = start(plan_with([drawing(PANEL)], PANEL))   # with no correction in the visit, the yes is recorded as before
+    m, relies = page(store, conn)['lines']
+    assert sorted(record(store, conn, [ans(relies, 'yes'), ans(m, 'yes')])['recorded']) == ['G1-S1', 'element:panel']
+
+
+def test_a_yes_the_server_refuses_tells_the_assistant_to_fix_the_drawing_not_to_send_the_link_again():
+    """The critic's check: an unknown size with nothing tried is refused at approval. The operator cannot act on that; the assistant is told to."""
+    spec = drawing([dim('box', 'wall thickness')])
+    spec['dimensions'][0]['tried'] = ''
+    store, conn = start(plan_with([spec]))
+    r = record(store, conn, [ans(page(store, conn)['lines'][0], 'yes')])
+    assert [x['key'] for x in r['refused']] == ['G1-S1'] and r['recorded'] == []
+    assert r['then'].startswith(P.SPEC_REFUSED) and 'yours to fix' in P.SPEC_REFUSED and 'propose again' in P.SPEC_REFUSED

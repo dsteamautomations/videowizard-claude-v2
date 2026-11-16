@@ -43,3 +43,11 @@ Old ways 99 and 100 are in `design/35-decision-log.md`.
 - The reference pictures, the stills and the takes are still asked in the chat (the reference steps wait on SK's answer about pictures on claude.ai).
 - The assistant still writes its notes on what it tried in technical words; they are no longer shown to the operator.
 - `vw visuals spec` stays for a correction said in the chat.
+
+## The critic's check before the deploy
+
+One read-only reviewer checked the merged change for faults that stop a run, lose the operator's work, or tell the assistant something the server refuses. The first join on a new film was read end to end and is sound. Three critical faults were confirmed and fixed, each with a test seen failing first:
+
+1. **After a proposal the join refused any file change that added a field the server stores with an empty default** (a material spec, an outfit, a camera move: about 28 fields). It named a clash the server never made. Now a field the files add where the server holds only an empty default goes in; a field the server really changed is still named.
+2. **A drawing was approved with a size the operator corrected in the same visit.** The drawing showed the size only as "Already confirmed"; the yes was recorded although the material it rested on was sent back. Now corrections are recorded first, and such a yes is not recorded: the drawing is asked again.
+3. **A yes the server refuses for missing research left the line open and told the assistant only to send the link again.** Now the assistant is told the drawing is its own to fix: complete it in the plan, check, propose again.

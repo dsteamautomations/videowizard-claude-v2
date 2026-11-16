@@ -1957,6 +1957,8 @@ def _merge3(old, mine, theirs, path, clashes):
         return theirs
     if theirs == old:
         return mine
+    if old is _GONE and mine is not _GONE and (theirs is _GONE or not theirs):   # a field the files add where the server holds only an empty default (null, '', [], {}): the files' value goes in
+        return mine
     if all(isinstance(v, dict) for v in (old, mine, theirs)):
         out = {k: _merge3(old.get(k, _GONE), mine.get(k, _GONE), theirs.get(k, _GONE), path + [k], clashes) for k in list(theirs) + [k for k in mine if k not in theirs]}
         return {k: v for k, v in out.items() if v is not _GONE}
