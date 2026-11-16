@@ -115,6 +115,9 @@ if __name__ == '__main__':
         from d207_wording_v3 import apply as d207, apply_steps as d207s   # design/207: the visuals rules after the review (any kind of AI video, the world, likeness, the page, the cost limit by length)
         prompt = d207(prompt, parts)
         d207s(steps)
+        from d209_wording_v3 import apply as d209, apply_steps as d209s   # design/209: the drawings and the materials approved on the page, after the plan
+        prompt = d209(prompt, parts)
+        d209s(steps)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

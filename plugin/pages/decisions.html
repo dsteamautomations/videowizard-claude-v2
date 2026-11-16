@@ -161,10 +161,31 @@ function preview(line){   // design/205: "Show me" plays a rough sample of a mot
 function shots(cols,src){   // design/206: the shots of a gap (or of one offered way) as a table, under their totals
   const wrap=el('div'); wrap.style.display='flex'; wrap.style.flexDirection='column'; wrap.style.gap='8px';
   wrap.appendChild(el('p','totals',[src.total,src.mix].filter(Boolean).join(' ')));
+  wrap.appendChild(grid(cols,src.table));
+  return wrap;
+}
+function grid(cols,rows){   // a table; on a narrow screen each row becomes a small block with its labels
   const tw=el('div','tw'), t=el('table','shots'), hr=el('tr'); (cols||[]).forEach(c=>hr.appendChild(el('th',null,c)));
   const th=el('thead'); th.appendChild(hr); t.appendChild(th);
-  const tb=el('tbody'); (src.table||[]).forEach(r=>{ const tr=el('tr'); r.forEach((c,i)=>{ const td=el('td',null,c); td.setAttribute('data-l',(cols||[])[i]||''); tr.appendChild(td); }); tb.appendChild(tr); });
-  t.appendChild(tb); tw.appendChild(t); wrap.appendChild(tw);
+  const tb=el('tbody'); (rows||[]).forEach(r=>{ const tr=el('tr'); r.forEach((c,i)=>{ const td=el('td',null,c); td.setAttribute('data-l',(cols||[])[i]||''); tr.appendChild(td); }); tb.appendChild(tr); });
+  t.appendChild(tb); tw.appendChild(t);
+  return tw;
+}
+function spec(line){   // design/209: a drawing's parts and sizes, or a material's facts, in plain words; each size is asked once; a recorded one is folded, to read back
+  const s=line.spec||{}, rec=line.state==='recorded', wrap=el(rec?'details':'div','group');
+  if(rec){ const sm=el('summary',null,'What you approved'); sm.style.fontWeight='600'; sm.style.cursor='pointer'; wrap.appendChild(sm); }
+  const list=(title,items)=>{ if(!items||!items.length) return; if(title) wrap.appendChild(el('h4',null,title));
+    const ul=el('ul'); ul.style.margin='0'; ul.style.paddingLeft='1.2em'; items.forEach(x=>ul.appendChild(el('li',null,x))); wrap.appendChild(ul); };
+  if(s.drawn_as) wrap.appendChild(el('p',null,'Drawn as: '+s.drawn_as));
+  if(s.words) wrap.appendChild(el('p',null,s.words));
+  list('Parts',s.parts);
+  if(s.facts&&s.facts.length){ const dl=el('dl','kv'); s.facts.forEach(r=>{dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));}); wrap.appendChild(dl); }
+  list('How they sit',s.sits); list('Proportions',s.proportions);
+  if(s.sizes&&s.sizes.length){ wrap.appendChild(el('h4',null,rec?'Sizes':'Sizes to confirm')); wrap.appendChild(grid(['Part','Measure','Size','From'],s.sizes)); }
+  if(s.differs&&s.differs.length){ const w=el('div','note'); w.appendChild(el('strong',null,'The same size has another value elsewhere')); const ul=el('ul'); s.differs.forEach(x=>ul.appendChild(el('li',null,x))); w.appendChild(ul); wrap.appendChild(w); }
+  if(s.confirmed) wrap.appendChild(el('p','said','Already confirmed: '+s.confirmed));
+  if(s.unknown) wrap.appendChild(el('p','said','Not known, so no figure is shown: '+s.unknown));
+  list('',s.other);
   return wrap;
 }
 const KINDS={Person:'People',Place:'Places',Object:'Things',Material:'Materials',Animal:'Animals',Process:'Processes',Technique:'Techniques'};
@@ -214,6 +235,8 @@ function block(line,n){
     const dl=el('dl','kv'); (w.rows||[]).forEach(r=>{dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));}); g.appendChild(dl);
     g.appendChild(shots(line.cols,w)); body.appendChild(g);
   });
+  if(line.spec) body.appendChild(spec(line));
+  if(line.ask&&line.state==='open') body.appendChild(el('p','totals',line.ask));   // design/209: the question of this line, in plain words
   if(line.state==='open'&&line.styles&&line.styles.length) body.appendChild(preview(line));
   if(body.childNodes.length) box.appendChild(body);
   const acts=el('div','acts');
@@ -250,7 +273,7 @@ function draw(force){
   lines.forEach((line,i)=>{
     const a=answers[line.line];
     if(line.state==='open'&&!a) open++; if(a) answered++;
-    const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':a?(a.choice==='accept'||a.choice==='accept_second'||String(a.choice).indexOf('way:')===0?'ans':'chg'):''),String(i+1)); d.title=line.title; dots.appendChild(d);
+    const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':a?(a.choice==='accept'||a.choice==='accept_second'||a.choice==='yes'||String(a.choice).indexOf('way:')===0?'ans':'chg'):''),String(i+1)); d.title=line.title; dots.appendChild(d);
     d.addEventListener('click',()=>{ const n=nodes[line.line]; if(n) n.node.scrollIntoView({block:'start'}); });   // design/206: a number jumps to its block
     const sig=JSON.stringify([i,line,a||null,editing[line.line]||null]);
     seen[line.line]=1;

@@ -86,6 +86,18 @@ def test_the_list_of_differences_is_folded_unless_the_operator_asked_for_the_cha
     assert "el('details','changed')" in html and 'c.open=!!line.asked' in html and "el('summary'" in html
 
 
+def test_the_page_draws_a_drawings_parts_and_sizes_and_a_materials_facts_in_plain_words():
+    """design/209: a spec line: what it is drawn as, its parts, how they sit, the sizes to confirm as a table, one muted line each for what is
+    already confirmed and what is not known, a remark where a size differs; a recorded one folded; the line's own question."""
+    html = PAGE.read_text(encoding='utf-8')
+    for needed in ('function spec(line)', 'if(line.spec) body.appendChild(spec(line));', "'Drawn as: '+s.drawn_as", "list('Parts',s.parts)", "list('How they sit',s.sits)",
+                   "grid(['Part','Measure','Size','From'],s.sizes)", "'Already confirmed: '+s.confirmed", "'Not known, so no figure is shown: '+s.unknown", 's.differs.forEach',
+                   "el(rec?'details':'div','group')", 'What you approved', "body.appendChild(el('p','totals',line.ask))", "a.choice==='yes'", 'function grid(cols,rows)',
+                   'wrap.appendChild(grid(cols,src.table))'):
+        assert needed in html, needed
+    assert '.open=true' not in html[html.index('function spec(line)'):html.index('const KINDS=')]   # a recorded line's content is closed until the operator opens it
+
+
 def test_the_world_of_the_film_is_grouped_under_one_heading_per_kind():
     """SK, 16 Nov 2026: 'Not shown' was repeated on every row. The page groups the world's rows under one heading each, with the rules listed
     under it; people, places and things are grouped by kind; the block is read, not answered."""

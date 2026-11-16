@@ -415,14 +415,96 @@ def _round_items(ctx):
 
 # ---------- everything else that waits: questions, pictures, specs, takes ----------
 
-def _spec_text(spec):
-    rows = []
-    for k, v in (spec or {}).items():
-        if isinstance(v, list):
-            rows += [f'{k}: ' + (', '.join(f'{a}: {b}' for a, b in x.items() if b not in (None, '', [])) if isinstance(x, dict) else str(x)) for x in v]
-        elif v not in (None, '', []):
-            rows.append(f'{k}: {v}')
+VIEW_WORDS = {'cutaway': 'a cutaway', 'plan': 'seen from above', 'side': 'from the side', 'elevation': 'from the front'}
+SPEC_FACTS = (('How it is laid', 'laid'), ('Joints', 'joint'), ('Pattern', 'pattern'))
+
+
+def _leaves(x):
+    """Every plain value of a record, without its field names."""
+    if isinstance(x, dict):
+        return [s for v in x.values() for s in _leaves(v)]
+    if isinstance(x, (list, tuple)):
+        return [s for v in x for s in _leaves(v)]
+    return [] if x is None or isinstance(x, bool) or not str(x).strip() else [' '.join(str(x).split())]
+
+
+def _spec_parts(spec, view=None):
+    """design/209 (SK, 16 Nov 2026): a drawing spec or a material spec as plain parts, the one function the page and the chat both show: what it
+    is drawn as and why, the words it carries, its parts, how they sit, its proportions, a material's facts, the sizes that are known (part,
+    measure, size, where it came from in one short line) and the names of the sizes that are not. The assistant's working notes (`tried`) are
+    not shown, and no field name is. A record of a shape this does not know is listed as its plain values (`other`), never an error."""
+    def listed(x):
+        if x is not None and not isinstance(x, list):
+            raise TypeError('not a list')
+        return x or []
+    short = lambda s: s if len(s) <= 100 else s[:99].rstrip() + '…'
+    try:
+        dims = listed(spec.get('dimensions'))
+        known = [d for d in dims if d.get('value') is not None]
+        v, why = view or (spec.get('view') or '', str(spec.get('view_reason') or '').strip())
+        label = ' '.join(str(spec.get('label') or '').split())
+        out = {'drawn_as': VIEW_WORDS[v] + (f' ({why})' if why else '') if v in VIEW_WORDS else '',
+               'words': ' '.join(x for x in ('Not to scale.' if spec.get('illustrative') else '', f'It carries the words "{label}".' if label else '') if x),
+               'parts': [str(p) for p in listed(spec.get('parts'))], 'sits': [str(p) for p in listed(spec.get('relationships'))],
+               'proportions': [str(p) for p in listed(spec.get('proportions'))], 'facts': [[name, str(spec[k])] for name, k in SPEC_FACTS if spec.get(k)],
+               'sizes': [[str(d['part']), str(d['measure']), f"{d['value']:g} {d.get('unit') or ''}".strip(), short(' '.join(str(d.get('source') or '').split()))] for d in known],
+               'unknown': ', '.join(f"{d['part']} {d['measure']}" for d in dims if d.get('value') is None), 'known': len(known)}
+        return {k: x for k, x in out.items() if x}
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return {'other': _leaves(spec)}
+
+
+def _spec_text(parts):
+    """The plain parts of a spec (`_spec_parts`) as the lines the chat shows above its question."""
+    c = parts or {}
+    rows = [f"Drawn as: {c['drawn_as']}"] if c.get('drawn_as') else []
+    rows += [c['words']] if c.get('words') else []
+    rows += ['Parts: ' + ', '.join(c['parts'])] if c.get('parts') else []
+    rows += [f'{k}: {v}' for k, v in c.get('facts') or []]
+    rows += (['How they sit:'] + [f'- {x}' for x in c['sits']]) if c.get('sits') else []
+    rows += ['Proportions: ' + '; '.join(c['proportions'])] if c.get('proportions') else []
+    rows += (['Sizes to confirm:'] + [f'- {p} {m}: {size}' + (f' (from {src})' if src else '') for p, m, size, src in c['sizes']]) if c.get('sizes') else []
+    rows += [f'Note: {x}' for x in c.get('differs') or []]
+    rows += [f"Already confirmed: {c['confirmed']}"] if c.get('confirmed') else []
+    rows += [f"Not known, so no figure is shown: {c['unknown']}"] if c.get('unknown') else []
+    rows += [f'- {x}' for x in c.get('other') or []]
     return '\n'.join(rows)[:6000]
+
+
+def _spec_views(ctx):
+    """design/209: every material spec and drawing spec of the film as the operator reads it, the materials first, then the drawings in the
+    film's order: its title, its state (`open`, `recorded` when approved as it is now, `with_assistant` with the operator's words), the question
+    it asks and its plain parts. Each fact is asked once: a known size that is the same part, measure and size as one the operator has approved
+    in this film, or as one on an earlier line still to answer, is on the one line `confirmed` and not among the `sizes` to confirm (so a
+    material's unit sizes are asked at the material). The same part and measure with another size on another line stays in full on both, with a
+    `differs` remark. A line that is back with the assistant confirms nothing."""
+    session, plan = ctx['session'], ctx['plan']
+    names, approved, corrections = _names(plan), session.get('spec_approvals') or {}, session.get('spec_corrections') or {}
+    rows = [(V.material_key(e['id']), names[e['id']], e['material_spec'], None) for e in plan.get('elements') or [] if e.get('material_spec')]
+    rows += [(sh['id'], sh.get('title') or sh['id'], sh['drawing_spec'], V.spec_view(sh)) for _, sh in V._accepted_shots(plan, session) if sh.get('drawing_spec')]
+    views = []
+    for key, title, spec, view in rows:
+        digest = V.spec_digest(spec)
+        state = 'with_assistant' if V.correction_pending(session, key, spec) else 'recorded' if (approved.get(key) or {}).get('digest') == digest else 'open'
+        parts = _spec_parts(spec, view)
+        views.append({'key': key, 'title': title, 'state': state, 'item': f'spec:{key}:{digest[:10]}', 'spec': parts, 'note': (corrections.get(key) or {}).get('words') or '',
+                      'ask': 'Are these facts right?' if view is None else 'Are the parts and the known sizes right?' if parts.get('known') else 'Are the parts right?'})
+    sizes = [{(p.strip().lower(), m.strip().lower()): size for p, m, size, _ in v['spec'].get('sizes') or []} for v in views]
+    live = [n for n, v in enumerate(views) if v['state'] != 'with_assistant']
+    for n in live:
+        v, keep, same, differs = views[n], [], {}, []
+        for row in v['spec'].get('sizes') or []:
+            k = (row[0].strip().lower(), row[1].strip().lower())
+            other = [f'{row[0]} {row[1]}: differs from {views[m]["title"]}: {sizes[m][k]}' for m in live if m != n and sizes[m].get(k, row[2]) != row[2]]
+            asked = any(sizes[m].get(k) == row[2] for m in live if m != n and (m < n if views[m]['state'] == v['state'] else views[m]['state'] == 'recorded' and v['state'] == 'open'))
+            if other or not asked:
+                keep.append(row)
+                differs += other
+            else:
+                same.setdefault(row[0], []).append(f'{row[1]} {row[2]}')
+        v['spec'] = {**{k: x for k, x in v['spec'].items() if k != 'sizes'}, **({'sizes': keep} if keep else {}), **({'differs': differs} if differs else {}),
+                     **({'confirmed': '; '.join(f"{part}: {', '.join(xs)}" for part, xs in same.items())} if same else {})}
+    return views
 
 
 def _drawing_items(ctx):
@@ -475,7 +557,7 @@ def _waiting_items(ctx):
     rows = [w for w in rows if w['kind'] not in ('set to judge', 'set to make')]   # the round's own items, above
     shots = {sh['id']: sh for _, sh in V._accepted_shots(plan, session)}
     title = lambda sid: (shots.get(sid) or {}).get('title') or sid
-    items = []
+    items, specs = [], None
     for n, w in enumerate(rows, 1):
         kind, group, it = w['kind'], w['group'], w['item']
         where = f'{n} of {len(rows)} waiting'
@@ -510,19 +592,18 @@ def _waiting_items(ctx):
                                [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator what to correct.')],
                                show=[_pic(run, r['id'], f'{group}-step-{i + 1}') for i, r in enumerate(chain)]))
         elif kind in ('drawing spec to approve', 'material spec to approve'):
-            if kind.startswith('material'):
-                key = 'element:' + group
-                spec = next((e.get('material_spec') for e in plan['elements'] if e['id'] == group), None)
-                what = f'{names.get(group, group)}: the facts of this material'
-            else:
-                key, spec, what = group, (shots.get(group) or {}).get('drawing_spec'), f'{title(group)}: the parts and sizes of this drawing'
+            key = V.material_key(group) if kind.startswith('material') else group
+            specs = specs or {v['key']: v for v in _spec_views(ctx)}   # design/209: the plain words the page shows, a size the operator approved earlier in the film said once
+            view = specs.get(key)
+            if not view:
+                continue
 
             def run_(choice, quote, words, key=key):
                 if choice == 'yes':
                     return V.approve_spec(store, user, run, outputs, key, quote)
                 return V.correct_spec(store, user, run, outputs, key, words)
-            items.append(_item(f"spec:{key}:{V.spec_digest(spec)[:10] if spec else ''}", 'spec', where, f'{what}. Are they right?', run_,
-                               [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator which value is wrong and what it should be.')], text=_spec_text(spec)))
+            items.append(_item(view['item'], 'spec', where, f"{view['title']}: {view['ask'][0].lower()}{view['ask'][1:]}", run_,
+                               [_button('Yes', 'yes'), _button('Correct it', 'correct', words=True, tell='Ask the operator which value is wrong and what it should be.')], text=_spec_text(view['spec'])))
         elif kind == 'take to select':   # design/207 (D2): the reuse question is retired; a reuse that passes the checks is kept without the operator
             job = next((j for j in take_rows if str(j['id']) == str(it)), None)
             if not job:
