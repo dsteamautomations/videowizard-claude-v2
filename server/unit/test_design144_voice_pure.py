@@ -99,4 +99,4 @@ def test_a_narration_answer_names_where_the_tweak_control_is():   # design/144 V
     assert "A sentence's tone or pace" in V.TWEAK_HINT and 'vw voice tweak' in V.TWEAK_HINT and 'A word sounds wrong' in V.TWEAK_HINT   # design/194: the control renamed, the word control beside it
     from pathlib import Path
     page = (Path(V.__file__).parent / 'templates' / 'voices2.html').read_text(encoding='utf-8')
-    assert "<summary>A sentence's tone or pace</summary>" in page and 'direction_number' in page and 'made_before_pronunciations_change' in page
+    assert "<summary>A sentence's tone or pace</summary>" in page and 'direction_number' in page and 'older: without the corrected words' in page   # design/208 J: said by the approved words themselves

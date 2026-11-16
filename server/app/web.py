@@ -221,6 +221,8 @@ def _voices2_state(conn, user, run):
     state = voices.page_state(store, run)
     if state.get('final') and not any(o['stage'] == 'voice' and o['unit'] is None for o in outputs):   # design/194: after a reopen the old final is no longer the final
         state = {**state, 'final': None}
+    said = voices.words_doc(store, run)   # design/208 I: each narration says whether the approved words are the ones it was made with
+    state = {**state, 'narrations': [{**n, 'behind': voices.narration_behind(n, said)} for n in state.get('narrations') or []]}
     direction = voices.direction_of(store, run)
     job_rows = conn.execute("select id, status, request, result, error, created_at from vw2_jobs where run_id=%s and stage='voice' order by created_at", (run['id'],)).fetchall()
     jobs_ = [{'id': str(j['id']), 'status': j['status'], 'kind': j['request'].get('kind'), 'voice_id': j['request'].get('voice_id'), 'name': j['request'].get('name'),
@@ -583,6 +585,66 @@ def voices2_data(request: Request, code: str, vw2_session: str | None = Cookie(d
         return JSONResponse(core.jsonable(_voices2_state(conn, user, run)))
 
 
+# ---------- design/208: "A word sounds wrong" on a page of its own, for one narration ----------
+
+@router.get('/runs/{code}/voices2/words/{job}', response_class=HTMLResponse)
+def voice_words_page(request: Request, code: str, job: str, vw2_session: str | None = Cookie(default=None)):
+    user = page_user(vw2_session)
+    if not user:
+        return login_redirect(request)
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+    return render(request, 'voice_words.html', user=user, run=run, job=job[:64])   # the narration is in the path, so a sign-in comes back to it
+
+
+def _voice_words_state(conn, store, run, job_id):
+    """The page's data: the narration it was opened for, the script, the corrected words, the tries made in this voice, and the time of every word of
+    the script in this narration (for "Hear it now"; empty when the narration has none)."""
+    import json
+    from . import core, voices
+    outputs = core.current_outputs(conn, run['id'])
+    state = voices.page_state(store, run)
+    narr = next((n for n in state.get('narrations') or [] if str(n.get('job_id')) == job_id), None)
+    job = conn.execute("select id, status, request, result, created_at from vw2_jobs where id::text=%s and run_id=%s and stage='voice'", (job_id, run['id'])).fetchone() if narr else None
+    if not job or job['status'] != 'ready':
+        raise Problem(404, 'NO_NARRATION', 'That narration is not on this film, or is not ready. Open the word page from a narration\'s row.')
+    script, _ = voices.script_text(store, outputs)
+    text = script['spoken_text']
+    result = job['result'] or {}
+    try:
+        times = voices.token_times(json.loads(store.get(result['timing_key']).decode('utf-8')), text) if result.get('timing_key') else []
+    except (Problem, ValueError, KeyError):
+        times = []
+    voice_id = job['request'].get('voice_id')
+    rows = conn.execute("select id, status, request, result, error, created_at from vw2_jobs where run_id=%s and stage='voice' and request->'pronounce' is not null "
+                        "and request->>'voice_id'=%s order by created_at", (run['id'], voice_id)).fetchall()
+    tries = [{'id': str(j['id']), 'status': j['status'], **{k: j['request']['pronounce'].get(k) for k in ('word', 'say_as', 'alone')},
+              'audio_key': (j['result'] or {}).get('audio_key'), 'error': j['error'], 'created_at': j['created_at'].isoformat()} for j in rows]
+    words = voices.words_view(store, run, text)
+    closed = any(o['stage'] == 'voice' and o['unit'] is None for o in outputs)
+    said = voices.words_doc(store, run)
+    newest = [n for n in state.get('narrations') or [] if n.get('voice_id') == narr.get('voice_id')][-1]   # design/208: a newer narration of this voice that already has the words
+    newer = {'job_id': newest['job_id'], 'number': newest.get('number')} if newest['job_id'] != job_id and not voices.narration_behind(newest, said) else None
+    making = bool(conn.execute("select 1 from vw2_jobs where run_id=%s and stage='voice' and request->>'kind'='narration' and status = any(%s) limit 1",
+                               (run['id'], ['queued', 'running', 'storage_pending'])).fetchone())
+    return {'run': {'code': run['code'], 'title': run.get('title')}, 'closed': closed, 'script_text': text, 'words': words, 'tries': tries, 'times': times, 'making': making,
+            'narration': {'job_id': job_id, 'voice_id': voice_id, 'name': narr.get('name'), 'number': narr.get('number'), 'made_at': job['created_at'].isoformat(),
+                          'audio_key': result.get('audio_key'), 'behind': voices.narration_behind(narr, said), 'newer': newer}}
+
+
+@router.get('/runs/{code}/voices2/words/{job}/data')
+def voice_words_data(request: Request, code: str, job: str, vw2_session: str | None = Cookie(default=None)):
+    from fastapi.responses import JSONResponse
+    from . import core
+    from .storage import storage
+    user = page_user(vw2_session)
+    if not user:
+        raise Problem(401, 'SIGN_IN', 'Sign in first.')
+    with db_connect() as conn:
+        run = _run_by_code(conn, user, code)
+        return JSONResponse(core.jsonable(_voice_words_state(conn, storage(), run, job[:64])))
+
+
 @router.get('/voices2/search')
 def voices2_search(request: Request, vw2_session: str | None = Cookie(default=None)):
     from fastapi.responses import JSONResponse
@@ -656,8 +718,10 @@ def _voices2_act(code, vw2_session, body):
             return JSONResponse({'job': str(row['id'])})
         if action == 'word-hear':   # design/194: the same three functions `vw voice pronounce` calls
             return JSONResponse(voices.try_word(conn, store, user, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), rid, bool(body.get('alone'))))
+        if action == 'word-cost':   # design/208: what a try would cost and whether it was made before; nothing is sent
+            return JSONResponse(voices.try_preview(conn, store, run, outputs, body['voice_id'], body.get('word'), body.get('say_as'), bool(body.get('alone'))))
         if action == 'word-final':
-            return JSONResponse(voices.finalise_word(store, user, run, outputs, body.get('word')))
+            return JSONResponse(voices.finalise_word(store, user, run, outputs, body.get('word'), body.get('say_as')))
         if action == 'word-remove':
             return JSONResponse(voices.remove_word(store, user, run, outputs, body.get('word')))
         if action == 'final':

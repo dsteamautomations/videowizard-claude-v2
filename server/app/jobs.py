@@ -30,8 +30,9 @@ def same_recording(snapshot, earlier):
     for n, row in enumerate(earlier, 1):
         req = row['request'] or {}
         try:
-            same = row['status'] == 'ready' and req.get('pronunciations_version') == snapshot.get('pronunciations_version') \
-                and [p['identity'] for p in narration_pieces.pieces_of(req)] == want
+            said = (req.get('pronunciations_digest'), snapshot.get('pronunciations_digest'))   # design/208 I: the approved words themselves; the counter for an older row
+            words = said[0] == said[1] if None not in said else req.get('pronunciations_version') == snapshot.get('pronunciations_version')
+            same = row['status'] == 'ready' and words and [p['identity'] for p in narration_pieces.pieces_of(req)] == want
         except (KeyError, TypeError):   # an older row of another shape is never the same recording
             same = False
         if same:
@@ -95,6 +96,7 @@ def submit_voice(conn, user, run, outputs, request, request_id, store=None):
     snapshot = {'kind': kind, 'voice_id': voice['voice_id'], 'name': voice['name'], 'model_id': model, 'settings': settings_, 'text': text, **({'saved_from_library': True} if saved_now else {}),
                 **({'dictionaries': [said['dictionary']]} if said and said.get('dictionary') else {}),
                 **({'pronunciations_version': said['version']} if said and said.get('version') else {}),   # design/194: also when the last word was removed (no dictionary)
+                **({'pronunciations_digest': said['digest']} if said and said.get('version') and said.get('digest') is not None else {}),   # design/208 I
                 **({'pronounce': request['pronounce']} if kind == 'audition' and request.get('pronounce') else {}),   # design/194: a try of one word, not a voice tryout
                 'characters': len(text), 'format': 'mp3_44100_128', 'source_script': script['summary']['content_digest'],
                 **({'timing_mode': 'generation', 'pieces': pieces, **directed} if kind == 'narration' else {})}
