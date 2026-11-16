@@ -70,7 +70,16 @@ def test_a_footage_frame_or_web_picture_of_a_person_is_refused_as_a_parent_by_na
     with pytest.raises(Problem, match='F4 is a footage frame of The mason'):   # a parent of any picture, not only the person's own
         g(lambda: image(store, element_id='E3', kind='sheet', name='sheet-E3', subject='the broom', parents=['W3', 'F4'],
                         prompt='Image 1 is the broom: take its form. Image 2 is the mason: take the hand.'))
-    assert image(store, element_id='E4', kind='sheet', name='sheet-E4', subject='the mason', parents=['U4'], prompt="Image 1 is the operator's own picture of the mason: take his build.")['reference_id']
+    own = lambda: image(store, element_id='E4', kind='sheet', name='sheet-E4', subject='the mason', parents=['U4'], prompt="Image 1 is the operator's own picture of the mason: take his build.")
+    with pytest.raises(Problem, match="U4 is the operator's own picture of The mason \\(E4\\), a person: .* only with their permission.*vw visuals likeness --element E4"):   # design/207 (D1)
+        g(own)
+    s = saved(store)
+    s['likeness'] = {'E4': {'quote': 'Yes, he agreed.', 'by': 'u1', 'at': '2026-11-16T00:00:00+00:00'}}
+    put(store, s)
+    assert own()['reference_id']   # with the operator's recorded yes the photo goes in; a footage frame too
+    assert image(store, element_id='E4', kind='sheet', name='sheet-E4f', subject='the mason', parents=['F4'], prompt='Image 1 is the mason in the footage: take his build.', request_id='q-frame')['reference_id']
+    with pytest.raises(Problem, match='W4 is a web picture .* from the web is never sent'):   # a web picture never, permission or not
+        g(lambda: image(store, element_id='E4', kind='sheet', name='sheet-E4', subject='the mason', parents=['W4'], prompt='Image 1 is the mason: take his build.'))
     assert image(store, element_id='E4', kind='sheet', name='sheet-E4w', subject='the mason', parents=[], prompt='The mason: wiry, about fifty, a faded blue shirt.', request_id='q-words')['op'] == 'generate'
 
 

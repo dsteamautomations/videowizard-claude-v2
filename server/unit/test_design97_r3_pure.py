@@ -27,8 +27,9 @@ def test_waiting_lists_each_item_for_the_operator_in_film_order_with_its_label_a
     items = VS.waiting(sess, VS.current_plan(store_with(sess, doc), sess), 'VW-9', [take('j1', 'VS1'), take('j2', 'VS1', 'running')])
     labels = [i['label'] for i in items]
     assert labels[0] == 'Reference sheet · E1'
-    assert 'Reuse · DG1' in labels and 'Graphics · AN1 · 3 states' in labels and 'Still · DG2' in labels and 'Drawing spec to approve · DG2' in labels and 'Take · VS1' in labels
-    assert labels.index('Reuse · DG1') < labels.index('Graphics · AN1 · 3 states') < labels.index('Still · DG2') < labels.index('Take · VS1')   # film order
+    assert 'Reuse · DG1' not in labels   # design/207 (D2): a reuse no longer waits for the operator; an entry left from before is not listed
+    assert 'Graphics · AN1 · 3 states' in labels and 'Still · DG2' in labels and 'Drawing spec to approve · DG2' in labels and 'Take · VS1' in labels
+    assert labels.index('Graphics · AN1 · 3 states') < labels.index('Still · DG2') < labels.index('Take · VS1')   # film order
     by = {i['label']: i for i in items}
     assert by['Still · DG2']['link'] == '/runs/VW-9/visuals#pictures/DG2/K1' and by['Take · VS1']['link'] == '/runs/VW-9/visuals#takes/VS1/j1'
     assert by['Reference sheet · E1']['link'] == '/runs/VW-9/visuals#references/E1/S1' and by['Still · DG2']['step'] == 'pictures'

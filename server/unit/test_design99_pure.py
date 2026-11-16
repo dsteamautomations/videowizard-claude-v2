@@ -60,7 +60,7 @@ def test_the_search_and_the_pick_need_no_words():
 def test_the_round_needs_no_words_and_the_page_wide_steps_still_do():
     for fn in (VS.round_done, VS.round_picks, VS.select_take, VS.review_take):
         assert 'words are required' not in inspect.getsource(fn) and 'reply is required' not in inspect.getsource(fn), fn.__name__
-    for fn, needle in ((VS.correct_footage, 'words are required'), (VS.revise_gap, 'reply is required'), (VS.approve_reuse, 'words approving the reuse are required')):
+    for fn, needle in ((VS.correct_footage, 'words are required'), (VS.revise_gap, 'reply is required')):   # design/207 (D2): approve_reuse is retired; a reuse needs no words of the operator
         assert needle in inspect.getsource(fn), fn.__name__
 
 

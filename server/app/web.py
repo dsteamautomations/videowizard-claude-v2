@@ -452,7 +452,8 @@ def _visuals_act(code, vw2_session, body):
             'fix': lambda: V.request_fix(conn, store, user, run, outputs, body['reference_id']),   # design/96 X1: the click is the request
             'clip': lambda: V.fill_clip(store, user, run, outputs, body['shot_id'], body['clip_id'], float(body.get('in_s') or 0), quote,
                                         {'reason': body.get('reuse'), 'considered': body.get('considered')}, body.get('crop')),   # design/89 B3, finding 7
-            'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7
+            'approve-reuse': lambda: V.approve_reuse(store, user, run, outputs, body['shot_id'], quote),   # design/89 H7; design/207 (D2): retired, answers in plain words (a page left open)
+            'likeness': lambda: V.likeness(store, user, run, outputs, body['element_id'], str(body.get('quote') or ''), conn=conn, stand_in=bool(body.get('stand_in'))),   # design/207 (D1): the permission line on a person's card
             'approve-spec': lambda: V.approve_spec(store, user, run, outputs, body['shot_id'], quote),   # design/89 D4
             'approve-specs': lambda: V.approve_specs(store, user, run, outputs, quote),   # design/106 D5
             'note': lambda: V.note_reference(store, user, run, outputs, body['reference_id'], body.get('note')),   # design/106 N4

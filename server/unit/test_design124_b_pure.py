@@ -347,10 +347,10 @@ def test_a_real_speaker_is_never_an_ai_still_or_take():
     assert 'speaker' not in out['elements'][0]   # absent stays absent
 
 
-def test_no_ai_picture_of_a_real_speaker_is_made():
+def test_an_ai_picture_of_a_real_speaker_is_made():
+    """design/207 point 4 (the stage half): the refusal "a real person speaking to camera: never an AI picture of them" is retired."""
     store = person_store()
     doc = json.loads(store.files['run-1/visuals/plan-v1.json'])['document']
     next(e for e in doc['elements'] if e['id'] == 'E4')['speaker'] = True
     store.files['run-1/visuals/plan-v1.json'] = json.dumps({'document': doc}).encode('utf-8')
-    with pytest.raises(Problem, match='real person speaking to camera'):
-        g(lambda: image(store, element_id='E4', kind='sheet', name='sheet-E4', subject='the client', parents=[], prompt='The client: about sixty, a white shirt.'))
+    assert image(store, element_id='E4', kind='sheet', name='sheet-E4', subject='the client', parents=[], prompt='The client: about sixty, a white shirt.')['reference_id']

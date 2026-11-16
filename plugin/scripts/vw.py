@@ -1809,7 +1809,7 @@ def _round_one(a, base):
 
 
 VISUALS_WHAT = ['prepare', 'treatment', 'sequence', 'budget', 'check', 'propose', 'select', 'accept', 'revise', 'elements', 'round', 'search', 'pick', 'nothing-fits', 'frame', 'supply', 'own', 'web',
-                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
+                'image', 'approve', 'reject', 'bind', 'packet', 'generator', 'prepare-take', 'take', 'status', 'fetch', 'review', 'still', 'asset', 'generations', 'record', 'feedback', 'footage', 'clip', 'reuse', 'spec', 'measure', 'unplace', 'fix', 'note', 'ask', 'answer', 'not-this', 'draw', 'font', 'scene', 'plan-join', 'plan', 'next', 'decide', 'card', 'page', 'likeness']   # design/113; design/117   # design/74 L26, L7; design/76; design/73; design/79; design/106 N4
 
 
 # design/106 T3: each subcommand takes only the flags it reads; any other is refused by name, before anything reaches the server
@@ -1828,7 +1828,8 @@ VISUALS_FLAGS = {
     'status': {'gap', 'shot', 'wait'}, 'fetch': {'ref', 'job'}, 'review': {'job', 'decision', 'notes', 'timing', 'quote'},
     'still': {'file', 'shot', 'ref', 'move', 'quote'} | _REUSE, 'clip': {'shot', 'clip', 'at', 'quote'} | _REUSE, 'asset': {'file', 'shot', 'kind', 'quote', 'made'}, 'generations': {'shot'},
     'sequence': {'shot', 'refs', 'quote'}, 'footage': {'camera', 'support', 'look', 'quote'}, 'reuse': {'shot', 'quote'}, 'spec': {'shot', 'element', 'quote', 'notes'},
-    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'}}
+    'measure': {'refs', 'question'}, 'unplace': {'shot', 'quote'}, 'note': {'ref', 'notes'},
+    'likeness': {'element', 'quote', 'stand_in'}}   # design/207 (D1)
 _VISUALS_ALL = set().union(*VISUALS_FLAGS.values()) | {'inr'}
 
 
@@ -2485,8 +2486,15 @@ def cmd_visuals(a):
             emit({'action': 'refused', 'message': 'Give the shot, the clip and where the stretch starts: `vw visuals clip --shot S --clip C --at <seconds> --quote "<their words>"`.'}, 2)
         out = write(base + '/clip', {'shot_id': a.shot, 'clip_id': a.clip, 'in_s': _number(a.at, '--at'), 'quote': a.quote, **_reuse_fields(a)})
         emit(out, 0, f"Shot {a.shot} filled with clip {a.clip} from {out['in_s']} s to {out['out_s']} s.")
-    if a.what == 'reuse':   # design/89 H7: the operator approves a proposed reuse with their words
-        emit(write(base + '/reuse', {'shot_id': a.shot, 'quote': a.quote}), 0, f'Reuse approved for {a.shot} with the operator\'s words.')
+    if a.what == 'reuse':   # design/207 (D2): retired by name (the older way, design/89 H7: the operator approved a proposed reuse with their words)
+        emit({'action': 'refused', 'message': "vw visuals reuse is retired: a reuse no longer needs the operator's approval. Place the shot again with the reason and the reimagined shot "
+                                              'considered (`vw visuals clip` or `vw visuals still`, with --reuse, --considered and --crop): a reuse that passes the checks is kept. Nothing was sent.'}, 2)
+    if a.what == 'likeness':   # design/207 (D1): the operator's yes that they have a person's permission to make AI pictures of them; --stand-in removes it
+        if not a.element or not (a.quote or '').strip():
+            emit({'action': 'refused', 'message': 'vw visuals likeness --element E --quote "<the operator\'s own words>" records that the operator has this person\'s permission; '
+                                                  'add --stand-in to make the person a stand-in again (made from the description). Nothing was sent.'}, 2)
+        out = write(base + '/likeness', {'element_id': a.element, 'quote': a.quote.strip(), 'stand_in': bool(getattr(a, 'stand_in', False))})
+        emit(out, 0, out.get('next') or ('The person is a stand-in again.' if getattr(a, 'stand_in', False) else 'The permission is recorded.'))
     if a.what == 'spec':   # design/89 D4; design/106 D4, D5: no words needed, no sizes typed; every spec at once, or one correction; design/111 F10: --element E for a material spec
         if a.element and not a.shot:
             a.shot = 'element:' + a.element
@@ -3363,6 +3371,7 @@ def build_parser():
                  '--keywords', '--search', '--n', '--reason', '--verdicts', '--picks', '--sets', '--move', '--role', '--item', '--choices', '--cost', '--source', '--accept', '--send-back', '--base', '--verdict', '--words', '--make', '--aside', '--back', '--made', '--in-s'):   # design/177: round's step-2 actions   # design/124 Changes 6, 9   # design/73, design/79; design/94 --move; design/106 --role; design/110; design/121 --source
         s.add_argument(flag)
     s.add_argument('--undo', action='store_true', help='round: undo Done until the next step used it (design/110 rule 0)')
+    s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
     s.add_argument('--one', action='store_true', help='next, decide, card: ask what comes next one at a time, never on a card (design/190)')
     s.add_argument('--rebuild', action='store_true', help='plan-join: drop the hand edits of out/visual-plan.json and rebuild it from the gap files (design/149 B7)')

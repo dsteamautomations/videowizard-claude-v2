@@ -247,7 +247,7 @@ const searching={}, ignoredEls={};   // design/121: the things whose search is r
 const ans={}, stale={}, notRec={}, v1={};   // stale: a stored answer discarded because its set was made again; notRec: the card a refused Done names; v1: step 1's Ignore this, kept across a redraw (E13)
 let saveChain=Promise.resolve(), confirmSets=false, doneBusy=false, sending='', clearWords=false, lastErr='';
 let pressed=null;   // U18: the button whose action is running or was last refused: {el, sel: the same button after a redraw, err: [text, kind], live: its click is still being handled}
-const OWN_FOR_PEOPLE=false, OWN_MAX=15*1024*1024;   // U19: an uploaded photo of a real person is not used until SK rules on it: true switches it on (the server's line: OWN_PICTURE_FOR_PEOPLE in visuals_stage.py)
+const OWN_MAX=15*1024*1024;   // U19; design/207 (D1): a person's photo is taken once the permission is recorded (data.likeness; the server's line: own_picture_refused in visuals_stage.py)
 const VW={yes:'Yes',no:'No',correct:'Correct it'}, SHORT={'material spec to approve':'spec to approve','drawing spec to approve':'spec to approve'};
 const FAILED='That could not be done; nothing was changed. The builder has been told what failed.';   // follow-up fix 9: never a bare key name or an exception's text
 const rx=s=>s.replace(/[^\w-]/g,'\\$&');
@@ -432,7 +432,7 @@ function clipForm(s){   // design/89 B3, finding 7: a stretch of a clip fills a 
     '<input id="cf-at-'+id+'" type="number" min="0" step="0.1" placeholder="from second" style="width:120px"></div>'+reuseFields(s)+
     '<textarea id="cf-w-'+id+'" class="words" style="width:100%;margin-top:6px" placeholder="your words for this stretch"></textarea>'+
     '<div class="btns"><button class="go" data-a="clip" data-shot="'+id+'">Use this stretch</button></div></details>';}
-function reuseFields(s){const id=esc(s.shot_id);   // H2, H4: only when the footage is already on screen elsewhere; the operator then approves the reuse
+function reuseFields(s){const id=esc(s.shot_id);   // H2, H4: only when the footage is already on screen elsewhere; design/207 (D2): a reuse that passes the checks is kept, with no approval
   return '<div class="ds" style="margin-top:6px">Only if this footage is already on screen elsewhere:</div>'+
     '<input id="rf-why-'+id+'" placeholder="why the same footage again" style="width:100%">'+
     '<input id="rf-alt-'+id+'" placeholder="the new angle considered, and why it adds nothing" style="width:100%;margin-top:4px">'+
@@ -476,12 +476,6 @@ function specBox(s){   // design/89 D2, D4: the drawing spec as a table, approve
     '<input id="ms-q-'+id+'" placeholder="what to measure, for example: how thick is the wall?" style="width:100%;margin-top:4px"><div class="btns"><button data-a="measure" data-shot="'+id+'">Measure</button></div>';
   const ms=(data.measurements||[]).flatMap(m=>m.measurements.map(x=>esc(x.part)+' '+esc(x.measure)+' '+esc(x.value)+' '+esc(x.unit)+' ('+esc(x.source)+')'));
   return h+(ms.length?'<div class="ds">Measured: '+ms.join(' · ')+'</div>':'')+'</details>';}
-function reuseBox(s){   // design/89 H2, H7: a reuse the assistant proposed waits for the operator's own words
-  const p=(data.reuse_pending||{})[s.shot_id];if(!p)return '';
-  return '<div class="card" style="border-color:var(--accent);margin-top:8px"><b>Showing footage again</b><div class="ds">Clip '+esc(p.clip_id)+' is already on screen in '+esc(p.on_screen)+'. '+
-    'The reason: '+esc(p.reason)+'. The new angle considered: '+esc(p.considered)+'. A reimagined shot is preferred; approve only if it adds nothing.</div>'+
-    '<textarea id="rw-'+esc(s.shot_id)+'" class="words" style="width:100%;margin-top:6px" placeholder="your words: why the same footage is right here"></textarea>'+
-    '<div class="btns"><button class="go" data-a="approve-reuse" data-shot="'+esc(s.shot_id)+'">Approve the reuse</button></div></div>';}
 function timed(g){const t=g.timing;if(!t||!t.sentences||!t.sentences.length)return '';   // design/89 A1: when each sentence is spoken in the gap
   return '<div class="ds timed">'+t.sentences.map(s=>'<span class="tm">'+Number(s.start_s).toFixed(1)+'–'+Number(s.end_s).toFixed(1)+' s</span> “'+esc(s.text)+'”').join('<br>')+'</div>';}
 function intendedBlock(){const iv=data.intended_visuals||[];if(!iv.length)return footageBlock();return footageBlock()+'<h3>The script\'s intended visuals</h3><div class="card">'+iv.map(e=>'<div class="ds"><b>'+esc(e.heading||'(no heading)')+'</b>'+(e.narration_starts?' · “'+esc(e.narration_starts)+'…”':'')+'</div><ul class="intended">'+e.lines.map(l=>'<li>'+esc(l)+'</li>').join('')+'</ul>').join('')+'</div>';}
@@ -585,7 +579,11 @@ function noteBox(r){   // design/106 N4: a saved picture's note, editable until 
   if((data.references||[]).some(x=>x.kind==='sheet'&&x.element_id===r.element_id&&x.status!=='rejected'))return r.note?'<div class="ds">Note: '+esc(r.note)+'</div>':'';
   return '<textarea id="ref-note" class="pnote keep" placeholder="note for the sheet: keep … / avoid …">'+esc(r.note||'')+'</textarea><div class="btns"><button data-a="save-note" data-ref="'+esc(r.id)+'">Save the note</button></div>';}
 function supplyBox(eid,label){return '<div class="search"><input type="file" id="up-'+esc(eid)+'" accept="image/png,image/jpeg,image/webp"><input id="url-'+esc(eid)+'" placeholder="or an https link to a picture"><button data-a="supply" data-el="'+esc(eid)+'">'+(label||'Add your own picture')+'</button></div>';}
-function ownAllowed(e){return e.kind!=='person'||OWN_FOR_PEOPLE;}   // U19: the one condition on the page: things and places only for now
+function ownAllowed(e){return e.kind!=='person'||!!(data.likeness||{})[e.id];}   // U19; design/207 (D1): the one condition on the page: a person's photo only with the recorded permission
+function likenessBox(e){const id=esc(e.id), k=(data.likeness||{})[e.id];   // design/207 (D1): the permission line on a person's card; the same server function as `vw visuals likeness`
+  return '<div class="search"><input id="lk-'+id+'" placeholder="your words: '+(k?'why this person is a stand-in now':'how you have their permission')+'">'+
+    (k?'<button data-a="likeness" data-el="'+id+'" data-off="1">Make this person a stand-in</button>':'<button data-a="likeness" data-el="'+id+'">I have this person\'s permission to make AI pictures of them</button>')+'</div>'+
+    '<div class="ds">'+(k?'You said you have this person\'s permission: "'+esc(k.quote)+'". Their sheet is made from the photo you upload here.':'With their permission you can upload their photo and their sheet is made from it. Without it this person is a stand-in, made from the description.')+'</div>';}
 function ownRef(eid,kind){return kind!=='person'&&(data.references||[]).some(r=>r.kind==='supplied'&&r.element_id===eid&&r.status==='approved');}   // F2: an approved own picture of a thing or a place is its reference
 function ownPics(eid){return (data.references||[]).filter(r=>r.kind==='supplied'&&r.element_id===eid&&r.url&&(r.status==='approved'||r.status==='rejected'));}
 function goldBtn(eid,rid,gold){return '<button class="gold'+(gold?' on':'')+'" data-golden="'+esc(eid)+':'+esc(rid)+'" aria-pressed="'+(gold?'true':'false')+'" title="the golden picture: the one every shot of this thing starts from">Use this as the starting picture</button>';}   // R2
@@ -594,8 +592,8 @@ function minePic(x,eid,gold,pick){   // U19: one picture of the operator's own o
     (pick&&x.status==='approved'?goldBtn(eid,x.id,gold):'')+'<div class="btns" style="margin:0 6px 6px">'+verdictBtns(x,{plain:true,approve:'Use it again',reject:'Remove'})+'</div></div>';}
 function ownBox(e,can){   // U19: "Upload my own picture" on the card of a thing or a place: a file or an https link
   if(!can)return '';
-  return ownAllowed(e)?'<div class="own" data-own="'+esc(e.id)+'">'+supplyBox(e.id,'Upload my own picture')+'<div class="ds">Your own picture of it, when none of these fits: a PNG, JPEG or WebP file up to 15 MB, or a link.</div></div>'
-    :'<div class="ds own" data-own-no="'+esc(e.id)+'">A person\'s reference is made from the description; an uploaded photo is not used for people.</div>';}
+  return ownAllowed(e)?'<div class="own" data-own="'+esc(e.id)+'">'+supplyBox(e.id,'Upload my own picture')+'<div class="ds">Your own picture of it, when none of these fits: a PNG, JPEG or WebP file up to 15 MB, or a link.</div>'+(e.kind==='person'?likenessBox(e):'')+'</div>'
+    :'<div class="own" data-own-no="'+esc(e.id)+'">'+likenessBox(e)+'</div>';}
 function ownBlock(e,can){const m=ownAllowed(e)?ownPics(e.id):[];return (m.length?'<div class="strip">'+m.map(x=>minePic(x,e.id,false,false)).join('')+'</div>':'')+ownBox(e,can);}   // step 1: shown and kept for step 2   // design/110; design/126 U6: also in the round's panel
 function usedIn(eid){   // design/126 U7: each plan shot that shows the thing, with the narration words under it (film frames, as the gap's timing) and its one-line purpose
   const out=[];(data.gaps||[]).forEach(g=>(g.shots||[]).forEach(s=>{if(!(s.element_ids||[]).includes(eid))return;
@@ -858,7 +856,7 @@ function renderKeptRound(rd){   // design/151: pass 1 the frames; 'making' while
         (ownAllowed(e)?ownPics(eid).map(x=>minePic(x,eid,(done?(d.golden||{})[eid]:a.golden)===x.id,!done)).join(''):'');   // R2; U19: the operator's own pictures beside the set's
       const notes=all[0].notes?'<details><summary class="ds" style="cursor:pointer">the model\'s notes and sources</summary><div class="ds" style="white-space:pre-wrap">'+esc(all[0].notes)+'</div>'+((all[0].sources||[]).map(s=>'<div class="ds"><a href="'+esc(s.url||'')+'" target="_blank" rel="noopener">'+esc(s.title||s.url||'')+'</a></div>').join(''))+'</details>':'';
       const body=head(eid,e,r)+(done?' <span class="badge ok">approved</span>':'')+'<div class="strip">'+pics+'</div>'+psum(all.map(x=>set.includes(x)?pstate(x,eid):'failed'))+notes+(done?'':ownBox(e,can))+
-        (r.spec_changed?'<div class="ds err" style="margin-top:6px">the spec changed after this set was made'+(r.cause?': '+esc(r.cause.text):'')+'. Make the set again with the spec as it is now, or judge this one.</div>'+(can?'<div class="btns"><button data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button></div>':''):'');   // E14
+        (r.spec_changed?'<div class="ds err" style="margin-top:6px">'+(r.photo_changed?'the photo or the permission changed after this set was made'+(r.cause?': '+esc(r.cause.text):'')+'. Make the set again as it stands now, or judge this one.':'the spec changed after this set was made'+(r.cause?': '+esc(r.cause.text):'')+'. Make the set again with the spec as it is now, or judge this one.')+'</div>'+(can?'<div class="btns"><button data-a="set-make" data-el="'+esc(eid)+'"'+(capHit()?' disabled title="the spend cap is reached"':'')+'>Make it now</button></div>':''):'');   // E14
       if(done)return body+tail+'</div>';   // R16: approved in an earlier pass; it asks nothing
       return body+(thing?'':'<div class="ds">For a person the full-length front picture is taken automatically as the starting picture.</div>')+
         '<div class="btns" style="margin:8px 0;gap:18px"><label><input type="radio" name="v-'+esc(eid)+'" value="yes" '+(v==='yes'?'checked':'')+'> Yes</label><label><input type="radio" name="v-'+esc(eid)+'" value="no" '+(v==='no'?'checked':'')+'> No</label><label><input type="radio" name="v-'+esc(eid)+'" value="correct" '+(v==='correct'?'checked':'')+'> Correct it</label></div>'+
@@ -991,7 +989,7 @@ function renderPictures(){
       if(loose.length)sh+='<details><summary class="ds" style="cursor:pointer">No shot recorded ('+loose.length+')</summary><div class="strip">'+loose.map(r=>refCard(r,use(r),false,true)).join('')+'</div></details>';
       const used=(d.references||[]).filter(r=>s.element_ids.includes(r.element_id)&&r.status==='approved'&&['frame','supplied','web','isolated','sheet'].includes(r.kind));   // design/94 S2, U1
       if(used.length)sh+='<details><summary class="ds" style="cursor:pointer">References used ('+used.length+')</summary><div class="strip">'+used.map(r=>'<div class="pic">'+(r.url?'<img src="'+esc(thumbOf(r.url))+'" loading="lazy" decoding="async" alt="">':'')+'<div class="cap" title="'+esc(r.name)+'">'+esc(r.element_id)+' · '+esc(r.kind)+(r.kind==='web'?' · guide only':'')+'</div></div>').join('')+'</div></details>';
-      h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
+      h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+'</div>';
     });
   });
   $('s-pictures').innerHTML=split(h);   // design/97 P1, P2: the shared panel
@@ -1057,7 +1055,7 @@ function renderTakes(){
       sh+=guideBox(s);
       if(s.takes.length){sh+='<table><thead><tr><th>Take</th><th>State</th><th class="c">Play</th><th>Checklist</th><th>Review</th></tr></thead><tbody>'+s.takes.map(k=>'<tr data-take="'+esc(k.job_id)+'" data-item="'+esc(k.job_id)+'" class="'+(isSel('take',k.job_id)?'sel':'')+'" style="cursor:pointer"><td><span class="nm" style="font-size:17px">'+esc(k.job_id.slice(0,8))+'</span>'+(k.selected?' <span class="badge ok">selected</span>':'')+'</td><td class="ds">'+(takeRejected(k)?'<span class="badge err">rejected</span>':esc(k.status))+(k.duration_s!=null?' · '+esc(k.duration_s)+' s'+(k.timing_matches===false?' <span class="err">(shorter than its slot)</span>':''):'')+(k.error?'<div class="err">'+esc(k.error)+'</div>':'')+(k.check&&k.check.must_failed&&k.check.must_failed.length?' <span class="badge err">marked</span>':'')+'</td><td class="c">'+(k.url?'<button class="ic" data-play="'+esc(k.url)+'" data-name="'+esc(s.shot_id)+' · '+esc(k.job_id.slice(0,8))+'">▶</button>':'')+'</td><td>'+checklist(k.checklist)+takeCheck(k.check)+'</td><td>'+reviewsOf(k)+(k.status==='ready'&&can&&!k.selected&&!takeRejected(k)?'<div class="ds">'+(isWaiting(k.job_id)?'<span class="badge waitb">waiting for you</span> ':'')+'click the row: Select and Reject are beside it</div>':'')+'</td></tr>').join('')+'</tbody></table>';}
       else if(!supplied(s)){sh+='<div class="ds">'+(s.prepared?'Take prepared; the assistant submits it.':'No take yet.')+'</div>';}
-      h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+reuseBox(s)+'</div>';
+      h+=sh+qBox(s.shot_id)+specBox(s)+clipForm(s)+'</div>';
     });
   });
   $('s-takes').innerHTML=split(h);   // design/97 P2: a take, a pair, judged in the shared panel
@@ -1232,8 +1230,9 @@ async function doClick(b){
     await send({action:'correct-spec',shot_id:sh,words:w},'Correction sent: the assistant revises the spec.');return;}   // design/106 D4
   if(a==='measure'){const sh=b.dataset.shot,sel=$('ms-f-'+sh),q=(($('ms-q-'+sh)||{}).value||'').trim(),refs=sel?[...sel.selectedOptions].map(o=>o.value):[];   // design/89 D2: the same server function as `vw visuals measure`
     if(!refs.length||!q){msg('Pick the footage frames and say what to measure.',true);return;}await send({action:'measure',reference_ids:refs,question:q},'Measured; the sizes are under the spec.');return;}
-  if(a==='approve-reuse'){const w=(($('rw-'+b.dataset.shot)||{}).value||'').trim();if(!w){needWords('rw-'+b.dataset.shot,'Say in your words why the same footage is right here.');return;}
-    await send({action:'approve-reuse',shot_id:b.dataset.shot,quote:w},'Reuse approved with your words.');return;}
+  if(a==='likeness'){const el=b.dataset.el,off=!!b.dataset.off,w=(($('lk-'+el)||{}).value||'').trim();   // design/207 (D1): the same server function as `vw visuals likeness` (visuals_stage.likeness)
+    if(!w){needWords('lk-'+el,off?'Say in your words why this person is a stand-in now.':'Say in your words how you have this person\'s permission.');return;}
+    await send({action:'likeness',element_id:el,quote:w,stand_in:off},off?'This person is a stand-in again: the sheet is made from the description.':'Permission recorded: you can upload their photo now.');return;}
   if(a==='footage'){const w=(($('ftwords')||{}).value||'').trim();const v=k=>(($('ft-'+k)||{}).value||'')||null;   // design/88 F4: the words sit with the button
     if(!v('camera')&&!v('support')&&!v('look')){msg('Choose what to correct first.',true);return;} if(!w){needWords('ftwords','Say in your words what the footage really is.');return;}
     await send({action:'footage',camera:v('camera'),support:v('support'),look:v('look'),quote:w},'Footage corrected: your words win for the rest of the run.');return;}

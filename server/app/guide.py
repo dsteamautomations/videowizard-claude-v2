@@ -258,6 +258,7 @@ def request_still(conn, store, user, run, outputs, shot_id, prompt, parents, rep
         roles = ['Image 1 is the layout: take from it positions and framing only.'] + [f'Image {n} is {j}' + ('' if j.endswith('.') else '.') for n, j in enumerate(jobs_, 2 + len(sheets))]
         facts = _drawn_facts(session, parents)
         effective = '\n'.join(x for x in [STILL_OPEN, d['how'], DIAGRAM_WORDS, words, G.layout_block(spec), ' '.join(roles),
+                                          VS.size_line(*VS.guarded(lambda: VS.locate(store, session, shot_id))[::3]),   # design/207: (plan, shot): the size sentence, when size is the message
                                           RIGHT_HAND_WORDS if any(p.get('hands') for p in spec.get('people') or []) else '',
                                           ('What must be true:\n' + '\n'.join(f'- {f}' for f in facts)) if facts else '',
                                           LOOK_WORDS.format(n=len(inputs)) if looks else ''] if x)

@@ -143,15 +143,11 @@ def test_a_reuse_needs_the_reason_the_reimagined_shot_and_words_60_s_apart_a_dif
     why = {'reason': 'the only shot of the kiln', 'considered': 'a drone view: none exists'}
     with pytest.raises(Problem, match='different stretch'):
         g(lambda: VS.fill_clip(store, USER, RUN, [MEDIA, m2], 'VS1', 'c1', 2.0, 'yes', why, [0.1, 0.1, 0.7, 0.7]))   # 2-12 s overlaps 0-4 s
-    with pytest.raises(Problem) as exc:
-        g(lambda: VS.fill_clip(store, USER, RUN, [MEDIA, m2], 'VS1', 'c1', 10.0, 'Use the kiln clip.', why, [0.1, 0.1, 0.7, 0.7]))
-    assert exc.value.code == 'REUSE_WAITING' and 'vw visuals reuse --shot VS1' in exc.value.message   # the checks pass; the assistant's quote is not the approval
-    assert saved(store)['reuse_pending']['VS1']['reason'] == 'the only shot of the kiln' and 'VS1' not in saved(store)['assets']
-    with pytest.raises(Problem, match='words approving the reuse'):
-        g(lambda: VS.approve_reuse(store, USER, RUN, [MEDIA, m2], 'VS1', ''))
-    out = VS.approve_reuse(store, USER, RUN, [MEDIA, m2], 'VS1', 'Yes, reuse it: no other shot shows the kiln.')
-    assert out['reuse']['crop'] == [0.1, 0.1, 0.7, 0.7] and out['reuse']['approval'].startswith('Yes, reuse it') and 'VS1' not in saved(store).get('reuse_pending', {})
-    assert saved(store)['assets']['VS1']['quote'] == 'Use the kiln clip.'
+    out = VS.fill_clip(store, USER, RUN, [MEDIA, m2], 'VS1', 'c1', 10.0, 'Use the kiln clip.', why, [0.1, 0.1, 0.7, 0.7])   # design/207 (D2): the checks pass, so the reuse is kept; nothing waits for the operator
+    assert out['reuse']['crop'] == [0.1, 0.1, 0.7, 0.7] and out['reuse']['reason'] == 'the only shot of the kiln' and not saved(store).get('reuse_pending')
+    assert saved(store)['assets']['VS1']['quote'] == 'Use the kiln clip.' and saved(store)['assets']['VS1']['reuse']['considered'] == 'a drone view: none exists'
+    with pytest.raises(Problem, match="no longer needs the operator's approval"):   # the older way, retired by name
+        g(lambda: VS.approve_reuse(store, USER, RUN, [MEDIA, m2], 'VS1', 'Yes, reuse it.'))
 
 
 def test_two_shots_never_share_a_start_image_or_a_still():

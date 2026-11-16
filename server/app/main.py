@@ -301,6 +301,12 @@ class ReuseApprove(Write):   # design/89 H7: the operator's own words for a prop
     quote: str = Field(min_length=1)
 
 
+class Likeness(Write):   # design/207 (D1): the operator's yes that they have a person's permission, or the person made a stand-in again
+    element_id: str
+    quote: str = ''
+    stand_in: bool = False
+
+
 class SpecApprove(Write):   # design/89 D4: the operator approves a drawing spec as a table; design/106 D4: no words needed; design/111 F10: 'element:E' for a material spec
     shot_id: str
     quote: str = ''
@@ -1890,8 +1896,13 @@ def visuals_clip(run_id: UUID, body: ClipBody, user=User, conn=DB):   # design/8
 
 
 @app.post('/api/runs/{run_id}/visuals/reuse')
-def visuals_reuse(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/89 H7
+def visuals_reuse(run_id: UUID, body: ReuseApprove, user=User, conn=DB):   # design/89 H7; design/207 (D2): retired, kept for an older tool: it answers that a reuse no longer needs approval
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.approve_reuse(storage(), user, run, outputs, body.shot_id, body.quote))
+
+
+@app.post('/api/runs/{run_id}/visuals/likeness')
+def visuals_likeness(run_id: UUID, body: Likeness, user=User, conn=DB):   # design/207 (D1): `vw visuals likeness`; the page's permission line calls the same function
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.likeness(storage(), user, run, outputs, body.element_id, body.quote, conn=conn, stand_in=body.stand_in))
 
 
 @app.post('/api/runs/{run_id}/visuals/references/{ref_id}/note')

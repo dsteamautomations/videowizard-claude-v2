@@ -8,7 +8,7 @@ PAGE = (Path(__file__).resolve().parents[1] / 'app' / 'templates' / 'visuals.htm
 SCRIPT = PAGE[PAGE.index('<script>'):]
 
 # the page before UX1, read from server 0.78.0's visuals.html
-OLD_ACTIONS = ['accept-selected', 'answer', 'approve', 'approve-reuse', 'approve-spec', 'approve-specs', 'clear-ticks', 'clip', 'correct-spec', 'fix', 'footage',
+OLD_ACTIONS = ['accept-selected', 'answer', 'approve', 'approve-spec',   # design/207 (D2): 'approve-reuse' is retired with the reuse approval box 'approve-specs', 'clear-ticks', 'clip', 'correct-spec', 'fix', 'footage',
                'ignore', 'measure', 'nothing-fits', 'pick', 'reason-skip', 'record', 'reject', 'reject-take', 'reject-take-why', 'reject-why', 'revise-selected',
                'round-done', 'round-picks', 'round-picks-back', 'round-search', 'round-undo', 'save-note', 'search', 'select', 'select-take', 'sequence', 'still',
                'supply', 'supply-open', 't-accept', 't-back', 'treatment', 'unplace']
@@ -30,7 +30,7 @@ OLD_SENDS = ["send({action:'select',gap_id:b.dataset.gap,choice_id:b.dataset.cho
              "send({action:'reject-take',job_id:b.dataset.job}", "send({action:'pick',search_id:sid,picks:list}", "send({action:'answer',item:b.dataset.item,answer:b.dataset.answer}",
              "send({action:'round-undo',quote:q}", "send({action:'supply',element_id:el,url:u}", "send({action:'nothing-fits',search_id:b.dataset.search,reason:q}",
              "send({action:'approve-spec',shot_id:b.dataset.shot,quote:''}", "send({action:'note',reference_id:b.dataset.ref,note:", "send({action:'approve-specs',quote:''}",
-             "send({action:'correct-spec',shot_id:sh,words:w}", "send({action:'measure',reference_ids:refs,question:q}", "send({action:'approve-reuse',shot_id:b.dataset.shot,quote:w}",
+             "send({action:'correct-spec',shot_id:sh,words:w}", "send({action:'measure',reference_ids:refs,question:q}",
              "send({action:'footage',camera:v('camera'),support:v('support'),look:v('look'),quote:w}", "send({action:'record',gap_ids:readyGaps().map(g=>g.gap_id),quote:q}",
              "send({action:'round-done',verdicts:verdicts,quote:q}", "send({action:'round-picks',picks:pk,ignore:ign,quote:q}",
              "send({action:'pick',search_id:sid,picks:[{n:p.n,note:p.note||''}]}", "JSON.stringify({action:'search',element_id:eid,keywords:kw,source:src})"]
