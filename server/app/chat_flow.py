@@ -544,6 +544,7 @@ WORDS = {
     'ask_person_set': 'Is this set right for this person?',
     'ask_thing_set': 'Which picture is the reference?',
     'set_made_max': 'This set was made {n} times, which is the most: use one of these pictures, or add your own.',
+    'set_made_max_thing': 'This set was made {n} times, which is the most: use one of these pictures, add your own, or leave it out.',
     'set_changed': 'The plan changed since this set was made.',
     'remake': 'Make it again from the changed plan',
     'rec_use': 'use this set',
@@ -808,6 +809,7 @@ def _round_v2(ctx, every, step):
             correct = [_button(remake('Correct it'), 'correct', words=True, tell='Ask the operator what to correct.')] if again else []
             (buttons if person else more).extend(correct)
             more = more + ([_button(priced(WORDS['remake']), 'remake')] if sf.get('changed') else [])
+            more = more + ([] if again or person else [_button(WORDS['leave'], 'aside')])   # made the most times: a thing may be left out (V.set_aside takes it then); a person shown in a made picture is never left out
             want = ('use:' + str(proposed.get('golden')) if not person and proposed.get('golden') else 'yes') if proposed.get('do') == 'use' else 'correct' if proposed.get('do') == 'remake' else None
             match = next((b for b in buttons + more if b['choice'] == want), None)
             if match:   # the proposed answer first; the chat shows four buttons, the others follow
@@ -829,7 +831,7 @@ def _round_v2(ctx, every, step):
             part = sf.get('partial')
             doubt = state == 'fail' or (proposed.get('do') or 'use') != 'use' or bool(part) or bool(sf.get('changed'))
             line = {'group': GROUP_SETS_DOUBT if doubt else group_of(eid),
-                    'text': '\n'.join(x for x in (about(eid, f), '' if again else WORDS['set_made_max'].format(n=sf.get('makes')), WORDS['set_changed'] if sf.get('changed') else '') if x),
+                    'text': '\n'.join(x for x in (about(eid, f), '' if again else WORDS['set_made_max' if person else 'set_made_max_thing'].format(n=sf.get('makes')), WORDS['set_changed'] if sf.get('changed') else '') if x),
                     **({'rec': {'do': proposed['do'], 'label': match['label'] if match else WORDS['rec_' + proposed['do']], 'reason': str(proposed.get('reason') or '')}} if proposed.get('do') in ('use', 'remake', 'doubt') else {}),
                     'pics': pics, 'check': check, **({'notes': {'title': WORDS['notes_title'], 'text': str(sf['notes']), 'sources': len(sf.get('sources') or [])}} if sf.get('notes') else {}),
                     **({'partial': WORDS['partial'].format(made=part.get('made'), asked=part.get('asked'), missing=', '.join(part.get('missing') or []) or 'not named')} if part else {}),
@@ -839,6 +841,8 @@ def _round_v2(ctx, every, step):
             def run_(choice, quote, words, eid=eid):
                 if choice == 'remake':
                     return {**make(eid, quote), 'tell': 'The set is being made again. ' + NOTHING}
+                if choice == 'aside':
+                    return V.set_aside(store, user, run, outputs, eid, words or quote)
                 golden = choice[4:] if choice.startswith('use:') else None
                 V.set_answer(store, user, run, outputs, eid, 'yes' if golden else choice, golden, words if choice == 'correct' else '')
                 out = flush_sets(conn, store, user, run, outputs, quote)
@@ -872,7 +876,7 @@ def _round_v2(ctx, every, step):
             unmade.append(_v2_item(f'setmake:{eid}', 'reference set to make', '', names[eid], WORDS['ask_make'], run_, [_button(priced(WORDS['make']), 'make'), _button(WORDS['leave'], 'aside')], line,
                                    _key=f'set:{eid}', _eid=eid, _person=person))
     items = back + by_group(sets) + unmade
-    if waiting and step == 2:   # the first sets are judged before the others are ordered: one button, with the price of all of them
+    if waiting and step in (2, 'rewrite'):   # (also while a sent-back set waits for its rewrite: ref_sets.round_rest takes it then, the operator answers both in one visit) the first sets are judged before the others are ordered: one button, with the price of all of them
         many = len(waiting) != 1
         line = {'text': WORDS['rest_text'].format(k=_n(len([r for r in rows.values() if r.get('set')]), 'set'), r=f"{len(waiting)} more {'are' if many else 'is'}", names=', '.join(names[e] for e in waiting))}
 
@@ -1224,6 +1228,10 @@ def flush_sets(conn, store, user, run, outputs, quote=''):
     kinds = _kinds(V.current_plan(store, s))
     kept = {e: a for e, r in rd['elements'].items() if e in kinds and not r.get('ignored') for a in [V._answered(s, kinds, e, r)] if a and V._set_rows(s, e, r.get('set'))}
     if not kept:
+        if V.round_v2(s) and rd.get('pass') != 'complete' and V._round_pass(s, rd) == 'complete':   # design/211: nothing is left with the operator (the others were left out): the state says complete; it is stored here, once, for both front ends
+            rd['pass'] = 'complete'
+            V.save_session(store, run, s)
+            return {'pass': 'complete', 'queued': [], 'errors': {}, 'approved': [], 'held': {}}
         if V._round_pass(s, rd) != 2:
             return None
         try:   # design/210 review: the last answer was "Leave it out" or the operator's own picture, so no set is left to judge: the round completes by the server's own test, as after a Yes
@@ -1487,7 +1495,8 @@ def next_item(conn, store, user, run, outputs, one=False):
         session.pop('chat_card', None)
         V.save_session(store, run, session)
     lines = with_assistant + working(conn, run)
-    return {'item': None, 'needed': False, 'working': lines, 'say_last': NOTHING,
+    turn = V.round_due(session, None) if V.round_v2(session) else None   # design/211: a v2 round that waits for Claude (the looks at the made sets, a rewrite): the server's own sentence, as every status gives it
+    return {'item': None, 'needed': False, 'working': lines, 'say_last': NOTHING, **({'then': turn} if turn else {}),
             'how': (FRAMES_ON_PAGE if _round_frames(ctx) else '') + 'Tell the operator the `working` lines as they are' + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
 
 
@@ -1512,9 +1521,11 @@ def answer(conn, store, user, run, outputs, item_id, choice, quote='', notes='',
     V.save_session(store, run, session)
     out = out if isinstance(out, dict) else {}
     done = {k: out[k] for k in ('recorded', 'accepted', 'revise', 'for_the_assistant', 'held', 'pass', 'queued', 'errors') if k in out}
+    said = out.get('tell') or (out.get('then') if V.round_v2(session) else None)   # design/211: an answer of a v2 round carries the server's own "what next" (the second go ordered, a set made)
     nxt = next_item(conn, store, user, run, outputs, one)   # SK, 12 Nov 2026: record and fetch in one step, so the operator waits once per answer, not twice
     return {'answered': item_id, 'choice': choice, **done, **nxt,
-            'then': (str(out['tell']) + ' ' if out.get('tell') else '')
+            'then': (str(said) + ' ' if said else '')
                     + ('The next decision is in `item`: show it now; do not run `vw visuals next` for it.' if nxt.get('item')
                        else 'What comes next is a card (`card`): show it now, as `how` says.' if nxt.get('card') else 'No decision waits now: give the `working` lines and the last line.')
+                    + (' ' + nxt['then'] if nxt.get('then') and nxt['then'] != said else '')
                     + (' The operator asked for a change: make only that change, send it again, and it returns in its turn.' if button.get('needs_words') else '')}

@@ -564,7 +564,7 @@ def test_frame_file_posts_the_rows_in_order_and_stops_at_the_first_refusal(harne
     code, out, err = run(args(what='frame', file='out/frames.json'), capsys)
     assert code == 2 and [p['element_id'] for p in posted] == ['E1', 'E2', 'E3'] and {k: v for k, v in posted[0].items() if k != 'request_id'} == {'element_id': 'E1', 'name': 'frame-E1', 'kind': 'frame', 'subject': 'the mason', 'source_media_id': 'c1', 'requested_s': 12.5} and posted[0]['request_id']   # defect 35: every write carries its request id
     assert 'E1@12.5' in json.dumps(out) and 'E2@3' in json.dumps(out) and 'Unknown clip c9' in json.dumps(out)
-    assert 'frame --file' in json.dumps(STAGES['visuals']) and 'frame --file' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    assert 'frame --file' in json.dumps(STAGES['visuals']) and 'trial --file' in (PLUGIN / 'commands' / 'vw.md').read_text(encoding='utf-8')   # design/211: instruction version 3 names the trial frames; version 2 keeps `frame --file`
 
 
 def test_steps_and_command_text_carry_the_long_blank_the_ai_run_and_the_continuity_rules():

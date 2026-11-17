@@ -54,7 +54,7 @@ def test_after_the_last_gap_with_no_spec_the_assistant_is_sent_to_the_references
     store, conn = proposed(plan_with([None, None]))
     r = done(store, conn, KEPT, 'accept')
     assert r['open'] == 0 and r['page']['step'] == 'Plan' and r['then'] == GAPS_DONE + P.REFS_START
-    assert '`vw visuals next`' not in r['then'] and '`vw visuals round --file out/reference-round.json`' in r['then'] and '`vw visuals page`' in r['then']
+    assert '`vw visuals next`' not in r['then'] and '`vw visuals digest`' in r['then'] and '`vw visuals look`' in r['then']   # design/211: the footage is searched first (was: the round file, then the page)
 
 
 def test_after_the_last_drawing_or_material_the_assistant_is_sent_to_the_references_not_to_the_chat():
@@ -194,18 +194,16 @@ def test_done_on_step_one_with_a_drawing_set_open_sends_the_operator_to_the_page
     assert 'on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown' in said
 
 
-def test_the_wording_script_changes_nothing_when_applied_twice_and_its_old_sentences_are_retired():
+def test_the_wording_scripts_old_sentences_are_retired():   # design/211: its new sentences were replaced in turn (scripts/d211a, d211b, d211c), so applying it again is no longer tested here; `c1_split_v3.py --check` holds the chain
     root = APP.parents[1]
     st = next(s for s in json.loads((root / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
     sys.path.insert(0, str(root / 'scripts'))
     import d210c_wording_v3 as W
-    parts = copy.deepcopy(st['parts'])
-    assert W.apply(st['prompt'], parts) == st['prompt'] and parts == st['parts'], 'applying twice changes nothing'
     retired = json.loads((root / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     text = json.dumps(st, ensure_ascii=False)
     assert W.RETIRED and all(old in retired and old not in text for old in W.RETIRED)
     cmd = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert all(new in cmd and (old not in cmd or old in new) for old, new in W.COMMANDS)
+    assert all(old not in cmd or old in new for old, new in W.COMMANDS)
 
 
 def test_no_text_of_the_server_sends_a_page_step_to_the_chat():

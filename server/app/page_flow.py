@@ -936,7 +936,7 @@ def page_record(conn, store, user, run, outputs, answers):
                     continue
                 said, out, waits = got
                 tell = tell or str((out or {}).get('tell') or '')
-                said_then = said_then or str((out or {}).get('then') or '')
+                said_then = str((out or {}).get('then') or '') or said_then   # the latest: an earlier answer's sentence may be out of date by the end of the visit (a count of rewrites, then "make the other sets")
                 if waits:
                     kept.append(key)
                     _log(conn, run, key, choice, said)

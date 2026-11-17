@@ -1,6 +1,6 @@
 # 211. The References step, rebuilt
 
-17 Nov 2026. **Status: a design note. Nothing is built. No code was changed.** It is the one shared agreement of three builders who work at the same time and are merged afterwards.
+17 Nov 2026. **Status: built on 17 Nov 2026, server 0.108.0, plugin 0.92.0; not deployed.** Written as the one shared agreement of three builders who worked at the same time; their parts were joined on `main` the same day. What was built differently from this note, and what is not built, is in section 9.
 
 SK's words: "combine everything, start the implementation, and run the trial after all the fixes." The trial is limited to 5 to 10 pictures.
 
@@ -730,3 +730,60 @@ Added by this note:
 - Where the trial runs. Deploys are on hold until SK says yes each time.
 - The cost of three checks per set (three Gemini Flash calls). Not priced.
 - `plugin/pages/decisions.html` was read from line 275 on; its picture row (`thumbs`) only by its callers.
+
+---
+
+## 9. After the build (the merger, 17 Nov 2026)
+
+Built on 17 Nov 2026, server 0.108.0, plugin 0.92.0 (the minimum too); **not deployed**, not pushed. No trial was run (section 7).
+
+### 9.1 What differs from the contract as written
+
+Part A (finding):
+
+- `TRIAL_LIMIT` and `TRIAL_UNKNOWN_CLIP` are the `reason` of a row in `failed`, not a refusal of the call: the other frames of the call go on.
+- `round_frames` reads "the run has footage" from the session (`session['clip_safe_zoom'] != {}`, written by `prepare`), not from the outputs.
+- `digest_answer.then` is `LOOK_ALL` when the run has no media or no thing is left to search.
+- Two more constants: `KEEP_REJECTED` (a frame the operator rejected cannot be kept again) and `OLDER_ROUND` (a look sent while an older round is open records nothing).
+- `trials.json` gains `fp` (the thing's fingerprint per trial frame); `things.json` gains `not_searched`.
+- `not_this`, `that_is_it` and `look_record` rewrite `round.elements[eid].frames` while a v2 round is at step 1, so the row follows the frames that stand.
+- A search repeated after the plan changed deletes the thing's old candidate frames.
+
+Part B (the sets):
+
+- `visuals_stage.ROUND_V = 2` is the version a new round gets. The server unit tests written before design/211 set it to None (`server/unit/conftest.py`): they post a round the older way and test the older round. In use it is always 2.
+- `set_make(..., quote=None)`: the chat tool gives the operator's words (an empty one is refused, `MAKE_NO_QUOTE`); the page and the chat question give their button's label.
+- `round_reopen` takes `approve`, `clean` or `ignore`. `round_rest` also runs while a sent-back set waits for its rewrite (state `'rewrite'`).
+- A round-file row may carry `pictures: [2, 3]`; each set picture stores its `ask`; a failed picture stores `failure`.
+- There is no constant for "step 1 recorded, nothing ordered": `then` is None and the tool prints "ok".
+- A round is complete, by its state, once the others were left out; a set made three times can be left out (`set_aside`).
+- `class RoundMake` in `main.py` (the body of `round --make` gains `quote`).
+
+Part C (the page and the chat):
+
+- `page_flow.REFS_START` is a module `__getattr__` that returns `ref_find.FIND_START`.
+- A second button on the "other sets" line: "Leave these out" (`rest_out`), which sets each waiting thing aside.
+- A line of state `making` may carry `tag` ("Not ordered", "Claude is looking", "Being rewritten").
+- In the chat the proposals question has a second button, "Ask me each one" (`session['round_each']`).
+
+The merger (each with a test in `server/unit/test_design211_together_pure.py`):
+
+- "Make the other sets" answered in the same visit as a "No" or "Correct it" was dropped as stale (part C offered the line at state 2 only; part B takes it at `'rewrite'` too). The line is now offered at both.
+- The page's "what next" after a visit took the first sentence an answer gave, which could be out of date by the end of the visit; it takes the latest.
+- A set made three times offered no "Leave it out" on its line (the contract and part B have it; part C had not). A thing's line has the button; a person's never.
+- A round completed by leaving things out was complete by its state while the stored `pass` stayed 2, so the page said the wrong next step. `chat_flow.flush_sets`, which both front ends pass through, stores it once.
+- The chat way (`vw visuals next`, `vw visuals decide`) lost the server's sentence: "make the other sets" answered there said nothing of the sets being made, and `vw visuals next` said "nothing is needed" while the sets waited for Claude's look or rewrite. Both carry `then` now; the tool prints it.
+- An answer that completes a v2 round says so (`page_flow.ROUND_NEXT`) through `round --sets` and the chat too.
+
+### 9.2 Not built
+
+- A per-run limit on trial frames cut at one time (8.3).
+- Relative heights of people (gap 17, in part).
+- `waiting()` may list an ignored thing's frame while the round is at `'looking'` or `'rewrite'`.
+- Gaps 11, 21 and 24; the AI video route of gap 23; cropping a small thing out of a frame.
+
+### 9.3 Not verified
+
+- No real model call: the image model, the server's Gemini check and the helpers were stood in for. No HTTP call, no database test (`server/tests`), no claude.ai page (the page file was checked in a local browser by part C only).
+- The three reviews of section 6.4 were done by the merger alone, by tests; no second reader.
+- An older round is pinned by fingerprints of the shared fixture's older round taken at d255486 (server functions, page and chat); VW-24's own data was not read.

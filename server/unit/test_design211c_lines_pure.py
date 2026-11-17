@@ -258,7 +258,8 @@ def test_a_set_made_three_times_offers_no_remake_and_says_why(monkeypatch):
     m = film.lines()['set:MASON']
     assert labels(m) == ['Yes'] and m['text'].endswith('This set was made 3 times, which is the most: use one of these pictures, or add your own.')
     film.change(lambda s: s['round']['elements']['STREET'].update(round=3))
-    assert labels(film.lines()['set:STREET']) == ['Use A', 'Use B', 'Use C']
+    street = film.lines()['set:STREET']   # the merger: a thing made the most times may be left out (the contract, 3.8; V.set_aside takes it); a person never
+    assert labels(street) == ['Use A', 'Use B', 'Use C', 'Leave it out'] and street['text'].endswith('use one of these pictures, add your own, or leave it out.')
 
 
 def test_a_set_whose_plan_changed_is_marked_and_can_be_made_again_with_the_price(monkeypatch):

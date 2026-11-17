@@ -381,4 +381,4 @@ def test_the_instructions_say_the_kept_round_and_name_what_is_retired():
     later = next(p['text'] for p in next(s for s in v3['stages'] if s['name'] == 'visuals')['parts'] if p['name'] == 'later')
     assert 'kept method' in later and 'judged on the page' in later and 'round --sets' in later   # design/210 part 2: each set is judged on the page (was design/188: in the chat, one at a time, now the way back)
     md = (root / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
-    assert 'round --sets' in md and 'the server adds the kept preamble' in md and 'tick' in md
+    assert 'round --sets' in md and 'the server writes each request itself, by kind of thing' in md and 'tick' in md   # design/211: was 'the server adds the kept preamble'

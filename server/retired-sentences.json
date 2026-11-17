@@ -79,6 +79,21 @@
     "THE OPERATOR'S DECISIONS, ONE AT A TIME, IN THE CHAT",
     "every line on one card, the Direction first",
     "until the round is complete; ask nothing per element",
-    "the question shows on the item's card"
+    "the question shows on the item's card",
+    "grab a frame of each the footage has",
+    "take the sharpest frame, the subject large and evenly lit",
+    "a frame for every element the footage has",
+    "its frame reference ids, and `prompt` (a thing: the subject block",
+    "full length, working pose, the face",
+    "between the two steps and after a set is made again",
+    "Done approves the frames and makes every set at once",
+    "the No and Correct it sets are made again with the words in the prompt",
+    "({element: {verdict: approve|ignore}}) and",
+    "Done on step 1 is not undone (the sets are ordered and paid then)",
+    "rows `{element_id, frames, prompt}`",
+    "Done makes every set silently",
+    "step 2 they judge every set in one shot",
+    "each in one visit: step 1; then, when the sets are back, `vw visuals page` again for the sets, and once more for each set made again",
+    "In the chat, one at a time (`vw visuals next`, section E), only where the page cannot be shown"
   ]
 }

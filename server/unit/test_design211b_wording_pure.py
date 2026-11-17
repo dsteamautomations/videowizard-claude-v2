@@ -60,8 +60,9 @@ def test_the_script_puts_its_sentences_in_and_applying_twice_changes_nothing():
                   '`vw visuals round --make E --quote`', 'verdict: approve|clean|ignore', 'orders the first three sets only', 'a set is made three times at most',
                   "the film's picture wins over the web", 'what comes next (`then`)', 'The server shows the operator no set before its look.'):
         assert words in text, words
-    for other in OTHERS[:5]:
-        assert other in text, other                                     # the sentences of parts A and C stand as they were
+    import d211a_wording_v3 as A, d211c_wording_v3 as C   # after the merge: the sentences of parts A and C are in, beside part B's
+    for where, old, new in A.PAIRS + C.PAIRS:
+        assert where != 'picture-search' or (new in text and old not in text), new[:70]
 
 
 def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_reads():

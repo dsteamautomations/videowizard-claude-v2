@@ -105,7 +105,7 @@ def test_the_command_file_says_where_each_decision_is_taken():
     assert 'every other decision of this stage is asked in the chat' not in CMD
     assert "the card's buttons" not in CMD and '`vw visuals next` hands' in CMD                       # C2: a question is handed out by `vw visuals next`
     assert '`select` a choice where offered' not in CMD and 'with the operator\'s answer' in CMD     # F3: the choice is the operator's
-    assert '`status --wait 900`: step 1 the operator approves' not in CMD and 'it ends when the sets are back; then `vw visuals page`' in CMD   # F5
+    assert '`status --wait 900`: step 1 the operator approves' not in CMD and '`status --wait 900` while sets are made' in CMD and 'then do what each answer says (`then`)' in CMD   # F5; design/211: every answer of the round says what comes next
 
 
 def test_the_drawing_skill_sends_the_approval_to_the_page():
@@ -121,10 +121,10 @@ def test_the_plan_part_leaves_an_offered_choice_to_the_operator():
 
 def test_the_picture_search_part_reads_in_the_order_it_is_done_and_names_no_command_that_refuses():
     text = PART['picture-search']
-    frames, drawn, the_round = text.index('grab a frame of each'), text.index('is drawn before the round'), text.index('write out/reference-round.json')
+    frames, drawn, the_round = text.index('take small trial frames'), text.index('is drawn before the round'), text.index('write out/reference-round.json')   # design/211: was 'grab a frame of each'
     assert frames < drawn < the_round < text.index('`vw visuals status --wait 900`')
     assert 'round --undo' not in text and 'until the round is complete; ask nothing per element' not in text
-    assert 'it ends when the sets are back; then `vw visuals page`' in text
+    assert 'Every answer of the round says what comes next (`then`): do that and add nothing of your own.' in text   # design/211: was 'it ends when the sets are back; then `vw visuals page`'
     assert len(text.strip().split('\n')) == 5   # the heading and four paragraphs: the frames, the drawings, the round, the two steps
 
 

@@ -27,3 +27,15 @@ def _long_shot_fixtures(request, monkeypatch):
         from app import visual_contract as VC
         real = VC._default_generator
         monkeypatch.setattr(VC, '_default_generator', lambda: {**real(), 'max_seconds': 60})
+
+# design/211: a round posted for a film with no round is now a v2 round (visuals_stage.ROUND_V). The modules written before design/211 post a
+# round the older way and test the older round, which stays in the code for every round started before the release (the live film VW-24): for
+# them a new round is an older round, as it was when they were written. The merger checked the 155 tests this covers: each one failed at the
+# post of a round on a film with no round (148 with the v2 refusal "give its proposal", 7 on a sentence that follows from it); none starts
+# from a round that already exists. The modules of design/211 (test_design211*) run the real value; test_design211b_older_pure and
+# test_design211_together_pure pin that a round without `v` behaves and reads as at d255486.
+@pytest.fixture(autouse=True)
+def _older_round_tests(request, monkeypatch):
+    if not request.module.__name__.startswith('test_design211'):
+        from app import visuals_stage as VS
+        monkeypatch.setattr(VS, 'ROUND_V', None)

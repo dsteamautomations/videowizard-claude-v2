@@ -2361,7 +2361,7 @@ def cmd_visuals(a):
                 + 'Buttons: ' + ', '.join(f"{b['label']} [{b['choice']}]" for b in item['buttons']) + '. ' + item['how'])
     if a.what == 'next':   # design/188 (SK, 12 Nov 2026): the one decision the operator takes now, handed out by the server; or what is being made
         out = write(base + '/chat/next', {'one': bool(a.one)})
-        emit(out, 0, chat_line(out))
+        emit(out, 0, chat_line(out) + (' ' + out['then'] if out.get('then') and not out.get('item') else ''))   # design/211: a v2 round that waits for the assistant (the looks, a rewrite): the server's sentence
     if a.what == 'card':   # design/190: every answer of one card in one call. The answers file is the copy kept here until the server has them; then it is marked sent
         given = Path(a.file or '')
         path = given if given.is_absolute() else ws / given

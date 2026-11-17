@@ -1,5 +1,5 @@
 {
   "name": "vw",
-  "version": "0.91.1",
+  "version": "0.92.0",
   "description": "VideoWizard executor: drives a video run through the VideoWizard server, one stage at a time."
 }

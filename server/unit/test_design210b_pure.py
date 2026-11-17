@@ -107,7 +107,7 @@ def test_with_no_round_yet_the_page_says_what_the_assistant_does():
     store, conn = film(begin=False)
     p = page(store, conn)
     assert p['step'] not in (A, B) and p['open'] is False
-    assert p['then'] == P.REFS_START and '`vw visuals round --file out/reference-round.json`' in p['then'] and '`vw visuals page`' in p['then']
+    assert p['then'] == P.REFS_START and '`vw visuals digest`' in p['then'] and '`vw visuals look`' in p['then']   # design/211: the footage is searched first (was: the round file, then the page)
 
 
 def test_the_references_come_after_the_plan_and_an_open_gap_holds_them_back():

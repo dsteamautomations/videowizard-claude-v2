@@ -58,4 +58,4 @@ def test_the_new_sentences_name_the_servers_commands_and_keep_the_word_match_as_
     assert RF.FRAME_RULE[:40] not in text                                                   # the rule's text lives in the server only
     for field in ('trial', 'view', 'verdict', 'seen', 'keep', 'closest', 'not_searched', 'clips', 'note'):   # the fields `look_record` reads
         assert field in text
-    assert 'Then the round, once any drawing set is approved' in text                       # part B's anchor is left as it was
+    assert 'Then the round, once every thing is searched and any drawing set is approved' in text   # after the merge: part B's sentence follows part A's

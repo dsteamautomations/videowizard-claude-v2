@@ -3439,7 +3439,13 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     rd['pass'] = 'making' if queued else (2 if left else 'complete')
     save_session(store, run, session)
     return {'pass': _round_pass(session, rd) if v2 else rd['pass'], 'queued': queued, 'errors': errors, 'approved': [eid for eid in active if verdicts[eid]['verdict'] == 'yes'], 'held': held, **({'unanswered': unanswered} if partial else {}),
-            **({'rewrite': [eid for eid in again], 'then': ref_sets.then_of(session)} if v2 else {})}
+            **({'rewrite': [eid for eid in again], 'then': ref_sets.then_of(session) or (_round_complete_words() if _round_pass(session, rd) == 'complete' else None)} if v2 else {})}
+
+
+def _round_complete_words():
+    """design/211 (the merger): the one sentence for a round that this answer completed, the page's own (page_flow.ROUND_NEXT), so the chat tool says it too."""
+    from . import page_flow
+    return page_flow.ROUND_NEXT
 
 
 # ---------- UI change, 11 Nov 2026: one answer of step 2 stored as it is made (R13); one set that was not made, made now (R17, R18) ----------
