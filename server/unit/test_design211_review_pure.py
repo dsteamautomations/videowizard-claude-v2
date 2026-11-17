@@ -161,7 +161,7 @@ def money(n):
 def step1_done(film, **answers):
     """Step 1 recorded on the page: the fixture's answers (TROWEL used from footage, FAN left out, BRICK and TILE a set), the routine things accepted."""
     lines = film.lines()
-    given = {'TROWEL': 'approve', 'FAN': 'ignore', 'BRICK': 'approve', 'TILE': 'approve', **answers}
+    given = {'TROWEL': 'use', 'FAN': 'ignore', 'BRICK': 'set', 'TILE': 'set', **answers}   # design/212: the buttons of step 1 (Approve, Leave out, Make a set)
     return film.record(*[ans(lines['ref:' + e], c) for e, c in given.items()], ans(lines['refs:proposals'], 'accept_all'))
 
 
@@ -178,14 +178,14 @@ def put_session(film, s):
 
 
 def test_C4_the_proposals_say_how_many_sets_are_made_first_and_that_the_rest_are_asked_after():
+    """design/212 (SK, 17 Nov 2026): the same truth about the sets, with no price in the sentence or on the button."""
     film, _ = at_step_1()
     lines = film.lines()
-    assert lines['refs:proposals']['buttons'][0]['label'] == f'Accept the 3 proposals (paid, about {money(3)})'   # three in all: all are made at once
-    film.record(ans(lines['ref:TROWEL'], 'clean'), ans(lines['ref:BRICK'], 'approve'))            # two more sets asked for on other lines: five
+    assert lines['refs:proposals']['buttons'][0]['label'] == 'Accept all 2'                         # the routine things; the person not in the footage is not among them
+    film.record(ans(lines['ref:TROWEL'], 'set'), ans(lines['ref:BRICK'], 'set'))                  # two more sets asked for on other lines
     line = film.lines()['refs:proposals']
     assert 'At most 3 sets are made first' in line['text'] and 'made only on your word' in line['text']
-    assert f'So far 5 sets are asked for, about {money(5)} in all: 3 first (about {money(3)}), 2 after (about {money(2)}).' in line['text']
-    assert line['buttons'][0]['label'] == f'Accept the 3 proposals (paid: 3 sets first, about {money(3)}; the others are asked after)'
+    assert '₹' not in line['text'] and 'paid' not in line['text'] and line['buttons'][0]['label'] == 'Accept all 2'
     item = film.next()['item']
     assert item['id'] == 'round1:all' and item['text'] == line['text'] and item['buttons'][0]['label'] == line['buttons'][0]['label']   # the same words in the chat
 
@@ -204,7 +204,7 @@ def test_C5_leave_these_out_never_covers_a_person_and_names_the_shots_that_lose_
     line = film.lines()['sets:rest']
     assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and line['buttons'][1]['label'] == 'Leave it out' and line['buttons'][0]['label'].startswith('Make the other 2 sets')
     assert 'The mason: a person shown in a made picture always gets a set' in line['text']
-    assert line['cost'] == 'If you leave it out, these shots are made with no reference: Roof tile: shot 2 of gap G3.'
+    assert line['cost'] == 'If you leave it out, these shots are made with no reference: Roof tile: shot 2 of gap 3.'
     film.record(ans(line, 'rest_out'))
     assert film.row('TILE')['ignored'] and not film.row('MASON').get('ignored')
     line = film.lines()['sets:rest']
@@ -212,17 +212,19 @@ def test_C5_leave_these_out_never_covers_a_person_and_names_the_shots_that_lose_
 
 
 def test_S12_the_comment_hint_is_true_for_every_answer_of_the_line():
+    """design/212: step 1 has no comment box: the words come with "Minor corrections". The hint stands where a box is still shown (a thing back at step 2)."""
     film, _ = at_step_1()
     trowel = film.lines()['ref:TROWEL']
-    assert {b['choice'] for b in trowel['buttons']} >= {'approve', 'clean'} and trowel['comment_hint'] == CF.WORDS['hint']
+    assert {b['choice'] for b in trowel['buttons']} >= {'use', 'set', 'fix'} and 'comment_hint' not in trowel and 'comment' not in trowel
     assert 'when a set is made; with any other answer they are not used' in CF.WORDS['hint'] and 'They go into the request of its set' not in CF.WORDS['hint']
 
 
-def test_S13_step_2_says_what_the_plans_shots_still_need_wherever_money_is_decided():
+def test_S13_step_2_names_no_money_and_the_chat_says_the_same_words():
+    """design/212 (SK, 17 Nov 2026): no cost on the page's references steps. Before (design/211 review, S13): step 2 said what the plan's shots still need."""
     film = at_step_2()
     page = film.page()
     rest = next(l for l in page['lines'] if l['key'] == 'sets:rest')
-    assert "The plan's shots still need about ₹" in page['summary'] and "The plan's shots still need about ₹" in rest['text'] and 'Spent so far ₹' in rest['text']
+    assert '₹' not in page['summary'] and '₹' not in json.dumps(page['lines']) and 'still need' not in rest['text']
     out = film.next()
     while out['item'] and not out['item']['id'].startswith('rest:'):
         out = film.decide(out['item']['id'], out['item']['buttons'][0]['choice'], 'this one')
@@ -275,12 +277,12 @@ def test_what_the_operator_reads_at_step_1_says_the_unread_clips_once_and_holds_
     said = 'Not searched for any thing, because they have no analysis: C003.mp4.'
     assert said in page['summary'] and 'no analysis' not in json.dumps(page['lines'])
     first = film.next()['item']
-    assert first['summary'] == said and said not in first['text']
+    assert first['summary'] == said + ' 1 person not in your footage gets a set from the description without being asked: The mason.' and said not in first['text']   # design/212: said once too
     assert not any('A size is not known' in w for l in page['lines'] for w in l.get('warnings') or [])
     lines = {l['key']: l for l in page['lines']}
-    assert lines['ref:T_LAY']['title'] == 'Laying a brick (a way of working)' and lines['ref:T_LAY']['group'] == 'Ways of working'
-    assert 'the closest is a close-up (shot 2 of gap G2).' in lines['ref:TROWEL']['text'] and not re.search(r'G\d-S\d-SH\d', json.dumps(page['lines']))
-    assert lines['ref:TROWEL']['cost'] == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap G2, shot 2 of gap G2.'
+    assert lines['ref:T_LAY']['title'] == 'Laying a brick (a way of working)' and lines['ref:T_LAY']['group'] == CF.STEP1_GROUPS[0]
+    assert 'the closest is a close-up (shot 2 of gap 2).' in lines['ref:TROWEL']['used'] and not re.search(r'G\d-S\d-SH\d', json.dumps(page['lines']))
+    assert lines['ref:TROWEL']['cost'] == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'
     film.decide(first['id'], 'each', 'ask me each one')
     nxt = film.next()['item']
     film.decide(nxt['id'], nxt['buttons'][0]['choice'], 'yes')
@@ -436,10 +438,10 @@ def test_M3_accept_the_proposals_does_not_cover_a_frame_that_became_weak():
               {'element': 'BRICK', 'clips': ['C001'], 'note': 'n'})
     film.post(round_file(film, TROWEL={'doubt': False}))
     trowel = film.lines()['ref:TROWEL']
-    assert trowel['group'] == 'Things' and not film.row('TROWEL')['doubt']                       # one good frame: routine, covered by the proposals
+    assert trowel['group'] == CF.STEP1_GROUPS[0] and not film.row('TROWEL')['doubt']                       # one good frame: routine, covered by the proposals
     film.record(ans(trowel, 'pics', pics={trowel['pics'][0]['choice'][4:]: 'not'}))              # "Not this picture": the weak frame takes its place
     lines = film.lines()
-    assert lines['ref:TROWEL']['pics'][0]['weak'] and lines['ref:TROWEL']['group'] == CF.GROUP_DOUBT
+    assert lines['ref:TROWEL']['pics'][0]['weak'] and lines['ref:TROWEL']['group'] == CF.STEP1_GROUPS[1] and 'ref:TROWEL' not in lines['refs:proposals']['covers']
     film.record(ans(lines['refs:proposals'], 'accept_all'))
     assert 'TROWEL' not in (film.session().get('chat_round') or {}) and film.state() == 1 and not film.row('TROWEL').get('from_footage')
 
@@ -501,7 +503,7 @@ def test_the_instruction_the_request_and_the_check_agree_after_the_review():
     assert [v['name'] for v in RS.WAY] == ['the action at its key moment', 'the result just after', 'close on where it happens'] and 'never required' in RS.MAY_SHOW['technique']
     assert 'a material as a surface, as the film uses it, and very close' in text and 'lettering only where the description names it' in text
     assert "the operator's words, the film's own pictures (the approved drawing for shape and size, the footage picture for look, colour and wear), your added words, the plan's description, then web photographs" in text
-    assert 'a make that returned no picture not counted' in text and 'says how many sets are made first, with their price, and that the others are asked after' in text
+    assert 'a make that returned no picture not counted' in text and 'says how many sets are made first and that the others are asked after' in text   # design/212: no price
     assert 'brings back only a thing that is new in the plan or whose entry in the plan changed' in text and '`vw visuals round --back E`' in text and 'A set is never made with `vw visuals image --kind sheet`' in text
     assert "each given a group name, its thing ids, the run folder's path and the tool's command line" in text and 'its `how` gives the points to judge by' in text
     cmd = (ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')

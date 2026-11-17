@@ -399,7 +399,6 @@ def _drawing_page(ctx, base, lines):
 
 REFS_STEP, SETS_STEP = 'References', 'References: the sets'
 REST_LEFT = 'The first sets are judged. {r} more are not ordered: the operator orders them on the page (`vw visuals page`), or leaves them.'   # design/211
-REFS_OVER = ("The sets and the plan's shots together pass this film's limit by about ₹{over:,.0f}. This is a warning: you can still answer and say done.")
 MARKED = 'Pictures answered'
 REFS_GO = 'The references come next: run `vw visuals page`. The operator answers every person, object and place there, in one visit.'   # only when this answer does not hold their round
 REFS_HERE = ('The references come next, and their round is in this answer: send its pictures and write it to the page (steps 2 and 3 of `how`), then give the operator '
@@ -445,8 +444,8 @@ def _drawn(session, eid):
 def _round_buttons(item, paid):
     """The chat item's own buttons, every one of them, for the page: one that leads to a paid set says so, with the price of one set."""
     if item.get('_v2'):   # design/211: the labels are the chat's own, the price already on them; a picture's own answer is under the picture
-        return [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words'))} for b in item['buttons'] + list(item.get('other_choices') or [])
-                if not (item['id'].startswith('round1:') and b['choice'].startswith(('not:', 'use:')))]
+        return [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words')), **({'small': True} if b.get('small') else {})}   # design/212: `small`: a link under the buttons
+                for b in item['buttons'] + list(item.get('other_choices') or []) if not (item['id'].startswith('round1:') and b['choice'].startswith(('not:', 'use:')))]
 
     def label(b):
         if b['choice'] in ('no', 'correct'):
@@ -465,8 +464,8 @@ def _own_line(ctx, item, paid):
             f'When the footage picture is not right, or there is none, add your own, {OWN_FILE}: it becomes the reference of this thing, and no picture is made.' if step1 else
             f'When none of these is right, add your own picture, {OWN_FILE}: every shot of this thing then starts from it.' if item['id'].startswith('set:') else
             f'Add your own picture, {OWN_FILE}: it becomes the reference of this thing, and no set is made.')
-    return {'label': 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else ''), 'person': person,
-            'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text}
+    label = (CF.WORDS['upload'] if step1 else 'Use my own picture') if item.get('_v2') else 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else '')   # design/212: no cost at the references of a v2 round
+    return {'label': label, 'person': person, 'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text}
 
 
 def _thing(plan, eid, words=KIND_WORDS):
@@ -494,6 +493,13 @@ def _v2_line(ctx, item, paid):
             line[field] = [{**pic(p['_key'], p['label']), **{k: v for k, v in p.items() if k not in ('_key', 'label')}} for p in line[field]]
     eid, kept, buttons = item['_eid'], item['_kept'], _round_buttons(item, paid)
     out = {'key': item['_key'], 'title': _thing_v2(ctx['plan'], eid) if eid else item['_title'], 'state': 'open', 'item': item['id'], 'ask': _ask(item), **line, 'buttons': buttons}
+    if eid and item['id'].startswith('round1:'):   # design/212: the name and the kind apart, for the list and the heading of the thing
+        from . import ref_sets
+        e = next(x for x in ctx['plan']['elements'] if x['id'] == eid)
+        out.update(name=str(e.get('name') or eid), kind=ref_sets.KIND_WORDS.get(e.get('kind'), 'a thing'))
+        out.pop('text', None)   # the page shows its parts (`desc`, `used`, `search`); the chat says them as one text. Left out so that 60 things stay one document
+        if out.get('pics'):
+            out['pics'] = [{k: v for k, v in x.items() if k != 'choice_label'} for x in out['pics']]   # a picture has a tick on the page, no button of its own
     if eid and item['id'].startswith(('round1:', 'set:', 'setmake:')):
         out['own'] = _own_line(ctx, item, paid)
     if kept and item['id'].startswith('round1:'):
@@ -541,9 +547,8 @@ def _refs_lines(ctx):
     (up to four, as the chat shows them), what a yes does in plain words, the chat item's buttons, a comment box and "Use my own picture".
     A thing answered at an earlier "done" stays open, to be changed, and says what is kept."""
     session, plan, run = ctx['session'], ctx['plan'], ctx['run']
-    if V.round_v2(session):   # design/211: the proposals, the doubtful things, the others by kind; "up to" this many sets: what is kept, else any paid answer
-        rows, paid = CF._round_items(ctx, every=True), _money(ctx)[1]
-        return [_v2_line(ctx, i, paid) for i in rows], len([i for i in rows if i['_eid'] and (i['_does'].get(i['_kept']['verdict']) == 'set' if i['_kept'] else 'set' in i['_does'].values())])
+    if V.round_v2(session):   # design/211: the proposals, then the things; design/212: in their five groups (`chat_flow.STEP1_GROUPS`), no cost counted
+        return [_v2_line(ctx, i, '') for i in CF._round_items(ctx, every=True)], 0
     items = {i['_eid']: i for i in CF._round_items(ctx, every=True)}
     _budget, paid = _money(ctx)
     lines = []
@@ -648,32 +653,23 @@ def _round_page(ctx, base, step):
     left = len([l for l in lines if waits(l)])
     more = f', {held} more after these' if held else ''
     many = lambda n, word: f"{n} {word}{'' if n == 1 else 's'}"
-    if v2 and step == 'refs':   # design/211: the money the sets may cost, what the plan's shots still need, and what is left after both; it warns, it does not block
-        stopped, x = refused.get('references'), sets * one
-        try:
-            y = float(V.budget(ctx['conn'], ctx['store'], ctx['run'], ctx['outputs'])['planned']['inr'])
-        except (Problem, KeyError, TypeError, ValueError):
-            y = None
-        z = None if y is None else cap - spent - x - y
-        after = '' if y is None else f" The plan's shots still need about ₹{y:,.0f}. " + (f'Left after both: ₹{z:,.0f}.' if z >= 0 else f'After both, the limit is passed by ₹{-z:,.0f}.')
-        over = REFS_OVER.format(over=-z) + ' ' if z is not None and z < 0 else ''
+    if v2 and step == 'refs':   # design/212 (SK, 17 Nov 2026): the new layout (`layout`: one thing at a time beside the list), and no cost: the limit is named only when "done" is refused
+        stopped = refused.get('references')
         unread = CF.unread_words(ctx)   # design/211 review: the clips nobody could search, said once here and not on every line
         return {**base, 'step': REFS_STEP, 'open': bool(left), 'lines': lines,
-                'summary': f"{many(total, 'thing')}: {total - kept} to answer, {kept} kept{more}. Spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit. These sets: up to ₹{x:,.0f}.{after}"
-                           + (' ' + unread if unread else ''),
+                'summary': f"{many(total, 'thing')}: {total - kept} to answer, {kept} answered{more}." + (' ' + unread if unread else ''),
                 'note': f'Not recorded: {stopped}' if stopped else
-                        over + f'This list is long: {held} more things appear here after you answer these and say done in the chat. Nothing is made until after the last one.' if held else
-                        over + 'Look at each picture, answer each thing, then say done in the chat. Nothing is made until every thing is answered.' if left else
-                        over + 'Every thing is answered. Say done in the chat.'}
+                        f'This list is long: {held} more things appear here after you answer these and say done in the chat. Nothing is made until after the last one.' if held else
+                        'Look at each thing and answer it, then say done in the chat. Nothing is made until you say done.' if left else
+                        'Every thing is answered. Say done in the chat.',
+                'layout': {'kind': 'things', 'made': CF.WORDS['made_note'], 'help': CF.WORDS['help'], **({'stopped': stopped} if stopped else {})}}
     if v2:   # design/211: step 2; while Claude looks at the sets, or writes a request again, the page says so
         from . import ref_sets
         state = V._round_pass(session, session['round'])
         then = (ref_sets.SETS_LOOK if state == 'looking' else ref_sets.rewrite_due(session) if state == 'rewrite'
                 else ref_sets.SETS_MAKING if state == 'making' and not left else '')   # design/211 review, N4: wait, then look: the operator sees no set before its look
-        y = CF.still_needs(ctx)   # design/211 review, S13
         return {**base, 'step': SETS_STEP, 'open': bool(left), 'lines': lines,
-                'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}. "
-                           f'A set made again costs about ₹{one:,.0f}; spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit.' + ('' if y is None else f" The plan's shots still need about ₹{y:,.0f}."),
+                'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}.",   # design/212: no cost is named
                 'note': f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
                         'Look at each set, answer each line, then say done in the chat.' if left else
                         'Nothing to answer here yet: the sets appear here when they are ready.' if making else 'Nothing more to answer here now.',
@@ -754,7 +750,7 @@ def _round_answer(ctx, a, choice, words):
         buttons = _round_buttons(item, paid)
         button = next((b for b in buttons if b['choice'] == choice), None)
         V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in buttons) + '.')
-        V.need(not button['needs_words'] or words, 'Say what should change in this line, in your own words.')
+        V.need(not button['needs_words'] or words, CF.WORDS['fix_words'] if item.get('_v2') and step1 else 'Say what should change in this line, in your own words.')
         label = button['label']
         again = choice == 'no' and words and item['id'].startswith('set:')   # design/210 review: a paid remake asked for with words is made with them, as "Correct it" is; the log keeps the button pressed
         out = item['_run']('correct' if again else choice, label, words) or {}

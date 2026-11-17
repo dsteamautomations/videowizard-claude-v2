@@ -544,7 +544,7 @@ def test_the_instructions_send_the_round_to_the_page_and_the_chat_is_the_way_bac
     st = next(s for s in d['stages'] if s['name'] == 'visuals')
     part = {p['name']: p['text'] for p in st['parts']}
     assert "The round's two steps are answered on the page too" in st['prompt']
-    assert 'The operator answers both steps on the page (`vw visuals page`), each in one visit' in part['picture-search'] and 'shows its price on its button' in part['picture-search']
+    assert 'The operator answers both steps on the page (`vw visuals page`), each in one visit' in part['picture-search'] and 'No cost is shown at the references, on the page or in the chat' in part['picture-search']   # design/212 (SK, 17 Nov 2026); before: a paid answer showed its price on its button
     assert 'on the page (Use my own picture' in part['picture-search'] and '`vw visuals supply`' not in part['picture-search'] and '`vw visuals own`' in part['picture-search']
     assert "every element's set judged on the page" in part['later']
     retired = json.loads((root / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']

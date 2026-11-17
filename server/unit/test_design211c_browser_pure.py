@@ -1,7 +1,7 @@
 """design/211 part C (section 6.3, the page checks): `plugin/pages/decisions.html` drawn in a headless browser from a local copy, with the
-rounds the server builds from the shared fixture and a stand-in for the page's database (no product server, no network). A v2 round: the
-groups fold, Claude's proposal and its button, a weak tag, what Claude saw, a picture's own button toggles and is saved with the answer,
-the check list, the folded notes and the set before; at desktop and phone width, light and dark. A line of an older round draws as before.
+rounds the server builds from the shared fixture and a stand-in for the page's database (no product server, no network). Step 2 of a v2
+round: the groups fold, Claude's proposal and its button, a weak tag, what Claude saw, the check list, the folded notes and the set before;
+at desktop and phone width, light and dark. A line of an older round draws as before. (Step 1 of a v2 round: test_design212_browser_pure.)
 Skipped where Playwright or its browser is not installed."""
 import base64
 import json
@@ -85,72 +85,8 @@ def no_side_scroll(pg):
     return pg.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
 
 
-@pytest.mark.parametrize('view,scheme', [('desktop', 'light'), ('desktop', 'dark'), ('phone', 'light'), ('phone', 'dark')])
-def test_step_1_of_a_v2_round_on_the_page(monkeypatch, browser, view, scheme):
-    pg = show(browser, doc(Film(monkeypatch).page()), view, scheme)
-    heads = pg.locator('button.ghead')
-    assert [t.split(' ', 1)[1] for t in heads.locator('span:first-child').all_text_contents()] == ['Doubtful: answer these yourself', 'People', 'Things', 'Materials', 'Places', 'Ways of working']   # 1
-    assert heads.nth(0).locator('.count').text_content() == '2 lines, 2 to answer' and heads.nth(0).get_attribute('aria-expanded') == 'true'   # 2
-    first = pg.locator('section.item').first
-    assert first.locator('.acts button').first.text_content() == 'Accept the 5 proposals (paid: 3 sets first, about ₹105; the others are asked after)' and 'go' in first.locator('.acts button').first.get_attribute('class')   # 3
-    trowel = block(pg, "Mason's trowel")
-    assert trowel.locator('p.prop').text_content() == 'Claude proposes: Use it as the reference. The film shows it whole and sharp from the side.'   # 4
-    assert trowel.locator('.acts > button').all_text_contents() == ['Use it as the reference', 'Make a clean set from it (paid, about ₹35)', 'Leave it out']   # 5: the proposed answer first
-    assert 'go' in trowel.locator('.acts > button').first.get_attribute('class')   # 6
-    assert trowel.locator('.pcell .tag').all_text_contents() == ['Weak']   # 7
-    assert trowel.locator('.pnote').all_text_contents() == ['Claude saw: The whole trowel, side on, sharp; the handle is reddish-brown.', 'Claude saw: In the hand, the blade half covered by mortar.']   # 8
-    assert 'Read before you answer' in trowel.locator('.note').text_content()   # 9
-    assert trowel.locator('.acts textarea').get_attribute('placeholder').startswith('Words for the picture (optional)')   # 10
-    assert 'If you leave it out, these shots are made with no reference of it: shot 1 of gap G2, shot 2 of gap G2.' in trowel.locator('.acts').text_content()   # 11
-    assert block(pg, 'The mason').locator('.acts > button').all_text_contents() == ['Have a set made (paid, about ₹35)']   # 12: no "Leave it out" for a person in a made picture
-    assert no_side_scroll(pg)   # 13
-    assert pg.evaluate('getComputedStyle(document.body).backgroundColor') == ('rgb(16, 22, 28)' if scheme == 'dark' else 'rgb(245, 247, 248)')   # 14: both themes
-    # a picture's own button toggles and is saved with the answer
-    ready(pg, trowel)
-    marks = trowel.locator('button.pick')
-    assert marks.all_text_contents() == ['Not this picture', 'Not this picture']   # 15
-    marks.nth(1).click()
-    pg.wait_for_function("window.__answers.l02 && window.__answers.l02.choice === 'pics'")
-    a = answers(pg)['l02']
-    assert (a['key'], a['item'], a['pics']) == ('ref:TROWEL', 'round1:TROWEL', {'f-trowel-use': 'not'})   # 16
-    assert trowel.locator('.pcell.no').count() == 1 and trowel.locator('button.pick.on').text_content() == 'Not this picture (marked: undo)'   # 17
-    assert trowel.locator('.head .tag').text_content() == 'A picture answered; the line still to answer' and trowel.locator('.acts > button').count() == 3   # 18: the line is still to answer
-    trowel.locator('.acts > button', has_text='Use it as the reference').click()
-    pg.wait_for_function("window.__answers.l02.choice === 'approve'")
-    assert answers(pg)['l02']['pics'] == {'f-trowel-use': 'not'} and trowel.locator('.head .tag').text_content() == 'You chose: Use it as the reference'   # 19: saved with the answer
-    trowel.locator('button', has_text='Undo my answer').click()
-    pg.wait_for_function("window.__answers.l02.choice === 'pics'")
-    assert answers(pg)['l02']['pics'] == {'f-trowel-use': 'not'}   # 20: the mark stays until it is undone under its picture
-    trowel.locator('button.pick.on').click()
-    pg.wait_for_function('!window.__answers.l02')
-    assert trowel.locator('.pcell.no').count() == 0   # 21
-    fan = block(pg, 'Wall fan regulator')
-    assert fan.locator('button.pick').text_content() == 'That is it'   # 22
-    ready(pg, fan)
-    fan.locator('button.pick').click()
-    pg.wait_for_function('window.__answers.l03')
-    assert answers(pg)['l03']['pics'] == {'t0000000000c1': 'use'} and fan.locator('.pcell.sel').count() == 1   # 23
-    # the groups fold
-    mason = block(pg, 'The mason')
-    heads.nth(1).click()
-    assert mason.is_hidden() and heads.nth(1).get_attribute('aria-expanded') == 'false'   # 24
-    heads.nth(1).click()
-    assert mason.is_visible()   # 25
-    brick = block(pg, 'Brick (a material)')
-    brick.locator('.acts > button', has_text='Leave it out').click()
-    pg.wait_for_function('window.__answers.l06')
-    assert brick.is_hidden() and heads.nth(3).locator('.count').text_content() == '1 line, none to answer'   # 26: a group whose lines are all answered folds
-    pg.locator('#dots .dot').nth(5).click()
-    assert brick.is_visible()   # 27: its number in the bar opens it again
-    first.locator('.acts button').first.click()
-    pg.wait_for_function("window.__answers.l01 && window.__answers.l01.choice === 'accept_all'")
-    assert answers(pg)['l01']['key'] == 'refs:proposals'   # 28
-    # the large picture still opens, and closes
-    trowel.locator('button.pic').first.click()
-    assert pg.locator('.zoom').count() == 1   # 29
-    pg.keyboard.press('Escape')
-    assert pg.locator('.zoom').count() == 0 and no_side_scroll(pg)   # 30
-    pg.close()
+# design/212 (SK, 17 Nov 2026): step 1 of a v2 round has its own layout now; its page checks are in test_design212_browser_pure.py. The test that
+# stood here (30 checks of the older layout of step 1: the groups by kind, a button under each picture, the comment box) went with that layout.
 
 
 @pytest.mark.parametrize('view,scheme', [('desktop', 'light'), ('phone', 'dark')])
@@ -161,10 +97,10 @@ def test_step_2_of_a_v2_round_on_the_page(monkeypatch, browser, view, scheme):
     pg = show(browser, doc(film.page()), view, scheme)
     assert [t.split(' ', 1)[1] for t in pg.locator('button.ghead span:first-child').all_text_contents()] == ['Doubtful: look at these first', 'People', 'Not ready yet', 'Recorded']   # 1
     rest = pg.locator('section.item').first
-    assert rest.locator('.acts > button').all_text_contents() == ['Make the other 2 sets (paid, about ₹70)', 'Leave these 2 out']   # 2
+    assert rest.locator('.acts > button').all_text_contents() == ['Make the other 2 sets', 'Leave these 2 out']   # 2: design/212: no cost on a button
     lay = block(pg, 'Laying a brick')
     assert lay.locator('.note strong').text_content() == "The program's check (Gemini): it found faults." and lay.locator('.note li').all_text_contents() == ['Picture B: the action is shown: A tool lying still; no hand.']   # 3
-    assert lay.locator('p.prop').text_content().startswith('Claude proposes: Correct it (paid, about ₹35: the set is made again). Picture B shows no hand at work.')   # 4
+    assert lay.locator('p.prop').text_content().startswith('Claude suggests: Correct it (the set is made again). Picture B shows no hand at work.')   # 4
     notes = lay.locator('details.group', has=pg.locator('summary', has_text="The image model's notes (1 source)"))
     assert notes.count() == 1 and notes.evaluate('d => d.open') is False and 'I drew bamboo' in notes.text_content()   # 5: folded
     cells = lay.locator('.pcell')

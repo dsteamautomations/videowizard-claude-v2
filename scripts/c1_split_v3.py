@@ -134,6 +134,8 @@ if __name__ == '__main__':
         from d211d_wording_v3 import apply as d211d, apply_steps as d211ds   # design/211, the review: the step list, the views by kind, the order of authority, what a helper is given, three makes, a second send
         prompt = d211d(prompt, parts)
         d211ds(steps)
+        from d212_wording_v3 import apply as d212   # design/212: step 1 of the references in its new layout (five groups, the buttons by case, a person not in the footage not asked, no cost shown)
+        prompt = d212(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

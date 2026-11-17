@@ -240,6 +240,6 @@ def test_the_page_shows_a_lines_pictures_small_and_opens_one_large():
                    'IntersectionObserver', 'The large picture is not available.', 'The buttons work when every picture of this line has shown.', 'A picture is missing: ',
                    "'Escape'", "'ArrowRight'", "'ArrowLeft'", "setAttribute('role','dialog')", "setAttribute('aria-modal','true')", 'opener.focus()', "'Previous'", "'Next'", "'Close'",
                    "/^\\/_blob\\/[0-9a-f]{32}$/", '/^data:image\\/(jpeg|png|webp);base64,/', 'if(line.pics&&line.pics.length) body.appendChild(pictures(line,check))',
-                   "grid(['Fact','Value','From'],line.facts)", 'Assumed, with no source (say if any is wrong): '):
+                   "grid(['Fact','Value','From'],line.facts,'facts')", 'Assumed, with no source (say if any is wrong): '):
         assert needed in html, needed
     assert 'innerHTML' not in html and html.count("claude.use('db')") == 1

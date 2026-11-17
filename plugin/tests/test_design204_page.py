@@ -91,8 +91,8 @@ def test_the_page_draws_a_drawings_parts_and_sizes_and_a_materials_facts_in_plai
     already confirmed and what is not known, a remark where a size differs; a recorded one folded; the line's own question."""
     html = PAGE.read_text(encoding='utf-8')
     for needed in ('function spec(line)', 'if(line.spec) body.appendChild(spec(line));', "'Drawn as: '+s.drawn_as", "list('Parts',s.parts)", "list('How they sit',s.sits)",
-                   "grid(['Part','Measure','Size','From'],s.sizes)", "'Already confirmed: '+s.confirmed", "'Not known, so no figure is shown: '+s.unknown", 's.differs.forEach',
-                   "el(rec?'details':'div','group')", 'What you approved', "body.appendChild(el('p','totals',line.ask))", "a.choice==='yes'", 'function grid(cols,rows)',
+                   "grid(['Part','Measure','Size','From'],s.sizes,'sizes')", "'Already confirmed: '+s.confirmed", "'Not known, so no figure is shown: '+s.unknown", 's.differs.forEach',
+                   "el(rec?'details':'div','group')", 'What you approved', "body.appendChild(el('p','totals',line.ask))", "a.choice==='yes'", 'function grid(cols,rows,kind)',
                    'wrap.appendChild(grid(cols,src.table))'):
         assert needed in html, needed
     assert '.open=true' not in html[html.index('function spec(line)'):html.index('const KINDS=')]   # a recorded line's content is closed until the operator opens it

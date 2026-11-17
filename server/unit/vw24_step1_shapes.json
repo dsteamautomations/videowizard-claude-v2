@@ -1,0 +1,665 @@
+{
+"about": "VW-24's step-1 round as the live server (0.108.0) gave it on 17 Nov 2026, 49 things: the shape of each line only (no words, no pictures). For test_design212_layout_pure.",
+"things": [
+{
+"id": "HELPER",
+"kind": "person",
+"rec": "set",
+"doubt": true,
+"frames": [
+true,
+true,
+true
+],
+"closest": false,
+"search": "found",
+"leave": false,
+"use": false,
+"shots": 4
+},
+{
+"id": "TILEMAKER",
+"kind": "person",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": false,
+"use": false,
+"shots": 1
+},
+{
+"id": "MOTHER",
+"kind": "person",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": false,
+"use": false,
+"shots": 5
+},
+{
+"id": "FATHER",
+"kind": "person",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": false,
+"use": false,
+"shots": 3
+},
+{
+"id": "CHILD",
+"kind": "person",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": false,
+"use": false,
+"shots": 2
+},
+{
+"id": "NEIGHBOUR",
+"kind": "person",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": false,
+"use": false,
+"shots": 1
+},
+{
+"id": "TILE",
+"kind": "material",
+"rec": "footage",
+"doubt": true,
+"frames": [
+false,
+true,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": false,
+"shots": 14
+},
+{
+"id": "CONCRETE",
+"kind": "material",
+"rec": "footage",
+"doubt": true,
+"frames": [
+true,
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 12
+},
+{
+"id": "MORTAR",
+"kind": "material",
+"rec": "leave",
+"doubt": true,
+"frames": [
+true,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 1
+},
+{
+"id": "CURING_RIDGES",
+"kind": "material",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 0
+},
+{
+"id": "CEILING_FINISH",
+"kind": "material",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "WATER",
+"kind": "material",
+"rec": "leave",
+"doubt": true,
+"frames": [
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 3
+},
+{
+"id": "SHUTTER_OIL",
+"kind": "material",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "PAN",
+"kind": "object",
+"rec": "footage",
+"doubt": true,
+"frames": [
+true,
+false,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 5
+},
+{
+"id": "TROWEL",
+"kind": "object",
+"rec": "footage",
+"doubt": true,
+"frames": [
+false,
+true,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 3
+},
+{
+"id": "OIL_BRUSH",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "OIL_TIN",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "SPIRIT_LEVEL",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "BUCKET",
+"kind": "object",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 3
+},
+{
+"id": "SHUTTER_BOARD",
+"kind": "object",
+"rec": "footage",
+"doubt": true,
+"frames": [
+true,
+false,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 4
+},
+{
+"id": "PROP_POST",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "CEMENT_BAG",
+"kind": "object",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 3
+},
+{
+"id": "BAR_BUNDLE",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "SAND_HEAP",
+"kind": "material",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "STONE_HEAP",
+"kind": "material",
+"rec": "footage",
+"doubt": true,
+"frames": [
+false,
+false,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 2
+},
+{
+"id": "FAN_REGULATOR",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "SHUTTER_WINDOW",
+"kind": "object",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 4
+},
+{
+"id": "CURTAIN",
+"kind": "object",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "STREET",
+"kind": "place",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "CONV_ROOF",
+"kind": "place",
+"rec": "leave",
+"doubt": true,
+"frames": [
+true,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 1
+},
+{
+"id": "ROOM",
+"kind": "place",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 8
+},
+{
+"id": "HOUSE",
+"kind": "place",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 4
+},
+{
+"id": "SITE_DECK",
+"kind": "place",
+"rec": "set",
+"doubt": true,
+"frames": [
+true,
+true,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 6
+},
+{
+"id": "SITE_BELOW",
+"kind": "place",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "TILE_YARD",
+"kind": "place",
+"rec": "set",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "SITE_YARD",
+"kind": "place",
+"rec": "footage",
+"doubt": true,
+"frames": [
+false,
+false,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 2
+},
+{
+"id": "LANE",
+"kind": "place",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "T_BRICKLAY",
+"kind": "technique",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "T_POUR",
+"kind": "technique",
+"rec": "footage",
+"doubt": true,
+"frames": [
+false,
+false,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 1
+},
+{
+"id": "T_OIL",
+"kind": "technique",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": false,
+"search": "not_searched",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "T_LEVEL",
+"kind": "technique",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 1
+},
+{
+"id": "T_CURE",
+"kind": "technique",
+"rec": "leave",
+"doubt": true,
+"frames": [],
+"closest": true,
+"search": "none",
+"leave": true,
+"use": false,
+"shots": 2
+},
+{
+"id": "T_STRIKE",
+"kind": "technique",
+"rec": "leave",
+"doubt": true,
+"frames": [
+true,
+true
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 1
+},
+{
+"id": "MASON",
+"kind": "person",
+"rec": "set",
+"doubt": false,
+"frames": [
+false,
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": false,
+"use": false,
+"shots": 9
+},
+{
+"id": "REBAR_GRID",
+"kind": "object",
+"rec": "footage",
+"doubt": false,
+"frames": [
+false,
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 4
+},
+{
+"id": "BRICK",
+"kind": "object",
+"rec": "footage",
+"doubt": false,
+"frames": [
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 2
+},
+{
+"id": "STRAIGHTEDGE",
+"kind": "object",
+"rec": "footage",
+"doubt": false,
+"frames": [
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 2
+},
+{
+"id": "WIRE_COIL",
+"kind": "object",
+"rec": "footage",
+"doubt": false,
+"frames": [
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 1
+},
+{
+"id": "T_SCREED",
+"kind": "technique",
+"rec": "footage",
+"doubt": false,
+"frames": [
+false,
+false,
+false
+],
+"closest": false,
+"search": "found",
+"leave": true,
+"use": true,
+"shots": 1
+}
+]
+}

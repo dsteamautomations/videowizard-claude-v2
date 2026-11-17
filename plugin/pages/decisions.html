@@ -138,9 +138,107 @@ input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .pcell.no .pic{opacity:.45}
 .pcell.ref .pic{border-style:dashed}
 details.group>summary{font-weight:600;cursor:pointer}
+/* design/212 (SK, 17 Nov 2026), finding 1: a table of facts or sizes gives its room to the value; a short label is not broken; "From" wraps */
+table.facts td:nth-child(1){width:1%;font-variant-numeric:normal} table.facts td.short{white-space:nowrap}
+table.facts td:nth-child(2){width:58%} table.facts td:nth-child(3){white-space:normal}
+table.sizes td:nth-child(4){white-space:normal}
+/* design/212 (SK, 17 Nov 2026): step 1 of the references in its own layout, for a desktop, full width: a slim top bar, the list of things on the left,
+   one thing at a time on the right with its pictures in one row and the answers directly under them. Every other step keeps the layout above. */
+[hidden]{display:none!important}
+#things{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);font-size:14px;line-height:1.45}
+#things button,#things textarea,#things input{font-size:inherit}
+.ttop{flex:none;min-height:52px;display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding:6px 16px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;z-index:5}
+.ttop h1{font-size:16px;white-space:nowrap}
+.tprog{display:flex;flex-direction:column;gap:4px;min-width:150px;font-size:12px;color:var(--muted);white-space:nowrap}
+.tprog i{display:block;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.tprog b{display:block;height:100%;width:0;background:var(--ok)}
+.tgrow{flex:1}
+.tpopw{position:relative}
+.tpop{position:absolute;top:calc(100% + 8px);left:0;width:340px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:10;font-size:13px}
+.tpop p+p{margin-top:8px}
+.tpop dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0} .tpop dd{margin:0}
+.tpop kbd{display:inline-block;min-width:22px;text-align:center;padding:1px 5px;border:1px solid var(--line);border-radius:4px;font:12px var(--body);background:var(--bg)}
+.tlink{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px;font-size:12.5px;font-weight:500;white-space:nowrap;border-radius:4px}
+.tauto{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.tauto input,.tck input{width:17px;height:17px;margin:0;accent-color:var(--accent);cursor:pointer}
+.tbtn{padding:8px 14px;background:var(--surface);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.tbtn:hover:not(:disabled),.tchip:hover{border-color:var(--accent)}
+.tbtn.quiet{font-weight:500;color:var(--muted)}
+.tbtn.stop{background:var(--stop);border-color:var(--stop);color:var(--surface)}
+.tsug{font-size:10.5px;font-weight:600;letter-spacing:.02em;padding:1px 6px;border-radius:4px;background:var(--surface);color:var(--accent)}
+.tchip{border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:500;background:var(--surface);white-space:nowrap}
+.tchip[aria-pressed="true"]{background:var(--fg);color:var(--surface);border-color:var(--fg)}
+#tstop{flex:none;margin:8px 16px 0}
+.tapp{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr)}
+@media (max-width:1100px){ .tapp{grid-template-columns:240px minmax(0,1fr)} .tprog{min-width:108px} .tcount{display:none} }
+.trail{overflow-y:auto;border-right:1px solid var(--line);background:var(--surface);padding:12px 10px 24px 16px}
+.tprop{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--accent-soft);font-size:13px}
+.trow2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px}
+.tprop .tbtn{padding:5px 11px}
+.tmore{margin-top:8px;font-size:12.5px}
+.tfil{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 6px}
+.tgh{display:flex;align-items:flex-start;gap:6px;width:100%;text-align:left;border:0;background:none;padding:8px 2px 6px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tgh::before{content:'▾';width:10px;flex:none} .tgh[aria-expanded="false"]::before{content:'▸'} .tgh span{flex:1}
+.trail ul{list-style:none;margin:0;padding:0}
+.trow{display:grid;grid-template-columns:10px minmax(0,1fr);gap:2px 8px;width:100%;text-align:left;border:0;background:none;border-radius:8px;padding:6px 8px;font-weight:400}
+.trow:hover{background:var(--bg)}
+.trow[aria-current="true"]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.tdot{width:9px;height:9px;border-radius:50%;border:2px solid var(--muted);margin-top:5px;box-sizing:border-box}
+.trow.done .tdot{background:var(--ok);border-color:var(--ok)}
+.tnm{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmeta{grid-column:2;display:flex;gap:8px;align-items:center;font-size:11.5px;color:var(--muted);white-space:nowrap;min-width:0}
+.ttag{font-size:11px;padding:0 6px;border-radius:4px;border:1px solid var(--line);margin-left:auto;overflow:hidden;text-overflow:ellipsis}
+.trow.done .ttag{background:var(--ok-soft);color:var(--ok);border-color:transparent;font-weight:600}
+.tempty{color:var(--muted);font-size:13px;padding:10px 2px}
+.tmain{overflow-y:auto;padding:14px 20px 28px;outline:0}
+.thead{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
+.thead h2{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:min(100%,22ch);max-width:100%}
+.tkind{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--line);white-space:nowrap}
+.tnav{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.tnav .tbtn{padding:6px 11px} .tnav span{font-size:13px;color:var(--muted);min-width:64px;text-align:center}
+.tsub{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.tstrip{margin-top:6px;padding:8px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-size:13px}
+.tsuggest{margin-top:8px;display:flex;align-items:baseline;gap:10px}
+.tpics{display:flex;gap:12px;margin-top:10px;align-items:flex-start}
+.ttile{flex:0 1 calc((100% - 24px)/3);min-width:0;margin:0;position:relative;border:2px solid var(--accent);border-radius:10px;background:var(--surface);overflow:hidden}
+.ttile.off{border-color:var(--line)} .ttile.closest.off{border-style:dashed;border-color:var(--muted)} .ttile.off img{opacity:.8}
+.timg{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:0;padding:0;background:var(--line);cursor:zoom-in}
+.timg:disabled{opacity:1;cursor:default}
+.timg .ph,.tpim .ph{display:grid;place-items:center;width:100%;height:100%;color:var(--muted);font-weight:500;font-size:12.5px}
+.timg img,.tpim img{display:block;width:100%;height:100%;object-fit:contain}
+.tck{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:6px;padding:3px 8px 3px 5px;border-radius:6px;background:var(--surface);font-size:12px;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer}
+.tweak{position:absolute;top:10px;right:8px;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--chg-soft);color:var(--chg)}
+.tcap{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 10px;font-size:13px}
+.tcap span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tinfo{flex:none;width:22px;height:22px;border-radius:50%;background:var(--surface);font:italic 600 12px Georgia,serif;color:var(--muted);padding:0}
+.tinfo[aria-expanded="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.tisit{padding:0 10px 6px;font-size:12px;color:var(--muted)}
+.tsaw{padding:8px 10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)} .tsaw b{color:var(--fg);font-weight:600}
+.tnopics{margin-top:10px;padding:14px 16px;border:1px dashed var(--line);border-radius:10px;color:var(--muted);background:var(--surface)}
+.tbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.tnote{margin-top:6px;font-size:12.5px;color:var(--muted)}
+.tmsg{margin-top:8px;padding:7px 12px;border-radius:8px;background:var(--stop-soft);color:var(--stop);font-weight:500}
+.tpanel{margin-top:8px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-width:760px;display:flex;flex-direction:column;gap:8px}
+.tpanel label{font-weight:600} .tpanel textarea{min-height:56px} .tpanel .group{border:0;padding:0}
+.tacts{display:flex;gap:8px;align-items:center}
+.tanswer{margin-top:10px;display:flex;align-items:center;gap:14px;padding:9px 14px;border-radius:10px;background:var(--ok-soft);border:1px solid var(--ok)}
+.tanswer p{flex:1;min-width:0;overflow-wrap:anywhere} .tanswer b{color:var(--ok)}
+.tfold{margin-top:16px;border:0;background:none;padding:4px 0;font-weight:600;color:var(--muted)}
+.tfold::before{content:'▸ '} .tfold[aria-expanded="true"]::before{content:'▾ '}
+.tdetails{margin-top:6px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-width:980px}
+.tdetails dl{margin:0} .tdetails dd{margin:2px 0 0}
+.tdetails dt{font-size:11.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:10px} .tdetails dt:first-child{margin-top:0}
+.tplist{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-width:1100px}
+.tprow{display:flex;align-items:center;gap:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tpth{display:flex;gap:6px;flex:none;width:330px} .tpth:empty{display:none}
+.tpim{display:block;width:105px;aspect-ratio:16/9;background:var(--line);border-radius:6px;overflow:hidden}
+.tptx{flex:1;min-width:0} .tptx .tnote{margin-top:2px;font-size:13px}
+.tptx .tsug{margin-left:8px;background:var(--accent-soft)}
+.talldone{max-width:520px;margin:12vh auto 0;text-align:center;padding:36px;border:1px solid var(--ok);border-radius:14px;background:var(--ok-soft)}
+.talldone h2{font-size:24px;color:var(--ok)} .talldone p{margin-top:8px;font-size:16px}
 </style>
 
-<div class="wrap">
+<div class="wrap" id="wrap">
   <header style="display:flex;flex-direction:column;gap:6px">
     <h3 id="step">VideoWizard</h3>
     <h1 id="title">Your decisions</h1>
@@ -149,6 +247,32 @@ details.group>summary{font-weight:600;cursor:pointer}
   </header>
   <div class="bar"><div class="dots" id="dots"></div><div class="msg" id="msg">Loading…</div></div>
   <div id="list"><div class="state">Loading the lines…</div></div>
+</div>
+<div id="things" hidden>
+  <header class="ttop">
+    <h1 id="tstep">References, step 1</h1>
+    <div class="tprog"><span id="tprogt"></span><i><b id="tprogb"></b></i></div>
+    <div class="tpopw"><button type="button" class="tlink" data-pop="thow" aria-expanded="false">How this works</button><div class="tpop" id="thow" hidden></div></div>
+    <div class="tpopw"><button type="button" class="tlink" data-pop="tkeys" aria-expanded="false">Keys</button>
+      <div class="tpop" id="tkeys" hidden><dl>
+        <dt><kbd>←</kbd> <kbd>→</kbd> or <kbd>J</kbd> <kbd>K</kbd></dt><dd>Previous or next thing</dd>
+        <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Tick or untick a picture</dd>
+        <dt><kbd>A</kbd></dt><dd>Approve</dd>
+        <dt><kbd>S</kbd></dt><dd>Make a set</dd>
+        <dt><kbd>C</kbd></dt><dd>Minor corrections, or words for the picture</dd>
+        <dt><kbd>U</kbd></dt><dd>Upload my own</dd>
+        <dt><kbd>L</kbd></dt><dd>Leave out</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Close what is open</dd>
+      </dl></div></div>
+    <span class="tgrow"></span>
+    <label class="tauto"><input type="checkbox" id="tauto"> Auto-advance</label>
+    <button type="button" class="tbtn go" id="tnextopen">Next to answer</button>
+  </header>
+  <p class="note" id="tstop" hidden></p>
+  <div class="tapp">
+    <nav class="trail" id="trail" aria-label="Things to answer"></nav>
+    <main class="tmain" id="tmain" tabindex="-1"></main>
+  </div>
 </div>
 
 <script>
@@ -202,10 +326,10 @@ function shots(cols,src){   // design/206: the shots of a gap (or of one offered
   wrap.appendChild(grid(cols,src.table));
   return wrap;
 }
-function grid(cols,rows){   // a table; on a narrow screen each row becomes a small block with its labels
-  const tw=el('div','tw'), t=el('table','shots'), hr=el('tr'); (cols||[]).forEach(c=>hr.appendChild(el('th',null,c)));
+function grid(cols,rows,kind){   // a table; on a narrow screen each row becomes a small block with its labels. design/212: `kind` ('facts', 'sizes') gives the value its room
+  const tw=el('div','tw'), t=el('table','shots'+(kind?' '+kind:'')), hr=el('tr'); (cols||[]).forEach(c=>hr.appendChild(el('th',null,c)));
   const th=el('thead'); th.appendChild(hr); t.appendChild(th);
-  const tb=el('tbody'); (rows||[]).forEach(r=>{ const tr=el('tr'); r.forEach((c,i)=>{ const td=el('td',null,c); td.setAttribute('data-l',(cols||[])[i]||''); tr.appendChild(td); }); tb.appendChild(tr); });
+  const tb=el('tbody'); (rows||[]).forEach(r=>{ const tr=el('tr'); r.forEach((c,i)=>{ const td=el('td',!i&&String(c).length<=24?'short':null,c); td.setAttribute('data-l',(cols||[])[i]||''); tr.appendChild(td); }); tb.appendChild(tr); });
   t.appendChild(tb); tw.appendChild(t);
   return tw;
 }
@@ -219,7 +343,7 @@ function spec(line){   // design/209: a drawing's parts and sizes, or a material
   list('Parts',s.parts);
   if(s.facts&&s.facts.length){ const dl=el('dl','kv'); s.facts.forEach(r=>{dl.appendChild(el('dt',null,r[0])); dl.appendChild(el('dd',null,r[1]));}); wrap.appendChild(dl); }
   list('How they sit',s.sits); list('Proportions',s.proportions);
-  if(s.sizes&&s.sizes.length){ wrap.appendChild(el('h4',null,rec?'Sizes':'Sizes to confirm')); wrap.appendChild(grid(['Part','Measure','Size','From'],s.sizes)); }
+  if(s.sizes&&s.sizes.length){ wrap.appendChild(el('h4',null,rec?'Sizes':'Sizes to confirm')); wrap.appendChild(grid(['Part','Measure','Size','From'],s.sizes,'sizes')); }
   if(s.differs&&s.differs.length){ const w=el('div','note'); w.appendChild(el('strong',null,'The same size has another value elsewhere')); const ul=el('ul'); s.differs.forEach(x=>ul.appendChild(el('li',null,x))); w.appendChild(ul); wrap.appendChild(w); }
   if(s.confirmed) wrap.appendChild(el('p','said','Already confirmed: '+s.confirmed));
   if(s.unknown) wrap.appendChild(el('p','said','Not known, so no figure is shown: '+s.unknown));
@@ -314,7 +438,7 @@ function pictures(line,onChange){   // a line with pictures: the row, the facts 
   const rec=line.state==='recorded', wrap=el(rec?'details':'div','group');
   if(rec){ const sm=el('summary',null,'What you approved'); sm.style.fontWeight='600'; sm.style.cursor='pointer'; wrap.appendChild(sm); }
   wrap.appendChild(thumbs(line,onChange));
-  if(line.facts&&line.facts.length){ wrap.appendChild(el('h4',null,'Facts, and where each came from')); wrap.appendChild(grid(['Fact','Value','From'],line.facts)); }
+  if(line.facts&&line.facts.length){ wrap.appendChild(el('h4',null,'Facts, and where each came from')); wrap.appendChild(grid(['Fact','Value','From'],line.facts,'facts')); }
   if(line.assumed) wrap.appendChild(el('p','changed','Assumed, with no source (say if any is wrong): '+line.assumed));
   return wrap;
 }
@@ -407,7 +531,7 @@ function block(line,n){
     String(line.notes.text).split('\n').forEach(x=>{ if(x.trim()) d.appendChild(el('p',null,x)); }); body.appendChild(d); }
   if(line.earlier&&line.earlier.length){   // folded: the set before, to compare the set made again with
     const d=el('details','group'); d.appendChild(el('summary',null,'The set before')); d.appendChild(thumbs({line:line.line,key:line.key,state:'recorded',pics:line.earlier})); body.appendChild(d); }
-  if(line.rec&&line.state==='open') body.appendChild(el('p','prop','Claude proposes: '+line.rec.label+'. '+(line.rec.reason||'')));   // above the buttons; the proposed answer is the first button
+  if(line.rec&&line.state==='open') body.appendChild(el('p','prop','Claude suggests: '+line.rec.label+'. '+(line.rec.reason||'')));   // above the buttons; the proposed answer is the first button
   if(line.ask&&line.state==='open') body.appendChild(el('p','totals',line.ask));   // design/209: the question of this line, in plain words
   if(line.state==='open'&&line.styles&&line.styles.length) body.appendChild(preview(line));
   if(body.childNodes.length) box.appendChild(body);
@@ -456,6 +580,9 @@ function heading(name,g,shut){   // design/211: the heading of a group of lines;
 function draw(force){
   const list=$('list');
   if(!ready){return;}
+  const things=!!(round&&round.layout&&round.layout.kind==='things');   // design/212: step 1 of the references has its own layout
+  $('things').hidden=!things; $('wrap').hidden=things;
+  if(things){ tDraw(); return; }
   if(!round){ list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); list.appendChild(el('div','state','Nothing to decide yet. The assistant writes the lines here when a step is ready.')); $('dots').textContent=''; $('msg').textContent='Nothing to decide yet'; return; }
   $('step').textContent='VideoWizard · '+(round.run||'')+' · '+(round.step||''); $('title').textContent=(round.step||'Your')+': your decisions'; $('summary').textContent=round.summary||'';
   const lines=round.lines||[], seen={};
@@ -487,7 +614,7 @@ function draw(force){
   rows.forEach((r,i)=>{ const n=nodes[r.head?'g:'+r.head:r.line.line]; if(n&&list.children[i]!==n.node) list.insertBefore(n.node,list.children[i]||null); });   // the film's order; a block already in place is not moved
   $('msg').textContent = !lines.length ? (round.note||'Nothing to decide') : open ? open+' still to answer. '+(round.note||'') : answered ? 'All answered. Go back to the chat and say done.' : (round.note||'Nothing waits for you here.');
 }
-function fail(e){ $('msg').textContent='Could not save ('+((e&&e.code)||'error')+'). Check that you are signed in to Claude, then try again.'; }
+function fail(e){ const m='Could not save ('+((e&&e.code)||'error')+'). Check that you are signed in to Claude, then try again.'; $('msg').textContent=m; if(!$('things').hidden) tRefuse(m); }
 function ref(line){ return db.doc('rounds/'+round.round+'/answers/'+line.line); }
 function marksOf(line){ const a=answers[line.line], m=a&&a.pics; return m&&Object.keys(m).length?m:null; }   // design/211: the pictures of this line answered on their own
 function write(line,choice,notes,more){ if(!db||!round) return; const m=marksOf(line); ref(line).set(Object.assign({key:line.key,item:line.item||'',choice:choice,notes:String(notes||'').slice(0,MAX),at:new Date().toISOString()},m?{pics:m}:{},more||{})).catch(fail); draw(true); }   // `more`: the operator's own picture and their words of permission (design/210 part 2)
@@ -500,6 +627,232 @@ function setMark(line,id,kind){   // one picture answered (or its answer undone)
   const d=own?Object.assign({},a):{key:line.key,item:line.item||'',choice:'pics',notes:''}; d.at=new Date().toISOString(); if(has) d.pics=m; else delete d.pics;
   ref(line).set(d).catch(fail); draw(true);
 }
+// ---------- design/212 (SK, 17 Nov 2026): step 1 of the references, one thing at a time beside the list ----------
+// The server decides and sends each thing's group, its case, the buttons that case allows, what a click with no picture ticked is told, and every
+// sentence (`round.layout.kind==='things'`); this only draws them and writes the answers the way every line's answer is written.
+const T={round:'',cur:0,filter:'all',panel:null,msg:'',timer:0,show:false,fold:{},tick:{},auto:true};
+try{ T.auto=localStorage.getItem('vw-refs-auto')!=='0'; }catch(e){}
+const mk=(tag,a,...kids)=>{ const e=document.createElement(tag);
+  for(const k in a||{}){ const v=a[k]; if(k==='on') for(const ev in v) e.addEventListener(ev,v[ev]); else if(k==='hidden'||k==='disabled'||k==='checked') e[k]=v; else if(v!=null&&v!==false) e.setAttribute(k,v); }
+  e.append(...kids.flat(Infinity).filter(x=>x!=null&&x!==false)); return e; };
+const tThings=()=>(round.lines||[]).filter(l=>l.key!=='refs:proposals');
+const tProp=()=>(round.lines||[]).find(l=>l.key==='refs:proposals');
+const tOwn=l=>{ const a=answers[l.line]; return a&&a.choice!=='pics'?a:null; };   // the operator's own answer to this thing, on this page
+const tByProp=l=>{ const p=tProp(); return !!p&&!!answers[p.line]&&(p.covers||[]).indexOf(l.key)>=0&&!tOwn(l); };   // answered by "Accept all": a thing answered alone keeps its answer
+const tDone=l=>!!(tOwn(l)||tByProp(l)||l.kept);
+const tMark=p=>({id:String(p.choice||'').slice(4),use:String(p.choice||'').indexOf('use:')===0});   // a footage picture (unticked: "not this picture") or the closest one (ticked: "that is it")
+function tTicked(l,p){ const k=tMark(p), a=tOwn(l), t=(T.tick[l.line]||{})[p.code];
+  return t!==undefined?t:a&&a.pics&&a.choice!=='ignore'&&a.choice!=='own'?(k.use?a.pics[k.id]==='use':a.pics[k.id]!=='not'):!k.use&&!p.weak; }   // at first: every footage picture that is not weak
+const tKept=l=>(l.pics||[]).filter(p=>tTicked(l,p));
+function tMarks(l){ const m={}; (l.pics||[]).forEach(p=>{ const k=tMark(p), on=tTicked(l,p); if(k.use?on:!on) m[k.id]=k.use?'use':'not'; }); return m; }
+function tRefuse(text){ T.msg=text||''; const m=$('tmsg'); if(m){ m.textContent=T.msg; m.hidden=!T.msg; } }
+function tAnswer(l,choice,notes,more){   // an answer is written as every line's answer is; the ticks travel with it as the pictures' own answers
+  T.panel=null; T.msg=''; clearTimeout(T.timer);
+  write(l,choice,notes||'',Object.assign({pics:choice==='ignore'||choice==='own'?{}:tMarks(l)},more||{}));
+  if(T.auto) T.timer=setTimeout(()=>{ if((tThings()[T.cur]||{}).line===l.line) tNextOpen(true); },1200);
+}
+function tUndo(l){ clearTimeout(T.timer); if(db&&round) ref(l).delete().catch(fail); }
+function tAct(l,b){   // one of the thing's buttons: refused here, in the server's own words, when it needs a picture ticked and none is
+  const need=(l.tick||{})[b.choice];
+  if(need&&!tKept(l).length) return tRefuse(need);
+  if(b.needs_words||b.choice==='ignore') return tOpen(T.panel===b.choice?null:b.choice);
+  tAnswer(l,b.choice,'');
+}
+function tOpen(p){ T.panel=p; T.msg=''; clearTimeout(T.timer); tDraw(); const f=document.querySelector('#tpanel textarea, #tpanel input, #tpanel button'); if(f) f.focus(); }
+function tGo(i){ clearTimeout(T.timer); T.show=false; T.cur=i; T.panel=null; T.msg=''; tDraw(); }
+function tStep(d){ const n=tThings().length; if(n) tGo(T.cur<0?(d>0?0:n-1):(T.cur+d+n)%n); }
+function tNextOpen(auto){ const list=tThings(), n=list.length;
+  for(let k=1;k<=n;k++){ const i=(Math.max(T.cur,0)+k)%n; if(!tDone(list[i])) return tGo(i); }
+  if(auto||list.every(tDone)) tGo(-1); }
+function tTick(l,p,on,fig){   // a tick changed: an answer already given follows it, or is taken back when it needs a picture and none is kept
+  (T.tick[l.line]=T.tick[l.line]||{})[p.code]=on; fig.classList.toggle('off',!on); tRefuse('');
+  const a=tOwn(l); if(!a||a.choice==='ignore'||a.choice==='own') return;
+  if((l.tick||{})[a.choice]&&!tKept(l).length){ T.msg=l.tick[a.choice]; tUndo(l); }
+  else write(l,a.choice,a.notes,{pics:tMarks(l)});
+}
+const T_DONE={use:'Approved',set:'Make a set',fix:'Corrections',own:'Own picture',ignore:'Left out'};
+function tTag(l){ const a=tOwn(l); return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
+function tSays(l){   // the answer as it stands, said back
+  const a=tOwn(l), q=s=>'“'+s+'”', has=(l.pics||[]).length>0;
+  if(!a) return tByProp(l)?['Your answer: ',((l.rec||{}).label||'Accepted')+". (Claude's proposal, accepted.)"]:l.case==='auto'?['Decided: ',l.kept+'. No answer is needed.']:['Kept from before: ',l.kept+'. Choose another answer to change it.'];
+  let s={use:'Approve: use the ticked pictures as the reference.',set:'Make a set.'+(a.notes?' Your words: '+q(a.notes):''),
+    fix:has?'Minor corrections: '+q(a.notes)+' A set is made with these words.':'Make a set, with your words: '+q(a.notes),
+    own:'My own picture'+(a.own&&a.own.name?': '+a.own.name:'')+'.'+(a.permission?' Permission: '+q(a.permission):''),ignore:'Leave it out.'}[a.choice]||String(a.choice);
+  const names=tKept(l).map(p=>p.label);
+  if(names.length&&a.choice!=='ignore'&&a.choice!=='own') s+=' Pictures kept: '+names.join('; ')+'.';
+  return ['Your answer: ',s];
+}
+function tLarge(p,btn){   // on a wide screen the row's pictures are wider than the small picture: the large one from the file store takes its place
+  if(innerWidth<=1700) return;
+  if(!zoomUrl[p.code]) zoomUrl[p.code]=picDoc('zoom',p.code,'url');
+  zoomUrl[p.code].then(u=>{ const img=btn.querySelector('img'); if(!img||!/^\/_blob\/[0-9a-f]{32}$/.test(u)) return; const small=img.src; img.onload=null; img.onerror=()=>{ img.onerror=null; img.src=small; }; img.src=u; });
+}
+function tTop(list){
+  const n=list.length, a=list.filter(tDone).length, lay=round.layout||{};
+  $('tstep').textContent=(round.step||'References')+', step 1'; $('tprogt').textContent=a+' of '+n+' answered'; $('tprogb').style.width=(n?100*a/n:0)+'%';
+  $('thow').replaceChildren(mk('p',{},lay.help||round.note||''),round.summary&&mk('p',{},round.summary)); $('tauto').checked=!!T.auto;
+  $('tstop').hidden=!lay.stopped; $('tstop').textContent=lay.stopped?'Not recorded: '+lay.stopped:'';
+}
+function tAccept(prop){ const b=(prop.buttons||[])[0]; if(b) write(prop,b.choice,''); }
+function tRail(list){
+  const rail=$('trail'), top=rail.scrollTop, kids=[], prop=tProp();
+  if(prop){   // "Accept Claude's proposals for the N routine things", with a button that shows them first
+    const rt=list.filter(l=>(prop.covers||[]).indexOf(l.key)>=0), left=rt.filter(l=>!tDone(l)).length, b=(prop.buttons||[])[0]||{};
+    kids.push(mk('div',{class:'tprop'},mk('p',{},left?prop.head:'The '+rt.length+' routine things are answered.'),
+      mk('div',{class:'trow2'},
+        mk('button',{class:'tbtn go',id:'taccept',type:'button',disabled:!left,on:{click:()=>tAccept(prop)}},b.label||'Accept'),
+        mk('button',{class:'tbtn',id:'tshow',type:'button',on:{click:()=>{ T.show=true; clearTimeout(T.timer); tDraw(); }}},prop.show||'Show them'),
+        answers[prop.line]&&mk('button',{class:'tlink',id:'tunaccept',type:'button',on:{click:()=>tUndo(prop)}},'Undo'),
+        mk('button',{class:'tlink',id:'twhat',type:'button','aria-expanded':String(!!T.fold['?']),'aria-controls':'tpmore',on:{click:()=>{ T.fold['?']=!T.fold['?']; tRail(list); }}},'what this does')),
+      mk('p',{class:'tmore',id:'tpmore',hidden:!T.fold['?']},prop.text)));
+  }
+  kids.push(mk('div',{class:'tfil',role:'group','aria-label':'Show'},[['all','All'],['open','To answer'],['done','Answered']].map(f=>
+    mk('button',{class:'tchip',type:'button','aria-pressed':String(T.filter===f[0]),'data-filter':f[0],on:{click:()=>{ T.filter=f[0]; tRail(list); }}},f[1]))));
+  const groups=[]; list.forEach((l,i)=>{ const g=l.group||''; let o=groups.find(x=>x.g===g); if(!o) groups.push(o={g:g,rows:[]}); o.rows.push([l,i]); });   // the groups, in the order the server sent the things
+  let shown=0;
+  groups.forEach((o,gi)=>{
+    const rows=o.rows.filter(r=>T.filter==='all'||(T.filter==='done')===tDone(r[0])); if(!rows.length) return;
+    shown+=rows.length; const open=!T.fold[o.g];
+    kids.push(mk('button',{class:'tgh',type:'button','aria-expanded':String(open),'aria-controls':'tgrp'+gi,on:{click:()=>{ T.fold[o.g]=open; tRail(list); }}},mk('span',{},o.g),String(rows.length)));
+    kids.push(mk('ul',{id:'tgrp'+gi,hidden:!open},rows.map(r=>{ const l=r[0], i=r[1], n=(l.pics||[]).length, d=tDone(l);
+      return mk('li',{},mk('button',{class:'trow'+(d?' done':''),type:'button','aria-current':i===T.cur&&!T.show?'true':null,'data-i':i,on:{click:()=>tGo(i)}},
+        mk('i',{class:'tdot',title:d?'Answered':'To answer'}),mk('span',{class:'tnm',title:l.name},l.name),
+        mk('span',{class:'tmeta'},l.kind,mk('span',{class:'tcount'},n?n+(n>1?' pictures':' picture'):'no picture'),mk('span',{class:'ttag'},d?tTag(l):((l.rec||{}).label||'')))));
+    })));
+  });
+  if(!shown) kids.push(mk('p',{class:'tempty'},T.filter==='open'?'Nothing left to answer.':'Nothing answered yet.'));
+  rail.replaceChildren(...kids); rail.scrollTop=top;
+  const c=rail.querySelector('.trow[aria-current]'); if(c) c.scrollIntoView({block:'nearest'});
+}
+function tPanel(l){   // what opens under the buttons: the words box, the operator's own picture (the page's own upload), or what leaving out costs
+  const cancel=mk('button',{class:'tbtn quiet',id:'tcancel',type:'button',on:{click:()=>tOpen(null)}},'Cancel');
+  if(T.panel==='fix'){
+    const has=(l.pics||[]).length>0, ta=mk('textarea',{id:'tfix',maxlength:String(MAX),placeholder:has?'For example: keep this man but change his clothes':'For example: a clear oil in an open tin, a brush resting on it'});
+    return [mk('label',{for:'tfix'},has?'What should change?':'What must the picture show?'),ta,
+      mk('div',{class:'tacts'},mk('button',{class:'tbtn go',id:'tfixsend',type:'button',on:{click:()=>{ const w=ta.value.trim().slice(0,MAX);
+        if(!w){ tRefuse('Write what should change first.'); ta.focus(); return; }
+        const need=(l.tick||{}).fix; if(need&&!tKept(l).length) return tRefuse(need);
+        tAnswer(l,'fix',w); }}},has?'Send corrections':'Make a set with these words'),cancel)]; }
+  if(T.panel==='own') return [ownBox(l),mk('div',{class:'tacts'},cancel)];
+  return [mk('p',{},l.cost||'This thing will have no reference picture.'),
+    mk('div',{class:'tacts'},mk('button',{class:'tbtn stop',id:'tleave',type:'button',on:{click:()=>tAnswer(l,'ignore','')}},'Leave it out'),cancel)];
+}
+function tMain(list){
+  const main=$('tmain'), l=list[T.cur], prop=tProp();
+  const fold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!target.hidden; btn.setAttribute('aria-expanded',String(!target.hidden)); });
+  const small=(p,cls)=>{ const s=mk('span',{class:cls},mk('span',{class:'ph'},p.missing?'Not available':'…')); if(!p.missing) loadThumb(p,s,()=>{},0); return s; };
+  if(T.show&&prop){   // the routine things, to be seen before they are accepted together
+    const rt=list.filter(x=>(prop.covers||[]).indexOf(x.key)>=0), left=rt.filter(x=>!tDone(x)).length, b=(prop.buttons||[])[0]||{};
+    main.replaceChildren(
+      mk('div',{class:'thead'},mk('h2',{},prop.head),mk('div',{class:'tnav'},
+        mk('button',{class:'tbtn go',id:'taccepthere',type:'button',disabled:!left,on:{click:()=>tAccept(prop)}},left?(b.label||'Accept'):'All accepted'),
+        mk('button',{class:'tbtn',id:'tclose',type:'button',on:{click:()=>{ T.show=false; tDraw(); }}},'Close'))),
+      mk('p',{class:'tnote'},prop.text),
+      mk('div',{class:'tplist'},rt.map(x=>mk('div',{class:'tprow'},
+        mk('div',{class:'tpth'},(x.pics||[]).slice(0,3).map(p=>small(p,'tpim'))),
+        mk('div',{class:'tptx'},mk('p',{},mk('b',{},x.name),' ',x.kind&&mk('span',{class:'tkind'},x.kind)),
+          mk('p',{},'Claude suggests: ',mk('b',{},(x.rec||{}).label||''),tDone(x)&&mk('span',{class:'tsug'},tOwn(x)?'You answered: '+tTag(x):tByProp(x)?'Accepted':'Kept: '+x.kept)),
+          mk('p',{class:'tnote'},(x.rec||{}).reason||'')),
+        mk('button',{class:'tbtn',type:'button','data-open':x.key,on:{click:()=>tGo(list.indexOf(x))}},'Open')))));
+    main.scrollTop=0; return;
+  }
+  if(!l){
+    main.replaceChildren(list.length&&list.every(tDone)
+      ?mk('div',{class:'talldone'},mk('h2',{},'All answered.'),mk('p',{},'Go back to the chat and say done.'))
+      :mk('p',{class:'tempty'},'Choose a thing from the list.'));
+    return;
+  }
+  const pics=l.pics||[], kids=[], gate=[], gmsg=mk('p',{class:'tnote',id:'tgate',hidden:true});
+  const check=()=>{   // as on every line with pictures: the buttons work only when every picture has shown
+    const bad=pics.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=pics.filter(p=>picSeen[p.code]!=='ok').length;
+    gate.forEach(b=>{ b.disabled=!!(bad.length||wait); });
+    gmsg.textContent=bad.length?'A picture is missing: '+bad.join(', ')+'. This thing cannot be answered here: tell the assistant in the chat.':wait?'The buttons work when every picture has shown.':''; gmsg.hidden=!gmsg.textContent; };
+  const usedFull=mk('p',{class:'tstrip',id:'tused',hidden:true},l.used), usedBtn=l.shots&&mk('button',{class:'tchip',id:'tshots',type:'button','aria-expanded':'false','aria-controls':'tused'},l.shots);
+  if(usedBtn) fold(usedBtn,usedFull);
+  kids.push(mk('div',{class:'thead'},mk('h2',{title:l.name},l.name),l.kind&&mk('span',{class:'tkind'},l.kind),usedBtn,
+      mk('div',{class:'tnav'},mk('button',{class:'tbtn',id:'tprev',type:'button','aria-label':'Previous thing',on:{click:()=>tStep(-1)}},'‹ Previous'),
+        mk('span',{},(T.cur+1)+' of '+list.length),mk('button',{class:'tbtn',id:'tnext',type:'button','aria-label':'Next thing',on:{click:()=>tStep(1)}},'Next ›'))),
+    mk('p',{class:'tsub',title:l.desc},l.desc),usedFull);
+  if(l.refused) kids.push(mk('p',{class:'tmsg',id:'trefused'},'Not recorded: '+l.refused));   // the server's refusal of the last "done", kept on its thing
+  if(l.rec){
+    const why=mk('p',{class:'tstrip',id:'twhy',hidden:true},l.rec.reason), wb=mk('button',{class:'tlink',id:'twhyb',type:'button','aria-expanded':'false','aria-controls':'twhy'},'Why?'); fold(wb,why);
+    kids.push(mk('p',{class:'tsuggest'},mk('span',{},'Claude suggests: ',mk('b',{},l.rec.label)),l.rec.reason&&wb),why);
+  }
+  if(pics.length){
+    kids.push(mk('div',{class:'tpics'},pics.map((p,i)=>{
+      const on=tTicked(l,p), k=tMark(p), id='tck'+i, saw=mk('p',{class:'tsaw',id:'tsaw'+i,hidden:true},mk('b',{},'What Claude saw: '),p.note);
+      const info=mk('button',{class:'tinfo',id:'tinfo'+i,type:'button','aria-expanded':'false','aria-controls':'tsaw'+i,'aria-label':'What Claude saw in this picture',title:'What Claude saw'},'i'); fold(info,saw);
+      const btn=mk('button',{class:'timg',type:'button',disabled:true,'aria-label':'Open large: '+p.label,on:{click:e=>openZoom(pics,i,e.currentTarget)}},mk('span',{class:'ph'},p.missing?'Not available':'Loading…'));
+      const fig=mk('figure',{class:'ttile'+(k.use?' closest':'')+(on?'':' off')},btn,
+        mk('label',{class:'tck',for:id},mk('input',{type:'checkbox',id:id,checked:on,'aria-label':'Keep this picture: '+p.label,on:{change:e=>tTick(l,p,e.target.checked,fig)}}),'Keep'),
+        p.weak&&mk('span',{class:'tweak'},'Weak'),
+        mk('figcaption',{class:'tcap'},mk('span',{title:p.label},p.label),p.note&&info),
+        k.use&&mk('p',{class:'tisit'},'Closest found: is this it?'),saw);
+      if(!p.missing) loadThumb(p,btn,()=>{ check(); tLarge(p,btn); },0);
+      return fig; })));
+  } else if(l.search){   // "Not in your footage.", with the reason behind a small "why"
+    const txt=mk('span',{},l.search.text), more=l.search.why&&mk('button',{class:'tlink',id:'tsearchwhy',type:'button','aria-expanded':'false',on:{click:e=>{
+      const open=e.currentTarget.getAttribute('aria-expanded')!=='true'; txt.textContent=open?l.search.text+' '+l.search.why:l.search.text; e.currentTarget.textContent=open?'less':'why'; e.currentTarget.setAttribute('aria-expanded',String(open)); }}},'why');
+    kids.push(mk('p',{class:'tnopics'},txt,' ',more));
+  }
+  const sug=(l.rec||{}).choice, bar=[];
+  (l.buttons||[]).filter(b=>!b.small).forEach((b,i)=>{   // the server's buttons for this thing's case, the suggested one first and marked
+    const first=i===0&&!!sug&&b.choice===sug, pan=b.needs_words||b.choice==='ignore';
+    bar.push(mk('button',{class:'tbtn'+(first?' go':b.choice==='ignore'?' quiet':''),type:'button','data-act':b.choice,'aria-expanded':pan?String(T.panel===b.choice):null,on:{click:()=>tAct(l,b)}},b.label,first&&[' ',mk('span',{class:'tsug'},'Suggested')])); });
+  if(l.own&&assets){ const at=bar.findIndex((x,i)=>i>0&&x.getAttribute('data-act')==='ignore');
+    bar.splice(at<0?bar.length:at,0,mk('button',{class:'tbtn',type:'button','data-act':'own','aria-expanded':String(T.panel==='own'),on:{click:()=>tOpen(T.panel==='own'?null:'own')}},l.own.label)); }
+  if(pics.length) bar.forEach(b=>gate.push(b));
+  kids.push(mk('div',{class:'tbar',role:'group','aria-label':'Your answer'},bar),
+    (l.buttons||[]).filter(b=>b.small).map(b=>mk('p',{class:'tnote'},mk('button',{class:'tlink',type:'button','data-act':'words',on:{click:()=>tAct(l,b)}},b.label+' (optional)'))),
+    mk('p',{class:'tnote',id:'tmade'},(round.layout||{}).made||''),gmsg,
+    mk('p',{class:'tmsg',id:'tmsg',role:'status',hidden:!T.msg},T.msg));
+  if(T.panel) kids.push(mk('div',{class:'tpanel',id:'tpanel'},tPanel(l)));
+  if(tDone(l)){ const a=tOwn(l), s=tSays(l);
+    kids.push(mk('div',{class:'tanswer',id:'tanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'Your own picture',src:a.own.url}),mk('p',{},mk('b',{},s[0]),s[1]),
+      a&&mk('button',{class:'tbtn',id:'tundo',type:'button',on:{click:()=>tUndo(l)}},'Undo'))); }
+  const det=mk('div',{class:'tdetails',id:'tdetails',hidden:true},mk('dl',{},
+    mk('dt',{},'Description'),mk('dd',{},l.desc),
+    l.used&&[mk('dt',{},'Shots'),mk('dd',{},l.used)],
+    l.search&&[mk('dt',{},'What the search found'),mk('dd',{},l.search.text+(l.search.why?' '+l.search.why:''))],
+    (l.warnings||[]).length?[mk('dt',{},'Take care'),l.warnings.map(w=>mk('dd',{},w))]:null,
+    l.cost&&[mk('dt',{},'If you leave it out'),mk('dd',{},l.cost)],
+    pics.length?[mk('dt',{},'What Claude saw in each picture'),pics.map(p=>mk('dd',{},mk('b',{},p.label+': '),p.note))]:null));
+  const detBtn=mk('button',{class:'tfold',id:'tdetb',type:'button','aria-expanded':'false','aria-controls':'tdetails'},'Details'); fold(detBtn,det);
+  kids.push(detBtn,det);
+  main.replaceChildren(...kids.flat(3).filter(Boolean)); main.scrollTop=0; check();
+}
+function tDraw(){
+  const list=tThings();
+  if(T.round!==round.round){ T.round=round.round; T.tick={}; T.panel=null; T.msg=''; T.show=false; const f=list.findIndex(l=>!tDone(l)); T.cur=list.length&&f<0?-1:Math.max(f,0); }   // a new round: the first thing still to answer
+  if(T.cur>=list.length) T.cur=list.length-1;
+  const f=document.activeElement&&document.activeElement.id;
+  tTop(list); tRail(list); tMain(list);
+  if(f){ const e=$(f); if(e&&$('things').contains(e)&&e!==document.activeElement) e.focus(); }   // what was in use keeps the focus when the thing is drawn again
+}
+const tPops=except=>Array.prototype.forEach.call(document.querySelectorAll('#things [data-pop]'),b=>{ if(b!==except){ $(b.getAttribute('data-pop')).hidden=true; b.setAttribute('aria-expanded','false'); } });
+document.addEventListener('click',e=>{
+  if($('things').hidden) return;
+  const b=e.target.closest&&e.target.closest('[data-pop]');
+  if(b){ const p=$(b.getAttribute('data-pop')); tPops(b); p.hidden=!p.hidden; b.setAttribute('aria-expanded',String(!p.hidden)); }
+  else if(!(e.target.closest&&e.target.closest('.tpop'))) tPops();
+});
+$('tauto').addEventListener('change',e=>{ T.auto=e.target.checked; try{ localStorage.setItem('vw-refs-auto',T.auto?'1':'0'); }catch(x){} if(!T.auto) clearTimeout(T.timer); });
+$('tnextopen').addEventListener('click',()=>tNextOpen(false));
+document.addEventListener('keydown',e=>{   // the keys of this layout; the large picture has its own
+  if($('things').hidden||zoomed||e.ctrlKey||e.metaKey||e.altKey||!round) return;
+  const k=e.key.length===1?e.key.toLowerCase():e.key, act=a=>{ const b=document.querySelector('#tmain [data-act="'+a+'"]'); if(b&&!b.disabled) b.click(); return !!b; };
+  if(k==='Escape'){
+    if(document.querySelector('.tpop:not([hidden])')) return tPops();
+    if(T.panel) return tOpen(null);
+    Array.prototype.forEach.call(document.querySelectorAll('#tmain [aria-expanded="true"]'),b=>b.click());
+    return tRefuse('');
+  }
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='checkbox') return;
+  if(k==='ArrowLeft'||k==='j'){ e.preventDefault(); tStep(-1); }
+  else if(k==='ArrowRight'||k==='k'){ e.preventDefault(); tStep(1); }
+  else if(/^[123]$/.test(k)){ const c=$('tck'+(k-1)); if(c) c.click(); }
+  else if('ascul'.indexOf(k)>=0&&k.length===1){ e.preventDefault(); if(k==='c') act('fix')||act('words'); else act({a:'use',s:'set',u:'own',l:'ignore'}[k]); }
+});
 function watchAnswers(){
   if(stopAnswers){stopAnswers(); stopAnswers=null;} answers={};
   if(!round) return;

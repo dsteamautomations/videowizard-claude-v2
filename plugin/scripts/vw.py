@@ -2404,7 +2404,8 @@ def cmd_visuals(a):
             suffix = _doc_suffix(_pictures_sent(folder))
             names = {c: c + suffix for c in _pic_codes(page.get('pictures'))} if suffix else {}   # design/210 review: pictures offered again are in other documents; the round says which
             doc = {'round': rnd, 'at': datetime.now(timezone.utc).isoformat(), 'run': m['code'], 'step': page['step'], 'open': page['open'], 'summary': page.get('summary') or '',
-                   'note': page.get('note') or '', 'lines': page['lines'], **({'pic_docs': names, 'zoom_docs': names} if names else {})}
+                   'note': page.get('note') or '', 'lines': page['lines'], **({'pic_docs': names, 'zoom_docs': names} if names else {}),
+                   **({'layout': page['layout']} if isinstance(page.get('layout'), dict) else {})}   # design/212: how the page lays this step out (step 1 of the references: one thing at a time beside the list)
             (folder / f'{rnd}.json').write_text(json.dumps(doc, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
             current.write_text(rnd + '\n', encoding='utf-8')
             waiting = len([l for l in page['lines'] if l['state'] == 'open'])

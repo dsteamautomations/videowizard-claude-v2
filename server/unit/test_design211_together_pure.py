@@ -250,21 +250,22 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     s = film.session()
     assert s['round']['v'] == 2 and len(s['round']['elements']['TROWEL']['frames']) == 2 and s['round']['elements']['TROWEL']['doubt'] and s['round']['elements']['FAN']['doubt']
 
-    # step 1 on the page: the proposals, the doubtful first, then by kind; each line with its proposal, its footage pictures and what was searched
+    # step 1 on the page: the proposals, then the things in the five groups of design/212; each line with its proposal, its footage pictures and what was searched
     page = film.page()
     lines = {l['key']: l for l in page['lines']}
-    assert page['step'] == P.REFS_STEP and [l['key'] for l in page['lines']] == ['refs:proposals', 'ref:TROWEL', 'ref:FAN', 'ref:BRICK', 'ref:TILE', 'ref:MASON', 'ref:STREET', 'ref:T_LAY']
-    assert [lines[k]['group'] for k in ('ref:TROWEL', 'ref:FAN', 'ref:BRICK', 'ref:TILE')] == ['Doubtful: answer these yourself'] * 4
-    assert [lines[k]['group'] for k in ('ref:MASON', 'ref:STREET', 'ref:T_LAY')] == ['People', 'Places', 'Ways of working']
-    assert "The plan's shots still need about ₹" in page['summary'] and 'Left after both: ₹' in page['summary']          # V.budget, real
-    assert lines['refs:proposals']['buttons'][0]['label'] == 'Accept the 3 proposals (paid, about ₹106)'
+    G = CF.STEP1_GROUPS
+    assert page['step'] == P.REFS_STEP and [l['key'] for l in page['lines']] == ['refs:proposals', 'ref:STREET', 'ref:T_LAY', 'ref:TROWEL', 'ref:FAN', 'ref:TILE', 'ref:BRICK', 'ref:MASON']
+    assert [lines[k]['group'] for k in ('ref:STREET', 'ref:T_LAY', 'ref:TROWEL', 'ref:FAN', 'ref:TILE', 'ref:BRICK', 'ref:MASON')] == [G[0], G[0], G[1], G[1], G[1], G[2], G[4]]
+    assert page['summary'].startswith('7 things: 6 to answer, 1 answered.') and '₹' not in json.dumps(page['lines']) + page['summary'] + page['note']   # design/212: no cost on the page; the person not in the footage needs no answer
+    assert lines['refs:proposals']['buttons'][0]['label'] == 'Accept all 2' and page['layout']['kind'] == 'things'
     trowel, fan = lines['ref:TROWEL'], lines['ref:FAN']
-    assert trowel['rec'] == {'do': 'footage', 'label': 'Use it as the reference', 'reason': F.ROWS['TROWEL'][1]} and [b['choice'] for b in trowel['buttons']] == ['approve', 'clean', 'ignore']
+    assert trowel['rec'] == {'do': 'footage', 'label': 'Use footage', 'choice': 'use', 'reason': F.ROWS['TROWEL'][1]} and [b['choice'] for b in trowel['buttons']] == ['use', 'set', 'fix', 'ignore']
     assert [(p['label'], p.get('weak'), p['choice'][:4]) for p in trowel['pics']] == [('side', None, 'not:'), ('in the hand, lifting mortar', True, 'not:')] and trowel['pics'][1]['note'] == 'Half covered by mortar.'
-    assert 'From your footage: 2 pictures.' in trowel['text'] and 'Used in 2 shots' in trowel['text']
-    assert 'Not searched for any thing, because they have no analysis: C003.mp4.' in page['summary'] and 'no analysis' not in trowel['text']   # design/211 review: said once, in the summary
-    assert 'None was found in your footage. Searched: 2 clips (C001.mp4, C002.mp4). The closest is shown.' in fan['text'] and fan['pics'][0]['choice'] == 'use:' + tid['FAN', 35.0]
-    assert 'Your footage was not searched for it: The helper was stopped.' in lines['ref:BRICK']['text'] and [b['choice'] for b in lines['ref:MASON']['buttons']] == ['approve']
+    assert trowel['case'] == 'footage' and 'search' not in trowel and trowel['used'].startswith('Used in 2 shots')
+    assert 'Not searched for any thing, because they have no analysis: C003.mp4.' in page['summary'] and 'no analysis' not in json.dumps(trowel)   # design/211 review: said once, in the summary
+    assert fan['search'] == {'text': 'Not in your footage. The closest picture is shown.', 'why': 'Searched: 2 clips (C001.mp4, C002.mp4).'} and fan['pics'][0]['choice'] == 'use:' + tid['FAN', 35.0]
+    assert lines['ref:BRICK']['search'] == {'text': 'Not in your footage.', 'why': 'The helper was stopped.'}
+    assert lines['ref:MASON']['case'] == 'auto' and [b['choice'] for b in lines['ref:MASON']['buttons']] == ['fix'] and lines['ref:MASON']['kept'] == 'A set will be made'   # not in the footage: no answer is needed
     assert 'has no picture of it' not in json.dumps(page)
 
     # "Not this picture" on the weak frame, "That is it" on the closest: part A changes the frames, the lines come back open
@@ -274,13 +275,14 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     s = film.session()
     assert s['references'][weak]['status'] == 'rejected' and len(s['round']['elements']['TROWEL']['frames']) == 1 and len(s['round']['elements']['FAN']['frames']) == 1   # part A rewrote part B's rows
     lines = film.lines()
-    assert len(lines['ref:TROWEL']['pics']) == 1 and lines['ref:FAN']['pics'][0]['choice'].startswith('not:') and [b['choice'] for b in lines['ref:FAN']['buttons']] == ['ignore', 'approve', 'clean']
+    assert len(lines['ref:TROWEL']['pics']) == 1 and lines['ref:FAN']['pics'][0]['choice'].startswith('not:') and [b['choice'] for b in lines['ref:FAN']['buttons']] == ['ignore', 'use', 'set', 'fix']
     refused = film.record(ans(lines['ref:TROWEL'], 'pics', pics={'no-such-picture': 'not'}))['refused']
     assert [r['key'] for r in refused] == ['ref:TROWEL'] and film.row('TROWEL')['frames'] == s['round']['elements']['TROWEL']['frames']
 
-    # a clean set, use it, have a set made, leave out; then the proposals accepted: step 1 is recorded once, the first three sets are ordered
+    # minor corrections (a set from the footage picture, with words), approve, make a set, leave out; then the proposals accepted: step 1 is recorded once, the first three sets are ordered;
+    # MASON, a person the footage does not show, is never answered: the server has the set made (design/212)
     lines = film.lines()
-    out = film.record(ans(lines['ref:TROWEL'], 'clean', 'Show the blade clean.'), ans(lines['ref:FAN'], 'approve'), ans(lines['ref:BRICK'], 'approve'), ans(lines['ref:TILE'], 'ignore'))
+    out = film.record(ans(lines['ref:TROWEL'], 'fix', 'Show the blade clean.'), ans(lines['ref:FAN'], 'use'), ans(lines['ref:BRICK'], 'set'), ans(lines['ref:TILE'], 'ignore'))
     assert out['kept'] == ['ref:TROWEL', 'ref:FAN', 'ref:BRICK', 'ref:TILE'] and film.ordered() == [] and film.state() == 1
     out = film.record(ans(film.lines()['refs:proposals'], 'accept_all'))
     assert says(out, 'vw visuals status') == RS.GO1_MAKING.format(k=3, x='106', r=2) and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'making'
@@ -304,7 +306,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     page = film.page()
     lines = {l['key']: l for l in page['lines']}
     assert [l['key'] for l in page['lines']] == ['sets:rest', 'set:T_LAY', 'set:MASON', 'set:STREET', 'set:TROWEL', 'set:BRICK', 'set:FAN']
-    assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make the other 2 sets (paid, about ₹71)'
+    assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make the other 2 sets'
     lay = lines['set:T_LAY']
     assert lay['group'] == 'Doubtful: look at these first' and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'fail', 'by': "The program's check (Gemini)", 'lines': ['Picture B: the view: Not the view asked.']}
     assert lay['notes']['sources'] == 1 and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
@@ -344,7 +346,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     film.back()
     film.set_looks()
     lay = film.lines()['set:T_LAY']
-    assert [b['choice'][:4] for b in lay['buttons']] == ['use:', 'use:', 'use:', 'asid'] and lay['buttons'][3]['label'] == 'Leave it out' and lay['text'].endswith(CF.WORDS['set_made_max_thing'].format(n=3))
+    assert [b['choice'][:4] for b in lay['buttons']] == ['use:', 'use:', 'use:', 'asid'] and lay['buttons'][3]['label'] == 'Leave out' and lay['text'].endswith(CF.WORDS['set_made_max_thing'].format(n=3))
     assert film.record(ans(lay, 'no'))['refused'][0]['key'] == 'set:T_LAY'
     held = film.do(lambda: VS.round_sets(film.store, USER, film.run, film.outputs, {'T_LAY': {'verdict': 'no'}}, 'No', conn=film.conn, partial=True))['held']
     assert held == {'T_LAY': RS.MAKES_LIMIT.format(eid='T_LAY', max=3)} and len(film.ordered()) == 8
@@ -356,7 +358,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
 def test_the_other_sets_left_out_and_a_set_made_three_times_left_out_complete_the_round():
     film, _ = at_step_1()
     lines = film.lines()
-    film.record(ans(lines['ref:TROWEL'], 'approve'), ans(lines['ref:FAN'], 'ignore'), ans(lines['ref:BRICK'], 'approve'), ans(lines['ref:TILE'], 'approve'), ans(lines['refs:proposals'], 'accept_all'))
+    film.record(ans(lines['ref:TROWEL'], 'use'), ans(lines['ref:FAN'], 'ignore'), ans(lines['ref:BRICK'], 'set'), ans(lines['ref:TILE'], 'set'), ans(lines['refs:proposals'], 'accept_all'))
     assert film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.session()['round']['rest'] == ['BRICK', 'TILE']
     film.back()
     film.set_looks()
@@ -378,7 +380,7 @@ def test_the_other_sets_left_out_and_a_set_made_three_times_left_out_complete_th
 def test_the_round_file_sent_again_orders_nothing_and_the_thing_comes_back_as_an_open_line():
     film, _ = at_step_1()
     lines = film.lines()
-    film.record(ans(lines['ref:TROWEL'], 'approve'), ans(lines['ref:FAN'], 'ignore'), ans(lines['ref:BRICK'], 'ignore'), ans(lines['ref:TILE'], 'ignore'), ans(lines['refs:proposals'], 'accept_all'))
+    film.record(ans(lines['ref:TROWEL'], 'use'), ans(lines['ref:FAN'], 'ignore'), ans(lines['ref:BRICK'], 'ignore'), ans(lines['ref:TILE'], 'ignore'), ans(lines['refs:proposals'], 'accept_all'))
     film.back()
     film.set_looks()
     out = film.post(round_file(film, FAN={'rec': 'set', 'reason': 'It is seen closer now.'}))
@@ -406,10 +408,10 @@ def test_the_main_path_in_the_chat_one_question_at_a_time():
     while out.get('item'):   # the doubtful things, one by one, each answered as Claude proposes
         item = out['item']
         line = page['ref:' + item['id'].split(':')[1]]
-        assert item['text'].startswith(line['text']) and 'Claude proposes: ' in item['text'] and line['rec']['reason'] in item['text'] and [b['label'] for b in item['buttons']] == [b['label'] for b in line['buttons']][:len(item['buttons'])]
+        assert item['text'].startswith(line['desc'] + '\n' + line['used']) and 'Claude suggests: ' in item['text'] and line['rec']['reason'] in item['text'] and [b['label'] for b in item['buttons']] == [b['label'] for b in line['buttons']][:len(item['buttons'])]
         asked.append(item['id'])
         out = film.decide(item['id'], item['buttons'][0]['choice'], item['buttons'][0]['label'])
-    assert asked == ['round1:TROWEL', 'round1:FAN', 'round1:BRICK', 'round1:TILE'] and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'making'
+    assert asked == ['round1:TROWEL', 'round1:FAN', 'round1:TILE', 'round1:BRICK'] and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'making'
     assert RS.GO1_MAKING.format(k=3, x='106', r=2) in says(out, 'vw visuals status')
     assert 'then' not in film.next()                                                           # while the sets are made: nothing to do
     film.back()
@@ -437,7 +439,7 @@ def test_the_main_path_in_the_chat_one_question_at_a_time():
 def test_the_chat_says_the_rewrite_is_due():
     film, _ = at_step_1()
     lines = film.lines()
-    film.record(ans(lines['ref:TROWEL'], 'approve'), ans(lines['ref:FAN'], 'ignore'), ans(lines['ref:BRICK'], 'ignore'), ans(lines['ref:TILE'], 'ignore'), ans(lines['refs:proposals'], 'accept_all'))
+    film.record(ans(lines['ref:TROWEL'], 'use'), ans(lines['ref:FAN'], 'ignore'), ans(lines['ref:BRICK'], 'ignore'), ans(lines['ref:TILE'], 'ignore'), ans(lines['refs:proposals'], 'accept_all'))
     film.back()
     film.set_looks()
     out = film.next()
