@@ -125,6 +125,12 @@ if __name__ == '__main__':
         d210bs(steps)
         from d210c_wording_v3 import apply as d210c   # design/210, the wording review: each step sent to where it is answered; the picture search in the order it is done
         prompt = d210c(prompt, parts)
+        from d211a_wording_v3 import apply as d211a   # design/211 part A: the footage pictures found by helpers (the digest, trial frames, looks)
+        prompt = d211a(prompt, parts)
+        from d211b_wording_v3 import apply as d211b   # design/211 part B: the sets (the proposal, the views, two goes, the looks, the rewrite)
+        prompt = d211b(prompt, parts)
+        from d211c_wording_v3 import apply as d211c   # design/211 part C: what the operator sees and decides (the proposals, the doubtful first)
+        prompt = d211c(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

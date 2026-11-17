@@ -26,7 +26,8 @@ VW_SKILLS = ('vw:vw', 'vw', 'vw:motion', 'motion', 'vw:guide', 'guide', 'vw:draw
 VW_HELPERS = ('vw:vw-scene-review', 'vw-scene-review', 'vw:vw-plan-gaps', 'vw-plan-gaps',   # design/125 O6, O9: the plugin's own helpers; their calls pass this guard too
               'vw:vw-motion-shot', 'vw-motion-shot', 'vw:vw-motion-rules', 'vw-motion-rules', 'vw:vw-motion-check', 'vw-motion-check',   # design/130
               'vw:vw-guide-scene', 'vw-guide-scene', 'vw:vw-guide-check', 'vw-guide-check',
-              'vw:vw-drawing', 'vw-drawing')   # design/200: the drawer of one thing's drawing set   # integration steps B to D: the builder and the fresh checker of an AI video shot's guide
+              'vw:vw-drawing', 'vw-drawing',
+              'vw:vw-reference-finder', 'vw-reference-finder', 'vw:vw-set-look', 'vw-set-look')   # design/211: the finder of the footage pictures, the looker at the made sets; design/200: the drawer of one thing's drawing set   # integration steps B to D: the builder and the fresh checker of an AI video shot's guide
 NOT_HERE = ("Blocked: {tool} is not available to the operator assistant. It uses only the vw tool, files inside the active run folder, "
             "questions to the operator, and the web after the warning and the operator's yes.")
 

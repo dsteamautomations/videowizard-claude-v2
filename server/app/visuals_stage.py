@@ -2097,6 +2097,12 @@ def kept(session):
     return (session or {}).get('refs') == 'kept'
 
 
+def round_v2(session):
+    """design/211: this film's reference round was created after the references step was rebuilt (`round['v'] == 2`). Every new behaviour of
+    design/211 is behind it; a round without it runs as before, to its end."""
+    return ((session or {}).get('round') or {}).get('v') == 2
+
+
 def is_kept(session, run):
     """design/151 (hotfix, 4 Nov 2026, VW-18): a new film (from design/139 on) with no older references (no sheet, no web pick) is kept from the start, not only once its round is
     posted: the page, the next-step lines and the refusals agree before the round. An older film, or one that already made a sheet or picked a web picture, is not."""
