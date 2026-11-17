@@ -3619,7 +3619,8 @@ def set_aside(store, user, run, outputs, element_id, words='', back=False):
     while the round is open. A set that was made is answered with No or Correct it, never set aside."""
     session = session_of(store, run, outputs)
     rd = session.get('round')
-    need(rd and rd.get('kept') and _round_pass(session, rd) in (2, 'making'), 'The reference round is not open at its sets: nothing can be set aside or brought back now.')
+    v2 = round_v2(session)   # design/211: also while the round waits for Claude (the looks, a rewrite); and a set made three times can be left out
+    need(rd and rd.get('kept') and _round_pass(session, rd) in ((2, 'making', 'looking', 'rewrite') if v2 else (2, 'making')), 'The reference round is not open at its sets: nothing can be set aside or brought back now.')
     row = rd['elements'].get(element_id)
     need(row, f'{element_id} is not in the reference round.')
     if back:
@@ -3631,8 +3632,14 @@ def set_aside(store, user, run, outputs, element_id, words='', back=False):
     need(not row.get('aside'), f'{element_id} is set aside already.')
     need(not row.get('ignored'), f'{element_id} was set to Ignore at step 1: it has no set.')
     need(not row.get('from_footage'), f'{element_id} is referenced by its footage picture: it has no set.')
-    need(not _set_rows(session, element_id, row.get('set'), ('generating', 'candidate', 'approved')),
+    limit = False
+    if v2:
+        from . import ref_sets
+        limit = int(row.get('round') or 0) >= ref_sets.MAKES_MAX and not _set_rows(session, element_id, row.get('set'), ('generating', 'approved'))   # "use one of these, add your own picture, or leave it out"
+    need(limit or not _set_rows(session, element_id, row.get('set'), ('generating', 'candidate', 'approved')),
          f'{element_id} has its set: answer it with No or Correct it; only a set that was never made can be set aside.')
+    for x in _set_rows(session, element_id, row.get('set')) if limit else []:   # its pictures are not used: rejected with the operator's words
+        x.update(status='rejected', rejection={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'notes': ' '.join(str(words or '').split()) or 'left out after three makes'})
     row['ignored'] = True
     row['aside'] = {'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'words': ' '.join(str(words or '').split())}
     row.pop('answer', None)

@@ -676,6 +676,34 @@ def test_after_three_makes_no_and_correct_it_are_held():
     assert judge(store, conn, {'T_LAY': yes(store, 'T_LAY')})['approved'] == ['T_LAY']                 # "use one of these" still stands
 
 
+def test_a_set_made_three_times_can_be_left_out_and_one_made_less_often_cannot():
+    store, conn = at_two()
+    assert 'only a set that was never made can be set aside' in refused(lambda: VS.set_aside(store, USER, RUN, [], 'T_LAY', 'no'))
+    s = saved(store)
+    s['round']['elements']['T_LAY']['round'] = 3
+    put(store, s)
+    live = s['round']['elements']['T_LAY']['set']
+    assert VS.set_aside(store, USER, RUN, [], 'T_LAY', 'None of these.')['aside'] is True
+    s = saved(store)
+    assert s['round']['elements']['T_LAY']['ignored'] and s['references'][live]['status'] == 'rejected' and s['references'][live]['rejection']['notes'] == 'None of these.'
+
+
+def test_the_others_left_out_do_not_hold_the_round_open():
+    store, conn = at_two()
+    judge(store, conn, {e: yes(store, e) for e in F.FIRST})
+    assert state(store) == 2                                          # BRICK and TILE wait
+    VS.set_aside(store, USER, RUN, [], 'BRICK', '')
+    assert state(store) == 2
+    VS.set_aside(store, USER, RUN, [], 'TILE', '')                    # "Leave these out": nothing is left with the operator
+    assert state(store) == 'complete' and VS._round_view(saved(store), F.plan())['pass'] == 'complete'
+    store, conn = at_two()
+    VS.set_aside(store, USER, RUN, [], 'BRICK', '')
+    VS.set_aside(store, USER, RUN, [], 'TILE', '')
+    assert state(store) == 2                                          # the first sets are not judged yet
+    judge(store, conn, {'T_LAY': {'verdict': 'no'}})
+    assert state(store) == 'rewrite' and VS.set_aside(store, USER, RUN, [], 'BRICK', '', back=True)['aside'] is False   # brought back while Claude rewrites
+
+
 # ---------- a second send of the round file ----------
 
 def test_a_second_send_orders_nothing_and_new_and_left_out_things_go_back_to_the_operator():

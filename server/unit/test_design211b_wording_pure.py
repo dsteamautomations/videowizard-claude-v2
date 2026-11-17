@@ -73,6 +73,7 @@ def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_rea
     agents = ''.join(p.read_text(encoding='utf-8') for p in (ROOT / 'plugin' / 'agents').glob('*.md'))
     listed = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
     assert len(W.RETIRED) == len(set(W.RETIRED)) == 10
+    assert all(len(s.split()) >= 4 for s in W.RETIRED)                   # the retired list takes sentences of four words or more
     for old in W.RETIRED:
         assert old not in now and old not in cmd and old not in agents, old
         assert old in before or old in cmd_before or old in listed, old  # it was really said before

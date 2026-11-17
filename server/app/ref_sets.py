@@ -436,7 +436,12 @@ def state(session, rd):
         return 'looking'
     if any(r.get('rewrite_due') and not r.get('ignored') for r in rd['elements'].values()):
         return 'rewrite'
-    return 'complete' if rd.get('pass') == 'complete' else 2
+    if rd.get('pass') == 'complete':
+        return 'complete'
+    # nothing is left with the operator (the others were set aside, "Leave these out"): the round is complete though no answer was recorded since
+    waits = rest_of(rd) or any(r.get('reopened') or r.get('answer') for r in rd['elements'].values())
+    settled = all(r.get('ignored') or r.get('from_footage') or (r.get('verdict') == 'yes' and V._set_rows(session, eid, r.get('set'), ('approved',))) for eid, r in rd['elements'].items())
+    return 'complete' if settled and not waits else 2
 
 
 def then_of(session):
