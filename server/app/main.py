@@ -1488,6 +1488,7 @@ class PageAnswer(Strict):   # design/204: one answer the operator gave on the ar
     notes: str = Field(default='', max_length=2000)
     own_ref: str = Field(default='', max_length=80)      # design/210: the operator's own picture given on the page, once the tool has handed it to `visuals/own`
     own_error: str = Field(default='', max_length=600)   # or why the tool could not hand it over
+    pics: dict[str, str] = Field(default_factory=dict, max_length=8)   # design/211: a picture answered on its own: {footage picture id: 'not'} or {trial frame id: 'use'}
 
 
 class PageAnswers(Write):
