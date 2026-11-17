@@ -12,10 +12,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import d211a_wording_v3 as W   # noqa: E402
 import d211d_wording_v3 as REVIEW   # noqa: E402  (design/211, the review: a later script that changes sentences of this one; these tests read the text as it was before it)
+import d213_wording_v3 as D213   # noqa: E402  (design/213: a later script still; it changes sentences of this one; these tests read the text as it was before it)
 
 
 def stage():
-    return REVIEW.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))
+    return REVIEW.before(D213.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))
 
 
 def applied():

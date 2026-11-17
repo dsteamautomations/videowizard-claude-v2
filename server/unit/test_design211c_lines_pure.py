@@ -1,7 +1,8 @@
 """design/211 part C (section 6.3): what the operator sees of a v2 reference round, on the page and in the chat with the same words.
 Step 1: the proposals, then the things in the five groups of design/212; each line with the plan's description, the shots that use the thing, what
 the footage has, Claude's proposal and its reason, each footage picture answered on its own. Step 2: the first sets with both checks, the
-image model's notes, the set before, and "make the rest". design/212 (SK, 17 Nov 2026): no cost is named at either step, the buttons of
+image model's notes, the set before, and "make the rest" (design/213, 17 Nov 2026: in the new layout, four groups, the answers Approve, Minor
+corrections, Make again and Leave out; its own tests are test_design213_layout_pure). design/212 (SK, 17 Nov 2026): no cost is named at either step, the buttons of
 step 1 are short and follow the case of the thing, and a person the footage does not show is not asked (test_design212_layout_pure). A round without `v == 2` shows exactly what it showed before.
 Parts A and B are stood in for (test_design211c_kit_pure). Without a database."""
 import copy
@@ -16,6 +17,7 @@ from test_design211c_kit_pure import Film, RUN, labels, older_step1
 
 W = CF.WORDS
 G = CF.STEP1_GROUPS
+S = CF.STEP2_GROUPS   # design/213: To judge, Could not be made, Waiting to be made, Settled
 NOT_ANALYSED = ''   # design/211 review: the clips with no analysis are named once, in the step's summary (UNREAD), not on every line
 UNREAD = ' Not searched for any thing, because they have no analysis: C003.mp4.'
 
@@ -186,40 +188,52 @@ def test_step_2_shows_make_the_rest_then_the_doubtful_sets_then_the_others_then_
     film = Film(monkeypatch, '2')
     p = film.page()
     assert p['step'] == P.SETS_STEP and [l['key'] for l in p['lines']] == ['sets:rest', 'set:T_LAY', 'set:MASON', 'set:STREET', 'set:BRICK', 'set:TILE', 'set:TROWEL']
-    assert [l.get('group') for l in p['lines']] == [None, CF.GROUP_SETS_DOUBT, 'People', 'Places', W['g_wait'], W['g_wait'], W['g_done']]
+    assert [l.get('group') for l in p['lines']] == [None, S[0], S[0], S[0], S[2], S[2], S[3]]   # design/213: the four groups; the set Claude would make again first (before: 'Doubtful: look at these first', People, Places, 'Not ready yet', 'Recorded')
     assert [l['state'] for l in p['lines']] == ['open', 'open', 'open', 'open', 'making', 'making', 'recorded']
     rest = p['lines'][0]
     assert rest['item'] == f'rest:{F.NOW}' and rest['title'] == 'The other sets'
-    assert rest['text'] == 'These are the first 3 sets. 2 more are not ordered yet: Brick, Roof tile. Look at these first: a fault here would repeat in all of them.'   # design/212: no money (before: design/211 review, S13)
-    assert rest['cost'] == 'If you leave these 2 out, these shots are made with no reference: Brick: shot 1 of gap 2, shot 2 of gap 2; Roof tile: shot 2 of gap 3.'   # (C5)
-    assert labels(rest) == ['Make the other 2 sets', 'Leave these 2 out'] and [b['choice'] for b in rest['buttons']] == ['rest', 'rest_out']
+    said = film.items()[0]   # design/213: the page shows the line's parts (`head`, `why`, the table of what is lost); the chat says them as one text
+    assert 'text' not in rest and said['text'].startswith('These are the first 3 sets. 2 more are not ordered yet: Brick, Roof tile. Look at these first: a fault here would repeat in all of them.\n')   # design/212: no money (before: design/211 review, S13)
+    assert (rest['head'], rest['why']) == ('2 more sets wait for your word', 'Judge the first sets first: a fault here would repeat in all of them.')
+    assert rest['cost'] == 'If you leave these 2 out, these shots are made with no reference: Brick: shot 1 of gap 2, shot 2 of gap 2; Roof tile: shot 2 of gap 3.' and rest['cost'] in said['text']   # (C5)
+    assert rest['buttons'][1]['loss']['rows'] == [['Brick', 2, 'shot 1 of gap 2, shot 2 of gap 2'], ['Roof tile', 1, 'shot 2 of gap 3']] and rest['covers'] == ['set:BRICK', 'set:TILE']
+    assert labels(rest) == ['Make them', 'Leave some out'] and [b['choice'] for b in rest['buttons']] == ['rest', 'rest_out']   # design/213 (before: the chat's labels on the page too)
+    assert [b['label'] for b in said['buttons']] == ['Make the other 2 sets', 'Leave these 2 out'] and rest['buttons'][1]['loss']['button'] == 'Leave these 2 out'
     assert p['summary'] == '6 things: 3 to answer, 0 kept, 2 not ready yet, 1 recorded.'
     brick, trowel = p['lines'][4], p['lines'][6]
-    assert brick['note'] == W['waiting'] and brick['tag'] == 'Not ordered'
+    assert brick['note'] == W['waiting'] and brick['tag'] == 'Waiting' and brick['head'] == W['wait_head'] and brick['wait_note'] == 'If left out, 2 shots would have no reference of it.'   # design/213 (before: the tag 'Not ordered')
     assert [x['label'] for x in trowel['pics']] == ['From your footage: side (the starting picture)', 'From your footage: in the hand, lifting mortar']   # taken from footage at step 1: listed, recorded
 
 
 def test_a_set_shows_its_pictures_with_their_views_both_checks_the_notes_and_the_proposal(monkeypatch):
-    l = Film(monkeypatch, '2').lines()
+    # design/213 (17 Nov 2026): a line of step 2 carries its parts and no `text`; the answers are Approve, Minor corrections and Make again; the image
+    # model's notes are read as Claude's two lines on them (`look`). Before: 'Use A', 'No' and 'Correct it' "(the set is made again)", `notes`, a comment box.
+    film = Film(monkeypatch, '2')
+    real = RS.set_facts   # the kit's stand-in for part B, with the two lines the look gives on the model's notes
+    monkeypatch.setattr(RS, 'set_facts', lambda *a: {**real(*a), 'model': {'chose': 'bamboo, as the photographs show', 'aside': 'the wooden scaffold the request named'}, 'footage': []})
+    l = film.lines()
     t = l['set:T_LAY']
+    said = next(i for i in film.items() if i['id'] == 'set:T_LAY:s-t_lay-1')
     assert t['item'] == 'set:T_LAY:s-t_lay-1' and t['ask'] == 'Which picture is the reference?'
-    assert t['text'] == 'The right hand lowers the brick; the left hand rests on the wall.\nUsed in 1 shot; the closest is a medium shot (shot 1 of gap 2).'
+    assert 'text' not in t and (t['desc'], t['used']) == ('The right hand lowers the brick; the left hand rests on the wall.', 'Used in 1 shot; the closest is a medium shot (shot 1 of gap 2).')
+    assert said['text'].startswith('The right hand lowers the brick; the left hand rests on the wall.\nUsed in 1 shot; the closest is a medium shot (shot 1 of gap 2).\n')   # the chat says them as one text
     assert [(x['label'], x['note'], x.get('weak', False), x['choice'], x['choice_label']) for x in t['pics']] == [
-        ('A · the action at its key moment', 'the action at its key moment: as asked.', False, 'use:s-t_lay-1', 'Use A'),
-        ('B · the result just after', 'the result just after: as asked.', True, 'use:s-t_lay-1-2', 'Use B'),
-        ('C · close on where it happens', 'close on where it happens: as asked.', False, 'use:s-t_lay-1-3', 'Use C')]
-    assert t['check'] == {'state': 'fail', 'by': "The program's check (Gemini)", 'lines': ['Picture B: the action is shown: A tool lying still; no hand.']}
-    assert t['notes'] == {'title': "The image model's notes", 'sources': 1,
-                          'text': '(1) One method, the most common. (3) The request asked for a wooden scaffold; the photographs show bamboo: I drew bamboo.'}
-    again = '(the set is made again)'   # design/212: no cost on a button
-    assert t['rec'] == {'do': 'remake', 'label': f'Correct it {again}', 'reason': 'Picture B shows no hand at work.'}
-    assert labels(t) == [f'Correct it {again}', 'Use A', 'Use B', 'Use C', f'None of these {again}'] and t['buttons'][0]['needs_words'] is True   # the proposed answer first
-    assert t['comment'] is True and t['own']['label'] == 'Use my own picture' and 'partial' not in t and 'earlier' not in t
+        ('A · the action at its key moment', 'the action at its key moment: as asked.', False, 'use:s-t_lay-1', 'Approve A'),
+        ('B · the result just after', 'the result just after: as asked.', True, 'use:s-t_lay-1-2', 'Approve B'),
+        ('C · close on where it happens', 'close on where it happens: as asked.', False, 'use:s-t_lay-1-3', 'Approve C')]
+    assert t['check'] == {'state': 'fail', 'by': "The program's check found:", 'chip': 'The check found 1 fault', 'lines': ['Picture B: the action is shown: A tool lying still; no hand.']}
+    assert 'notes' not in t and t['look'] == {'chose': 'bamboo, as the photographs show', 'aside': 'the wooden scaffold the request named'}   # the raw notes are not shown
+    assert 'The image model chose: bamboo, as the photographs show' in said['text'] and 'It set aside: the wooden scaffold the request named' in said['text']
+    assert t['rec'] == {'do': 'remake', 'label': 'Make it again', 'reason': 'Picture B shows no hand at work.'} and t['tag'] == 'Make again'
+    assert labels(t) == ['Make again', 'Approve', 'Minor corrections'] and [b['choice'] for b in t['buttons']] == ['no', 'use', 'correct'] and t['buttons'][0]['sug'] is True   # the proposed answer first
+    assert t['buttons'][2]['needs_words'] is True and t['pick'] is True                # "Approve" takes the picture chosen under the pictures
+    assert [b['label'] for b in said['buttons'] + said['other_choices']] == ['Make again', 'Approve A', 'Approve B', 'Approve C', 'Minor corrections']   # the chat: one "Approve" per picture
+    assert 'comment' not in t and t['own']['label'] == 'Upload my own' and 'partial' not in t and 'earlier' not in t
     m, s = l['set:MASON'], l['set:STREET']
-    assert m['check'] == {'state': 'pass', 'by': "The program's check (Gemini)", 'lines': []} and m['ask'] == 'Is this set right for this person?'
-    assert labels(m) == ['Yes', f'No {again}', f'Correct it {again}'] and m['rec'] == {'do': 'use', 'label': 'Yes', 'reason': 'All three agree with the plan.'}
-    assert not any('choice' in x for x in m['pics'])                                # a person's starting picture is the server's choice
-    assert labels(s)[0] == 'Use A' and s['rec']['label'] == 'Use A' and s['group'] == 'Places'
+    assert m['check'] == {'state': 'pass', 'by': "The program's check found no fault.", 'chip': 'Check passed', 'lines': []} and m['ask'] == 'Is this set right for this person?'
+    assert labels(m) == ['Approve', 'Minor corrections', 'Make again'] and [b['choice'] for b in m['buttons']] == ['yes', 'correct', 'no'] and m['rec'] == {'do': 'use', 'label': 'Use this set', 'reason': 'All three agree with the plan.'}
+    assert not any('choice' in x for x in m['pics']) and 'pick' not in m             # a person's starting picture is the server's choice
+    assert labels(s)[0] == 'Approve' and s['buttons'][0]['sug'] is True and s['rec']['label'] == 'Use this set' and s['group'] == S[0]
 
 
 def test_the_inputs_of_a_set_come_first_to_compare_with_and_have_no_button(monkeypatch):
@@ -236,7 +250,7 @@ def test_a_check_that_did_not_run_says_so_and_blocks_nothing(monkeypatch):
     film = Film(monkeypatch, '2')
     film.change(lambda s: [r.pop('check') for r in s['references'].values() if r.get('set') == 's-mason-1'])
     m = film.lines()['set:MASON']
-    assert m['check'] == {'state': 'none', 'by': "The program's check (Gemini)", 'lines': []} and m['buttons'] and m['group'] == 'People'
+    assert m['check'] == {'state': 'none', 'by': "The program's check did not run on these pictures.", 'chip': 'The check did not run', 'lines': []} and m['buttons'] and m['group'] == S[0]   # design/213: the check's own sentence and chip
     film.change(lambda s: s['references']['s-t_lay-1-3'].pop('check'))
     assert film.lines()['set:T_LAY']['check']['lines'] == ['Picture B: the action is shown: A tool lying still; no hand.', 'Picture C was not checked: the check did not run.']
 
@@ -245,7 +259,7 @@ def test_a_partial_set_is_shown_as_it_is_with_what_is_missing(monkeypatch):
     film = Film(monkeypatch, '2')
     film.change(lambda s: s['references'].pop('s-street-1-3'))
     s = film.lines()['set:STREET']
-    assert s['partial'] == '2 of 3 pictures came back; missing: its fixed things.' and len(s['pics']) == 2 and s['group'] == CF.GROUP_SETS_DOUBT
+    assert s['partial'] == '2 of 3 pictures came back; missing: its fixed things.' and len(s['pics']) == 2 and s['group'] == S[0]   # design/213: one group, "To judge" (before: among the doubtful)
     assert 'three pictures' not in json.dumps(s).lower()
 
 
@@ -262,7 +276,7 @@ def test_a_set_made_again_shows_the_operators_words_and_the_set_before(monkeypat
     film = Film(monkeypatch, '2', session=F.session('complete'))
     film.change(remade)
     t = film.lines()['set:T_LAY']
-    assert t['changes'] == ['Made again as you asked: "Show the hand pressing the brick down."'] and t['asked'] is True
+    assert t['asked'] == 'Made again as you asked: "Show the hand pressing the brick down."' and 'changes' not in t and t['made_n'] == 'made twice'   # design/213: the sentence itself (before: True, with `changes`)
     assert [x['label'] for x in t['earlier']] == ['Before: A', 'Before: B', 'Before: C'] and all(x['code'] and '_key' not in x for x in t['earlier'])
     assert t['earlier'][0]['code'] == P.pic_code(CF._ref_key(RUN, 's-t_lay-1'), film.session()['references']['s-t_lay-1']['sha256']) and t['earlier'][0]['code'] in {x['code'] for x in film.page()['pictures']}   # sent to the page like any picture
 
@@ -271,17 +285,20 @@ def test_a_set_made_three_times_offers_no_remake_and_says_why(monkeypatch):
     film = Film(monkeypatch, '2')
     film.change(lambda s: s['round']['elements']['MASON'].update(round=3))
     m = film.lines()['set:MASON']
-    assert labels(m) == ['Yes'] and m['text'].endswith('This set was made 3 times, which is the most: use one of these pictures, or add your own.')
+    said = lambda key: next(i for i in film.items() if i['_key'] == key)['text']   # design/213: the page line has `most`; the chat's text says the same
+    assert labels(m) == ['Approve'] and m['most'] == 'This set was made 3 times, which is the most: use it, or add your own picture.' and m['most'] in said('set:MASON')
     film.change(lambda s: s['round']['elements']['STREET'].update(round=3))
     street = film.lines()['set:STREET']   # the merger: a thing made the most times may be left out (the contract, 3.8; V.set_aside takes it); a person never
-    assert labels(street) == ['Use A', 'Use B', 'Use C', 'Leave out'] and street['text'].endswith('use one of these pictures, add your own, or leave it out.')
+    assert labels(street) == ['Approve', 'Leave out'] and [b['choice'] for b in street['buttons']] == ['use', 'aside'] and street['most'].endswith('use one of these pictures, add your own, or leave it out.')
+    assert [x['choice_label'] for x in street['pics']] == ['Approve A', 'Approve B', 'Approve C'] and street['most'] in said('set:STREET')
 
 
 def test_a_set_whose_plan_changed_is_marked_and_can_be_made_again(monkeypatch):
     film = Film(monkeypatch, '2')
     film.changed.add('STREET')
     s = film.lines()['set:STREET']
-    assert s['text'].endswith(W['set_changed']) and labels(s)[-1] == 'Make it again from the changed plan' and s['group'] == CF.GROUP_SETS_DOUBT
+    assert s['changed'] == W['set_changed'] and labels(s)[-1] == 'Make it again from the changed plan' and s['buttons'][-1]['choice'] == 'remake' and s['group'] == S[0]   # design/213: `changed` on the line, the group "To judge"
+    assert '\n' + W['set_changed'] + '\n' in next(i for i in film.items() if i['_key'] == 'set:STREET')['text']
 
 
 def test_a_set_that_was_not_made_gives_the_real_cause(monkeypatch):
@@ -293,18 +310,21 @@ def test_a_set_that_was_not_made_gives_the_real_cause(monkeypatch):
             s['references'][rid].update(status='failed')
     film.change(unmake)
     s = film.lines()['set:STREET']
-    assert s['item'] == 'setmake:STREET' and s['group'] == 'Not made' and s['text'].endswith('\nGemini (gemini-nano-banana-2.1) refused the request.')
-    assert labels(s) == ['Make it', 'Leave out'] and s['ask'] == 'Make it now?' and s['cost'].startswith('If you leave it out')
-    film.cause = {'element_id': 'STREET', 'text': 'the spend cap is reached: ₹3,740 spent of ₹3,754'}
-    assert film.lines()['set:STREET']['text'].endswith('Its reference set was not made: the spend cap is reached: ₹3,740 spent of ₹3,754. It can be made when that is settled.')
+    said = lambda: next(i for i in film.items() if i['_key'] == 'set:STREET')['text']
+    # design/213: the group "Could not be made"; the line has `head` and `why`, what is lost as `loss`; the chat's text says them
+    assert s['item'] == 'setmake:STREET' and s['group'] == S[1] and (s['head'], s['why']) == ('This set could not be made.', 'Gemini (gemini-nano-banana-2.1) refused the request.')
+    assert '\nThis set could not be made.\nGemini (gemini-nano-banana-2.1) refused the request.\nIf you leave it out' in said()
+    assert labels(s) == ['Make it', 'Leave out'] and s['ask'] == 'Make it now?' and s['loss']['text'].startswith('If you leave it out') and s['own']['label'] == 'Upload my own'
+    film.cause = {'element_id': 'STREET', 'text': 'the material spec of Brick is not approved'}   # something stands in its way
+    assert film.lines()['set:STREET']['why'] == 'It can be made when this is settled: the material spec of Brick is not approved.' and film.lines()['set:STREET']['why'] in said()
     assert 'OpenAI' not in json.dumps(film.page()['lines'])
 
 
 def test_the_lines_while_sets_are_made_looked_at_and_written_again(monkeypatch):
     p = Film(monkeypatch, 'making').page()
     by = {l['key']: l for l in p['lines']}
-    assert all(by[k]['state'] == 'making' and by[k]['note'] == 'Its set is being made.' and 'tag' not in by[k] for k in ('set:MASON', 'set:STREET', 'set:T_LAY'))
-    assert 'sets:rest' not in by and by['set:BRICK']['tag'] == 'Not ordered' and p['open'] is False and p['then'] == RS.SETS_MAKING   # the rest is offered once the first sets are judged; design/211 review (N4): wait, then look
+    assert all(by[k]['state'] == 'making' and by[k]['note'] == 'Its set is being made.' and by[k]['tag'] == 'Being made' and by[k]['group'] == S[2] for k in ('set:MASON', 'set:STREET', 'set:T_LAY'))   # design/213: every line has its tag and its group
+    assert 'sets:rest' not in by and by['set:BRICK']['tag'] == 'Waiting' and p['open'] is False and p['then'] == RS.SETS_MAKING   # the rest is offered once the first sets are judged; design/211 review (N4): wait, then look
     p = Film(monkeypatch, 'looking').page()
     by = {l['key']: l for l in p['lines']}
     assert all(by[k]['state'] == 'making' and by[k]['note'] == 'Claude is looking at it.' and by[k]['tag'] == 'Claude is looking' and 'pics' not in by[k] for k in ('set:MASON', 'set:STREET', 'set:T_LAY'))
@@ -312,7 +332,7 @@ def test_the_lines_while_sets_are_made_looked_at_and_written_again(monkeypatch):
     p = Film(monkeypatch, 'rewrite').page()
     by = {l['key']: l for l in p['lines']}
     assert by['set:T_LAY']['note'] == 'The assistant is writing its request again from your words.' and by['set:T_LAY']['tag'] == 'Being rewritten'
-    assert by['set:MASON']['state'] == 'recorded' and [x['label'] for x in by['set:MASON']['pics']] == ['A · full length, front (the starting picture)', 'B · right hand and forearm', 'C · the face']
+    assert by['set:MASON']['state'] == 'recorded' and by['set:MASON']['group'] == S[3] and by['set:MASON']['head'] == W['settled'] and [x['label'] for x in by['set:MASON']['pics']] == ['A · full length, front (the starting picture)', 'B · right hand and forearm', 'C · the face']
 
 
 def test_a_set_with_an_incomplete_look_is_not_shown_even_at_step_2(monkeypatch):
@@ -327,9 +347,13 @@ def test_a_thing_back_after_the_round_was_sent_again_is_an_open_line(monkeypatch
     film = Film(monkeypatch, '2')
     film.change(lambda s: (s['round']['elements']['FAN'].update(reopened='left_out'), s['round']['elements']['BRICK'].update(reopened='new')))
     by = film.lines()
-    assert by['set:FAN']['item'] == 'reopen:FAN' and by['set:FAN']['group'] == 'Back with you' and by['set:FAN']['text'].endswith(W['reopen_left'])
-    assert by['set:BRICK']['text'].endswith(W['reopen_new']) and labels(by['set:BRICK']) == ['Make a set', 'Leave out']
-    assert 'Brick' not in by['sets:rest']['text'] and '1 more is not ordered yet: Roof tile.' in by['sets:rest']['text'] and labels(by['sets:rest']) == ['Make the other set', 'Leave it out']
+    said = {i['_key']: i for i in film.items()}   # design/213: the page line has `head`; the chat's text ends with the same sentence
+    assert by['set:FAN']['item'] == 'reopen:FAN' and (by['set:FAN']['group'], by['set:FAN']['tag'], by['set:FAN']['case']) == (S[0], 'Back with you', 'back') and by['set:FAN']['head'] == W['reopen_left']
+    assert '\n' + W['reopen_left'] in said['set:FAN']['text'] and by['set:BRICK']['head'] == W['reopen_new'] and '\n' + W['reopen_new'] in said['set:BRICK']['text']
+    assert labels(by['set:BRICK']) == ['Make a set', 'Add words for the picture', 'Leave out'] and [b['choice'] for b in by['set:BRICK']['buttons']] == ['approve', 'words', 'ignore']
+    rest = said['sets:rest']
+    assert 'Brick' not in rest['text'] and '1 more is not ordered yet: Roof tile.' in rest['text'] and [b['label'] for b in rest['buttons']] == ['Make the other set', 'Leave it out']
+    assert labels(by['sets:rest']) == ['Make them', 'Leave some out'] and by['sets:rest']['covers'] == ['set:TILE'] and by['sets:rest']['buttons'][1]['loss']['button'] == 'Leave it out'
 
 
 # ---------- one flow, two front ends ----------
@@ -343,10 +367,14 @@ def test_the_chat_item_of_each_line_has_the_same_question_text_and_buttons_as_th
     assert lines and {l['item'] for l in lines} == set(items)
     for l in lines:
         i = items[l['item']]
-        own = [b['label'] for b in i['buttons'] + i.get('other_choices', []) if not (state == '1' and b['choice'].startswith(('not:', 'use:')))]
-        assert CF._split(i['question'])[1] == l['ask'] and i['text'].startswith(l.get('text') or l['desc'] or l['used']) and own == labels(l), l['key']   # design/212: a thing's line of step 1 carries its parts
+        both = i['buttons'] + i.get('other_choices', [])
+        own, page = [b['label'] for b in both if not (state == '1' and b['choice'].startswith(('not:', 'use:')))], labels(l)
+        if state == '2':   # design/213: the same answers, by their choices: the page has one "Approve" for the picture chosen where the chat has one per picture, and short labels of its own on "make the rest"
+            assert list(dict.fromkeys(b['choice'].split(':')[0] for b in both)) == [b['choice'].split(':')[0] for b in l['buttons']], l['key']
+            own, page = [b['label'] for b in both if not b['choice'].startswith(('use:', 'rest'))], [b['label'] for b in l['buttons'] if b['choice'] not in ('use', 'rest', 'rest_out')]
+        assert CF._split(i['question'])[1] == l['ask'] and i['text'].startswith(l.get('text') or l.get('desc') or l.get('used') or '') and own == page, l['key']   # design/212: a thing's line of step 1 carries its parts (design/213: of step 2 too)
         for said in ([W['proposes'].format(**l['rec'])] if l.get('rec') else []) + [W['read_first'].format(warning=w) for w in l.get('warnings', [])] + l.get('check', {}).get('lines', []) \
-                + [x['note'] for x in l.get('pics', []) if x.get('note')] + [l[k] for k in ('partial', 'cost') if l.get(k)]:
+                + [x['note'] for x in l.get('pics', []) if x.get('note')] + [l[k] for k in ('partial', 'cost', 'most', 'changed', 'asked') if l.get(k)]:
             assert said in i['text'], (l['key'], said)
         assert [P.pic_code(x['key'], marks[x['key']]) for x in i['show']] == [x['code'] for x in l.get('pics', [])]   # the chat shows the same pictures, in the same order
 

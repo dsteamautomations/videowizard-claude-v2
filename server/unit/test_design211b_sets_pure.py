@@ -288,15 +288,15 @@ def test_a_way_of_working_may_show_hands_in_the_request_and_its_lines_do_not_for
 
 def test_the_lines_of_a_set_by_kind_all_must():
     names = lambda eid, **kw: [l['check'] for l in request(eid, **kw)['lines']]
-    assert names('FAN') == ['the view', 'same as picture 1', 'matches the description', 'one thing only', 'nothing floats', 'no text', 'no person']
+    assert names('FAN') == ['the view', IC.SAME_THING, 'matches the description', 'one thing only', 'nothing floats', 'no text', 'no person']
     assert names('BRICK') == names('FAN')
-    assert names('TROWEL') == ['the view', 'same as picture 1', 'matches the footage picture', 'matches the description', 'one thing only', 'nothing floats', 'no text', 'no person']
-    assert names('STREET') == ['the view', 'same as picture 1', 'matches the description', 'nothing floats', 'no text', 'the place is the subject']
-    assert names('T_LAY') == ['the view', 'same as picture 1', 'matches the description', 'one thing only', 'nothing floats', 'no text', 'the action is shown']
-    assert names('MASON') == ['the view', 'same as picture 1', 'matches the description', 'no text', 'one person', 'plain ground']
+    assert names('TROWEL') == ['the view', IC.SAME_THING, 'matches the footage picture', 'matches the description', 'one thing only', 'nothing floats', 'no text', 'no person', 'a real face']   # design/213: its footage pictures are sent, so the face line is its own
+    assert names('STREET') == ['the view', IC.SAME_THING, 'matches the description', 'nothing floats', 'no text', 'the place is the subject']
+    assert names('T_LAY') == ['the view', IC.SAME_THING, 'matches the description', 'one thing only', 'nothing floats', 'no text', 'the action is shown']
+    assert names('MASON') == ['the view', IC.SAME_THING, 'matches the description', 'no text', 'one person', 'plain ground']
     for eid in KINDS:
         lines = request(eid)['lines']
-        assert all(l['weight'] == 'must' and l['pass_when'] for l in lines) and next(l for l in lines if l['check'] == 'same as picture 1')['pictures'] == [2, 3]
+        assert all(l['weight'] == 'must' and l['pass_when'] for l in lines) and next(l for l in lines if l['check'] == IC.SAME_THING)['pictures'] == [2, 3]
         assert el(eid)['description'] in next(l for l in lines if l['check'] == 'matches the description')['pass_when']
 
 
@@ -308,9 +308,9 @@ def set_picture(n, lines, **more):
 def test_each_picture_of_a_set_reads_its_own_lines_the_view_of_its_turn_and_picture_one_only_from_the_second_on():
     lines = request('FAN')['lines']
     one, two = IC.lines_of(set_picture(1, lines)), IC.lines_of(set_picture(2, lines))
-    assert 'same as picture 1' not in [l['check'] for l in one] and 'same as picture 1' in [l['check'] for l in two]
+    assert IC.SAME_THING not in [l['check'] for l in one] and IC.SAME_THING in [l['check'] for l in two]   # design/213: the line's name
     assert one[0] == {'check': 'the view', 'weight': 'must', 'pass_when': 'the picture shows what its turn asked: the ask of picture 1'} and two[0]['pass_when'].endswith('the ask of picture 2')
-    assert all('pictures' not in l for l in one + two) and [l['check'] for l in one[-3:]] == [l['check'] for l in IC.FIXED]
+    assert all('pictures' not in l for l in one + two) and [l['check'] for l in one[-2:]] == ['readable text', 'nothing extra']   # design/213: no footage picture was sent, so "a real face" is not asked
     older = {'id': 'x', 'kind': 'sheet', 'element_kind': 'object', 'set': 'x', 'set_n': 1, 'server_checklist': VS.KEPT_THING_LINES}
     assert IC.lines_of(older) == VS.KEPT_THING_LINES + IC.FIXED   # an older set's lines are read as before
 
@@ -319,7 +319,7 @@ def test_a_real_face_is_not_asked_of_a_persons_set_made_from_their_own_permitted
     lines = request('MASON')['lines']
     photo = set_picture(1, lines, element_kind='person', generation={'parents': [{'id': 'own-1'}]})
     words = set_picture(1, lines, element_kind='person')
-    assert 'a real face' not in [l['check'] for l in IC.lines_of(photo)] and 'a real face' in [l['check'] for l in IC.lines_of(words)]
+    assert 'a real face' not in [l['check'] for l in IC.lines_of(photo)] and 'a real face' not in [l['check'] for l in IC.lines_of(words)]   # design/213: nor of a person made from words alone
     assert 'a real face' in [l['check'] for l in IC.lines_of(set_picture(1, request('TROWEL')['lines'], generation={'parents': [{'id': 'f-trowel-side'}]}))]
 
 
@@ -433,8 +433,8 @@ def test_pictures_two_and_three_are_checked_with_picture_one_beside_them(monkeyp
     for r in ('s-street-1', 's-street-1-2'):
         ref = s['references'][r]
         IC._model_check(store, s, ref, {'key': ref['key'], 'width': 2752, 'height': 1536}, None)
-    assert sent[0][1] == [] and 'same as picture 1' not in sent[0][2]
-    assert sent[1][1] == [('picture 1 of this set', b'png-s-street-1')] and 'same as picture 1' in sent[1][2] and sent[1][0] == b'png-s-street-1-2'
+    assert sent[0][1] == [] and IC.SAME_THING not in sent[0][2]
+    assert sent[1][1] == [('picture 1 of this set', b'png-s-street-1')] and IC.SAME_THING in sent[1][2] and sent[1][0] == b'png-s-street-1-2'
 
 
 # ---------- one picture's check, for the page ----------
@@ -460,7 +460,7 @@ def facts(s, eid, plan=None):
 def test_set_facts_of_a_made_set_its_pictures_checks_looks_notes_and_the_recommendation():
     s = F.session('2')
     f = facts(s, 'T_LAY')
-    assert set(f) == {'pictures', 'inputs', 'from', 'notes', 'sources', 'partial', 'rec', 'makes', 'makes_left', 'asked', 'history', 'changed', 'fail'}
+    assert set(f) == {'pictures', 'inputs', 'from', 'notes', 'sources', 'partial', 'rec', 'makes', 'makes_left', 'asked', 'history', 'changed', 'fail', 'model', 'footage'}   # design/213
     assert [(p['ref'], p['n'], p['view']) for p in f['pictures']] == [('s-t_lay-1', 1, F.VIEWS['T_LAY'][0]), ('s-t_lay-1-2', 2, F.VIEWS['T_LAY'][1]), ('s-t_lay-1-3', 3, F.VIEWS['T_LAY'][2])]
     assert [p['check']['state'] for p in f['pictures']] == ['pass', 'fail', 'pass'] and f['pictures'][1]['look']['verdict'] == 'weak' and f['pictures'][0]['look']['ref'] == 's-t_lay-1'
     assert f['rec'] == {'do': 'remake', 'golden': None, 'reason': 'Picture B shows no hand at work.'} and f['from'] == 'web' and f['inputs'] == []

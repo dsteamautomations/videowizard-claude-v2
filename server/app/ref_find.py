@@ -380,6 +380,12 @@ def _not_rejected(session, eid, tid):
            KEEP_REJECTED.format(eid=eid, trial=tid))
 
 
+def look_extra(look, kind):
+    """design/213: what a look may say beside its verdict, kept only as the looker gave it, true or false, never guessed from a word: `face`
+    (the frame shows the person's face) and, for a person, `child` (the person is a child; the plan has no field for it)."""
+    return {k: look[k] for k in (('face', 'child') if kind == 'person' else ('face',)) if isinstance(look.get(k), bool)}
+
+
 def _look_one(conn, store, user, run, outputs, doc, element, thing, by):
     """One thing of `look_record`: everything is checked before anything is written. Returns its search record."""
     eid = element['id']
@@ -402,7 +408,7 @@ def _look_one(conn, store, user, run, outputs, doc, element, thing, by):
             V.need(view, LOOK_VIEW.format(eid=eid))
             V.need(verdict != 'fail', KEEP_FAIL.format(eid=eid, trial=tid))
             _not_rejected(session, eid, tid)
-        rows.append({'trial': tid, 'view': view, 'verdict': verdict, 'seen': seen, 'keep': bool(l.get('keep')), 'closest': bool(l.get('closest'))})
+        rows.append({'trial': tid, 'view': view, 'verdict': verdict, 'seen': seen, 'keep': bool(l.get('keep')), 'closest': bool(l.get('closest')), 'extra': look_extra(l, element.get('kind'))})
     keeps = [r for r in rows if r['keep']]
     asked = {r['trial'] for r in keeps}
     unkept = {r['trial'] for r in rows if not r['keep']}   # design/211 review, N10: a look sent again without `keep` lets go of the frame kept for it, while the operator has not answered it
@@ -418,7 +424,7 @@ def _look_one(conn, store, user, run, outputs, doc, element, thing, by):
     for r in rows:
         trial = doc['trials'][r['trial']]
         held = (trial['looks'].get(eid) or {}).get('ref')
-        look = {'who': by, 'at': at, 'view': r['view'], 'verdict': r['verdict'], 'seen': r['seen'], 'trial': r['trial'], 'ref': made.get(r['trial']) or (held if held in session['references'] else None)}
+        look = {'who': by, 'at': at, 'view': r['view'], 'verdict': r['verdict'], 'seen': r['seen'], 'trial': r['trial'], 'ref': made.get(r['trial']) or (held if held in session['references'] else None), **r['extra']}
         if r['keep']:
             _mark(session, trial, eid, look['ref'], look)
         else:
@@ -431,7 +437,7 @@ def _look_one(conn, store, user, run, outputs, doc, element, thing, by):
 
 def look_record(conn, store, user, run, outputs, things, by):
     """The looks of `vw visuals look` (design/211 section 3.3): things = [{'element', 'clips', 'note', 'not_searched'?, 'looks': [{'trial',
-    'view', 'verdict', 'seen', 'keep'?, 'closest'?}]}]. Each look is stored on its trial frame; a `keep` row becomes a `frame` reference
+    'view', 'verdict', 'seen', 'keep'?, 'closest'?, 'face'?, 'child'?}]}] (design/213: `face` and `child`, true or false, kept on the look). Each look is stored on its trial frame; a `keep` row becomes a `frame` reference
     through `visuals_stage.add_reference`, with `view`, `look`, `weak`, `trial` on it; the search record goes to `session['found'][eid]`
     with the result the server decides. Returns {'recorded': [eid], 'refused': {eid: message}, 'results': {eid: result},
     'kept': {eid: [reference ids]}, 'left': [eid], 'then': LOOK_MORE or LOOK_ALL}. A refused thing does not stop the others.
@@ -474,6 +480,14 @@ def frames_of(session, eid):
     order = (((session or {}).get('found') or {}).get(eid) or {}).get('kept') or []   # the view order, settled with the plan when the record was written
     rows = sorted(_kept(session, eid), key=lambda r: order.index(r['id']) if r['id'] in order else len(order))
     return [{'ref': r['id'], 'view': r.get('view'), 'verdict': r['look'].get('verdict'), 'seen': r['look'].get('seen'), 'weak': bool(r.get('weak'))} for r in rows]
+
+
+def faces_of(session, eid):
+    """design/213: the thing's kept footage frames whose look says they show the face, the best first: a look that passes before a weak
+    one, then the view order. [reference ids]."""
+    refs = (session or {}).get('references') or {}
+    rows = [f for f in frames_of(session, eid) if ((refs.get(f['ref']) or {}).get('look') or {}).get('face') is True]
+    return [f['ref'] for f in sorted(rows, key=lambda f: f['verdict'] != 'pass')]
 
 
 def found_all(store, run, session, plan):

@@ -92,6 +92,7 @@ def looks(store, recommend='use', only=None, **change):
     for s in RS.looks_due(store, RUN, [])['sets']:
         if only is None or s['element_id'] in only:
             out.append({'element_id': s['element_id'], 'set': s['set'], 'recommend': recommend, 'golden': s['pictures'][0]['ref'] if recommend == 'use' else None, 'reason': 'All agree with the plan.',
+                        'chose': 'The most common variant.', 'aside': 'Nothing of the request.',   # design/213: required where the pictures carry the image model's notes
                         'pictures': [{'ref': p['ref'], 'view': p['view'], 'verdict': 'pass', 'seen': p['view'] + ': as asked.'} for p in s['pictures']], **change})
     return out
 
@@ -257,7 +258,7 @@ def test_the_request_of_an_ordered_set_is_the_servers_with_its_views_and_the_row
     for eid in F.FIRST:
         want = RS.set_request(F.plan(), RUN, s, el(eid), {k: v for k, v in s['round']['elements'][eid].items() if k != 'parts'})
         job, row = jobs(conn)[eid], s['round']['elements'][eid]
-        assert job['prompt'].startswith(want['prompt']) and job['views'] == [v['ask'] for v in want['views']] and job['view_names'] == RS.view_names(el(eid)) and job['set'] is True
+        assert job['prompt'].startswith(want['prompt']) and job['views'] == [v['ask'] for v in want['views']] and job['view_names'] == RS.view_names(el(eid), s['round']) and job['set'] is True
         assert row['parts'] == want['parts'] and row['made']['fp'] == RS.fp(F.plan(), s, el(eid)) and s['references'][row['set']]['server_checklist'] == want['lines']
         assert VS.KEPT_PREAMBLE not in job['prompt'] and VS.PERSON_SET not in job['prompt'] and 'Sizes: ' not in job['prompt'].replace(want['prompt'], '')
     assert jobs(conn)['STREET']['search'] is True and 'search' not in jobs(conn)['MASON'] and jobs(conn)['MASON']['parents'] == []
@@ -431,7 +432,7 @@ def test_a_partial_set_is_looked_at_and_judged_as_it_is():
     assert [len(s['pictures']) for s in due] == [2, 2, 2]
     look(store)
     s = saved(store)
-    assert state(store) == 2 and RS.set_facts(s, F.plan(), 'STREET', s['round']['elements']['STREET'])['partial'] == {'made': 2, 'asked': 3, 'missing': ['its fixed things']}
+    assert state(store) == 2 and RS.set_facts(s, F.plan(), 'T_LAY', s['round']['elements']['T_LAY'])['partial'] == {'made': 2, 'asked': 3, 'missing': ['close on where it happens']}   # design/213: a place of a round posted now is one picture, so a set of three is read
 
 
 # ---------- the looks at a made set ----------
@@ -455,7 +456,7 @@ def test_the_sets_to_look_at_come_with_their_facts_request_inputs_and_large_pict
     out = RS.looks_due(store, RUN, [])
     assert out['then'] == RS.SETS_LOOK and [x['element_id'] for x in out['sets']] == ['MASON', 'TROWEL', 'T_LAY']
     t = out['sets'][1]
-    assert set(t) == {'element_id', 'name', 'set', 'facts', 'request', 'inputs', 'pictures', 'notes'} and t['name'] == "Mason's trowel" and t['set'] == s['round']['elements']['TROWEL']['set']
+    assert set(t) == {'element_id', 'name', 'set', 'facts', 'request', 'inputs', 'pictures', 'notes', 'footage'} and t['name'] == "Mason's trowel" and t['set'] == s['round']['elements']['TROWEL']['set']
     assert t['facts'] == RS.thing_facts(F.plan(), s, el('TROWEL')) and t['request'] == jobs(conn)['TROWEL']['prompt'] and t['notes'] == '(1) One variant.'
     zoom = page_flow.PIC_SIZES['zoom'][0]
     assert t['inputs'][0] == {'ref': 'f-trowel-side', 'role': 'footage', 'view': 'side', 'key': s['references']['f-trowel-side']['key'] + '.' + s['references']['f-trowel-side']['sha256'][:10] + zoom} and store.exists(t['inputs'][0]['key'])
@@ -475,7 +476,8 @@ def test_the_looks_are_recorded_on_each_picture_and_on_the_row():
     assert out == {'recorded': ['STREET'], 'refused': {}, 'left': ['MASON', 'T_LAY'], 'then': RS.SETS_LOOK}
     s = saved(store)
     row = s['round']['elements']['STREET']
-    assert row['set_look'] == {'who': 'helper', 'at': row['set_look']['at'], 'set': row['set'], 'recommend': 'use', 'golden': row['set'], 'reason': 'All agree with the plan.'}
+    assert row['set_look'] == {'who': 'helper', 'at': row['set_look']['at'], 'set': row['set'], 'recommend': 'use', 'golden': row['set'], 'reason': 'All agree with the plan.',
+                                'chose': 'The most common variant.', 'aside': 'Nothing of the request.'}   # design/213
     pic = s['references'][row['set'] + '-2']
     assert pic['look'] == {'who': 'helper', 'at': row['set_look']['at'], 'view': 'from the other side', 'verdict': 'pass', 'seen': 'from the other side: as asked.', 'trial': None, 'ref': pic['id']}
     assert RS.looked(s, 'STREET', row) and not RS.looked(s, 'MASON', s['round']['elements']['MASON'])
@@ -599,7 +601,7 @@ def test_when_the_limit_has_no_room_for_all_of_them_none_is_ordered():
     s = saved(store)
     s['cap_inr'] = 50
     put(store, s)
-    assert refused(lambda: RS.round_rest(conn, store, USER, RUN, [], 'now')) == RS.REST_CAP.format(n=2, x='71', spent='0', cap='50')
+    assert refused(lambda: RS.round_rest(conn, store, USER, RUN, [], 'now')) == RS.LIMIT_PLAIN   # design/213: no amount
     assert len(conn.inserted) == 3 and saved(store)['round']['rest'] == ['BRICK', 'TILE'] and saved(store)['round']['go'] == 1 and state(store) == 2
 
 

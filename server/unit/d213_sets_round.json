@@ -1,0 +1,1966 @@
+{
+ "step": "References: the sets",
+ "open": true,
+ "summary": "34 things: 3 to answer, 0 kept, 17 not ready yet, 14 recorded.",
+ "note": "Look at each set, answer each line, then say done in the chat.",
+ "layout": {
+  "kind": "sets",
+  "made": "Nothing is made until you say done in the chat.",
+  "help": [
+   "Look at each set, answer each line, then say done in the chat.",
+   "A set is the pictures made of one person or thing: up to three. The one you approve becomes its reference: pictures of this thing start from it.",
+   "Judge the first sets, then say whether the others are made. The settled ones need no answer. Only what you do here counts: nothing is chosen for you."
+  ],
+  "groups": [
+   "To judge",
+   "Could not be made",
+   "Waiting to be made",
+   "Settled"
+  ],
+  "pick": "Choose the picture that is the reference first."
+ },
+ "lines": [
+  {
+   "line": "l01",
+   "key": "sets:rest",
+   "title": "The other sets",
+   "state": "open",
+   "item": "rest:2026-11-17T10:00:00+00:00",
+   "ask": "Make the other sets now?",
+   "buttons": [
+    {
+     "label": "Make them",
+     "choice": "rest",
+     "needs_words": false,
+     "act": "rest",
+     "say": "The other 17 sets will be made.",
+     "big": "Make the other 17"
+    },
+    {
+     "label": "Leave some out",
+     "choice": "rest_out",
+     "needs_words": false,
+     "act": "rest_out",
+     "say": "6 sets will be made. 11 are left out.",
+     "loss": {
+      "head": "If you leave these 11 out",
+      "intro": "These shots are then made with no reference of the thing named. Nothing is left out until you choose it below.",
+      "cols": [
+       "Left out",
+       "Shots",
+       "Which shots lose it"
+      ],
+      "rows": [
+       [
+        "Thing Tile",
+        1,
+        "shot 10 of gap 1"
+       ],
+       [
+        "Thing Ceiling_Finish",
+        1,
+        "shot 11 of gap 1"
+       ],
+       [
+        "Thing Shutter_Oil",
+        1,
+        "shot 12 of gap 1"
+       ],
+       [
+        "Thing Oil_Brush",
+        1,
+        "shot 13 of gap 1"
+       ],
+       [
+        "Thing Oil_Tin",
+        1,
+        "shot 14 of gap 1"
+       ],
+       [
+        "Thing Prop_Post",
+        1,
+        "shot 15 of gap 1"
+       ],
+       [
+        "Thing Cement_Bag",
+        1,
+        "shot 16 of gap 1"
+       ],
+       [
+        "Thing Shutter_Window",
+        1,
+        "shot 17 of gap 1"
+       ],
+       [
+        "Thing Site_Below",
+        1,
+        "shot 18 of gap 1"
+       ],
+       [
+        "Thing Lane",
+        1,
+        "shot 19 of gap 1"
+       ],
+       [
+        "Thing T_Bricklay",
+        1,
+        "shot 20 of gap 1"
+       ]
+      ],
+      "people": "The 6 people always get a set: Thing Helper, Thing Tilemaker, Thing Mother, Thing Father, Thing Child, Thing Neighbour.",
+      "button": "Leave these 11 out"
+     }
+    }
+   ],
+   "cost": "If you leave these 11 out, these shots are made with no reference: Thing Tile: shot 10 of gap 1; Thing Ceiling_Finish: shot 11 of gap 1; Thing Shutter_Oil: shot 12 of gap 1; Thing Oil_Brush: shot 13 of gap 1; Thing Oil_Tin: shot 14 of gap 1; Thing Prop_Post: shot 15 of gap 1; Thing Cement_Bag: shot 16 of gap 1; Thing Shutter_Window: shot 17 of gap 1; Thing Site_Below: shot 18 of gap 1; Thing Lane: shot 19 of gap 1; Thing T_Bricklay: shot 20 of gap 1.",
+   "head": "17 more sets wait for your word",
+   "why": "Judge the first sets first: a fault here would repeat in all of them.",
+   "show": "Show the 17",
+   "list_head": "The 17 sets waiting to be made",
+   "list_note": "None of these is made yet. They are made together when you choose \"Make them\".",
+   "covers": [
+    "set:HELPER",
+    "set:TILEMAKER",
+    "set:MOTHER",
+    "set:FATHER",
+    "set:CHILD",
+    "set:NEIGHBOUR",
+    "set:TILE",
+    "set:CEILING_FINISH",
+    "set:SHUTTER_OIL",
+    "set:OIL_BRUSH",
+    "set:OIL_TIN",
+    "set:PROP_POST",
+    "set:CEMENT_BAG",
+    "set:SHUTTER_WINDOW",
+    "set:SITE_BELOW",
+    "set:LANE",
+    "set:T_BRICKLAY"
+   ]
+  },
+  {
+   "line": "l02",
+   "key": "set:MASON",
+   "title": "Thing Mason (a person)",
+   "state": "open",
+   "item": "set:MASON:s-mason-1",
+   "ask": "Is this set right for this person?",
+   "buttons": [
+    {
+     "label": "Make again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found.",
+     "sug": true
+    },
+    {
+     "label": "Approve",
+     "choice": "yes",
+     "needs_words": false,
+     "act": "approve",
+     "say": "Approve: this set is right. Picture A is the reference and the face goes with it."
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Make again",
+   "desc": "What it looks like.",
+   "used": "Used in 1 shot; the closest is a medium shot (shot 1 of gap 1).",
+   "shots": "Used in 1 shot · closest: a medium shot",
+   "rec": {
+    "do": "remake",
+    "label": "Make it again",
+    "reason": "Why."
+   },
+   "pics": [
+    {
+     "code": "p01e473f9e449",
+     "label": "A · full length, front",
+     "letter": "A",
+     "view": "full length, front",
+     "note": "full length, front: as asked."
+    },
+    {
+     "code": "p0ec80a762b87",
+     "label": "B · right hand and forearm",
+     "letter": "B",
+     "view": "right hand and forearm",
+     "note": "right hand and forearm: as asked.",
+     "weak": true,
+     "flag": true
+    },
+    {
+     "code": "pe49a4db02af9",
+     "label": "C · the face",
+     "letter": "C",
+     "view": "the face",
+     "note": "the face: as asked."
+    }
+   ],
+   "check": {
+    "state": "fail",
+    "by": "The program's check found:",
+    "chip": "The check found 1 fault",
+    "lines": [
+     "Picture B: the view: Not the view asked."
+    ]
+   },
+   "look": {
+    "chose": "the raised deck the plan describes, with the boards of the footage",
+    "aside": "the bare ground of the footage pictures"
+   },
+   "rule": "For a person, picture A is the reference and the face goes with it",
+   "name": "Thing Mason",
+   "kind": "a person",
+   "details": [
+    [
+     "Description",
+     "What it looks like."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a medium shot (shot 1 of gap 1)."
+    ],
+    [
+     "Why Claude suggests this",
+     "Why."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · full length, front: full length, front: as asked.",
+      "B · right hand and forearm: right hand and forearm: as asked.",
+      "C · the face: the face: as asked."
+     ]
+    ],
+    [
+     "What the check found",
+     [
+      "Picture B: the view: Not the view asked."
+     ]
+    ],
+    [
+     "What the image model did",
+     [
+      "The image model chose: the raised deck the plan describes, with the boards of the footage",
+      "It set aside: the bare ground of the footage pictures"
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": true,
+    "permitted": false,
+    "text": "Add this person's own photo, a PNG, JPEG or WebP file up to 15 MB: their set is made from it. A real person's photo is used only with their permission: write first, in your own words, that you have it.",
+    "say": "My own photo: the set is made from it."
+   }
+  },
+  {
+   "line": "l03",
+   "key": "set:SITE_DECK",
+   "title": "Thing Site_Deck (a place)",
+   "state": "open",
+   "item": "set:SITE_DECK:s-site_deck-1",
+   "ask": "Which picture is the reference?",
+   "buttons": [
+    {
+     "label": "Make again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found.",
+     "sug": true
+    },
+    {
+     "label": "Approve",
+     "choice": "use",
+     "needs_words": false,
+     "act": "approve",
+     "say": ""
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Make again",
+   "desc": "What it looks like.",
+   "used": "Used in 1 shot; the closest is a medium shot (shot 2 of gap 1).",
+   "shots": "Used in 1 shot · closest: a medium shot",
+   "rec": {
+    "do": "remake",
+    "label": "Make it again",
+    "reason": "Why."
+   },
+   "pics": [
+    {
+     "code": "pe18a877e5bc7",
+     "label": "From your footage: whole",
+     "ref_only": true,
+     "view": "whole"
+    },
+    {
+     "code": "p5534628a7c96",
+     "label": "From your footage: whole",
+     "ref_only": true,
+     "view": "whole"
+    },
+    {
+     "code": "p7e2d39a82da1",
+     "label": "From your footage: whole",
+     "ref_only": true,
+     "view": "whole"
+    },
+    {
+     "code": "pcc2918d5e30c",
+     "label": "A · the whole place",
+     "letter": "A",
+     "view": "the whole place",
+     "note": "the whole place: as asked.",
+     "choice": "use:s-site_deck-1",
+     "choice_label": "Approve A",
+     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "p9e4fe51f6c4d",
+     "label": "B · from the other side",
+     "letter": "B",
+     "view": "from the other side",
+     "note": "from the other side: as asked.",
+     "weak": true,
+     "flag": true,
+     "choice": "use:s-site_deck-1-2",
+     "choice_label": "Approve B",
+     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "p029df773bfed",
+     "label": "C · its fixed things",
+     "letter": "C",
+     "view": "its fixed things",
+     "note": "its fixed things: as asked.",
+     "choice": "use:s-site_deck-1-3",
+     "choice_label": "Approve C",
+     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+    }
+   ],
+   "check": {
+    "state": "fail",
+    "by": "The program's check found:",
+    "chip": "The check found 1 fault",
+    "lines": [
+     "Picture B: the view: Not the view asked."
+    ]
+   },
+   "look": {
+    "chose": "the raised deck the plan describes, with the boards of the footage",
+    "aside": "the bare ground of the footage pictures"
+   },
+   "differs": "Claude added for the picture: The footage shows it on the ground; the plan has it on a roof: the look from the footage, the place from the plan.",
+   "pick": true,
+   "name": "Thing Site_Deck",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "What it looks like."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a medium shot (shot 2 of gap 1)."
+    ],
+    [
+     "Why Claude suggests this",
+     "Why."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · the whole place: the whole place: as asked.",
+      "B · from the other side: from the other side: as asked.",
+      "C · its fixed things: its fixed things: as asked."
+     ]
+    ],
+    [
+     "What the check found",
+     [
+      "Picture B: the view: Not the view asked."
+     ]
+    ],
+    [
+     "What the image model did",
+     [
+      "The image model chose: the raised deck the plan describes, with the boards of the footage",
+      "It set aside: the bare ground of the footage pictures"
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   }
+  },
+  {
+   "line": "l04",
+   "key": "set:ONE_PICTURE",
+   "title": "The street (a place)",
+   "state": "open",
+   "item": "set:STREET:s-street-1",
+   "ask": "Is this picture right as the reference?",
+   "buttons": [
+    {
+     "label": "Approve",
+     "choice": "use:s-street-1",
+     "needs_words": false,
+     "act": "approve",
+     "say": "Approve: this picture is the reference; pictures of this thing start from it.",
+     "sug": true
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+    },
+    {
+     "label": "Make again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Use it",
+   "desc": "A sandy unpaved street between low houses.",
+   "used": "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1).",
+   "shots": "Used in 1 shot · closest: a wide shot",
+   "rec": {
+    "do": "use",
+    "label": "Use this picture",
+    "reason": "All three agree with the plan."
+   },
+   "pics": [
+    {
+     "code": "p92ad37aa52c9",
+     "label": "the whole place",
+     "letter": "",
+     "view": "the whole place",
+     "note": "the whole place: as asked."
+    }
+   ],
+   "check": {
+    "state": "pass",
+    "by": "The program's check found no fault.",
+    "chip": "Check passed",
+    "lines": []
+   },
+   "name": "The street (one picture)",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "A sandy unpaved street between low houses."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
+    ],
+    [
+     "Why Claude suggests this",
+     "All three agree with the plan."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "the whole place: the whole place: as asked."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   }
+  },
+  {
+   "line": "l05",
+   "key": "set:MADE_AGAIN",
+   "title": "Laying a brick (a way of working)",
+   "state": "open",
+   "item": "set:T_LAY:s-t_lay-2",
+   "ask": "Which picture is the reference?",
+   "buttons": [
+    {
+     "label": "Approve",
+     "choice": "use",
+     "needs_words": false,
+     "act": "approve",
+     "say": "",
+     "sug": true
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+    },
+    {
+     "label": "Make again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Use it",
+   "desc": "The right hand lowers the brick; the left hand rests on the wall.",
+   "used": "Used in 1 shot; the closest is a medium shot (shot 1 of gap 2).",
+   "shots": "Used in 1 shot · closest: a medium shot",
+   "rec": {
+    "do": "use",
+    "label": "Use this set",
+    "reason": "The hand is at work in all three."
+   },
+   "pics": [
+    {
+     "code": "p2ff74921262f",
+     "label": "A · the action at its key moment",
+     "letter": "A",
+     "view": "the action at its key moment",
+     "note": "the action at its key moment: as asked.",
+     "choice": "use:s-t_lay-2",
+     "choice_label": "Approve A",
+     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "pafc68c813cc2",
+     "label": "B · the result just after",
+     "letter": "B",
+     "view": "the result just after",
+     "note": "the result just after: as asked.",
+     "choice": "use:s-t_lay-2-2",
+     "choice_label": "Approve B",
+     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "p4248e2df77b2",
+     "label": "C · close on where it happens",
+     "letter": "C",
+     "view": "close on where it happens",
+     "note": "close on where it happens: as asked.",
+     "choice": "use:s-t_lay-2-3",
+     "choice_label": "Approve C",
+     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+    }
+   ],
+   "check": {
+    "state": "pass",
+    "by": "The program's check found no fault.",
+    "chip": "Check passed",
+    "lines": []
+   },
+   "pick": true,
+   "made_n": "made twice",
+   "earlier": [
+    {
+     "code": "pf17ce8888fc7",
+     "label": "Before: A"
+    },
+    {
+     "code": "pfe0192549710",
+     "label": "Before: B"
+    },
+    {
+     "code": "pae08bc8c5f0e",
+     "label": "Before: C"
+    }
+   ],
+   "asked": "Made again as you asked: \"Show the hand pressing the brick down.\"",
+   "name": "Laying a brick (made again)",
+   "kind": "a way of working",
+   "details": [
+    [
+     "Description",
+     "The right hand lowers the brick; the left hand rests on the wall."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a medium shot (shot 1 of gap 2)."
+    ],
+    [
+     "Why Claude suggests this",
+     "The hand is at work in all three."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · the action at its key moment: the action at its key moment: as asked.",
+      "B · the result just after: the result just after: as asked.",
+      "C · close on where it happens: close on where it happens: as asked."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   }
+  },
+  {
+   "line": "l06",
+   "key": "set:MADE_MOST",
+   "title": "The street (a place)",
+   "state": "open",
+   "item": "set:STREET:s-street-1",
+   "ask": "Which picture is the reference?",
+   "buttons": [
+    {
+     "label": "Approve",
+     "choice": "use",
+     "needs_words": false,
+     "act": "approve",
+     "say": "",
+     "sug": true
+    },
+    {
+     "label": "Leave out",
+     "choice": "aside",
+     "needs_words": false,
+     "act": "leave",
+     "say": "Leave it out. 1 shot will be made with no reference of it."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Use it",
+   "desc": "A sandy unpaved street between low houses.",
+   "used": "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1).",
+   "shots": "Used in 1 shot · closest: a wide shot",
+   "rec": {
+    "do": "use",
+    "label": "Use this set",
+    "reason": "All three agree with the plan."
+   },
+   "pics": [
+    {
+     "code": "p92ad37aa52c9",
+     "label": "A · the whole place",
+     "letter": "A",
+     "view": "the whole place",
+     "note": "the whole place: as asked.",
+     "choice": "use:s-street-1",
+     "choice_label": "Approve A",
+     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "p64a748859ef1",
+     "label": "B · from the other side",
+     "letter": "B",
+     "view": "from the other side",
+     "note": "from the other side: as asked.",
+     "choice": "use:s-street-1-2",
+     "choice_label": "Approve B",
+     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "ped031b26c982",
+     "label": "C · its fixed things",
+     "letter": "C",
+     "view": "its fixed things",
+     "note": "its fixed things: as asked.",
+     "choice": "use:s-street-1-3",
+     "choice_label": "Approve C",
+     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+    }
+   ],
+   "check": {
+    "state": "pass",
+    "by": "The program's check found no fault.",
+    "chip": "Check passed",
+    "lines": []
+   },
+   "pick": true,
+   "made_n": "made 3 times",
+   "most": "This set was made 3 times, which is the most: use one of these pictures, add your own, or leave it out.",
+   "loss": {
+    "text": "If you leave it out, this 1 shot is made with no reference of it:",
+    "shots": [
+     "shot 1 of gap 1"
+    ]
+   },
+   "name": "The street (made most)",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "A sandy unpaved street between low houses."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
+    ],
+    [
+     "Why Claude suggests this",
+     "All three agree with the plan."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · the whole place: the whole place: as asked.",
+      "B · from the other side: from the other side: as asked.",
+      "C · its fixed things: its fixed things: as asked."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   }
+  },
+  {
+   "line": "l07",
+   "key": "set:PLAN_CHANGED",
+   "title": "The street (a place)",
+   "state": "open",
+   "item": "set:STREET:s-street-1",
+   "ask": "Which picture is the reference?",
+   "buttons": [
+    {
+     "label": "Approve",
+     "choice": "use",
+     "needs_words": false,
+     "act": "approve",
+     "say": "",
+     "sug": true
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+    },
+    {
+     "label": "Make again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found."
+    },
+    {
+     "label": "Make it again from the changed plan",
+     "choice": "remake",
+     "needs_words": false,
+     "act": "remake",
+     "say": "Make it again from the changed plan. The new set comes back to you."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Use it",
+   "desc": "A sandy unpaved street between low houses.",
+   "used": "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1).",
+   "shots": "Used in 1 shot · closest: a wide shot",
+   "rec": {
+    "do": "use",
+    "label": "Use this set",
+    "reason": "All three agree with the plan."
+   },
+   "pics": [
+    {
+     "code": "p92ad37aa52c9",
+     "label": "A · the whole place",
+     "letter": "A",
+     "view": "the whole place",
+     "note": "the whole place: as asked.",
+     "choice": "use:s-street-1",
+     "choice_label": "Approve A",
+     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "p64a748859ef1",
+     "label": "B · from the other side",
+     "letter": "B",
+     "view": "from the other side",
+     "note": "from the other side: as asked.",
+     "choice": "use:s-street-1-2",
+     "choice_label": "Approve B",
+     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+    }
+   ],
+   "check": {
+    "state": "pass",
+    "by": "The program's check found no fault.",
+    "chip": "Check passed",
+    "lines": []
+   },
+   "pick": true,
+   "changed": "The plan changed since this set was made.",
+   "partial": "2 of 3 pictures came back; missing: its fixed things.",
+   "name": "The street (plan changed)",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "A sandy unpaved street between low houses."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
+    ],
+    [
+     "Why Claude suggests this",
+     "All three agree with the plan."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · the whole place: the whole place: as asked.",
+      "B · from the other side: from the other side: as asked."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   },
+   "refused": "These cannot be made now: the film has reached the limit its owner set. Ask the owner to raise it."
+  },
+  {
+   "line": "l08",
+   "key": "set:KEPT",
+   "title": "The street (a place)",
+   "state": "open",
+   "item": "set:STREET:s-street-1",
+   "ask": "Which picture is the reference?",
+   "buttons": [
+    {
+     "label": "Approve",
+     "choice": "use",
+     "needs_words": false,
+     "act": "approve",
+     "say": "",
+     "sug": true
+    },
+    {
+     "label": "Minor corrections",
+     "choice": "correct",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make it again with your words: \"{words}\". Claude rewrites the request first; the new set comes back to you."
+    },
+    {
+     "label": "Make again",
+     "choice": "no",
+     "needs_words": false,
+     "act": "again",
+     "say": "Make it again. Claude rewrites the request from what the checks found. The new set comes back to you.",
+     "ask": "Make this set again? Claude rewrites the request from what the checks found."
+    }
+   ],
+   "group": "To judge",
+   "case": "judge",
+   "tag": "Use it",
+   "desc": "A sandy unpaved street between low houses.",
+   "used": "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1).",
+   "shots": "Used in 1 shot · closest: a wide shot",
+   "rec": {
+    "do": "use",
+    "label": "Use this set",
+    "reason": "All three agree with the plan."
+   },
+   "pics": [
+    {
+     "code": "p92ad37aa52c9",
+     "label": "A · the whole place",
+     "letter": "A",
+     "view": "the whole place",
+     "note": "the whole place: as asked.",
+     "choice": "use:s-street-1",
+     "choice_label": "Approve A",
+     "say": "Approve: picture A is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "p64a748859ef1",
+     "label": "B · from the other side",
+     "letter": "B",
+     "view": "from the other side",
+     "note": "from the other side: as asked.",
+     "choice": "use:s-street-1-2",
+     "choice_label": "Approve B",
+     "say": "Approve: picture B is the reference; pictures of this thing start from it."
+    },
+    {
+     "code": "ped031b26c982",
+     "label": "C · its fixed things",
+     "letter": "C",
+     "view": "its fixed things",
+     "note": "its fixed things: as asked.",
+     "choice": "use:s-street-1-3",
+     "choice_label": "Approve C",
+     "say": "Approve: picture C is the reference; pictures of this thing start from it."
+    }
+   ],
+   "check": {
+    "state": "pass",
+    "by": "The program's check found no fault.",
+    "chip": "Check passed",
+    "lines": []
+   },
+   "pick": true,
+   "name": "The street (kept)",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "A sandy unpaved street between low houses."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a wide shot (shot 1 of gap 1)."
+    ],
+    [
+     "Why Claude suggests this",
+     "All three agree with the plan."
+    ],
+    [
+     "What Claude saw in each picture",
+     [
+      "A · the whole place: the whole place: as asked.",
+      "B · from the other side: from the other side: as asked.",
+      "C · its fixed things: its fixed things: as asked."
+     ]
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "When none of these is right, add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference, and pictures of this thing start from it.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   },
+   "kept": "Approve B",
+   "kept_note": "Kept, not recorded yet: the reason is on this line. Choose again to change it."
+  },
+  {
+   "line": "l09",
+   "key": "set:BACK",
+   "title": "Wall fan regulator (an object)",
+   "state": "open",
+   "item": "reopen:FAN",
+   "ask": "Make a set?",
+   "buttons": [
+    {
+     "label": "Make a set",
+     "choice": "approve",
+     "needs_words": false,
+     "act": "set",
+     "say": "Make a set. It comes back to you to judge.",
+     "sug": true
+    },
+    {
+     "label": "Add words for the picture",
+     "choice": "words",
+     "needs_words": true,
+     "act": "fix",
+     "say": "Make a set, with your words: \"{words}\". It comes back to you to judge.",
+     "hint": "What must the picture show?"
+    },
+    {
+     "label": "Leave out",
+     "choice": "ignore",
+     "needs_words": false,
+     "act": "leave",
+     "say": "Leave it out. 1 shot will be made with no reference of it."
+    }
+   ],
+   "group": "To judge",
+   "case": "back",
+   "tag": "Back with you",
+   "desc": "A round dial on a white plate.",
+   "used": "Used in 1 shot; the closest is a wide shot (shot 1 of gap 3).",
+   "shots": "Used in 1 shot · closest: a wide shot",
+   "head": "It is new in the plan, so it is back with you. Nothing was made.",
+   "loss": {
+    "text": "If you leave it out, this 1 shot is made with no reference of it:",
+    "shots": [
+     "shot 1 of gap 3"
+    ]
+   },
+   "name": "Wall fan regulator (back)",
+   "kind": "an object",
+   "details": [
+    [
+     "Description",
+     "A round dial on a white plate."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a wide shot (shot 1 of gap 3)."
+    ]
+   ]
+  },
+  {
+   "line": "l10",
+   "key": "set:ROOM",
+   "title": "Thing Room (a place)",
+   "state": "open",
+   "item": "setmake:ROOM",
+   "ask": "Make it now?",
+   "buttons": [
+    {
+     "label": "Make it",
+     "choice": "make",
+     "needs_words": false,
+     "act": "make",
+     "say": "Make it. The set comes back to you to judge."
+    },
+    {
+     "label": "Leave out",
+     "choice": "aside",
+     "needs_words": false,
+     "act": "leave",
+     "say": "Leave it out. 1 shot will be made with no reference of it."
+    }
+   ],
+   "group": "Could not be made",
+   "case": "notmade",
+   "tag": "Not made",
+   "desc": "What it looks like.",
+   "used": "Used in 1 shot; the closest is a medium shot (shot 3 of gap 1).",
+   "shots": "Used in 1 shot · closest: a medium shot",
+   "loss": {
+    "text": "If you leave it out, this 1 shot is made with no reference of it:",
+    "shots": [
+     "shot 3 of gap 1"
+    ]
+   },
+   "head": "This set could not be made.",
+   "why": "The request places something at 'middle' with no landmark.",
+   "name": "Thing Room",
+   "kind": "a place",
+   "details": [
+    [
+     "Description",
+     "What it looks like."
+    ],
+    [
+     "Shots",
+     "Used in 1 shot; the closest is a medium shot (shot 3 of gap 1)."
+    ],
+    [
+     "Why it could not be made",
+     "The request places something at 'middle' with no landmark."
+    ]
+   ],
+   "own": {
+    "label": "Upload my own",
+    "person": false,
+    "permitted": true,
+    "text": "Add your own picture, a PNG, JPEG or WebP file up to 15 MB: it becomes the reference of this thing, and no set is made.",
+    "say": "My own picture: it becomes the reference; pictures of this thing start from it."
+   }
+  },
+  {
+   "line": "l11",
+   "key": "set:PHOTO_REFUSED",
+   "title": "The mason (a person)",
+   "state": "open",
+   "item": "likeness:MASON:s-mason-1",
+   "ask": "Give another photo, or make them a stand-in (made from the description)?",
+   "buttons": [
+    {
+     "label": "Another photo",
+     "choice": "photo",
+     "needs_words": false,
+     "act": "photo",
+     "say": "Another photo: give it to the assistant in the chat."
+    },
+    {
+     "label": "A stand-in",
+     "choice": "standin",
+     "needs_words": true,
+     "act": "standin",
+     "say": "A stand-in: the set is made from the description. Your words: \"{words}\".",
+     "hint": "Say in your own words that this person is a stand-in now."
+    }
+   ],
+   "group": "Could not be made",
+   "case": "photo",
+   "tag": "Not made",
+   "desc": "A lean man in his forties, short grey hair, a moustache.",
+   "used": "Used in 2 shots; the closest is a medium shot (shot 2 of gap 1).",
+   "shots": "Used in 2 shots · closest: a medium shot",
+   "head": "The picture service refused this person's photo.",
+   "name": "The mason (photo refused)",
+   "kind": "a person",
+   "details": [
+    [
+     "Description",
+     "A lean man in his forties, short grey hair, a moustache."
+    ],
+    [
+     "Shots",
+     "Used in 2 shots; the closest is a medium shot (shot 2 of gap 1)."
+    ]
+   ]
+  },
+  {
+   "line": "l12",
+   "key": "set:HELPER",
+   "title": "Thing Helper (a person)",
+   "name": "Thing Helper",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l13",
+   "key": "set:TILEMAKER",
+   "title": "Thing Tilemaker (a person)",
+   "name": "Thing Tilemaker",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l14",
+   "key": "set:MOTHER",
+   "title": "Thing Mother (a person)",
+   "name": "Thing Mother",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l15",
+   "key": "set:FATHER",
+   "title": "Thing Father (a person)",
+   "name": "Thing Father",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l16",
+   "key": "set:CHILD",
+   "title": "Thing Child (a person)",
+   "name": "Thing Child",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l17",
+   "key": "set:NEIGHBOUR",
+   "title": "Thing Neighbour (a person)",
+   "name": "Thing Neighbour",
+   "kind": "a person",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "A person: always gets a set.",
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l18",
+   "key": "set:TILE",
+   "title": "Thing Tile (a material)",
+   "name": "Thing Tile",
+   "kind": "a material",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l19",
+   "key": "set:CEILING_FINISH",
+   "title": "Thing Ceiling_Finish (a material)",
+   "name": "Thing Ceiling_Finish",
+   "kind": "a material",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l20",
+   "key": "set:SHUTTER_OIL",
+   "title": "Thing Shutter_Oil (a material)",
+   "name": "Thing Shutter_Oil",
+   "kind": "a material",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l21",
+   "key": "set:OIL_BRUSH",
+   "title": "Thing Oil_Brush (an object)",
+   "name": "Thing Oil_Brush",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l22",
+   "key": "set:OIL_TIN",
+   "title": "Thing Oil_Tin (an object)",
+   "name": "Thing Oil_Tin",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l23",
+   "key": "set:PROP_POST",
+   "title": "Thing Prop_Post (an object)",
+   "name": "Thing Prop_Post",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l24",
+   "key": "set:CEMENT_BAG",
+   "title": "Thing Cement_Bag (an object)",
+   "name": "Thing Cement_Bag",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l25",
+   "key": "set:SHUTTER_WINDOW",
+   "title": "Thing Shutter_Window (an object)",
+   "name": "Thing Shutter_Window",
+   "kind": "an object",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l26",
+   "key": "set:SITE_BELOW",
+   "title": "Thing Site_Below (a place)",
+   "name": "Thing Site_Below",
+   "kind": "a place",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l27",
+   "key": "set:LANE",
+   "title": "Thing Lane (a place)",
+   "name": "Thing Lane",
+   "kind": "a place",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l28",
+   "key": "set:T_BRICKLAY",
+   "title": "Thing T_Bricklay (a way of working)",
+   "name": "Thing T_Bricklay",
+   "kind": "a way of working",
+   "state": "making",
+   "group": "Waiting to be made",
+   "case": "wait",
+   "note": "Not ordered yet: it is offered when the first sets are judged.",
+   "head": "Not made yet. It is made when you choose \"Make them\".",
+   "tag": "Waiting",
+   "wait_note": "If left out, 1 shot would have no reference of it.",
+   "out": true,
+   "details": [
+    [
+     "Where it stands",
+     "Not ordered yet: it is offered when the first sets are judged."
+    ]
+   ]
+  },
+  {
+   "line": "l29",
+   "key": "set:REBAR_GRID",
+   "title": "Thing Rebar_Grid (an object)",
+   "name": "Thing Rebar_Grid",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p8168e3f702c8",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pdf6029783bff",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p4e34ece85687",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l30",
+   "key": "set:CONCRETE",
+   "title": "Thing Concrete (a material)",
+   "name": "Thing Concrete",
+   "kind": "a material",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pff400ff2e394",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pe50cdf908210",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p97fafa0a7680",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l31",
+   "key": "set:PAN",
+   "title": "Thing Pan (an object)",
+   "name": "Thing Pan",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p12ebed4b5571",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p3c8fe4f1e1a8",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pc741320fa267",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l32",
+   "key": "set:BRICK",
+   "title": "Thing Brick (an object)",
+   "name": "Thing Brick",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p02736704b136",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p263fb60f9a82",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l33",
+   "key": "set:TROWEL",
+   "title": "Thing Trowel (an object)",
+   "name": "Thing Trowel",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pca78c273689c",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p74d89fd542fd",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "paf25b3c47c8c",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l34",
+   "key": "set:STRAIGHTEDGE",
+   "title": "Thing Straightedge (an object)",
+   "name": "Thing Straightedge",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p16388726eec0",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p51eed9aa0686",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l35",
+   "key": "set:SHUTTER_BOARD",
+   "title": "Thing Shutter_Board (an object)",
+   "name": "Thing Shutter_Board",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p461894a88b14",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pc0fb23ec2c16",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pd925cf6cd7bd",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l36",
+   "key": "set:WIRE_COIL",
+   "title": "Thing Wire_Coil (an object)",
+   "name": "Thing Wire_Coil",
+   "kind": "an object",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p4c0e4d01c7e9",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p6ef74d550241",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l37",
+   "key": "set:STONE_HEAP",
+   "title": "Thing Stone_Heap (a material)",
+   "name": "Thing Stone_Heap",
+   "kind": "a material",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p2e00dec68fed",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pa7761b740454",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l38",
+   "key": "set:SITE_YARD",
+   "title": "Thing Site_Yard (a place)",
+   "name": "Thing Site_Yard",
+   "kind": "a place",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p436c8e8b6ddc",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pcd22ea361d50",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p8077b525e101",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l39",
+   "key": "set:T_POUR",
+   "title": "Thing T_Pour (a way of working)",
+   "name": "Thing T_Pour",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pddfc92852f58",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pd89fa7642ffa",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pc12b715f73f8",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l40",
+   "key": "set:T_LEVEL",
+   "title": "Thing T_Level (a way of working)",
+   "name": "Thing T_Level",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p77d0fbf11415",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l41",
+   "key": "set:T_SCREED",
+   "title": "Thing T_Screed (a way of working)",
+   "name": "Thing T_Screed",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "pf65d169e3505",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "pa210385954d5",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p699e299c678c",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  },
+  {
+   "line": "l42",
+   "key": "set:T_STRIKE",
+   "title": "Thing T_Strike (a way of working)",
+   "name": "Thing T_Strike",
+   "kind": "a way of working",
+   "state": "recorded",
+   "group": "Settled",
+   "case": "settled",
+   "tag": "Settled",
+   "head": "Settled at the step before: its footage pictures are the reference. Nothing to do here.",
+   "pics": [
+    {
+     "code": "p7420a0f29d6f",
+     "label": "From your footage: whole"
+    },
+    {
+     "code": "p038f4f301c54",
+     "label": "From your footage: whole"
+    }
+   ],
+   "details": [
+    [
+     "The reference pictures",
+     [
+      "From your footage: whole",
+      "From your footage: whole"
+     ]
+    ]
+   ]
+  }
+ ]
+}

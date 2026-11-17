@@ -160,7 +160,7 @@ class Film:
         rows = []
         for s in self.due()['sets']:
             rec = (recommend or {}).get(s['element_id'], 'use')
-            rows.append({'element_id': s['element_id'], 'set': s['set'], 'recommend': rec, 'golden': s['pictures'][0]['ref'] if rec == 'use' else None, 'reason': 'Looked at against the plan.',
+            rows.append({'element_id': s['element_id'], 'set': s['set'], 'recommend': rec, 'golden': s['pictures'][0]['ref'] if rec == 'use' else None, 'reason': 'Looked at against the plan.', 'chose': 'The most common variant.', 'aside': 'Nothing of the request.',
                          'pictures': [{'ref': p['ref'], 'view': p['view'], 'verdict': 'pass', 'seen': f"{p['view']}: as asked."} for p in s['pictures']]})
         return self.do(lambda: RS.round_looks(self.store, USER, self.run, self.outputs, rows, 'helper'))
 
@@ -198,6 +198,16 @@ def png():
 def ans(line, choice, notes='', pics=None):
     """The page's answer to a line, as `vw visuals page --record` sends it: it passes the server's own model."""
     return PageAnswer(line=line['line'], key=line['key'], item=line.get('item', ''), choice=choice, notes=notes, pics=pics or {}).model_dump()
+
+
+def approve(line):
+    """design/213: the answer the page sends for "Approve" on a set: a thing's chosen picture (here the first made), a person's `yes`."""
+    return next((p['choice'] for p in line.get('pics') or [] if p.get('choice')), next(b['choice'] for b in line['buttons'] if b.get('act') == 'approve'))
+
+
+def chat(film, key):
+    """The chat's item of a line of the page: it says the line's parts as one text, and has the chat's own labels."""
+    return next(i for i in film.do(lambda: CF._round_items(CF._ctx(film.conn, film.store, USER, film.run, film.outputs), every=True)) if i['_key'] == key)
 
 
 def a_look(trial, view, verdict='pass', seen='The whole thing, sharp.', **more):
@@ -302,18 +312,20 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     out = film.set_looks({'T_LAY': 'remake'})
     assert says(out, 'vw visuals page') == RS.SETS_PAGE and out['refused'] == {} and film.state() == 2
 
-    # step 2 on the page: "make the rest" first, the doubtful set first, each set with its check, the notes and Claude's look
+    # step 2 on the page: "make the rest" first, the set Claude would make again first, each set with its check, Claude's two lines on the model's notes and Claude's look
+    # (design/213, 17 Nov 2026: the new layout; before: the group 'Doubtful: look at these first', the raw notes, 'Yes' / 'No' / 'Correct it')
     page = film.page()
     lines = {l['key']: l for l in page['lines']}
     assert [l['key'] for l in page['lines']] == ['sets:rest', 'set:T_LAY', 'set:MASON', 'set:STREET', 'set:TROWEL', 'set:BRICK', 'set:FAN']
-    assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make the other 2 sets'
+    assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make them' and lines['sets:rest']['buttons'][0]['big'] == 'Make the other 2'
+    assert [b['label'] for b in chat(film, 'sets:rest')['buttons']] == ['Make the other 2 sets', 'Leave these 2 out']
     lay = lines['set:T_LAY']
-    assert lay['group'] == 'Doubtful: look at these first' and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'fail', 'by': "The program's check (Gemini)", 'lines': ['Picture B: the view: Not the view asked.']}
-    assert lay['notes']['sources'] == 1 and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
-    assert lines['set:MASON']['check']['state'] == 'pass' and lines['set:MASON']['rec']['label'] == 'Yes' and [b['choice'] for b in lines['set:MASON']['buttons']] == ['yes', 'no', 'correct']
+    assert lay['group'] == CF.STEP2_GROUPS[0] and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'fail', 'by': "The program's check found:", 'chip': 'The check found 1 fault', 'lines': ['Picture B: the view: Not the view asked.']}
+    assert 'notes' not in lay and lay['look'] == {'chose': 'The most common variant.', 'aside': 'Nothing of the request.'} and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
+    assert lines['set:MASON']['check']['state'] == 'pass' and lines['set:MASON']['rec']['label'] == 'Use this set' and [b['choice'] for b in lines['set:MASON']['buttons']] == ['yes', 'correct', 'no']
 
-    # one visit: "Correct it", "No", a picture chosen, and "make the other sets". Nothing is made again before Claude's rewrite; the others are ordered
-    out = film.record(ans(lay, 'correct', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], lines['set:STREET']['buttons'][0]['choice']), ans(lines['sets:rest'], 'rest'))
+    # one visit: "Minor corrections", "Make again", a picture chosen, and "make the other sets". Nothing is made again before Claude's rewrite; the others are ordered
+    out = film.record(ans(lay, 'correct', 'Show the hand pressing the brick down.'), ans(lines['set:MASON'], 'no'), ans(lines['set:STREET'], approve(lines['set:STREET'])), ans(lines['sets:rest'], 'rest'))
     assert out['recorded'] == ['set:T_LAY', 'set:MASON', 'set:STREET', 'sets:rest'] and out['stale'] == [] and out['refused'] == []
     assert film.ordered()[3:] == ['TROWEL', 'BRICK'] and film.state() == 'making' and says(out, 'vw visuals status') == RS.ALL_MAKING.format(k=2, x='71')
     s = film.session()
@@ -335,9 +347,9 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
 
     # the sets made again say what was asked and show the set before; the clean set shows the footage picture it was made from
     lines = film.lines()
-    assert lines['set:T_LAY']['changes'] == ['Made again as you asked: "Show the hand pressing the brick down."'] and len(lines['set:T_LAY']['earlier']) == 3 and 'sets:rest' not in lines
+    assert lines['set:T_LAY']['asked'] == 'Made again as you asked: "Show the hand pressing the brick down."' and len(lines['set:T_LAY']['earlier']) == 3 and 'sets:rest' not in lines
     assert [(p['label'], p.get('ref_only')) for p in lines['set:TROWEL']['pics']][:2] == [('From your footage: side', True), ('A · side', None)]
-    first = lambda key: lines[key]['buttons'][0]['choice']
+    first = lambda key: approve(lines[key])
     out = film.record(ans(lines['set:MASON'], 'yes'), ans(lines['set:TROWEL'], first('set:TROWEL')), ans(lines['set:BRICK'], first('set:BRICK')), ans(lines['set:T_LAY'], 'no'))
     assert film.state() == 'rewrite' and says(out, 'vw visuals round --rewrite') == RS.rewrite_due(film.session()) == VS.round_due(film.session(), film.plan)
 
@@ -346,11 +358,12 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     film.back()
     film.set_looks()
     lay = film.lines()['set:T_LAY']
-    assert [b['choice'][:4] for b in lay['buttons']] == ['use:', 'use:', 'use:', 'asid'] and lay['buttons'][3]['label'] == 'Leave out' and lay['text'].endswith(CF.WORDS['set_made_max_thing'].format(n=3))
+    assert [b['choice'] for b in lay['buttons']] == ['use', 'aside'] and [p['choice'][:4] for p in lay['pics'] if p.get('choice')] == ['use:', 'use:', 'use:'] and lay['buttons'][1]['label'] == 'Leave out'
+    assert lay['most'] == CF.WORDS['set_made_max_thing'].format(n=3) and lay['most'] in chat(film, 'set:T_LAY')['text']
     assert film.record(ans(lay, 'no'))['refused'][0]['key'] == 'set:T_LAY'
     held = film.do(lambda: VS.round_sets(film.store, USER, film.run, film.outputs, {'T_LAY': {'verdict': 'no'}}, 'No', conn=film.conn, partial=True))['held']
     assert held == {'T_LAY': RS.MAKES_LIMIT.format(eid='T_LAY', max=3)} and len(film.ordered()) == 8
-    out = film.record(ans(lay, lay['buttons'][0]['choice']))
+    out = film.record(ans(lay, approve(lay)))
     assert says(out, 'vw visuals next') == P.ROUND_NEXT and film.state() == 'complete' and film.session()['round']['pass'] == 'complete'
     assert sorted(film.session()['golden']) == ['BRICK', 'FAN', 'MASON', 'STREET', 'TROWEL', 'T_LAY'] and len(film.ordered()) == 8
 
@@ -363,7 +376,7 @@ def test_the_other_sets_left_out_and_a_set_made_three_times_left_out_complete_th
     film.back()
     film.set_looks()
     lines = film.lines()
-    out = film.record(ans(lines['sets:rest'], 'rest_out'), ans(lines['set:MASON'], 'yes'), ans(lines['set:STREET'], lines['set:STREET']['buttons'][0]['choice']), ans(lines['set:T_LAY'], 'no'))
+    out = film.record(ans(lines['sets:rest'], 'rest_out'), ans(lines['set:MASON'], 'yes'), ans(lines['set:STREET'], approve(lines['set:STREET'])), ans(lines['set:T_LAY'], 'no'))
     assert out['refused'] == [] and film.row('BRICK')['ignored'] and film.row('TILE')['ignored'] and film.ordered() == ['MASON', 'STREET', 'T_LAY'] and film.state() == 'rewrite'
     for n in (2, 3):   # made again twice: the limit
         film.rewrite([{'element_id': 'T_LAY', 'prompt': f'The hand presses the brick, try {n}.'}])
@@ -389,7 +402,7 @@ def test_the_round_file_sent_again_orders_nothing_and_the_thing_comes_back_as_an
     for eid in ('FAN', 'BRICK', 'TILE'):
         assert says(film.do(lambda: VS.set_aside(film.store, USER, film.run, film.outputs, eid, back=True)), 'vw visuals page') == RS.BACK_ASKED.format(eid=eid)
     lines = film.lines()
-    assert [b['choice'] for b in lines['set:FAN']['buttons']] == ['approve', 'ignore'] and lines['set:FAN']['group'] == CF.WORDS['g_back']
+    assert [b['choice'] for b in lines['set:FAN']['buttons']] == ['approve', 'words', 'ignore'] and (lines['set:FAN']['group'], lines['set:FAN']['tag']) == (CF.STEP2_GROUPS[0], CF.WORDS['tag_back'])   # design/213: "Add words for the picture" too; in "To judge", tagged
     out = film.record(ans(lines['set:FAN'], 'approve', 'The dial is cream, not white.'), ans(lines['set:BRICK'], 'ignore'), ans(lines['set:TILE'], 'ignore'))
     assert out['refused'] == [] and film.ordered()[3:] == ['FAN'] and film.row('FAN')['operator_words'] == ['The dial is cream, not white.'] and film.row('BRICK')['ignored'] and film.state() == 'making'
     assert out['then'].startswith('3 line(s) still wait for the operator on the page') and [l['key'] for l in out['page']['lines'] if l['state'] == 'open'] == ['set:MASON', 'set:STREET', 'set:T_LAY']   # the first sets, not judged yet

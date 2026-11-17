@@ -446,7 +446,7 @@ def _drawn(session, eid):
 def _round_buttons(item, paid):
     """The chat item's own buttons, every one of them, for the page: one that leads to a paid set says so, with the price of one set."""
     if item.get('_v2'):   # design/211: the labels are the chat's own, the price already on them; a picture's own answer is under the picture
-        return [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words')), **({'small': True} if b.get('small') else {})}   # design/212: `small`: a link under the buttons
+        return [{'label': b['label'], 'choice': b['choice'], 'needs_words': bool(b.get('needs_words')), **{k: b[k] for k in ('small', 'say', 'hint') if b.get(k)}}   # design/212: `small`: a link under the buttons; design/213: `say`, what the answer will do, and the hint of its words box
                 for b in item['buttons'] + list(item.get('other_choices') or []) if not (item['id'].startswith('round1:') and b['choice'].startswith(('not:', 'use:')))]
 
     def label(b):
@@ -464,10 +464,12 @@ def _own_line(ctx, item, paid):
     text = (f"Add this person's own photo, {OWN_FILE}: their set is made from it. A real person's photo is used only with their permission: write first, in your own words, that you have it." if person else
             f'When the footage picture is not right, add your own, {OWN_FILE}: its set is made from your picture and the drawings.' if drawn else
             f'When the footage picture is not right, or there is none, add your own, {OWN_FILE}: it becomes the reference of this thing, and no picture is made.' if step1 else
+            CF.WORDS['own_set'].format(file=OWN_FILE) if item['id'].startswith('set:') and item.get('_v2') else   # design/213: true for every kind of thing: pictures of it start from the reference
             f'When none of these is right, add your own picture, {OWN_FILE}: every shot of this thing then starts from it.' if item['id'].startswith('set:') else
             f'Add your own picture, {OWN_FILE}: it becomes the reference of this thing, and no set is made.')
-    label = (CF.WORDS['upload'] if step1 else 'Use my own picture') if item.get('_v2') else 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else '')   # design/212: no cost at the references of a v2 round
-    return {'label': label, 'person': person, 'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text}
+    label = CF.WORDS['upload'] if item.get('_v2') else 'Use my own picture' + (f' ({paid}: the set is made from it)' if person or drawn else '')   # design/212: no cost at the references of a v2 round
+    return {'label': label, 'person': person, 'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text,
+            **({'say': CF.WORDS['say_own_person' if person else 'say_own']} if item.get('_v2') and not step1 else {})}
 
 
 def _thing(plan, eid, words=KIND_WORDS):
@@ -486,6 +488,23 @@ def _ask(item):
     return q[:1].upper() + q[1:]
 
 
+def _named(plan, eid):
+    """The name and the kind of a thing apart, for the list and the heading (design/212)."""
+    from . import ref_sets
+    e = next(x for x in plan['elements'] if x['id'] == eid)
+    return {'name': str(e.get('name') or eid), 'kind': ref_sets.KIND_WORDS.get(e.get('kind'), 'a thing')}
+
+
+def _details(line):
+    """design/213: the folded "Details" of a line of step 2: [[label, text or texts]], only what the line has."""
+    look, made = line.get('look') or {}, [p for p in line.get('pics') or [] if not p.get('ref_only')]
+    rows = [['Description', line.get('desc')], ['Shots', line.get('used')], ['Why Claude suggests this', (line.get('rec') or {}).get('reason')],
+            ['What Claude saw in each picture', [f"{p['label']}: {p['note']}" for p in made if p.get('note')]], ['What the check found', (line.get('check') or {}).get('lines')],
+            ['What the image model did', [CF.WORDS['model_' + k].format(words=look[k]) for k in ('chose', 'aside') if look.get(k)]],
+            ['Why it could not be made', line.get('why')], ['Where it stands', line.get('note')]]
+    return [r for r in rows if r[1]]
+
+
 def _v2_line(ctx, item, paid):
     """design/211: a line of a v2 round, from the chat's own item. Its fields are built once, in `chat_flow._round_v2`, so the page and the
     chat say the same; here a picture gets its code, and the line its key, its title, "Use my own picture" and the answer kept so far."""
@@ -494,12 +513,14 @@ def _v2_line(ctx, item, paid):
         if line.get(field):
             line[field] = [{**pic(p['_key'], p['label'], p.get('_mark')), **{k: v for k, v in p.items() if k not in ('_key', 'label', '_mark')}} for p in line[field]]
     eid, kept, buttons = item['_eid'], item['_kept'], _round_buttons(item, paid)
-    out = {'key': item['_key'], 'title': _thing_v2(ctx['plan'], eid) if eid else item['_title'], 'state': 'open', 'item': item['id'], 'ask': _ask(item), **line, 'buttons': buttons}
-    if eid and item['id'].startswith('round1:'):   # design/212: the name and the kind apart, for the list and the heading of the thing
-        from . import ref_sets
-        e = next(x for x in ctx['plan']['elements'] if x['id'] == eid)
-        out.update(name=str(e.get('name') or eid), kind=ref_sets.KIND_WORDS.get(e.get('kind'), 'a thing'))
+    out = {'key': item['_key'], 'title': _thing_v2(ctx['plan'], eid) if eid else item['_title'], 'state': 'open', 'item': item['id'], 'ask': _ask(item), 'buttons': buttons, **line}   # design/213: a line of step 2 carries the page's own buttons
+    if (eid and (item['id'].startswith('round1:') or line.get('case'))) or item['_key'] == 'sets:rest':
         out.pop('text', None)   # the page shows its parts (`desc`, `used`, `search`); the chat says them as one text. Left out so that 60 things stay one document
+    if eid and line.get('case') and not item['id'].startswith('round1:'):   # design/213: a line of step 2 in the new layout
+        out.update(_named(ctx['plan'], eid), details=_details(out))
+        out.pop('cost', None)
+    if eid and item['id'].startswith('round1:'):   # design/212: the name and the kind apart, for the list and the heading of the thing
+        out.update(_named(ctx['plan'], eid))
         if out.get('pics'):
             out['pics'] = [{k: v for k, v in x.items() if k != 'choice_label'} for x in out['pics']]   # a picture has a tick on the page, no button of its own
     if eid and item['id'].startswith(('round1:', 'set:', 'setmake:')):
@@ -527,9 +548,10 @@ def _sets_lines_v2(ctx):
     items = CF._round_items(ctx, every=True)
     asked = {i['_eid'] for i in items}
     wait, done = [], []
+    rest = next((i['_line'].pop('waits') for i in items if i['_key'] == 'sets:rest'), {})
     for eid in [e['id'] for e in plan['elements'] if e['id'] in rd['elements'] and e['id'] not in asked]:
         row = rd['elements'][eid]
-        head = {'key': f'set:{eid}', 'title': _thing_v2(plan, eid)}
+        head = {'key': f'set:{eid}', 'title': _thing_v2(plan, eid), **_named(plan, eid)}
         rows = lambda *status: sorted(V._set_rows(session, eid, row.get('set'), status), key=lambda r: int(r.get('set_n') or 1))
         gold = V.golden_of(session, eid)
         if row.get('ignored'):
@@ -540,10 +562,15 @@ def _sets_lines_v2(ctx):
             mine = refs.get(gold) if gold and not any(r['id'] == gold for r in shown) else None
             pics = ([pic(CF._ref_key(run, r['id']), label(n, r) + (' (the starting picture)' if r['id'] == gold else ''), r.get('sha256')) for n, r in enumerate(shown)]
                     + ([pic(mine.get('key') or CF._ref_key(run, gold), 'Your own picture (the starting picture)', mine.get('sha256'))] if mine else []))
-            done.append({**head, 'state': 'recorded', 'group': words['g_done'], **({'pics': pics} if pics else {})})
+            done.append({**head, 'state': 'recorded', 'group': CF.STEP2_GROUPS[3], 'case': 'settled', 'tag': words['tag_settled'],
+                         'head': words['settled_footage' if row.get('from_footage') and shown else 'settled'], **({'pics': pics} if pics else {}),
+                         'details': [['The reference pictures', [x['label'] for x in pics]]] if pics else []})
         else:
             said = ('making', '') if rows('generating') else ('rewriting', 'tag_rewriting') if row.get('rewrite_due') else ('looking', 'tag_looking') if rows('candidate') else ('waiting', 'tag_waiting')
-            wait.append({**head, 'state': 'making', 'group': words['g_wait'], 'note': words[said[0]], **({'tag': words[said[1]]} if said[1] else {})})
+            mine = rest.get(f'set:{eid}') or {}   # design/213: one of the sets that wait for the operator's word: what the list of them says of it
+            wait.append({**head, 'state': 'making', 'group': CF.STEP2_GROUPS[2], 'case': 'wait', 'note': words[said[0]], 'head': words['wait_head'] if mine else words[said[0]],
+                         'tag': words[said[1]] if said[1] else words['tag_making'], **({'wait_note': mine['note'], **({'out': True} if mine['out'] else {})} if mine else {})})
+            wait[-1]['details'] = _details(wait[-1])
     return [_v2_line(ctx, i, paid) for i in items] + wait + done
 
 
@@ -673,12 +700,14 @@ def _round_page(ctx, base, step):
         state = V._round_pass(session, session['round'])
         then = (ref_sets.SETS_LOOK if state == 'looking' else ref_sets.rewrite_due(session) if state == 'rewrite'
                 else ref_sets.SETS_MAKING if state == 'making' and not left else '')   # design/211 review, N4: wait, then look: the operator sees no set before its look
+        note = (f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
+                'Look at each set, answer each line, then say done in the chat.' if left else
+                'Nothing to answer here yet: the sets appear here when they are ready.' if making else 'Nothing more to answer here now.')
         return {**base, 'step': SETS_STEP, 'open': bool(left), 'lines': lines,
                 'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}.",   # design/212: no cost is named
-                'note': f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
-                        'Look at each set, answer each line, then say done in the chat.' if left else
-                        'Nothing to answer here yet: the sets appear here when they are ready.' if making else 'Nothing more to answer here now.',
-                **({'then': then} if then else {})}
+                'note': note, **({'then': then} if then else {}),
+                # design/213 (17 Nov 2026): the sets in the new layout: one set at a time beside the list, in the server's four groups
+                'layout': {'kind': 'sets', 'made': CF.WORDS['made_note'], 'help': [note, CF.WORDS['help_set'], CF.WORDS['help_rest']], 'groups': CF.STEP2_GROUPS, 'pick': CF.WORDS['pick']}}
     if step == 'refs':
         stopped = refused.get('references')
         return {**base, 'step': REFS_STEP, 'open': bool(left), 'lines': lines,

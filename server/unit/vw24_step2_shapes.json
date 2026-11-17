@@ -1,0 +1,249 @@
+{
+ "from": "VW-24's round at step 2 of its references, as the live server 0.109.2 gave it on 17 Nov 2026: shapes only",
+ "things": [
+  {
+   "id": "MASON",
+   "kind": "person",
+   "case": "judge",
+   "compare": 0,
+   "pictures": 3,
+   "rec": "remake",
+   "check_faults": 1,
+   "check": "fail"
+  },
+  {
+   "id": "SITE_DECK",
+   "kind": "place",
+   "case": "judge",
+   "compare": 3,
+   "pictures": 3,
+   "rec": "remake",
+   "check_faults": 3,
+   "check": "fail"
+  },
+  {
+   "id": "ROOM",
+   "kind": "place",
+   "case": "notmade",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "HELPER",
+   "kind": "person",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "TILEMAKER",
+   "kind": "person",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "MOTHER",
+   "kind": "person",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "FATHER",
+   "kind": "person",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "CHILD",
+   "kind": "person",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "NEIGHBOUR",
+   "kind": "person",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "TILE",
+   "kind": "material",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "CEILING_FINISH",
+   "kind": "material",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "SHUTTER_OIL",
+   "kind": "material",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "OIL_BRUSH",
+   "kind": "object",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "OIL_TIN",
+   "kind": "object",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "PROP_POST",
+   "kind": "object",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "CEMENT_BAG",
+   "kind": "object",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "SHUTTER_WINDOW",
+   "kind": "object",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "SITE_BELOW",
+   "kind": "place",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "LANE",
+   "kind": "place",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "T_BRICKLAY",
+   "kind": "technique",
+   "case": "wait",
+   "compare": 0,
+   "pictures": 0
+  },
+  {
+   "id": "REBAR_GRID",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "CONCRETE",
+   "kind": "material",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "PAN",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "BRICK",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 2
+  },
+  {
+   "id": "TROWEL",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "STRAIGHTEDGE",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 2
+  },
+  {
+   "id": "SHUTTER_BOARD",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "WIRE_COIL",
+   "kind": "object",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 2
+  },
+  {
+   "id": "STONE_HEAP",
+   "kind": "material",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 2
+  },
+  {
+   "id": "SITE_YARD",
+   "kind": "place",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "T_POUR",
+   "kind": "technique",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "T_LEVEL",
+   "kind": "technique",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 1
+  },
+  {
+   "id": "T_SCREED",
+   "kind": "technique",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 3
+  },
+  {
+   "id": "T_STRIKE",
+   "kind": "technique",
+   "case": "settled",
+   "compare": 0,
+   "pictures": 2
+  }
+ ]
+}

@@ -2526,7 +2526,7 @@ def cmd_visuals(a):
                     files.append({'trial': t['id'], 'element': eid, 'clip': t.get('clip'), 'at_s': t.get('at_s'), 'file': rel})
             emit({'frames': files, 'failed': out.get('failed') or [], 'left': out.get('left') or {}, 'then': out.get('then')}, 0,
                  ' '.join([*(f"{f.get('clip')} at {f.get('at_s')} s: {f.get('reason')}" for f in out.get('failed') or []), out.get('then') or '']))
-        doc = _json_file(m, a.file)   # look: {by, things: [{element, clips, note, not_searched, looks: [{trial, view, verdict, seen, keep, closest}]}]}
+        doc = _json_file(m, a.file)   # look: {by, things: [{element, clips, note, not_searched, looks: [{trial, view, verdict, seen, keep, closest, face, child}]}]}; design/213: face and child, true or false, go as written
         if not isinstance(doc, dict) or not isinstance(doc.get('things'), list):
             emit({'action': 'refused', 'message': f'{a.file} must be {{by, things: [{{element, clips, note, looks}}]}}; nothing was sent.'}, 2)
         out = write(base + '/looks', {'by': str(doc.get('by') or ''), 'things': doc['things']})
@@ -2546,7 +2546,7 @@ def cmd_visuals(a):
             out = call('GET', base + '/round/looks')
             for s in out.get('sets') or []:
                 folder = 'work/visuals/sets/' + re.sub(r'[^A-Za-z0-9._-]', '-', str(s.get('element_id')))
-                for name, pics in (('input', s.get('inputs') or []), ('picture', s.get('pictures') or [])):
+                for name, pics in (('input', s.get('inputs') or []), ('picture', s.get('pictures') or []), ('footage', s.get('footage') or [])):   # design/213: the thing's footage pictures that were not inputs, to compare with
                     for n, pic in enumerate(pics, 1):
                         if pic.get('key'):
                             pic['file'] = f"{folder}/{name}-{pic.get('n') or n}{'.png' if pic['key'].endswith('.png') else '.jpg'}"
@@ -2554,7 +2554,7 @@ def cmd_visuals(a):
             (ws / 'work' / 'visuals' / 'sets').mkdir(parents=True, exist_ok=True)
             (ws / 'work' / 'visuals' / 'sets' / 'looks.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
             emit({'file': 'work/visuals/sets/looks.json', 'sets': [s.get('element_id') for s in out.get('sets') or []], 'then': out.get('then')}, 0, out.get('then'))
-        if getattr(a, 'looks', None):   # the looks recorded: {by, sets} from a helper, or the list of sets alone
+        if getattr(a, 'looks', None):   # the looks recorded: {by, sets} from a helper, or the list of sets alone; design/213: each set's `chose` and `aside` go as written
             sent = _json_file(m, a.looks)
             out = write(base + '/round/looks', {'by': (sent.get('by') if isinstance(sent, dict) else None) or 'assistant', 'sets': sent.get('sets') if isinstance(sent, dict) else sent})
             emit(out, 0, out.get('then'))

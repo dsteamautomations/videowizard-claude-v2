@@ -2542,13 +2542,17 @@ def likeness_of(session, element_id):
 
 def likeness_photo(session, element_id):
     """design/207 (D1): the picture a person's sheet is made from when the permission is recorded: the operator's newest own photo (a later photo replaces
-    an earlier one), else the person's first approved footage frame. None for a stand-in: the sheet is made from the description."""
+    an earlier one), else the approved footage frame that shows the person's face best (design/213: `ref_find.faces_of`; a look that passes before a
+    weak one, then the view order), else the person's first approved footage frame. None for a stand-in: the sheet is made from the description."""
     if not likeness_of(session, element_id):
         return None
     mine = _own_pictures(session, element_id)
     frames = [r['id'] for r in session['references'].values() if r.get('kind') == 'frame' and r.get('status') == 'approved' and r.get('element_id') == element_id]
     when = lambda rid: str(session['references'][rid].get('created_at') or '')   # the session is stored with its keys sorted: the order of the rows says nothing
-    return max(mine, key=when) if mine else min(frames, key=when) if frames else None
+    if mine:
+        return max(mine, key=when)
+    from . import ref_find
+    return next((f for f in ref_find.faces_of(session, element_id) if f in frames), None) or (min(frames, key=when) if frames else None)
 
 
 def own_picture_refused(kind, session=None, element_id=None):
@@ -2581,7 +2585,10 @@ def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=F
     """design/207 (D1): the operator's yes, once per person, in their own words: they have this person's permission to make AI pictures of them. With it the
     person's own photo (or footage frame) is the source of their sheet. stand_in: the record is removed; the person is made from the description again and a
     set made from the photo is rejected (its golden picture with it; a complete round is open again for this person). One run-log line either way, with
-    the words; a stand-in asked for a person who has no record changes nothing and logs nothing."""
+    the words; a stand-in asked for a person who has no record changes nothing and logs nothing.
+    design/213: a person the footage shows (a kept frame whose look says it shows their face): the permission needs no photo, the set is then made from
+    the film's own pictures of them; "make a stand-in" is recorded too (`session['stand_in'][id]`: {quote, by, at}), so the question is not asked again
+    (`ref_sets.footage_person`); the permission removes that record."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     element = next((e for e in plan['elements'] if e['id'] == element_id), None)
@@ -2589,10 +2596,15 @@ def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=F
     need(element.get('kind') == 'person', f"{element_id} is a {element.get('kind')}: the permission is recorded for a person only.")
     quote = ' '.join(str(quote or '').split())
     need(quote, "Give the operator's own words (--quote): " + ('why this person is a stand-in now.' if stand_in else "their yes that they have this person's permission to make AI pictures of them."))
-    if stand_in and not likeness_of(session, element_id):   # nothing to remove: no record, no log line
+    from . import ref_find
+    faces = ref_find.faces_of(session, element_id)   # design/213: the footage shows this person's face
+    stamp = {'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    if stand_in and not likeness_of(session, element_id) and (not faces or (session.get('stand_in') or {}).get(element_id)):   # nothing to remove: no record, no log line
         return {'element_id': element_id, 'likeness': False, 'next': f'{element_id} is already a stand-in: no permission is recorded for this person. Nothing was changed.'}
-    name = element.get('name') or element_id
+    name, had = element.get('name') or element_id, bool(likeness_of(session, element_id))
     if stand_in:
+        if faces:
+            session.setdefault('stand_in', {})[element_id] = stamp
         (session.get('likeness') or {}).pop(element_id, None)
         if (session['references'].get(golden_of(session, element_id) or '') or {}).get('kind') in ('supplied', 'frame'):   # the photo is no longer the starting picture
             session['golden'].pop(element_id)
@@ -2612,15 +2624,18 @@ def likeness(store, user, run, outputs, element_id, quote, conn=None, stand_in=F
                 if r.get('kind') == 'sheet' and r.get('element_id') == element_id and r.get('status') != 'rejected' and (r.get('generation') or {}).get('parents'):
                     r['sources_changed'] = True
     else:
-        session.setdefault('likeness', {})[element_id] = {'quote': quote, 'by': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+        session.setdefault('likeness', {})[element_id] = stamp
+        (session.get('stand_in') or {}).pop(element_id, None)
     save_session(store, run, session)
     if conn is not None:
         from . import runlog
         runlog.write(conn, {'run_id': run['id'], 'stage': 'visuals', 'kind': 'decision', 'about': f'person {element_id}', 'rule': 'design/207 (own likeness with permission, or a stand-in)',
-                            'entry': f'{name} is a stand-in, made from the description; the permission record is removed' if stand_in else f"the operator has {name}'s permission to make AI pictures of them",
+                            'entry': f'{name} is a stand-in, made from the description' + ('; the permission record is removed' if had else '') if stand_in else f"the operator has {name}'s permission to make AI pictures of them",
                             'by_kind': 'operator', 'by_name': user.get('name') or '', 'quote': quote, 'request_id': None})
     return {'element_id': element_id, 'likeness': not stand_in,
-            'next': (f'{element_id} is a stand-in again: the sheet is made from the description. A sheet made from the photo is no longer used: make it again (`vw visuals round --make {element_id}`).' if stand_in else
+            'next': (f'{element_id} is a stand-in: the sheet is made from the description, with no picture of the person in the footage.' if stand_in and not had else
+                     f'{element_id} is a stand-in again: the sheet is made from the description. A sheet made from the photo is no longer used: make it again (`vw visuals round --make {element_id}`).' if stand_in else
+                     f"The permission is recorded for {element_id}. Their sheet is made from the film's own pictures of them; a photo of their own, when one is given (`vw visuals own --element {element_id} --file <photo>`), is used instead." if faces else
                      f"The permission is recorded for {element_id}. Give the person's photo (`vw visuals own --element {element_id} --file <photo>`); their sheet is made from it.")}
 
 
@@ -3349,6 +3364,8 @@ def _queue_sets(conn, store, user, run, outputs, eids):
         except (Problem, ValueError) as exc:
             errors[eid] = getattr(exc, 'message', None) or str(exc)
             if getattr(exc, 'code', '') == 'VISUALS_CAP':
+                if round_v2(session):   # design/213: the limit of a v2 round is said with no amount
+                    errors[eid] = ref_sets.LIMIT_PLAIN
                 for rest in eids[eids.index(eid) + 1:]:
                     errors[rest] = errors[eid]
                 break
@@ -3435,7 +3452,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
             continue
         if v['verdict'] != 'yes' and room is not None and len(again) >= room:   # the cap: nothing is rejected and nothing queued; the answer waits, stored
             r['answer'] = {'verdict': v['verdict'], 'golden': None, 'words': ' '.join(str(v.get('words') or '').split()), 'set': r.get('set'), 'by': user['id'], 'at': stamp['at']}
-            held[eid] = f'the spend cap of ₹{budget[1]:,.0f} is reached (₹{budget[0]:,.0f} spent): the set is not made again; its answer is kept and waits'
+            held[eid] = ref_sets.LIMIT_PLAIN if v2 else f'the spend cap of ₹{budget[1]:,.0f} is reached (₹{budget[0]:,.0f} spent): the set is not made again; its answer is kept and waits'   # design/213: no amount in a v2 round
             continue
         r['verdict'] = v['verdict']
         r.pop('answer', None)   # recorded: nothing stored is left behind
@@ -3629,8 +3646,8 @@ def set_make(conn, store, user, run, outputs, element_id, quote=None):
     need(not old or _spec_changed(session, plan, element_id, row) or plan_changed, f'{element_id} has its set: judge it (Yes, No or Correct it).')
     need(not v2 or ref_sets.makes(session, element_id, row) < ref_sets.MAKES_MAX, ref_sets.MAKES_LIMIT.format(eid=element_id, max=ref_sets.MAKES_MAX) if v2 else '')
     cause = set_cause(session, plan, element_id, _set_budget(run, session, visuals_spend(conn, run)))
-    need(not cause, f"{element_id}: its set cannot be made yet: {(cause or {}).get('text')}.")
-    what = 'the photo or the permission changed' if _photo_changed(session, plan, element_id, row) else 'the plan changed' if plan_changed else 'the spec changed'   # design/207 (D1)
+    need(not cause, ref_sets.LIMIT_PLAIN if v2 and (cause or {}).get('kind') == 'cap' else f"{element_id}: its set cannot be made yet: {(cause or {}).get('text')}.")   # design/213: the limit of a v2 round, with no amount
+    what ='the photo or the permission changed' if _photo_changed(session, plan, element_id, row) else 'the plan changed' if plan_changed else 'the spec changed'   # design/207 (D1)
     queued, errors = _queue_sets(conn, store, user, run, outputs, [element_id])
     need(queued, f'{element_id}: its set was not made: {_plain(errors.get(element_id))}')
     session = session_of(store, run, outputs)
@@ -3752,6 +3769,16 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
         queued, errors = _queue_sets(conn, store, user, run, outputs, todo)
         session = session_of(store, run, outputs)
         rd = session['round']
+        # design/213: a set of the first go that was refused before any call is replaced by the next waiting one, so the first go is three made sets where three
+        # are possible; the refused one stays "not made" with its reason. The limit stops every order, so nothing replaces a set it refused; and where no
+        # set at all could be ordered the cause is not the thing's own (the picture service is down): the waiting sets stay waiting.
+        while v2 and queued and rd.get('rest') and len(queued) < ref_sets.FIRST_MAX and not any(ref_sets.is_limit(m) for m in errors.values()):
+            nxt = rd['rest'].pop(0)
+            save_session(store, run, session)
+            more, bad = _queue_sets(conn, store, user, run, outputs, [nxt])
+            queued, errors = queued + more, {**errors, **bad}
+            session = session_of(store, run, outputs)
+            rd = session['round']
         rd['pass'] = 'making' if queued else ('complete' if not todo else 2)   # every set refused before the call: step 2 shows them (No or Correct it makes them again)
         save_session(store, run, session)
         return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'from_footage': from_footage, 'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2),
@@ -3846,7 +3873,8 @@ def _set_state(session, plan, step, eid, row, budget):
                     'next': f"The picture service refused the photo of {eid}. Ask the operator: give another photo (`vw visuals own --element {eid} --file <photo>`), or make the person a stand-in "
                             f'(`vw visuals likeness --element {eid} --stand-in --quote "<their words>"`); then make the sheet again (`vw visuals round --make {eid}`).'}
         return {**out, 'cause': None, 'settled': None, 'problem': problem, **mark}
-    was = 'spec' if 'material spec of' in error else 'cap' if "on this film's visuals" in error else 'size' if 'size still unknown' in error else 'other' if error else None
+    from . import ref_sets
+    was = 'spec' if 'material spec of' in error else 'cap' if ref_sets.is_limit(error) else 'size' if 'size still unknown' in error else 'other' if error else None
     return {**out, 'cause': cause, 'settled': None if cause else {'spec': 'spec approved', 'size': 'size measured', 'cap': 'spend cap raised'}.get(was),
             'problem': _plain(error) if was == 'other' and not cause else None, **mark}
 
@@ -4156,7 +4184,8 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
     if (element['kind'] not in ('graphic', 'style') and not body.get('fix_of') and (body['kind'] in ('keyframe', 'isolated') or named) and body['kind'] not in ('sheet', 'component', 'style')   # design/124 A4 item 14
             and not str(plan['foundation'].get('studio_background') or '').strip()):   # design/91 N9: a picture in the film is in the film's world
         lines.append(WORLD_LINE)
-    check_cap(conn, run, session, image_price_inr(run, provider='gemini' if is_set else None) * variants * (SET_MAX if is_set else 1), 'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
+    check_cap(conn, run, session, image_price_inr(run, provider='gemini' if is_set else None) * variants * ((len(body.get('views') or ()) or SET_MAX) if is_set else 1),   # design/213: a set is counted by its pictures (a place of a round posted from now on: one)
+              'one image' if variants == 1 else 'a set of three' if is_set else 'two candidates')   # design/65 B7; design/151
     op = 'edit' if parents else 'generate'
     made = []
     for n in range(variants):

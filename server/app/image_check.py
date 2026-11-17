@@ -23,6 +23,7 @@ FIXED = [{'check': 'readable text', 'pass_when': 'no readable text anywhere in t
                                                    "the labels of a sheet's views, a drawing spec's label, a style picture's sample labels)", 'weight': 'must'},
          {'check': 'a real face', 'pass_when': 'no face that matches a person in the footage frames sent as references', 'weight': 'must'},
          {'check': 'nothing extra', 'pass_when': 'nothing in the frame that the prompt did not ask for (a second person, a vehicle, a sign, a logo)', 'weight': 'should'}]
+SAME_THING = "the same thing as picture A, seen as this picture's view asks"   # design/213: the line of a reference set that compares a later picture with the first (ref_sets._lines)
 SCENE_FIXED = [   # design/91 N7: for scene pictures, not graphics; should lines, so they never start a fix round alone
     {'check': 'plausible setting', 'pass_when': 'the setting and its scale are plausible for what is shown: the location, the size of the spaces against a person, the ground', 'weight': 'should'},
     {'check': 'practitioner', 'pass_when': 'people handle tools and materials as a practitioner would (nothing set down on fresh work, the right tool for the task)', 'weight': 'should'},
@@ -289,9 +290,12 @@ def lines_of(ref):
     fixed = FIXED
     if ref.get('set'):   # design/211: a picture of a reference set is checked by itself: a line may name the pictures it is asked of; "the view" is the picture's own turn
         n = int(ref.get('set_n') or 1)
-        own = [{**{k: v for k, v in l.items() if k != 'pictures'}, **({'pass_when': f"{l['pass_when']}: {ref['ask']}"} if l.get('check') == 'the view' and ref.get('ask') else {})}
+        # design/213: the line that compares a picture with picture A is given this picture's own view too: another view is not a fault
+        own = [{**{k: v for k, v in l.items() if k != 'pictures'}, **({'pass_when': f"{l['pass_when']}: {ref['ask']}"} if l.get('check') in ('the view', SAME_THING) and ref.get('ask') else {})}
                for l in own if n in (l.get('pictures') or (n,))]
-        if ref.get('element_kind') == 'person' and (ref.get('generation') or {}).get('parents'):   # made from the person's own photo, with their permission: the face must match it
+        # made from the person's own photo, with their permission: the face must match it. design/213: a picture of a v2 round's set (it carries the sentence of its turn, `ask`)
+        # is asked "a real face" by its own lines, and only where a picture of the film was sent with the request (ref_sets._lines): never a set made from words alone
+        if ref.get('ask') or (ref.get('element_kind') == 'person' and (ref.get('generation') or {}).get('parents')):
             fixed = [l for l in FIXED if l['check'] != 'a real face']
     return own + fixed + ([] if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') in ('component', 'sheet') else SCENE_FIXED)   # design/117 P1: a cut-out has no scene; design/124 A4 item 14: nor a sheet
 
@@ -485,7 +489,7 @@ def _model_check(store, session, ref, result, transport_factory, png=None, lines
             return record
         pngs = [(('scene' if p.get('kind') == 'frame' else p.get('kind') or 'reference'), store.get(p['key'])) for p in parents if p.get('key')]
         first = session['references'].get(ref.get('set') or '') or {}
-        if int(ref.get('set_n') or 1) > 1 and first.get('key') and any(l.get('check') == 'same as picture 1' for l in lines):   # design/211: pictures 2 and 3 of a set are compared with picture 1
+        if int(ref.get('set_n') or 1) > 1 and first.get('key') and any(l.get('check') in (SAME_THING, 'same as picture 1') for l in lines):   # design/211: pictures 2 and 3 of a set are compared with picture 1 (the second name: the lines of a set stored before design/213)
             pngs.append(('picture 1 of this set', store.get(first['key'])))
         payload = build(png if png is not None else store.get(result['key']), pngs, lines, (ref.get('generation') or {}).get('prompt'))
         received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, lambda t: t.generate(payload), settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)

@@ -136,6 +136,8 @@ if __name__ == '__main__':
         d211ds(steps)
         from d212_wording_v3 import apply as d212   # design/212: step 1 of the references in its new layout (five groups, the buttons by case, a person not in the footage not asked, no cost shown)
         prompt = d212(prompt, parts)
+        from d213_wording_v3 import apply as d213   # design/213: the references sets screen in the new layout, and the corrections of step 5 (a place one picture, a person the footage shows, the plan against the footage, the notes as two lines, the limit with no amount)
+        prompt = d213(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

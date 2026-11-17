@@ -236,6 +236,32 @@ table.sizes td:nth-child(4){white-space:normal}
 .tptx .tsug{margin-left:8px;background:var(--accent-soft)}
 .talldone{max-width:520px;margin:12vh auto 0;text-align:center;padding:36px;border:1px solid var(--ok);border-radius:14px;background:var(--ok-soft)}
 .talldone h2{font-size:24px;color:var(--ok)} .talldone p{margin-top:8px;font-size:16px}
+/* design/213: step 2 of the references ("the sets") in the same layout: the footage pictures to compare with in a small row, the made set under it with
+   a radio where a picture must be chosen, one chip for the check, the waiting sets as a banner and a card, the table of what leaving out loses. */
+.tchip.warn{background:var(--chg-soft);border-color:transparent;color:var(--chg);font-weight:600} .tchip.calm{color:var(--ok)}
+.tsuggest.wide{flex-wrap:wrap;align-items:center;gap:4px 12px} .trule{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.tsaid{margin-top:6px;padding:6px 12px;font-size:13px}
+.tstrip ul,.tpanel ul{margin:4px 0 0;padding-left:18px} .tpanel ul{columns:2}
+.tlab{margin-top:10px;font-family:var(--body);font-size:11.5px}
+.tfrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:4px}
+.tfcell{display:flex;align-items:center;gap:10px;min-width:0;font-size:12.5px;color:var(--muted)}
+.tfth{flex:0 0 min(46%,max(150px,11vw));aspect-ratio:16/9;border-radius:6px;padding:0;background:var(--line);overflow:hidden;cursor:zoom-in}
+.tfth:disabled{opacity:1;cursor:default} .tfth .ph{display:grid;place-items:center;width:100%;height:100%;font-weight:500;font-size:12px}
+.tfth img{display:block;width:100%;height:100%;object-fit:cover}
+.ttile.plain{border-color:var(--line)}
+.tflag{position:absolute;top:9px;left:9px;width:12px;height:12px;border-radius:50%;box-sizing:border-box;background:var(--chg);border:2px solid var(--surface)}
+.tletter{flex:none;width:22px;height:22px;border-radius:5px;background:var(--fg);color:var(--surface);font:600 12.5px/22px var(--display);text-align:center}
+.tpick{display:flex;align-items:center;gap:8px;width:100%;border:0;border-top:1px solid var(--line);border-radius:0;background:none;padding:7px 10px;font-weight:500;text-align:left}
+.tpick::before{content:'';box-sizing:border-box;flex:none;width:18px;height:18px;border-radius:50%;border:2px solid var(--muted);background:var(--surface)}
+.tpick[aria-checked="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600} .tpick[aria-checked="true"]::before{border:5px solid var(--accent)}
+.tpick kbd{margin-left:auto;font:11px var(--body);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.tpick:focus-visible{outline-offset:-2px}
+.tnopics b{color:var(--fg)} .tnopics .tsug{background:var(--accent-soft)}
+.trow.calm .tdot{border:0;background:var(--line);width:7px;height:7px;margin:6px 1px 0} .trow.calm .tnm{color:var(--muted);font-weight:400} .trow.calm .ttag{border-color:transparent;padding-right:0}
+table.loss{margin-top:12px;max-width:1100px;background:var(--surface);border:1px solid var(--line);font-size:13px}
+table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3){white-space:normal;color:var(--muted)}
+.tcard{max-width:560px;margin:10vh auto 0;text-align:center;padding:32px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.tcard h2{font-size:24px} .tcard .tbar{justify-content:center;margin-top:18px} .tcard .tnote{margin-top:10px} .talldone .tnote{font-size:13px}
 </style>
 
 <div class="wrap" id="wrap">
@@ -254,7 +280,16 @@ table.sizes td:nth-child(4){white-space:normal}
     <div class="tprog"><span id="tprogt"></span><i><b id="tprogb"></b></i></div>
     <div class="tpopw"><button type="button" class="tlink" data-pop="thow" aria-expanded="false">How this works</button><div class="tpop" id="thow" hidden></div></div>
     <div class="tpopw"><button type="button" class="tlink" data-pop="tkeys" aria-expanded="false">Keys</button>
-      <div class="tpop" id="tkeys" hidden><dl>
+      <div class="tpop" id="tkeys" hidden><dl id="tkeys2" hidden>
+        <dt><kbd>←</kbd> <kbd>→</kbd> or <kbd>J</kbd> <kbd>K</kbd></dt><dd>Previous or next set</dd>
+        <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Choose picture A, B or C as the reference</dd>
+        <dt><kbd>A</kbd></dt><dd>Approve</dd>
+        <dt><kbd>C</kbd></dt><dd>Minor corrections</dd>
+        <dt><kbd>M</kbd></dt><dd>Make again, or make it</dd>
+        <dt><kbd>U</kbd></dt><dd>Upload my own</dd>
+        <dt><kbd>L</kbd></dt><dd>Leave out</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Close what is open</dd>
+      </dl><dl id="tkeys1">
         <dt><kbd>←</kbd> <kbd>→</kbd> or <kbd>J</kbd> <kbd>K</kbd></dt><dd>Previous or next thing</dd>
         <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Tick or untick a picture</dd>
         <dt><kbd>A</kbd></dt><dd>Approve</dd>
@@ -580,7 +615,7 @@ function heading(name,g,shut){   // design/211: the heading of a group of lines;
 function draw(force){
   const list=$('list');
   if(!ready){return;}
-  const things=!!(round&&round.layout&&round.layout.kind==='things');   // design/212: step 1 of the references has its own layout
+  const things=!!(round&&round.layout&&(round.layout.kind==='things'||round.layout.kind==='sets'));   // design/212: step 1 of the references has its own layout; design/213: step 2 (the sets) is drawn in it too
   $('things').hidden=!things; $('wrap').hidden=things;
   if(things){ tDraw(); return; }
   if(!round){ list.textContent=''; Object.keys(nodes).forEach(k=>delete nodes[k]); list.appendChild(el('div','state','Nothing to decide yet. The assistant writes the lines here when a step is ready.')); $('dots').textContent=''; $('msg').textContent='Nothing to decide yet'; return; }
@@ -635,11 +670,14 @@ try{ T.auto=localStorage.getItem('vw-refs-auto')!=='0'; }catch(e){}
 const mk=(tag,a,...kids)=>{ const e=document.createElement(tag);
   for(const k in a||{}){ const v=a[k]; if(k==='on') for(const ev in v) e.addEventListener(ev,v[ev]); else if(k==='hidden'||k==='disabled'||k==='checked') e[k]=v; else if(v!=null&&v!==false) e.setAttribute(k,v); }
   e.append(...kids.flat(Infinity).filter(x=>x!=null&&x!==false)); return e; };
-const tThings=()=>(round.lines||[]).filter(l=>l.key!=='refs:proposals');
-const tProp=()=>(round.lines||[]).find(l=>l.key==='refs:proposals');
+const tSets=()=>!!round&&(round.layout||{}).kind==='sets';   // design/213: step 2, the sets, in this layout
+const tThings=()=>(round.lines||[]).filter(l=>l.key!=='refs:proposals'&&l.key!=='sets:rest');
+const tProp=()=>(round.lines||[]).find(l=>l.key==='refs:proposals'||l.key==='sets:rest');   // the line that answers many at once: the routine things, or the waiting sets
 const tOwn=l=>{ const a=answers[l.line]; return a&&a.choice!=='pics'?a:null; };   // the operator's own answer to this thing, on this page
-const tByProp=l=>{ const p=tProp(); return !!p&&!!answers[p.line]&&(p.covers||[]).indexOf(l.key)>=0&&!tOwn(l); };   // answered by "Accept all": a thing answered alone keeps its answer
+const tByProp=l=>{ const p=tProp(); return !tSets()&&!!p&&!!answers[p.line]&&(p.covers||[]).indexOf(l.key)>=0&&!tOwn(l); };   // answered by "Accept all": a thing answered alone keeps its answer
 const tDone=l=>!!(tOwn(l)||tByProp(l)||l.kept);
+const tCounts=l=>!tSets()||l.state==='open';   // the sets: only an open line is judged; a waiting or a settled set has nothing to press
+const tWaits=l=>tCounts(l)&&!tDone(l);
 const tMark=p=>({id:String(p.choice||'').slice(4),use:String(p.choice||'').indexOf('use:')===0});   // a footage picture, or the closest one found (ticked: "that is it")
 // design/212 review: a picture starts ticked when the server says so (`on`: the pictures Claude's proposal uses). Only a picture the operator unticked themselves is
 // "not this picture"; one that started unticked and stays so is simply not used; one they ticked themselves is used.
@@ -650,22 +688,23 @@ function tMarks(l){ const m={}; (l.pics||[]).forEach(p=>{ const k=tMark(p), on=t
 function tRefuse(text){ T.msg=text||''; const m=$('tmsg'); if(m){ m.textContent=T.msg; m.hidden=!T.msg; } }
 function tAnswer(l,choice,notes,more){   // an answer is written as every line's answer is; the ticks travel with it as the pictures' own answers
   T.panel=null; T.msg=''; clearTimeout(T.timer);
-  write(l,choice,notes||'',Object.assign({pics:choice==='ignore'||choice==='own'?{}:tMarks(l)},more||{}));
+  write(l,choice,notes||'',Object.assign(tSets()?{}:{pics:choice==='ignore'||choice==='own'?{}:tMarks(l)},more||{}));
   if(T.auto) T.timer=setTimeout(()=>{ if((tThings()[T.cur]||{}).line===l.line) tNextOpen(true); },1200);
 }
-function tUndo(l){ clearTimeout(T.timer); if(db&&round) ref(l).delete().catch(fail); }
+function tUndo(l){ clearTimeout(T.timer); if(!db||!round) return; ref(l).delete().catch(fail);
+  const r=tSets()&&tProp(), b=r&&r!==l&&l.case==='judge'&&sRestAns(); if(b&&!b.loss) ref(r).delete().catch(fail); }   // the sets: "Make them" stands only while every judged set has its answer
 function tAct(l,b){   // one of the thing's buttons: refused here, in the server's own words, when it needs a picture ticked and none is
   const need=(l.tick||{})[b.choice];
   if(need&&!tKept(l).length) return tRefuse(need);
   if(b.needs_words||b.choice==='ignore') return tOpen(T.panel===b.choice?null:b.choice);
   tAnswer(l,b.choice,'');
 }
-function tOpen(p){ T.panel=p; T.msg=''; clearTimeout(T.timer); tDraw(); const f=document.querySelector('#tpanel textarea, #tpanel input, #tpanel button'); if(f) f.focus(); }
+function tOpen(p){ T.panel=p; T.msg=''; clearTimeout(T.timer); tDraw(); const f=(tSets()&&$('tleave')&&$('tcancel'))||document.querySelector('#tpanel textarea, #tpanel input, #tpanel button'); if(f) f.focus(); }   // the sets: leaving out is never one key away
 function tGo(i){ clearTimeout(T.timer); T.show=false; T.cur=i; T.panel=null; T.msg=''; tDraw(); }
 function tStep(d){ const n=tThings().length; if(n) tGo(T.cur<0?(d>0?0:n-1):(T.cur+d+n)%n); }
 function tNextOpen(auto){ const list=tThings(), n=list.length;
-  for(let k=1;k<=n;k++){ const i=(Math.max(T.cur,0)+k)%n; if(!tDone(list[i])) return tGo(i); }
-  if(auto||list.every(tDone)) tGo(-1); }
+  for(let k=1;k<=n;k++){ const i=(Math.max(T.cur,0)+k)%n; if(tWaits(list[i])) return tGo(i); }
+  if(auto||!list.some(tWaits)) tGo(-1); }
 function tTick(l,p,on,fig){   // a tick changed: an answer already given follows it, or is taken back when it needs a picture and none is kept
   (T.tick[l.line]=T.tick[l.line]||{})[p.code]=on; fig.classList.toggle('off',!on); tRefuse('');
   const a=tOwn(l); if(!a||a.choice==='ignore'||a.choice==='own') return;
@@ -673,9 +712,12 @@ function tTick(l,p,on,fig){   // a tick changed: an answer already given follows
   else write(l,a.choice,a.notes,{pics:tMarks(l)});
 }
 const T_DONE={use:'Approved',set:'Make a set',fix:'Corrections',own:'Own picture',ignore:'Left out'};
-function tTag(l){ const a=tOwn(l); return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
+function tTag(l){ const a=tOwn(l); if(tSets()) return a?(sBtn(l,a).label||a.choice):l.kept||sWaitTag(l)||l.tag||''; return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||((l.buttons||[]).find(x=>x.choice===a.choice)||{}).label||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
 function tSays(l){   // the answer as it stands, said back
   const a=tOwn(l), q=s=>'“'+s+'”', has=(l.pics||[]).length>0;
+  if(tSets()){ if(!a) return ['Kept from before: ',l.kept+'.'+(l.kept_note?' '+l.kept_note:'')];   // the sentence is the server's: the chosen picture's, else the button's
+    const p=(l.pics||[]).find(x=>x.choice&&x.choice===a.choice), b=sBtn(l,a); return ['Your answer: ',String((p&&p.say)||b.say||b.label||a.choice).replace('{words}',a.notes||'')]; }
+  const sb=a&&(l.buttons||[]).find(x=>x.choice===a.choice&&x.say); if(sb) return ['Your answer: ',String(sb.say).replace('{words}',a.notes||'')];   // design/213: the server's own sentence, where the button has one
   if(!a) return tByProp(l)?['Your answer: ',((l.rec||{}).label||'Accepted')+". (Claude's proposal, accepted.)"]:l.case==='auto'?['Decided: ',l.kept+'. No answer is needed.']:['Kept from before: ',l.kept+(l.kept_how?' '+l.kept_how:'')+'. Choose another answer to change it.'];
   // what will happen, said plainly: which pictures the answer uses, or that the set is made from the description
   const n=tKept(l).length, pic=n+' ticked picture'+(n===1?'':'s'), from=n?'from the '+pic:'from the description; the footage pictures are not used';
@@ -690,15 +732,21 @@ function tLarge(p,btn){   // on a wide screen the row's pictures are wider than 
   zoomUrl[p.code].then(u=>{ const img=btn.querySelector('img'); if(!img||!/^\/_blob\/[0-9a-f]{32}$/.test(u)) return; const small=img.src; img.onload=null; img.onerror=()=>{ img.onerror=null; img.src=small; }; img.src=u; });
 }
 function tTop(list){
-  const n=list.length, a=list.filter(tDone).length, lay=round.layout||{};
-  $('tstep').textContent=(round.step||'References')+', step 1'; $('tprogt').textContent=a+' of '+n+' answered'; $('tprogb').style.width=(n?100*a/n:0)+'%';
+  const n=list.filter(tCounts).length, a=list.filter(l=>tCounts(l)&&tDone(l)).length, lay=round.layout||{}, s=tSets();
+  $('tstep').textContent=s?(round.step||''):(round.step||'References')+', step 1'; $('tprogt').textContent=a+' of '+n+(s?' judged':' answered'); $('tprogb').style.width=(n?100*a/n:0)+'%';
+  if(s) $('thow').replaceChildren(...[].concat(lay.help||[]).map(x=>mk('p',{},x))); else
   $('thow').replaceChildren(mk('p',{},lay.help||round.note||''),round.summary&&mk('p',{},round.summary)); $('tauto').checked=!!T.auto;
+  $('tnextopen').textContent=s?'Next to judge':'Next to answer'; $('tkeys1').hidden=s; $('tkeys2').hidden=!s;
   $('tstop').hidden=!lay.stopped; $('tstop').textContent=lay.stopped?'Not recorded: '+lay.stopped:'';
 }
 function tAccept(prop){ const b=(prop.buttons||[])[0]; if(b) write(prop,b.choice,''); }
 function tRail(list){
   const rail=$('trail'), top=rail.scrollTop, kids=[], prop=tProp();
-  if(prop){   // "Accept Claude's proposals for the N routine things", with a button that shows them first
+  if(prop&&tSets()){   // design/213: the waiting sets, made or left out together once the first sets are judged
+    const ans=sRestAns();
+    kids.push(mk('div',{class:'tprop'},mk('p',{},ans?(ans.say||ans.label||''):prop.head),mk('div',{class:'trow2'},sRest(prop,list,false)),
+      !ans&&!sJudged(list)&&mk('p',{class:'tmore',id:'trestwhy'},prop.why)));
+  } else if(prop){   // "Accept Claude's proposals for the N routine things", with a button that shows them first
     const rt=list.filter(l=>(prop.covers||[]).indexOf(l.key)>=0), left=rt.filter(l=>!tDone(l)).length, b=(prop.buttons||[])[0]||{};
     kids.push(mk('div',{class:'tprop'},mk('p',{},left?prop.head:'The '+rt.length+' routine things are answered.'),
       mk('div',{class:'trow2'},
@@ -708,26 +756,39 @@ function tRail(list){
         mk('button',{class:'tlink',id:'twhat',type:'button','aria-expanded':String(!!T.fold['?']),'aria-controls':'tpmore',on:{click:()=>{ T.fold['?']=!T.fold['?']; tRail(list); }}},'what this does')),
       mk('p',{class:'tmore',id:'tpmore',hidden:!T.fold['?']},prop.text)));
   }
-  kids.push(mk('div',{class:'tfil',role:'group','aria-label':'Show'},[['all','All'],['open','To answer'],['done','Answered']].map(f=>
+  kids.push(mk('div',{class:'tfil',role:'group','aria-label':'Show'},[['all','All'],['open',tSets()?'To judge':'To answer'],['done',tSets()?'Judged':'Answered']].map(f=>
     mk('button',{class:'tchip',type:'button','aria-pressed':String(T.filter===f[0]),'data-filter':f[0],on:{click:()=>{ T.filter=f[0]; tRail(list); }}},f[1]))));
   const groups=[]; list.forEach((l,i)=>{ const g=l.group||''; let o=groups.find(x=>x.g===g); if(!o) groups.push(o={g:g,rows:[]}); o.rows.push([l,i]); });   // the groups, in the order the server sent the things
   let shown=0;
   groups.forEach((o,gi)=>{
-    const rows=o.rows.filter(r=>T.filter==='all'||(T.filter==='done')===tDone(r[0])); if(!rows.length) return;
+    const rows=o.rows.filter(r=>T.filter==='all'||(tCounts(r[0])&&(T.filter==='done')===tDone(r[0]))); if(!rows.length) return;
     shown+=rows.length; const open=!T.fold[o.g];
     kids.push(mk('button',{class:'tgh',type:'button','aria-expanded':String(open),'aria-controls':'tgrp'+gi,on:{click:()=>{ T.fold[o.g]=open; tRail(list); }}},mk('span',{},o.g),String(rows.length)));
     kids.push(mk('ul',{id:'tgrp'+gi,hidden:!open},rows.map(r=>{ const l=r[0], i=r[1], n=(l.pics||[]).length, d=tDone(l);
-      return mk('li',{},mk('button',{class:'trow'+(d?' done':''),type:'button','aria-current':i===T.cur&&!T.show?'true':null,'data-i':i,on:{click:()=>tGo(i)}},
-        mk('i',{class:'tdot',title:d?'Answered':'To answer'}),mk('span',{class:'tnm',title:l.name},l.name),
-        mk('span',{class:'tmeta'},l.kind,mk('span',{class:'tcount'},n?n+(n>1?' pictures':' picture'):'no picture'),mk('span',{class:'ttag'},d?tTag(l):((l.rec||{}).label||'')))));
+      return mk('li',{},mk('button',{class:'trow'+(d?' done':'')+(tCounts(l)?'':' calm'),type:'button','aria-current':i===T.cur&&!T.show?'true':null,'data-i':i,on:{click:()=>tGo(i)}},
+        mk('i',{class:'tdot',title:tSets()?tTag(l):d?'Answered':'To answer'}),mk('span',{class:'tnm',title:l.name},l.name),
+        mk('span',{class:'tmeta'},l.kind,!tSets()&&mk('span',{class:'tcount'},n?n+(n>1?' pictures':' picture'):'no picture'),mk('span',{class:'ttag'},tSets()||d?tTag(l):((l.rec||{}).label||'')))));
     })));
   });
-  if(!shown) kids.push(mk('p',{class:'tempty'},T.filter==='open'?'Nothing left to answer.':'Nothing answered yet.'));
+  if(!shown) kids.push(mk('p',{class:'tempty'},tSets()?(T.filter==='open'?'Nothing left to judge.':'Nothing judged yet.'):T.filter==='open'?'Nothing left to answer.':'Nothing answered yet.'));
   rail.replaceChildren(...kids); rail.scrollTop=top;
   const c=rail.querySelector('.trow[aria-current]'); if(c) c.scrollIntoView({block:'nearest'});
 }
 function tPanel(l){   // what opens under the buttons: the words box, the operator's own picture (the page's own upload), or what leaving out costs
   const cancel=mk('button',{class:'tbtn quiet',id:'tcancel',type:'button',on:{click:()=>tOpen(null)}},'Cancel');
+  if(tSets()&&T.panel!=='own'){   // design/213: the words box, the small confirm of "make again", or what leaving out loses; every sentence is the server's
+    const b=(l.buttons||[])[+String(T.panel).slice(1)]||{}, loss=l.loss||{}, go=(id,cls,label,words)=>mk('button',{class:'tbtn '+cls,id:id,type:'button',on:{click:()=>{
+      const w=words?words.value.trim().slice(0,MAX):''; if(words&&!w){ tRefuse('Write what should change first.'); words.focus(); return; } tAnswer(l,b.choice,w); }}},label);
+    if(b.needs_words){ const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)}); return [mk('label',{for:'tfix'},b.hint||'What should change?'),ta,mk('div',{class:'tacts'},go('tfixsend','go',b.act==='fix'?'Send corrections':b.label,ta),cancel)]; }
+    if(b.act==='leave') return [mk('p',{},loss.text||''),(loss.shots||[]).length?mk('ul',{},loss.shots.map(x=>mk('li',{},x))):null,mk('div',{class:'tacts'},go('tleave','stop','Leave it out'),cancel)];
+    return [mk('p',{},b.ask||''),mk('div',{class:'tacts'},go('tagain','go',b.label),cancel)];
+  }
+  const wb=(l.buttons||[]).find(x=>x.choice===T.panel&&x.needs_words&&x.choice!=='fix');
+  if(wb){   // design/213: an answer of the server's that needs the operator's own words (the permission of a person the footage shows)
+    const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)});
+    return [mk('label',{for:'tfix'},wb.hint||'Your words'),ta,mk('div',{class:'tacts'},mk('button',{class:'tbtn go',id:'tfixsend',type:'button',on:{click:()=>{ const w=ta.value.trim().slice(0,MAX);
+      if(!w){ tRefuse(wb.hint||'Write your words first.'); ta.focus(); return; } tAnswer(l,wb.choice,w,{pics:tMarks(l)}); }}},wb.label),cancel)];
+  }
   if(T.panel==='fix'){
     const has=(l.pics||[]).length>0, ta=mk('textarea',{id:'tfix',maxlength:String(MAX),placeholder:has?'For example: keep this man but change his clothes':'For example: a clear oil in an open tin, a brush resting on it'});
     return [mk('label',{for:'tfix'},has?'What should change?':'What must the picture show?'),ta,
@@ -740,8 +801,8 @@ function tPanel(l){   // what opens under the buttons: the words box, the operat
     mk('div',{class:'tacts'},mk('button',{class:'tbtn stop',id:'tleave',type:'button',on:{click:()=>tAnswer(l,'ignore','')}},'Leave it out'),cancel)];
 }
 function tMain(list){
-  const main=$('tmain'), l=list[T.cur], prop=tProp();
-  const fold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!target.hidden; btn.setAttribute('aria-expanded',String(!target.hidden)); });
+  const main=$('tmain'), l=list[T.cur], prop=tProp(), fold=tFold;
+  if(tSets()&&(T.show||!l)){ main.replaceChildren(...sOther(list,prop).flat(4).filter(Boolean)); main.scrollTop=0; return; }
   const small=(p,cls)=>{ const s=mk('span',{class:cls},mk('span',{class:'ph'},p.missing?'Not available':'…')); if(!p.missing) loadThumb(p,s,()=>{},0); return s; };
   if(T.show&&prop){   // the routine things, to be seen before they are accepted together
     const rt=list.filter(x=>(prop.covers||[]).indexOf(x.key)>=0), left=rt.filter(x=>!tDone(x)).length, b=(prop.buttons||[])[0]||{};
@@ -771,11 +832,15 @@ function tMain(list){
     gmsg.textContent=bad.length?'A picture is missing: '+bad.join(', ')+'. This thing cannot be answered here: tell the assistant in the chat.':wait?'The buttons work when every picture has shown.':''; gmsg.hidden=!gmsg.textContent; };
   const usedFull=mk('p',{class:'tstrip',id:'tused',hidden:true},l.used), usedBtn=l.shots&&mk('button',{class:'tchip',id:'tshots',type:'button','aria-expanded':'false','aria-controls':'tused'},l.shots);
   if(usedBtn) fold(usedBtn,usedFull);
-  kids.push(mk('div',{class:'thead'},mk('h2',{title:l.name},l.name),l.kind&&mk('span',{class:'tkind'},l.kind),usedBtn,
+  kids.push(mk('div',{class:'thead'},mk('h2',{title:l.name},l.name),l.kind&&mk('span',{class:'tkind'},l.kind),l.made_n&&mk('span',{class:'tkind'},l.made_n),usedBtn,
       mk('div',{class:'tnav'},mk('button',{class:'tbtn',id:'tprev',type:'button','aria-label':'Previous thing',on:{click:()=>tStep(-1)}},'‹ Previous'),
         mk('span',{},(T.cur+1)+' of '+list.length),mk('button',{class:'tbtn',id:'tnext',type:'button','aria-label':'Next thing',on:{click:()=>tStep(1)}},'Next ›'))),
     mk('p',{class:'tsub',title:l.desc},l.desc),usedFull);
+  if(!tSets()&&l.likeness) kids.push(mk('p',{class:'tstrip',id:'tlikeness'},mk('b',{},l.likeness.ask)));   // design/213: the one question for a person the footage shows
+  if(!tSets()&&l.differs) kids.push(mk('p',{class:'changed tsaid',id:'tdiffers'},l.differs));   // design/213: where the plan and the footage differ, said openly
   if(l.refused) kids.push(mk('p',{class:'tmsg',id:'trefused'},'Not recorded: '+l.refused));   // the server's refusal of the last "done", kept on its thing
+  let bar=[];
+  if(tSets()) bar=sBody(l,kids,gate,check); else {
   if(l.note) kids.push(mk('p',{class:'changed',id:'tcame'},l.note,' ',l.again&&l.again.choice&&mk('button',{class:'tbtn',id:'tconfirm',type:'button',on:{click:()=>tAnswer(l,l.again.choice,l.again.notes||'')}},'Confirm my answer')));   // design/212 review: a new picture came; the answer given waits for a look at it
   if(l.rec){
     const why=mk('p',{class:'tstrip',id:'twhy',hidden:true},l.rec.reason), wb=mk('button',{class:'tlink',id:'twhyb',type:'button','aria-expanded':'false','aria-controls':'twhy'},'Why?'); fold(wb,why);
@@ -798,14 +863,15 @@ function tMain(list){
       const open=e.currentTarget.getAttribute('aria-expanded')!=='true'; txt.textContent=open?l.search.text+' '+l.search.why:l.search.text; e.currentTarget.textContent=open?'less':'why'; e.currentTarget.setAttribute('aria-expanded',String(open)); }}},'why');
     kids.push(mk('p',{class:'tnopics'},txt,' ',more));
   }
-  const sug=(l.rec||{}).choice, bar=[];
+  const sug=(l.rec||{}).choice;
   (l.buttons||[]).filter(b=>!b.small).forEach((b,i)=>{   // the server's buttons for this thing's case, the suggested one first and marked
     const first=i===0&&!!sug&&b.choice===sug, pan=b.needs_words||b.choice==='ignore';
     bar.push(mk('button',{class:'tbtn'+(first?' go':b.choice==='ignore'?' quiet':''),type:'button','data-act':b.choice,'aria-expanded':pan?String(T.panel===b.choice):null,on:{click:()=>tAct(l,b)}},b.label,first&&[' ',mk('span',{class:'tsug'},'Suggested')])); });
-  if(l.own&&assets){ const at=bar.findIndex((x,i)=>i>0&&x.getAttribute('data-act')==='ignore');
+  }
+  if(l.own&&assets&&(bar.length||!tSets())){ const at=bar.findIndex((x,i)=>i>0&&/^(ignore|leave)$/.test(x.getAttribute('data-act')));
     bar.splice(at<0?bar.length:at,0,mk('button',{class:'tbtn',type:'button','data-act':'own','aria-expanded':String(T.panel==='own'),on:{click:()=>tOpen(T.panel==='own'?null:'own')}},l.own.label)); }
   if(pics.length) bar.forEach(b=>gate.push(b));
-  kids.push(mk('div',{class:'tbar',role:'group','aria-label':'Your answer'},bar),
+  if(bar.length||!tSets()) kids.push(mk('div',{class:'tbar',role:'group','aria-label':'Your answer'},bar),
     (l.buttons||[]).filter(b=>b.small).map(b=>mk('p',{class:'tnote'},mk('button',{class:'tlink',type:'button','data-act':'words',on:{click:()=>tAct(l,b)}},b.label+' (optional)'))),
     mk('p',{class:'tnote',id:'tmade'},(round.layout||{}).made||''),gmsg,
     mk('p',{class:'tmsg',id:'tmsg',role:'status',hidden:!T.msg},T.msg));
@@ -813,20 +879,98 @@ function tMain(list){
   if(tDone(l)){ const a=tOwn(l), s=tSays(l);
     kids.push(mk('div',{class:'tanswer',id:'tanswer'},a&&a.own&&typeof a.own.url==='string'&&mk('img',{class:'ownpic',alt:'Your own picture',src:a.own.url}),mk('p',{},mk('b',{},s[0]),s[1]),
       a&&mk('button',{class:'tbtn',id:'tundo',type:'button',on:{click:()=>tUndo(l)}},'Undo'))); }
-  const det=mk('div',{class:'tdetails',id:'tdetails',hidden:true},mk('dl',{},
+  const det=mk('div',{class:'tdetails',id:'tdetails',hidden:true},mk('dl',{},tSets()?(l.details||[]).map(r=>[mk('dt',{},r[0]),[].concat(r[1]).map(x=>mk('dd',{},x))]):[
     mk('dt',{},'Description'),mk('dd',{},l.desc),
     l.used&&[mk('dt',{},'Shots'),mk('dd',{},l.used)],
     l.search&&[mk('dt',{},'What the search found'),mk('dd',{},l.search.text+(l.search.why?' '+l.search.why:''))],
     (l.warnings||[]).length?[mk('dt',{},'Take care'),l.warnings.map(w=>mk('dd',{},w))]:null,
     l.cost&&[mk('dt',{},'If you leave it out'),mk('dd',{},l.cost)],
-    pics.length?[mk('dt',{},'What Claude saw in each picture'),pics.map(p=>mk('dd',{},mk('b',{},p.label+': '),p.note))]:null));
+    pics.length?[mk('dt',{},'What Claude saw in each picture'),pics.map(p=>mk('dd',{},mk('b',{},p.label+': '),p.note))]:null]));
   const detBtn=mk('button',{class:'tfold',id:'tdetb',type:'button','aria-expanded':'false','aria-controls':'tdetails'},'Details'); fold(detBtn,det);
   kids.push(detBtn,det);
   main.replaceChildren(...kids.flat(3).filter(Boolean)); main.scrollTop=0; check();
 }
+// ---------- design/213: step 2 of the references, "the sets", in the layout above (`round.layout.kind==='sets'`) ----------
+// The server sends every group, the order, each set's case, its buttons (each with its slot `act` and the sentence `say` its answer reads back),
+// and the waiting sets as one line (`sets:rest`). Nothing is parsed here: this draws them and writes the answers as every line's answer is written.
+const tFold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!target.hidden; btn.setAttribute('aria-expanded',String(!target.hidden)); });
+function sBtn(l,a){ return a.choice==='own'?(l.own||{}):(l.buttons||[]).find(b=>b.choice===a.choice)||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{}; }   // the button an answer came from
+const sRestAns=()=>{ const r=tProp(), a=r&&answers[r.line]; return a?((r.buttons||[]).find(b=>b.choice===a.choice)||{choice:a.choice}):null; };   // how the waiting sets were answered
+const sJudged=list=>list.every(l=>l.case!=='judge'||tDone(l));
+const sWaitTag=l=>{ const r=tProp(), b=sRestAns(); return b&&(r.covers||[]).indexOf(l.key)>=0?(b.loss&&l.out?'Left out':'Will be made'):''; };
+function sPicked(l){   // the picture chosen as the reference: the only one that can be, the one clicked here, or the one of the answer given
+  const c=(l.pics||[]).filter(p=>p.choice), t=T.tick[l.line], a=tOwn(l);
+  return c.length===1?c[0]:c.find(p=>t!==undefined?p.code===t:!!a&&p.choice===a.choice)||null; }
+function sPick(l,p){   // a click on the chosen picture takes the choice back; an approval already given follows the choice, or is taken back with it
+  const on=sPicked(l)===p?null:p, a=tOwn(l), was=a&&(l.pics||[]).some(x=>x.choice===a.choice);
+  clearTimeout(T.timer); T.tick[l.line]=on?on.code:''; T.msg='';
+  if(was&&on) write(l,on.choice,''); else { if(was) tUndo(l); tDraw(); } }
+function sAct(l,b,i){
+  if(b.act==='approve'){ const p=sPicked(l); if(l.pick&&!p) return tRefuse((round.layout||{}).pick||''); return tAnswer(l,l.pick?p.choice:b.choice,''); }
+  if(b.needs_words||b.act==='again'||b.act==='leave') return tOpen(T.panel==='b'+i?null:'b'+i);
+  tAnswer(l,b.choice,'');
+}
+function sShow(m){ clearTimeout(T.timer); T.show=m; T.panel=null; T.msg=''; tDraw(); const c=m==='leave'&&$('tclose'); if(c) c.focus(); }
+function sRestSet(rest,b){ T.show=false; if(!tThings().some(tWaits)) T.cur=-1; write(rest,b.choice,''); }
+function sRest(rest,list,big){   // the buttons of the waiting sets: small in the list's banner, large on the card
+  const bs=rest.buttons||[], show=mk('button',{class:'tbtn',type:'button','data-rest':'show',on:{click:()=>sShow('list')}},rest.show||'');
+  if(sRestAns()) return [show,mk('button',{class:'tbtn',type:'button','data-rest':'undo',on:{click:()=>tUndo(rest)}},'Undo')];
+  return [bs[0]&&mk('button',{class:'tbtn go',type:'button','data-rest':bs[0].choice,disabled:!sJudged(list),'aria-describedby':sJudged(list)?null:'trestwhy',on:{click:()=>sRestSet(rest,bs[0])}},(big&&bs[0].big)||bs[0].label),show,
+    bs.filter(b=>b.loss).map(b=>mk('button',{class:big?'tbtn quiet':'tlink',type:'button','data-rest':b.choice,on:{click:()=>sShow('leave')}},b.label))];
+}
+function sOther(list,rest){   // the main panel when no set is open: the waiting sets listed, what leaving some out loses, the card of the waiting sets, or "all answered"
+  const lay=round.layout||{}, ans=sRestAns(), close=label=>mk('button',{class:'tbtn'+(label==='Cancel'?' quiet':''),id:'tclose',type:'button',on:{click:()=>sShow(false)}},label);
+  const b=rest&&(rest.buttons||[]).find(x=>x.loss);
+  if(T.show==='leave'&&b){ const loss=b.loss; return [
+    mk('div',{class:'thead'},mk('h2',{},loss.head)),mk('p',{class:'tnote'},loss.intro),grid(loss.cols,loss.rows,'loss'),
+    loss.people&&mk('p',{class:'tstrip',id:'tpeople'},loss.people),
+    mk('div',{class:'tbar'},mk('button',{class:'tbtn stop',id:'trestout',type:'button',on:{click:()=>sRestSet(rest,b)}},loss.button||b.label),close('Cancel')),
+    mk('p',{class:'tnote'},lay.made||'')]; }
+  if(T.show&&rest) return [
+    mk('div',{class:'thead'},mk('h2',{},rest.list_head||rest.head),mk('div',{class:'tnav'},close('Close'))),
+    mk('p',{class:'tnote'},ans?(ans.say||''):rest.list_note),
+    mk('div',{class:'tplist'},list.filter(x=>(rest.covers||[]).indexOf(x.key)>=0).map(x=>mk('div',{class:'tprow'},
+      mk('div',{class:'tptx'},mk('p',{},mk('b',{},x.name),' ',x.kind&&mk('span',{class:'tkind'},x.kind),ans&&mk('span',{class:'tsug'},sWaitTag(x))),mk('p',{class:'tnote'},x.wait_note||'')),
+      mk('button',{class:'tbtn',type:'button','data-open':x.key,on:{click:()=>tGo(list.indexOf(x))}},'Open'))))];
+  if(list.length&&!list.some(tWaits)) return rest&&!ans
+    ?[mk('div',{class:'tcard',id:'trestcard'},mk('h2',{},rest.head),mk('div',{class:'tbar'},sRest(rest,list,true)),mk('p',{class:'tnote'},lay.made||''))]
+    :[mk('div',{class:'talldone'},mk('h2',{},'All answered.'),mk('p',{},'Go back to the chat and say done.'),ans&&ans.say&&mk('p',{class:'tnote'},ans.say))];
+  return [mk('p',{class:'tempty'},'Choose a thing from the list.')];
+}
+function sBody(l,kids,gate,check){   // one set: what is said openly, the suggestion with the check, the footage to compare with, the made pictures; returns its buttons
+  const pics=l.pics||[], ref=pics.filter(p=>p.ref_only), made=pics.filter(p=>!p.ref_only), zoom=made.concat(ref), open=l.state==='open', many=open&&made.filter(p=>p.choice).length>1, cur=sPicked(l), row=[], under=[];
+  const img=(p,cls,all)=>{ const b=mk('button',{class:cls,type:'button',disabled:true,'aria-label':'Open large: '+p.label,on:{click:e=>openZoom(all,all.indexOf(p),e.currentTarget)}},mk('span',{class:'ph'},p.missing?'Not available':'Loading…'));
+    if(!p.missing) loadThumb(p,b,()=>{ check(); if(cls==='timg') tLarge(p,b); },0); return b; };
+  const behind=(id,cls,label,...body)=>{ const box=mk('div',{class:'tstrip',id:id,hidden:true},body), b=mk('button',{class:cls,id:id+'b',type:'button','aria-expanded':'false','aria-controls':id},label); tFold(b,box); under.push(box); return b; };
+  const before=(l.earlier||[]).length?behind('tearlier','tlink','The set before',mk('div',{class:'tfrow'},l.earlier.map(p=>mk('div',{class:'tfcell'},img(p,'tfth',l.earlier),mk('span',{},p.label))))):null;
+  [['differs'],['asked',before],['changed'],['partial'],['most']].forEach(x=>{ if(l[x[0]]) kids.push(mk('p',{class:'changed tsaid',id:'t'+x[0]},l[x[0]],x[1]&&[' ',x[1]])); });
+  if(before&&!l.asked) row.push(before);
+  kids.push(under.splice(0));
+  if(l.rec) row.push(mk('span',{},'Claude suggests: ',mk('b',{},l.rec.label)),l.rec.reason&&behind('twhy','tlink','Why?',l.rec.reason));
+  if(l.check) row.push(behind('tcheck','tchip '+(l.check.state==='pass'?'calm':'warn'),l.check.chip,mk('b',{},l.check.by),(l.check.lines||[]).length?mk('ul',{},l.check.lines.map(x=>mk('li',{},x))):null));
+  if(l.look) row.push(behind('tlook','tlink','What the image model did',l.look.chose&&mk('p',{},'It chose: '+l.look.chose),l.look.aside&&mk('p',{},'It set aside: '+l.look.aside)));
+  if(l.rule) row.push(mk('span',{class:'trule'},l.rule));
+  if(row.length) kids.push(mk('div',{class:'tsuggest wide'},row),under);
+  if(ref.length) kids.push(mk('h3',{class:'tlab'},'Compare with your footage'),mk('div',{class:'tfrow',id:'tfoot'},ref.map(p=>mk('div',{class:'tfcell'},img(p,'tfth',zoom),mk('span',{},p.view||p.label)))));
+  if(made.length) kids.push(ref.length&&open&&mk('h3',{class:'tlab'},'The set that was made'),mk('div',{class:'tpics',role:many?'radiogroup':null,'aria-label':many?'Which picture is the reference?':null},made.map((p,i)=>{
+    const on=many&&cur===p, view=p.view||p.label, saw=p.note&&mk('p',{class:'tsaw',id:'tsaw'+i,hidden:true},mk('b',{},'What Claude saw: '),p.note);
+    const info=saw&&mk('button',{class:'tinfo',id:'tinfo'+i,type:'button','aria-expanded':'false','aria-controls':'tsaw'+i,'aria-label':'What Claude saw in this picture',title:'What Claude saw'},'i'); if(info) tFold(info,saw);
+    const pk=many&&p.choice&&mk('button',{class:'tpick',id:'tpick'+(i+1),type:'button',role:'radio','aria-checked':String(on),'aria-label':(on?'The reference: ':'Use as the reference: ')+p.label,on:{click:()=>sPick(l,p)}},on?'The reference':'Use as the reference',mk('kbd',{'aria-hidden':'true'},String(i+1)));
+    if(pk) gate.push(pk);
+    return mk('figure',{class:'ttile'+(on?'':' plain')},img(p,'timg',zoom),
+      p.flag&&mk('i',{class:'tflag',role:'img','aria-label':'The check names this picture',title:'The check names this picture'}),p.weak&&mk('span',{class:'tweak'},'Weak'),
+      mk('figcaption',{class:'tcap'},made.length>1&&p.letter&&mk('b',{class:'tletter'},p.letter),mk('span',{title:view},view),info),pk,saw); })));
+  if(l.head&&open){   // not made: the bold sentence, its reason behind a small "why"
+    const why=l.why&&mk('span',{id:'twhynot',hidden:true},' '+l.why), wb=why&&mk('button',{class:'tlink',id:'twhynotb',type:'button','aria-expanded':'false','aria-controls':'twhynot'},'why'); if(wb) tFold(wb,why);
+    kids.push(mk('p',{class:'tnopics'},mk('b',{},l.head),' ',wb,why));
+  } else if(l.head) kids.push(mk('p',{class:'tnopics'},l.head,sWaitTag(l)&&[' ',mk('span',{class:'tsug'},sWaitTag(l))]));
+  return open?(l.buttons||[]).map((b,i)=>{ const pan=b.needs_words||b.act==='again'||b.act==='leave';
+    return mk('button',{class:'tbtn'+(b.sug?' go':b.act==='leave'?' quiet':''),type:'button','data-act':b.act,'aria-expanded':pan?String(T.panel==='b'+i):null,on:{click:()=>sAct(l,b,i)}},b.label,b.sug&&[' ',mk('span',{class:'tsug'},'Suggested')]); }):[];
+}
 function tDraw(){
   const list=tThings();
-  if(T.round!==round.round){ T.round=round.round; T.tick={}; T.panel=null; T.msg=''; T.show=false; const f=list.findIndex(l=>!tDone(l)); T.cur=list.length&&f<0?-1:Math.max(f,0); }   // a new round: the first thing still to answer
+  if(T.round!==round.round){ T.round=round.round; T.tick={}; T.panel=null; T.msg=''; T.show=false; const f=list.findIndex(tWaits); T.cur=list.length&&f<0?-1:Math.max(f,0);   // a new round: the first thing still to answer
+    if(tSets()){ T.fold={}; list.forEach(l=>{ if(T.fold[l.group]===undefined) T.fold[l.group]=true; if(l.state!=='recorded') T.fold[l.group]=false; }); } }   // the sets: a group with nothing but settled sets starts folded
   if(T.cur>=list.length) T.cur=list.length-1;
   const f=document.activeElement&&document.activeElement.id;
   tTop(list); tRail(list); tMain(list);
@@ -847,13 +991,15 @@ document.addEventListener('keydown',e=>{   // the keys of this layout; the large
   if(k==='Escape'){
     if(document.querySelector('.tpop:not([hidden])')) return tPops();
     if(T.panel) return tOpen(null);
+    if(tSets()&&T.show) return sShow(false);
     Array.prototype.forEach.call(document.querySelectorAll('#tmain [aria-expanded="true"]'),b=>b.click());
     return tRefuse('');
   }
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)&&e.target.type!=='checkbox') return;
   if(k==='ArrowLeft'||k==='j'){ e.preventDefault(); tStep(-1); }
   else if(k==='ArrowRight'||k==='k'){ e.preventDefault(); tStep(1); }
-  else if(/^[123]$/.test(k)){ const c=$('tck'+(k-1)); if(c) c.click(); }
+  else if(/^[123]$/.test(k)){ const c=$(tSets()?'tpick'+k:'tck'+(k-1)); if(c) c.click(); }
+  else if(tSets()){ if('acmul'.indexOf(k)>=0&&k.length===1){ e.preventDefault(); if(k==='m') act('again')||act('make'); else act({a:'approve',c:'fix',u:'own',l:'leave'}[k]); } }
   else if('ascul'.indexOf(k)>=0&&k.length===1){ e.preventDefault(); if(k==='c') act('fix')||act('words'); else act({a:'use',s:'set',u:'own',l:'ignore'}[k]); }
 });
 function watchAnswers(){

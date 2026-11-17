@@ -12,7 +12,7 @@ import pytest
 
 from app import chat_flow as CF, page_flow as P, ref_find as RF, ref_sets as RS, visuals_stage as VS
 import d211_fixture as F
-from test_design211_together_pure import Film, RUN, USER, a_look, ans, at_step_1, outside, round_file, says, searched   # noqa: F401 (`outside`: ffmpeg and the prices stood in)
+from test_design211_together_pure import Film, RUN, USER, a_look, ans, approve, at_step_1, chat, outside, round_file, says, searched   # noqa: F401 (`outside`: ffmpeg and the prices stood in)
 
 PERFUME = {'id': 'BOTTLE', 'name': 'The perfume bottle', 'kind': 'object', 'identity': 'exact', 'requirements': 'The product of the advertisement.', 'required_views': [], 'size': [],
            'description': 'A square clear glass bottle with a gold cap; the label reads "NOOR" in thin black capitals.'}
@@ -75,12 +75,12 @@ def test_C3_the_order_of_authority_is_said_once_and_the_check_carries_the_operat
     plan = F.plan()
     s = F.specs_approved(F.session('making'), plan, VS.spec_digest)
     r = RS.set_request(plan, RUN, s, el('TROWEL'), {'prompt': 'The blade is narrow.', 'operator_words': ['An earlier word.', 'The handle is red, not brown.']})
-    order = "(1) the operator's words; (2) the film's own footage picture; (3) the words added by the film's writer; (4) the description from the film's plan; (5) real photographs from the web"
+    order = "(1) the operator's words; (2) the words added by the film's writer; (3) the film's own footage picture; (4) the description from the film's plan; (5) real photographs from the web"
     assert r['prompt'].count(RS.AUTHORITY.format(order=order)) == 1 and 'the photographs win' not in r['prompt'] and 'this wins' not in r['prompt']
     line = checks(r)['matches the description']
     assert line.startswith("it agrees with these, the earlier winning where two differ: the operator's words: The handle is red, not brown; the words added by the film's writer: The blade is narrow; the description of the plan: ")
     assert 'A pointed steel blade, a reddish-brown handle.' in line and 'An earlier word.' not in line
-    assert "where the operator's words say otherwise, they win" in checks(r)['matches the footage picture']
+    assert "where the operator's words or the words added by the film's writer say otherwise, they win" in checks(r)['matches the footage picture']
     web = ask(PERFUME)   # no operator, no writer, no film picture: the plan, then the web
     assert RS.AUTHORITY.format(order="(1) the description from the film's plan; (2) real photographs from the web") in web['prompt'] and 'the photographs win' not in web['prompt']
     assert checks(web)['matches the description'] == 'it agrees with the description of the plan: ' + PERFUME['description']
@@ -202,13 +202,15 @@ def test_C5_leave_these_out_never_covers_a_person_and_names_the_shots_that_lose_
     film = rest_with_a_person()
     assert film.session()['round']['rest'] == ['MASON', 'TILE']
     line = film.lines()['sets:rest']
-    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and line['buttons'][1]['label'] == 'Leave it out' and line['buttons'][0]['label'].startswith('Make the other 2 sets')
-    assert 'The mason: a person shown in a made picture always gets a set' in line['text']
+    said = chat(film, 'sets:rest')   # design/213: the page line has its parts and short labels; the chat says the same as one text
+    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make them', 'Leave some out'] and line['buttons'][1]['loss']['button'] == 'Leave it out'
+    assert [b['label'] for b in said['buttons']] == ['Make the other 2 sets', 'Leave it out and make the other 1']
+    assert 'The mason: a person shown in a made picture always gets a set' in said['text'] and line['buttons'][1]['loss']['people'] == 'This person always gets a set: The mason.'
     assert line['cost'] == 'If you leave it out, these shots are made with no reference: Roof tile: shot 2 of gap 3.'
     film.record(ans(line, 'rest_out'))
     assert film.row('TILE')['ignored'] and not film.row('MASON').get('ignored')
-    line = film.lines()['sets:rest']
-    assert [b['choice'] for b in line['buttons']] == ['rest'] and line['buttons'][0]['label'].startswith('Make the other set') and 'cost' not in line
+    # design/213: the person, who always gets a set, is made on the same word (before: the line stayed, with "Make the other set" alone)
+    assert film.ordered()[-1] == 'MASON' and film.session()['round']['rest'] == [] and 'sets:rest' not in film.lines()
 
 
 def test_S12_the_comment_hint_is_true_for_every_answer_of_the_line():
@@ -224,11 +226,11 @@ def test_S13_step_2_names_no_money_and_the_chat_says_the_same_words():
     film = at_step_2()
     page = film.page()
     rest = next(l for l in page['lines'] if l['key'] == 'sets:rest')
-    assert '₹' not in page['summary'] and '₹' not in json.dumps(page['lines']) and 'still need' not in rest['text']
+    assert '₹' not in page['summary'] and '₹' not in json.dumps(page['lines']) and 'still need' not in json.dumps(rest) and 'text' not in rest   # design/213: the page line carries its parts
     out = film.next()
     while out['item'] and not out['item']['id'].startswith('rest:'):
         out = film.decide(out['item']['id'], out['item']['buttons'][0]['choice'], 'this one')
-    assert out['item']['text'] == '\n'.join([rest['text'], rest['cost']])   # the same words in the chat
+    assert out['item']['text'].endswith('\n' + rest['cost']) and '₹' not in out['item']['text'] and 'still need' not in out['item']['text']   # the same words in the chat
 
 
 def test_S14_a_set_made_again_shows_the_set_before_in_the_chat_too():
@@ -265,7 +267,7 @@ def test_S16_N2_the_looks_listing_carries_the_judging_points_and_the_shape_of_th
     how = film.due()['how']
     assert how == RS.LOOK_HOW and len(how['judge']) == 5 and any('approved drawing' in p and 'footage picture' in p for p in how['judge']) and any("the plan's description" in p for p in how['judge'])
     row = how['file']['sets'][0]
-    assert set(row) == {'element_id', 'set', 'recommend', 'golden', 'reason', 'pictures'} and set(row['pictures'][0]) == {'ref', 'view', 'verdict', 'seen'} and '--looks' in how['send']
+    assert set(row) == {'element_id', 'set', 'recommend', 'golden', 'reason', 'chose', 'aside', 'pictures'} and set(row['pictures'][0]) == {'ref', 'view', 'verdict', 'seen'} and '--looks' in how['send']
     assert '`how`' in RS.SETS_LOOK and 'its group name' in RS.SETS_LOOK and 'its group name' in RF.FIND_START
     helper = (Path(__file__).resolve().parents[2] / 'plugin' / 'agents' / 'vw-set-look.md').read_text(encoding='utf-8')
     assert '`how`' in helper and 'approved drawing' in helper and 'Each picture shows the view its turn asked for' not in helper   # one source: the server's
@@ -408,7 +410,7 @@ def test_M1_no_fourth_make_whatever_way_the_order_comes():
     assert queued == [] and errors == {'T_LAY': RS.MAKES_LIMIT.format(eid='T_LAY', max=3)} and len(film.ordered()) == before
     film.do(lambda: VS.set_aside(film.store, USER, film.run, film.outputs, 'T_LAY', back=True))   # brought back: its line offers no paid button
     line = film.lines()['set:T_LAY']
-    assert 'make' not in [b['choice'] for b in line['buttons']] and CF.WORDS['made_max_unmade'].format(n=3) in line['text']
+    assert 'make' not in [b['choice'] for b in line['buttons']] and CF.WORDS['made_max_unmade'].format(n=3) == line['head']   # design/213: the line's `head` (before: in its `text`)
     assert film.record(ans(line, 'make'))['refused'] and len(film.ordered()) == before and film.row('T_LAY')['round'] == 3
 
 
@@ -449,7 +451,7 @@ def test_M3_accept_the_proposals_does_not_cover_a_frame_that_became_weak():
 def test_M5_a_round_file_sent_again_reopens_only_what_is_new_or_changed_in_the_plan():
     film = at_step_2(BRICK='ignore', TILE='ignore')
     lines = film.lines()
-    film.record(ans(lines['set:MASON'], 'yes'), ans(lines['set:STREET'], lines['set:STREET']['buttons'][0]['choice']), ans(lines['set:T_LAY'], lines['set:T_LAY']['buttons'][0]['choice']))
+    film.record(ans(lines['set:MASON'], 'yes'), ans(lines['set:STREET'], approve(lines['set:STREET'])), ans(lines['set:T_LAY'], approve(lines['set:T_LAY'])))   # design/213: the page sends the picture chosen
     assert film.state() == 'complete'
     out = film.post(round_file(film, FAN={'rec': 'set', 'reason': 'It is seen closer now.'}))   # the same plan: nothing comes back, the round stays complete
     assert out['reopened'] == [] and out['then'] == RS.MERGE_NONE and film.state() == 'complete' and film.row('FAN')['ignored'] and says(out, 'vw visuals round --back')
@@ -462,9 +464,9 @@ def test_M5_a_round_file_sent_again_reopens_only_what_is_new_or_changed_in_the_p
     out = film.post(round_file(film) + [{'element_id': 'BOTTLE', 'rec': 'set', 'reason': 'The product.'}])
     assert out['reopened'] == ['FAN', 'BOTTLE'] and out['then'] == RS.MERGE_ASK.format(n=2) and film.state() == 2 and film.row('BRICK')['ignored'] and not film.row('BRICK').get('reopened')
     lines = film.lines()
-    assert CF.WORDS['reopen_changed'] in lines['set:FAN']['text'] and CF.WORDS['reopen_new'] in lines['set:BOTTLE']['text'] and 'set:BRICK' not in lines
+    assert CF.WORDS['reopen_changed'] == lines['set:FAN']['head'] and CF.WORDS['reopen_new'] == lines['set:BOTTLE']['head'] and CF.WORDS['reopen_changed'] in chat(film, 'set:FAN')['text'] and 'set:BRICK' not in lines
     out = film.do(lambda: VS.set_aside(film.store, USER, film.run, film.outputs, 'BRICK', back=True))   # the operator asks for it by name
-    assert film.row('BRICK')['reopened'] == 'asked' and CF.WORDS['reopen_left'] in film.lines()['set:BRICK']['text'] and says(out, 'vw visuals page')
+    assert film.row('BRICK')['reopened'] == 'asked' and CF.WORDS['reopen_left'] == film.lines()['set:BRICK']['head'] and says(out, 'vw visuals page')
 
 
 def test_M6_a_set_of_a_v2_round_is_never_made_by_the_image_command():

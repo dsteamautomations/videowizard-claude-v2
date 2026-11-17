@@ -125,7 +125,7 @@ def _gemini_set(req, parents, tries):
     set with a note naming the missing view; a limit or an outage on any turn answers as that turn did, so the whole set is requeued."""
     views = list(req['views'])
     contents = [{'role': 'user', 'parts': _parent_parts(parents) + [{'text': req['prompt'] + f'\n\nImage 1 of {len(views)}: {views[0].rstrip(".")}.'}]}]
-    images, notes, sources, usage_in, usage_out, idx = [], [], [], 0, 0, None
+    images, notes, sources, usage_in, usage_out, idx = [], [], [], 0, 0, None   # design/213: `notes` holds one entry per picture that came, the words of its own turn
     for n, view in enumerate(views, 1):
         if n > 1:
             contents.append({'role': 'user', 'parts': [{'text': f'Image {n} of {len(views)}: {view.rstrip(".")}.'}]})
@@ -133,7 +133,7 @@ def _gemini_set(req, parents, tries):
         if r.status_code >= 400:
             if n == 1 or r.status_code == 429 or r.status_code >= 500:
                 return _error(r, idx)
-            notes.append(f'picture {n} ({view}) did not come back: HTTP {r.status_code}.')
+            notes[-1] = f'{notes[-1]} picture {n} ({view}) did not come back: HTTP {r.status_code}.'.strip()   # said with the last picture that came
             break
         body = r.json()
         cands = body.get('candidates') or []
@@ -150,14 +150,13 @@ def _gemini_set(req, parents, tries):
                 out = _Answer(400, {'error': {'type': 'no_image', 'message': words}}, words)
                 out.key_index = idx
                 return out
-            notes.append(f'picture {n} ({view}) did not come back: {words}')
+            notes[-1] = f'{notes[-1]} picture {n} ({view}) did not come back: {words}'.strip()
             break
         images.append(got[0])
-        if words:
-            notes.append(words)
+        notes.append(words)
         sources += [x for x in _sources(cand) if x not in sources]
         contents.append({'role': 'model', 'parts': parts})
-    out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage_in, 'output_tokens': usage_out}, 'notes': ' '.join(notes), 'sources': sources})
+    out = _Answer(200, {'data': [{'b64_json': im['data']} for im in images], 'usage': {'input_tokens': usage_in, 'output_tokens': usage_out}, 'notes': ' '.join(x for x in notes if x), 'notes_each': notes, 'sources': sources})
     out.key_index = idx
     return out
 
@@ -293,6 +292,7 @@ def process_image(job):
             cost = {'model': req['model'], 'quality': req['quality'], 'size': req['size'], 'input_tokens': usage.get('input_tokens'), 'output_tokens': usage.get('output_tokens')}
         return 'retained', {'key': k, 'sha256': sha, 'bytes': len(png), 'width': width, 'height': height, 'revised_prompt': body['data'][0].get('revised_prompt'), 'cost': cost,
                             **({'extra': extra, 'notes': body.get('notes') or '', 'sources': body.get('sources') or []} if req.get('set') else {}),   # design/151
+                            **({'notes_each': body['notes_each']} if req.get('set') and body.get('notes_each') else {}),   # design/213: the notes of each picture's own turn
                             **({'key_index': r.key_index} if getattr(r, 'key_index', None) is not None else {}),   # design/114: which key, never the key
                             **({'edit': edit} if edit else {})}, None, cost, None
     except (Problem, OSError, ValueError, KeyError, TypeError, httpx.RequestError) as exc:
@@ -405,8 +405,9 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
             jobs.record_file(conn, job['run_id'], 'visuals', x['key'], Path(x['key']).name, x['sha256'], x['bytes'], 'image/png')
         names, asks = job['request'].get('view_names') or [], job['request'].get('views') or []
         if status == 'retained' and names:   # design/211: each picture of a v2 set carries the view its turn asked: the short name, and the sentence the check reads
+            each = (result or {}).get('notes_each')   # design/213: each picture keeps the notes of its own turn; the set's notes are these joined (ref_sets.set_facts)
             for n, pic in enumerate(made):
-                pic.update({'view': names[n] if n < len(names) else '', **({'ask': asks[n]} if n < len(asks) else {})})
+                pic.update({'view': names[n] if n < len(names) else '', **({'ask': asks[n]} if n < len(asks) else {}), **({'notes': each[n] if n < len(each) else ''} if each else {})})
         if status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
             due = True   # design/92: checked after this transaction, with no lock held (check_image)
             for pic in made:   # design/211: every picture of a set is checked, not the first only

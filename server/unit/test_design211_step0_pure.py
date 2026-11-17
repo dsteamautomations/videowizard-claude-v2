@@ -26,7 +26,7 @@ def test_the_contracts_names_and_signatures():
                        'look_record': 'conn, store, user, run, outputs, things, by', 'round_frames': 'session, plan, eid, named', 'frames_of': 'session, eid',
                        'found_all': 'store, run, session, plan', 'fingerprint': 'element', 'not_this': 'conn, store, user, run, outputs, eid, ref_id, quote',
                        'that_is_it': 'conn, store, user, run, outputs, eid, trial, quote'},
-            ref_sets: {'thing_facts': 'plan, session, element', 'views_for': 'element, plan', 'view_names': 'element', 'set_request': 'plan, run, session, element, row',
+            ref_sets: {'thing_facts': 'plan, session, element', 'views_for': 'element, plan, rd', 'view_names': 'element, rd', 'set_request': 'plan, run, session, element, row',
                        'check_summary': 'session, ref', 'set_facts': 'session, plan, eid, row', 'looks_due': 'store, run, outputs',
                        'round_looks': 'store, user, run, outputs, sets, by', 'round_rest': 'conn, store, user, run, outputs, quote',
                        'round_rewrite': 'conn, store, user, run, outputs, rows', 'round_reopen': 'conn, store, user, run, outputs, eid, verdict, words, quote'}}

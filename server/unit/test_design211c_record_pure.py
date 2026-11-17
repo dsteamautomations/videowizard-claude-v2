@@ -194,7 +194,7 @@ def test_an_answer_to_a_set_made_again_since_is_stale_and_an_unknown_choice_is_r
     out = film.record({**ans(l['set:MASON'], 'yes'), 'item': 'set:MASON:s-mason-0'}, ans(l['set:STREET'], 'clean'), ans(l['sets:rest'], 'accept_all'))
     assert out['stale'] == ['set:MASON'] and film.called('round_sets') == [] and film.called('round_rest') == []
     assert [r['key'] for r in out['refused']] == ['set:STREET', 'sets:rest'] and all(r['message'].startswith('Not an answer to this line: ') for r in out['refused'])
-    assert {x['key']: x for x in out['page']['lines']}['set:STREET']['refused'].startswith("Not an answer to this line: 'clean'. Its answers are: Use A")
+    assert {x['key']: x for x in out['page']['lines']}['set:STREET']['refused'].startswith("Not an answer to this line: 'clean'. Its answers are: Approve A")
 
 
 def test_the_answer_of_the_page_may_carry_picture_marks():

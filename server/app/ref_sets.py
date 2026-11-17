@@ -10,7 +10,7 @@ A refusal is a named constant (a format string): raised with `visuals_stage.need
 import re
 from datetime import datetime, timezone
 
-from . import ref_find, visuals_stage as V
+from . import image_check, ref_find, visuals_stage as V
 from .errors import Problem
 from .visual_contract import SIZE_ORDER, all_scenes
 
@@ -55,19 +55,22 @@ WORD_NEEDED = "This step of the reference round is paid on the operator's word: 
 # it with the sets to look at (`looks_due`), and the helper file points to it.
 LOOK_HOW = {
     'judge': ['Each picture shows the view its turn asked for; a second near-identical picture is not a view.',
-              "It is the film's own thing: where a footage picture is among the inputs, compare look, colour, material and wear with it; where an approved drawing is among them, "
+              "It is the film's own thing: where a footage picture is among the inputs, or beside them (`footage`), compare look, colour, material and wear with it; where an approved drawing is among them, "
               'compare shape, size and how the thing is built with the drawing. A set that looks right and is not the film\'s thing is wrong.',
               "It agrees with the plan's description, requirements and sizes, and with the operator's words in the request, which win over all of these. Say what differs.",
               'The pictures of the set agree with one another: the same thing in every detail they share.',
-              'What the image model changed: read its notes for what it took from the web instead of the request, and what it left out.'],
+              'What the image model changed: read its notes for what it took from the web instead of the request, and what it left out. Say it for the operator in two plain lines: '
+              '`chose`, what the model chose, and `aside`, what it set aside; no file name, no heading, nothing copied from the notes as written.'],
     'may_show': ('A person alone on plain ground. An object or a material with no person; a hand, and the material the thing works on, only in a picture that shows it in use. A place as '
                  'the subject. A way of working as the action or the change itself: hands and a tool are allowed, never required, and no face. Lettering only where the description names it.'),
     'file': {'by': 'helper | assistant',
              'sets': [{'element_id': '<the element id>', 'set': '<the set id of this listing>', 'recommend': 'use | remake | doubt',
                        'golden': '<with use: the id of the picture every shot starts from; null for a person, and with remake or doubt>', 'reason': '<one line, at most 300 characters>',
+                       'chose': '<one line, at most 300 characters: what the image model chose>', 'aside': '<one line, at most 300 characters: what it set aside>',
                        'pictures': [{'ref': '<the picture id>', 'view': '<its view>', 'verdict': 'pass | weak | fail', 'seen': '<one line: what you saw, at most 300 characters>'}]}]},
     'send': ('`vw visuals round --looks <file>`. Every picture of a set gets its row. `use`: the set can serve as it is; `remake`: a fault would be copied into the film (say which '
-             'picture and what is wrong, so the request can be rewritten); `doubt`: you cannot tell. A refused set is named with its reason: fix that row and send it again.')}
+             'picture and what is wrong, so the request can be rewritten); `doubt`: you cannot tell. `chose` and `aside` are required where the pictures of the set carry '
+             "the image model's notes. A refused set is named with its reason: fix that row and send it again.")}
 
 # ---------- refusals ----------
 
@@ -84,10 +87,12 @@ LOOK_PICTURES = '{eid}: every picture of the set needs its look; missing: {missi
 LOOK_VERDICT = '{eid}: the verdict of a look is pass, weak or fail, and the recommendation is use, remake or doubt.'
 LOOK_SEEN = '{eid}: a look says in one line what was seen, at most {max} characters, and the recommendation gives its reason.'
 LOOK_GOLDEN = '{eid}: the picture proposed as the starting picture is not a picture of this set.'
+LOOK_MODEL = ("{eid}: the pictures of this set carry the image model's notes: say what it chose (`chose`) and what it set aside (`aside`), one line each, at most {max} characters.")
 REST_NOT_NOW = 'The other sets are ordered once the first sets are back and have their look: not now.'
 REST_NONE = 'No set waits to be ordered.'
 REST_CAP = ('The other {n} sets need about ₹{x}, and ₹{spent} is spent of the ₹{cap} limit of this film: none was ordered. Leave some things out, or ask the '
-            'owner to set another limit for this film.')
+            'owner to set another limit for this film.')   # design/213: no longer said; LIMIT_PLAIN is
+LIMIT_PLAIN = 'These cannot be made now: the film has reached the limit its owner set. Ask the owner to raise it.'   # design/213: the limit of a v2 round, with no amount
 REWRITE_NOT_DUE = '{eid}: no rewrite is asked for it now.'
 REWRITE_EMPTY = '{eid}: the rewritten request is empty.'
 REWRITE_SAME = '{eid}: the request is the same as before: the same words would buy the same picture. Change it from the operator\'s words, the check and your look.'
@@ -116,6 +121,8 @@ ONE_THING_FOOTAGE = ("One rule above all: show one real thing, as one real photo
 SET_LINE = ("This is a set of three pictures of the same one subject, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each "
             'picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers '
             'or captions inside any picture. Say what each picture adds.')
+# design/213: a place of a round posted from now on (`round['place_one']`) is one picture
+ONE_LINE = ('This is one picture of the subject. Deliver it as one output image at full size, never as a collage, grid or split frame, with no borders, numbers or captions inside it.')
 FINISH = ('Natural colours, no filters, no stylisation, no illustration. The camera near enough that the subject is readable, the surroundings soft. No text, lettering, logo '
           'or mark except what the description names; no watermark and no mark of a picture library; nothing in the picture that its sources do not justify.')
 # the order of authority, said once in a request and used again in its check (design/211 review, C3 and S11): the earlier wins
@@ -140,6 +147,12 @@ FRAME_DRAWN_LINE = "Image {k} is the film's own picture of {name} ({view}): take
 SHEET_LINE = 'Image {k} is an approved drawing of {name} ({view}).'
 ADDED_LINE = "Added by the film's writer: {words}"
 OPERATOR_LINE = "The operator's words: {words}"
+# design/213: a person the footage shows, with the recorded permission: the film's own pictures of them (visuals_stage.LIKENESS_PHOTO_LINE, said of footage pictures)
+LIKENESS_FOOTAGE_LINE = ('{images} of this person, used with their permission: take the face, the build, the skin and the hair from {them}, nothing else; '
+                         'the garments, the poses and the plain ground are as written here.')
+FACE_LINE = ('the face matches the footage', "the face is the same person as in the film's own picture sent as a reference")
+SAME_WHEN = ("it shows the same thing as picture A of the set, sent as a reference: every detail both pictures show is the same; a different side, distance or framing is not a "
+             "difference. This picture's view")   # image_check.lines_of adds the view of the picture being checked
 PERSON_SET = ('Make a set of three separate pictures of this one person, one per turn: 1, {a}; 2, {b}; 3, {c}. Deliver each as one separate output image at full size, never a collage, '
               'grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; no text, numbers or captions inside any picture '
               'except lettering the description names.')
@@ -215,7 +228,7 @@ def thing_facts(plan, session, element):
             'real_person': element.get('kind') == 'person' and bool(element.get('speaker')),
             'description': str(element.get('description') or ''), 'requirements': str(element.get('requirements') or ''),
             'sizes': [{k: d.get(k) for k in ('part', 'measure', 'value', 'unit', 'status')} for d in element.get('size') or []],
-            'views': view_names(element), 'signs': [str(s.get('what') or s.get('sign') or '') for s in element.get('signs_of_use') or []],
+            'views': view_names(element, (session or {}).get('round')), 'signs': [str(s.get('what') or s.get('sign') or '') for s in element.get('signs_of_use') or []],
             'shots': shots, 'shots_made': sum(1 for s in shots if s['way'] != 'footage'), 'closest': max(sizes, key=SIZE_ORDER.index) if sizes else '',
             'scene': {'gap': first[0].get('gap_id'), 'scene': first[1].get('id'), 'place': str(first[1].get('location_time') or '').strip()} if first else None}
 
@@ -230,11 +243,13 @@ def _same_view(a, b):
     return bool(a and b) and (a <= b or b <= a)
 
 
-def views_for(element, plan):
-    """The three views of a thing's set, always three: [{'name': short label, 'ask': the sentence of that turn}]. The plan's required_views
+def views_for(element, plan, rd=None):
+    """The three views of a thing's set: [{'name': short label, 'ask': the sentence of that turn}]. The plan's required_views
     first (two that read the same are one), then the kind's own, never one already present. A person's pictures 1 (full length, front)
-    and 3 (the face) are fixed."""
+    and 3 (the face) are fixed. design/213: `rd`, the round: a place of a round posted from now on (`place_one`) gets one view, the whole place."""
     name = element.get('name') or element.get('id') or 'the subject'
+    if element.get('kind') == 'place' and (rd or {}).get('place_one'):
+        return [{'name': PLACE[0]['name'], 'ask': PLACE[0]['ask'].format(name=name)}]
     asked = []
     for v in element.get('required_views') or []:
         v = ' '.join(str(v or '').split())
@@ -252,22 +267,29 @@ def views_for(element, plan):
     return out
 
 
-def view_names(element):
-    """The three view names of a thing, as `views_for` names them: for the helpers' brief and the labels of footage frames."""
-    return [v['name'] for v in views_for(element, None)]
+def view_names(element, rd=None):
+    """The view names of a thing, as `views_for` names them: for the helpers' brief and the labels of footage frames."""
+    return [v['name'] for v in views_for(element, None, rd)]
 
 
 # ---------- the request and the checks ----------
 
 def inputs_of(session, element):
     """The pictures a set is made from, in the order they are sent: the thing's approved footage frames that have a look (up to three, in view
-    order; a frame the operator marked "not this" is rejected, so it is not among them), then its approved drawings. A person: their photo,
-    only with the recorded permission. Returns ([{'ref', 'role', 'view'}], the ids of the weak frames)."""
+    order; a frame the operator marked "not this" is rejected, so it is not among them), then its approved drawings. A person, only with
+    the recorded permission: their own photo; with none, their approved footage frames (design/213: the best face first, up to three);
+    a stand-in gets no picture. Returns ([{'ref', 'role', 'view'}], the ids of the weak frames)."""
     eid, refs = element['id'], session.get('references') or {}
+    approved = [f for f in ref_find.frames_of(session, eid) if (refs.get(f['ref']) or {}).get('status') == 'approved']
     if element.get('kind') == 'person':
+        if V.likeness_of(session, eid) and not V._own_pictures(session, eid):
+            faces = [fid for fid in ref_find.faces_of(session, eid) if any(f['ref'] == fid for f in approved)]
+            mine = sorted(approved, key=lambda f: faces.index(f['ref']) if f['ref'] in faces else len(faces))[:3]
+            if mine:
+                return [{'ref': f['ref'], 'role': 'footage', 'view': f.get('view') or ''} for f in mine], set()
         photo = V.likeness_photo(session, eid)
         return ([{'ref': photo, 'role': 'photo', 'view': ''}] if photo else []), set()
-    frames = [f for f in ref_find.frames_of(session, eid) if (refs.get(f['ref']) or {}).get('status') == 'approved'][:3]
+    frames = approved[:3]
     from . import drawings
     return ([{'ref': f['ref'], 'role': 'footage', 'view': f.get('view') or ''} for f in frames]
             + [{'ref': s['id'], 'role': 'drawing', 'view': s['view']} for s in drawings.approved_sheets(session, eid)]), {f['ref'] for f in frames if f.get('weak')}
@@ -317,7 +339,8 @@ def _plain_words(element, text):
 
 def _authority(operator, added, footage, sheets, search):
     """The sources of a request in their order of authority, the earlier winning; with fewer than two there is nothing to say."""
-    order = [x for x in (BY_OPERATOR if operator else '', BY_FILM.get((bool(footage), bool(sheets)), ''), BY_WRITER if added else '', BY_PLAN, BY_WEB if search else '') if x]
+    # design/213: the writer's words rank above the film's own pictures (the plan against the footage: what the writer says of the film's thing wins)
+    order = [x for x in (BY_OPERATOR if operator else '', BY_WRITER if added else '', BY_FILM.get((bool(footage), bool(sheets)), ''), BY_PLAN, BY_WEB if search else '') if x]
     return order if len(order) > 1 else []
 
 
@@ -327,23 +350,30 @@ def fp(plan, session, element):
     return ref_find.fingerprint(element) + '|' + _place(element, thing_facts(plan, session, element))
 
 
-def _lines(element, facts, inputs, added='', operator=''):
+def _lines(element, facts, inputs, added='', operator='', n=3):
     """The check lines of a v2 set (design/211 section 3.7), all must. `pictures` on a line: the pictures of the set it is asked of. The
-    line on the description carries the operator's words and the writer's added words, in the request's own order of authority."""
+    line on the description carries the operator's words and the writer's added words, in the request's own order of authority.
+    design/213: `n`, how many pictures the set has: a later picture is the same thing as picture A, seen as its own view asks (no such line
+    for a set of one); the footage line gives way to the operator's and the writer's words; a person made from their own footage pictures is
+    checked for the face; "a real face" is asked only where a picture of the film was sent and the set is not that person's own likeness."""
     kind = element.get('kind')
     line = lambda check, when, **more: {'check': check, 'weight': 'must', 'pass_when': when, **more}
-    out = [line('the view', 'the picture shows what its turn asked'),
-           line('same as picture 1', 'the same thing as picture 1 of the set, sent as a reference, in every detail both show', pictures=[2, 3])]
+    out = [line('the view', 'the picture shows what its turn asked')] + [line(image_check.SAME_THING, SAME_WHEN, pictures=list(range(2, n + 1)))] * (n > 1)
     drawn = any(i['role'] == 'drawing' for i in inputs)
-    if any(i['role'] == 'footage' for i in inputs):
+    film = any(i['role'] == 'footage' for i in inputs)
+    if film and kind == 'person':
+        out.append(line(*FACE_LINE))
+    elif film:
+        win = ' or '.join([BY_OPERATOR] * bool(operator) + [BY_WRITER] * bool(added))
         out.append(line('matches the footage picture', ("it has the look, colour, material and wear of the film's footage picture sent as a reference; its shape and size follow the approved drawing" if drawn else
                                                         "it has the form, colour and material of the film's footage picture sent as a reference")
-                        + ("; where the operator's words say otherwise, they win" if operator else '')))
+                        + (f'; where {win} say otherwise, they win' if win else '')))
     described = _plain_words(element, facts['description'].strip() or facts['requirements'].strip())
     first = [f"{BY_OPERATOR}: {operator.rstrip('.')}"] * bool(operator) + [f"{BY_WRITER}: {added.rstrip('.')}"] * bool(added)
     out.append(line('matches the description', 'it agrees with the description of the plan: ' + described if not first else
                     'it agrees with these, the earlier winning where two differ: ' + '; '.join(first + ['the description of the plan: ' + described])))
-    return out + [line(*x) for x in _kind_lines(kind)]
+    face = [dict(l) for l in image_check.FIXED if l['check'] == 'a real face'] if film and kind != 'person' else []
+    return out + [line(*x) for x in _kind_lines(kind)] + face
 
 
 def _kind_lines(kind):
@@ -374,7 +404,7 @@ def set_request(plan, run, session, element, row):
     row = row or {}
     eid, kind = element['id'], element.get('kind')
     facts = thing_facts(plan, session, element)
-    name, views = facts['name'], views_for(element, plan)
+    name, views = facts['name'], views_for(element, plan, session.get('round'))
     inputs, weak = inputs_of(session, element)
     footage = [i for i in inputs if i['role'] == 'footage']
     sheets = [i for i in inputs if i['role'] == 'drawing']
@@ -401,7 +431,8 @@ def set_request(plan, run, session, element, row):
         text = [f'Character sheet of {name}, a person in this film.', *words('Who they are', facts['requirements']), *words('Fixed look', facts['description']),
                 *(['Garments: ' + '; '.join(outfits) + '.'] if outfits else []), LOOK_PERSON.format(look=look), *told,
                 *[f"This person is not {o.get('name') or o['id']} ({str(o.get('description') or '').strip().rstrip('.')})." for o in others],
-                *([V.LIKENESS_PHOTO_LINE] if inputs else []), PERSON_SET.format(a=views[0]['ask'], b=views[1]['ask'], c=views[2]['ask'])]
+                *([LIKENESS_FOOTAGE_LINE.format(images="Image 1 is the film's own picture" if len(inputs) == 1 else f"Images 1 to {len(inputs)} are the film's own pictures",
+                                                them='it' if len(inputs) == 1 else 'them')] if footage else [V.LIKENESS_PHOTO_LINE] if inputs else []), PERSON_SET.format(a=views[0]['ask'], b=views[1]['ask'], c=views[2]['ask'])]
         prompt, source = '\n'.join(text), 'footage' if inputs else 'words'
     else:
         pictures = [(FRAME_WEAK_LINE if i['ref'] in weak else FRAME_DRAWN_LINE if sheets else FRAME_LINE).format(k=k, name=name, view=i['view'] or 'as filmed') for k, i in enumerate(footage, 1)]
@@ -413,11 +444,12 @@ def set_request(plan, run, session, element, row):
         subject = [f'The subject: {name}, {KIND_WORDS.get(kind, "a thing")} in this film.',
                    *words("Its description, from the film's plan", facts['description']), *words('What it must meet', facts['requirements']), *told]
         text = [OPENING + ' ' + (FROM_FOOTAGE if footage else FROM_WEB) + '\n' + (ONE_THING_FOOTAGE if footage else ONE_THING),
-                SET_LINE + ' The three views: ' + '; '.join(f"{n}, {v['name']}" for n, v in enumerate(views, 1)) + '.', '\n'.join(subject), *pictures,
+                (SET_LINE + ' The three views: ' + '; '.join(f"{n}, {v['name']}" for n, v in enumerate(views, 1)) + '.') if len(views) > 1 else f"{ONE_LINE} The view: {views[0]['name']}.",
+                '\n'.join(subject), *pictures,
                 MAY_SHOW.get(kind, MAY_SHOW['object']) + '\n' + setting + ' ' + LOOK_LINE.format(look=look) + '\n' + FINISH, NOTES_FOOTAGE if footage else NOTES]
         prompt, source = '\n\n'.join(text), 'footage' if footage else 'web'
     prompt = re.sub(r'(?<!\.)\.\.(?!\.)', '.', prompt).replace('.;', ';')   # a sentence of the plan that ends in a full stop gets no second one
-    lines = _lines(element, facts, inputs, added, operator)
+    lines = _lines(element, facts, inputs, added, operator, len(views))
     if drawn or sheets:   # the facts of the drawing set are checked on the picture, and it must be a photograph
         lines += [{'check': 'drawn fact: ' + f, 'weight': 'must', 'pass_when': f'the picture shows it as the approved drawings do: {f}'} for f in drawn] + [V.DRAWN_LOOK_LINE]
     parts = {'kind': kind, 'subject': name, 'description': facts['description'], 'requirements': facts['requirements'], 'sizes': sizes, 'material': material, 'signs': signs,
@@ -462,16 +494,49 @@ def _pictures(session, eid, row, statuses=('candidate', 'approved')):
     return sorted(V._set_rows(session, eid, row.get('set'), statuses), key=lambda r: int(r.get('set_n') or 1)) if row.get('set') else []
 
 
+def is_limit(error):
+    """A set's stored refusal is the film's limit: the sentence of a v2 round from design/213 on, or the older one with its figures."""
+    return str(error or '') == LIMIT_PLAIN or "on this film's visuals" in str(error or '')
+
+
+def footage_person(session, plan, eid):
+    """design/213: a person the footage shows: {'faces': the kept footage frames whose look says they show the face, the best first (a
+    look that passes before a weak one, then the view order), 'child': a look says the person is a child, 'state'}. 'state': 'permitted'
+    or 'stand_in' as recorded (`visuals_stage.likeness`: `session['likeness']`, `session['stand_in']`); 'ask' where a face frame is kept
+    and neither is recorded yet; None for a thing that is not a person, and for a person with no face frame and nothing recorded."""
+    if (_element(plan, eid) or {}).get('kind') != 'person':
+        return {'faces': [], 'child': False, 'state': None}
+    faces = ref_find.faces_of(session, eid)
+    refs = session.get('references') or {}
+    child = any(((refs.get(f['ref']) or {}).get('look') or {}).get('child') is True for f in ref_find.frames_of(session, eid))
+    state = 'permitted' if V.likeness_of(session, eid) else 'stand_in' if (session.get('stand_in') or {}).get(eid) else 'ask' if faces else None
+    return {'faces': faces, 'child': child, 'state': state}
+
+
+def footage_beside(session, element, inputs):
+    """design/213: the thing's approved footage frames that were not inputs of its set, to compare the set with: [{'ref', 'view'}]. Nothing
+    of the footage person for a person with no recorded permission: a stand-in is never compared with them."""
+    eid, refs, used = element['id'], session.get('references') or {}, {i.get('ref') for i in inputs or []}
+    if element.get('kind') == 'person' and not V.likeness_of(session, eid):
+        return []
+    return [{'ref': f['ref'], 'view': f.get('view') or ''} for f in ref_find.frames_of(session, eid) if (refs.get(f['ref']) or {}).get('status') == 'approved' and f['ref'] not in used]
+
+
 def set_facts(session, plan, eid, row):
     """What the page and the chat show of one made (or failed) set (design/211 section 3.7): {'pictures': [{'ref', 'n', 'view', 'check':
-    check_summary, 'look': look or None}], 'inputs': [{'ref', 'role', 'view'}], 'from': 'footage'|'web'|'words', 'notes', 'sources': [{'url',
+    check_summary, 'look': look or None, 'notes'}], 'inputs': [{'ref', 'role', 'view'}], 'from': 'footage'|'web'|'words', 'notes', 'sources': [{'url',
     'title'}], 'partial': {'made', 'asked', 'missing'} or None, 'rec': {'do', 'golden', 'reason'} or None, 'makes', 'makes_left',
     'asked': the operator's words of the last remake or None, 'history': [{'n', 'set', 'added', 'operator'}], 'changed': bool,
-    'fail': {'cause', 'model', 'text'} or None}. The pictures are those of the set the row holds now, candidate or approved."""
+    'fail': {'cause', 'model', 'text'} or None, 'model': {'chose', 'aside'} or None, 'footage': [{'ref', 'view'}]}. The pictures are those
+    of the set the row holds now, candidate or approved. design/213: `notes` is the set's notes for the record, each said once; a picture's
+    own `notes` are those of its turn ('' on a set stored before they were kept per picture); `model` is what the look says the image model
+    chose and set aside; `footage` the thing's footage pictures that were not inputs (`footage_beside`)."""
     element = _element(plan, eid) or {'id': eid}
     pics = _pictures(session, eid, row)
     parts, look = row.get('parts') or {}, row.get('set_look') or {}
-    names = list(parts.get('views') or view_names(element))
+    names = list(parts.get('views') or view_names(element, session.get('round')))
+    said = list(dict.fromkeys(p['notes'] for p in pics if p.get('notes')))
+    own = len(pics) == 1 or any(p.get('notes') != pics[0].get('notes') for p in pics)   # the notes are kept per picture: a set stored before carries the whole on each
     made = row.get('made') or {}
     failed = _pictures(session, eid, row, ('failed',))
     fail = None
@@ -479,12 +544,14 @@ def set_facts(session, plan, eid, row):
         if failed:
             fail = fail_of(failed[-1])
         elif row.get('error'):   # refused by the server before any call: its own sentence, no provider to name
-            fail = {'cause': 'limit' if "on this film's visuals" in str(row['error']) else 'other', 'model': None, 'text': V._plain(row['error'])}
+            fail = {'cause': 'limit', 'model': None, 'text': LIMIT_PLAIN} if is_limit(row['error']) else {'cause': 'other', 'model': None, 'text': V._plain(row['error'])}
     history = list(row.get('history') or [])
     return {'pictures': [{'ref': p['id'], 'n': int(p.get('set_n') or 1), 'view': p.get('view') or (names[int(p.get('set_n') or 1) - 1] if int(p.get('set_n') or 1) <= len(names) else ''),
-                          'check': check_summary(session, p), 'look': p.get('look')} for p in pics],
+                          'check': check_summary(session, p), 'look': p.get('look'), 'notes': (p.get('notes') or '') if own else ''} for p in pics],
             'inputs': list(parts.get('inputs') or []), 'from': parts.get('source') or 'web',
-            'notes': next((p.get('notes') for p in pics if p.get('notes')), '') or '', 'sources': next((p.get('sources') for p in pics if p.get('sources')), []) or [],
+            'model': {'chose': look.get('chose') or '', 'aside': look.get('aside') or ''} if pics and look.get('set') == row.get('set') and (look.get('chose') or look.get('aside')) else None,
+            'footage': footage_beside(session, element, parts.get('inputs')),
+            'notes': ' '.join(said), 'sources': next((p.get('sources') for p in pics if p.get('sources')), []) or [],
             'partial': {'made': len(pics), 'asked': len(names), 'missing': names[len(pics):]} if pics and len(pics) < len(names) else None,
             'rec': {'do': look.get('recommend'), 'golden': look.get('golden'), 'reason': look.get('reason') or ''} if pics and look.get('set') == row.get('set') else None,
             'makes': makes(session, eid, row), 'makes_left': max(0, MAKES_MAX - makes(session, eid, row)),
@@ -629,7 +696,8 @@ def start(conn, store, user, run, session, plan, kinds, elements):
     if missing:
         faults.append(f"Every person a picture is made of gets a set: add a row for {', '.join(missing)} (element_id, rec set, reason).")
     V.need(not faults, '\n'.join(faults))
-    session['round'] = {'pass': 1, 'at': _now(), 'by': user['id'], 'elements': rows, 'quote': None, 'kept': True, 'v': 2, 'go': 1, 'rest': [], 'own_ids': True}   # defect 55: its sets' ids carry the round's `at` (`visuals_stage._queue_sets`)
+    session['round'] = {'pass': 1, 'at': _now(), 'by': user['id'], 'elements': rows, 'quote': None, 'kept': True, 'v': 2, 'go': 1, 'rest': [], 'own_ids': True,
+                        'place_one': True}   # design/213: a place of this round gets one picture (views_for); defect 55: its sets' ids carry the round's `at` (`visuals_stage._queue_sets`)
     V.save_session(store, run, session)
     doubtful = sum(1 for r in rows.values() if r['doubt'])
     return {'pass': 1, 'elements': len(rows), 'kept': True, 'v': 2, 'doubtful': doubtful, 'then': ROUND_POSTED.format(n=len(rows), d=doubtful)}
@@ -717,8 +785,9 @@ def _due(session, rd):
 
 def looks_due(store, run, outputs):
     """`GET /api/runs/{run_id}/visuals/round/looks`: the made sets with no complete look: {'sets': [{'element_id', 'name', 'set', 'facts':
-    thing_facts, 'request', 'inputs': [{'ref', 'role', 'view', 'key'}], 'pictures': [{'ref', 'n', 'view', 'key', 'check'}], 'notes'}], 'then'}.
-    The picture keys are the 1600 px copies (page_flow.sized)."""
+    thing_facts, 'request', 'inputs': [{'ref', 'role', 'view', 'key'}], 'pictures': [{'ref', 'n', 'view', 'key', 'check'}], 'notes',
+    'footage': [{'ref', 'view', 'key'}]}], 'then'}. The picture keys are the 1600 px copies (page_flow.sized). design/213: `footage`, the
+    thing's footage pictures that were not inputs of the set, to compare it with (`footage_beside`)."""
     session = V.session_of(store, run, outputs)
     rd = session.get('round')
     if not V.round_v2(session):
@@ -740,14 +809,16 @@ def looks_due(store, run, outputs):
         sets.append({'element_id': eid, 'name': element.get('name') or eid, 'set': row['set'], 'facts': thing_facts(plan, session, element),
                      'request': (pics[0].get('generation') or {}).get('prompt') or '', 'inputs': [{**i, 'key': big(i['ref'])} for i in facts['inputs']],
                      'pictures': [{'ref': p['ref'], 'n': p['n'], 'view': p['view'], 'key': big(p['ref']), 'check': p['check']} for p in facts['pictures']],
-                     'notes': facts['notes']})
+                     'notes': facts['notes'], 'footage': [{**i, 'key': big(i['ref'])} for i in facts['footage']]})
     return {'sets': sets, 'then': SETS_LOOK if sets else then_of(session), 'how': LOOK_HOW}
 
 
 def round_looks(store, user, run, outputs, sets, by):
     """`POST /api/runs/{run_id}/visuals/round/looks`: sets = [{'element_id', 'set', 'recommend', 'golden', 'reason', 'pictures': [{'ref',
-    'view', 'verdict', 'seen'}]}]. Each picture gets its `look`; the row its `set_look`. Refuses LOOK_SET_UNKNOWN, LOOK_PICTURES,
-    LOOK_VERDICT, LOOK_SEEN, LOOK_GOLDEN. Returns {'recorded': [eid], 'refused': {eid: message}, 'left': [eid], 'then'}."""
+    'view', 'verdict', 'seen'}], 'chose', 'aside'}]. Each picture gets its `look`; the row its `set_look`. Refuses LOOK_SET_UNKNOWN, LOOK_PICTURES,
+    LOOK_VERDICT, LOOK_SEEN, LOOK_GOLDEN, LOOK_MODEL. Returns {'recorded': [eid], 'refused': {eid: message}, 'left': [eid], 'then'}.
+    design/213: `chose` and `aside`, what the image model chose and what it set aside, one line each: required where a picture of the set
+    carries the model's notes; kept in the row's `set_look`."""
     session = V.session_of(store, run, outputs)
     rd = session.get('round')
     V.need(V.round_v2(session) and rd.get('pass') != 1, 'No set of the reference round waits for a look.')
@@ -760,6 +831,7 @@ def round_looks(store, user, run, outputs, sets, by):
         looks = {p.get('ref'): p for p in s.get('pictures') or [] if isinstance(p, dict)}
         missing = [str(p.get('view') or p['id']) for p in pics if p['id'] not in looks]
         mine = [looks[p['id']] for p in pics if p['id'] in looks]
+        model = {k: one(s.get(k)) for k in ('chose', 'aside')} if isinstance(s, dict) else {}
         if not pics:
             refused[eid] = LOOK_SET_UNKNOWN.format(eid=eid, set=s.get('set'))
         elif missing:
@@ -770,12 +842,15 @@ def round_looks(store, user, run, outputs, sets, by):
             refused[eid] = LOOK_SEEN.format(eid=eid, max=ref_find.SEEN_CHARS)
         elif s.get('golden') and s['golden'] not in {p['id'] for p in pics}:
             refused[eid] = LOOK_GOLDEN.format(eid=eid)
+        elif any(len(v) > ref_find.SEEN_CHARS for v in model.values()) or (any(p.get('notes') for p in pics) and not all(model.values())):
+            refused[eid] = LOOK_MODEL.format(eid=eid, max=ref_find.SEEN_CHARS)
         else:
             at = _now()
             for p in pics:
                 l = looks[p['id']]
                 p['look'] = {'who': who, 'at': at, 'view': one(l.get('view')) or p.get('view') or '', 'verdict': l['verdict'], 'seen': one(l['seen']), 'trial': None, 'ref': p['id']}
-            row['set_look'] = {'who': who, 'at': at, 'set': row['set'], 'recommend': s['recommend'], 'golden': s.get('golden') or None, 'reason': one(s['reason'])}
+            row['set_look'] = {'who': who, 'at': at, 'set': row['set'], 'recommend': s['recommend'], 'golden': s.get('golden') or None, 'reason': one(s['reason']),
+                               **({k: v for k, v in model.items() if v})}
             recorded.append(eid)
     V.save_session(store, run, session)
     left = [eid for eid, _ in _due(session, rd)]
@@ -795,7 +870,7 @@ def _order(conn, store, user, run, outputs, eids):
 
 
 def round_rest(conn, store, user, run, outputs, quote):
-    """The second go, on the operator's word: every set of `round['rest']` ordered, or none (REST_CAP). Refuses REST_NOT_NOW, REST_NONE.
+    """The second go, on the operator's word: every set of `round['rest']` ordered, or none (LIMIT_PLAIN). Refuses REST_NOT_NOW, REST_NONE.
     Returns {'pass', 'queued': [eid], 'errors': {eid: message}, 'cost_inr', 'then': ALL_MAKING}. It is taken while the first sets are with
     the operator, also when one of them waits for its rewrite: the operator answers both in one visit."""
     session = V.session_of(store, run, outputs)
@@ -804,7 +879,7 @@ def round_rest(conn, store, user, run, outputs, quote):
     rest = rest_of(rd)
     V.need(rest, REST_NONE)
     spent, cap, one = V._set_budget(run, session, V.visuals_spend(conn, run))
-    V.need(spent + one * len(rest) <= cap + 1e-9, REST_CAP.format(n=len(rest), x=_inr(one * len(rest)), spent=_inr(spent), cap=_inr(cap)))
+    V.need(spent + one * len(rest) <= cap + 1e-9, LIMIT_PLAIN)   # design/213: no amount is said here (REST_CAP, the sentence with the figures, is no longer said)
     rd.update(go=2, rest=[], rest_word={'by': user['id'], 'at': _now(), 'quote': V.said(quote, 'Make the other sets', user)})
     V.save_session(store, run, session)
     session, queued, errors = _order(conn, store, user, run, outputs, rest)
