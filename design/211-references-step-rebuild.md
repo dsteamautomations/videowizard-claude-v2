@@ -1,6 +1,6 @@
 # 211. The References step, rebuilt
 
-17 Nov 2026. **Status: built on 17 Nov 2026, server 0.108.0, plugin 0.92.0; not deployed.** Written as the one shared agreement of three builders who worked at the same time; their parts were joined on `main` the same day. What was built differently from this note, and what is not built, is in section 9.
+17 Nov 2026. **Status: built on 17 Nov 2026, server 0.108.0, plugin 0.92.0; not deployed. Reviewed by three critics the same day; their findings are fixed (section 9.4), still not deployed.** Written as the one shared agreement of three builders who worked at the same time; their parts were joined on `main` the same day. What was built differently from this note, and what is not built, is in section 9.
 
 SK's words: "combine everything, start the implementation, and run the trial after all the fixes." The trial is limited to 5 to 10 pictures.
 
@@ -325,13 +325,13 @@ The fixed text is generic: no "site", no "trade", no "how the work is done", no 
 - **`round_rest`** refusals: `REST_NOT_NOW` (the round is not at state 2 of its first go), `REST_NONE`, `REST_CAP` (the limit has no room for all of them: none is ordered, the sentence gives the figures).
 - **"No" and "Correct it".** `round_sets` rejects the pictures as today, appends the words to `operator_words`, sets `rewrite_due`, and orders nothing. `round_rewrite` takes `{element_id, prompt}`, moves the earlier request to `history`, stores the new `prompt`, clears `rewrite_due` and orders the set: the operator's click was the word for the spend. Refusals: `REWRITE_NOT_DUE`, `REWRITE_EMPTY`, `REWRITE_SAME` (the same words as before would buy the same picture). `corrections` stays empty in a v2 round.
 - **Three makes.** With `round >= 3` a "No" or "Correct it" is held, not recorded: `MAKES_LIMIT`. The line then offers: use one of these, your own picture, or leave it out.
-- **No spend on a second send.** `V._round_merge` for a v2 round orders nothing. A thing the operator left out, or one new in the plan, gets `reopened` and goes back to the operator as an open line. A thing whose set was not made gets its new `prompt` and its error cleared, and stays "not made" with its paid button.
+- **No spend on a second send.** `V._round_merge` for a v2 round orders nothing. A thing new in the plan (`reopened: 'new'`), or a thing the operator left out whose entry in the plan changed since the round was sent (`reopened: 'changed'`; each row keeps `fp`, the fingerprint of its plan entry), goes back to the operator as an open line. **A thing the operator left out stays left out** (decision of the master thread after the review, 17 Nov 2026, taken by default): it comes back only when the operator asks for it by name, `vw visuals round --back E` (`V.set_aside(back=True)`, `reopened: 'asked'`), also in a complete round, which is then with the operator again. A thing whose set was not made gets its new `prompt` and its error cleared, and stays "not made" with its paid button. When nothing comes back the answer says so (`ref_sets.MERGE_NONE`).
 - **`V.set_make`** (`vw visuals round --make E`) needs the operator's words in a v2 round: `MAKE_NO_QUOTE`.
 - **A plan changed after the sets.** `set_facts(...)['changed']` marks the set; `V.set_make` accepts it as it accepts a changed spec today.
 
 ### 3.9 Every "what next" sentence of a v2 round
 
-One constant each; the answer carries it as `then`. Figures in braces are filled in.
+One constant each; the answer carries it as `then`. Figures in braces are filled in. The review of 17 Nov changed some of these sentences and added others (`SETS_MAKING`, `ROUND_STEP1`, `ROUND_STEP2`, `ROUND_DONE`, `MERGE_NONE`, `BACK_ASKED`, `STEP1_NO_SET`, `NOT_ORDERED`, `WORD_NEEDED`): the code holds the text, section 9.4 says what changed.
 
 | Constant (module) | Said when | The sentence |
 |---|---|---|
@@ -781,9 +781,60 @@ The merger (each with a test in `server/unit/test_design211_together_pure.py`):
 - Relative heights of people (gap 17, in part).
 - `waiting()` may list an ignored thing's frame while the round is at `'looking'` or `'rewrite'`.
 - Gaps 11, 21 and 24; the AI video route of gap 23; cropping a small thing out of a frame.
+- After the review: the comment box is not hidden per answer (its hint says when the words are used). A person's set that was not made still offers "Leave it out" on its own line. The plan's own sentences are not rewritten: only a clip's file name and a landmark's code name are taken out of them. A film's look written as one long sentence is kept or dropped whole.
 
 ### 9.3 Not verified
 
 - No real model call: the image model, the server's Gemini check and the helpers were stood in for. No HTTP call, no database test (`server/tests`), no claude.ai page (the page file was checked in a local browser by part C only).
 - The three reviews of section 6.4 were done by the merger alone, by tests; no second reader.
 - An older round is pinned by fingerprints of the shared fixture's older round taken at d255486 (server functions, page and chat); VW-24's own data was not read.
+- After the review: still no real model call, so nobody has seen whether the image model follows the order of authority, the new views or "except what the description names", nor whether the program's check reads the longer line on the description. The word lists (the look's sentences for a photograph; a plan view that shows the same as a default view) were tried on the fixture and on VW-24's things only. The page file was not changed and not opened in a browser by the fixer beyond the existing page tests; the new fields it draws (`cost` on the line of the other sets, the longer button of the proposals) use fields it already draws. `main.py`'s two doors call `V.round_word`; no HTTP test ran. `design/35-decision-log.md` has no new row (no older way is kept).
+
+### 9.4 The review of 17 Nov 2026 (three critics): what changed
+
+Tests: `server/unit/test_design211_review_pure.py`, `plugin/tests/test_design211_review.py`, one test or more per finding, named by its label. The requests as they read now, for VW-24's things and two things of other kinds of film: `design/_work/design211-requests-printed.md`. No older way is kept by this change: it corrects the v2 round, which no film has run; a round without `v` is untouched (the test that pins the older round's page and chat passes as it was).
+
+The request and its checks (`ref_sets.py`), for every category of film:
+
+- **C1.** A way of working shows "the action or the change"; hands, forearms and a tool are allowed where the description names them, never required. Its third view is "close on where it happens" (was "the tool meeting the material"). The check line: "the action or the change is shown … hands and a tool are allowed, not required; no face".
+- **C2.** "No text, lettering, logo or mark except what the description names", in the request and in the check line ("except lettering the description names").
+- **C3, S11.** One order of authority, said once in the request (`AUTHORITY`) and used in the check: the operator's words; the film's own pictures (the approved drawing for shape and size, the footage picture for look, colour and wear); the writer's added words; the plan's description; web photographs. "The photographs win" is gone. The check line on the description carries the operator's words and the writer's.
+- **C6.** A person's sheet names no place (`parts.place` is empty); no code name of a person is in it.
+- **S7.** A material has its own views: a surface of it; as the film uses it; very close.
+- **S8.** Only the sentences of the film's look that fit a photograph are placed (those on drawn or lettered pictures are left out, by a word list), "for colour and finish"; for light the request says the place and time of the setting win.
+- **S9.** A weak frame: "take its form, colour and material from it, and the wear the description names; show the thing whole and uncovered".
+- **S10.** A default view that a view of the plan already shows is left out (by a short word list per default view); there are always three. A view in use may show the hand and the material the description names.
+- No code name in a request: the category, an element id, a landmark's name (`near_wall (the wall)` reads "the wall"), a clip's file name; no doubled full stop.
+
+What the operator is told (`chat_flow.py`, `page_flow.py`; the same words on the page and in the chat):
+
+- **C4.** The proposals say the truth about the sets: at most three are made first, the others are offered after with their price, with the figures so far; the button says "paid: 3 sets first, about ₹X; the others are asked after" when more than three are asked for.
+- **C5.** "Leave these out" never covers a person shown in a made picture, says so, and names the shots that lose a reference.
+- **S12.** The comment hint is true for every answer: the words are used only when a set is made.
+- **S13.** Step 2 says what the plan's shots still need: in the page's summary and on the line that offers the other sets.
+- **S14.** The chat shows the set before of a set made again, as the page does.
+- **S15.** The check in plain words ("Picture A is not the size asked for"), no size in pixels and no picture id; a picture whose check did not run is said to be "not checked".
+- **S16, N2.** The points to judge a set by (against the footage picture, the approved drawing, the plan's words and the operator's) and the shape of the looks file come with the listing (`ref_sets.LOOK_HOW`, `how` in `looks_due`'s answer and in looks.json); the helper file points to it.
+- The clips with no analysis are named once (the page's summary; the chat's first question of the step), not on every line. A size that is not known is no warning on a line. A way of working is titled "(a way of working)". A shot is named as the operator knows it ("shot 2 of gap G2"), never by its code name.
+
+The "what next" sentences:
+
+- **N1.** `vw visuals status` prints, for a round with `v`, the server's sentence only (`V.round_status`, `ref_sets.status_of`: one for each state).
+- **N3.** The step list of the instructions names the rebuilt way (`scripts/d211d_wording_v3.py`, registered after the three parts; the older sentences are retired by name).
+- **N4.** While sets of a v2 round are made the page says wait, then look (`ref_sets.SETS_MAKING`).
+- **N5.** `vw visuals digest` on an older round answers `OLDER_ROUND`.
+- **N6, N9.** With the plan accepted and no round, `vw visuals next` gives `FIND_START`; once every thing is searched, `LOOK_ALL`.
+- **N7.** `REWRITE_DUE` names the things and the operator's words (`ref_sets.rewrite_due`).
+- **N8.** Step 1 recorded with nothing ordered says so in one sentence, with what was not ordered and why (`STEP1_NO_SET`, `NOT_ORDERED`).
+- **N10.** The helper files say how a path and a command are written so the guard takes them the first time; the sentences tell the assistant to give each helper its group, its ids, the run folder's path and the tool's command line; a finder replaces a kept frame by sending its look again without `keep`. Three older sentences were checked gone from the instructions and the helper files and are in the retired list.
+- A paid step of a v2 round sent by the tool (`round --verdicts`, `round --sets`) needs the operator's words in the server (`V.round_word`), as `--rest` and `--make` do.
+
+Money and limits:
+
+- **M1.** Three makes at most is enforced in `V._queue_sets`, the one place every order passes.
+- **M2.** A make that returned no picture is not counted (`ref_sets.makes`); at the limit a set that was not made offers no paid button.
+- **M3.** A kept frame that is weak makes the line doubtful when the line is built, not only when the round was sent: "Accept the proposals" never covers it.
+- **M5.** The contract note of section 3.8, above.
+- **M6.** `vw visuals image --kind sheet` on a film with a v2 round is refused by name (`V.SHEET_BY_ROUND`); a set is ordered through the round only.
+
+Left as it is: a stored `must_failed: size` on rows checked before the size check was repaired (the line now reads "is not the size asked for"; the rows are not rewritten).

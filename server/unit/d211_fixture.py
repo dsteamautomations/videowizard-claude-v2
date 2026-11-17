@@ -122,7 +122,7 @@ def _found(result, clips, note, kept=(), closest=None):
 
 VIEWS = {'MASON': ['full length, front', 'right hand and forearm', 'the face'],
          'STREET': ['the whole place', 'from the other side', 'its fixed things'],
-         'T_LAY': ['the action at its key moment', 'the result just after', 'the tool meeting the material']}
+         'T_LAY': ['the action at its key moment', 'the result just after', 'close on where it happens']}   # design/211 review: no hands and no tool are asked of a way of working
 ROWS = {   # the round file's own fields per thing: rec, reason, doubt, first, prompt
     'MASON': ('set', 'A person a picture is made of.', False, True, ''),
     'TROWEL': ('footage', 'The film shows it whole and sharp from the side.', True, False, ''),          # doubtful: one kept frame is weak

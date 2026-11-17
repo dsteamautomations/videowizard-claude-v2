@@ -13,13 +13,14 @@ import d211_fixture as F
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import d211b_wording_v3 as W   # noqa: E402
+import d211d_wording_v3 as REVIEW   # noqa: E402  (design/211, the review: a later script that changes sentences of this one; these tests read the text as it was before it)
 
 OTHERS = ('`vw visuals elements` shows where each is seen', 'A clip frame is free and exact', 'never a blurred one for identity', 'The operator answers both steps on the page',
           'In the chat, one at a time (`vw visuals next`, section E)', "except the plugin's helpers the steps name")   # the anchors of parts A and C: never inside one of part B's
 
 
 def stage():
-    return next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    return REVIEW.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))
 
 
 def applied():
@@ -69,7 +70,7 @@ def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_rea
     st, prompt, parts = applied()
     now = prompt + ''.join(p['text'] for p in parts)
     before = st['prompt'] + ''.join(p['text'] for p in st['parts'])
-    cmd_before = (ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')
+    cmd_before = REVIEW.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8'))
     cmd = commands(cmd_before)
     agents = ''.join(p.read_text(encoding='utf-8') for p in (ROOT / 'plugin' / 'agents').glob('*.md'))
     listed = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
@@ -83,17 +84,17 @@ def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_rea
 
 
 def test_the_instruction_the_request_and_the_check_agree_that_a_way_of_working_may_show_hands():
-    _, _, parts = applied()
-    text = next(p for p in parts if p['name'] == 'picture-search')['text']
-    assert 'a way of working at its key moment, its result, and the tool meeting the material (hands and forearms, no face)' in text
-    assert 'hands and forearms doing it' in RS.MAY_SHOW['technique'] and RS.MAY_SHOW['process'] == RS.MAY_SHOW['technique'] and 'No face' in RS.MAY_SHOW['technique']
+    # design/211 review (C1): the text as the review's script left it; hands and a tool are allowed where the description names them, never required
+    now = next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')
+    text = next(p for p in now['parts'] if p['name'] == 'picture-search')['text']
+    assert 'a way of working as the action or the change at its key moment, its result, and close on where it happens (hands and a tool allowed where the description names them, never required; no face)' in text
+    assert 'allowed where the description names them, never required' in RS.MAY_SHOW['technique'] and RS.MAY_SHOW['process'] == RS.MAY_SHOW['technique'] and 'No face' in RS.MAY_SHOW['technique']
     lay = next(e for e in F.plan()['elements'] if e['id'] == 'T_LAY')
     lines = {name: when for name, when in RS._kind_lines(lay['kind'])}
-    assert 'the hands and the tool doing it' in lines['the action is shown'] and 'no person' not in lines and 'no person' in dict(RS._kind_lines('object'))
-    helper = (ROOT / 'plugin' / 'agents' / 'vw-set-look.md').read_text(encoding='utf-8')
-    assert 'a way of working with the hands and forearms doing it, and no face' in helper and 'Hands in a way of working are right, not a fault.' in helper
-    assert [v['name'] for v in RS.WAY] == ['the action at its key moment', 'the result just after', 'the tool meeting the material']
-    assert 'an object or a material whole, as the film uses it, and its telling detail (no person; a hand only in use)' in text and 'a hand may hold it only' in RS.MAY_SHOW['object']
+    assert 'hands and a tool are allowed, not required' in lines['the action is shown'] and 'no person' not in lines and 'no person' in dict(RS._kind_lines('object'))
+    assert 'hands and a tool are allowed, never required' in RS.LOOK_HOW['may_show'] and '`how.may_show`' in (ROOT / 'plugin' / 'agents' / 'vw-set-look.md').read_text(encoding='utf-8')
+    assert [v['name'] for v in RS.WAY] == ['the action at its key moment', 'the result just after', 'close on where it happens']
+    assert 'an object whole, as the film uses it, and its telling detail (no person; in use, the hand and the material the description names)' in text and 'the hand that holds it' in RS.MAY_SHOW['object']
 
 
 def test_the_commands_the_sentences_name_are_the_tools():

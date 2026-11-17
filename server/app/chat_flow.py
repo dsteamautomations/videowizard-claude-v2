@@ -494,14 +494,16 @@ WORDS = {
     'free': 'nothing is paid',
     'again': '{label} ({paid}: the set is made again)',
     # a thing: where the film uses it, what the footage has
-    'used': 'Used in {shots}; the closest is {size} ({gap}, shot {shot}).',
+    'used': 'Used in {shots}; the closest is {size} ({where}).',
+    'shot': 'shot {n} of gap {gap}',
+    'shot_unnumbered': 'a shot of gap {gap}',
     'no_shot': 'No shot of the plan names it.',
     'found': 'From your footage: {pictures}.',
     'none': 'None was found in your footage. Searched: {clips}{names}.',
     'closest': 'The closest is shown.',
     'nothing_close': 'Nothing close was seen.',
     'not_searched': 'Your footage was not searched for it: {note}.',
-    'no_analysis': 'Not searched, because they have no analysis: {names}.',
+    'no_analysis': 'Not searched for any thing, because they have no analysis: {names}.',
     'own_is': 'Your own picture is its reference.',
     'closest_label': 'The closest: {view}',
     # step 1: the answers
@@ -518,12 +520,11 @@ WORDS = {
     'ask_mine': 'Use your own picture as the reference?',
     'ask_set': 'Have a reference set made (paid)?',
     'ask_person': 'Have a reference set made of this person (paid)?',
-    'hint': 'Words for the picture (optional): what it must show. They go into the request of its set.',
+    'hint': 'Words for the picture (optional): what it must show. They go into the request when a set is made; with any other answer they are not used.',
     'cost': 'If you leave it out, these shots are made with no reference of it: {ids}.',
     'cost_none': 'If you leave it out, no made shot loses it.',
     'warn_person': 'This is a real, named person and no photo of them is recorded: the set is made from the description alone.',
     'warn_exact': 'This is one exact, real thing: a made picture must match it.',
-    'warn_size': 'A size is not known: {what}.',
     'warn_cause': 'A set cannot be made now: {cause}.',
     'warn_stale': 'The plan changed since the footage was searched for it.',
     'proposes': 'Claude proposes: {label}. {reason}',
@@ -531,9 +532,13 @@ WORDS = {
     # step 1: "Accept the proposals"
     'all_title': "Claude's proposals",
     'all_ask': 'Accept the proposals for the routine things?',
-    'all_text': '{n} have a proposal from Claude. {d} are yours to answer one by one. Accepting the other {r} has {s} made{price}, '
-                'takes the footage pictures of {f} as they are, and leaves {l} out. A line you answer yourself keeps your answer.',
+    'all_text': '{n} have a proposal from Claude. {d} are yours to answer one by one. Accepting the other {r} asks for {s}{price}, '
+                'takes the footage pictures of {f} as they are, and leaves {l} out.{goes} A line you answer yourself keeps your answer.',
+    'goes': ' At most {m} sets are made first, when every thing is answered; any others are offered with their price after you have judged those, and made only on your word. '
+            'So far {a} asked for, about ₹{t:,.0f} in all: {k} first (about ₹{x:,.0f}){after}.',
+    'goes_after': ', {r} after (about ₹{y:,.0f})',
     'accept': 'Accept the {n} ({price})',
+    'accept_first': 'paid: {k} sets first, about ₹{x:,.0f}; the others are asked after',
     'each': 'Ask me each one',
     # step 2: the sets
     'rest_title': 'The other sets',
@@ -541,6 +546,13 @@ WORDS = {
     'rest_text': 'These are the first {k}. {r} not ordered yet: {names}. Look at these first: a fault here would repeat in all of them.',
     'rest_make': 'Make the other {sets} ({paid})',
     'rest_out': 'Leave {them} out',
+    'rest_people': '{names}: a person shown in a made picture always gets a set, so leaving out does not cover {them}.',
+    'rest_cost': 'If you leave {them} out, these shots are made with no reference: {things}.',
+    'rest_cost_none': 'If you leave {them} out, no made shot loses a reference.',
+    'money': "Spent so far ₹{s:,.0f} of the ₹{c:,.0f} limit. The plan's shots still need about ₹{y:,.0f}.",
+    'money_spent': 'Spent so far ₹{s:,.0f} of the ₹{c:,.0f} limit.',
+    'earlier': 'The set before is shown too: {labels}.',
+    'made_max_unmade': 'Its set was made {n} times, which is the most: add your own picture, or leave it out.',
     'ask_person_set': 'Is this set right for this person?',
     'ask_thing_set': 'Which picture is the reference?',
     'set_made_max': 'This set was made {n} times, which is the most: use one of these pictures, or add your own.',
@@ -560,7 +572,9 @@ WORDS = {
     'check_fail': '{by}: it found faults.',
     'check_none': '{by}: the check did not run.',
     'check_line': 'Picture {letter}: {check}: {seen}',
-    'check_off': 'Picture {letter}: the check did not run.',
+    'check_off': 'Picture {letter} was not checked: the check did not run.',
+    'check_size': 'Picture {letter} is not the size asked for.',
+    'check_parent': 'Picture {letter} was made from a picture that is not approved.',
     'notes_title': "The image model's notes",
     'partial': '{made} of {asked} pictures came back; missing: {missing}.',
     'asked': 'Made again as you asked: "{words}"',
@@ -570,7 +584,8 @@ WORDS = {
     'ask_make': 'Make it now (paid)?',
     'make': 'Make it',
     'reopen_new': 'It is new in the plan, so it is back with you. Nothing was made.',
-    'reopen_left': 'You left it out before; the round was sent again, so it is back with you. Nothing was made.',
+    'reopen_left': 'You left it out before and asked for it again, so it is back with you. Nothing was made.',
+    'reopen_changed': 'You left it out before; its entry in the plan changed since, so it is back with you. Nothing was made.',
     # step 2: the lines with nothing to answer (the page)
     'making': 'Its set is being made.',
     'looking': 'Claude is looking at it.',
@@ -590,17 +605,34 @@ def _n(n, word):
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
-def _used(facts):
+def _shot_words(session, plan):
+    """Each shot as the operator knows it from the plan's page: its number in its gap's table, and the gap (design/211 review: no shot code name)."""
+    out = {}
+    for gap in (plan or {}).get('gaps') or []:
+        gid = gap.get('gap_id')
+        try:
+            chosen = [s['id'] for sc in V.chosen_scenes(gap, (session.get('choice_selections') or {}).get(gid)) for s in sc.get('shots') or []]
+        except (KeyError, TypeError, ValueError, StopIteration):
+            chosen = []
+        for sc in gap.get('scenes') or []:
+            for s in sc.get('shots') or []:
+                out[s.get('id')] = WORDS['shot'].format(n=chosen.index(s['id']) + 1, gap=gid) if s.get('id') in chosen else WORDS['shot_unnumbered'].format(gap=gid)
+    return out
+
+
+def _used(facts, where):
     """Where the film uses a thing: how many shots, and the closest of them."""
     shots = facts.get('shots') or []
     if not shots:
         return WORDS['no_shot']
     near = next((s for s in shots if s.get('size') == facts.get('closest')), shots[0])
-    return WORDS['used'].format(shots=_n(len(shots), 'shot'), size=SIZE_WORDS.get(near.get('size'), near.get('size') or 'of no stated size'), gap=near.get('gap'), shot=near.get('shot'))
+    return WORDS['used'].format(shots=_n(len(shots), 'shot'), size=SIZE_WORDS.get(near.get('size'), near.get('size') or 'of no stated size'),
+                                where=where.get(near.get('shot')) or WORDS['shot_unnumbered'].format(gap=near.get('gap')))
 
 
 def _footage_words(found, frames):
-    """What the footage has of a thing, from the search record (`ref_find.found_all`) and the pictures that stand. Clips with no analysis are named."""
+    """What the footage has of a thing, from the search record (`ref_find.found_all`) and the pictures that stand. The clips with no analysis
+    are named once for the step (`_unread`), not on every line."""
     if frames:
         said = WORDS['found'].format(pictures=_n(len(frames), 'picture'))
     elif not found:
@@ -611,12 +643,34 @@ def _footage_words(found, frames):
         names, n = list(found.get('clip_names') or []), int(found.get('clips') or 0)
         said = (WORDS['none'].format(clips=_n(n, 'clip'), names=f" ({', '.join(names)}{'…' if n > len(names) else ''})" if names else '')
                 + ' ' + WORDS['closest' if found.get('closest') else 'nothing_close'])
-    missed = list((found or {}).get('not_searched') or [])
-    return ' '.join(x for x in (said, WORDS['no_analysis'].format(names=', '.join(missed)) if missed else '') if x)
+    return said
 
 
-def _cost(facts):
-    made = [s['shot'] for s in facts.get('shots') or [] if s.get('way') != 'footage']
+def _unread(found):
+    """The clips nobody could search, said once for the step: the page's summary and the chat's first question."""
+    missed = next((list(f.get('not_searched') or []) for f in (found or {}).values()), [])
+    return WORDS['no_analysis'].format(names=', '.join(missed)) if missed else ''
+
+
+def unread_words(ctx):
+    from . import ref_find
+    return _unread(ref_find.found_all(ctx['store'], ctx['run'], ctx['session'], ctx['plan'])) if ctx.get('plan') and V.round_v2(ctx['session']) else ''
+
+
+def still_needs(ctx):
+    """What the plan's shots still need, in rupees (`visuals_stage.budget`); None when it cannot be read."""
+    try:
+        return float(V.budget(ctx['conn'], ctx['store'], ctx['run'], ctx['outputs'])['planned']['inr'])
+    except (V.Problem, KeyError, TypeError, ValueError):
+        return None
+
+
+def _made_shots(facts, where):
+    return [where.get(s['shot']) or WORDS['shot_unnumbered'].format(gap=s.get('gap')) for s in facts.get('shots') or [] if s.get('way') != 'footage']
+
+
+def _cost(facts, where):
+    made = _made_shots(facts, where)
     return WORDS['cost'].format(ids=', '.join(made)) if made else WORDS['cost_none']
 
 
@@ -628,14 +682,17 @@ def _told(line):
     parts += [WORDS['check_' + check['state']].format(by=check['by'])] if check else []
     parts += list(check.get('lines') or []) + list(line.get('changes') or [])
     parts += [f"{line['notes']['title']}: {line['notes']['text']}"] if line.get('notes') else []
+    parts += [WORDS['earlier'].format(labels=', '.join(p['label'] for p in line['earlier']))] if line.get('earlier') else []   # design/211 review, S14: the chat shows the set before too
     parts += [WORDS['proposes'].format(**line['rec'])] if line.get('rec') else []
     return '\n'.join(p for p in parts + [line.get('cost') or ''] if p)
 
 
 def _v2_item(ident, kind, position, name, ask, run, buttons, line, more=(), **marks):
     """One question of a v2 round: the chat's item, with the page's line beside it."""
+    named = lambda p, n, tag='': f"{marks.get('_eid') or 'round'}{tag}-{n}.{'jpg' if p['_key'].endswith('.jpg') else 'png'}"
     item = _item(ident, kind, position, f'{name}: {ask[:1].lower()}{ask[1:]}', run, buttons, text=_told(line), more=more,
-                 show=[{'key': p['_key'], 'name': f"{marks.get('_eid') or 'round'}-{n}.{'jpg' if p['_key'].endswith('.jpg') else 'png'}"} for n, p in enumerate(line.get('pics') or [], 1)])
+                 show=[{'key': p['_key'], 'name': named(p, n)} for n, p in enumerate(line.get('pics') or [], 1)]
+                      + [{'key': p['_key'], 'name': named(p, n, '-before')} for n, p in enumerate(line.get('earlier') or [], 1)])
     item.update({'_v2': True, '_line': line, '_eid': '', '_person': False, '_kept': None, '_frames': [], '_makes': False, **marks})
     return item
 
@@ -681,7 +738,8 @@ def _round_v2(ctx, every, step):
     paid = WORDS['paid'].format(x=budget[2])
     priced = lambda label: f'{label} ({paid})'
     facts = lambda eid: ref_sets.thing_facts(plan, session, by_id[eid])
-    about = lambda eid, f: '\n'.join(x for x in (str(f.get('description') or by_id[eid].get('description') or ''), _used(f)) if x)
+    where = _shot_words(session, plan)
+    about = lambda eid, f: '\n'.join(x for x in (str(f.get('description') or by_id[eid].get('description') or ''), _used(f, where)) if x)
     group_of = lambda eid: GROUPS.get(kinds.get(eid), 'Things')
     by_group = lambda rows: sorted(rows, key=lambda i: GROUP_ORDER.index(i['_line']['group']) if i['_line']['group'] in GROUP_ORDER else -1)   # the doubtful first, then by kind; the plan's order inside
     if step == 1:
@@ -706,10 +764,9 @@ def _round_v2(ctx, every, step):
             if match:
                 opts.sort(key=lambda o: o is not match)   # the proposed answer first
             cause = V.set_cause(session, plan, eid, budget)
-            unknown = [f"{d.get('part')} {d.get('measure')}".strip() for d in f.get('sizes') or [] if d.get('value') is None or d.get('status') == 'unknown']
             warnings = ([WORDS['warn_person']] if f.get('real_person') and not V.likeness_of(session, eid) else []) + ([WORDS['warn_exact']] if f.get('identity') == 'exact' else []) \
-                + [WORDS['warn_size'].format(what=w) for w in unknown[:1]] + ([WORDS['warn_cause'].format(cause=cause['text'])] if cause else []) + ([WORDS['warn_stale']] if fnd.get('stale') else [])
-            doubt = bool(row.get('doubt') or not match or f.get('real_person') or fnd.get('stale'))
+                + ([WORDS['warn_cause'].format(cause=cause['text'])] if cause else []) + ([WORDS['warn_stale']] if fnd.get('stale') else [])   # a size that is not known is no warning here: nothing is decided by it
+            doubt = bool(row.get('doubt') or any(p.get('weak') for p in frames) or not match or f.get('real_person') or fnd.get('stale'))   # design/211 review, M3: a weak frame that came in since the round was sent counts too
             pics = [{'_key': _ref_key(run, p['ref']), 'label': str(p.get('view') or 'Footage picture'), 'note': str(p.get('seen') or ''), **({'weak': True} if p.get('weak') else {}),
                      'choice': 'not:' + p['ref'], 'choice_label': WORDS['not_this']} for p in frames]
             if closest:
@@ -719,7 +776,7 @@ def _round_v2(ctx, every, step):
             line = {'group': GROUP_DOUBT if doubt else group_of(eid), 'text': '\n'.join(x for x in (about(eid, f), WORDS['own_is'] if mine else _footage_words(fnd, frames)) if x),
                     **({'rec': {'do': rec, 'label': match[0] if match else REC_WORDS.get(rec, str(rec)), 'reason': str(row.get('reason') or '')}} if rec else {}),
                     **({'warnings': warnings} if warnings else {}), **({'pics': pics} if pics else {}), **({'comment': True, 'comment_hint': WORDS['hint']} if sets else {}),
-                    **({'cost': _cost(f)} if any(o[2] == 'none' for o in opts) else {})}
+                    **({'cost': _cost(f, where)} if any(o[2] == 'none' for o in opts) else {})}
             does = {o[1]: o[2] for o in opts}
 
             def run_(choice, quote, words, eid=eid, own=None, pics=None, does=does, opts=opts, marked=None):
@@ -748,9 +805,14 @@ def _round_v2(ctx, every, step):
         if routine and (every or session.get('round_each') != rd.get('at')):
             does = [i['_does'][i['_routine']] for i in routine]
             n_sets = does.count('set')
-            price = WORDS['paid'].format(x=n_sets * budget[2]) if n_sets else WORDS['free']
-            line = {'text': WORDS['all_text'].format(n=_n(len(things), 'thing'), d=len([i for i in things if not i['_routine']]), r=len(routine), s=_n(n_sets, 'set'),
-                                                     price=f" ({WORDS['paid'].format(x=n_sets * budget[2])})" if n_sets else '', f=_n(does.count('footage'), 'thing'), l=does.count('none'))}
+            # design/211 review, C4: the truth about the sets: three are made first, the others are asked after; counted with the sets the operator's own answers ask for so far
+            asked = n_sets + len([i for i in things if i['_kept'] and i['_does'].get(i['_kept'].get('verdict')) == 'set'])
+            k, one = min(asked, ref_sets.FIRST_MAX), budget[2]
+            price = WORDS['free'] if not n_sets else WORDS['accept_first'].format(k=k, x=k * one) if asked > k else WORDS['paid'].format(x=n_sets * one)
+            goes = WORDS['goes'].format(m=ref_sets.FIRST_MAX, a=f"{_n(asked, 'set')} {'is' if asked == 1 else 'are'}", t=asked * one, k=k, x=k * one,
+                                        after=WORDS['goes_after'].format(r=asked - k, y=(asked - k) * one) if asked > k else '') if asked else ''
+            line = {'text': WORDS['all_text'].format(n=_n(len(things), 'thing'), d=len([i for i in things if not i['_routine']]), r=len(routine), s=_n(n_sets, 'set'), goes=goes,
+                                                     price=f" ({WORDS['paid'].format(x=n_sets * one)})" if n_sets else '', f=_n(does.count('footage'), 'thing'), l=does.count('none'))}
 
             def run_(choice, quote, words):
                 if choice == 'each':   # the chat: the operator answers every line; not offered again in this round
@@ -765,6 +827,8 @@ def _round_v2(ctx, every, step):
                                      line, _key='refs:proposals', _title=WORDS['all_title']))
         if not every:
             items = [i for i in items if not i['_kept']]
+            if items and not held and session.get('round_each') != rd.get('at'):   # said once, with the first question of the step
+                items[0]['_summary'] = _unread(found)
         for n, i in enumerate(items, 1):
             i['position'] = f'References, {n} of {len(items)}'
         return items
@@ -778,7 +842,8 @@ def _round_v2(ctx, every, step):
         person = kinds.get(eid) == 'person'
         if row.get('reopened'):   # back after the round was sent again: the operator's word orders its set, or leaves it out
             f = facts(eid)
-            line = {'group': WORDS['g_back'], 'text': about(eid, f) + '\n' + WORDS['reopen_left' if row['reopened'] == 'left_out' else 'reopen_new'], 'comment': True, 'comment_hint': WORDS['hint'], 'cost': _cost(f)}
+            line = {'group': WORDS['g_back'], 'text': about(eid, f) + '\n' + WORDS[{'new': 'reopen_new', 'changed': 'reopen_changed'}.get(row['reopened'], 'reopen_left')], 'comment': True,
+                    'comment_hint': WORDS['hint'], 'cost': _cost(f, where)}
             back.append(_v2_item(f'reopen:{eid}', 'reference set to make', '', names[eid], WORDS['ask_set'],
                                  lambda choice, quote, words, eid=eid: ref_sets.round_reopen(conn, store, user, run, outputs, eid, choice, words, quote),
                                  [_button(priced(WORDS['set']), 'approve'), _button(WORDS['leave'], 'ignore')], line, _key=f'set:{eid}', _eid=eid, _person=person))
@@ -796,9 +861,12 @@ def _round_v2(ctx, every, step):
             f, letter = facts(eid), {p['ref']: LETTERS[n] for n, p in enumerate(shown)}
             states = [(p.get('check') or {}).get('state') or 'none' for p in shown]
             state = 'fail' if 'fail' in states else 'pass' if 'pass' in states else 'none'
+            # design/211 review, S15: plain words, no size in pixels and no picture id; a check that did not run on a picture is said so, whatever the program's own lines found
+            fault = lambda p, x: WORDS['check_' + x['check']].format(letter=letter[p['ref']]) if x.get('check') in ('size', 'parent') else \
+                WORDS['check_line'].format(letter=letter[p['ref']], check=x.get('check'), seen=x.get('seen'))
             check = {'state': state, 'by': WORDS['check_by'],
-                     'lines': [WORDS['check_line'].format(letter=letter[p['ref']], check=x.get('check'), seen=x.get('seen')) for p in shown for x in (p.get('check') or {}).get('failed') or []]
-                              + ([WORDS['check_off'].format(letter=letter[p['ref']]) for p, st in zip(shown, states) if st == 'none'] if state != 'none' else [])}
+                     'lines': [fault(p, x) for p in shown for x in (p.get('check') or {}).get('failed') or []]
+                              + ([WORDS['check_off'].format(letter=letter[p['ref']]) for p, st in zip(shown, states) if st == 'none' or (p.get('check') or {}).get('error')] if state != 'none' else [])}
             proposed, again = sf.get('rec') or {}, int(sf.get('makes_left') or 0) > 0
             remake = lambda label: WORDS['again'].format(label=label, paid=paid)
             if person:
@@ -867,28 +935,41 @@ def _round_v2(ctx, every, step):
                                        line, _key=f'set:{eid}', _eid=eid, _person=person))
                 continue
             fail = (ref_sets.set_facts(session, plan, eid, row).get('fail') or {}).get('text') if row.get('set') or row.get('error') else None
-            line = {'group': WORDS['g_not_made'], 'text': about(eid, f) + '\n' + (WORDS['not_made_cause'].format(cause=cause['text']) if cause else fail or WORDS['not_made']), 'cost': _cost(f)}
+            most = ref_sets.makes(session, eid, row) >= ref_sets.MAKES_MAX   # design/211 review, M2: made the most times: no paid button
+            line = {'group': WORDS['g_not_made'], 'cost': _cost(f, where),
+                    'text': about(eid, f) + '\n' + (WORDS['made_max_unmade'].format(n=ref_sets.MAKES_MAX) if most else WORDS['not_made_cause'].format(cause=cause['text']) if cause else fail or WORDS['not_made'])}
 
             def run_(choice, quote, words, eid=eid):
                 if choice == 'make':
                     return {**make(eid, quote), 'tell': 'The set is being made. ' + NOTHING}
                 return V.set_aside(store, user, run, outputs, eid, words or quote)
-            unmade.append(_v2_item(f'setmake:{eid}', 'reference set to make', '', names[eid], WORDS['ask_make'], run_, [_button(priced(WORDS['make']), 'make'), _button(WORDS['leave'], 'aside')], line,
+            unmade.append(_v2_item(f'setmake:{eid}', 'reference set to make', '', names[eid], WORDS['ask_make'], run_, ([] if most else [_button(priced(WORDS['make']), 'make')]) + [_button(WORDS['leave'], 'aside')], line,
                                    _key=f'set:{eid}', _eid=eid, _person=person))
     items = back + by_group(sets) + unmade
     if waiting and step in (2, 'rewrite'):   # (also while a sent-back set waits for its rewrite: ref_sets.round_rest takes it then, the operator answers both in one visit) the first sets are judged before the others are ordered: one button, with the price of all of them
         many = len(waiting) != 1
-        line = {'text': WORDS['rest_text'].format(k=_n(len([r for r in rows.values() if r.get('set')]), 'set'), r=f"{len(waiting)} more {'are' if many else 'is'}", names=', '.join(names[e] for e in waiting))}
+        # design/211 review, C5: a person shown in a made picture always gets a set, so "Leave out" never covers one; the line names the shots that lose a reference
+        wf = {e: facts(e) for e in waiting}
+        people = [e for e in waiting if kinds.get(e) == 'person' and wf[e].get('shots_made')]
+        out_ = [e for e in waiting if e not in people]
+        them = f'these {len(out_)}' if len(out_) != 1 else 'it'
+        lose = [f"{names[e]}: {', '.join(_made_shots(wf[e], where))}" for e in out_ if _made_shots(wf[e], where)]
+        y = still_needs(ctx)   # design/211 review, S13: what the plan's shots still need, wherever money is decided
+        line = {'text': '\n'.join(x for x in (
+                    WORDS['rest_text'].format(k=_n(len([r for r in rows.values() if r.get('set')]), 'set'), r=f"{len(waiting)} more {'are' if many else 'is'}", names=', '.join(names[e] for e in waiting)),
+                    WORDS['rest_people'].format(names=', '.join(names[e] for e in people), them='them' if len(people) != 1 else 'this one') if people and out_ else '',
+                    WORDS['money_spent'].format(s=budget[0], c=budget[1]) if y is None else WORDS['money'].format(s=budget[0], c=budget[1], y=y)) if x),
+                **({'cost': WORDS['rest_cost'].format(them=them, things='; '.join(lose)) if lose else WORDS['rest_cost_none'].format(them=them)} if out_ else {})}
 
         def run_(choice, quote, words):
             if choice == 'rest':
                 return ref_sets.round_rest(conn, store, user, run, outputs, quote)
-            for eid in waiting:
+            for eid in out_:
                 V.set_aside(store, user, run, outputs, eid, words or quote)
-            return {'aside': waiting}
+            return {'aside': out_}
         rest = _v2_item(f"rest:{rd.get('at')}", 'reference set to make', '', WORDS['rest_title'], WORDS['rest_ask'], run_,
-                        [_button(WORDS['rest_make'].format(sets=f'{len(waiting)} sets' if many else 'set', paid=WORDS['paid'].format(x=len(waiting) * budget[2])), 'rest'),
-                         _button(WORDS['rest_out'].format(them=f'these {len(waiting)}' if many else 'it'), 'rest_out')], line, _key='sets:rest', _title=WORDS['rest_title'])
+                        [_button(WORDS['rest_make'].format(sets=f'{len(waiting)} sets' if many else 'set', paid=WORDS['paid'].format(x=len(waiting) * budget[2])), 'rest')]
+                        + ([_button(WORDS['rest_out'].format(them=them), 'rest_out')] if out_ else []), line, _key='sets:rest', _title=WORDS['rest_title'])
         items = [rest] + items if every else items + [rest]   # the page shows it first; the chat asks it once the first sets are answered
     for n, i in enumerate(items, 1):
         i['position'] = f'Reference sets, {n} of {len(items)}'
@@ -1259,7 +1340,7 @@ def _candidates(ctx):
     for step in (_drawing_items, _round_items, _waiting_items, _guide_items, _record_items):   # design/200: a drawing set is approved before the pictures made from it
         items = step(ctx)
         if items:
-            return items, '', note
+            return items, str(items[0].get('_summary') or '') if items[0].get('_v2') else '', note   # design/211 review: a v2 round's first question says once what holds for the whole step
     return [], '', note
 
 
@@ -1495,7 +1576,8 @@ def next_item(conn, store, user, run, outputs, one=False):
         session.pop('chat_card', None)
         V.save_session(store, run, session)
     lines = with_assistant + working(conn, run)
-    turn = V.round_due(session, None) if V.round_v2(session) else None   # design/211: a v2 round that waits for Claude (the looks at the made sets, a rewrite): the server's own sentence, as every status gives it
+    # design/211: a v2 round that waits for Claude (the looks at the made sets, a rewrite): the server's own sentence, as every status gives it; design/211 review, N6: and with the plan accepted and no round, what comes next
+    turn = V.round_due(session, ctx['plan']) if V.round_v2(session) or (V.ROUND_V == 2 and not session.get('round')) else None
     return {'item': None, 'needed': False, 'working': lines, 'say_last': NOTHING, **({'then': turn} if turn else {}),
             'how': (FRAMES_ON_PAGE if _round_frames(ctx) else '') + 'Tell the operator the `working` lines as they are' + ('' if lines else ' (there are none: say in one line what you are doing next)') + f', then "{NOTHING}"'}
 

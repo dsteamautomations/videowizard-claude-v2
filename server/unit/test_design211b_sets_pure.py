@@ -94,9 +94,11 @@ def test_a_thing_no_shot_names_has_no_shots_and_no_scene():
 # ---------- the three views ----------
 
 def test_the_plans_views_come_first_and_the_kind_fills_to_three():
-    assert RS.view_names(el('TROWEL')) == ['side', 'in the hand, lifting mortar', 'whole and at rest']
-    assert RS.view_names(el('TILE')) == ['underside', 'a stacked pair', 'whole and at rest']
-    assert RS.view_names(el('FAN')) == ['whole and at rest', 'as the film uses it', 'the detail that shows how it is made'] == RS.view_names(el('BRICK'))
+    # design/211 review (S10, S7): a default view the plan's own view already shows is left out; a material has its own views
+    assert RS.view_names(el('TROWEL')) == ['side', 'in the hand, lifting mortar', 'the detail that shows how it is made']
+    assert RS.view_names(el('TILE')) == ['underside', 'a stacked pair', 'as the film uses it']
+    assert RS.view_names(el('FAN')) == ['whole and at rest', 'as the film uses it', 'the detail that shows how it is made']
+    assert RS.view_names(el('BRICK')) == ['a surface of it, filling the frame', 'as the film uses it', 'very close: what it is made of']
     assert RS.view_names(el('STREET')) == F.VIEWS['STREET'] and RS.view_names(el('T_LAY')) == F.VIEWS['T_LAY'] and RS.view_names(el('MASON')) == F.VIEWS['MASON']
     four = {**el('TROWEL'), 'required_views': ['side', 'top', 'underside', 'in the hand']}
     assert RS.view_names(four) == ['side', 'top', 'underside']
@@ -106,7 +108,7 @@ def test_the_plans_views_come_first_and_the_kind_fills_to_three():
 
 
 def test_two_views_that_read_the_same_are_one_and_the_kinds_own_view_is_never_added_twice():
-    assert RS.view_names({**el('TROWEL'), 'required_views': ['side', 'Side view', 'the side']}) == ['side', 'whole and at rest', 'as the film uses it']
+    assert RS.view_names({**el('TROWEL'), 'required_views': ['side', 'Side view', 'the side']}) == ['side', 'as the film uses it', 'the detail that shows how it is made']
     assert RS.view_names({**el('TROWEL'), 'required_views': ['the whole trowel, at rest']})[1:] == ['as the film uses it', 'the detail that shows how it is made']
     assert RS.view_names({**el('STREET'), 'required_views': ['from the other side']}) == ['from the other side', 'the whole place', 'its fixed things']
     for views in (['side', 'Side view', 'the side'], ['underside', 'the underside view', 'whole and at rest']):
@@ -155,7 +157,7 @@ def test_the_fixed_text_keeps_the_two_ideas_of_the_owners_text():
     r = request('FAN')
     assert RS.OPENING in r['prompt'] and RS.ONE_THING in r['prompt'] and RS.SET_LINE in r['prompt'] and RS.FINISH in r['prompt'] and RS.NOTES in r['prompt']
     assert 'correctness matters more than anything else' in RS.OPENING and 'the AI will copy exactly what it sees, including any mistake' in RS.OPENING
-    assert 'show one real thing, as one real photograph would' in RS.ONE_THING and 'Do not combine them' in RS.ONE_THING and 'the photographs win' in RS.FROM_WEB
+    assert 'show one real thing, as one real photograph would' in RS.ONE_THING and 'Do not combine them' in RS.ONE_THING and 'the photographs win' not in RS.FROM_WEB and 'the earlier one wins' in RS.AUTHORITY   # design/211 review (C3): one order of authority, said once
     assert 'never as a collage' in RS.SET_LINE and 'with URLs' in RS.NOTES
 
 
@@ -203,7 +205,8 @@ def test_a_place_gets_its_first_two_signs_of_use_unless_it_is_staged_clean():
 
 def test_the_writers_added_words_are_placed_and_win_over_the_description_and_an_empty_one_adds_nothing():
     r = request('T_LAY')
-    assert r['parts']['added'] == 'The brick is wet from soaking.' and "Added by the film's writer; where this differs from the description, this wins: The brick is wet from soaking." in r['prompt']
+    assert r['parts']['added'] == 'The brick is wet from soaking.' and "Added by the film's writer: The brick is wet from soaking." in r['prompt']
+    assert "(1) the words added by the film's writer; (2) the description from the film's plan; (3) real photographs from the web" in r['prompt']   # design/211 review (C3): they win over the description by the order said once
     none = request('STREET', row={'prompt': '', 'operator_words': []})
     assert none['parts']['added'] == '' and none['parts']['operator'] == '' and 'Added by' not in none['prompt'] and "The operator's words" not in none['prompt']
 
@@ -229,7 +232,7 @@ def test_a_footage_picture_is_the_first_input_it_wins_over_the_web_and_search_st
 def test_a_weak_frame_is_named_weak_in_the_request():
     r = request('TROWEL')
     assert RS.FRAME_WEAK_LINE.format(k=2, name="Mason's trowel", view='in the hand, lifting mortar') in r['prompt']
-    assert 'take its form, colour and material' in RS.FRAME_WEAK_LINE and 'show it whole and clean' in RS.FRAME_WEAK_LINE and 'weak picture' not in request('TILE')['prompt']
+    assert 'take its form, colour and material' in RS.FRAME_WEAK_LINE and 'show the thing whole and uncovered' in RS.FRAME_WEAK_LINE and 'weak picture' not in request('TILE')['prompt']
 
 
 def test_a_frame_not_yet_approved_or_marked_not_this_is_no_input_and_three_at_most():
@@ -258,7 +261,7 @@ def test_the_approved_drawings_follow_the_footage_pictures_with_their_facts_and_
 def test_a_person_is_made_from_the_description_alone_and_from_their_photo_only_with_the_permission():
     r = request('MASON')
     assert r['inputs'] == [] and r['search'] is False and r['parts']['source'] == 'words' and RS.FROM_WEB not in r['prompt'] and 'Google' not in r['prompt']
-    assert r['prompt'].startswith('Character sheet of The mason (MASON), a person in this film.') and 'Garments: a white shirt, a checked lungi.' in r['prompt']
+    assert r['prompt'].startswith('Character sheet of The mason, a person in this film.') and 'Garments: a white shirt, a checked lungi.' in r['prompt']   # design/211 review: no code name
     assert RS.PERSON_SET.format(a='a full-length front view, standing at ease', b='right hand and forearm, the same person', c='a close view of the face') in r['prompt']
     s = ready()
     s['references']['own-1'] = {'id': 'own-1', 'kind': 'supplied', 'element_id': 'MASON', 'status': 'approved', 'created_at': F.NOW}
@@ -270,13 +273,14 @@ def test_a_person_is_made_from_the_description_alone_and_from_their_photo_only_w
 
 def test_a_way_of_working_may_show_hands_in_the_request_and_its_lines_do_not_forbid_them():
     r = request('T_LAY')
-    assert 'the hands and forearms doing it' in r['prompt'] and 'No face.' in r['prompt'] and 'No person and no face' not in r['prompt']
+    # design/211 review (C1): hands, forearms and a tool are allowed where the description names them, never required
+    assert 'Hands, forearms and a tool are allowed where the description names them, never required.' in r['prompt'] and 'No face.' in r['prompt'] and 'No person and no face' not in r['prompt']
     checks = {l['check']: l['pass_when'] for l in r['lines']}
-    assert 'no person' not in checks and 'the hands and the tool doing it' in checks['the action is shown'] and 'no face' in checks['the action is shown']
+    assert 'no person' not in checks and 'hands and a tool are allowed, not required' in checks['the action is shown'] and 'no face' in checks['the action is shown']
     assert not any(re.search(r'no hands?\b', w) for w in checks.values())
     assert any('no hands' in l['pass_when'] for l in VS.KEPT_THING_LINES)   # the older lines forbade them: they stay for an older round
     thing = request('FAN')
-    assert 'No person and no face in any picture; a hand may hold it only in a picture whose view shows it in use.' in thing['prompt']
+    assert 'No person and no face in any picture. In a picture whose view shows it in use, the hand that holds it and the material it works on may be shown' in thing['prompt']
     assert 'No person as the subject.' in request('STREET')['prompt']
 
 

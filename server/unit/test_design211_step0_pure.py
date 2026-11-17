@@ -40,7 +40,7 @@ def test_the_contracts_names_and_signatures():
                  'REC_PERSON', 'REASON_MISSING', 'FIRST_TOO_MANY', 'CLEAN_NO_FRAME', 'SET_NO_LOOK', 'LOOK_SET_UNKNOWN', 'LOOK_PICTURES', 'LOOK_VERDICT', 'LOOK_SEEN', 'LOOK_GOLDEN',
                  'REST_NOT_NOW', 'REST_NONE', 'REST_CAP', 'REWRITE_NOT_DUE', 'REWRITE_EMPTY', 'REWRITE_SAME', 'MAKES_LIMIT', 'MAKE_NO_QUOTE'):
         assert isinstance(getattr(ref_sets, name), str), name
-    assert ref_sets.REWRITE_DUE.format(n=2).count('{element_id, prompt}') == 1   # the braces of the rows survive the formatting
+    assert ref_sets.REWRITE_DUE.format(n=2, things='A; B').count('{element_id, prompt}') == 1   # the braces of the rows survive the formatting (design/211 review: the sentence names the things)
     assert set(ref_sets.REC_VERDICT) == set(ref_sets.RECS) and set(ref_sets.REC_VERDICT.values()) == set(ref_sets.STEP1_VERDICTS)
 
 

@@ -131,6 +131,9 @@ if __name__ == '__main__':
         prompt = d211b(prompt, parts)
         from d211c_wording_v3 import apply as d211c   # design/211 part C: what the operator sees and decides (the proposals, the doubtful first)
         prompt = d211c(prompt, parts)
+        from d211d_wording_v3 import apply as d211d, apply_steps as d211ds   # design/211, the review: the step list, the views by kind, the order of authority, what a helper is given, three makes, a second send
+        prompt = d211d(prompt, parts)
+        d211ds(steps)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

@@ -261,7 +261,8 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     trowel, fan = lines['ref:TROWEL'], lines['ref:FAN']
     assert trowel['rec'] == {'do': 'footage', 'label': 'Use it as the reference', 'reason': F.ROWS['TROWEL'][1]} and [b['choice'] for b in trowel['buttons']] == ['approve', 'clean', 'ignore']
     assert [(p['label'], p.get('weak'), p['choice'][:4]) for p in trowel['pics']] == [('side', None, 'not:'), ('in the hand, lifting mortar', True, 'not:')] and trowel['pics'][1]['note'] == 'Half covered by mortar.'
-    assert 'From your footage: 2 pictures.' in trowel['text'] and 'Not searched, because they have no analysis: C003.mp4.' in trowel['text'] and 'Used in 2 shots' in trowel['text']
+    assert 'From your footage: 2 pictures.' in trowel['text'] and 'Used in 2 shots' in trowel['text']
+    assert 'Not searched for any thing, because they have no analysis: C003.mp4.' in page['summary'] and 'no analysis' not in trowel['text']   # design/211 review: said once, in the summary
     assert 'None was found in your footage. Searched: 2 clips (C001.mp4, C002.mp4). The closest is shown.' in fan['text'] and fan['pics'][0]['choice'] == 'use:' + tid['FAN', 35.0]
     assert 'Your footage was not searched for it: The helper was stopped.' in lines['ref:BRICK']['text'] and [b['choice'] for b in lines['ref:MASON']['buttons']] == ['approve']
     assert 'has no picture of it' not in json.dumps(page)
@@ -306,7 +307,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     assert [b['choice'] for b in lines['sets:rest']['buttons']] == ['rest', 'rest_out'] and lines['sets:rest']['buttons'][0]['label'] == 'Make the other 2 sets (paid, about ₹71)'
     lay = lines['set:T_LAY']
     assert lay['group'] == 'Doubtful: look at these first' and lay['rec']['do'] == 'remake' and lay['check'] == {'state': 'fail', 'by': "The program's check (Gemini)", 'lines': ['Picture B: the view: Not the view asked.']}
-    assert lay['notes']['sources'] == 1 and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · the tool meeting the material'] and lay['pics'][0]['note']
+    assert lay['notes']['sources'] == 1 and [p['label'] for p in lay['pics']] == ['A · the action at its key moment', 'B · the result just after', 'C · close on where it happens'] and lay['pics'][0]['note']
     assert lines['set:MASON']['check']['state'] == 'pass' and lines['set:MASON']['rec']['label'] == 'Yes' and [b['choice'] for b in lines['set:MASON']['buttons']] == ['yes', 'no', 'correct']
 
     # one visit: "Correct it", "No", a picture chosen, and "make the other sets". Nothing is made again before Claude's rewrite; the others are ordered
@@ -336,7 +337,7 @@ def test_a_v2_round_from_the_digest_to_complete_on_the_page():
     assert [(p['label'], p.get('ref_only')) for p in lines['set:TROWEL']['pics']][:2] == [('From your footage: side', True), ('A · side', None)]
     first = lambda key: lines[key]['buttons'][0]['choice']
     out = film.record(ans(lines['set:MASON'], 'yes'), ans(lines['set:TROWEL'], first('set:TROWEL')), ans(lines['set:BRICK'], first('set:BRICK')), ans(lines['set:T_LAY'], 'no'))
-    assert film.state() == 'rewrite' and says(out, 'vw visuals round --rewrite') == RS.REWRITE_DUE.format(n=1) == VS.round_due(film.session(), film.plan)
+    assert film.state() == 'rewrite' and says(out, 'vw visuals round --rewrite') == RS.rewrite_due(film.session()) == VS.round_due(film.session(), film.plan)
 
     # the third make is the last: "No" and "Correct it" are not offered and are held; the line offers a picture, the operator's own, or to leave it out
     assert says(film.rewrite([{'element_id': 'T_LAY', 'prompt': 'Both hands are seen; the right presses the brick.'}]), 'vw visuals status') == RS.REWRITE_MAKING.format(n=1, x='35')
@@ -381,7 +382,10 @@ def test_the_round_file_sent_again_orders_nothing_and_the_thing_comes_back_as_an
     film.back()
     film.set_looks()
     out = film.post(round_file(film, FAN={'rec': 'set', 'reason': 'It is seen closer now.'}))
-    assert says(out, 'vw visuals page') == RS.MERGE_ASK.format(n=3) and out['reopened'] == ['FAN', 'BRICK', 'TILE'] and film.ordered() == ['MASON', 'STREET', 'T_LAY']
+    # design/211 review (M5): the plan is the same, so nothing comes back; a thing the operator left out comes back when they ask for it by name
+    assert says(out, 'vw visuals round --back') == RS.MERGE_NONE and out['reopened'] == [] and film.ordered() == ['MASON', 'STREET', 'T_LAY']
+    for eid in ('FAN', 'BRICK', 'TILE'):
+        assert says(film.do(lambda: VS.set_aside(film.store, USER, film.run, film.outputs, eid, back=True)), 'vw visuals page') == RS.BACK_ASKED.format(eid=eid)
     lines = film.lines()
     assert [b['choice'] for b in lines['set:FAN']['buttons']] == ['approve', 'ignore'] and lines['set:FAN']['group'] == CF.WORDS['g_back']
     out = film.record(ans(lines['set:FAN'], 'approve', 'The dial is cream, not white.'), ans(lines['set:BRICK'], 'ignore'), ans(lines['set:TILE'], 'ignore'))
@@ -439,14 +443,16 @@ def test_the_chat_says_the_rewrite_is_due():
     out = film.next()
     while out.get('item'):
         out = film.decide(out['item']['id'], 'no', 'No')
-    assert film.state() == 'rewrite' and RS.REWRITE_DUE.format(n=3) in says(out, 'vw visuals round --rewrite') and film.next()['then'] == RS.REWRITE_DUE.format(n=3)
+    due = RS.rewrite_due(film.session())
+    assert film.state() == 'rewrite' and due in says(out, 'vw visuals round --rewrite') and film.next()['then'] == due and due.startswith('3 set(s) wait for your rewrite: MASON (no words')
 
 
 # ---------- every "what next" sentence of the three parts names commands the tool takes ----------
 
 def test_every_what_next_sentence_names_commands_the_tool_takes():
     for module, names in ((RF, ('FIND_START', 'FIND_WORDS', 'TRIAL_NEXT', 'LOOK_MORE', 'LOOK_ALL', 'OLDER_ROUND')),
-                          (RS, ('ROUND_POSTED', 'GO1_MAKING', 'ALL_MAKING', 'SETS_LOOK', 'SETS_PAGE', 'REWRITE_DUE', 'REWRITE_MAKING', 'MERGE_ASK', 'SET_NO_LOOK', 'LOOK_SET_UNKNOWN', 'MAKE_NO_QUOTE')),
+                          (RS, ('ROUND_POSTED', 'GO1_MAKING', 'ALL_MAKING', 'SETS_LOOK', 'SETS_PAGE', 'REWRITE_DUE', 'REWRITE_MAKING', 'MERGE_ASK', 'SET_NO_LOOK', 'LOOK_SET_UNKNOWN', 'MAKE_NO_QUOTE',
+                                'SETS_MAKING', 'ROUND_STEP1', 'ROUND_STEP2', 'ROUND_DONE', 'MERGE_NONE', 'BACK_ASKED', 'NOT_ORDERED', 'WORD_NEEDED')),   # the second line: the sentences of the review
                           (P, ('REST_LEFT', 'REFS_HERE', 'REFS_GO', 'SETS_WAIT', 'SETS_STAND', 'SETS_NONE', 'ROUND_NEXT', 'ROUND_REFUSED', 'REFS_START'))):
         for name in names:
             commands(getattr(module, name))

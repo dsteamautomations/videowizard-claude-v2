@@ -92,7 +92,7 @@ def test_step_1_of_a_v2_round_on_the_page(monkeypatch, browser, view, scheme):
     assert [t.split(' ', 1)[1] for t in heads.locator('span:first-child').all_text_contents()] == ['Doubtful: answer these yourself', 'People', 'Things', 'Materials', 'Places', 'Ways of working']   # 1
     assert heads.nth(0).locator('.count').text_content() == '2 lines, 2 to answer' and heads.nth(0).get_attribute('aria-expanded') == 'true'   # 2
     first = pg.locator('section.item').first
-    assert first.locator('.acts button').first.text_content() == 'Accept the 5 proposals (paid, about ₹175)' and 'go' in first.locator('.acts button').first.get_attribute('class')   # 3
+    assert first.locator('.acts button').first.text_content() == 'Accept the 5 proposals (paid: 3 sets first, about ₹105; the others are asked after)' and 'go' in first.locator('.acts button').first.get_attribute('class')   # 3
     trowel = block(pg, "Mason's trowel")
     assert trowel.locator('p.prop').text_content() == 'Claude proposes: Use it as the reference. The film shows it whole and sharp from the side.'   # 4
     assert trowel.locator('.acts > button').all_text_contents() == ['Use it as the reference', 'Make a clean set from it (paid, about ₹35)', 'Leave it out']   # 5: the proposed answer first
@@ -101,7 +101,7 @@ def test_step_1_of_a_v2_round_on_the_page(monkeypatch, browser, view, scheme):
     assert trowel.locator('.pnote').all_text_contents() == ['Claude saw: The whole trowel, side on, sharp; the handle is reddish-brown.', 'Claude saw: In the hand, the blade half covered by mortar.']   # 8
     assert 'Read before you answer' in trowel.locator('.note').text_content()   # 9
     assert trowel.locator('.acts textarea').get_attribute('placeholder').startswith('Words for the picture (optional)')   # 10
-    assert 'If you leave it out, these shots are made with no reference of it: G2-S1-SH1, G2-S1-SH2.' in trowel.locator('.acts').text_content()   # 11
+    assert 'If you leave it out, these shots are made with no reference of it: shot 1 of gap G2, shot 2 of gap G2.' in trowel.locator('.acts').text_content()   # 11
     assert block(pg, 'The mason').locator('.acts > button').all_text_contents() == ['Have a set made (paid, about ₹35)']   # 12: no "Leave it out" for a person in a made picture
     assert no_side_scroll(pg)   # 13
     assert pg.evaluate('getComputedStyle(document.body).backgroundColor') == ('rgb(16, 22, 28)' if scheme == 'dark' else 'rgb(245, 247, 248)')   # 14: both themes

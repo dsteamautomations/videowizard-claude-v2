@@ -1991,6 +1991,8 @@ def _round_one(a, base):
         emit(out, 0, (out.get('next') or f'{eid}: its set is being made.')
              + (f" (about ₹{out.get('cost_inr') or 0:,.0f}; paid: tell the operator.) Then `vw visuals status --wait 900`." if out.get('queued') else ''))
     out = write(base + '/round/aside', {'element_id': eid, 'words': words if what == 'aside' else '', 'back': what == 'back'})
+    if 'then' in out:   # design/211 review: a thing left out at step 1 of a v2 round, asked for again: the server's sentence
+        emit(out, 0, out['then'])
     emit(out, 0, (out.get('next') or ('Set aside.' if what == 'aside' else 'Brought back.')).replace('Bring back returns it', f'`vw visuals round --back {eid}` returns it'))
 
 
@@ -2832,6 +2834,8 @@ def cmd_visuals(a):
         rd = st.get('round') or {}
         round_line = (f"; reference round at pass {rd.get('pass')}" + (': the operator answers it on the page, `vw visuals page`' if rd.get('pass') in (1, 2) else ': the sets are being made, wait' if rd.get('pass') == 'making'
                                                                         else ': complete; the approved sets are the references' if rd.get('kept') else ': read the verdicts and make the sheets')) if rd else ''   # design/151
+        if rd.get('v'):   # design/211 review, N1: a round made after the references step was rebuilt: the server's own sentence (`round_due`) and no line of the tool's
+            round_line = ''
         if open_:
             images, takes = sum(1 for j in open_ if j.get('provider') in ('openai', 'gemini-image')), sum(1 for j in open_ if j.get('provider') == 'video')   # design/124 A4 item 20: both picture AIs
             drawn = sum(1 for j in open_ if j.get('provider') == 'drawn')   # W13: a drawing open is named too

@@ -133,7 +133,8 @@ def test_a_film_with_no_round_gets_a_v2_round_with_the_fields_of_each_row():
     rd = saved(store)['round']
     assert (rd['v'], rd['pass'], rd['go'], rd['rest'], rd['kept'], rd['quote']) == (2, 1, 1, [], True, None) and sorted(rd['elements']) == sorted(F.THINGS)
     assert rd['elements']['TROWEL'] == {'frames': ['f-trowel-side', 'f-trowel-use'], 'keywords': '', 'verdict': None, 'search_id': None, 'error': None, 'prompt': '', 'corrections': [], 'set': None, 'round': 0,
-                                        'rec': 'footage', 'reason': 'The film shows it whole and sharp from the side.', 'doubt': True, 'first': False, 'operator_words': [], 'history': []}
+                                        'rec': 'footage', 'reason': 'The film shows it whole and sharp from the side.', 'doubt': True, 'first': False, 'operator_words': [], 'history': [],
+                                        'fp': ref_find.fingerprint(el('TROWEL'))}   # design/211 review (M5): the plan's entry as it was when the round was sent
     assert rd['elements']['T_LAY']['prompt'] == 'The brick is wet from soaking.' and rd['elements']['T_LAY']['first'] is True and rd['elements']['TILE']['frames'] == ['f-tile-under']
     assert VS.round_v2(saved(store)) and state(store) == 1 and conn.inserted == []
 
@@ -305,11 +306,12 @@ def test_a_marked_thing_the_operator_left_out_gives_its_place_to_another():
     assert out['queued'] == ['MASON', 'BRICK', 'T_LAY'] and out['rest'] == ['TILE'] and out['then'] == RS.GO1_MAKING.format(k=3, x='106', r=1)
 
 
-def test_nothing_to_make_completes_the_round_with_no_sentence_of_part_b():
+def test_nothing_to_make_completes_the_round_and_says_so():
     store, conn = film()
     post(store, conn)
     out = done(store, conn, **{e: {'verdict': 'ignore'} for e in F.THINGS if e != 'TROWEL'})
-    assert out['pass'] == 'complete' and out['queued'] == [] and out['then'] is None and out['from_footage'] == ['TROWEL'] and state(store) == 'complete' and conn.inserted == []
+    assert out['pass'] == 'complete' and out['queued'] == [] and out['from_footage'] == ['TROWEL'] and state(store) == 'complete' and conn.inserted == []
+    assert out['then'] == RS.STEP1_NO_SET + ' ' + page_flow.ROUND_NEXT   # design/211 review (N8): one sentence, never "ok"
 
 
 def test_clean_makes_a_set_from_the_footage_pictures():
@@ -401,7 +403,7 @@ def test_the_round_moves_through_its_states_and_the_stored_pass_keeps_its_four_v
 
 
 def test_while_the_round_waits_for_claude_every_status_repeats_what_to_do():
-    assert VS.round_due(F.session('looking'), F.plan()) == RS.SETS_LOOK and VS.round_due(F.session('rewrite'), F.plan()) == RS.REWRITE_DUE.format(n=1)
+    assert VS.round_due(F.session('looking'), F.plan()) == RS.SETS_LOOK and VS.round_due(F.session('rewrite'), F.plan()) == RS.rewrite_due(F.session('rewrite'))
     assert all(VS.round_due(F.session(k), F.plan()) is None for k in ('1', 'making', '2', 'complete')) and VS.round_due(F.older_session(), F.plan()) is None
     assert RS.then_of(F.session('2')) == RS.SETS_PAGE and RS.then_of(F.session('making')) is None and RS.then_of(F.session('complete')) is None
 
@@ -444,7 +446,7 @@ def test_the_sets_to_look_at_come_with_their_facts_request_inputs_and_large_pict
     store, conn = film()
     post(store, conn)
     done(store, conn, TROWEL={'verdict': 'clean'}, MASON={'verdict': 'approve'}, STREET={'verdict': 'ignore'}, BRICK={'verdict': 'ignore'}, TILE={'verdict': 'ignore'})
-    assert RS.looks_due(store, RUN, []) == {'sets': [], 'then': None}                 # being made: nothing to look at yet
+    assert RS.looks_due(store, RUN, []) == {'sets': [], 'then': None, 'how': RS.LOOK_HOW}   # being made: nothing to look at yet
     back(store)
     s = saved(store)
     for r in ('f-trowel-side', s['round']['elements']['TROWEL']['set']):
@@ -457,7 +459,7 @@ def test_the_sets_to_look_at_come_with_their_facts_request_inputs_and_large_pict
     assert t['facts'] == RS.thing_facts(F.plan(), s, el('TROWEL')) and t['request'] == jobs(conn)['TROWEL']['prompt'] and t['notes'] == '(1) One variant.'
     zoom = page_flow.PIC_SIZES['zoom'][0]
     assert t['inputs'][0] == {'ref': 'f-trowel-side', 'role': 'footage', 'view': 'side', 'key': s['references']['f-trowel-side']['key'] + zoom} and store.exists(t['inputs'][0]['key'])
-    assert [(p['ref'], p['n'], p['view']) for p in t['pictures']] == [(t['set'], 1, 'side'), (t['set'] + '-2', 2, 'in the hand, lifting mortar'), (t['set'] + '-3', 3, 'whole and at rest')]
+    assert [(p['ref'], p['n'], p['view']) for p in t['pictures']] == [(t['set'], 1, 'side'), (t['set'] + '-2', 2, 'in the hand, lifting mortar'), (t['set'] + '-3', 3, 'the detail that shows how it is made')]
     assert t['pictures'][0]['key'].endswith(zoom) and t['pictures'][0]['check'] == {'state': 'none', 'failed': [], 'error': None}
     assert t['pictures'][1]['key'] == s['references'][t['set'] + '-2']['key']        # a picture that cannot be shrunk is given at its full size
     assert RS.looks_due(store_of(F.older_session()), RUN, []) == {'sets': [], 'then': None}
@@ -539,11 +541,11 @@ def test_the_first_sets_are_judged_from_the_chat_tool_while_the_others_wait():
     assert out['approved'] == ['MASON', 'STREET', 'T_LAY'] and out['pass'] == 2 and out['then'] is None and saved(store)['golden']['STREET'] == saved(store)['round']['elements']['STREET']['set']
     assert 'a verdict is required' in refused(lambda: judge(at_two()[0], conn, {'MASON': {'verdict': 'yes'}}, partial=False))   # of the first sets, each is still asked
     store, conn = at_two()
-    post(store, conn, rows(FAN={'rec': 'set'}))                                        # FAN is back with the operator: the round stays open for it
+    VS.set_aside(store, USER, RUN, [], 'FAN', back=True)                               # FAN is back with the operator (they asked for it by name): the round stays open for it
     assert judge(store, conn, {e: yes(store, e) for e in F.FIRST}, partial=False)['pass'] == 2
     VS.set_aside(store, USER, RUN, [], 'BRICK', '')
     VS.set_aside(store, USER, RUN, [], 'TILE', '')
-    assert judge(store, conn, {})['pass'] == 2 and saved(store)['round']['elements']['FAN']['reopened'] == 'left_out'
+    assert judge(store, conn, {})['pass'] == 2 and saved(store)['round']['elements']['FAN']['reopened'] == 'asked'
 
 
 # ---------- the second go ----------
@@ -607,7 +609,7 @@ def test_no_orders_nothing_and_waits_for_the_rewrite():
     store, conn = at_two()
     before = saved(store)['round']['elements']['T_LAY']['set']
     out = judge(store, conn, {'T_LAY': {'verdict': 'correct', 'words': 'Show the hand pressing the brick down.'}, 'STREET': {'verdict': 'no'}})
-    assert out['queued'] == [] and out['rewrite'] == ['STREET', 'T_LAY'] and out['pass'] == 'rewrite' and out['then'] == RS.REWRITE_DUE.format(n=2) and len(conn.inserted) == 3
+    assert out['queued'] == [] and out['rewrite'] == ['STREET', 'T_LAY'] and out['pass'] == 'rewrite' and len(conn.inserted) == 3 and out['then'] == RS.rewrite_due(saved(store)) and out['then'].startswith('2 set(s) wait for your rewrite: STREET (no words')
     s = saved(store)
     lay, street = s['round']['elements']['T_LAY'], s['round']['elements']['STREET']
     assert lay['rewrite_due'] == {'words': 'Show the hand pressing the brick down.', 'set': before, 'at': lay['rewrite_due']['at']} and lay['operator_words'] == ['Show the hand pressing the brick down.']
@@ -629,7 +631,7 @@ def test_the_rewrite_keeps_the_earlier_request_and_orders_the_set_once():
     row, job = s['round']['elements']['T_LAY'], req(conn.inserted[-1])
     assert row['history'] == [{'n': 1, 'set': before, 'added': 'The brick is wet from soaking.', 'operator': 'Show the hand pressing the brick down.', 'at': row['history'][0]['at']}]
     assert row['prompt'] == 'The right hand presses the wet brick into the mortar bed.' and 'rewrite_due' not in row and row['round'] == 2 and row['set'] != before
-    assert 'this wins: The right hand presses the wet brick into the mortar bed.' in job['prompt'] and "The operator's words: Show the hand pressing the brick down." in job['prompt']
+    assert "Added by the film's writer: The right hand presses the wet brick into the mortar bed." in job['prompt'] and "The operator's words: Show the hand pressing the brick down." in job['prompt']
     assert 'The brick is wet from soaking.' not in job['prompt'] and "The operator's correction" not in job['prompt'] and job['parents'] == []
     assert s['references'][before]['generation']['prompt'] != job['prompt']          # the earlier request stays on the earlier set
     assert refused(lambda: rewritten(store, conn, 'Another one.')) == RS.REWRITE_NOT_DUE.format(eid='T_LAY') and len(conn.inserted) == 4
@@ -706,7 +708,7 @@ def test_the_others_left_out_do_not_hold_the_round_open():
 
 # ---------- a second send of the round file ----------
 
-def test_a_second_send_orders_nothing_and_new_and_left_out_things_go_back_to_the_operator():
+def test_a_second_send_orders_nothing_and_only_a_new_thing_goes_back_to_the_operator():   # design/211 review (M5): a thing the operator left out stays left out
     store, conn = at_two()
     s = saved(store)
     s['round']['elements'].pop('TILE')                                   # as if the plan named TILE only after the round was posted
@@ -714,11 +716,11 @@ def test_a_second_send_orders_nothing_and_new_and_left_out_things_go_back_to_the
     s['round']['elements']['BRICK'].update(error='the material spec of BRICK is not approved')
     put(store, s)
     out = post(store, conn, rows(FAN={'rec': 'set', 'reason': 'Seen close after all.'}, BRICK={'prompt': 'A wire-cut face.'}, STREET={'prompt': 'Another street.'}))
-    assert out == {'pass': 2, 'kept': True, 'v': 2, 'merged': ['BRICK'], 'reopened': ['FAN', 'TILE'], 'left': ['MASON', 'TROWEL', 'STREET', 'T_LAY'], 'queued': [], 'errors': {}, 'elements': 7,
-                   'cost_inr': 0, 'then': RS.MERGE_ASK.format(n=2)}
+    assert out == {'pass': 2, 'kept': True, 'v': 2, 'merged': ['BRICK'], 'reopened': ['TILE'], 'left': ['MASON', 'TROWEL', 'FAN', 'STREET', 'T_LAY'], 'queued': [], 'errors': {}, 'elements': 7,
+                   'cost_inr': 0, 'then': RS.MERGE_ASK.format(n=1)}
     assert len(conn.inserted) == 3                                       # nothing was ordered
     e = saved(store)['round']['elements']
-    assert e['FAN']['reopened'] == 'left_out' and e['FAN']['ignored'] is True and e['FAN']['rec'] == 'set' and e['FAN']['reason'] == 'Seen close after all.'
+    assert 'reopened' not in e['FAN'] and e['FAN']['ignored'] is True and e['FAN']['rec'] == 'no_set' and e['FAN']['reason'] != 'Seen close after all.'   # left out: the new row is not taken
     assert e['TILE']['reopened'] == 'new' and e['TILE']['verdict'] is None and e['TILE']['set'] is None and e['TILE']['frames'] == ['f-tile-under']
     assert e['BRICK']['prompt'] == 'A wire-cut face.' and e['BRICK']['error'] is None and not e['BRICK'].get('set') and 'reopened' not in e['BRICK']   # not made: its paid button stays
     assert e['STREET']['prompt'] == '' and e['STREET']['set'] and e['TROWEL']['from_footage']                                                         # a set that is there is never replaced
@@ -727,14 +729,15 @@ def test_a_second_send_orders_nothing_and_new_and_left_out_things_go_back_to_the
 def test_a_second_send_of_a_complete_round_opens_it_only_for_what_came_back():
     s = F.session('complete')
     store, conn = film(F.specs_approved(s, F.plan(), VS.spec_digest))
-    out = post(store, conn, rows(FAN={'rec': 'set'}))
-    assert out['reopened'] == ['FAN', 'BRICK', 'TILE'] and out['then'] == RS.MERGE_ASK.format(n=3) and out['pass'] == 2 and conn.inserted == []
-    assert refused(lambda: post(store, conn, rows(FAN={'rec': None}))) == RS.REC_MISSING.format(eid='FAN')
+    out = post(store, conn, rows(FAN={'rec': 'set'}))                   # design/211 review (M5): the same plan: the things left out stay left out, the round stays complete
+    assert out['reopened'] == [] and out['then'] == RS.MERGE_NONE and out['pass'] == 'complete' and conn.inserted == []
+    back = VS.set_aside(store, USER, RUN, [], 'FAN', back=True)         # the operator asks for one by name: an open line, and the round is with them again
+    assert back['then'] == RS.BACK_ASKED.format(eid='FAN') and saved(store)['round']['elements']['FAN']['reopened'] == 'asked' and state(store) == 2 and conn.inserted == []
 
 
 def test_a_thing_that_came_back_is_answered_with_the_meaning_of_step_1():
     store, conn = at_two()
-    post(store, conn, rows(FAN={'rec': 'set', 'reason': 'Seen close after all.'}))
+    VS.set_aside(store, USER, RUN, [], 'FAN', back=True)
     out = VS.guarded(lambda: RS.round_reopen(conn, store, USER, RUN, [], 'FAN', 'approve', 'The white one.', 'yes, make it'))
     assert out == {'element_id': 'FAN', 'queued': True, 'pass': 'making', 'cost_inr': 35.38, 'then': RS.ALL_MAKING.format(k=1, x=SET_INR)} and len(conn.inserted) == 4
     row = saved(store)['round']['elements']['FAN']
@@ -747,7 +750,8 @@ def test_a_thing_that_came_back_is_answered_with_the_meaning_of_step_1():
 def test_a_thing_that_came_back_can_be_left_out_or_take_its_footage_picture():
     s = F.session('complete')
     store, conn = film(F.specs_approved(s, F.plan(), VS.spec_digest))
-    post(store, conn, rows())
+    for eid in ('FAN', 'BRICK', 'TILE'):
+        VS.set_aside(store, USER, RUN, [], eid, back=True)
     out = VS.guarded(lambda: RS.round_reopen(conn, store, USER, RUN, [], 'BRICK', 'ignore', '', 'leave it'))
     assert out['queued'] is False and conn.inserted == [] and saved(store)['round']['elements']['BRICK']['ignored'] is True and 'reopened' not in saved(store)['round']['elements']['BRICK']
     assert refused(lambda: RS.round_reopen(conn, store, USER, RUN, [], 'FAN', 'clean', '', 'clean it')) == RS.CLEAN_NO_FRAME.format(eid='FAN')
@@ -802,8 +806,9 @@ def test_the_fourth_make_of_one_thing_is_refused_for_a_set_made_by_hand_too():
     back(store, fail=('STREET',))
     look(store)
     s = saved(store)
-    s['round']['elements']['STREET']['round'] = 3
+    s['round']['elements']['STREET']['round'] = 4                      # design/211 review (M2): ordered four times, and the first returned no picture: three makes
     put(store, s)
+    assert RS.makes(s, 'STREET', s['round']['elements']['STREET']) == 3
     assert refused(lambda: VS.set_make(conn, store, USER, RUN, [], 'STREET', quote='once more')) == RS.MAKES_LIMIT.format(eid='STREET', max=3)
 
 

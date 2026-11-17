@@ -469,9 +469,15 @@ def _own_line(ctx, item, paid):
             'permitted': not person or bool(V.likeness_of(session, eid)), 'text': text}
 
 
-def _thing(plan, eid):
+def _thing(plan, eid, words=KIND_WORDS):
     e = next(x for x in plan['elements'] if x['id'] == eid)
-    return f"{e.get('name') or eid} ({KIND_WORDS.get(e.get('kind'), 'a thing')})"
+    return f"{e.get('name') or eid} ({words.get(e.get('kind'), 'a thing')})"
+
+
+def _thing_v2(plan, eid):
+    """design/211 review: one word for the kind, the request's own (a way of working stands under "Ways of working")."""
+    from . import ref_sets
+    return _thing(plan, eid, ref_sets.KIND_WORDS)
 
 
 def _ask(item):
@@ -487,7 +493,7 @@ def _v2_line(ctx, item, paid):
         if line.get(field):
             line[field] = [{**pic(p['_key'], p['label']), **{k: v for k, v in p.items() if k not in ('_key', 'label')}} for p in line[field]]
     eid, kept, buttons = item['_eid'], item['_kept'], _round_buttons(item, paid)
-    out = {'key': item['_key'], 'title': _thing(ctx['plan'], eid) if eid else item['_title'], 'state': 'open', 'item': item['id'], 'ask': _ask(item), **line, 'buttons': buttons}
+    out = {'key': item['_key'], 'title': _thing_v2(ctx['plan'], eid) if eid else item['_title'], 'state': 'open', 'item': item['id'], 'ask': _ask(item), **line, 'buttons': buttons}
     if eid and item['id'].startswith(('round1:', 'set:', 'setmake:')):
         out['own'] = _own_line(ctx, item, paid)
     if kept and item['id'].startswith('round1:'):
@@ -512,7 +518,7 @@ def _sets_lines_v2(ctx):
     wait, done = [], []
     for eid in [e['id'] for e in plan['elements'] if e['id'] in rd['elements'] and e['id'] not in asked]:
         row = rd['elements'][eid]
-        head = {'key': f'set:{eid}', 'title': _thing(plan, eid)}
+        head = {'key': f'set:{eid}', 'title': _thing_v2(plan, eid)}
         rows = lambda *status: sorted(V._set_rows(session, eid, row.get('set'), status), key=lambda r: int(r.get('set_n') or 1))
         gold = V.golden_of(session, eid)
         if row.get('ignored'):
@@ -651,8 +657,10 @@ def _round_page(ctx, base, step):
         z = None if y is None else cap - spent - x - y
         after = '' if y is None else f" The plan's shots still need about ₹{y:,.0f}. " + (f'Left after both: ₹{z:,.0f}.' if z >= 0 else f'After both, the limit is passed by ₹{-z:,.0f}.')
         over = REFS_OVER.format(over=-z) + ' ' if z is not None and z < 0 else ''
+        unread = CF.unread_words(ctx)   # design/211 review: the clips nobody could search, said once here and not on every line
         return {**base, 'step': REFS_STEP, 'open': bool(left), 'lines': lines,
-                'summary': f"{many(total, 'thing')}: {total - kept} to answer, {kept} kept{more}. Spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit. These sets: up to ₹{x:,.0f}.{after}",
+                'summary': f"{many(total, 'thing')}: {total - kept} to answer, {kept} kept{more}. Spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit. These sets: up to ₹{x:,.0f}.{after}"
+                           + (' ' + unread if unread else ''),
                 'note': f'Not recorded: {stopped}' if stopped else
                         over + f'This list is long: {held} more things appear here after you answer these and say done in the chat. Nothing is made until after the last one.' if held else
                         over + 'Look at each picture, answer each thing, then say done in the chat. Nothing is made until every thing is answered.' if left else
@@ -660,11 +668,12 @@ def _round_page(ctx, base, step):
     if v2:   # design/211: step 2; while Claude looks at the sets, or writes a request again, the page says so
         from . import ref_sets
         state = V._round_pass(session, session['round'])
-        then = (ref_sets.SETS_LOOK if state == 'looking' else ref_sets.REWRITE_DUE.format(n=len([r for r in session['round']['elements'].values() if r.get('rewrite_due')])) if state == 'rewrite'
-                else SETS_WAIT if state == 'making' and not left else '')
+        then = (ref_sets.SETS_LOOK if state == 'looking' else ref_sets.rewrite_due(session) if state == 'rewrite'
+                else ref_sets.SETS_MAKING if state == 'making' and not left else '')   # design/211 review, N4: wait, then look: the operator sees no set before its look
+        y = CF.still_needs(ctx)   # design/211 review, S13
         return {**base, 'step': SETS_STEP, 'open': bool(left), 'lines': lines,
                 'summary': f"{many(total, 'thing')}: {total - kept - making - done} to answer, {kept} kept, {making} not ready yet, {done} recorded{more}. "
-                           f'A set made again costs about ₹{one:,.0f}; spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit.',
+                           f'A set made again costs about ₹{one:,.0f}; spent so far ₹{spent:,.0f} of the ₹{cap:,.0f} limit.' + ('' if y is None else f" The plan's shots still need about ₹{y:,.0f}."),
                 'note': f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
                         'Look at each set, answer each line, then say done in the chat.' if left else
                         'Nothing to answer here yet: the sets appear here when they are ready.' if making else 'Nothing more to answer here now.',
@@ -1027,11 +1036,11 @@ def page_record(conn, store, user, run, outputs, answers):
         f"{left} thing(s) still wait for the operator on the page: write the new round to the page and give them the link again. The answers given are kept: nothing is made until every thing is answered." if at_refs and left else
         'Every thing is answered and kept. When what stands in the way is settled, run `vw visuals page --record` again: the step is recorded then.' if at_refs else
         ref_sets.SETS_LOOK if at_sets and state == 'looking' else
-        ref_sets.REWRITE_DUE.format(n=len([r for r in rd['elements'].values() if r.get('rewrite_due')])) if at_sets and state == 'rewrite' else
+        ref_sets.rewrite_due(ended) if at_sets and state == 'rewrite' else
         said_then if at_sets and said_then and left == len(rest_open) else
         REST_LEFT.format(r=len([l for l in now['lines'] if l.get('tag') == CF.WORDS['tag_waiting']])) if at_sets and rest_open and left == 1 else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if at_sets and left else
-        SETS_WAIT if at_sets and any(l['state'] == 'making' for l in now['lines']) else SETS_STAND if at_sets and any(l.get('kept') for l in now['lines']) else SETS_NONE if at_sets else
+        (ref_sets.SETS_MAKING if state == 'making' else SETS_WAIT) if at_sets and any(l['state'] == 'making' for l in now['lines']) else SETS_STAND if at_sets and any(l.get('kept') for l in now['lines']) else SETS_NONE if at_sets else
         ROUND_NEXT if (was_round or kept or any(k.startswith(('ref:', 'set:')) for k in recorded)) and rd.get('kept') and rd.get('pass') == 'complete' else
         f"{left} line(s) still wait for the operator on the page: write the new round to the page and give them the link again." if (at_plan or at_spec or at_draw) and left else
         DRAW_BACK if at_draw else after(DRAW_DONE, DRAW_NEXT) if was_draw else

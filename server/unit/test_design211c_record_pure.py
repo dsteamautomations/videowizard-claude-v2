@@ -25,10 +25,10 @@ def test_accept_the_proposals_covers_every_routine_line_and_no_doubtful_one(monk
     out = film.record(ans(film.lines()['refs:proposals'], 'accept_all'))
     held = film.session()['chat_round']
     assert sorted(held) == ['BRICK', 'MASON', 'STREET', 'TILE', 'T_LAY'] and 'TROWEL' not in held and 'FAN' not in held
-    assert all(v['verdict'] == 'approve' and v['quote'] == 'Accept the 5 proposals (paid, about ₹175)' and v['words'] == '' for v in held.values())   # the priced label is their word
+    assert all(v['verdict'] == 'approve' and v['quote'] == 'Accept the 5 proposals (paid: 3 sets first, about ₹105; the others are asked after)' and v['words'] == '' for v in held.values())   # the priced label is their word
     assert out['kept'] == ['refs:proposals'] and out['refused'] == [] and film.called('round_done') == [] and out['then'] == '2' + WAIT_1
     l = {x['key']: x for x in out['page']['lines']}
-    assert 'refs:proposals' not in l and l['ref:BRICK']['kept'] == 'Accept the 5 proposals (paid, about ₹175)' and l['ref:BRICK']['kept_note'] == P.REFS_KEPT and 'kept' not in l['ref:TROWEL']
+    assert 'refs:proposals' not in l and l['ref:BRICK']['kept'] == 'Accept the 5 proposals (paid: 3 sets first, about ₹105; the others are asked after)' and l['ref:BRICK']['kept_note'] == P.REFS_KEPT and 'kept' not in l['ref:TROWEL']
     assert any('refs:proposals' in x and 'accept_all' in x and 'Accept the 5 proposals' in x for x in logged(film))   # one log line with their words
 
 
@@ -226,7 +226,7 @@ def test_then_refs_go_when_the_round_is_started_and_not_in_this_answer(monkeypat
 
 
 def test_then_sets_wait_while_the_first_sets_are_made(monkeypatch):
-    assert Film(monkeypatch, 'making').record()['then'] == 'Nothing was answered on the page. ' + P.SETS_WAIT
+    assert Film(monkeypatch, 'making').record()['then'] == 'Nothing was answered on the page. ' + ref_sets.SETS_MAKING   # design/211 review (N4): wait, then look
 
 
 def test_then_sets_look_while_claude_looks_at_the_sets(monkeypatch):
@@ -236,7 +236,8 @@ def test_then_sets_look_while_claude_looks_at_the_sets(monkeypatch):
 
 def test_then_rewrite_due_while_a_request_is_written_again(monkeypatch):
     film = Film(monkeypatch, 'rewrite')
-    assert film.record()['then'] == 'Nothing was answered on the page. ' + ref_sets.REWRITE_DUE.format(n=1) and film.page()['then'] == ref_sets.REWRITE_DUE.format(n=1)
+    due = ref_sets.rewrite_due(film.session())   # design/211 review (N7): the sentence names the things and the operator's words
+    assert film.record()['then'] == 'Nothing was answered on the page. ' + due and film.page()['then'] == due and due.startswith('1 set(s) wait for your rewrite: ')
     assert '{element_id, prompt}' in film.page()['then']
 
 

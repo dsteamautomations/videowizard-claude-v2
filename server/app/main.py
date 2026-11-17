@@ -1825,12 +1825,18 @@ def visuals_round(run_id: UUID, body: RoundStart, user=User, conn=DB):
 
 @app.post('/api/runs/{run_id}/visuals/round/done')
 def visuals_round_done(run_id: UUID, body: RoundDone, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn))   # design/121 change 6: no search at Done; design/151
+    def done(run, outputs):   # design/121 change 6: no search at Done; design/151; design/211 review: the tool's door to a paid step of a v2 round needs the operator's words
+        visuals_stage.round_word(storage(), run, outputs, body.quote)
+        return visuals_stage.round_done(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn)
+    return _visuals_call(conn, user, run_id, body, done)
 
 
 @app.post('/api/runs/{run_id}/visuals/round/sets')
 def visuals_round_sets(run_id: UUID, body: RoundSets, user=User, conn=DB):
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.round_sets(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn))   # design/151
+    def sets(run, outputs):   # design/151; design/211 review: as `round/done`
+        visuals_stage.round_word(storage(), run, outputs, body.quote)
+        return visuals_stage.round_sets(storage(), user, run, outputs, body.verdicts, body.quote, conn=conn)
+    return _visuals_call(conn, user, run_id, body, sets)
 
 
 @app.post('/api/runs/{run_id}/visuals/round/answer')

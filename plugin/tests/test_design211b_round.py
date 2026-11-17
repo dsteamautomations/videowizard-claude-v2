@@ -162,7 +162,7 @@ def test_the_set_look_helpers_file():
     for words in ('work/visuals/sets/looks.json', 'work/visuals/sets/<element>/', '`vw visuals round --looks work/visuals/sets/<group>.looks.json`', 'recommend', 'use', 'remake', 'doubt',
                   'pass', 'weak', 'fail', 'golden', 'never approve', 'never order'):
         assert words in body, words
-    for point in ('shows the view', "film's own", "plan's description", 'three pictures agree', 'image model changed'):   # the five things it judges by (design/211 section 3.11)
+    for point in ('`how.judge`', '`how.file`', '`how.may_show`', 'footage picture', 'approved drawing', "plan's words"):   # design/211 review (N2, S16): the points it judges by are the server's, in looks.json (`how`); the file points to them
         assert point in body, point
     assert 'hands' in body and 'way of working' in body                  # the helper agrees with the request and the check: a way of working may show hands
     assert '\r' not in text and 'vw visuals image' not in body and 'vw visuals approve' not in body

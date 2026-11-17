@@ -29,14 +29,45 @@ ROUND_POSTED = ('The round is posted for {n} things, {d} of them doubtful. Run `
                 '(`vw visuals next`) only where the page cannot be shown.')
 GO1_MAKING = "Step 1 is recorded. The first {k} sets are being made (about ₹{x}); {r} more wait for the operator's word. Wait: `vw visuals status --wait 900`."
 ALL_MAKING = '{k} set(s) are being made (about ₹{x}). Wait: `vw visuals status --wait 900`.'
-SETS_LOOK = ('The sets are back. Look at them before the operator does: `vw visuals round --looks` lists them and fetches the pictures. Start `vw-set-look` helpers, '
-             'about 5 sets each (with 5 sets or fewer, look yourself); each records its looks: `vw visuals round --looks <file>`. No set is shown to the operator '
-             'before its look is recorded.')
+SETS_LOOK = ('The sets are back. Look at them before the operator does: `vw visuals round --looks` lists them, fetches the pictures and says how to judge them and the '
+             'shape of the file to send (`how`, in work/visuals/sets/looks.json). With more than 5 sets start `vw-set-look` helpers, about 5 sets each, each given its group name, '
+             "its element ids, the run folder's path and the tool's command line; with 5 sets or fewer, look yourself. Each records its looks: `vw visuals round --looks <file>`. "
+             'No set is shown to the operator before its look is recorded.')
+SETS_MAKING = 'The sets are being made. Wait for them (`vw visuals status --wait 900`); then look at them before the operator does (`vw visuals round --looks`).'
+ROUND_STEP1 = 'The reference round is at step 1: the operator answers it on the page (`vw visuals page`); in the chat (`vw visuals next`) only where the page cannot be shown.'
+ROUND_STEP2 = 'The reference round is with the operator: its lines are on the page (`vw visuals page`).'
+ROUND_DONE = 'The reference round is complete: the approved sets and the footage pictures taken are the references.'
 SETS_PAGE = 'Every set has its look. Run `vw visuals page`: the operator judges the sets there, in one visit.'
-REWRITE_DUE = ("{n} set(s) wait for your rewrite. For each, write the request again from the operator's words, the check and your look: out/round-rewrites.json, "
+REWRITE_DUE = ("{n} set(s) wait for your rewrite: {things}. For each, write the request again from the operator's words, the check and your look: out/round-rewrites.json, "
                'rows {{element_id, prompt}}. Send it: `vw visuals round --rewrite out/round-rewrites.json`. The sets are made then, not before.')
+REWRITE_WORDS, REWRITE_NO_WORDS = '{eid} ("{words}")', '{eid} (no words: from the check and your look)'
 REWRITE_MAKING = '{n} set(s) are being made again (about ₹{x}). Wait: `vw visuals status --wait 900`.'
 MERGE_ASK = 'The round is past step 1: nothing was made. {n} thing(s) are back with the operator as open lines. Run `vw visuals page`.'
+MERGE_NONE = ('The round is past step 1: nothing was made and nothing came back. Only a thing that is new in the plan, or whose entry in the plan changed, comes back by a round '
+              'file sent again; a thing the operator left out stays left out until they ask for it by name (`vw visuals round --back <element>`).')
+BACK_ASKED = '{eid} is back with the operator as an open line: nothing was made. Run `vw visuals page`.'
+STEP1_NO_SET = 'Step 1 is recorded. No set was ordered.'
+STEP1_WAIT = " {r} more wait for the operator's word."
+NOT_ORDERED = ' Not ordered: {things}. Each is on the page with its reason (`vw visuals page`).'
+WORD_NEEDED = "This step of the reference round is paid on the operator's word: give their words (`--quote`). Nothing was recorded."
+
+# how a made set is looked at: the judging points and the shape of the file (design/211 review, N2 and S16). One source: the server gives
+# it with the sets to look at (`looks_due`), and the helper file points to it.
+LOOK_HOW = {
+    'judge': ['Each picture shows the view its turn asked for; a second near-identical picture is not a view.',
+              "It is the film's own thing: where a footage picture is among the inputs, compare look, colour, material and wear with it; where an approved drawing is among them, "
+              'compare shape, size and how the thing is built with the drawing. A set that looks right and is not the film\'s thing is wrong.',
+              "It agrees with the plan's description, requirements and sizes, and with the operator's words in the request, which win over all of these. Say what differs.",
+              'The pictures of the set agree with one another: the same thing in every detail they share.',
+              'What the image model changed: read its notes for what it took from the web instead of the request, and what it left out.'],
+    'may_show': ('A person alone on plain ground. An object or a material with no person; a hand, and the material the thing works on, only in a picture that shows it in use. A place as '
+                 'the subject. A way of working as the action or the change itself: hands and a tool are allowed, never required, and no face. Lettering only where the description names it.'),
+    'file': {'by': 'helper | assistant',
+             'sets': [{'element_id': '<the element id>', 'set': '<the set id of this listing>', 'recommend': 'use | remake | doubt',
+                       'golden': '<with use: the id of the picture every shot starts from; null for a person, and with remake or doubt>', 'reason': '<one line, at most 300 characters>',
+                       'pictures': [{'ref': '<the picture id>', 'view': '<its view>', 'verdict': 'pass | weak | fail', 'seen': '<one line: what you saw, at most 300 characters>'}]}]},
+    'send': ('`vw visuals round --looks <file>`. Every picture of a set gets its row. `use`: the set can serve as it is; `remake`: a fault would be copied into the film (say which '
+             'picture and what is wrong, so the request can be rewritten); `doubt`: you cannot tell. A refused set is named with its reason: fix that row and send it again.')}
 
 # ---------- refusals ----------
 
@@ -71,7 +102,7 @@ REOPEN_NOT_DUE = '{eid} is not back with the operator: there is nothing to answe
 OPENING = ('I need a photograph-like image that will be used as a reference picture for an AI image model. Because it is a reference, correctness matters more than '
            'anything else: the AI will copy exactly what it sees, including any mistake.')
 FROM_WEB = ("This film's own footage shows no picture of the subject, so the picture is made from real photographs: search Google Images for real photographs of the subject "
-            'below, study what it really looks like, and build the picture from them. If anything I ask for below contradicts what the real photographs show, the photographs win.')
+            'below, study what it really looks like, and build the picture from them. What the words below leave open, the real photographs decide.')
 FROM_FOOTAGE = ("The film's own picture of the subject is attached. It is the truth about this subject: take the thing itself from it, its exact form, colour, material and wear. "
                 "Search Google Images for real photographs too, but only for what the film's picture does not show (a side it hides, a detail too small to read). "
                 "Where a web photograph differs from the film's picture, the film's picture wins.")
@@ -85,39 +116,64 @@ ONE_THING_FOOTAGE = ("One rule above all: show one real thing, as one real photo
 SET_LINE = ("This is a set of three pictures of the same one subject, made one per turn: I name each picture's view in its turn; keep every detail the same across the set, each "
             'picture adding the view the others lack. Deliver each picture as one separate output image at full size, never as a collage, grid or split frame, with no borders, numbers '
             'or captions inside any picture. Say what each picture adds.')
-FINISH = ('Natural colours, no filters, no stylisation, no illustration. The camera near enough that the subject is readable, the surroundings soft. No text, logos, watermarks, '
-          "lettering of a picture library or maker's stamps; nothing in the picture that its sources do not justify.")
+FINISH = ('Natural colours, no filters, no stylisation, no illustration. The camera near enough that the subject is readable, the surroundings soft. No text, lettering, logo '
+          'or mark except what the description names; no watermark and no mark of a picture library; nothing in the picture that its sources do not justify.')
+# the order of authority, said once in a request and used again in its check (design/211 review, C3 and S11): the earlier wins
+AUTHORITY = 'Where two of these disagree, the earlier one wins: {order}.'
+BY_OPERATOR, BY_WRITER, BY_PLAN, BY_WEB = "the operator's words", "the words added by the film's writer", "the description from the film's plan", 'real photographs from the web'
+BY_FILM = {(True, True): "the film's own pictures (the approved drawing for shape and size; the film's footage picture for look, colour and wear)",
+           (True, False): "the film's own footage picture", (False, True): 'the approved drawing, for shape, size and how the thing is built'}
+LOOK_LINE = "The film's look, for colour and finish: {look}. For light, the place and time of the setting win."
+NOT_PHOTO = re.compile(r'\b(drawn|drawings?|diagrams?|graphics?|animat\w*|labels?|captions?|fonts?|typefaces?|titles?|subtitles?|lettering|charts?|icons?|arrows?)\b', re.I)
+CODE_NAME = re.compile(r'\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\s*\(([^()]*)\)')   # a code name with its plain words in brackets: the plain words stay
+LISTED = re.compile(r'\b[a-z][a-z0-9_]*\s*\(([^()]*)\)')
+CLIP_NAMES = re.compile(r'\s*\((?:clips?|frames?)\s+[A-Z]*\d[^()]*\)')   # `(clips C0084, C0085)`: the film's own file names say nothing to an image model
+CLIP_BARE = re.compile(r'\bclips? [A-Z]{0,3}\d{2,}(?:(?:, | and | or )[A-Z]{0,3}\d{2,})*')   # `as in clips C0084 and C0087`: said as the footage
+LOOK_PERSON = "The film's look, for colour and finish only: {look}."
 NOTES = ('With the pictures, tell me: (1) the one variant you chose and why, and the other variants you saw in the photographs but left out; (2) what you found in the real photographs '
          'and which findings you implemented; (3) anything in my request that the photographs contradicted and what you did instead; (4) the web pages and images you consulted, with URLs.')
 NOTES_FOOTAGE = NOTES[:-1] + "; (5) what you took from the film's picture and what from the web."
 FRAME_LINE = "Image {k} is the film's own picture of {name} ({view}): take the thing itself from it, its exact form, colour, material and wear."
 FRAME_WEAK_LINE = ("Image {k} is the film's own picture of {name} ({view}); it is a weak picture (part of the thing is hidden, small or unsharp): take its form, colour and material "
-                   'from it; show it whole and clean.')
+                   'from it, and the wear the description names; show the thing whole and uncovered.')
+FRAME_DRAWN_LINE = "Image {k} is the film's own picture of {name} ({view}): take its look, colour, material and wear from it; its shape and size come from the approved drawing."
 SHEET_LINE = 'Image {k} is an approved drawing of {name} ({view}).'
-ADDED_LINE = "Added by the film's writer; where this differs from the description, this wins: {words}"
+ADDED_LINE = "Added by the film's writer: {words}"
 OPERATOR_LINE = "The operator's words: {words}"
 PERSON_SET = ('Make a set of three separate pictures of this one person, one per turn: 1, {a}; 2, {b}; 3, {c}. Deliver each as one separate output image at full size, never a collage, '
-              'grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; no text, numbers or captions inside any picture.')
+              'grid or split frame; the same person in every picture in every detail; alone on plain neutral ground, nothing else in the frame; no text, numbers or captions inside any picture '
+              'except lettering the description names.')
 KIND_WORDS = {'person': 'a person', 'object': 'an object', 'material': 'a material', 'place': 'a place', 'technique': 'a way of working', 'process': 'a way of working'}
-MAY_SHOW = {'object': 'What may be shown: the thing alone. No person and no face in any picture; a hand may hold it only in a picture whose view shows it in use.',
+MAY_SHOW = {'object': ('What may be shown: the thing itself. No person and no face in any picture. In a picture whose view shows it in use, the hand that holds it and the material it '
+                       'works on may be shown where the description names them.'),
+            'material': ('What may be shown: the material itself, with the container or the surface that holds it where the description names one. No person and no face in any picture; '
+                         'a hand only in a picture whose view shows it in use.'),
             'place': 'What may be shown: the place itself is the subject of every picture. No person as the subject.',
-            'technique': 'What may be shown: the hands and forearms doing it, the tool and the material. No face.'}
-MAY_SHOW.update(material=MAY_SHOW['object'], process=MAY_SHOW['technique'])
+            'technique': ('What may be shown: the action or the change itself, on its material. Hands, forearms and a tool are allowed where the description names them, never required. '
+                          'No face.')}
+MAY_SHOW.update(process=MAY_SHOW['technique'])
 NO_PLACE = 'a plain real setting that fits the description'
 
 PERSON_FRONT = {'name': 'full length, front', 'ask': 'a full-length front view, standing at ease'}
 PERSON_SIDE = {'name': 'full length, side', 'ask': 'a full-length view from the side, standing at ease'}
 PERSON_FACE = {'name': 'the face', 'ask': 'a close view of the face'}
-THING = [{'name': 'whole and at rest', 'ask': 'the whole of {name}, at rest, filling the frame'},
-         {'name': 'as the film uses it', 'ask': 'the same {name} as the film uses it; a hand may hold it, no face'},
-         {'name': 'the detail that shows how it is made', 'ask': 'a close view of the detail of the same {name} that shows how it is made'}]
+# `like`: a view of the plan that shows the same as this default view; the default is then left out (design/211 review, S10)
+# ponytail: a short word list per default view; a view of the plan it misses gives two near-alike pictures, and the look at the set says so
+THING = [{'name': 'whole and at rest', 'ask': 'the whole of {name}, at rest, filling the frame',
+          'like': r'\b(whole|full|side|front|back|rear|top|above|below|underside|profile|three[- ]quarter|angled?|overall|at rest)\b'},
+         {'name': 'as the film uses it', 'ask': 'the same {name} as the film uses it; the hand that holds it and the material it works on may be shown where the description names them, no face',
+          'like': r'\b(in use|used|using|hands?|held|holding|carried|carrying|at work|working|tipped|pouring|lifting)\b'},
+         {'name': 'the detail that shows how it is made', 'ask': 'a close view of the detail of the same {name} that shows how it is made', 'like': r'\b(detail|close|close-up|joint|edge)\b'}]
+MATERIAL = [{'name': 'a surface of it, filling the frame', 'ask': '{name} alone, its surface filling the frame, evenly lit'},
+            {'name': 'as the film uses it', 'ask': 'the same {name} as the film uses it, in the amount and in the container or on the surface the description names'},
+            {'name': 'very close: what it is made of', 'ask': 'a very close view of the same {name}: what it is made of, its texture and its colour'}]
 PLACE = [{'name': 'the whole place', 'ask': 'the whole of {name}, seen wide'},
          {'name': 'from the other side', 'ask': 'the same place seen from the other side'},
          {'name': 'its fixed things', 'ask': 'a nearer view of the things that always stand in the same place'}]
-WAY = [{'name': 'the action at its key moment', 'ask': 'the action at its key moment: the hands and the tool doing it'},
-       {'name': 'the result just after', 'ask': 'the result just after the action, in the same place, on the same material'},
-       {'name': 'the tool meeting the material', 'ask': 'a close view of the tool meeting the material'}]
-KIND_VIEWS = {'object': THING, 'material': THING, 'place': PLACE, 'technique': WAY, 'process': WAY}
+WAY = [{'name': 'the action at its key moment', 'ask': 'the action or the change at its key moment'},
+       {'name': 'the result just after', 'ask': 'the result just after, in the same place, on the same material'},
+       {'name': 'close on where it happens', 'ask': 'a close view of the spot where the action or the change happens'}]
+KIND_VIEWS = {'object': THING, 'material': MATERIAL, 'place': PLACE, 'technique': WAY, 'process': WAY}
 VIEW_STOP = {'the', 'a', 'an', 'of', 'view', 'its', 'it', 'from', 'in', 'on', 'and', 'at', 'as', 'is', 'same', 'seen', 'shown'}
 
 FAIL_TEXT = {'refused': '{who} refused the request.', 'no_picture': '{who} returned no picture.', 'timeout': '{who} did not answer in time.',
@@ -188,9 +244,11 @@ def views_for(element, plan):
         mine = next((v for v in asked if not _same_view(v, PERSON_FRONT['name']) and not _same_view(v, PERSON_FACE['name'])), None)
         return [dict(PERSON_FRONT), {'name': mine, 'ask': f'{mine}, the same person'} if mine else dict(PERSON_SIDE), dict(PERSON_FACE)]
     out = [{'name': v, 'ask': f'this view of the same {name}: {v}'} for v in asked[:V.SET_MAX]]
-    for own in KIND_VIEWS.get(element.get('kind')) or THING:
-        if len(out) < V.SET_MAX and not any(_same_view(own['name'], x['name']) for x in out):
-            out.append({'name': own['name'], 'ask': own['ask'].format(name=name)})
+    for strict in (True, False):   # first the default views the plan does not already show; then, only to reach three, the others
+        for own in KIND_VIEWS.get(element.get('kind')) or THING:
+            shown = strict and any(own.get('like') and re.search(own['like'], x, re.I) for x in asked[:V.SET_MAX])
+            if len(out) < V.SET_MAX and not shown and not any(_same_view(own['name'], x['name']) for x in out):
+                out.append({'name': own['name'], 'ask': own['ask'].format(name=name)})
     return out
 
 
@@ -236,7 +294,31 @@ def _place(element, facts):
     """Where the thing is shown: the scene of its own first shot; a place's own description for a place; never the film's first scene."""
     if element.get('kind') == 'place':
         return facts['description'].strip().rstrip('.') or facts['name']
+    if element.get('kind') == 'person':
+        return ''   # a person's sheet is on plain ground: no place is named in it (design/211 review, C6)
     return ((facts['scene'] or {}).get('place') or '').rstrip('.')
+
+
+def _look(plan):
+    """The film's look as a photograph can take it: the sentences on drawn or lettered pictures are left out (design/211 review, S8)."""
+    # ponytail: a word list decides what is about a drawn picture; a look written as one long sentence is kept or dropped whole
+    text = ' '.join(str((plan.get('foundation') or {}).get('appearance') or '').split())
+    return ' '.join(s for s in re.split(r'(?<=[.;])\s+', text) if s and not NOT_PHOTO.search(s)).rstrip('.;') or 'as the footage'
+
+
+def _plain_words(element, text):
+    """The plan's words with no code name in them: `near_wall (the half-built wall)` reads `the half-built wall`; a place's list of
+    landmarks loses every name of the list."""
+    text = CLIP_BARE.sub('the footage', CLIP_NAMES.sub('', str(text or '')))
+    if element.get('kind') == 'place' and text.lstrip().lower().startswith('landmarks:'):
+        return LISTED.sub(r'\1', re.sub(r'\)\s*,\s*', '); ', text))
+    return CODE_NAME.sub(r'\1', text)
+
+
+def _authority(operator, added, footage, sheets, search):
+    """The sources of a request in their order of authority, the earlier winning; with fewer than two there is nothing to say."""
+    order = [x for x in (BY_OPERATOR if operator else '', BY_FILM.get((bool(footage), bool(sheets)), ''), BY_WRITER if added else '', BY_PLAN, BY_WEB if search else '') if x]
+    return order if len(order) > 1 else []
 
 
 def fp(plan, session, element):
@@ -245,15 +327,22 @@ def fp(plan, session, element):
     return ref_find.fingerprint(element) + '|' + _place(element, thing_facts(plan, session, element))
 
 
-def _lines(element, facts, inputs):
-    """The check lines of a v2 set (design/211 section 3.7), all must. `pictures` on a line: the pictures of the set it is asked of."""
+def _lines(element, facts, inputs, added='', operator=''):
+    """The check lines of a v2 set (design/211 section 3.7), all must. `pictures` on a line: the pictures of the set it is asked of. The
+    line on the description carries the operator's words and the writer's added words, in the request's own order of authority."""
     kind = element.get('kind')
     line = lambda check, when, **more: {'check': check, 'weight': 'must', 'pass_when': when, **more}
     out = [line('the view', 'the picture shows what its turn asked'),
            line('same as picture 1', 'the same thing as picture 1 of the set, sent as a reference, in every detail both show', pictures=[2, 3])]
+    drawn = any(i['role'] == 'drawing' for i in inputs)
     if any(i['role'] == 'footage' for i in inputs):
-        out.append(line('matches the footage picture', "it has the form, colour and material of the film's footage picture sent as a reference"))
-    out.append(line('matches the description', 'it agrees with the description of the plan: ' + (facts['description'].strip() or facts['requirements'].strip())))
+        out.append(line('matches the footage picture', ("it has the look, colour, material and wear of the film's footage picture sent as a reference; its shape and size follow the approved drawing" if drawn else
+                                                        "it has the form, colour and material of the film's footage picture sent as a reference")
+                        + ("; where the operator's words say otherwise, they win" if operator else '')))
+    described = _plain_words(element, facts['description'].strip() or facts['requirements'].strip())
+    first = [f"{BY_OPERATOR}: {operator.rstrip('.')}"] * bool(operator) + [f"{BY_WRITER}: {added.rstrip('.')}"] * bool(added)
+    out.append(line('matches the description', 'it agrees with the description of the plan: ' + described if not first else
+                    'it agrees with these, the earlier winning where two differ: ' + '; '.join(first + ['the description of the plan: ' + described])))
     return out + [line(*x) for x in _kind_lines(kind)]
 
 
@@ -263,13 +352,13 @@ def _kind_lines(kind):
         out.append(('one thing only', 'everything belongs to one consistent real thing; nothing of a second variant is mixed in'))
     if kind != 'person':
         out.append(('nothing floats', 'nothing floats or stands where it could not really stand'))
-    out.append(('no text', 'no caption, number, label, logo or watermark anywhere in the picture'))
+    out.append(('no text', 'no caption, number, label, logo or watermark anywhere in the picture, except lettering the description names'))
     if kind in ('object', 'material'):
-        out.append(('no person', "no person and no face; a hand only where the picture's view shows the thing in use"))
+        out.append(('no person', "no person and no face; a hand, and the material the thing works on, only where the picture's view shows it in use"))
     if kind == 'place':
         out.append(('the place is the subject', 'the picture shows the place as its view asks, not one object of it'))
     if kind in ('technique', 'process'):
-        out.append(('the action is shown', 'the hands and the tool doing it, or its result where the view asks for the result; no face'))
+        out.append(('the action is shown', 'the action or the change is shown, or its result where the view asks for the result; hands and a tool are allowed, not required; no face'))
     if kind == 'person':
         out += [(l['check'], l['pass_when']) for l in V.PERSON_SET_LINES[:2]]   # one person, plain ground: as before
     return out
@@ -292,7 +381,7 @@ def set_request(plan, run, session, element, row):
     added = ' '.join(str(row.get('prompt') or '').split())
     operator = ' '.join(str((row.get('operator_words') or [''])[-1] or '').split())
     place = _place(element, facts)
-    look = str((plan.get('foundation') or {}).get('appearance') or '').strip().rstrip('.') or 'as the footage'
+    look = _look(plan)
     try:
         category = V.category_of(run)
     except Problem:
@@ -301,31 +390,34 @@ def set_request(plan, run, session, element, row):
     material = ' '.join(V.material_sentence(m) for m in V.materials_of(plan, eid) if V.material_approved(session, m))
     signs = [] if kind != 'place' or str(element.get('staged_clean') or '').strip() else [s for s in facts['signs'] if s][:2]
     drawn = _drawn_facts(session, eid) if sheets else []
-    words = lambda label, text: [f'{label}: {text}'] if str(text).strip() else []
+    words = lambda label, text: [f'{label}: {_plain_words(element, text)}'] if str(text).strip() else []
+    order = _authority(operator, added, footage, sheets, kind != 'person')
     told = (words('Sizes', '; '.join(sizes) + '.') if sizes else []) + ([material] if material else []) + (words('Signs of use', '; '.join(signs) + '.') if signs else []) \
-        + ([ADDED_LINE.format(words=added)] if added else []) + ([OPERATOR_LINE.format(words=operator)] if operator else [])
+        + ([ADDED_LINE.format(words=added)] if added else []) + ([OPERATOR_LINE.format(words=operator)] if operator else []) \
+        + ([AUTHORITY.format(order='; '.join(f'({n}) {x}' for n, x in enumerate(order, 1)))] if order else [])
     if kind == 'person':
         others = [e for e in plan.get('elements') or [] if e.get('kind') == 'person' and e['id'] != eid]
         outfits = [o for o in dict.fromkeys(str((sc.get('outfit') or {}).get(eid) or '').strip() for gap in plan.get('gaps') or [] for sc in all_scenes(gap)) if o]
-        text = [f'Character sheet of {name} ({eid}), a person in this film.', *words('Who they are', facts['requirements']), *words('Fixed look', facts['description']),
-                *(['Garments: ' + '; '.join(outfits) + '.'] if outfits else []), f"Where the film shows them: {place or NO_PLACE}; the film's look: {look}.", *told,
-                *[f"Not {o['id']} ({o.get('name') or o['id']}): {str(o.get('description') or '').strip().rstrip('.')}." for o in others],
+        text = [f'Character sheet of {name}, a person in this film.', *words('Who they are', facts['requirements']), *words('Fixed look', facts['description']),
+                *(['Garments: ' + '; '.join(outfits) + '.'] if outfits else []), LOOK_PERSON.format(look=look), *told,
+                *[f"This person is not {o.get('name') or o['id']} ({str(o.get('description') or '').strip().rstrip('.')})." for o in others],
                 *([V.LIKENESS_PHOTO_LINE] if inputs else []), PERSON_SET.format(a=views[0]['ask'], b=views[1]['ask'], c=views[2]['ask'])]
         prompt, source = '\n'.join(text), 'footage' if inputs else 'words'
     else:
-        pictures = [(FRAME_WEAK_LINE if i['ref'] in weak else FRAME_LINE).format(k=k, name=name, view=i['view'] or 'as filmed') for k, i in enumerate(footage, 1)]
+        pictures = [(FRAME_WEAK_LINE if i['ref'] in weak else FRAME_DRAWN_LINE if sheets else FRAME_LINE).format(k=k, name=name, view=i['view'] or 'as filmed') for k, i in enumerate(footage, 1)]
         if sheets:
             pictures += [row.get('drawn_how') or '\n'.join(SHEET_LINE.format(k=k, name=name, view=i['view']) for k, i in enumerate(sheets, len(footage) + 1)), V.KEPT_DRAWN_LINE]
             pictures += ['What must be true:\n' + '\n'.join(f'- {f}' for f in drawn)] if drawn else []
         setting = (f"Setting: the place itself, as described, in its own light and time{': ' + facts['scene']['place'] if (facts['scene'] or {}).get('place') else ''}." if kind == 'place' else
                    f"Setting: {place or NO_PLACE}{', as a soft hint at the edges' if kind in ('object', 'material') else ''}; the light of that place and time.")
-        subject = [f'The subject: {name}, {KIND_WORDS.get(kind, "a thing")} in this film' + (f' ({category})' if category else '') + '.',
+        subject = [f'The subject: {name}, {KIND_WORDS.get(kind, "a thing")} in this film.',
                    *words("Its description, from the film's plan", facts['description']), *words('What it must meet', facts['requirements']), *told]
         text = [OPENING + ' ' + (FROM_FOOTAGE if footage else FROM_WEB) + '\n' + (ONE_THING_FOOTAGE if footage else ONE_THING),
                 SET_LINE + ' The three views: ' + '; '.join(f"{n}, {v['name']}" for n, v in enumerate(views, 1)) + '.', '\n'.join(subject), *pictures,
-                MAY_SHOW.get(kind, MAY_SHOW['object']) + '\n' + setting + f" The film's look: {look}.\n" + FINISH, NOTES_FOOTAGE if footage else NOTES]
+                MAY_SHOW.get(kind, MAY_SHOW['object']) + '\n' + setting + ' ' + LOOK_LINE.format(look=look) + '\n' + FINISH, NOTES_FOOTAGE if footage else NOTES]
         prompt, source = '\n\n'.join(text), 'footage' if footage else 'web'
-    lines = _lines(element, facts, inputs)
+    prompt = re.sub(r'(?<!\.)\.\.(?!\.)', '.', prompt).replace('.;', ';')   # a sentence of the plan that ends in a full stop gets no second one
+    lines = _lines(element, facts, inputs, added, operator)
     if drawn or sheets:   # the facts of the drawing set are checked on the picture, and it must be a photograph
         lines += [{'check': 'drawn fact: ' + f, 'weight': 'must', 'pass_when': f'the picture shows it as the approved drawings do: {f}'} for f in drawn] + [V.DRAWN_LOOK_LINE]
     parts = {'kind': kind, 'subject': name, 'description': facts['description'], 'requirements': facts['requirements'], 'sizes': sizes, 'material': material, 'signs': signs,
@@ -358,6 +450,14 @@ def fail_of(ref):
     return {'cause': cause, 'model': gen.get('model'), 'text': FAIL_TEXT[cause].format(who=who)}
 
 
+def makes(session, eid, row):
+    """How many times the thing's set was made (design/211 review, M2): the orders (`round`), an order whose every picture failed not
+    counted: the provider's failure is not the operator's make."""
+    rows = [r for r in session['references'].values() if r.get('kind') == 'sheet' and r.get('element_id') == eid and r.get('set')]
+    failed = {r['set'] for r in rows if r.get('status') == 'failed'} - {r['set'] for r in rows if r.get('status') != 'failed'}
+    return max(0, int((row or {}).get('round') or 0) - len(failed))
+
+
 def _pictures(session, eid, row, statuses=('candidate', 'approved')):
     return sorted(V._set_rows(session, eid, row.get('set'), statuses), key=lambda r: int(r.get('set_n') or 1)) if row.get('set') else []
 
@@ -387,7 +487,7 @@ def set_facts(session, plan, eid, row):
             'notes': next((p.get('notes') for p in pics if p.get('notes')), '') or '', 'sources': next((p.get('sources') for p in pics if p.get('sources')), []) or [],
             'partial': {'made': len(pics), 'asked': len(names), 'missing': names[len(pics):]} if pics and len(pics) < len(names) else None,
             'rec': {'do': look.get('recommend'), 'golden': look.get('golden'), 'reason': look.get('reason') or ''} if pics and look.get('set') == row.get('set') else None,
-            'makes': int(row.get('round') or 0), 'makes_left': max(0, MAKES_MAX - int(row.get('round') or 0)),
+            'makes': makes(session, eid, row), 'makes_left': max(0, MAKES_MAX - makes(session, eid, row)),
             'asked': (history[-1].get('operator') or None) if history and pics else None,
             'history': [{k: h.get(k) for k in ('n', 'set', 'added', 'operator')} for h in history],
             'changed': bool(pics) and bool(made) and ((made.get('fp') is not None and made['fp'] != fp(plan, session, element)) or V._spec_changed(session, plan, eid, row)),
@@ -451,8 +551,20 @@ def then_of(session):
     if at == 'looking':
         return SETS_LOOK
     if at == 'rewrite':
-        return REWRITE_DUE.format(n=sum(1 for r in rd['elements'].values() if r.get('rewrite_due') and not r.get('ignored')))
+        return rewrite_due(session)
     return SETS_PAGE if at == 2 and any(V._set_rows(session, eid, r['set']) for eid, r in _sets(rd)) else None
+
+
+def rewrite_due(session):
+    """REWRITE_DUE with the things that wait and the operator's words of each (design/211 review, N7)."""
+    due = [(eid, r['rewrite_due']) for eid, r in session['round']['elements'].items() if r.get('rewrite_due') and not r.get('ignored')]
+    return REWRITE_DUE.format(n=len(due), things='; '.join((REWRITE_WORDS if d.get('words') else REWRITE_NO_WORDS).format(eid=eid, words=d.get('words')) for eid, d in sorted(due)))
+
+
+def status_of(session):
+    """The one sentence `vw visuals status` says of a v2 round, by its state (design/211 review, N1): the tool prints it and no line of its own."""
+    at = state(session, session['round'])
+    return then_of(session) or {1: ROUND_STEP1, 'making': SETS_MAKING, 'complete': ROUND_DONE}.get(at, ROUND_STEP2)
 
 
 # ---------- the round file: a new round, and one sent again ----------
@@ -508,7 +620,8 @@ def start(conn, store, user, run, session, plan, kinds, elements):
         fields, bad = _row_faults(session, plan, kinds, made, row, budget)
         faults += bad
         if fields:
-            rows[row['element_id']] = {'keywords': '', 'verdict': None, 'search_id': None, 'error': None, 'corrections': [], 'set': None, 'round': 0, 'operator_words': [], 'history': [], **fields}
+            rows[row['element_id']] = {'keywords': '', 'verdict': None, 'search_id': None, 'error': None, 'corrections': [], 'set': None, 'round': 0, 'operator_words': [], 'history': [], **fields,
+                                       'fp': ref_find.fingerprint(_element(plan, row['element_id']))}
     firsts = [eid for eid, r in rows.items() if r['first']]
     if len(firsts) > FIRST_MAX:
         faults.append(FIRST_TOO_MANY.format(n=len(firsts), max=FIRST_MAX))
@@ -524,14 +637,18 @@ def start(conn, store, user, run, session, plan, kinds, elements):
 
 def merge(conn, store, user, run, session, plan, kinds, elements):
     """`visuals_stage._round_merge` for a v2 round: the round file sent again after step 1 orders nothing. A thing new in the plan, or one the
-    operator left out, goes back to the operator as an open line (`reopened`); a thing whose set was not made gets its new words and its
-    error cleared, and stays "not made" with its paid button; a thing that has its set, or its footage picture, is left as it is."""
+    operator left out whose entry in the plan changed since the round, goes back to the operator as an open line (`reopened`: 'new' or
+    'changed'); a thing the operator left out stays left out (design/211 review, M5: it comes back only when they ask for it by name,
+    `visuals_stage.set_aside(back=True)`); a thing whose set was not made gets its new words and its error cleared, and stays "not made"
+    with its paid button; a thing that has its set, or its footage picture, is left as it is."""
     rd, made, budget = session['round'], _made_ids(plan), _budget(conn, run, session)
     faults, reopened, merged, left = [], [], [], []
     for row in elements:
         eid = (row or {}).get('element_id')
         cur = rd['elements'].get(eid)
-        if cur and not cur.get('ignored') and (cur.get('from_footage') or cur.get('rewrite_due') or V._set_rows(session, eid, cur.get('set'), ('generating', 'candidate', 'approved'))):
+        now = ref_find.fingerprint(_element(plan, eid)) if eid in kinds else None
+        changed = bool(cur) and cur.get('fp') is not None and cur['fp'] != now
+        if cur and (not changed if cur.get('ignored') else (cur.get('from_footage') or cur.get('rewrite_due') or V._set_rows(session, eid, cur.get('set'), ('generating', 'candidate', 'approved')))):
             left.append(eid)
             continue
         fields, bad = _row_faults(session, plan, kinds, made, row, budget)
@@ -540,10 +657,10 @@ def merge(conn, store, user, run, session, plan, kinds, elements):
             continue
         if cur is None:
             rd['elements'][eid] = {'keywords': '', 'verdict': None, 'search_id': None, 'error': None, 'corrections': [], 'set': None, 'round': 0, 'operator_words': [], 'history': [],
-                                   **fields, 'first': False, 'reopened': 'new'}
+                                   **fields, 'first': False, 'reopened': 'new', 'fp': now}
             reopened.append(eid)
         elif cur.get('ignored'):
-            cur.update({**fields, 'first': False, 'reopened': 'left_out', 'error': None})
+            cur.update({**fields, 'first': False, 'reopened': 'changed', 'error': None, 'fp': now})
             reopened.append(eid)
         else:
             cur.update({**fields, 'first': bool(cur.get('first')), 'error': None})
@@ -553,7 +670,7 @@ def merge(conn, store, user, run, session, plan, kinds, elements):
         rd['pass'] = 2   # an open line: the round is with the operator again
     V.save_session(store, run, session)
     return {'pass': state(session, rd), 'kept': True, 'v': 2, 'merged': merged, 'reopened': reopened, 'left': left, 'queued': [], 'errors': {}, 'elements': len(rd['elements']), 'cost_inr': 0,
-            'then': MERGE_ASK.format(n=len(reopened))}
+            'then': MERGE_ASK.format(n=len(reopened)) if reopened or merged else MERGE_NONE}
 
 
 # ---------- step 1 recorded: the first go ----------
@@ -582,11 +699,14 @@ def first_go(plan, rd, todo):
     return first, [eid for eid in order if eid not in first]
 
 
-def done_then(run, queued, rest):
-    """The "what next" after step 1 is recorded; None when no set was ordered and none waits."""
-    if rest:
-        return GO1_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued))), r=len(rest))
-    return ALL_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued)))) if queued else None
+def done_then(run, queued, rest, errors=None, complete=False):
+    """The "what next" after step 1 is recorded: the sets being made; with none ordered, that none was, how many wait, and what was not
+    ordered with its reason (design/211 review, N8); `complete`: no set was asked for, so the round is over."""
+    if queued:
+        said = GO1_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued))), r=len(rest)) if rest else ALL_MAKING.format(k=len(queued), x=_inr(_price(run, len(queued))))
+    else:
+        said = STEP1_NO_SET + (STEP1_WAIT.format(r=len(rest)) if rest else '') + (' ' + V._round_complete_words() if complete else '')
+    return said + (NOT_ORDERED.format(things='; '.join(f"{eid}: {V._plain(msg).rstrip('.')}." for eid, msg in errors.items()).rstrip('.')) if errors else '')
 
 
 # ---------- the looks at a made set ----------
@@ -621,7 +741,7 @@ def looks_due(store, run, outputs):
                      'request': (pics[0].get('generation') or {}).get('prompt') or '', 'inputs': [{**i, 'key': big(i['ref'])} for i in facts['inputs']],
                      'pictures': [{'ref': p['ref'], 'n': p['n'], 'view': p['view'], 'key': big(p['ref']), 'check': p['check']} for p in facts['pictures']],
                      'notes': facts['notes']})
-    return {'sets': sets, 'then': SETS_LOOK if sets else then_of(session)}
+    return {'sets': sets, 'then': SETS_LOOK if sets else then_of(session), 'how': LOOK_HOW}
 
 
 def round_looks(store, user, run, outputs, sets, by):

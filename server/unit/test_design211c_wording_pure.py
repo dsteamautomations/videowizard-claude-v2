@@ -23,7 +23,10 @@ def script():
 
 def visuals():
     d = json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))
-    return next(s for s in d['stages'] if s['name'] == 'visuals')
+    spec = importlib.util.spec_from_file_location('d211d_wording_v3', ROOT / 'scripts' / 'd211d_wording_v3.py')   # design/211, the review: a later script that changes a sentence of this one
+    review = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(review)
+    return review.before(next(s for s in d['stages'] if s['name'] == 'visuals'))   # the text as it was before it
 
 
 def test_each_anchor_of_script_c_is_found_once_or_is_already_applied():

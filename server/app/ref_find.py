@@ -41,8 +41,8 @@ FRAME_RULE = ('A frame is a good reference when the thing is whole, not covered,
 # ---------- "what next" (design/211 section 3.9): the answer carries one of these as `then`; the tool prints it and adds nothing ----------
 
 FIND_START = ('The references come next. Run `vw visuals digest`. Then find each thing in the footage: start `vw-reference-finder` helpers, about 5 things each, '
-              'up to 6 at a time (with 5 things or fewer, do it yourself). Each takes trial frames (`vw visuals trial`), looks at them and records what it saw '
-              '(`vw visuals look`).')
+              "up to 6 at a time, each given its group name, its thing ids, the run folder's path and the tool's command line (with 5 things or fewer, do it yourself). "
+              'Each takes trial frames (`vw visuals trial`), looks at them and records what it saw (`vw visuals look`).')
 FIND_WORDS = ('This run has no digest of its footage, so the search is by words only: `vw visuals elements` names the likely clips. Every frame still needs a look '
               '(`vw visuals trial`, then `vw visuals look`). Tell the operator the footage was searched by words only.')
 TRIAL_NEXT = 'Read each trial frame, then record what you saw: `vw visuals look --file <file>`. A trial frame is not a reference.'
@@ -125,6 +125,11 @@ def _analysed(outputs):
     return sorted(rows)
 
 
+def all_searched(session, plan):
+    """Nothing is left to search: the film has no footage, or every thing the round takes has its search record for the plan as it is now."""
+    return not _has_footage(session) or all(_searched(session, e) for e in _things(plan))
+
+
 def footage(store, run, outputs):
     """True when the run has at least one analysed clip (an `analysis` output, not excluded, contract clip-log-v1). A film with none
     skips the search: `round_frames` then asks for no search record."""
@@ -190,8 +195,9 @@ def digest_answer(store, run, outputs):
              'not_searched': [{'clip': cid, 'name': c.get('name') or cid, 'reason': 'the digest could not be built'} for cid, c in media.items()]}
     things = [{**ref_sets.thing_facts(plan, session, e), 'found': (_searched(session, e) or {}).get('result')} for e in _things(plan)]
     left = [t for t in things if t['found'] is None]
+    older = bool(session.get('round')) and not V.round_v2(session)   # design/211 review, N5: an older round runs to its end as it began; nothing here is for it
     return {'digest': d, 'things': things, 'rule': FRAME_RULE, 'limits': LIMITS,
-            'then': LOOK_ALL if not media or not left else FIND_START if d['clips'] else FIND_WORDS}
+            'then': OLDER_ROUND if older else LOOK_ALL if not media or not left else FIND_START if d['clips'] else FIND_WORDS}
 
 
 # ---------- trial frames ----------
@@ -399,6 +405,8 @@ def _look_one(conn, store, user, run, outputs, doc, element, thing, by):
         rows.append({'trial': tid, 'view': view, 'verdict': verdict, 'seen': seen, 'keep': bool(l.get('keep')), 'closest': bool(l.get('closest'))})
     keeps = [r for r in rows if r['keep']]
     asked = {r['trial'] for r in keeps}
+    unkept = {r['trial'] for r in rows if not r['keep']}   # design/211 review, N10: a look sent again without `keep` lets go of the frame kept for it, while the operator has not answered it
+    stale += [r['id'] for r in _kept(session, eid) if r['status'] == 'candidate' and r.get('trial') in unkept and r['id'] not in stale]
     views = [_view_key(r['view']) for r in keeps] + [_view_key(r.get('view')) for r in _kept(session, eid) if r['id'] not in stale and r.get('trial') not in asked]
     V.need(len(views) <= KEPT_PER_THING and len(set(views)) == len(views), KEEP_LIMIT.format(eid=eid, max=KEPT_PER_THING))
     if stale:   # found as the plan described the thing before, and never answered by the operator: they go
@@ -409,7 +417,8 @@ def _look_one(conn, store, user, run, outputs, doc, element, thing, by):
     session, at, closest = V.session_of(store, run, outputs), _now(), None
     for r in rows:
         trial = doc['trials'][r['trial']]
-        look = {'who': by, 'at': at, 'view': r['view'], 'verdict': r['verdict'], 'seen': r['seen'], 'trial': r['trial'], 'ref': made.get(r['trial']) or (trial['looks'].get(eid) or {}).get('ref')}
+        held = (trial['looks'].get(eid) or {}).get('ref')
+        look = {'who': by, 'at': at, 'view': r['view'], 'verdict': r['verdict'], 'seen': r['seen'], 'trial': r['trial'], 'ref': made.get(r['trial']) or (held if held in session['references'] else None)}
         if r['keep']:
             _mark(session, trial, eid, look['ref'], look)
         else:

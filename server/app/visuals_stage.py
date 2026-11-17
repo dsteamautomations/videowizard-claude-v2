@@ -2122,12 +2122,33 @@ def round_due(session, plan):
         return None
     if not any(e.get('kind') != 'graphic' and e['id'] != STYLE for e in plan.get('elements') or []):
         return None
-    if ROUND_V == 2:   # design/211: a film with no round starts the rebuilt references step: the footage is searched first
+    if ROUND_V == 2:   # design/211: a film with no round starts the rebuilt references step: the footage is searched first; once every thing is searched, the round file is next
         from . import ref_find
-        return ref_find.FIND_START
+        return ref_find.LOOK_ALL if ref_find.all_searched(session, plan) else ref_find.FIND_START
     return ('the reference round is next, before any picture: `vw visuals elements`, then `vw visuals frame --file out/frames.json` for every element the footage shows, '
             "then `vw visuals round --file out/reference-round.json` (one row per element, every person included and none for an animal: element_id, frames, prompt); the sets are made on Gemini's image model with Google Search, "
             "whatever the film's picture AI for the shots; the specs can be approved meanwhile")
+
+
+def round_status(session, plan):
+    """What `vw visuals status` says of the reference round (`round_due` in its answer). design/211 review, N1: a v2 round has one sentence
+    for each of its states, the server's; the tool prints it and adds no line of its own."""
+    if round_v2(session):
+        from . import ref_sets
+        return ref_sets.status_of(session)
+    return round_due(session, plan)
+
+
+SHEET_BY_ROUND = ("{eid}: on this film a reference set is made through the reference round, on the operator's word, never by `vw visuals image --kind sheet`. Its line is on the page "
+                  '(`vw visuals page`); a thing the round does not hold yet comes in by sending the round file again (`vw visuals round --file out/reference-round.json`).')
+
+
+def round_word(store, run, outputs, quote):
+    """design/211 review: the chat tool's doors to a paid step of a v2 round (`round --verdicts`, `round --sets`) need the operator's words,
+    as `--rest` and `--make` do. The page's click and the chat's answer carry their own word. An older round: as before."""
+    if round_v2(session_of(store, run, outputs)):
+        from . import ref_sets
+        need(str(quote or '').strip(), ref_sets.WORD_NEEDED)
 
 
 def mark_kept(session, run):
@@ -3315,10 +3336,14 @@ def _queue_sets(conn, store, user, run, outputs, eids):
         prompt = row['prompt'] + ''.join(f"\nThe operator's correction: {c.rstrip('.')}." for c in row.get('corrections') or [])
         if round_v2(session):   # design/211: the server writes the whole request (ref_sets.set_request); the operator's words are placed there, nothing is appended here
             prompt = row['prompt']
+            from . import ref_sets
+            if ref_sets.makes(session, eid, row) >= ref_sets.MAKES_MAX:   # design/211 review, M1: every order of a set passes here, so the limit holds whatever way it comes
+                errors[eid] = ref_sets.MAKES_LIMIT.format(eid=eid, max=ref_sets.MAKES_MAX)
+                continue
         body = {'element_id': eid, 'kind': 'sheet', 'name': f'set-{eid}-r{n}', 'subject': element.get('name') or eid, 'prompt': prompt, 'parents': [],
                 'request_id': str(uuid.uuid5(uuid.NAMESPACE_OID, f"{run['id']}-set-{eid}-{n}"))}
         try:
-            out = generate_image(conn, store, user, run, outputs, body)
+            out = generate_image(conn, store, user, run, outputs, body, **({'round_set': True} if round_v2(session) else {}))
         except (Problem, ValueError) as exc:
             errors[eid] = getattr(exc, 'message', None) or str(exc)
             if getattr(exc, 'code', '') == 'VISUALS_CAP':
@@ -3402,7 +3427,7 @@ def round_sets(store, user, run, outputs, verdicts, quote, conn=None, partial=Fa
     for eid in active:
         r, v = rd['elements'][eid], verdicts[eid]
         rows = _set_rows(session, eid, r.get('set'))
-        if v2 and v['verdict'] != 'yes' and int(r.get('round') or 0) >= ref_sets.MAKES_MAX:   # design/211: three makes: the answer is held, not recorded
+        if v2 and v['verdict'] != 'yes' and ref_sets.makes(session, eid, r) >= ref_sets.MAKES_MAX:   # design/211: three makes: the answer is held, not recorded
             r.pop('answer', None)
             held[eid] = ref_sets.MAKES_LIMIT.format(eid=eid, max=ref_sets.MAKES_MAX)
             continue
@@ -3493,7 +3518,7 @@ def set_answer(store, user, run, outputs, element_id, verdict=None, golden=None,
     if v2:   # design/211: no answer before the look; after three makes "No" and "Correct it" are held
         from . import ref_sets
         need(ref_sets.looked(session, element_id, row), ref_sets.SET_NO_LOOK.format(eid=element_id))
-        need(verdict not in ('no', 'correct') or int(row.get('round') or 0) < ref_sets.MAKES_MAX, ref_sets.MAKES_LIMIT.format(eid=element_id, max=ref_sets.MAKES_MAX))
+        need(verdict not in ('no', 'correct') or ref_sets.makes(session, element_id, row) < ref_sets.MAKES_MAX, ref_sets.MAKES_LIMIT.format(eid=element_id, max=ref_sets.MAKES_MAX))
     plan = guarded(lambda: current_plan(store, session))
     kind = next((e.get('kind') for e in plan['elements'] if e['id'] == element_id), None)
     supplied = (session['references'].get(golden or '') or {}).get('kind') == 'supplied'   # U19: the operator's own picture
@@ -3600,7 +3625,7 @@ def set_make(conn, store, user, run, outputs, element_id, quote=None):
     old = [x['id'] for x in _set_rows(session, element_id, row.get('set'), ('candidate', 'approved'))]
     plan_changed = v2 and bool(old) and not _spec_changed(session, plan, element_id, row) and ref_sets.set_facts(session, plan, element_id, row)['changed']   # design/211: the plan's words of this thing changed since
     need(not old or _spec_changed(session, plan, element_id, row) or plan_changed, f'{element_id} has its set: judge it (Yes, No or Correct it).')
-    need(not v2 or int(row.get('round') or 0) < ref_sets.MAKES_MAX, ref_sets.MAKES_LIMIT.format(eid=element_id, max=ref_sets.MAKES_MAX) if v2 else '')
+    need(not v2 or ref_sets.makes(session, element_id, row) < ref_sets.MAKES_MAX, ref_sets.MAKES_LIMIT.format(eid=element_id, max=ref_sets.MAKES_MAX) if v2 else '')
     cause = set_cause(session, plan, element_id, _set_budget(run, session, visuals_spend(conn, run)))
     need(not cause, f"{element_id}: its set cannot be made yet: {(cause or {}).get('text')}.")
     what = 'the photo or the permission changed' if _photo_changed(session, plan, element_id, row) else 'the plan changed' if plan_changed else 'the spec changed'   # design/207 (D1)
@@ -3626,9 +3651,18 @@ def set_aside(store, user, run, outputs, element_id, words='', back=False):
     session = session_of(store, run, outputs)
     rd = session.get('round')
     v2 = round_v2(session)   # design/211: also while the round waits for Claude (the looks, a rewrite); and a set made three times can be left out
-    need(rd and rd.get('kept') and _round_pass(session, rd) in ((2, 'making', 'looking', 'rewrite') if v2 else (2, 'making')), 'The reference round is not open at its sets: nothing can be set aside or brought back now.')
+    need(rd and rd.get('kept') and _round_pass(session, rd) in ((2, 'making', 'looking', 'rewrite') + (('complete',) if back else ()) if v2 else (2, 'making')),
+         'The reference round is not open at its sets: nothing can be set aside or brought back now.')
     row = rd['elements'].get(element_id)
     need(row, f'{element_id} is not in the reference round.')
+    if back and v2 and row.get('ignored') and not row.get('aside'):   # design/211 review, M5: left out at step 1, asked for again by name: an open line, answered by the operator (ref_sets.round_reopen); nothing is made here
+        need(not row.get('reopened'), f'{element_id} is back with the operator already.')
+        from . import ref_sets
+        row['reopened'] = 'asked'
+        rd['pass'] = 2 if rd.get('pass') == 'complete' else rd['pass']
+        save_session(store, run, session)
+        return {'element_id': element_id, 'aside': False, 'next': f'{element_id} is back in the round.', 'then': ref_sets.BACK_ASKED.format(eid=element_id)}
+    need(not (back and v2) or _round_pass(session, rd) != 'complete', 'The reference round is not open at its sets: nothing can be set aside or brought back now.')
     if back:
         need(row.get('aside'), f'{element_id} was not set aside at step 2: there is nothing to bring back.')
         row['ignored'] = False
@@ -3641,7 +3675,7 @@ def set_aside(store, user, run, outputs, element_id, words='', back=False):
     limit = False
     if v2:
         from . import ref_sets
-        limit = int(row.get('round') or 0) >= ref_sets.MAKES_MAX and not _set_rows(session, element_id, row.get('set'), ('generating', 'approved'))   # "use one of these, add your own picture, or leave it out"
+        limit = ref_sets.makes(session, element_id, row) >= ref_sets.MAKES_MAX and not _set_rows(session, element_id, row.get('set'), ('generating', 'approved'))   # "use one of these, add your own picture, or leave it out"
     need(limit or not _set_rows(session, element_id, row.get('set'), ('generating', 'candidate', 'approved')),
          f'{element_id} has its set: answer it with No or Correct it; only a set that was never made can be set aside.')
     for x in _set_rows(session, element_id, row.get('set')) if limit else []:   # its pictures are not used: rejected with the operator's words
@@ -3719,7 +3753,7 @@ def round_done(store, user, run, outputs, verdicts, quote, conn=None):
         rd['pass'] = 'making' if queued else ('complete' if not todo else 2)   # every set refused before the call: step 2 shows them (No or Correct it makes them again)
         save_session(store, run, session)
         return {'pass': rd['pass'], 'queued': queued, 'errors': errors, 'from_footage': from_footage, 'cost_inr': round(len(queued) * image_price_inr(run, provider='gemini') * SET_MAX, 2),
-                **({'rest': list(rd.get('rest') or []), 'then': ref_sets.done_then(run, queued, rd.get('rest') or [])} if v2 else {})}
+                **({'rest': list(rd.get('rest') or []), 'then': ref_sets.done_then(run, queued, rd.get('rest') or [], errors, complete=rd['pass'] == 'complete')} if v2 else {})}
     searched = [eid for eid, r in rd['elements'].items() if r['verdict'] == 'search']
     rd['pass'] = 2 if searched else 'complete'
     save_session(store, run, session)
@@ -3831,8 +3865,9 @@ def _searches(session):
     return [{k: v for k, v in s.items() if k != 'results'} | {'results': s.get('results') or []} for s in (session.get('searches') or {}).values()]
 
 
-def generate_image(conn, store, user, run, outputs, body):
-    """Queue an OpenAI image job (paid, informed). The worker stores the PNG and creates the candidate reference."""
+def generate_image(conn, store, user, run, outputs, body, round_set=False):
+    """Queue an OpenAI image job (paid, informed). The worker stores the PNG and creates the candidate reference.
+    `round_set`: the order comes from the reference round (`_queue_sets`); a set of a v2 round is made no other way (design/211 review, M6)."""
     session = session_of(store, run, outputs)
     plan = guarded(lambda: current_plan(store, session))
     need((body['kind'] == 'style') == (body['element_id'] == STYLE), f'The style sheet is kind style with element {STYLE}, and only it.')   # design/89 C2
@@ -3841,6 +3876,7 @@ def generate_image(conn, store, user, run, outputs, body):
     need(body['kind'] in ('isolated', 'sheet', 'keyframe', 'state', 'style', 'component'), 'Generated references are isolated, sheet, keyframe, state, style or component.')
     need(not (body['kind'] == 'sheet' and element['kind'] == 'animal'), ANIMAL_NO_SHEET.format(eid=element['id']))   # design/207 (D4); design/207 point 4: a real speaker may have an AI picture (the older refusal, retired)
     is_set = body['kind'] == 'sheet' and body['element_id'] != STYLE and mark_kept(session, run)   # design/151: a reference set by the kept method
+    need(not (is_set and round_v2(session)) or round_set or body.get('fix_of'), SHEET_BY_ROUND.format(eid=element['id']))
     subject_words = body['prompt']   # hotfix 11 Nov 2026 (VW-19): the writer's own words for a kept set, before the server wraps them in its preamble
     v2row = ((session.get('round') or {}).get('elements') or {}).get(element['id']) if is_set and round_v2(session) else None
     if v2row is not None:   # design/211: the request of a v2 round's set is written by the server, by kind of thing, from the plan's own words and the film's own pictures
@@ -6264,7 +6300,7 @@ def status(conn, store, run, outputs, repair=True):
             'golden': dict(session.get('golden') or {}), 'golden_due': golden_due(session, plan) if plan else [],   # design/111 F11
             'sheet_due': sheet_due(session, plan) if plan else [],   # design/119 rule 2
             'kept': kept(session),   # design/151 hotfix: the references are made the kept way (no search, no picks, no sheet per element: the round makes every set)
-            'round_due': round_due(session, plan),   # design/151 hotfix: the round is next, said in words
+            'round_due': round_status(session, plan),   # design/151 hotfix: the round is next, said in words; design/211 review: a v2 round's own sentence by its state
             'image_provider': provider_of(run),   # design/120
             'set_provider': 'gemini',   # design/151 hotfix: a reference set is the kept (Gemini) method on every film, whatever image_provider says
             'not_this': {eid: list(rec.get('lines') or []) for eid, rec in (session.get('not_this') or {}).items()},   # design/111 F12

@@ -9,12 +9,13 @@ import json
 
 import pytest
 
-from app import chat_flow as CF, page_flow as P
+from app import chat_flow as CF, page_flow as P, ref_sets as RS
 import d211_fixture as F
 from test_design211c_kit_pure import Film, PAID, RUN, labels, older_step1
 
 W = CF.WORDS
-NOT_ANALYSED = ' Not searched, because they have no analysis: C003.mp4.'
+NOT_ANALYSED = ''   # design/211 review: the clips with no analysis are named once, in the step's summary (UNREAD), not on every line
+UNREAD = ' Not searched for any thing, because they have no analysis: C003.mp4.'
 
 
 def digest(x):
@@ -40,7 +41,7 @@ def test_a_thing_with_footage_shows_the_description_the_shots_the_pictures_and_t
     film = Film(monkeypatch)
     l = film.lines()['ref:TROWEL']
     assert l['title'] == "Mason's trowel (an object)" and l['ask'] == 'Use the footage pictures as the reference?'
-    assert l['text'] == ('A pointed steel blade, a reddish-brown handle.\nUsed in 2 shots; the closest is a close-up (G2, shot G2-S1-SH2).\nFrom your footage: 2 pictures.' + NOT_ANALYSED)
+    assert l['text'] == ('A pointed steel blade, a reddish-brown handle.\nUsed in 2 shots; the closest is a close-up (shot 2 of gap G2).\nFrom your footage: 2 pictures.' + NOT_ANALYSED)   # design/211 review: no shot code name
     assert l['rec'] == {'do': 'footage', 'label': 'Use it as the reference', 'reason': 'The film shows it whole and sharp from the side.'}
     assert labels(l) == ['Use it as the reference', f'Make a clean set from it ({PAID})', 'Leave it out'] and [b['choice'] for b in l['buttons']] == ['approve', 'clean', 'ignore']
     assert [(x['label'], x['note'], x.get('weak', False), x['choice'], x['choice_label']) for x in l['pics']] == [
@@ -49,7 +50,7 @@ def test_a_thing_with_footage_shows_the_description_the_shots_the_pictures_and_t
     assert l['pics'][0]['code'] == P.pic_code(CF._ref_key(RUN, 'f-trowel-side'))
     assert l['warnings'] == [W['warn_exact']]
     assert l['comment'] is True and l['comment_hint'] == W['hint']                   # a clean set can follow, so the words reach its request
-    assert l['cost'] == 'If you leave it out, these shots are made with no reference of it: G2-S1-SH1, G2-S1-SH2.'
+    assert l['cost'] == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap G2, shot 2 of gap G2.'
     assert l['own']['label'] == 'Use my own picture' and 'kept' not in l
 
 
@@ -82,7 +83,7 @@ def test_a_person_shown_in_a_made_picture_has_no_leave_it_out_and_a_thing_no_sho
     film = Film(monkeypatch)
     l = film.lines()
     assert labels(l['ref:MASON']) == [f'Have a set made ({PAID})'] and 'cost' not in l['ref:MASON'] and l['ref:MASON']['ask'] == 'Have a reference set made of this person (paid)?'
-    assert l['ref:MASON']['warnings'] == ['A size is not known: body height.']
+    assert 'warnings' not in l['ref:MASON']   # design/211 review: a size that is not known is no warning: nothing is decided by it
     plan = F.plan()
     for g in plan['gaps']:
         for sc in g['scenes']:
@@ -118,7 +119,7 @@ def test_the_warnings_of_a_line(monkeypatch):
     film.cause = {'element_id': 'BRICK', 'text': 'the material spec of Brick is not approved'}
     film.change(lambda s: s['found']['STREET'].update(stale=True))
     l = film.lines()
-    assert l['ref:MASON']['warnings'] == [W['warn_person'], 'A size is not known: body height.'] and l['ref:MASON']['group'] == CF.GROUP_DOUBT   # a real person's likeness is never routine
+    assert l['ref:MASON']['warnings'] == [W['warn_person']] and l['ref:MASON']['group'] == CF.GROUP_DOUBT   # a real person's likeness is never routine
     assert l['ref:BRICK']['warnings'] == ['A set cannot be made now: the material spec of Brick is not approved.']
     assert l['ref:STREET']['warnings'] == [W['warn_stale']] and l['ref:STREET']['group'] == CF.GROUP_DOUBT
     assert 'warnings' not in l['ref:T_LAY']
@@ -137,33 +138,37 @@ def test_a_proposal_its_answer_would_not_carry_out_makes_the_line_doubtful(monke
 def test_accept_the_proposals_names_what_it_does_and_its_total_price(monkeypatch):
     l = Film(monkeypatch).lines()['refs:proposals']
     assert l['title'] == "Claude's proposals" and l['item'] == 'round1:all' and l['ask'] == 'Accept the proposals for the routine things?'
-    assert l['text'] == ('7 things have a proposal from Claude. 2 are yours to answer one by one. Accepting the other 5 has 5 sets made (paid, about ₹175), '
-                         'takes the footage pictures of 0 things as they are, and leaves 0 out. A line you answer yourself keeps your answer.')
-    assert l['buttons'] == [{'label': 'Accept the 5 proposals (paid, about ₹175)', 'choice': 'accept_all', 'needs_words': False}] and 'own' not in l and 'pics' not in l
+    # design/211 review (C4): the truth about the sets: three are made first, the others are asked after
+    assert l['text'] == ('7 things have a proposal from Claude. 2 are yours to answer one by one. Accepting the other 5 asks for 5 sets (paid, about ₹175), '
+                         'takes the footage pictures of 0 things as they are, and leaves 0 out. At most 3 sets are made first, when every thing is answered; any others are offered '
+                         'with their price after you have judged those, and made only on your word. So far 5 sets are asked for, about ₹175 in all: 3 first (about ₹105), 2 after '
+                         '(about ₹70). A line you answer yourself keeps your answer.')
+    assert l['buttons'] == [{'label': 'Accept the 5 proposals (paid: 3 sets first, about ₹105; the others are asked after)', 'choice': 'accept_all', 'needs_words': False}] and 'own' not in l and 'pics' not in l
 
 
 def test_accept_the_proposals_with_nothing_to_pay_says_so(monkeypatch):
     film = Film(monkeypatch)
     film.change(lambda s: [row.update(rec='leave', doubt=False) for row in s['round']['elements'].values()])
     l = film.lines()['refs:proposals']
-    assert l['buttons'][0]['label'] == 'Accept the 6 proposals (nothing is paid)' and 'has 0 sets made, takes' in l['text'] and 'leaves 6 out' in l['text']   # MASON has no "Leave it out": doubtful
+    assert l['buttons'][0]['label'] == 'Accept the 5 proposals (nothing is paid)' and 'asks for 0 sets, takes' in l['text'] and 'leaves 5 out' in l['text'] and 'At most' not in l['text']
+    # MASON has no "Leave it out": doubtful; TROWEL keeps a weak frame: doubtful whatever its row says (design/211 review, M3)
 
 
 def test_the_summary_of_step_1_gives_the_four_figures(monkeypatch):
     film = Film(monkeypatch)
     p = film.page()
-    assert p['summary'] == ("7 things: 7 to answer, 0 kept. Spent so far ₹0 of the ₹3,754 limit. These sets: up to ₹245. The plan's shots still need about ₹1,200. Left after both: ₹2,309.")
+    assert p['summary'] == ("7 things: 7 to answer, 0 kept. Spent so far ₹0 of the ₹3,754 limit. These sets: up to ₹245. The plan's shots still need about ₹1,200. Left after both: ₹2,309." + UNREAD)
     assert p['note'].startswith('Look at each picture')
     film.planned = 3600.0
     p = film.page()
-    assert p['summary'].endswith("The plan's shots still need about ₹3,600. After both, the limit is passed by ₹91.")
+    assert p['summary'].endswith("The plan's shots still need about ₹3,600. After both, the limit is passed by ₹91." + UNREAD)
     assert p['note'].startswith(P.REFS_OVER.format(over=91)) and 'you can still answer and say done' in p['note'] and p['open'] is True   # a warning: nothing is blocked
 
 
 def test_the_summary_leaves_the_shots_out_when_their_cost_cannot_be_worked_out(monkeypatch):
     film = Film(monkeypatch)
     monkeypatch.setattr(P.V, 'budget', lambda *a: (_ for _ in ()).throw(KeyError('no picture AI')))
-    assert film.page()['summary'] == '7 things: 7 to answer, 0 kept. Spent so far ₹0 of the ₹3,754 limit. These sets: up to ₹245.'
+    assert film.page()['summary'] == '7 things: 7 to answer, 0 kept. Spent so far ₹0 of the ₹3,754 limit. These sets: up to ₹245.' + UNREAD
 
 
 # ---------- step 2 ----------
@@ -176,9 +181,11 @@ def test_step_2_shows_make_the_rest_then_the_doubtful_sets_then_the_others_then_
     assert [l['state'] for l in p['lines']] == ['open', 'open', 'open', 'open', 'making', 'making', 'recorded']
     rest = p['lines'][0]
     assert rest['item'] == f'rest:{F.NOW}' and rest['title'] == 'The other sets'
-    assert rest['text'] == 'These are the first 3 sets. 2 more are not ordered yet: Brick, Roof tile. Look at these first: a fault here would repeat in all of them.'
+    assert rest['text'] == ('These are the first 3 sets. 2 more are not ordered yet: Brick, Roof tile. Look at these first: a fault here would repeat in all of them.\n'
+                            "Spent so far ₹0 of the ₹3,754 limit. The plan's shots still need about ₹1,200.")   # design/211 review (S13)
+    assert rest['cost'] == 'If you leave these 2 out, these shots are made with no reference: Brick: shot 1 of gap G2, shot 2 of gap G2; Roof tile: shot 2 of gap G3.'   # (C5)
     assert labels(rest) == ['Make the other 2 sets (paid, about ₹70)', 'Leave these 2 out'] and [b['choice'] for b in rest['buttons']] == ['rest', 'rest_out']
-    assert p['summary'] == '6 things: 3 to answer, 0 kept, 2 not ready yet, 1 recorded. A set made again costs about ₹35; spent so far ₹0 of the ₹3,754 limit.'
+    assert p['summary'] == "6 things: 3 to answer, 0 kept, 2 not ready yet, 1 recorded. A set made again costs about ₹35; spent so far ₹0 of the ₹3,754 limit. The plan's shots still need about ₹1,200."
     brick, trowel = p['lines'][4], p['lines'][6]
     assert brick['note'] == W['waiting'] and brick['tag'] == 'Not ordered'
     assert [x['label'] for x in trowel['pics']] == ['From your footage: side (the starting picture)', 'From your footage: in the hand, lifting mortar']   # taken from footage at step 1: listed, recorded
@@ -188,11 +195,11 @@ def test_a_set_shows_its_pictures_with_their_views_both_checks_the_notes_and_the
     l = Film(monkeypatch, '2').lines()
     t = l['set:T_LAY']
     assert t['item'] == 'set:T_LAY:s-t_lay-1' and t['ask'] == 'Which picture is the reference?'
-    assert t['text'] == 'The right hand lowers the brick; the left hand rests on the wall.\nUsed in 1 shot; the closest is a medium shot (G2, shot G2-S1-SH1).'
+    assert t['text'] == 'The right hand lowers the brick; the left hand rests on the wall.\nUsed in 1 shot; the closest is a medium shot (shot 1 of gap G2).'
     assert [(x['label'], x['note'], x.get('weak', False), x['choice'], x['choice_label']) for x in t['pics']] == [
         ('A · the action at its key moment', 'the action at its key moment: as asked.', False, 'use:s-t_lay-1', 'Use A'),
         ('B · the result just after', 'the result just after: as asked.', True, 'use:s-t_lay-1-2', 'Use B'),
-        ('C · the tool meeting the material', 'the tool meeting the material: as asked.', False, 'use:s-t_lay-1-3', 'Use C')]
+        ('C · close on where it happens', 'close on where it happens: as asked.', False, 'use:s-t_lay-1-3', 'Use C')]
     assert t['check'] == {'state': 'fail', 'by': "The program's check (Gemini)", 'lines': ['Picture B: the action is shown: A tool lying still; no hand.']}
     assert t['notes'] == {'title': "The image model's notes", 'sources': 1,
                           'text': '(1) One method, the most common. (3) The request asked for a wooden scaffold; the photographs show bamboo: I drew bamboo.'}
@@ -223,7 +230,7 @@ def test_a_check_that_did_not_run_says_so_and_blocks_nothing(monkeypatch):
     m = film.lines()['set:MASON']
     assert m['check'] == {'state': 'none', 'by': "The program's check (Gemini)", 'lines': []} and m['buttons'] and m['group'] == 'People'
     film.change(lambda s: s['references']['s-t_lay-1-3'].pop('check'))
-    assert film.lines()['set:T_LAY']['check']['lines'] == ['Picture B: the action is shown: A tool lying still; no hand.', 'Picture C: the check did not run.']
+    assert film.lines()['set:T_LAY']['check']['lines'] == ['Picture B: the action is shown: A tool lying still; no hand.', 'Picture C was not checked: the check did not run.']
 
 
 def test_a_partial_set_is_shown_as_it_is_with_what_is_missing(monkeypatch):
@@ -289,7 +296,7 @@ def test_the_lines_while_sets_are_made_looked_at_and_written_again(monkeypatch):
     p = Film(monkeypatch, 'making').page()
     by = {l['key']: l for l in p['lines']}
     assert all(by[k]['state'] == 'making' and by[k]['note'] == 'Its set is being made.' and 'tag' not in by[k] for k in ('set:MASON', 'set:STREET', 'set:T_LAY'))
-    assert 'sets:rest' not in by and by['set:BRICK']['tag'] == 'Not ordered' and p['open'] is False and p['then'] == P.SETS_WAIT   # the rest is offered once the first sets are judged
+    assert 'sets:rest' not in by and by['set:BRICK']['tag'] == 'Not ordered' and p['open'] is False and p['then'] == RS.SETS_MAKING   # the rest is offered once the first sets are judged; design/211 review (N4): wait, then look
     p = Film(monkeypatch, 'looking').page()
     by = {l['key']: l for l in p['lines']}
     assert all(by[k]['state'] == 'making' and by[k]['note'] == 'Claude is looking at it.' and by[k]['tag'] == 'Claude is looking' and 'pics' not in by[k] for k in ('set:MASON', 'set:STREET', 'set:T_LAY'))
@@ -346,7 +353,7 @@ def test_in_the_chat_a_picture_is_answered_on_its_own_with_the_same_words(monkey
 def test_the_chat_asks_the_proposals_first_and_then_each_open_thing(monkeypatch):
     film = Film(monkeypatch)
     got = film.next()['item']
-    assert got['id'] == 'round1:all' and [b['label'] for b in got['buttons']] == ['Accept the 5 proposals (paid, about ₹175)', 'Ask me each one'] and got['position'] == 'References, 1 of 8'
+    assert got['id'] == 'round1:all' and [b['label'] for b in got['buttons']] == ['Accept the 5 proposals (paid: 3 sets first, about ₹105; the others are asked after)', 'Ask me each one'] and got['position'] == 'References, 1 of 8'
     out = film.decide('round1:all', 'each')
     assert out['item']['id'] == 'round1:TROWEL' and out['item']['position'] == 'References, 1 of 7' and 'Claude proposes: Use it as the reference.' in out['item']['message']
     assert out['item']['buttons'][1]['description'] == 'A set is made from the footage picture'   # the line under a paid button, its price aside
@@ -387,7 +394,7 @@ def big(n, words):
 def test_a_round_of_60_things_fits_one_document_of_the_page(monkeypatch):
     plan, s = big(60, 'A plain thing. ' * 20)
     p = Film(monkeypatch, plan=plan, session=s).page()
-    assert len(p['lines']) == 61 and p['lines'][0]['key'] == 'refs:proposals' and 'Accept the 60 proposals (paid, about ₹2,100)' == p['lines'][0]['buttons'][0]['label']
+    assert len(p['lines']) == 61 and p['lines'][0]['key'] == 'refs:proposals' and 'Accept the 60 proposals (paid: 3 sets first, about ₹105; the others are asked after)' == p['lines'][0]['buttons'][0]['label']
     assert len(json.dumps(p['lines'], ensure_ascii=False).encode('utf-8')) <= P.ROUND_BYTES
     plan, s = big(60, 'A long description of the thing, sentence after sentence. ' * 80)   # over the size of one document: the later lines wait for the next "done"
     p = Film(monkeypatch, plan=plan, session=s).page()
