@@ -1773,6 +1773,39 @@ def visuals_elements(run_id: UUID, user=User, conn=DB):
     return Response(visuals_stage.elements_answer(plan, package.get('world_evidence')))   # design/207 (D4): an animal is not listed, it has no reference
 
 
+# ---------- design/211 part A: the footage pictures (the digest, trial frames, the looks) ----------
+
+from . import ref_find   # noqa: E402
+
+
+class TrialFrames(Write):
+    frames: list[dict[str, Any]] = Field(min_length=1, max_length=40)   # over 8 is the server function's own refusal (TRIAL_TOO_MANY)
+
+
+class Looks(Write):
+    by: str = Field(max_length=20)
+    things: list[dict[str, Any]] = Field(min_length=1, max_length=80)
+
+
+@app.get('/api/runs/{run_id}/visuals/digest')
+def visuals_digest(run_id: UUID, user=User, conn=DB):
+    """What every analysed clip shows, part by part, and the things to find in it. A read: it never waits for the run's lock."""
+    run = core.load_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: ref_find.digest_answer(storage(), run, core.current_outputs(conn, run['id']))))
+
+
+@app.post('/api/runs/{run_id}/visuals/trials')
+def visuals_trials(run_id: UUID, body: TrialFrames, user=User, conn=DB):
+    run = core.load_run(conn, user, run_id)
+    cut = ref_find.cut_trials(storage(), run, core.current_outputs(conn, run['id']), body.frames)   # before the run's lock, as the search: helpers do not wait on each other's cutting
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_find.trial_record(storage(), user, run, outputs, body.frames, cut))
+
+
+@app.post('/api/runs/{run_id}/visuals/looks')
+def visuals_looks(run_id: UUID, body: Looks, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_find.look_record(conn, storage(), user, run, outputs, body.things, body.by))
+
+
 @app.post('/api/runs/{run_id}/visuals/search')
 def visuals_search(run_id: UUID, body: SearchBody, user=User, conn=DB):
     found = visuals_stage.search_rows(storage(), core.load_run(conn, user, run_id), body.keywords, body.source)   # design/92, design/121 change 6: before the run's lock

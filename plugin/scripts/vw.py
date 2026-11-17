@@ -2487,8 +2487,44 @@ def cmd_visuals(a):
                          if e.get('kind') == 'person' else "not seen in the footage: the operator's own picture (`vw visuals own`), else its set is made in the round"))   # design/207 (D3)
         lines += [f'No reference for {eid}: a living extra is carried by its words.' for eid in out.get('no_reference') or []]   # design/207 (D4)
         emit({'file': 'work/visuals/elements.json', 'elements': len(out.get('elements') or [])}, 0, 'Elements against the footage (work/visuals/elements.json): ' + '; '.join(lines))
-    if a.what in ('digest', 'trial', 'look'):   # design/211 part A: the digest of the footage, trial frames, the looks (step 0: the words and their flags only)
-        emit({'action': 'refused', 'message': f'`vw visuals {a.what}` is not built yet (design/211, part A); nothing was sent.'}, 2)
+    if a.what in ('digest', 'trial', 'look'):   # design/211 part A: the digest of the footage, trial frames, the looks. The server's `then` is the one "what next".
+        if a.what == 'digest':   # what every clip shows, part by part, as files of 25 clips, and the things to find with the frame rule and the limits
+            out = call('GET', base + '/digest')
+            d, folder = out.get('digest') or {}, ws / 'work' / 'visuals' / 'digest'
+            folder.mkdir(parents=True, exist_ok=True)
+            for old in folder.glob('clips-*.json'):   # a refresh leaves no stale part
+                old.unlink()
+            clips, index = d.get('clips') or [], []
+            for name, n in rows_files(folder, 'clips', clips, cap=25):
+                index += [{'clip': c.get('clip'), 'name': c.get('name'), 'duration_s': c.get('duration_s'), 'overview': c.get('overview'),
+                           'entities': [e.get('name') for e in c.get('entities') or []], 'file': f'work/visuals/digest/{name}'} for c in clips[len(index):len(index) + n]]
+            rows_file(folder / 'index.json', index)
+            (ws / 'work' / 'visuals' / 'refs').mkdir(parents=True, exist_ok=True)
+            (ws / 'work' / 'visuals' / 'refs' / 'things.json').write_text(json.dumps({'things': out.get('things') or [], 'rule': out.get('rule'), 'limits': out.get('limits'),
+                                                                                      'not_searched': d.get('not_searched') or []}, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+            emit({'index': 'work/visuals/digest/index.json', 'clips': len(clips), 'clip_files': sorted({r['file'] for r in index}), 'things_file': 'work/visuals/refs/things.json',
+                  'things': {t.get('id'): t.get('found') for t in out.get('things') or []}, 'not_searched': d.get('not_searched') or [], 'then': out.get('then')}, 0, out.get('then'))
+        if a.what == 'trial':   # small trial frames, free; each lands under work/visuals/trials/<element>/
+            if a.file:
+                rows = _rows(m, a.file, ('element', 'clip', 'at'))
+            elif a.element and a.clip and a.at is not None:
+                rows = [{'element': a.element, 'clip': a.clip, 'at': a.at}]
+            else:
+                emit({'action': 'refused', 'message': 'Give the frames: --file <rows {element, clip, at}>, or --element E --clip C --at <seconds>; nothing was sent.'}, 2)
+            out = write(base + '/trials', {'frames': [{'element_id': r['element'], 'clip': r['clip'], 'at_s': _number(r['at'], '--at')} for r in rows]})
+            asked, files = {str(r['element']) for r in rows}, []
+            for t in out.get('trials') or []:
+                for eid in [e for e in t.get('elements') or [] if e in asked]:
+                    rel = f"work/visuals/trials/{eid}/{t['id']}.jpg"
+                    _download(m, t['key'], rel)
+                    files.append({'trial': t['id'], 'element': eid, 'clip': t.get('clip'), 'at_s': t.get('at_s'), 'file': rel})
+            emit({'frames': files, 'failed': out.get('failed') or [], 'left': out.get('left') or {}, 'then': out.get('then')}, 0,
+                 ' '.join([*(f"{f.get('clip')} at {f.get('at_s')} s: {f.get('reason')}" for f in out.get('failed') or []), out.get('then') or '']))
+        doc = _json_file(m, a.file)   # look: {by, things: [{element, clips, note, not_searched, looks: [{trial, view, verdict, seen, keep, closest}]}]}
+        if not isinstance(doc, dict) or not isinstance(doc.get('things'), list):
+            emit({'action': 'refused', 'message': f'{a.file} must be {{by, things: [{{element, clips, note, looks}}]}}; nothing was sent.'}, 2)
+        out = write(base + '/looks', {'by': str(doc.get('by') or ''), 'things': doc['things']})
+        emit(out, 0, ' '.join([*(out.get('refused') or {}).values(), out.get('then') or '']))   # a refused thing is the server's sentence; the others were recorded
     if a.what == 'ask':   # design/110 rule 0: the question is a server state on the item
         choices = [c.strip() for c in str(a.choices or '').split('|') if c.strip()]
         out = write(base + '/ask', {'item': a.item, 'question': a.question or '', 'choices': choices, 'cost_inr': float(a.cost) if a.cost else None})
