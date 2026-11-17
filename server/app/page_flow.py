@@ -52,14 +52,15 @@ _MADE = set()   # ponytail: the sizes this process knows are stored, so a page w
 PIC_WORKERS = 8   # pictures whose sizes are made at one time: the storage reads and writes at once, as `analysis_jobs.REUSE_READS`
 
 
-def pic_code(key):
-    """A picture's code on the page: the same for the same storage key in every round, so a picture is sent once."""
-    return 'p' + hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]
+def pic_code(key, mark=''):
+    """A picture's code on the page: the same for the same storage key AND the same content in every round, so a picture is sent once, and a
+    picture stored again under a key used before is a new picture (defect 55, VW-24). `mark`: the content's mark, its sha256; with none, the key alone."""
+    return 'p' + hashlib.sha1((key + ('\n' + str(mark) if mark else '')).encode('utf-8')).hexdigest()[:12]
 
 
-def pic(key, label):
-    """One picture of a line: its code, the label shown under it and, until `page` answers, its storage key."""
-    return {'code': pic_code(key), 'label': str(label), '_key': key}
+def pic(key, label, mark=''):
+    """One picture of a line: its code, the label shown under it and, until `page` answers, its storage key and its content's mark."""
+    return {'code': pic_code(key, mark), 'label': str(label), '_key': key, **({'_mark': str(mark)} if mark else {})}
 
 
 def shrink(data, side, quality):
@@ -77,10 +78,11 @@ def shrink(data, side, quality):
     return out.getvalue()
 
 
-def sized(store, key, which):
-    """The storage key of a picture's small (`thumb`) or large (`zoom`) size: made from the full picture once, stored beside it, reused after."""
+def sized(store, key, which, mark=''):
+    """The storage key of a picture's small (`thumb`) or large (`zoom`) size: made from the full picture once, stored beside it, reused after.
+    Defect 55: its name carries the content's mark, so a copy made of an earlier picture under the same key is never given for a new one."""
     suffix, side, quality = PIC_SIZES[which]
-    out = key + suffix
+    out = key + ('.' + str(mark)[:10] if mark else '') + suffix
     if out not in _MADE:
         if not store.exists(out):
             store.put(out, shrink(store.get(key), side, quality), 'image/jpeg')
@@ -96,12 +98,12 @@ def _with_pictures(store, page):
     shown = lambda line: (line.get('pics') or []) + (line.get('earlier') or [])   # design/211: a set made again keeps the set before, folded
     for line in page['lines']:
         for p in shown(line):
-            keys.setdefault(p['code'], p.pop('_key', None))
+            keys.setdefault(p['code'], (p.pop('_key', None), p.pop('_mark', '')))
 
     def both(item):
-        code, key = item
+        code, (key, mark) = item
         try:
-            return {'code': code, 'thumb': sized(store, key, 'thumb'), 'zoom': sized(store, key, 'zoom')}
+            return {'code': code, 'thumb': sized(store, key, 'thumb', mark), 'zoom': sized(store, key, 'zoom', mark)}
         except Exception:   # a broken or half-written picture never fails the page
             return None
     found, failed = {}, []
@@ -352,7 +354,7 @@ def _drawing_lines(ctx):
         if r.get('status') != 'approved' and not item:
             continue
         n = len(r['views'])
-        seen = {'pics': [pic(v['labelled_key'], v['name']) for v in r['views']],
+        seen = {'pics': [pic(v['labelled_key'], v['name'], v.get('labelled_sha256') or r['sha256']) for v in r['views']],
                 'facts': [[str(f.get('what') or ''), f"{f.get('value', '')} {f.get('unit') or ''}".strip(), str(f.get('source') or '')] for f in r.get('facts') or [] if not f.get('assumed')],
                 'assumed': '; '.join(r.get('assumed') or [])}
         seen = {k: v for k, v in seen.items() if v}
@@ -490,7 +492,7 @@ def _v2_line(ctx, item, paid):
     line = dict(item['_line'])
     for field in ('pics', 'earlier'):
         if line.get(field):
-            line[field] = [{**pic(p['_key'], p['label']), **{k: v for k, v in p.items() if k not in ('_key', 'label')}} for p in line[field]]
+            line[field] = [{**pic(p['_key'], p['label'], p.get('_mark')), **{k: v for k, v in p.items() if k not in ('_key', 'label', '_mark')}} for p in line[field]]
     eid, kept, buttons = item['_eid'], item['_kept'], _round_buttons(item, paid)
     out = {'key': item['_key'], 'title': _thing_v2(ctx['plan'], eid) if eid else item['_title'], 'state': 'open', 'item': item['id'], 'ask': _ask(item), **line, 'buttons': buttons}
     if eid and item['id'].startswith('round1:'):   # design/212: the name and the kind apart, for the list and the heading of the thing
@@ -536,8 +538,8 @@ def _sets_lines_v2(ctx):
             shown = [refs[f] for f in row.get('frames') or [] if (refs.get(f) or {}).get('status') == 'approved'] if row.get('from_footage') else rows('approved')[:len(CF.LETTERS)]
             label = lambda n, r: words['from_footage'].format(view=r.get('view') or 'a footage picture') if row.get('from_footage') else words['picture'].format(letter=CF.LETTERS[n], view=r.get('view') or 'no view named')
             mine = refs.get(gold) if gold and not any(r['id'] == gold for r in shown) else None
-            pics = ([pic(CF._ref_key(run, r['id']), label(n, r) + (' (the starting picture)' if r['id'] == gold else '')) for n, r in enumerate(shown)]
-                    + ([pic(mine.get('key') or CF._ref_key(run, gold), 'Your own picture (the starting picture)')] if mine else []))
+            pics = ([pic(CF._ref_key(run, r['id']), label(n, r) + (' (the starting picture)' if r['id'] == gold else ''), r.get('sha256')) for n, r in enumerate(shown)]
+                    + ([pic(mine.get('key') or CF._ref_key(run, gold), 'Your own picture (the starting picture)', mine.get('sha256'))] if mine else []))
             done.append({**head, 'state': 'recorded', 'group': words['g_done'], **({'pics': pics} if pics else {})})
         else:
             said = ('making', '') if rows('generating') else ('rewriting', 'tag_rewriting') if row.get('rewrite_due') else ('looking', 'tag_looking') if rows('candidate') else ('waiting', 'tag_waiting')
@@ -567,7 +569,7 @@ def _refs_lines(ctx):
                 'Your own picture is its reference: no picture is made and nothing is paid.')
         kept = item['_kept']
         lines.append({'key': f'ref:{eid}', 'title': _thing(plan, eid), 'state': 'open', 'item': item['id'], 'ask': _ask(item), 'text': text + (' Choose a picture to see it large.' if live else ''),
-                      **({'pics': [pic(CF._ref_key(run, f), f'Footage picture {n}') for n, f in enumerate(live, 1)]} if live else {}),
+                      **({'pics': [pic(CF._ref_key(run, f), f'Footage picture {n}', session['references'][f].get('sha256')) for n, f in enumerate(live, 1)]} if live else {}),
                       'buttons': _round_buttons(item, paid), 'comment': True, 'own': _own_line(ctx, item, paid),
                       **({'kept': str(kept.get('quote') or kept.get('verdict')), 'kept_note': REFS_KEPT} if kept else {})})
     return lines, len([i for i in items.values() if i['_makes']])
@@ -597,7 +599,7 @@ def _sets_lines(ctx):
             lines.append({**head, 'state': 'open', 'item': item['id'], 'ask': _ask(item),
                           'text': (f"Three pictures of the same {'person' if person else 'thing'}. Choose a picture to see it large."
                                    + ('' if person else ' Choose the one every shot starts from: under the picture, or with a button below.')),
-                          'pics': [{**pic(CF._ref_key(run, r['id']), CF.LETTERS[n]), **({} if person else {'choice': 'use:' + r['id']})} for n, r in enumerate(item['_rows'])],
+                          'pics': [{**pic(CF._ref_key(run, r['id']), CF.LETTERS[n], r.get('sha256')), **({} if person else {'choice': 'use:' + r['id']})} for n, r in enumerate(item['_rows'])],
                           'buttons': buttons, 'comment': True, 'own': _own_line(ctx, item, paid),
                           **({'kept': said, 'kept_note': SETS_KEPT if V._round_pass(session, rd) == 'making' else SETS_HELD} if a else {})})
         elif item:   # its set was not made, or the picture service refused a person's photo
@@ -615,8 +617,8 @@ def _sets_lines(ctx):
             gold = V.golden_of(session, eid)
             mine = session['references'].get(gold) if gold and not any(r['id'] == gold for r in done) else None
             lines.append({**head, 'state': 'recorded',
-                          'pics': [pic(CF._ref_key(run, r['id']), CF.LETTERS[n] + (' (the starting picture)' if r['id'] == gold else '')) for n, r in enumerate(done[:len(CF.LETTERS)])]
-                                  + ([pic(mine.get('key') or CF._ref_key(run, gold), 'Your own picture (the starting picture)')] if mine else [])})
+                          'pics': [pic(CF._ref_key(run, r['id']), CF.LETTERS[n] + (' (the starting picture)' if r['id'] == gold else ''), r.get('sha256')) for n, r in enumerate(done[:len(CF.LETTERS)])]
+                                  + ([pic(mine.get('key') or CF._ref_key(run, gold), 'Your own picture (the starting picture)', mine.get('sha256'))] if mine else [])})
     return lines
 
 

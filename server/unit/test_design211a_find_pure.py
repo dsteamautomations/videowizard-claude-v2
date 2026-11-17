@@ -475,7 +475,7 @@ def test_found_all_gives_each_result_with_its_clips_its_closest_picture_and_stal
     fan = out['FAN']
     assert set(fan) == {'result', 'by', 'at', 'clips', 'clip_names', 'not_searched', 'note', 'closest', 'stale'}
     assert fan['clips'] == 6 and fan['clip_names'] == ['C001.mp4', 'C002.mp4', 'C003.mp4', 'C004', 'C005'] and fan['not_searched'] == ['C003.mp4'] and fan['note'] == 'No indoor wall is filmed.'
-    assert fan['closest'] == {'trial': 't0000000000c1', 'key': f"{RUN['id']}/visuals/trials/t0000000000c1.jpg", 'view': 'whole', 'seen': 'A switch plate on a wall, not a fan regulator.'}
+    assert fan['closest'] == {'trial': 't0000000000c1', 'key': f"{RUN['id']}/visuals/trials/t0000000000c1.jpg", 'sha256': 'c1' * 32, 'view': 'whole', 'seen': 'A switch plate on a wall, not a fan regulator.'}
     assert out['STREET']['closest'] is None and out['BRICK']['clips'] == 0 and out['BRICK']['note'] == 'The helper was stopped.'
     assert out['TILE']['stale'] is False and out['TROWEL']['stale'] is True
     s['found']['TROWEL']['result'] = 'weak'

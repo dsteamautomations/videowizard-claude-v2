@@ -173,7 +173,7 @@ class Film:
         for eid, f in (session.get('found') or {}).items():
             t = trials.get(f.get('closest') or '')
             out[eid] = {'result': f['result'], 'by': f['by'], 'at': f['at'], 'clips': len(f['clips']), 'clip_names': [names[c] for c in f['clips']][:5], 'not_searched': [c['name'] for c in F.digest()['not_searched']],
-                        'note': f['note'], 'closest': {'trial': t['id'], 'key': t['key'], 'view': t['looks'][eid]['view'], 'seen': t['looks'][eid]['seen']} if t else None, 'stale': bool(f.get('stale'))}
+                        'note': f['note'], 'closest': {'trial': t['id'], 'key': t['key'], 'sha256': t['sha256'], 'view': t['looks'][eid]['view'], 'seen': t['looks'][eid]['seen']} if t else None, 'stale': bool(f.get('stale'))}
         return out
 
     def not_this(self, conn, store, user, run, outputs, eid, ref_id, quote):

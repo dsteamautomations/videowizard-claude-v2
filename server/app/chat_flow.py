@@ -48,6 +48,11 @@ def _pic(run, ref_id, name):
     return {'key': _ref_key(run, ref_id), 'name': name + '.png'}
 
 
+def _mark(refs, ref_id):
+    """Defect 55 (VW-24): the content's mark of a reference's picture, its sha256: the page knows a picture by its key and this mark."""
+    return str((refs.get(ref_id) or {}).get('sha256') or '')
+
+
 # ---------- the treatment and the plan ----------
 
 def _changes(changes, n=10):
@@ -813,13 +818,13 @@ def _round_v2(ctx, every, step):
             # set that can only come from the footage: every picture. A set of a person, or of a thing with approved drawings (made with or without footage): the pictures
             # that are not weak; with only weak ones the set is from the description. "Leave out": none. A picture left unticked is not used; it is never "not this picture".
             starts = lambda p: rec in ('footage', 'clean') or (rec == 'set' and not (makes and p.get('weak'))) or p['ref'] in (session.get('refs_taken') or [])   # the closest picture the operator took ("that is it") is theirs: ticked
-            pics = [{'_key': _ref_key(run, p['ref']), 'label': str(p.get('view') or 'Footage picture'), 'note': str(p.get('seen') or ''), **({'weak': True} if p.get('weak') else {}),
+            pics = [{'_key': _ref_key(run, p['ref']), '_mark': _mark(session['references'], p['ref']), 'label': str(p.get('view') or 'Footage picture'), 'note': str(p.get('seen') or ''), **({'weak': True} if p.get('weak') else {}),
                      **({'on': True} if starts(p) else {}), 'choice': 'not:' + p['ref'], 'choice_label': WORDS['not_this']} for p in frames]
             start_off = [p['ref'] for p in frames if not starts(p)]
             waits = (session.get('chat_round') or {}).get(eid) or {}
             waits = waits if waits.get('confirm') and waits.get('frames') == stamps[eid] else {}   # an answer held for a look at a picture that came in place of a rejected one
             if closest:
-                pics.append({'_key': closest['key'], 'label': WORDS['closest_label'].format(view=closest.get('view') or 'not said'), 'note': str(closest.get('seen') or ''),
+                pics.append({'_key': closest['key'], '_mark': str(closest.get('sha256') or ''), 'label': WORDS['closest_label'].format(view=closest.get('view') or 'not said'), 'note': str(closest.get('seen') or ''),
                              'choice': 'use:' + closest['trial'], 'choice_label': WORDS['that_is_it']})
             # design/212: the case of the thing, and the buttons that case allows: (the label, the choice both front ends send, needs the operator's words, a small link)
             case = 'auto' if auto else 'footage' if frames else 'closest' if closest else 'none'
@@ -993,16 +998,17 @@ def _round_v2(ctx, every, step):
                 buttons, more = both[:4], both[4:]
             refs = session['references']
             drawn = {v.get('id'): v.get('labelled_key') or v.get('plain_key') for v in ((session.get('drawings') or {}).get(eid) or {}).get('views') or []}
+            drawn_mark = {v.get('id'): v.get('labelled_sha256' if v.get('labelled_key') else 'plain_sha256') for v in ((session.get('drawings') or {}).get(eid) or {}).get('views') or []}
             pics = []
             for i in sf.get('inputs') or []:   # what the set was made from, first, to compare with
                 key = (refs.get(i['ref']) or {}).get('key') or drawn.get(i['ref']) or (_ref_key(run, i['ref']) if i['ref'] in refs else None)
                 if key:
-                    pics.append({'_key': key, 'ref_only': True, 'label': WORDS['from_footage'].format(view=i.get('view') or (refs.get(i['ref']) or {}).get('view') or 'a footage picture')
+                    pics.append({'_key': key, '_mark': _mark(refs, i['ref']) or str(drawn_mark.get(i['ref']) or ''), 'ref_only': True, 'label': WORDS['from_footage'].format(view=i.get('view') or (refs.get(i['ref']) or {}).get('view') or 'a footage picture')
                                  if i.get('role') == 'footage' else WORDS['photo' if i.get('role') == 'photo' else 'drawing']})
-            pics += [{'_key': _ref_key(run, p['ref']), 'label': WORDS['picture'].format(letter=letter[p['ref']], view=p.get('view') or 'no view named'), 'note': str((p.get('look') or {}).get('seen') or ''),
+            pics += [{'_key': _ref_key(run, p['ref']), '_mark': _mark(refs, p['ref']), 'label': WORDS['picture'].format(letter=letter[p['ref']], view=p.get('view') or 'no view named'), 'note': str((p.get('look') or {}).get('seen') or ''),
                       **({'weak': True} if (p.get('look') or {}).get('verdict') == 'weak' else {}), **({} if person else {'choice': 'use:' + p['ref'], 'choice_label': f"Use {letter[p['ref']]}"})} for p in shown]
             old = (sf.get('history') or [{}])[-1].get('set')
-            earlier = [{'_key': r['key'], 'label': WORDS['before'].format(letter=LETTERS[n])} for n, r in enumerate(sorted(
+            earlier = [{'_key': r['key'], '_mark': str(r.get('sha256') or ''), 'label': WORDS['before'].format(letter=LETTERS[n])} for n, r in enumerate(sorted(
                 [r for r in refs.values() if old and r.get('kind') == 'sheet' and r.get('element_id') == eid and r.get('set') == old and r.get('key')], key=lambda r: int(r.get('set_n') or 1))[:len(LETTERS)])]
             part = sf.get('partial')
             doubt = state == 'fail' or (proposed.get('do') or 'use') != 'use' or bool(part) or bool(sf.get('changed'))

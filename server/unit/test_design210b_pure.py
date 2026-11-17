@@ -129,7 +129,7 @@ def test_every_thing_is_on_the_page_at_once_with_its_footage_pictures_and_the_ch
     assert [x['title'] for x in p['lines']] == ['Plinth (an object)', 'Clamp kiln (a place)', 'Mason (a person)']
     assert [x['item'] for x in p['lines']] == ['round1:E1', 'round1:E2', 'round1:P1'] and all(x['state'] == 'open' and x['comment'] is True for x in p['lines'])
     assert len(l['ref:E1']['pics']) == 4 and [x['label'] for x in l['ref:E1']['pics']] == ['Footage picture 1', 'Footage picture 2', 'Footage picture 3', 'Footage picture 4']   # up to four, as the chat shows
-    assert l['ref:E1']['pics'][0]['code'] == P.pic_code(CF._ref_key(NEW, 'F1')) and len(p['pictures']) == 4
+    assert l['ref:E1']['pics'][0]['code'] == P.pic_code(CF._ref_key(NEW, 'F1'), saved(store)['references']['F1']['sha256']) and len(p['pictures']) == 4
     assert l['ref:E1']['buttons'] == [{'label': 'Yes, use it', 'choice': 'approve', 'needs_words': False}, {'label': 'Leave it out', 'choice': 'ignore', 'needs_words': False}]
     assert 'nothing is paid' in l['ref:E1']['text'] and l['ref:E1']['ask'] == 'Use this picture from your footage as the reference?'
     assert 'pics' not in l['ref:E2'] and l['ref:E2']['buttons'][0] == {'label': f'Yes, make one ({paid(store, conn)})', 'choice': 'approve', 'needs_words': False}
@@ -307,7 +307,7 @@ def test_a_persons_set_shows_its_three_pictures_alone_and_asks_yes_no_or_correct
     l = by(p)['set:P1']
     rows = sorted(s['id'] for s in saved(store)['references'].values() if s.get('kind') == 'sheet' and s['element_id'] == 'P1')
     assert p['step'] == B and [x['key'] for x in p['lines']] == ['set:E2', 'set:P1'] and l['title'] == 'Mason (a person)' and l['item'] == f"set:P1:{rows[0]}"
-    assert [x['label'] for x in l['pics']] == ['A', 'B', 'C'] and [x['code'] for x in l['pics']] == [P.pic_code(CF._ref_key(NEW, r)) for r in rows] and not any('choice' in x for x in l['pics'])
+    assert [x['label'] for x in l['pics']] == ['A', 'B', 'C'] and [x['code'] for x in l['pics']] == [P.pic_code(CF._ref_key(NEW, r), saved(store)['references'][r]['sha256']) for r in rows] and not any('choice' in x for x in l['pics'])
     cost = paid(store, conn)
     assert l['buttons'] == [{'label': 'Yes', 'choice': 'yes', 'needs_words': False}, {'label': f'No ({cost}: the set is made again)', 'choice': 'no', 'needs_words': False},
                             {'label': f'Correct it ({cost}: the set is made again)', 'choice': 'correct', 'needs_words': True}]

@@ -478,7 +478,7 @@ def frames_of(session, eid):
 
 def found_all(store, run, session, plan):
     """The search record of every thing, for the page and the chat: {eid: {'result', 'by', 'at', 'clips': count, 'clip_names': [first five],
-    'not_searched': [clip names], 'note', 'closest': {'trial', 'key', 'view', 'seen'} or None, 'stale': bool}}. A thing with no record is absent."""
+    'not_searched': [clip names], 'note', 'closest': {'trial', 'key', 'sha256', 'view', 'seen'} or None, 'stale': bool}}. A thing with no record is absent."""
     try:
         d = V.load_json(store, V.key(run, 'digest.json'))
     except (Problem, ValueError):
@@ -493,7 +493,7 @@ def found_all(store, run, session, plan):
         look = ((trial or {}).get('looks') or {}).get(e['id']) or {}
         out[e['id']] = {'result': rec.get('result'), 'by': rec.get('by'), 'at': rec.get('at'), 'clips': len(clips), 'clip_names': [names.get(c, c) for c in clips[:5]],
                         'not_searched': [c.get('name') or c['clip'] for c in d.get('not_searched') or []], 'note': rec.get('note') or '',
-                        'closest': {'trial': trial['id'], 'key': trial['key'], 'view': look.get('view'), 'seen': look.get('seen')} if trial else None,
+                        'closest': {'trial': trial['id'], 'key': trial['key'], 'sha256': trial.get('sha256'), 'view': look.get('view'), 'seen': look.get('seen')} if trial else None,
                         'stale': rec.get('fingerprint') != fingerprint(e)}
     return out
 

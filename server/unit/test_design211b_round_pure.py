@@ -458,7 +458,7 @@ def test_the_sets_to_look_at_come_with_their_facts_request_inputs_and_large_pict
     assert set(t) == {'element_id', 'name', 'set', 'facts', 'request', 'inputs', 'pictures', 'notes'} and t['name'] == "Mason's trowel" and t['set'] == s['round']['elements']['TROWEL']['set']
     assert t['facts'] == RS.thing_facts(F.plan(), s, el('TROWEL')) and t['request'] == jobs(conn)['TROWEL']['prompt'] and t['notes'] == '(1) One variant.'
     zoom = page_flow.PIC_SIZES['zoom'][0]
-    assert t['inputs'][0] == {'ref': 'f-trowel-side', 'role': 'footage', 'view': 'side', 'key': s['references']['f-trowel-side']['key'] + zoom} and store.exists(t['inputs'][0]['key'])
+    assert t['inputs'][0] == {'ref': 'f-trowel-side', 'role': 'footage', 'view': 'side', 'key': s['references']['f-trowel-side']['key'] + '.' + s['references']['f-trowel-side']['sha256'][:10] + zoom} and store.exists(t['inputs'][0]['key'])
     assert [(p['ref'], p['n'], p['view']) for p in t['pictures']] == [(t['set'], 1, 'side'), (t['set'] + '-2', 2, 'in the hand, lifting mortar'), (t['set'] + '-3', 3, 'the detail that shows how it is made')]
     assert t['pictures'][0]['key'].endswith(zoom) and t['pictures'][0]['check'] == {'state': 'none', 'failed': [], 'error': None}
     assert t['pictures'][1]['key'] == s['references'][t['set'] + '-2']['key']        # a picture that cannot be shrunk is given at its full size

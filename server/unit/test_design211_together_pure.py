@@ -489,7 +489,9 @@ OLDER = {'step1': 'ad40300f115390166ae596bd425c9e242642c2ab3475522018ffcd10a4270
 
 
 @pytest.mark.parametrize('state', sorted(OLDER))
-def test_an_older_round_gives_the_page_and_the_chat_it_gave_before_design_211(state):
+def test_an_older_round_gives_the_page_and_the_chat_it_gave_before_design_211(state, monkeypatch):
+    real = P.pic
+    monkeypatch.setattr(P, 'pic', lambda key, label, mark='': real(key, label))   # defect 55: but for the content's mark in a picture's code and in the names of its two sizes, the page is that of before
     view = older_view(state)
     assert 'refused' not in view['page'] and (state == 'complete' or view['page']['step'] in (P.REFS_STEP, P.SETS_STEP))
     assert hashlib.sha256(json.dumps(view, sort_keys=True).encode()).hexdigest() == OLDER[state], json.dumps(view, sort_keys=True, ensure_ascii=False)[:3000]

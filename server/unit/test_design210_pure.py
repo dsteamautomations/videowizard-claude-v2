@@ -134,7 +134,7 @@ def test_a_set_with_one_sheet_is_the_chats_own_item_with_its_picture_its_facts_a
     assert p['step'] == STEP and p['open'] is True and len(p['lines']) == 1 and line['state'] == 'open' and line['line'] == 'l01'
     assert line['item'] == item['id'] == 'drawing:wall:' + 'a' * 10 and line['key'] == 'drawing:wall' and line['title'] == 'The wall'
     assert line['buttons'] == [{'label': 'Yes', 'choice': 'yes', 'needs_words': False}, {'label': 'Correct it', 'choice': 'correct', 'needs_words': True}]
-    assert line['pics'] == [{'code': P.pic_code(rows[0]['labelled_key']), 'label': 'Front'}] and line['ask'] == 'Is the shape and arrangement right?'
+    assert line['pics'] == [{'code': P.pic_code(rows[0]['labelled_key'], 'l'), 'label': 'Front'}] and line['ask'] == 'Is the shape and arrangement right?'
     assert line['facts'] == [['board thickness', '18 mm', "the joiner's drawing"]] and line['assumed'] == 'slope of a tail: 1 in 7' and line['text'].startswith('1 sheet.')
     pic = p['pictures'][0]
     assert p['pictures'] == [{'code': line['pics'][0]['code'], 'thumb': pic['thumb'], 'zoom': pic['zoom']}] and pic['thumb'].startswith('r1/') and pic['zoom'].startswith('r1/')
@@ -147,7 +147,7 @@ def test_a_set_with_eight_sheets_shows_all_of_them_in_their_order():
     names = ('Front', 'Side', 'From above', 'Section', 'Back', 'Detail', 'Three-quarter', 'Underside')
     rows = put_set(store, views=names)
     p = page(store, conn)
-    assert [x['label'] for x in p['lines'][0]['pics']] == list(names) and [x['code'] for x in p['lines'][0]['pics']] == [P.pic_code(r['labelled_key']) for r in rows]
+    assert [x['label'] for x in p['lines'][0]['pics']] == list(names) and [x['code'] for x in p['lines'][0]['pics']] == [P.pic_code(r['labelled_key'], 'l') for r in rows]
     assert len(p['pictures']) == 8 and p['lines'][0]['text'].startswith('8 sheets.')
 
 
@@ -245,7 +245,7 @@ def test_a_sheet_that_cannot_be_read_is_named_and_the_rest_of_the_page_is_built(
     store.d[rows[1]['labelled_key']] = b'half a file'
     p = page(store, conn)
     assert p['pictures_failed'] == ['Thing 1: Side'] and len(p['pictures']) == 3 and len(p['lines']) == 2
-    assert by_key(p)['drawing:T1']['pics'][1] == {'code': P.pic_code(rows[1]['labelled_key']), 'label': 'Side', 'missing': True}
+    assert by_key(p)['drawing:T1']['pics'][1] == {'code': P.pic_code(rows[1]['labelled_key'], 'l'), 'label': 'Side', 'missing': True}
 
 
 def test_the_layout_drawing_of_a_shot_is_not_this_step_and_the_chat_path_is_unchanged():

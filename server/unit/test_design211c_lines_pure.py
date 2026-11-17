@@ -51,7 +51,7 @@ def test_a_thing_with_footage_shows_the_description_the_shots_the_pictures_and_t
     assert [(x['label'], x['note'], x.get('weak', False), x['choice']) for x in l['pics']] == [
         ('side', 'The whole trowel, side on, sharp; the handle is reddish-brown.', False, 'not:f-trowel-side'),
         ('in the hand, lifting mortar', 'In the hand, the blade half covered by mortar.', True, 'not:f-trowel-use')]
-    assert l['pics'][0]['code'] == P.pic_code(CF._ref_key(RUN, 'f-trowel-side'))
+    assert l['pics'][0]['code'] == P.pic_code(CF._ref_key(RUN, 'f-trowel-side'), film.session()['references']['f-trowel-side']['sha256'])
     assert l['warnings'] == [W['warn_exact']]
     assert 'comment' not in l and 'comment_hint' not in l                           # design/212: the words come with "Minor corrections", not in a box under every answer
     assert l['cost'] == 'If you leave it out, these shots are made with no reference of it: shot 1 of gap 2, shot 2 of gap 2.'
@@ -264,7 +264,7 @@ def test_a_set_made_again_shows_the_operators_words_and_the_set_before(monkeypat
     t = film.lines()['set:T_LAY']
     assert t['changes'] == ['Made again as you asked: "Show the hand pressing the brick down."'] and t['asked'] is True
     assert [x['label'] for x in t['earlier']] == ['Before: A', 'Before: B', 'Before: C'] and all(x['code'] and '_key' not in x for x in t['earlier'])
-    assert t['earlier'][0]['code'] == P.pic_code(CF._ref_key(RUN, 's-t_lay-1')) and t['earlier'][0]['code'] in {x['code'] for x in film.page()['pictures']}   # sent to the page like any picture
+    assert t['earlier'][0]['code'] == P.pic_code(CF._ref_key(RUN, 's-t_lay-1'), film.session()['references']['s-t_lay-1']['sha256']) and t['earlier'][0]['code'] in {x['code'] for x in film.page()['pictures']}   # sent to the page like any picture
 
 
 def test_a_set_made_three_times_offers_no_remake_and_says_why(monkeypatch):
@@ -338,6 +338,7 @@ def test_a_thing_back_after_the_round_was_sent_again_is_an_open_line(monkeypatch
 def test_the_chat_item_of_each_line_has_the_same_question_text_and_buttons_as_the_page(monkeypatch, state):
     film = Film(monkeypatch, state)
     items = {i['id']: i for i in film.items()}
+    marks = {r['key']: r['sha256'] for r in [*film.session()['references'].values(), *F.trials()['trials'].values()] if r.get('key')}   # defect 55: a picture is its key and its content
     lines = [l for l in film.page()['lines'] if l['state'] == 'open']
     assert lines and {l['item'] for l in lines} == set(items)
     for l in lines:
@@ -347,7 +348,7 @@ def test_the_chat_item_of_each_line_has_the_same_question_text_and_buttons_as_th
         for said in ([W['proposes'].format(**l['rec'])] if l.get('rec') else []) + [W['read_first'].format(warning=w) for w in l.get('warnings', [])] + l.get('check', {}).get('lines', []) \
                 + [x['note'] for x in l.get('pics', []) if x.get('note')] + [l[k] for k in ('partial', 'cost') if l.get(k)]:
             assert said in i['text'], (l['key'], said)
-        assert [P.pic_code(x['key']) for x in i['show']] == [x['code'] for x in l.get('pics', [])]   # the chat shows the same pictures, in the same order
+        assert [P.pic_code(x['key'], marks[x['key']]) for x in i['show']] == [x['code'] for x in l.get('pics', [])]   # the chat shows the same pictures, in the same order
 
 
 def test_in_the_chat_a_picture_is_answered_on_its_own_with_the_same_words(monkeypatch):
@@ -424,6 +425,8 @@ OLDER = {'step1': (older_step1, P.REFS_STEP, '94b01dfc73e032f6', 'b0fada184a3af7
 def test_an_older_round_shows_exactly_the_lines_of_before(monkeypatch, step):
     make, name, page, every, chat = OLDER[step]
     film = Film(monkeypatch, session=make())
+    real = P.pic
+    monkeypatch.setattr(P, 'pic', lambda key, label, mark='': real(key, label))   # defect 55: but for the content's mark in a picture's code, the lines are those of before
     monkeypatch.setattr(CF, '_round_v2', lambda *a: (_ for _ in ()).throw(AssertionError('an older round never takes the new path')))
     p = film.page()
     assert p['step'] == name and digest({k: p[k] for k in ('step', 'open', 'lines', 'summary', 'note')}) == page

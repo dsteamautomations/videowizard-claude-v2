@@ -629,7 +629,7 @@ def start(conn, store, user, run, session, plan, kinds, elements):
     if missing:
         faults.append(f"Every person a picture is made of gets a set: add a row for {', '.join(missing)} (element_id, rec set, reason).")
     V.need(not faults, '\n'.join(faults))
-    session['round'] = {'pass': 1, 'at': _now(), 'by': user['id'], 'elements': rows, 'quote': None, 'kept': True, 'v': 2, 'go': 1, 'rest': []}
+    session['round'] = {'pass': 1, 'at': _now(), 'by': user['id'], 'elements': rows, 'quote': None, 'kept': True, 'v': 2, 'go': 1, 'rest': [], 'own_ids': True}   # defect 55: its sets' ids carry the round's `at` (`visuals_stage._queue_sets`)
     V.save_session(store, run, session)
     doubtful = sum(1 for r in rows.values() if r['doubt'])
     return {'pass': 1, 'elements': len(rows), 'kept': True, 'v': 2, 'doubtful': doubtful, 'then': ROUND_POSTED.format(n=len(rows), d=doubtful)}
@@ -727,9 +727,9 @@ def looks_due(store, run, outputs):
     from .page_flow import sized
 
     def big(ref_id):
-        key = (session['references'].get(ref_id) or {}).get('key')
+        key, mark = ((session['references'].get(ref_id) or {}).get(k) for k in ('key', 'sha256'))
         try:
-            return sized(store, key, 'zoom') if key else None
+            return sized(store, key, 'zoom', mark) if key else None   # defect 55: the copy of this content, never one made of an earlier picture under the same key
         except Exception:   # a picture that cannot be shrunk is read at its full size
             return key
     sets = []

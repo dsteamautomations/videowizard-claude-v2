@@ -3341,7 +3341,9 @@ def _queue_sets(conn, store, user, run, outputs, eids):
                 errors[eid] = ref_sets.MAKES_LIMIT.format(eid=eid, max=ref_sets.MAKES_MAX)
                 continue
         body = {'element_id': eid, 'kind': 'sheet', 'name': f'set-{eid}-r{n}', 'subject': element.get('name') or eid, 'prompt': prompt, 'parents': [],
-                'request_id': str(uuid.uuid5(uuid.NAMESPACE_OID, f"{run['id']}-set-{eid}-{n}"))}
+                # defect 55 (VW-24): a round posted from 0.109.2 (`own_ids`) adds its own `at`, so a round started again never stores its pictures under an earlier round's keys;
+                # the same on a retry inside the round. A round posted before keeps its ids.
+                'request_id': str(uuid.uuid5(uuid.NAMESPACE_OID, f"{run['id']}-set-{eid}-{n}" + (f"-{session['round']['at']}" if session['round'].get('own_ids') else '')))}
         try:
             out = generate_image(conn, store, user, run, outputs, body, **({'round_set': True} if round_v2(session) else {}))
         except (Problem, ValueError) as exc:
