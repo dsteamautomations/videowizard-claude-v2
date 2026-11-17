@@ -2,6 +2,8 @@
 
 17 Nov 2026. For SK.
 
+**Updated 17 Nov 2026, evening:** Part 4 is added at the end. It holds what was learned today while the References step was rebuilt, released and tested on VW-24: every issue SK reported, the fix made for each, the faults the critics caught before release, and the learnings to carry to the next step.
+
 **What this is.** Over 14 to 17 Nov the Treatment and Plan steps were reviewed line by line and changed heavily. This document lists every mistake found in those two steps and every learning stated, and then checks each one against the References step (the footage pictures, the paid reference sets, and the page where the operator judges them). **What was read:** design notes 151, 188, 190, 191, 195, 200 and 202 to 210; SK's review points and the answers; the critic reviews after each build; the commit messages since 14 Nov; the code and the instructions the References step runs; and VW-24's own files: the 49 lines of step 1 as the operator saw them, the plan's 50 things, and all 38 reference sets that were made (114 pictures, each with the full text sent to the picture model, the model's notes and the check result). I opened the four contact sheets and looked at every set. **Nothing is built or changed.** No code was touched; nothing was run on the server or the database.
 
 Yesterday's review of the footage pictures (`references-step-review-vw24-17-nov.md`) is taken as known and is not repeated.
@@ -328,3 +330,84 @@ The full table, with 70 items and the proof for each, is `refs-review/C-carry-ov
 - The shots' estimate for VW-24 was not in the files read.
 - The chat way back was read only where it shares code with the page.
 - No set was made or remade for this study; nothing was tried against the picture model.
+
+---
+
+## Part 4. Learnings from rebuilding and testing the References step (17 Nov 2026)
+
+**What happened today, in order.** The References step was reviewed (33 gaps, five root problems), rebuilt by three builders from one shared agreement (design/211), joined, read by three critics, fixed and released (server 0.108.0, plugin 0.92.0). VW-24 was rolled back to the Reference drawings step and became the first real film on the new step. SK reviewed the operator's screen, corrected a trial page over five rounds, and that layout was built and released (design/212, server 0.109.0, plugin 0.93.0).
+
+### 4.1 The issues SK reported on VW-24, and the fix for each
+
+| # | The issue, as reported | The fix | Where it stands |
+|---|---|---|---|
+| 1 | On the drawings step, the facts table breaks a long value into many short lines while another column is empty. | The columns are sized by their content: the value column is the widest. | Live |
+| 2 | The footage search used ten helpers, 18 million tokens and about $16.4 at API prices in nine minutes. All of it was Claude on the operator's laptop; none was Gemini, and no picture had been made. | Not fixed yet. To do: a cheaper model and lower effort for the helper, only the clips that mention its things, a thing's trial frames on one sheet. | Open |
+| 3 | The step-1 screen was cluttered: the pictures and the grey text under them filled the view, the question and its buttons were out of sight, and two rows of page numbers wasted the top. | A new layout: a list of things on the left, one thing on the right with the buttons directly under the pictures, the explanations folded behind a click, a slim top bar with "Next to answer". | Live |
+| 4 | "Have a set made (paid, about ₹35)" did not say whether a click starts the paid work at once; the buttons were overloaded. | Plain short buttons (Approve, Make a set, Minor corrections, Upload my own, Leave out) and one line under them: "Nothing is made until you say done in the chat." | Live |
+| 5 | The operator could not choose one, two or three pictures clearly, nor say "this one, with a small change". | A checkbox on each picture; "Minor corrections" opens a box for the operator's words. | Live |
+| 6 | 43 of the 49 things were marked "doubtful", so "Accept the proposals" saved almost nothing. | The list is now in five groups (see 13). Narrowing what counts as doubtful is still to do. | Partly |
+| 7 | The money line priced a set for every thing, more than the old sets had cost. | Not fixed; no cost is shown on this page any more (see 10). The count behind it is still to check. | Open |
+| 8 | The tag "Set" was not self-explaining. SK: "Make as Sets". | One word, "set", for every kind of thing, people included. The tag reads "Make a set". "How this works" says what a set is. | Live |
+| 9 | The six routine things could be accepted together but not seen first. | "Show the 6" beside Accept: each thing with its pictures, Claude's suggestion and reason, and "Open" to answer it alone. | Live |
+| 10 | **SK's decision:** "remove all the places where the cost is mentioned … not to show the cost anywhere on this page." | No price on a button, no money line, no cost word in any sentence of the references steps, on the page and in the chat. The server still keeps the limit and records every spend. | Live |
+| 11 | A person the footage does not show was asked with the same buttons as everything else, under a sentence that read like an error. Nothing was to be decided. | Such people are under "No action needed" and count as answered; their set is ordered at "done". Only two optional buttons stay: add words, upload own photo. | Live |
+| 12 | "Minor corrections" was offered on a thing with no picture, where there is nothing to correct. | It is offered only where a picture exists. Without one: Make a set, Upload my own, Leave out, and a small optional link to add words. The suggested answer is the first button. | Live |
+| 13 | Things with footage pictures were mixed with things that have none. | Five groups in this order: Routine: accept together; With footage pictures; No picture: a set is suggested; No picture: suggested to leave out; No action needed. "Next" follows the same order. | Live |
+| 14 | In a narrow window a thing's name was cut to one letter. | The name keeps its room; the chips wrap under it. | Live |
+| 15 | After the release, the word "free" is still in 11 of Claude's own reasons behind "Why?". | Not fixed yet. The assistant wrote these during the search and they are stored with the round. To do: tell the helper not to write cost words; take the word out when the line is built. | Open |
+| 16 | The operator republished the page and still saw the old layout. | The new layout was only on the trial page at that time. It was then built into the plugin and released. | Live |
+
+### 4.2 Faults the critics caught before a release reached the team
+
+| Release | What the critics found | What it would have meant |
+|---|---|---|
+| design/211 | Six mismatches between the three builders' parts, found only by walking a whole round through the joined code. | "Make the other sets" clicked with a "No" was silently dropped; a set made three times had no "Leave it out". |
+| design/211 | Six critical faults in the request text and the operator's sentences. | A "way of working" was forced to show hands; "no text" was demanded of things whose description names lettering; "Accept the 45 proposals" said 45 sets would be made when 3 are. |
+| design/211 | A fourth make was possible by a roundabout path; three failures of the picture model used up the three makes. | The "at most three" rule was not held; a thing could be left with no way to get a set. |
+| design/212 | **Every unticked picture was treated as "not this picture".** Weak pictures started unticked. | One click on "Make a set" for the young site worker would have rejected his three pictures, started a new search and changed his line to "Not in your footage". |
+| design/212 | A typed correction was lost when a replacement picture arrived. | The operator would have had to type it again without being told. |
+
+### 4.3 The learnings to carry to the next step
+
+**About what the operator sees**
+
+1. **One question, its options and its pictures belong in one view.** If the operator scrolls to find what is asked, the screen is wrong, however complete it is.
+2. **Explanations are opened, not shown.** What Claude saw and why it suggests something sit behind a click. The operator's eye goes to the picture and the answer.
+3. **The buttons follow the case.** The same five buttons on every line make the operator work out which ones apply. Where nothing is to be decided, nothing is asked.
+4. **A button is a word or two.** Never a sentence, never a note inside it.
+5. **One word for one thing.** "Set" everywhere, people included.
+6. **A bulk approval must be inspectable.** "Accept all" comes with "show them".
+7. **A sentence must not read like an error when nothing is wrong.** "Your footage was not searched for it: no clip could show her" became "Not in your footage", with the reason behind "why".
+8. **A default must not carry a hidden meaning.** An untouched checkbox must not reject a picture. Only what the operator does themselves is their word.
+9. **The page tells the operator what will happen before "done":** "Make a set from the 2 ticked pictures", not just "Make a set".
+
+**About how the work is done**
+
+10. **A step moved to the page without its own review carries its old faults with it.** 41 of the 56 mistakes found in the treatment and plan steps were present in the References step.
+11. **Show the design on a trial page with the film's real data before building it.** SK corrected the layout in five short rounds on a trial page. The same corrections after a build would each have been a release.
+12. **Parts built apart must be walked together before release.** Six faults lay between parts that each passed their own tests.
+13. **A critic who did not write the code finds what the builder cannot.** Each release today had a fault that would have reached VW-24.
+14. **The program decides by rule in many places where a model should read or look.** The word match that chose the footage pictures was one of 31 such places in this step alone. The audit of the whole flow listed 1,785 program decisions; its table is in `design/_work/system-decisions/`.
+15. **Measure a cost before assuming it.** The helper search was expected to take "minutes"; it took nine minutes and 18 million tokens. On a Max plan that is usage, not money, but it can stall a film at the plan's limit.
+16. **A figure from a reviewer is checked before it is repeated.** A reviewer read a trial page's estimate as a second spend and reported ₹960 left of the limit; the true figure was about ₹2,400. It was corrected before it reached a decision.
+
+**About releases and the live film**
+
+17. **Do not give the operator an instruction before the release it depends on exists.** The "publish only" instruction was given one step early; the operator republished the old page and saw no change. That was the builder's mistake.
+18. **"Publish only" works.** After a plugin update the page can be published again without the footage search being repeated, because the search results are kept on the server.
+19. **Read the live film's state before and after every release and every reset,** without writing. Each rollback has an undo and a dry run first.
+20. **A round started before a change keeps the older way to its end.** VW-24's first round was never disturbed by the new code; it moved to the new step only by SK's word, through a rollback.
+21. **Tests are run lean:** the checks of the changed area while building, one full run before a deploy, a short critic for a fix round (SK, 17 Nov).
+
+### 4.4 Still open after today
+
+| Open | Why it matters |
+|---|---|
+| The helper search uses too much (finding 2) | It can use up a plan's limit in the middle of a film |
+| What counts as "doubtful" (finding 6) | Eleven near-identical "leave out" decisions are still answered one by one |
+| The word "free" in Claude's reasons (finding 15) | SK's decision was no cost word anywhere on the page |
+| Whether the chat should also stop naming amounts after "done" | SK's decision named the page; the assistant's message still says the amount of the first sets |
+| The new page has not been seen on claude.ai with VW-24 yet | Everything so far is a test browser and the live server's data |
+| The first three sets with the new request | No real picture has been made by the rebuilt step yet |
+| The step-2 screen (judging the sets) | It keeps its older layout; the same redesign has not been done there |
