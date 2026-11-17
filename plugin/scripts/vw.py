@@ -2442,7 +2442,8 @@ def cmd_visuals(a):
                 d = d.get('data') if isinstance(d, dict) and isinstance(d.get('data'), dict) else d
                 if isinstance(d, dict) and d.get('key') and d.get('choice'):
                     answers.append({'line': f.stem[:20], 'key': str(d['key'])[:120], 'item': str(d.get('item') or '')[:200], 'choice': str(d['choice'])[:120], 'notes': str(d.get('notes') or '')[:2000],
-                                    **({'own': d['own']} if isinstance(d.get('own'), dict) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {})})
+                                    **({'own': d['own']} if isinstance(d.get('own'), dict) else {}), **({'permission': str(d['permission'])[:300]} if d.get('permission') else {}),
+                                    **({'pics': {str(k)[:80]: str(v)[:8] for k, v in list(d['pics'].items())[:8]}} if isinstance(d.get('pics'), dict) and d['pics'] else {})})   # design/211: a picture answered on its own
             answers, own_fetch = page_own(folder, base, answers)   # design/210 part 2: the operator's own pictures reach the server before their lines are recorded
             out = write(base + '/page/record', {'answers': answers}, wait=PAGE_WAIT)
             taken = folder / 'answers' / 'rounds' / rnd / 'answers'

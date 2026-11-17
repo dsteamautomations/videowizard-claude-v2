@@ -128,6 +128,16 @@ input[type=file]{max-width:100%;font:inherit;font-size:.9rem;color:var(--fg)}
 input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .acts .group{flex:1 1 100%}
 .ownpic{display:block;max-width:156px;max-height:110px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line)}
+/* design/211: the reference round, rebuilt. A heading that folds the lines of one group; Claude's proposal above the buttons; under a picture what
+   Claude saw, a "weak" tag and its own answer; a picture marked "not this picture" is dimmed; a picture shown only to compare with has a dashed edge. */
+.ghead{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font-family:var(--display);font-size:1rem;padding:10px 14px;background:var(--surface)}
+.ghead .count{margin-left:auto;font-family:var(--body);font-weight:500;text-align:right}
+.prop{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:6px;padding:8px 12px}
+.pnote{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.pcell .tag{align-self:flex-start}
+.pcell.no .pic{opacity:.45}
+.pcell.ref .pic{border-style:dashed}
+details.group>summary{font-weight:600;cursor:pointer}
 </style>
 
 <div class="wrap">
@@ -147,14 +157,15 @@ const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
 const MAX=2000, OWN_MAX=15*1024*1024, OWN_TYPES=['image/png','image/jpeg','image/webp'];   // design/210 part 2: what the server takes as the operator's own picture
 let db=null, assets=null, round=null, answers={}, stopAnswers=null, ready=false;
-const editing={}, drafts={}, nodes={};   // per line: the choice being typed for, its text (and, under 'c:' and 'p:' with the line, its comment and its words of permission), and the block on screen with what it was drawn from
+const editing={}, drafts={}, nodes={}, folded={};   // per line: the choice being typed for, its text (and, under 'c:' and 'p:' with the line, its comment and its words of permission), and the block on screen with what it was drawn from
 const comment=line=>String(drafts['c:'+line.line]||'').trim().slice(0,MAX);
 
 function tagOf(line,a){
   if(line.key==='world') return ['t-open','To read'];   // the world of the film is read, not answered
   if(line.state==='recorded') return a&&a.choice==='reopen'?['t-chg','You reopened it']:['t-rec','Recorded'];
   if(line.state==='with_assistant') return ['t-chg','With the assistant'];
-  if(line.state==='making') return ['t-mak','Being made'];   // design/210 part 2: its set is on its way
+  if(line.state==='making') return ['t-mak',line.tag||'Being made'];   // design/210 part 2: its set is on its way; design/211: or Claude is looking at it, or its request is written again
+  if(a&&a.choice==='pics') return ['t-chg','A picture answered; the line still to answer'];   // design/211: only a picture of the line is answered so far
   if(!a) return line.kept?['t-ans','Kept: '+line.kept]:['t-open','To answer'];
   if(a.choice==='own') return ['t-ans','You chose: Use my own picture'];
   const b=(line.buttons||[]).find(x=>x.choice===a.choice);
@@ -243,11 +254,22 @@ function thumbs(line,onChange){   // a line's pictures as a row of small ones, e
     btn.appendChild(el('span','ph',p.missing?'Not available':'Loading…')); btn.appendChild(el('span',null,p.label));
     btn.addEventListener('click',()=>openZoom(pics,i,btn));
     btns.push(btn);
-    if(p.choice&&line.state==='open'){   // design/210 part 2: a picture that can be chosen has its own button under it; the chosen one is marked; the answer is the same as the button's below
-      const on=!!a&&a.choice===p.choice, cell=el('div','pcell'+(on?' sel':'')), pk=el('button','pick'+(on?' on':''),on?'Chosen':'Choose '+p.label);
-      pk.type='button'; pk.setAttribute('aria-pressed',on?'true':'false');
-      pk.addEventListener('click',()=>{ if(on) undo(line); else write(line,p.choice,comment(line)); });
-      cell.appendChild(btn); cell.appendChild(pk); row.appendChild(cell);
+    const pick=!!p.choice&&line.state==='open';
+    if(pick||p.note||p.weak||p.ref_only){   // design/210 part 2: a picture that can be chosen has its own button under it; the chosen one is marked; the answer is the same as the button's below
+      // design/211: a footage picture is answered on its own ("Not this picture"; "That is it" on the closest): kept in the answer's `pics`, beside the line's own answer
+      const id=pick?p.choice.slice(4):'', kind=pick&&p.choice.indexOf('not:')===0?'not':'use', mark=pick&&(kind==='not'||String(line.key).indexOf('ref:')===0);
+      const on=pick&&(mark?((a&&a.pics)||{})[id]===kind:(!!a&&a.choice===p.choice));
+      const cell=el('div','pcell'+(on?(kind==='not'?' no':' sel'):'')+(p.ref_only?' ref':''));
+      cell.appendChild(btn);
+      if(p.weak) cell.appendChild(el('span','tag t-chg','Weak'));
+      if(p.ref_only) cell.appendChild(el('span','pnote','To compare with'));
+      if(p.note) cell.appendChild(el('span','pnote','Claude saw: '+p.note));
+      if(pick){
+        const what=p.choice_label||'Choose '+p.label, pk=el('button','pick'+(on?' on':''),on?(mark?what+' (marked: undo)':'Chosen'):what);
+        pk.type='button'; pk.setAttribute('aria-pressed',on?'true':'false');
+        pk.addEventListener('click',()=>{ if(mark) setMark(line,id,on?null:kind); else if(on) undo(line); else write(line,p.choice,comment(line)); });
+        cell.appendChild(pk); }
+      row.appendChild(cell);
     } else row.appendChild(btn);
   });
   const fill=()=>pics.forEach((p,i)=>{ if(!p.missing) loadThumb(p,btns[i],onChange||(()=>{}),0); });
@@ -342,14 +364,14 @@ function world(rows){   // SK, 16 Nov 2026: one heading per kind of rule with it
   return wrap;
 }
 function block(line,n){
-  const a=answers[line.line], box=el('section','item');
+  const marked=answers[line.line], a=marked&&marked.choice!=='pics'?marked:null, box=el('section','item');   // design/211: an answer that only marks a picture leaves the line to answer
   const pics=line.pics||[], gate=[], gmsg=el('span','said','');   // design/210: the buttons of a line with pictures work only when every one of them has shown
   const check=()=>{ if(!gate.length) return;
     const bad=pics.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=pics.filter(p=>picSeen[p.code]!=='ok').length;
     gate.forEach(b=>{ b.disabled=!!(bad.length||wait); });
     gmsg.textContent=bad.length?'A picture is missing: '+bad.join(', ')+'. This line cannot be answered here: tell the assistant in the chat.':wait?'The buttons work when every picture of this line has shown.':''; };
   const head=el('div','head'); head.appendChild(el('h2',null,n+'. '+line.title));
-  const t=tagOf(line,a); head.appendChild(el('span','tag '+t[0],t[1])); box.appendChild(head);
+  const t=tagOf(line,marked); head.appendChild(el('span','tag '+t[0],t[1])); box.appendChild(head);
   const body=el('div','body');
   if(line.changes&&line.changes.length){   // SK, 16 Nov 2026: folded, so the list of differences does not confuse; open when the operator asked for the change
     const c=el('details','changed'); c.open=!!line.asked;
@@ -359,6 +381,7 @@ function block(line,n){
   if(line.state==='with_assistant') body.appendChild(el('p','lead',line.note?'Your words: “'+line.note+'”. The assistant is rewriting this line.':'The assistant is rewriting this line.'));
   if(line.state==='making') body.appendChild(el('p','lead',line.note||'Its set is being made.'));
   if(line.text) String(line.text).split('\n').forEach(p=>{ if(p.trim()) body.appendChild(el('p',null,p)); });
+  if(line.partial) body.appendChild(el('p','changed',line.partial));   // design/211: a set that came back with fewer pictures, as it is
   if(line.key==='world') body.appendChild(world(line.rows)); else
   groups(line.rows).forEach(g=>{
     const wrap=g.name?el('div','group'):el('div'); if(g.name) wrap.appendChild(el('h4',null,g.name==='First'?'The first direction':g.name==='Second'?'The second direction':g.name));
@@ -374,6 +397,17 @@ function block(line,n){
   });
   if(line.spec) body.appendChild(spec(line));
   if(line.pics&&line.pics.length) body.appendChild(pictures(line,check));
+  if(line.check){   // design/211: the program's own check of the set: one line when it passed, the faults as a list, or that it did not run
+    const c=line.check, by=c.by||'The check', rows=c.lines||[];
+    if(c.state==='none') body.appendChild(el('p','said',by+': the check did not run.'));
+    else if(!rows.length) body.appendChild(el('p','said',by+(c.state==='fail'?': it found faults.':': passed.')));
+    else { const w=el('div',c.state==='fail'?'note':'changed'); w.appendChild(el('strong',null,by+(c.state==='fail'?': it found faults.':': passed.'))); const ul=el('ul'); rows.forEach(x=>ul.appendChild(el('li',null,x))); w.appendChild(ul); body.appendChild(w); } }
+  if(line.notes&&line.notes.text){   // folded: what the image model wrote about the set it made
+    const d=el('details','group'), n=line.notes.sources||0; d.appendChild(el('summary',null,(line.notes.title||'Notes')+(n?' ('+n+(n===1?' source)':' sources)'):'')));
+    String(line.notes.text).split('\n').forEach(x=>{ if(x.trim()) d.appendChild(el('p',null,x)); }); body.appendChild(d); }
+  if(line.earlier&&line.earlier.length){   // folded: the set before, to compare the set made again with
+    const d=el('details','group'); d.appendChild(el('summary',null,'The set before')); d.appendChild(thumbs({line:line.line,key:line.key,state:'recorded',pics:line.earlier})); body.appendChild(d); }
+  if(line.rec&&line.state==='open') body.appendChild(el('p','prop','Claude proposes: '+line.rec.label+'. '+(line.rec.reason||'')));   // above the buttons; the proposed answer is the first button
   if(line.ask&&line.state==='open') body.appendChild(el('p','totals',line.ask));   // design/209: the question of this line, in plain words
   if(line.state==='open'&&line.styles&&line.styles.length) body.appendChild(preview(line));
   if(body.childNodes.length) box.appendChild(body);
@@ -395,12 +429,14 @@ function block(line,n){
     if(gate.length){ acts.appendChild(gmsg); check(); }
   } else if(line.state==='open'){
     if(line.kept) acts.appendChild(el('span','said',line.kept_note||'Kept, not recorded yet.'));
+    if(marked) acts.appendChild(el('span','said','Your answer to a picture is saved on this page. Answer the line too, or say done in the chat: the line then comes back with what is left.'));
     if(line.comment){   // design/210 part 2: words the operator may add to any answer of this line
       const cw=el('div','edit'), ta=el('textarea'); ta.maxLength=MAX; ta.style.minHeight='48px'; ta.setAttribute('aria-label','Add a comment (optional)');
-      ta.placeholder='Add a comment (optional). It is kept with your answer; where a set is corrected, it says what to correct.'; ta.value=drafts['c:'+line.line]||'';
+      ta.placeholder=line.comment_hint||'Add a comment (optional). It is kept with your answer; where a set is corrected, it says what to correct.'; ta.value=drafts['c:'+line.line]||'';
       ta.addEventListener('input',()=>{drafts['c:'+line.line]=ta.value;}); cw.appendChild(ta); acts.appendChild(cw); }
     (line.buttons||[]).forEach((b,i)=>{const btn=el('button',i===0?'go':null,(line.key==='motion'?'Use ':'')+b.label); btn.addEventListener('click',()=>{ const said=line.comment?comment(line):''; if(b.needs_words&&!said){editing[line.line]=b.choice; draw(true); const ta=$('ta-'+line.line); if(ta) ta.focus();} else write(line,b.choice,said); }); acts.appendChild(btn); if(pics.length) gate.push(btn);});
     if(gate.length){ acts.appendChild(gmsg); check(); }
+    if(line.cost) acts.appendChild(el('span','said',line.cost));   // design/211: what leaving the thing out costs
     if(line.own&&assets) acts.appendChild(ownBox(line));
   } else if(line.state==='making'){ acts.appendChild(el('span','said','Nothing to answer here yet: it appears here when it is back.'));
   } else if(line.state==='recorded'&&line.reopen){
@@ -411,6 +447,12 @@ function block(line,n){
   if(acts.childNodes.length) box.appendChild(acts);
   return box;
 }
+function heading(name,g,shut){   // design/211: the heading of a group of lines; a click folds or opens it
+  const b=el('button','ghead'); b.type='button'; b.setAttribute('aria-expanded',shut?'false':'true');
+  b.appendChild(el('span',null,(shut?'▸ ':'▾ ')+name)); b.appendChild(el('span','count',g.n+(g.n===1?' line, ':' lines, ')+(g.wait?g.wait+' to answer':'none to answer')));
+  b.addEventListener('click',()=>{ folded[name]=!shut; draw(true); });
+  return b;
+}
 function draw(force){
   const list=$('list');
   if(!ready){return;}
@@ -419,28 +461,45 @@ function draw(force){
   const lines=round.lines||[], seen={};
   if(list.firstChild&&list.firstChild.className==='state') list.textContent='';
   const dots=$('dots'); dots.textContent=''; let open=0, answered=0;
+  // design/211: lines that name a `group` stand under one heading that folds; a group none of whose lines waits is folded until the operator opens it
+  const waits=line=>{ const x=answers[line.line]; return line.state==='open'&&!(x&&x.choice!=='pics')&&!line.kept; }, grp={}, rows=[];
+  lines.forEach((line,i)=>{ const g=line.group||''; if(g){ if(!grp[g]){ grp[g]={n:0,wait:0}; rows.push({head:g}); } grp[g].n++; if(waits(line)) grp[g].wait++; } rows.push({line:line,i:i}); });
+  const shut=g=>!!g&&(folded[g]!==undefined?folded[g]:grp[g].wait===0);
   lines.forEach((line,i)=>{
-    const a=answers[line.line];
+    const x=answers[line.line], a=x&&x.choice!=='pics'?x:null;
     if(line.state==='open'&&!a&&!line.kept) open++; if(a) answered++;
-    const yes=a&&(a.choice==='accept'||a.choice==='accept_second'||a.choice==='yes'||String(a.choice).indexOf('way:')===0||a.choice==='approve'||a.choice==='own'||a.choice==='make'||String(a.choice).indexOf('use:')===0);
+    const yes=a&&(a.choice==='accept'||a.choice==='accept_second'||a.choice==='yes'||String(a.choice).indexOf('way:')===0||a.choice==='approve'||a.choice==='own'||a.choice==='make'||String(a.choice).indexOf('use:')===0||a.choice==='clean'||a.choice==='accept_all'||a.choice==='rest');
     const d=el('div','dot '+(line.state==='recorded'&&!a?'rec':line.state==='with_assistant'?'chg':line.state==='making'?'mak':a?(yes?'ans':'chg'):line.kept?'ans':''),String(i+1)); d.title=line.title; dots.appendChild(d);
-    d.addEventListener('click',()=>{ const n=nodes[line.line]; if(n) n.node.scrollIntoView({block:'start'}); });   // design/206: a number jumps to its block
-    const sig=JSON.stringify([i,line,a||null,editing[line.line]||null,(line.pics||[]).map(p=>docId('pics',p.code))]);   // a picture moved to another document is drawn again
-    seen[line.line]=1;
-    const old=nodes[line.line];
-    if(old&&old.sig===sig) return;                               // unchanged: left alone, so a box being typed in keeps its text and its place
-    const node=block(line,i+1);
-    if(old) list.replaceChild(node,old.node); else list.appendChild(node);
-    nodes[line.line]={node:node,sig:sig};
+    d.addEventListener('click',()=>{ if(shut(line.group)){ folded[line.group]=false; draw(true); } const n=nodes[line.line]; if(n) n.node.scrollIntoView({block:'start'}); });   // design/206: a number jumps to its block (design/211: and opens its group)
+  });
+  rows.forEach(r=>{
+    const key=r.head?'g:'+r.head:r.line.line, line=r.line, i=r.i;
+    const sig=r.head?JSON.stringify([r.head,grp[r.head],shut(r.head)]):JSON.stringify([i,line,answers[line.line]||null,editing[line.line]||null,(line.pics||[]).map(p=>docId('pics',p.code)),(line.earlier||[]).map(p=>docId('pics',p.code))]);   // a picture moved to another document is drawn again
+    seen[key]=1;
+    const old=nodes[key];
+    if(!(old&&old.sig===sig)){                                   // unchanged: left alone, so a box being typed in keeps its text and its place
+      const node=r.head?heading(r.head,grp[r.head],shut(r.head)):block(line,i+1);
+      if(old) list.replaceChild(node,old.node); else list.appendChild(node);
+      nodes[key]={node:node,sig:sig}; }
+    if(line) nodes[key].node.hidden=shut(line.group);
   });
   Object.keys(nodes).forEach(k=>{ if(!seen[k]){ list.removeChild(nodes[k].node); delete nodes[k]; delete editing[k]; delete drafts[k]; } });
-  lines.forEach((line,i)=>{ const n=nodes[line.line]; if(n&&list.children[i]!==n.node) list.insertBefore(n.node,list.children[i]||null); });   // the film's order; a block already in place is not moved
+  rows.forEach((r,i)=>{ const n=nodes[r.head?'g:'+r.head:r.line.line]; if(n&&list.children[i]!==n.node) list.insertBefore(n.node,list.children[i]||null); });   // the film's order; a block already in place is not moved
   $('msg').textContent = !lines.length ? (round.note||'Nothing to decide') : open ? open+' still to answer. '+(round.note||'') : answered ? 'All answered. Go back to the chat and say done.' : (round.note||'Nothing waits for you here.');
 }
 function fail(e){ $('msg').textContent='Could not save ('+((e&&e.code)||'error')+'). Check that you are signed in to Claude, then try again.'; }
 function ref(line){ return db.doc('rounds/'+round.round+'/answers/'+line.line); }
-function write(line,choice,notes,more){ if(!db||!round) return; ref(line).set(Object.assign({key:line.key,item:line.item||'',choice:choice,notes:String(notes||'').slice(0,MAX),at:new Date().toISOString()},more||{})).catch(fail); draw(true); }   // `more`: the operator's own picture and their words of permission (design/210 part 2)
-function undo(line){ if(!db||!round) return; ref(line).delete().catch(fail); }
+function marksOf(line){ const a=answers[line.line], m=a&&a.pics; return m&&Object.keys(m).length?m:null; }   // design/211: the pictures of this line answered on their own
+function write(line,choice,notes,more){ if(!db||!round) return; const m=marksOf(line); ref(line).set(Object.assign({key:line.key,item:line.item||'',choice:choice,notes:String(notes||'').slice(0,MAX),at:new Date().toISOString()},m?{pics:m}:{},more||{})).catch(fail); draw(true); }   // `more`: the operator's own picture and their words of permission (design/210 part 2)
+function undo(line){ if(!db||!round) return; const m=marksOf(line), a=answers[line.line]; if(m&&a.choice!=='pics') ref(line).set({key:line.key,item:line.item||'',choice:'pics',notes:'',pics:m,at:new Date().toISOString()}).catch(fail); else ref(line).delete().catch(fail); }   // the picture marks stay until each is undone under its picture
+function setMark(line,id,kind){   // one picture answered (or its answer undone): saved with the line's answer, or alone as the choice `pics`
+  if(!db||!round) return;
+  const a=answers[line.line], m=Object.assign({},marksOf(line)||{}); if(kind) m[id]=kind; else delete m[id];
+  const has=Object.keys(m).length>0, own=a&&a.choice!=='pics';
+  if(!has&&!own){ ref(line).delete().catch(fail); return; }
+  const d=own?Object.assign({},a):{key:line.key,item:line.item||'',choice:'pics',notes:''}; d.at=new Date().toISOString(); if(has) d.pics=m; else delete d.pics;
+  ref(line).set(d).catch(fail); draw(true);
+}
 function watchAnswers(){
   if(stopAnswers){stopAnswers(); stopAnswers=null;} answers={};
   if(!round) return;
