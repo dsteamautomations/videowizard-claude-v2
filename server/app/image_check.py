@@ -286,7 +286,14 @@ def drawn_fix(svg, sheet, failed, rules, transport_factory):
 def lines_of(ref):
     """The server's must lines (design/89 C1, D5: the claims and the spec's relationships), the checklist the writer gave this picture, then the three fixed lines."""
     own = list(ref.get('server_checklist') or []) + [c for c in ((ref.get('answer') or {}).get('checklist') or []) if isinstance(c, dict) and c.get('check')]
-    return own + FIXED + ([] if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') in ('component', 'sheet') else SCENE_FIXED)   # design/117 P1: a cut-out has no scene; design/124 A4 item 14: nor a sheet
+    fixed = FIXED
+    if ref.get('set'):   # design/211: a picture of a reference set is checked by itself: a line may name the pictures it is asked of; "the view" is the picture's own turn
+        n = int(ref.get('set_n') or 1)
+        own = [{**{k: v for k, v in l.items() if k != 'pictures'}, **({'pass_when': f"{l['pass_when']}: {ref['ask']}"} if l.get('check') == 'the view' and ref.get('ask') else {})}
+               for l in own if n in (l.get('pictures') or (n,))]
+        if ref.get('element_kind') == 'person' and (ref.get('generation') or {}).get('parents'):   # made from the person's own photo, with their permission: the face must match it
+            fixed = [l for l in FIXED if l['check'] != 'a real face']
+    return own + fixed + ([] if ref.get('element_kind') in ('graphic', 'style') or ref.get('kind') in ('component', 'sheet') else SCENE_FIXED)   # design/117 P1: a cut-out has no scene; design/124 A4 item 14: nor a sheet
 
 
 def build(candidate_png, parents, lines, prompt):
@@ -312,12 +319,24 @@ def read(body, lines):
     return {'lines': out, 'must_failed': [l for l in out if l['weight'] == 'must' and l['pass'] is False], 'model': CHECK_MODEL}
 
 
+SIZE_TOLERANCE = 0.02   # design/211: a picture's width over height within 2 % of the aspect asked (2752x1536 is 16:9)
+
+
 def code_checks(ref, result, parents):
     """What code can check without a model: the size against the request, the parent chain."""
     out = []
     want = (ref.get('generation') or {}).get('size')
     got = f"{result.get('width')}x{result.get('height')}" if result.get('width') and result.get('height') else None
-    out.append({'check': 'size', 'pass_when': f'the picture is {want}', 'weight': 'must', 'pass': (got == want) if want and got else None, 'seen': got or ''})
+    if isinstance(want, dict):   # design/211 (a plain defect, repaired for every run): every Gemini picture is asked by a record {aspect, tier}; the older line compared that record with "WxH" and failed every picture
+        aspect = str(want.get('aspect') or '')
+        try:
+            a, b = (float(x) for x in aspect.split(':'))
+            ok = abs(result['width'] / result['height'] - a / b) <= SIZE_TOLERANCE * a / b if got else None
+        except (ValueError, ZeroDivisionError):
+            ok = None
+        out.append({'check': 'size', 'pass_when': f'the picture is {aspect}', 'weight': 'must', 'pass': ok, 'seen': got or ''})
+    else:
+        out.append({'check': 'size', 'pass_when': f'the picture is {want}', 'weight': 'must', 'pass': (got == want) if want and got else None, 'seen': got or ''})
     if parents:
         ok = lambda p: p.get('status') == 'approved' or p.get('id') == ref.get('fix_of') or (ref.get('kind') == 'state' and p.get('status') == 'candidate')   # design/124 decision 9: never a candidate start
         out.append({'check': 'parent', 'pass_when': 'made from approved parents (a fix from the picture it fixes, a state from the previous state)', 'weight': 'must',
@@ -465,6 +484,9 @@ def _model_check(store, session, ref, result, transport_factory, png=None, lines
             record['error'] = 'no Gemini key on the server'
             return record
         pngs = [(('scene' if p.get('kind') == 'frame' else p.get('kind') or 'reference'), store.get(p['key'])) for p in parents if p.get('key')]
+        first = session['references'].get(ref.get('set') or '') or {}
+        if int(ref.get('set_n') or 1) > 1 and first.get('key') and any(l.get('check') == 'same as picture 1' for l in lines):   # design/211: pictures 2 and 3 of a set are compared with picture 1
+            pngs.append(('picture 1 of this set', store.get(first['key'])))
         payload = build(png if png is not None else store.get(result['key']), pngs, lines, (ref.get('generation') or {}).get('prompt'))
         received, record['key_index'] = keys.gemini(transport_factory, CHECK_MODEL, lambda t: t.generate(payload), settings(), terminal_deadline_seconds=180, initial_soft_wait_seconds=30, on_update=lambda e: None, capture_answer_deltas=False)
         body = received.get('body')

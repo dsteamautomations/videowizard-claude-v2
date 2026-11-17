@@ -215,6 +215,11 @@ def key_out_green(png):
         return buf.getvalue()
 
 
+def _who(req):
+    """design/211: who was really called, for a failure's sentence: OpenAI, or Google's image model by its own id (a Gemini failure was named "OpenAI")."""
+    return f"Google's image model {req.get('model')}" if (req or {}).get('provider') == 'gemini' else 'OpenAI'
+
+
 def process_image(job):
     """Returns (status, result, error, cost, retry_in)."""
     req, jid = job['request'], str(job['id'])
@@ -236,16 +241,16 @@ def process_image(job):
                 r = _openai('/images/edits', data={'model': req['model'], 'prompt': req['prompt'], 'size': req['size'], 'quality': req['quality'],
                                                    **({'background': req['background']} if req.get('background') else {})}, files=files)
             if r.status_code == 404 or (r.status_code == 400 and 'model' in r.text.lower() and 'not' in r.text.lower()):
-                return 'rejected', {'failure': 'MODEL_UNAVAILABLE', 'http_status': r.status_code}, f"OpenAI reports the model {req['model']} is unavailable on this account.", None, None
+                return 'rejected', {'failure': 'MODEL_UNAVAILABLE', 'http_status': r.status_code}, f"{'Google' if req.get('provider') == 'gemini' else 'OpenAI'} reports the model {req['model']} is unavailable on this account.", None, None
             if r.status_code >= 500 or r.status_code == 429:   # design/82 U3: back to the queue 1, 2 then 4 minutes later; the fourth attempt is rejected
                 attempt = job.get('attempt') or 1
                 if attempt < 4:
-                    return 'queued', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code}; attempt {attempt + 1} of 4 in {2 ** (attempt - 1)} min.', None, 2 ** (attempt - 1)
-                return 'rejected', {'failure': 'provider', 'http_status': r.status_code}, f'OpenAI returned HTTP {r.status_code} on {attempt} attempts; no further retry.', None, None
+                    return 'queued', {'failure': 'provider', 'http_status': r.status_code}, f'{_who(req)} returned HTTP {r.status_code}; attempt {attempt + 1} of 4 in {2 ** (attempt - 1)} min.', None, 2 ** (attempt - 1)
+                return 'rejected', {'failure': 'provider', 'http_status': r.status_code}, f'{_who(req)} returned HTTP {r.status_code} on {attempt} attempts; no further retry.', None, None
             if r.status_code >= 400:
-                result, error = refusal(r)
+                result, error = refusal(r, req)
                 if getattr(r, '_body', None) and (r._body.get('error') or {}).get('type') == 'no_image':   # design/120: Gemini answered in words, not a picture
-                    result, error = {**result, 'failure': 'no_image'}, f"The model returned no picture: {(r._body.get('error') or {}).get('message')}"
+                    result, error = {**result, 'failure': 'no_image'}, f"{_who(req)} returned no picture: {(r._body.get('error') or {}).get('message')}"
                 return 'failed', result, error, None, None
             durable(raw_path, r.content)
         body = json.loads(raw_path.read_text(encoding='utf-8'))
@@ -298,9 +303,10 @@ def process_image(job):
         return 'failed', {'phase': 'prepare'}, (exc.message if isinstance(exc, Problem) else f'{exc.__class__.__name__}: {exc}'), None, None
 
 
-def refusal(r):
+def refusal(r, req=None):
     """design/71 P5: a refused picture says why. OpenAI's error body names a moderation block (with its stage and categories) or a user error;
-    anything else keeps the plain message. Returns (result, error)."""
+    anything else keeps the plain message. Returns (result, error). design/211: `req`, the job's request: a refusal of Google's image model
+    is named as such, with its model and its own words."""
     try:
         err = (r.json() or {}).get('error') or {}
     except ValueError:
@@ -314,6 +320,8 @@ def refusal(r):
                         'use it as a look reference only, pick a frame without a face, or change the prompt.')
     if kind == 'image_generation_user_error':
         return result, f"OpenAI refused the request: the prompt or the pictures are the problem; do not resend unchanged. ({err.get('message') or r.text[:120]})"
+    if (req or {}).get('provider') == 'gemini':
+        return result, f"{_who(req)} rejected the request (HTTP {r.status_code}){': ' + str(err.get('message'))[:160] if err.get('message') else ''}."
     return result, f'OpenAI rejected the request (HTTP {r.status_code}).'
 
 
@@ -369,6 +377,8 @@ def apply_image_result(conn, run_id, ref, status, result, error, cost):
         return True
     if status in ('rejected', 'failed'):
         ref.update(status='failed', error=error)
+        if (result or {}).get('failure'):   # design/211: what failed, for the sentence the operator reads (ref_sets.fail_of)
+            ref['failure'] = {k: result[k] for k in ('failure', 'http_status') if k in result}
         return True
     return False
 
@@ -387,12 +397,20 @@ def finalize_image(conn, job, status, result, error, cost, retry_in):
     ref = session['references'].get(job['request']['reference']['id'])
     due = False
     if ref and apply_image_result(conn, job['run_id'], ref, status, result, error, cost):
-        for n, x in enumerate((result or {}).get('extra') or [], 2):   # design/151: the set's other pictures are sibling candidates (set, set_n); the check runs on the first
+        made = [ref]
+        for n, x in enumerate((result or {}).get('extra') or [], 2):   # design/151: the set's other pictures are sibling candidates (set, set_n)
             sid = f"{ref['id']}-{n}"
             session['references'][sid] = {**{k_: v for k_, v in ref.items() if k_ not in ('check_pending', 'check')}, 'id': sid, 'name': f"{ref.get('name') or ref['id']}-{n}", 'set_n': n, **x}
+            made.append(session['references'][sid])
             jobs.record_file(conn, job['run_id'], 'visuals', x['key'], Path(x['key']).name, x['sha256'], x['bytes'], 'image/png')
+        names, asks = job['request'].get('view_names') or [], job['request'].get('views') or []
+        if status == 'retained' and names:   # design/211: each picture of a v2 set carries the view its turn asked: the short name, and the sentence the check reads
+            for n, pic in enumerate(made):
+                pic.update({'view': names[n] if n < len(names) else '', **({'ask': asks[n]} if n < len(asks) else {})})
         if status == 'retained' and ((ref.get('answer') or {}).get('checklist') or ref.get('server_checklist')):   # design/86 K2: the check before the operator sees it
-            ref['check_pending'] = due = True   # design/92: checked after this transaction, with no lock held (check_image)
+            due = True   # design/92: checked after this transaction, with no lock held (check_image)
+            for pic in made:   # design/211: every picture of a set is checked, not the first only
+                pic['check_pending'] = True
         store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
     return due
 
@@ -406,15 +424,24 @@ def check_image(job, result):
     k, rid = f"{job['run_id']}/visuals/session.json", job['request']['reference']['id']
     try:
         session = json.loads(store.get(k).decode('utf-8'))
-        record = image_check.run_check(store, session, session['references'][rid], result, transport_factory)
+        records = {rid: image_check.run_check(store, session, session['references'][rid], result, transport_factory)}
+        for n in range(2, 2 + len((result or {}).get('extra') or [])):   # design/211: the other pictures of a set, each with its own check (one model call each)
+            pic = session['references'].get(f'{rid}-{n}')
+            if pic and pic.get('check_pending') and pic.get('key'):
+                records[pic['id']] = image_check.run_check(store, session, pic, {'key': pic['key'], 'width': pic.get('width'), 'height': pic.get('height')}, transport_factory)
         with connect() as conn:
             conn.execute('select pg_advisory_xact_lock(hashtextextended(%s, 0))', ('run:' + str(job['run_id']),))
             session = json.loads(store.get(k).decode('utf-8'))
-            ref = session['references'].get(rid)
-            if not ref or ref.get('job_id') != str(job['id']) or ref.get('status') != 'candidate' or 'check' in ref:
+            changed = False
+            for pid, record in records.items():
+                ref = session['references'].get(pid)
+                if not ref or ref.get('job_id') != str(job['id']) or ref.get('status') != 'candidate' or 'check' in ref:
+                    continue
+                ref['check'] = record
+                ref.pop('check_pending', None)
+                changed = True
+            if not changed:
                 return
-            ref['check'] = record
-            ref.pop('check_pending', None)
             store.put(k, json.dumps(session, ensure_ascii=False, sort_keys=True).encode('utf-8'), 'application/json')
     except Exception:   # a picture is never held back by its check
         return
