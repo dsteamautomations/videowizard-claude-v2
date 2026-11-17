@@ -37,3 +37,53 @@ Evidence: the two sets the rebuilt step made on VW-24 (the mason, the roof deck)
 - I looked at the six pictures of the two sets and the three footage pictures of the deck. No other set exists yet.
 - Whether the mason in the footage has given permission is not something the system knows.
 - The fix for issue 1 is being built; it is not deployed.
+
+---
+
+## The judgement: is each proposed correction the right one?
+
+Added 17 Nov 2026, at SK's request ("act on my behalf and say whether those fixes will be appropriate"). **Nothing is built; this waits for SK's approval.**
+
+I judged each correction against the rules SK has set over these weeks: a model reads and looks, the program enforces; the operator is not asked what needs no answer; a rule fits every category of film; a real person's likeness needs recorded permission; nothing already approved is quietly set aside; the smallest change that removes the cause.
+
+| # | Issue | My first proposal | Verdict | The correction I now recommend |
+|---|---|---|---|---|
+| 1 | Yesterday's pictures were shown and looked at | A picture is its name and its content | **Right. Done and live** (0.109.2) | None further. |
+| 2 | A person's set is made from words though the footage shows them | "Decide the rule" | **Not enough: it left the decision open.** | At step 4, a person the footage shows gets one question: "Is the person in these pictures the one the film means, and do you have their permission?" Yes: their footage pictures go into the set as their own likeness, with the permission recorded. No: a stand-in from the description, and the request says the stand-in must not resemble the person in the footage. This keeps your permission rule and ends the two-different-men problem. |
+| 3 | The plan and the footage disagree, and nobody is asked which wins | Ask the operator once | **Wrong: one more question that needs no answer.** | Claude already knows the difference and says so in its reason ("the footage deck lies on the ground; the plan's deck is on a roof"). It should write one more line per thing: what to take from the footage (the materials and their look) and what from the plan (where it is). The server gives that same line to the request and to the check. The operator reads it behind "Why?" and corrects it with "Minor corrections" if it is wrong. |
+| 4 | The check calls a face "real" on a face made from words | Ask the line only when a real photo was an input | **Right.** Small. | As proposed. |
+| 5 | The check treats another view as a fault | Give the check each picture's view | **Right.** Small. | As proposed: "the same thing as picture A, seen as picture B's view asks". |
+| 6 | The three pictures of a place are not one place | Make A first, then give A to the model for B and C | **Wrong tool. The right one is already approved.** | Your image workflow (design/200, Area A) names a "composition set" for exactly this: a site, a room, where things stand. The roof deck should have had one. The correction is that Claude proposes the kind of drawing for every thing, places included, with its reason, and the operator sees it at the Reference drawings step. Chaining A into B and C is not needed then. |
+| 7 | The set shows the footage's method, not the film's | Name the film's own things in a place's request and give their references | **Right, and it belongs with 6.** | A place's composition drawing is built from the film's own things (the tile's approved drawing), and the things that stand in a place are made before the place. |
+| 8 | The image model's notes are shown raw | Claude turns them into two plain lines | **Right.** It is a reading job, so it is Claude's. | Done at Claude's look, where it already reads them: what the model chose, and what it set aside. The raw notes stay in the record, not on the page. |
+| 9 | The same notes sit on all three pictures | Split the notes by picture when stored | **Drop it.** | Splitting free text by a program is the kind of rule that fails. With 8, the raw notes are not shown, and Claude's own line per picture already exists. |
+| 10 | "Leave out" lists 30 shots in one sentence | A table, one row per thing | **Right.** In the trial page. | As in the trial. |
+| 11 | Waiting and settled things look like work | Folded groups with nothing to press | **Right.** In the trial page. | As in the trial. |
+| 12 | "Doubtful: look at these first" is back | Plain group names | **Right.** In the trial page. | As in the trial. |
+| 13 | A technical refusal is shown in the open | "This set could not be made", reason behind "why" | **Right.** In the trial page. | As in the trial. |
+| 14 | A first set that fails is not replaced | Order the next one in its place | **Right, small, low value now.** | Do it with the others; the cause of this one failure is already fixed (defect 54). |
+| 15 | Places and rooms get no drawing | (found after the note) | **Same correction as 6.** | See 6. |
+
+### What changed in my own proposals
+
+- **Three were wrong or incomplete** (2, 3, 6). In each I had reached for the nearest patch: a question, another question, a chaining trick. The better answers were already in your own decisions: the permission rule, "do not ask what needs no answer", and the composition drawing of design/200.
+- **One should be dropped** (9).
+- **The rest stand** as proposed.
+
+### How I would group the work
+
+| Group | Items | Size | Needs from SK |
+|---|---|---|---|
+| The screen | 10, 11, 12, 13, with the trial page's layout | Medium | Approval of the trial page |
+| The check tells the truth | 4, 5 | Small | Nothing |
+| The request and the check agree | 3, 8 | Small to medium | Nothing |
+| Drawings for places | 6, 7, 15 | Medium | A yes that places and rooms may get a composition drawing, as design/200 says |
+| A person from the footage | 2 | Medium | A yes to the one question at step 4, since it concerns a real person's likeness |
+| Small | 14 | Small | Nothing |
+
+### What I would not do now
+
+- Make the three pictures by chaining one into the next. The composition drawing is the approved way.
+- Add any question the operator must answer about plan against footage.
+- Parse the image model's notes by program.
+
