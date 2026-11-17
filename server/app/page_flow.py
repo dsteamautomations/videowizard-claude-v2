@@ -504,6 +504,9 @@ def _v2_line(ctx, item, paid):
         out['own'] = _own_line(ctx, item, paid)
     if kept and item['id'].startswith('round1:'):
         out.update(kept=str(kept.get('quote') or kept.get('verdict')), kept_note=REFS_KEPT)
+        if item.get('_v2') and item['_frames'] and kept.get('verdict') in ('approve', 'clean') and not kept.get('own'):   # design/212 review: what the kept answer will do, said plainly
+            n = len([f for f in item['_frames'] if (kept.get('pics') or {}).get(f) not in ('off', 'not')])
+            out['kept_how'] = CF.WORDS['kept_pictures'].format(n=n, s='' if n == 1 else 's') if n else CF.WORDS['kept_words']
     elif kept:
         choice = ('use:' + kept['golden']) if kept.get('golden') else kept['verdict']
         out.update(kept=next((b['label'] for b in buttons if b['choice'] == choice), 'Use my own picture' if kept.get('golden') else choice),
@@ -726,8 +729,10 @@ def _round_answer(ctx, a, choice, words):
     eid, person, step1 = item['_eid'], item['_person'], item['id'].startswith('round1:')
     _budget, paid = _money(ctx)
     marks = {str(k): str(v) for k, v in a['pics'].items()} if item.get('_v2') and step1 and eid and isinstance(a.get('pics'), dict) else {}
+    # design/212 review: an answer written by the page of before design/212 (approve, clean, ignore: the item's own stored choices) is still taken, with the label it had then
+    older = lambda: next(({'label': o[0], 'choice': o[1], 'needs_words': False} for o in item.get('_opts') or [] if step1 and o[1] == choice), None)
     if marks and choice != 'own':   # design/211: a picture answered on its own (not this picture; that is it), before the line's own answer, through the chat item's own function
-        button = next((b for b in _round_buttons(item, paid) if b['choice'] == choice), None)
+        button = next((b for b in _round_buttons(item, paid) if b['choice'] == choice), None) or older()
         V.need(choice == 'pics' or button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in _round_buttons(item, paid)) + '.')
         out = item['_run'](choice, button['label'] if button else MARKED, words, pics=marks) or {}
         said = (button['label'] + '; ' if button and 'marked' not in out else '') + MARKED + ': ' + ', '.join(f'{k} {v}' for k, v in marks.items())
@@ -748,7 +753,7 @@ def _round_answer(ctx, a, choice, words):
             out = {}
     else:
         buttons = _round_buttons(item, paid)
-        button = next((b for b in buttons if b['choice'] == choice), None)
+        button = next((b for b in buttons if b['choice'] == choice), None) or older()
         V.need(button, f"Not an answer to this line: {choice!r}. Its answers are: " + ', '.join(b['label'] for b in buttons) + '.')
         V.need(not button['needs_words'] or words, CF.WORDS['fix_words'] if item.get('_v2') and step1 else 'Say what should change in this line, in your own words.')
         label = button['label']

@@ -57,8 +57,8 @@ A person, and a thing with approved drawings, has no "Approve": a set is always 
 
 | Button | Sends | Stored as |
 |---|---|---|
-| Approve | `use`, with the ticks | `approve`, where that takes the footage pictures as the reference. An unticked footage picture is `pics: {id: 'not'}` ("not this picture"); a ticked closest picture is `pics: {id: 'use'}` ("that is it"). |
-| Make a set | `set`, with the ticks | `clean` where pictures are kept and the thing can be taken from footage; else `approve`, where that has a set made. |
+| Approve | `use`, with the ticks | `approve`, where that takes the ticked footage pictures as the reference. A ticked closest picture is `pics: {id: 'use'}` ("that is it"). What a tick means: section 3a. |
+| Make a set | `set`, with the ticks | `clean` where the thing can be taken from footage (from its ticked pictures); else `approve`, where that has a set made: from the ticked pictures, or from the description where none is ticked. |
 | Minor corrections | `fix`, with the ticks and the operator's words (required) | as Make a set, with `words`: they reach the request as the operator's words. |
 | Add words for the picture | `fix` with words | as Make a set, with `words`. |
 | Upload my own | `own` | the existing own-picture path (design/210); for a person, their words of permission first. |
@@ -66,7 +66,25 @@ A person, and a thing with approved drawings, has no "Approve": a set is always 
 
 Refusals, by the server, kept on the thing: Approve, Make a set or Minor corrections with no picture kept where one is needed ("Tick at least one picture first.", "…: the set is made from it.", "Tick the picture first, if that is it."); Minor corrections with no words ("Write what should change first."). The page says the same sentence at the click, before anything is written. The refusals of design/211 stand (a picture not on the line; the limit at "done").
 
-An answer of the page as it was before this change (`approve`, `clean`, `ignore` sent to the item's function) is still taken.
+An answer of the page as it was before this change (an answer document with `approve`, `clean` or `ignore`, as the 0.92.0 page wrote it) is still taken, through `page_record`, with the label it had then; it knew no ticks, so every picture it did not mark "not" is used.
+
+## 3a. What a tick means (the review of 17 Nov 2026)
+
+In plain words: **a ticked picture is used; an unticked picture is not used.** Nothing more happens to a picture that was never ticked.
+
+- **Which pictures start ticked** follows Claude's proposal for the thing, not the "Weak" mark (the mark stays on the picture). The server sends it (`on` on each picture), so the chat, which has no ticks, uses the same pictures.
+  - "Use footage", and a set that can only come from the footage pictures: every picture starts ticked, weak or not.
+  - A set proposed for a person, or for a thing with approved drawings (a set is made of these with or without footage): the pictures that are not weak start ticked. With only weak pictures none is ticked, and the set is made from the description.
+  - "Leave out": none.
+  - A "closest found" picture: not ticked; a tick says "that is it". Once the operator has taken it, it is theirs and starts ticked.
+- **A picture that started unticked and is left so** is simply not used: no "not this picture", no search for the next best, and the thing keeps its pictures on its line. At "done" the server sets those pictures aside (`chat_flow.round_close`), so the set is made from the ticked ones only.
+- **A picture the operator ticks themselves** is used (`pics: {id: 'on'}`).
+- **A picture the operator unticks themselves** (it started ticked) is "not this picture" (`pics: {id: 'not'}`), as before: it is rejected with their word and the next best may come in its place.
+- **With no picture ticked**, "Make a set" means from the description, for a person and for a thing with approved drawings. For any other thing with footage pictures the click is refused: "Tick at least one picture first: the set is made from it."
+- **The answer says what will happen**, before "done": "Make a set from the 2 ticked pictures.", "Make a set from the description; the footage pictures are not used.", "Approve: the 2 ticked pictures are the reference.", and the same for corrections. An answer kept from an earlier visit says it too.
+- **When "not this picture" brings a picture the operator has not seen**, their answer and their typed words are kept and wait: the thing stays to answer with the note "A new picture was found for this thing. Look at it, then confirm or change your answer." and a "Confirm my answer" button. The new picture starts ticked only if the proposal would use it. **Once per thing:** if another picture comes after the operator has confirmed, it is left unticked (not used) and the answer stands.
+
+The stored round keeps its shape: the kept answer's `pics` map now also holds `'off'` for a picture that is not used; the taken closest pictures are remembered in `session['refs_taken']`; an answer that waits for a look is `chat_round[eid]` with `confirm`.
 
 ## 4. A person the footage does not show
 
@@ -88,8 +106,8 @@ This replaces two earlier decisions: design/210's default that a paid button sho
 
 ## 7. Decisions taken by default (SK can change any)
 
-1. **A picture that is weak is not ticked at first**, as on the trial page. So "Approve" on a thing whose pictures are all weak asks for a tick first.
-2. **An unticked picture may bring the next best trial frame** (`ref_find.not_this`, unchanged). The operator has not seen it, so the thing comes back once more with it, as with "Not this picture" before.
+1. **For a set proposed for a person or a thing with approved drawings, "the proposal uses the picture" is read from the weak mark**: the round's row has no field that says whether Claude means the footage or the description. A field on the row would say it exactly (section 3a).
+2. **One look per thing at a picture that came in place of a rejected one**; a later one is left unticked (section 3a).
 3. **"Minor corrections" is not offered on a "closest found" picture**, as the requirement lists the cases. The trial page offered it there.
 4. **A real, named person with no photo, not in the footage, is under "No action needed" too.** The warning that the set is made from the description alone is in "Details".
 5. **A proposal that cannot be carried out as said** (use the footage, where a set must be made) reads "Make a set", which is what the thing's button does. The line is not routine, as before.

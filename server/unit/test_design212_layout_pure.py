@@ -254,11 +254,35 @@ def test_leave_out_is_ignore_and_names_the_shots_that_lose_the_thing(monkeypatch
     assert kept(film, 'TROWEL')['verdict'] == 'ignore'
 
 
-def test_a_picture_that_comes_in_place_of_an_unticked_one_sends_the_line_back(monkeypatch):
+def test_a_picture_that_comes_in_place_of_an_unticked_one_keeps_the_answer_and_asks_for_one_look(monkeypatch):
+    """The review of 17 Nov, fault 2: the choice and the typed words were dropped, and the key was reported as recorded."""
+    film = Film(monkeypatch)
+    film.next_frame = {**F._frame('f-trowel-3', 'TROWEL', 'object', 'frame-TROWEL', 't0000000000a3')}
+    out = film.record(ans(film.lines()['ref:TROWEL'], 'fix', 'Keep it, with a new handle.', pics={'f-trowel-use': 'not'}))
+    assert out['kept'] == ['ref:TROWEL'] and 'ref:TROWEL' not in out['recorded'] and not out['refused']
+    line = {x['key']: x for x in out['page']['lines']}['ref:TROWEL']
+    assert line['note'] == 'A new picture was found for this thing. Look at it, then confirm or change your answer.'
+    assert line['again'] == {'choice': 'fix', 'notes': 'Keep it, with a new handle.'} and 'kept' not in line and out['open'] >= 1   # still to answer: not counted, so "done" cannot close the step
+    assert [(x['choice'], x.get('on', False)) for x in line['pics']] == [('not:f-trowel-side', True), ('not:f-trowel-3', True)]         # the new one starts ticked: the proposal uses the footage
+    assert next(i for i in film.items() if i['id'] == 'round1:TROWEL')['text'].startswith('A new picture was found for this thing.')    # the chat says it too
+    film.next_frame = None
+    film.record(ans(line, 'fix', 'Keep it, with a new handle.'))                                                                    # confirmed, as it was
+    assert kept(film, 'TROWEL') == {'verdict': 'clean', 'words': 'Keep it, with a new handle.', 'pics': {}} and 'note' not in film.lines()['ref:TROWEL']
+
+
+def test_a_second_new_picture_does_not_ask_again_it_is_not_used_and_the_answer_stands(monkeypatch):
+    """One look per thing: after the operator confirmed once, a picture that comes in place of another is left unticked, and the answer is kept."""
     film = Film(monkeypatch)
     film.next_frame = {**F._frame('f-trowel-3', 'TROWEL', 'object', 'frame-TROWEL', 't0000000000a3')}
     out = film.record(ans(film.lines()['ref:TROWEL'], 'use', pics={'f-trowel-use': 'not'}))
-    assert 'chat_round' not in film.session() and out['open'] >= 1                                                  # the operator has not seen the new picture: the line is still to answer
+    film.next_frame = {**F._frame('f-trowel-4', 'TROWEL', 'object', 'frame-TROWEL', 't0000000000a2')}
+    line = film.lines()['ref:TROWEL']
+    out = film.record(ans(line, 'use', pics={'f-trowel-3': 'not'}))
+    assert out['kept'] == ['ref:TROWEL'] and len(film.called('not_this')) == 2
+    got = film.session()['chat_round']['TROWEL']
+    assert got['verdict'] == 'approve' and 'confirm' not in got and got['pics']['f-trowel-4'] == 'off'
+    line = film.lines()['ref:TROWEL']
+    assert line['kept'] == 'Approve' and line['kept_how'] == 'from the 1 ticked picture' and 'note' not in line
 
 
 def test_the_answers_of_the_page_before_this_layout_are_still_taken(monkeypatch):
@@ -343,3 +367,97 @@ def test_an_older_round_has_none_of_this(monkeypatch):
     p = Film(monkeypatch, session=older_step1()).page()
     assert 'layout' not in p and not any(k in l for l in p['lines'] for k in ('case', 'group', 'tick', 'search', 'covers')) and '₹' in p['summary']
     assert [b['choice'] for b in p['lines'][0]['buttons']] == ['approve', 'ignore']
+
+
+# ---------- the review of 17 Nov 2026: what a tick means ----------
+
+def test_the_pictures_that_start_ticked_follow_the_proposal_not_the_weak_mark(monkeypatch):
+    film, _things = vw24(monkeypatch)
+    l = film.lines()
+    on = lambda key: [bool(x.get('on')) for x in l[key]['pics']]
+    assert on('ref:CONCRETE') == [True, True, True] and l['ref:CONCRETE']['pics'][0]['weak'] is True     # "use footage": every picture, weak or not
+    assert on('ref:HELPER') == [False, False, False]                                                    # a person, a set proposed, only weak pictures: from the description
+    assert on('ref:MASON') == [True, True, True]                                                        # a person, a set proposed, good pictures: from them
+    assert on('ref:SITE_DECK') == [True, True, True]                                                    # a thing whose set can only come from its footage pictures
+    assert on('ref:MORTAR') == [False, False]                                                           # proposed to leave out: none
+    assert on('ref:TILEMAKER') == [False]                                                               # a "closest found" picture is never ticked for the operator
+
+
+def test_a_picture_left_unticked_is_not_used_and_is_never_not_this_picture(monkeypatch):
+    """The review of 17 Nov, fault 1: on VW-24's young site worker one click on "Make a set" wrote three "not this picture" marks."""
+    film, _things = vw24(monkeypatch)
+    out = film.record(ans(film.lines()['ref:HELPER'], 'set'))
+    assert out['kept'] == ['ref:HELPER'] and film.called('not_this') == [] and film.called('that_is_it') == []
+    line = film.lines()['ref:HELPER']
+    assert len(line['pics']) == 3 and line['case'] == 'footage' and 'search' not in line               # the thing keeps its pictures on its line
+    got = film.session()['chat_round']['HELPER']
+    assert got['verdict'] == 'approve' and got['pics'] == {'f-HELPER-0': 'off', 'f-HELPER-1': 'off', 'f-HELPER-2': 'off'}
+    assert line['kept'] == 'Make a set' and line['kept_how'] == 'from the description; the footage pictures are not used'
+
+
+def test_a_default_pass_over_vw24_rejects_no_picture(monkeypatch):
+    film, _things = vw24(monkeypatch)
+    lines = [l for l in film.lines().values() if l['key'] != 'refs:proposals' and l['case'] != 'auto']
+    out = film.record(*[ans(l, l['rec'].get('choice') or l['buttons'][0]['choice']) for l in lines if not l['buttons'][0].get('needs_words')])
+    assert film.called('not_this') == [] and film.called('that_is_it') == []
+    assert sorted(r['message'] for r in out['refused']) == ['Tick the picture first, if that is it.'] * len([l for l in lines if l['rec'].get('choice') == 'use' and l['case'] == 'closest'])
+
+
+def test_a_picture_the_operator_ticked_themselves_is_used(monkeypatch):
+    film, _things = vw24(monkeypatch)
+    film.record(ans(film.lines()['ref:HELPER'], 'set', pics={'f-HELPER-1': 'on'}))
+    got = film.session()['chat_round']['HELPER']
+    assert got['pics'] == {'f-HELPER-0': 'off', 'f-HELPER-2': 'off'} and film.called('not_this') == []
+    assert film.lines()['ref:HELPER']['kept_how'] == 'from the 1 ticked picture'
+
+
+def test_the_chat_follows_the_same_ticks_and_accept_all_too(monkeypatch):
+    film = Film(monkeypatch)
+    film.change(lambda s: (s['references'].update({'f-mason-1': {'id': 'f-mason-1', 'element_id': 'MASON', 'kind': 'frame', 'status': 'candidate', 'key': f"{RUN['id']}/visuals/references/f-mason-1.png",
+                                                                 'view': 'front', 'look': {'verdict': 'weak', 'seen': 'A man, far off.'}, 'weak': True}})))
+    item = next(i for i in film.items() if i['id'] == 'round1:MASON')
+    item['_run']('set', 'Make a set', '')                                                               # the chat has no ticks: the proposal's own
+    assert film.session()['chat_round']['MASON']['pics'] == {'f-mason-1': 'off'} and film.called('not_this') == []
+    film.record(ans(film.lines()['refs:proposals'], 'accept_all'))
+    assert film.session()['chat_round']['TILE']['pics'] == {}                                           # its one good picture is used
+
+
+def test_at_done_an_unticked_picture_is_set_aside_with_no_search_for_another(monkeypatch):
+    from app import visuals_stage as VS
+    film = Film(monkeypatch)
+    film.change(lambda s: (s['references'].update({'f-mason-1': {'id': 'f-mason-1', 'element_id': 'MASON', 'kind': 'frame', 'status': 'candidate', 'key': f"{RUN['id']}/visuals/references/f-mason-1.png",
+                                                                 'view': 'front', 'look': {'verdict': 'weak', 'seen': 'A man, far off.'}, 'weak': True}})))
+    seen, real = {}, VS.round_done
+
+    def done(store, user, run, outputs, verdicts, quote, conn=None):
+        seen.update({k: (r['status'], (r.get('rejection') or {}).get('notes')) for k, r in film.session()['references'].items()})
+        return real(store, user, run, outputs, verdicts, quote, conn=conn)
+    monkeypatch.setattr(VS, 'round_done', done)
+    l = film.lines()
+    out = film.record(ans(l['refs:proposals'], 'accept_all'), ans(l['ref:MASON'], 'set'), ans(l['ref:TROWEL'], 'use'), ans(l['ref:FAN'], 'ignore'))
+    assert not out['refused'] and film.called('round_done')[0][0]['MASON'] == {'verdict': 'approve', 'words': ''}
+    assert seen['f-mason-1'] == ('rejected', 'not ticked by the operator: not used') and film.called('not_this') == []   # so the set is made from the description
+    assert seen['f-trowel-side'][0] == 'candidate' and seen['f-trowel-use'][0] == 'candidate'                             # "use footage": both were ticked
+
+
+def test_approve_with_only_unticked_pictures_is_refused_until_one_is_ticked(monkeypatch):
+    film, _things = vw24(monkeypatch)
+    l = film.lines()['ref:MORTAR']                                                                      # two pictures, proposed to leave out: none starts ticked
+    out = film.record(ans(l, 'use'))
+    assert out['refused'][0]['message'] == 'Tick at least one picture first.' and film.called('not_this') == []
+    out = film.record(ans(film.lines()['ref:MORTAR'], 'use', pics={'f-MORTAR-0': 'on'}))
+    assert out['kept'] == ['ref:MORTAR'] and film.session()['chat_round']['MORTAR']['pics'] == {'f-MORTAR-1': 'off'}
+
+
+# ---------- the review: an answer in the shape of the page of before design/212 ----------
+
+def test_an_answer_document_of_the_page_before_this_layout_is_still_taken(monkeypatch):
+    """The review of 17 Nov, fault 3: `approve`, `clean`, `ignore` written by the 0.92.0 page were refused with "Not an answer to this line"."""
+    film = Film(monkeypatch)
+    l = film.lines()
+    out = film.record(ans(l['ref:TROWEL'], 'clean', 'Sharper.', pics={'f-trowel-use': 'not'}), ans(l['ref:BRICK'], 'approve', 'A wet brick.'), ans(l['ref:FAN'], 'ignore'), ans(l['ref:TILE'], 'approve'))
+    assert out['refused'] == [] and out['kept'] == ['ref:TROWEL', 'ref:BRICK', 'ref:FAN', 'ref:TILE']
+    assert kept(film, 'TROWEL') == {'verdict': 'clean', 'words': 'Sharper.', 'pics': {'f-trowel-use': 'not'}} and film.session()['chat_round']['TROWEL']['quote'] == 'Make a clean set from it'
+    assert kept(film, 'BRICK') == {'verdict': 'approve', 'words': 'A wet brick.', 'pics': {}} and kept(film, 'FAN')['verdict'] == 'ignore'
+    out = film.record(ans(film.lines()['ref:STREET'], 'no_such_choice'))
+    assert out['refused'][0]['message'].startswith("Not an answer to this line: 'no_such_choice'.")

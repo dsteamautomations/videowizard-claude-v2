@@ -640,11 +640,13 @@ const tProp=()=>(round.lines||[]).find(l=>l.key==='refs:proposals');
 const tOwn=l=>{ const a=answers[l.line]; return a&&a.choice!=='pics'?a:null; };   // the operator's own answer to this thing, on this page
 const tByProp=l=>{ const p=tProp(); return !!p&&!!answers[p.line]&&(p.covers||[]).indexOf(l.key)>=0&&!tOwn(l); };   // answered by "Accept all": a thing answered alone keeps its answer
 const tDone=l=>!!(tOwn(l)||tByProp(l)||l.kept);
-const tMark=p=>({id:String(p.choice||'').slice(4),use:String(p.choice||'').indexOf('use:')===0});   // a footage picture (unticked: "not this picture") or the closest one (ticked: "that is it")
-function tTicked(l,p){ const k=tMark(p), a=tOwn(l), t=(T.tick[l.line]||{})[p.code];
-  return t!==undefined?t:a&&a.pics&&a.choice!=='ignore'&&a.choice!=='own'?(k.use?a.pics[k.id]==='use':a.pics[k.id]!=='not'):!k.use&&!p.weak; }   // at first: every footage picture that is not weak
+const tMark=p=>({id:String(p.choice||'').slice(4),use:String(p.choice||'').indexOf('use:')===0});   // a footage picture, or the closest one found (ticked: "that is it")
+// design/212 review: a picture starts ticked when the server says so (`on`: the pictures Claude's proposal uses). Only a picture the operator unticked themselves is
+// "not this picture"; one that started unticked and stays so is simply not used; one they ticked themselves is used.
+function tTicked(l,p){ const k=tMark(p), a=tOwn(l), t=(T.tick[l.line]||{})[p.code], m=a&&a.pics&&a.choice!=='ignore'&&a.choice!=='own'?a.pics[k.id]:undefined;
+  return t!==undefined?t:k.use?m==='use':m==='not'?false:m==='on'?true:!!p.on; }
 const tKept=l=>(l.pics||[]).filter(p=>tTicked(l,p));
-function tMarks(l){ const m={}; (l.pics||[]).forEach(p=>{ const k=tMark(p), on=tTicked(l,p); if(k.use?on:!on) m[k.id]=k.use?'use':'not'; }); return m; }
+function tMarks(l){ const m={}; (l.pics||[]).forEach(p=>{ const k=tMark(p), on=tTicked(l,p); if(k.use){ if(on) m[k.id]='use'; } else if(!!p.on!==on) m[k.id]=on?'on':'not'; }); return m; }
 function tRefuse(text){ T.msg=text||''; const m=$('tmsg'); if(m){ m.textContent=T.msg; m.hidden=!T.msg; } }
 function tAnswer(l,choice,notes,more){   // an answer is written as every line's answer is; the ticks travel with it as the pictures' own answers
   T.panel=null; T.msg=''; clearTimeout(T.timer);
@@ -674,12 +676,12 @@ const T_DONE={use:'Approved',set:'Make a set',fix:'Corrections',own:'Own picture
 function tTag(l){ const a=tOwn(l); return a?(a.choice==='fix'&&!(l.pics||[]).length?T_DONE.set:T_DONE[a.choice]||a.choice):tByProp(l)?((l.rec||{}).label||'Accepted'):l.kept; }
 function tSays(l){   // the answer as it stands, said back
   const a=tOwn(l), q=s=>'“'+s+'”', has=(l.pics||[]).length>0;
-  if(!a) return tByProp(l)?['Your answer: ',((l.rec||{}).label||'Accepted')+". (Claude's proposal, accepted.)"]:l.case==='auto'?['Decided: ',l.kept+'. No answer is needed.']:['Kept from before: ',l.kept+'. Choose another answer to change it.'];
-  let s={use:'Approve: use the ticked pictures as the reference.',set:'Make a set.'+(a.notes?' Your words: '+q(a.notes):''),
-    fix:has?'Minor corrections: '+q(a.notes)+' A set is made with these words.':'Make a set, with your words: '+q(a.notes),
+  if(!a) return tByProp(l)?['Your answer: ',((l.rec||{}).label||'Accepted')+". (Claude's proposal, accepted.)"]:l.case==='auto'?['Decided: ',l.kept+'. No answer is needed.']:['Kept from before: ',l.kept+(l.kept_how?' '+l.kept_how:'')+'. Choose another answer to change it.'];
+  // what will happen, said plainly: which pictures the answer uses, or that the set is made from the description
+  const n=tKept(l).length, pic=n+' ticked picture'+(n===1?'':'s'), from=n?'from the '+pic:'from the description; the footage pictures are not used';
+  const s={use:has?'Approve: the '+pic+(n===1?' is':' are')+' the reference.':'Approve.',set:(has?'Make a set '+from+'.':'Make a set.')+(a.notes?' Your words: '+q(a.notes):''),
+    fix:has?'Minor corrections: '+q(a.notes)+' A set is made '+from+', with these words.':'Make a set, with your words: '+q(a.notes),
     own:'My own picture'+(a.own&&a.own.name?': '+a.own.name:'')+'.'+(a.permission?' Permission: '+q(a.permission):''),ignore:'Leave it out.'}[a.choice]||String(a.choice);
-  const names=tKept(l).map(p=>p.label);
-  if(names.length&&a.choice!=='ignore'&&a.choice!=='own') s+=' Pictures kept: '+names.join('; ')+'.';
   return ['Your answer: ',s];
 }
 function tLarge(p,btn){   // on a wide screen the row's pictures are wider than the small picture: the large one from the file store takes its place
@@ -774,6 +776,7 @@ function tMain(list){
         mk('span',{},(T.cur+1)+' of '+list.length),mk('button',{class:'tbtn',id:'tnext',type:'button','aria-label':'Next thing',on:{click:()=>tStep(1)}},'Next ›'))),
     mk('p',{class:'tsub',title:l.desc},l.desc),usedFull);
   if(l.refused) kids.push(mk('p',{class:'tmsg',id:'trefused'},'Not recorded: '+l.refused));   // the server's refusal of the last "done", kept on its thing
+  if(l.note) kids.push(mk('p',{class:'changed',id:'tcame'},l.note,' ',l.again&&l.again.choice&&mk('button',{class:'tbtn',id:'tconfirm',type:'button',on:{click:()=>tAnswer(l,l.again.choice,l.again.notes||'')}},'Confirm my answer')));   // design/212 review: a new picture came; the answer given waits for a look at it
   if(l.rec){
     const why=mk('p',{class:'tstrip',id:'twhy',hidden:true},l.rec.reason), wb=mk('button',{class:'tlink',id:'twhyb',type:'button','aria-expanded':'false','aria-controls':'twhy'},'Why?'); fold(wb,why);
     kids.push(mk('p',{class:'tsuggest'},mk('span',{},'Claude suggests: ',mk('b',{},l.rec.label)),l.rec.reason&&wb),why);

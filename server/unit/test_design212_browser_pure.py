@@ -150,16 +150,16 @@ def test_step_1_in_its_new_layout(monkeypatch, browser, size, scheme):
     assert pg.locator('#tsaw0').text_content() == 'What Claude saw: The whole trowel, side on, sharp; the handle is reddish-brown.'             # 19
     shot(pg, f'three-pictures-{tag}')
     assert pg.evaluate('document.documentElement.scrollWidth <= window.innerWidth') and '₹' not in pg.locator('body').inner_text()             # 20: no cost on the page
-    # the ticks: a picture that is not weak is ticked at first; an unticked one is "not this picture"
-    assert pg.evaluate("[...document.querySelectorAll('#tmain .tck input')].map(e => e.checked)") == [True, False, False]                       # 21
+    # the ticks (the review of 17 Nov): the pictures Claude's proposal uses start ticked, weak or not; one the operator unticks is "not this picture"
+    assert pg.evaluate("[...document.querySelectorAll('#tmain .tck input')].map(e => e.checked)") == [True, True, True]                         # 21: "use footage": all three, two of them weak
     pg.locator('#tmain [data-act="use"]').click()
     a = saved(pg, 'l06', 'use')
-    assert (a['key'], a['item'], a['pics'], a['notes']) == ('ref:TROWEL', 'round1:TROWEL', {'f-trowel-use': 'not', 'f-trowel-3': 'not'}, '')    # 22
-    assert pg.locator('#tanswer').text_content() == 'Your answer: Approve: use the ticked pictures as the reference. Pictures kept: side.Undo'  # 23
+    assert (a['key'], a['item'], a['pics'], a['notes']) == ('ref:TROWEL', 'round1:TROWEL', {}, '')                                              # 22: nothing is marked
+    assert pg.locator('#tanswer').text_content() == 'Your answer: Approve: the 3 ticked pictures are the reference.Undo'                       # 23: what will happen, said plainly
     assert pg.locator('#trail .trow[aria-current] .ttag').text_content() == 'Approved' and pg.locator('#tprogt').text_content() == '2 of 7 answered'   # 24
-    pg.locator('#tck1').check()
+    pg.locator('#tck2').uncheck()
     pg.wait_for_function("Object.keys(window.__answers.l06.pics).length === 1")
-    assert answers(pg)['l06']['pics'] == {'f-trowel-3': 'not'}                                                                                  # 25: the answer follows the ticks
+    assert answers(pg)['l06']['pics'] == {'f-trowel-3': 'not'} and 'the 2 ticked pictures are the reference' in pg.locator('#tanswer').text_content()   # 25: the answer follows the ticks; the operator's own untick is "not this picture"
     pg.locator('#tck0').uncheck()
     pg.locator('#tck1').uncheck()
     gone(pg, 'l06')
@@ -292,7 +292,9 @@ def test_the_keys_the_large_picture_and_auto_advance(monkeypatch, browser):
     assert name() == 'Brick'                                                                                                                   # 2
     thing(pg, "Mason's trowel")
     pg.keyboard.press('2')
-    assert pg.locator('#tck1').is_checked()                                                                                                    # 3: a number ticks a picture
+    assert not pg.locator('#tck1').is_checked()                                                                                                # 3: a number ticks or unticks a picture
+    pg.keyboard.press('2')
+    assert pg.locator('#tck1').is_checked()
     pg.keyboard.press('c')
     assert pg.locator('#tpanel #tfix').count() == 1                                                                                            # 4
     pg.keyboard.press('Escape')
@@ -384,4 +386,46 @@ def test_the_table_of_facts_gives_its_room_to_the_value(browser):
     assert pg.evaluate("getComputedStyle(document.querySelector('table.facts tbody tr:nth-child(2) td:nth-child(3)')).whiteSpace") == 'normal'  # 3: FROM wraps
     assert pg.locator('#things').is_hidden() and pg.locator('section.item').count() == 1                                                        # 4: this step keeps its own layout
     shot(pg, 'facts-table')
+    pg.close()
+
+
+def test_what_a_tick_means_on_vw24s_things(monkeypatch, browser):
+    """The review of 17 Nov 2026, fault 1, on VW-24's shapes at 1366x768: the starting ticks follow the proposal; a picture left unticked is not used
+    and is never "not this picture"; the answer says what will happen; and a new picture that came asks for one look."""
+    from test_design212_layout_pure import vw24
+    film, _things = vw24(monkeypatch)
+    page = film.page()
+    by = {l['key']: l for l in page['lines']}
+    by['ref:PAN'].update(note='A new picture was found for this thing. Look at it, then confirm or change your answer.', again={'choice': 'fix', 'notes': 'Without the mortar in it.'})
+    pg = show(browser, doc(page))
+    ticks = lambda: pg.evaluate("[...document.querySelectorAll('#tmain .tck input')].map(e => e.checked)")
+    line = lambda key: by[key]['line']
+    # a person, a set proposed, three weak pictures: none starts ticked; "Make a set" marks no picture and says it is made from the description
+    thing(pg, 'Thing Helper')
+    assert ticks() == [False, False, False] and pg.locator('#tmain .tweak').count() == 3                                                        # 1
+    pg.locator('#tmain [data-act="set"]').click()
+    a = saved(pg, line('ref:HELPER'), 'set')
+    assert a['pics'] == {}                                                                                                                     # 2: no "not this picture"
+    assert pg.locator('#tanswer p').text_content() == 'Your answer: Make a set from the description; the footage pictures are not used.'       # 3
+    assert pg.locator('#tmain .ttile').count() == 3                                                                                            # 4: its pictures stay
+    shot(pg, 'ticks-from-the-description')
+    pg.locator('#tck1').check()
+    pg.wait_for_function('l => Object.keys(window.__answers[l].pics).length === 1', arg=line('ref:HELPER'))
+    assert answers(pg)[line('ref:HELPER')]['pics'] == {'f-HELPER-1': 'on'}                                                                     # 5: a picture the operator ticked is used
+    assert pg.locator('#tanswer p').text_content() == 'Your answer: Make a set from the 1 ticked picture.'                                     # 6
+    shot(pg, 'ticks-one-ticked')
+    # "use footage" with a weak picture: all start ticked; the operator's own untick is "not this picture"
+    thing(pg, 'Thing Concrete')
+    assert ticks() == [True, True, True] and pg.locator('#tmain .tweak').count() == 1                                                           # 7
+    pg.locator('#tck0').uncheck()
+    pg.locator('#tmain [data-act="use"]').click()
+    assert saved(pg, line('ref:CONCRETE'), 'use')['pics'] == {'f-CONCRETE-0': 'not'}                                                           # 8
+    assert pg.locator('#tanswer p').text_content() == 'Your answer: Approve: the 2 ticked pictures are the reference.'                         # 9
+    # a new picture came for a thing: the answer given waits for one look
+    thing(pg, 'Thing Pan')
+    assert pg.locator('#tcame').text_content().startswith('A new picture was found for this thing. Look at it, then confirm or change your answer.')   # 10
+    pg.locator('#tconfirm').click()
+    a = saved(pg, line('ref:PAN'), 'fix')
+    assert a['notes'] == 'Without the mortar in it.' and 'A set is made from the 3 ticked pictures, with these words.' in pg.locator('#tanswer p').text_content()   # 11
+    assert not pg.errors, pg.errors
     pg.close()

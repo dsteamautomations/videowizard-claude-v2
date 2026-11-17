@@ -125,11 +125,12 @@ def test_a_picture_mark_with_a_line_answer_keeps_the_answer_when_it_still_means_
     assert film.session()['chat_round']['TROWEL'] == {'verdict': 'approve', 'quote': 'Approve', 'frames': 'f-trowel-side', 'words': '', 'pics': {'f-trowel-use': 'not'}}
 
 
-def test_a_picture_mark_that_brings_an_unseen_picture_leaves_the_line_open(monkeypatch):
+def test_a_picture_mark_that_brings_an_unseen_picture_keeps_the_answer_and_leaves_the_line_open(monkeypatch):
     film = Film(monkeypatch)
     film.next_frame = {**film.session()['references']['f-trowel-use'], 'id': 'f-trowel-next', 'view': 'in the hand, lifting mortar'}
     out = film.record(ans(film.lines()['ref:TROWEL'], 'use', pics={'f-trowel-use': 'not'}))
-    assert out['recorded'] == ['ref:TROWEL'] and out['kept'] == [] and 'TROWEL' not in (film.session().get('chat_round') or {})   # the operator has not seen the next best: it is shown first
+    assert out['recorded'] == [] and out['kept'] == ['ref:TROWEL'] and film.session()['chat_round']['TROWEL']['confirm'] is True   # design/212 review: the operator has not seen the next best: their answer is kept and waits for their look
+    assert 'kept' not in {x['key']: x for x in out['page']['lines']}['ref:TROWEL']                                                    # the line is still to answer
     assert [x['choice'] for x in {x['key']: x for x in out['page']['lines']}['ref:TROWEL']['pics']] == ['not:f-trowel-side', 'not:f-trowel-next']
 
 

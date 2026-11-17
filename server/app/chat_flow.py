@@ -311,7 +311,7 @@ def sheet_of(store, run, rows):
 
 def _round_kept(held, stamps):
     """The first-step answers that still stand: the thing is in the round and its footage pictures are the ones the operator answered about."""
-    return {e: v for e, v in (held or {}).items() if isinstance(v, dict) and e in stamps and v.get('frames') == stamps[e]}
+    return {e: v for e, v in (held or {}).items() if isinstance(v, dict) and e in stamps and v.get('frames') == stamps[e] and not v.get('confirm')}   # design/212 review: an answer that waits for a look at a new picture is not an answer yet
 
 
 def _round1(session, plan):
@@ -347,8 +347,13 @@ def round_close(conn, store, user, run, outputs, quote):
     kinds = _kinds(plan)
     owns = {e: held[e]['own'] for e, _ in elements if held[e].get('own') and kinds.get(e) != 'person' and held[e]['verdict'] == 'approve'}
     aside = [f for e in owns for f in frames_of[e] if (s['references'].get(f) or {}).get('status') == 'candidate']
-    for f in aside:
-        s['references'][f].update(status='rejected', rejection={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote, 'notes': "the operator's own picture is used instead"})
+    # design/212 review: a footage picture left unticked is not used: set aside here, at "done", with no search for another (never "not this picture")
+    unticked = [f for e, _ in elements if e not in owns and held[e].get('verdict') in ('approve', 'clean') for f in frames_of[e]
+                if (held[e].get('pics') or {}).get(f) == 'off' and (s['references'].get(f) or {}).get('status') == 'candidate'] if V.round_v2(s) else []
+    for f in aside + unticked:
+        s['references'][f].update(status='rejected', rejection={'by': user['id'], 'at': datetime.now(timezone.utc).isoformat(), 'quote': quote,
+                                                                'notes': WORDS['aside'] if f in unticked else "the operator's own picture is used instead"})
+    aside = aside + unticked
     if aside:
         V.save_session(store, run, s)
     verdicts = {e: {'verdict': held[e]['verdict'] if e in held else 'ignore'} for e, _ in everything}
@@ -530,6 +535,10 @@ WORDS = {
     'fix_tell': 'Ask the operator what should change, in their own words.',
     'no_answer': 'This thing cannot be answered that way now: choose one of its buttons.',
     'made_note': 'Nothing is made until you say done in the chat.',
+    'came': 'A new picture was found for this thing. Look at it, then confirm or change your answer.',
+    'kept_pictures': 'from the {n} ticked picture{s}',
+    'kept_words': 'from the description; the footage pictures are not used',
+    'aside': 'not ticked by the operator: not used',
     'help': 'Choose a thing in the list. Tick the pictures to keep, then choose an answer under them; you can undo it. Nothing is made until you say done in the chat. '
             'A set is three pictures of one thing, which become its reference; for a person, their three views.',
     'not_this': 'Not this picture',
@@ -698,7 +707,7 @@ def _told(line):
     parts += [f"{line['notes']['title']}: {line['notes']['text']}"] if line.get('notes') else []
     parts += [WORDS['earlier'].format(labels=', '.join(p['label'] for p in line['earlier']))] if line.get('earlier') else []   # design/211 review, S14: the chat shows the set before too
     parts += [WORDS['proposes'].format(**line['rec'])] if line.get('rec') else []
-    return '\n'.join(p for p in parts + [line.get('cost') or ''] if p)
+    return '\n'.join(p for p in [line.get('note') or ''] + parts + [line.get('cost') or ''] if p)   # design/212 review: first, that a new picture came for the thing
 
 
 def _v2_item(ident, kind, position, name, ask, run, buttons, line, more=(), **marks):
@@ -713,21 +722,24 @@ def _v2_item(ident, kind, position, name, ask, run, buttons, line, more=(), **ma
 
 def round_marks(ctx, eid, marks, quote):
     """The pictures of a step-1 line answered on their own: "Not this picture" (`ref_find.not_this`) and "That is it" on the closest picture
-    (`ref_find.that_is_it`). A mark that names a picture not on that line is refused (PIC_UNKNOWN) before anything is changed. True when a
-    picture the operator has not seen came in its place."""
+    (`ref_find.that_is_it`). A mark that names a picture not on that line is refused (PIC_UNKNOWN) before anything is changed. Returns the
+    pictures the operator has not seen that came in place of a rejected one."""
     from . import ref_find
     session, run = ctx['session'], ctx['run']
     frames = {f['ref'] for f in ref_find.frames_of(session, eid)}
     found = ref_find.found_all(ctx['store'], run, session, ctx['plan']).get(eid) or {}
     closest = None if frames else (found.get('closest') or {}).get('trial')
     for pid, mark in marks.items():
-        V.need((mark == 'not' and pid in frames) or (mark == 'use' and pid == closest), PIC_UNKNOWN.format(pic=pid))
-    came = False
+        V.need((mark in ('not', 'on', 'off') and pid in frames) or (mark == 'use' and pid == closest), PIC_UNKNOWN.format(pic=pid))
+    came = []   # design/212 review: the pictures that came in place of a rejected one; a tick on a picture ('on', 'off') changes nothing here
     for pid, mark in marks.items():
         if mark == 'not':
-            came = bool((ref_find.not_this(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], eid, pid, quote) or {}).get('next')) or came
-        else:
-            ref_find.that_is_it(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], eid, pid, quote)
+            came += [x for x in [(ref_find.not_this(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], eid, pid, quote) or {}).get('next')] if x]
+        elif mark == 'use':   # the frame it becomes is the operator's own choice: remembered, so that it starts ticked (the frame's record does not say who kept it)
+            took = (ref_find.that_is_it(ctx['conn'], ctx['store'], ctx['user'], run, ctx['outputs'], eid, pid, quote) or {}).get('ref')
+            s = V.session_of(ctx['store'], run, ctx['outputs'])
+            s['refs_taken'] = [*(s.get('refs_taken') or []), *([took] if took else [])]
+            V.save_session(ctx['store'], run, s)
     return came
 
 
@@ -753,7 +765,7 @@ def round_accept(ctx, quote):
     todo = [i for i in _round_items(ctx, every=True) if i.get('_routine') and not i['_kept']]
     V.need(todo, ACCEPT_NONE)
     s = V.session_of(ctx['store'], ctx['run'], ctx['outputs'])
-    s['chat_round'] = {**(s.get('chat_round') or {}), **{i['_eid']: {'verdict': i['_routine'], 'quote': quote, 'frames': i['_stamp'], 'words': '', 'pics': {}} for i in todo}}
+    s['chat_round'] = {**(s.get('chat_round') or {}), **{i['_eid']: {'verdict': i['_routine'], 'quote': quote, 'frames': i['_stamp'], 'words': '', 'pics': {r: 'off' for r in i['_off']}} for i in todo}}   # the pictures the proposal does not use stay unused
     V.save_session(ctx['store'], ctx['run'], s)
     return {'accepted': [i['_eid'] for i in todo]}
 
@@ -797,8 +809,15 @@ def _round_v2(ctx, every, step):
             warnings = ([WORDS['warn_person']] if f.get('real_person') and not V.likeness_of(session, eid) else []) + ([WORDS['warn_exact']] if f.get('identity') == 'exact' else []) \
                 + ([WORDS['warn_cause'].format(cause=cause['text'])] if cause and cause.get('kind') != 'cap' else []) + ([WORDS['warn_stale']] if fnd.get('stale') else [])   # a size that is not known is no warning here: nothing is decided by it; design/212: the limit is named only in a refusal after "done"
             doubt = bool(row.get('doubt') or any(p.get('weak') for p in frames) or not match or f.get('real_person') or fnd.get('stale'))   # design/211 review, M3: a weak frame that came in since the round was sent counts too
+            # design/212 review (17 Nov 2026): which pictures start ticked follows the proposal, not the weak mark: the pictures the proposal uses. "Use the footage" and a
+            # set that can only come from the footage: every picture. A set of a person, or of a thing with approved drawings (made with or without footage): the pictures
+            # that are not weak; with only weak ones the set is from the description. "Leave out": none. A picture left unticked is not used; it is never "not this picture".
+            starts = lambda p: rec in ('footage', 'clean') or (rec == 'set' and not (makes and p.get('weak'))) or p['ref'] in (session.get('refs_taken') or [])   # the closest picture the operator took ("that is it") is theirs: ticked
             pics = [{'_key': _ref_key(run, p['ref']), 'label': str(p.get('view') or 'Footage picture'), 'note': str(p.get('seen') or ''), **({'weak': True} if p.get('weak') else {}),
-                     'choice': 'not:' + p['ref'], 'choice_label': WORDS['not_this']} for p in frames]
+                     **({'on': True} if starts(p) else {}), 'choice': 'not:' + p['ref'], 'choice_label': WORDS['not_this']} for p in frames]
+            start_off = [p['ref'] for p in frames if not starts(p)]
+            waits = (session.get('chat_round') or {}).get(eid) or {}
+            waits = waits if waits.get('confirm') and waits.get('frames') == stamps[eid] else {}   # an answer held for a look at a picture that came in place of a rejected one
             if closest:
                 pics.append({'_key': closest['key'], 'label': WORDS['closest_label'].format(view=closest.get('view') or 'not said'), 'note': str(closest.get('seen') or ''),
                              'choice': 'use:' + closest['trial'], 'choice_label': WORDS['that_is_it']})
@@ -835,29 +854,51 @@ def _round_v2(ctx, every, step):
                     **({'search': {'text': said, 'why': why}} if not frames and said and not mine else {}),
                     **({'rec': {'do': rec, 'label': tag, 'reason': str(row.get('reason') or ''), **({'choice': sug} if sug else {})}} if rec else {}),
                     **({'warnings': warnings} if warnings else {}), **({'pics': pics} if pics else {}), **({'tick': tick} if tick else {}),
-                    **({'cost': _cost(f, where)} if can_leave else {})}
+                    **({'cost': _cost(f, where)} if can_leave else {}),
+                    **({'note': WORDS['came'], 'again': {'choice': waits.get('choice'), 'notes': str(waits.get('words') or '')}} if waits else {})}
 
-            def run_(choice, quote, words, eid=eid, own=None, pics=None, does=does, opts=opts, marked=None, tick=tick, frames=frames, closest=closest):
+            def run_(choice, quote, words, eid=eid, own=None, pics=None, does=does, opts=opts, marked=None, tick=tick, frames=frames, closest=closest, start_off=start_off, waits=waits):
                 marks = dict(pics or {})
                 if choice.startswith(('not:', 'use:')):   # the chat: one picture answered on its own
                     marks, choice = {choice[4:]: 'not' if choice.startswith('not:') else 'use'}, 'pics'
                 new = choice in ('use', 'set', 'fix')   # design/212: the buttons say what the operator wants; the stored choice is found below
                 V.need(choice != 'fix' or words, WORDS['fix_words'])
+                # design/212 review: the pictures not used: one the operator unticked ('not': also "not this picture"), and one that started unticked and was not ticked ('on').
+                # An answer in the shape of before design/212 (approve, clean, ignore) knew no ticks: every picture not marked "not" is used
+                unused = lambda ms: [p['ref'] for p in frames if ms.get(p['ref']) in ('not', 'off') or (new and p['ref'] in start_off and ms.get(p['ref']) != 'on')]
                 if choice in tick and marked is None:   # an answer that needs a picture kept: refused before anything is marked
-                    V.need([p for p in frames if marks.get(p['ref']) != 'not'] or (closest and marks.get(closest['trial']) == 'use'), tick[choice])
-                if marks:   # the pictures first; the line's own answer stands only when it still means the same and no unseen picture came
+                    V.need(len(unused(marks)) < len(frames) or (closest and marks.get(closest['trial']) == 'use'), tick[choice])
+                if marked is None and any(m in ('not', 'use') for m in marks.values()):   # the pictures first: "not this picture", "that is it"
                     came = round_marks(ctx, eid, marks, quote)
                     again = next(i for i in _round_items(_ctx(conn, store, user, run, outputs), every=True) if i.get('_eid') == eid)
+                    if choice == 'pics':
+                        return {'marked': eid}
                     mine_ = next((o[0] for o in opts if o[1] == choice), None)
-                    same = not came and (new or any(o[1] == choice and o[0] == mine_ for o in again['_opts']))
-                    return again['_run'](choice, quote, words, own=own, marked=marks) if same else {'marked': eid}
+                    if not new and not any(o[1] == choice and o[0] == mine_ for o in again['_opts']):
+                        return {'marked': eid}   # the older answer would now mean something else: the line is asked again
+                    if came and not waits:   # design/212 review: a picture the operator has not seen came: their answer and words are kept, and wait once for their look at it
+                        s = V.session_of(store, run, outputs)
+                        s['chat_round'] = {**(s.get('chat_round') or {}), eid: {'confirm': True, 'choice': choice, 'words': words, 'quote': quote, 'frames': again['_stamp'], 'pics': {}}}
+                        V.save_session(store, run, s)
+                        return {'stored': eid, 'came': came}
+                    # once per thing: a picture that comes after the operator has confirmed is not used, and the answer stands
+                    return again['_run'](choice, quote, words, own=own, marked={**marks, **{c: 'off' for c in came}})
+                if marked is None:
+                    bad = [k for k in marks if k not in {p['ref'] for p in frames}]
+                    V.need(not bad, PIC_UNKNOWN.format(pic=bad[0] if bad else ''))
+                    if choice == 'pics':
+                        return {'marked': eid}
+                    marked = marks
                 verdict = choice
-                if new:   # Approve: the footage pictures as the reference. Make a set, Minor corrections, Add words: a set, from the pictures kept where there are any
+                if new:   # Approve: the ticked footage pictures as the reference. Make a set, Minor corrections, Add words: a set, from the ticked pictures; from the description where none is ticked
                     verdict = next((o[1] for o in opts if o[2] == ('footage' if choice == 'use' else 'set')), None)
                     V.need(verdict, WORDS['tick_use'] if choice == 'use' else WORDS['no_answer'])
+                off = unused(marked)
+                V.need(not (verdict == 'clean' or does.get(verdict) == 'footage') or len(off) < len(frames) or not frames, tick.get(choice) or WORDS['tick_use'])
                 s = V.session_of(store, run, outputs)
                 s['chat_round'] = {**(s.get('chat_round') or {}), eid: {'verdict': verdict, 'quote': quote, 'frames': stamps[eid], 'words': words if does.get(verdict) == 'set' else '',
-                                                                       'pics': dict(marked or {}), **({'own': own} if own else {})}}
+                                                                       'pics': {**{k: v for k, v in marked.items() if v != 'on'}, **{r: 'off' for r in off if marked.get(r) != 'not'}},
+                                                                       **({'own': own} if own else {})}}
                 V.save_session(store, run, s)
                 out = None if every else round_close(conn, store, user, run, outputs, quote)
                 return out if out is not None else {'stored': eid}
@@ -866,7 +907,7 @@ def _round_v2(ctx, every, step):
             things.append(_v2_item(f'round1:{eid}', 'reference', '', names[eid], ask, run_, [button(x) for x in acts if not x[3]], line,
                                    more=[button(x) for x in acts if x[3]] + [_button(f"{p['choice_label']}: {p['label']}", p['choice']) for p in pics],
                                    _key=f'ref:{eid}', _eid=eid, _person=person, _frames=[p['ref'] for p in frames], _makes=makes, _kept=held.get(eid), _does=does, _stamp=stamps[eid],
-                                   _opts=opts, _routine=None if doubt or auto else ref_sets.REC_VERDICT[rec]))
+                                   _opts=opts, _off=start_off, _routine=None if doubt or auto else ref_sets.REC_VERDICT[rec]))
         items = sorted(things, key=lambda i: STEP1_GROUPS.index(i['_line']['group']))   # design/212: the five groups in their order; the plan's order inside
         routine_all = [i for i in things if i['_routine']]
         routine = [i for i in routine_all if not i['_kept']]
