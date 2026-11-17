@@ -717,7 +717,7 @@ function tSays(l){   // the answer as it stands, said back
   const a=tOwn(l), q=s=>'“'+s+'”', has=(l.pics||[]).length>0;
   if(tSets()){ if(!a) return ['Kept from before: ',l.kept+'.'+(l.kept_note?' '+l.kept_note:'')];   // the sentence is the server's: the chosen picture's, else the button's
     const p=(l.pics||[]).find(x=>x.choice&&x.choice===a.choice), b=sBtn(l,a); return ['Your answer: ',String((p&&p.say)||b.say||b.label||a.choice).replace('{words}',a.notes||'')]; }
-  const sb=a&&(l.buttons||[]).find(x=>x.choice===a.choice&&x.say); if(sb) return ['Your answer: ',String(sb.say).replace('{words}',a.notes||'')];   // design/213: the server's own sentence, where the button has one
+  const sb=a&&(l.buttons||[]).find(x=>x.choice===a.choice&&x.say); if(sb){ const k=tKept(l).length; return ['Your answer: ',String(sb.say).replace('{words}',a.notes||'').replace('{pictures}',k+' ticked picture'+(k===1?'':'s'))]; }   // design/213: the server's own sentence, where the button has one
   if(!a) return tByProp(l)?['Your answer: ',((l.rec||{}).label||'Accepted')+". (Claude's proposal, accepted.)"]:l.case==='auto'?['Decided: ',l.kept+'. No answer is needed.']:['Kept from before: ',l.kept+(l.kept_how?' '+l.kept_how:'')+'. Choose another answer to change it.'];
   // what will happen, said plainly: which pictures the answer uses, or that the set is made from the description
   const n=tKept(l).length, pic=n+' ticked picture'+(n===1?'':'s'), from=n?'from the '+pic:'from the description; the footage pictures are not used';
@@ -787,7 +787,9 @@ function tPanel(l){   // what opens under the buttons: the words box, the operat
   if(wb){   // design/213: an answer of the server's that needs the operator's own words (the permission of a person the footage shows)
     const ta=mk('textarea',{id:'tfix',maxlength:String(MAX)});
     return [mk('label',{for:'tfix'},wb.hint||'Your words'),ta,mk('div',{class:'tacts'},mk('button',{class:'tbtn go',id:'tfixsend',type:'button',on:{click:()=>{ const w=ta.value.trim().slice(0,MAX);
-      if(!w){ tRefuse(wb.hint||'Write your words first.'); ta.focus(); return; } tAnswer(l,wb.choice,w,{pics:tMarks(l)}); }}},wb.label),cancel)];
+      if(!w){ tRefuse(wb.hint||'Write your words first.'); ta.focus(); return; }
+      const need=(l.tick||{})[wb.choice]; if(need&&!tKept(l).length) return tRefuse(need);
+      tAnswer(l,wb.choice,w,{pics:tMarks(l)}); }}},wb.label),cancel)];
   }
   if(T.panel==='fix'){
     const has=(l.pics||[]).length>0, ta=mk('textarea',{id:'tfix',maxlength:String(MAX),placeholder:has?'For example: keep this man but change his clothes':'For example: a clear oil in an open tin, a brush resting on it'});
@@ -924,7 +926,8 @@ function sOther(list,rest){   // the main panel when no set is open: the waiting
   if(T.show==='leave'&&b){ const loss=b.loss; return [
     mk('div',{class:'thead'},mk('h2',{},loss.head)),mk('p',{class:'tnote'},loss.intro),grid(loss.cols,loss.rows,'loss'),
     loss.people&&mk('p',{class:'tstrip',id:'tpeople'},loss.people),
-    mk('div',{class:'tbar'},mk('button',{class:'tbtn stop',id:'trestout',type:'button',on:{click:()=>sRestSet(rest,b)}},loss.button||b.label),close('Cancel')),
+    mk('div',{class:'tbar'},mk('button',{class:'tbtn stop',id:'trestout',type:'button',disabled:!sJudged(list),'aria-describedby':sJudged(list)?null:'trestoutwhy',on:{click:()=>sRestSet(rest,b)}},loss.button||b.label),close('Cancel')),
+    !sJudged(list)&&mk('p',{class:'tmore',id:'trestoutwhy'},rest.why),   // design/213 review: as "Make them": not before the first sets are judged
     mk('p',{class:'tnote'},lay.made||'')]; }
   if(T.show&&rest) return [
     mk('div',{class:'thead'},mk('h2',{},rest.list_head||rest.head),mk('div',{class:'tnav'},close('Close'))),

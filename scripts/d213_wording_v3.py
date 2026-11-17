@@ -7,7 +7,7 @@ Leave out; a place gets one picture; a way of working is proposed "leave" unless
 frame shows the face is asked for at step 1 with one question, the permission; where the plan and the footage differ the added words say
 what to take from each, and they rank above the film's pictures; a look turns the image model's notes into two plain lines, and is given
 the thing's kept footage pictures; a limit with no room is said with no amount. The two helper files (`plugin/agents/vw-reference-finder.md`,
-`plugin/agents/vw-set-look.md`) say the same. The older sentences are retired by name (server/retired-sentences.json). Registered in
+`plugin/agents/vw-set-look.md`) and the command file (`plugin/commands/vw.md`) say the same. The older sentences are retired by name (server/retired-sentences.json). Registered in
 scripts/c1_split_v3.py after design/212's script. Exact anchors, each found once; run once: python scripts/d213_wording_v3.py"""
 import json
 import sys
@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 P = ROOT / 'server' / 'procedures' / 'v3.json'
 R = ROOT / 'server' / 'retired-sentences.json'
 AGENTS = ROOT / 'plugin' / 'agents'
+CMD = ROOT / 'plugin' / 'commands' / 'vw.md'
 
 PAIRS = [   # (where: 'common' or a part's name, the old sentence, the new one)
     ('picture-search',   # L: the look says whether a person's frame shows the face
@@ -61,6 +62,12 @@ RETIRED = ['the one every shot starts from',   # the sentences replaced, for ser
            "your look and the image model's notes",
            'a place whole, from the other side, and its fixed things',
            'After No or Correct it nothing is made']
+COMMANDS = [   # (the old sentence, the new one) in plugin/commands/vw.md
+    ("Yes with the golden tick on a thing (the one every shot starts from; a person's golden is the full-length front, and the face close-up follows it into shots), No, or "
+     'Correct it (',
+     "Approve with the reference picture chosen on a thing (the one pictures of that thing start from; a person's is the full-length front, and the face close-up follows it "
+     'into shots), Minor corrections with their words, or Make again ('),
+]
 HELPERS = [   # (the file under plugin/agents, the old sentence, the new one)
     ('vw-reference-finder.md',   # L: the face, a child, a person who is not the character
      'say why in `not_searched`.',
@@ -117,6 +124,13 @@ def before_helper(name, text):
     return text
 
 
+def before_commands(text):
+    """plugin/commands/vw.md as it read before this script."""
+    for old, new in COMMANDS:
+        text = text.replace(new, old)
+    return text
+
+
 def main():
     raw = P.read_bytes()
     d = json.loads(raw.decode('utf-8'))
@@ -135,6 +149,13 @@ def main():
                     sys.exit('not applied: plugin/agents/%s: not found once: %s' % (name, old[:60]))
                 text = text.replace(old, new)
         (AGENTS / name).write_bytes(text.encode('utf-8'))   # bytes: the file keeps its line ends
+    text = CMD.read_bytes().decode('utf-8')
+    for old, new in COMMANDS:
+        if new not in text:
+            if text.count(old) != 1:
+                sys.exit('not applied: plugin/commands/vw.md: not found once: %s' % old[:60])
+            text = text.replace(old, new)
+    CMD.write_bytes(text.encode('utf-8'))   # bytes: the file keeps its line ends
     print('visuals: design/213')
     print('words in the visuals stage:', sum(len(t.split()) for t in [st.get('prompt') or '', *(st.get('steps') or []), *(p['text'] for p in st.get('parts') or [])]))
 

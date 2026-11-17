@@ -683,7 +683,8 @@ WORDS = {
     'loss_head': 'If you leave {them} out',
     'loss_intro': 'These shots are then made with no reference of the thing named. Nothing is left out until you choose it below.',
     'loss_cols': ['Left out', 'Shots', 'Which shots lose it'],
-    'loss_people': '{people} always {get} a set: {names}.',
+    'loss_people': '{people} always {get} a set: {names}. Leaving the others out also has {their} made, on the same word, when you say done in the chat.',
+    'rest_first': 'Judge the first sets first: a fault here would repeat in all of them. Nothing was left out and nothing was made.',
     'wait_person': 'A person: always gets a set.',
     'wait_loss': 'If left out, {shots} would have no reference of it.',
     'wait_none': 'Made with the others.',
@@ -703,7 +704,7 @@ WORDS = {
     'permit_hint': 'Write in your own words that you have the permission.',
     'permit_words': 'Write in your own words that you have the permission first.',
     'standin': 'Make a stand-in',
-    'say_permit': 'I have their permission: "{words}". The set is made from your footage pictures of this person.',
+    'say_permit': 'I have their permission: "{words}". The set is made from the {pictures} of this person.',
     'say_standin1': 'Make a stand-in: the set is made from the description. The made person will differ from the person in your clips.',
     'g_back': 'Back with you',
     'g_not_made': 'Not made',
@@ -930,7 +931,7 @@ def _round_v2(ctx, every, step):
             acts.sort(key=lambda x: not (sug and x[1] == sug and x[0] != WORDS['add_words']))   # the suggested answer first
             tick = {}   # the answers that need a picture kept, with what the click is told when none is
             if permit:
-                case = 'likeness'
+                case, tick = 'likeness', {'permit': WORDS['tick_set']}
             elif case == 'footage' and not makes:
                 tick = {'use': WORDS['tick_use'], 'set': WORDS['tick_set'], 'fix': WORDS['tick_set']}
             elif case == 'closest' and any(x[1] == 'use' for x in acts):
@@ -953,10 +954,15 @@ def _round_v2(ctx, every, step):
                 marks = dict(pics or {})
                 if permit and choice in ('permit', 'standin'):   # design/213: recorded through the likeness path both front ends share; a set is made either way
                     V.need(choice == 'standin' or words, WORDS['permit_words'])
+                    kept_ = [p['ref'] for p in frames if marks.get(p['ref']) not in ('not', 'off') and not (p['ref'] in start_off and marks.get(p['ref']) != 'on')]
+                    V.need(choice == 'standin' or kept_, WORDS['tick_set'])   # the permission is for the pictures ticked: with none there is nothing to make the set from
                     V.likeness(store, user, run, outputs, eid, words or quote, conn=conn, stand_in=choice == 'standin')
+                    if choice == 'permit':   # design/213 review: the ticks are kept exactly as "Make a set" keeps them: only the ticked frames feed the likeness; the words of permission are not words for the picture
+                        again = next(i for i in _round_items(_ctx(conn, store, user, run, outputs), every=True) if i.get('_eid') == eid)
+                        return again['_run']('set', quote, '', own=own, pics=marks)
                     s = V.session_of(store, run, outputs)
                     s['chat_round'] = {**(s.get('chat_round') or {}), eid: {'verdict': 'approve', 'quote': quote, 'frames': stamps[eid], 'words': '',
-                                                                           'pics': {p['ref']: 'off' for p in frames} if choice == 'standin' else {}}}   # a stand-in: nothing of the footage person is used
+                                                                           'pics': {p['ref']: 'off' for p in frames}}}   # a stand-in: nothing of the footage person is used
                     V.save_session(store, run, s)
                     out = None if every else round_close(conn, store, user, run, outputs, quote)
                     return out if out is not None else {'stored': eid}
@@ -1237,8 +1243,8 @@ def _round_v2(ctx, every, step):
                 'head': WORDS['loss_head'].format(them=them), 'intro': WORDS['loss_intro'], 'cols': WORDS['loss_cols'],
                 'rows': [[names[e], len(_made_shots(wf[e], where)), ', '.join(_made_shots(wf[e], where))] for e in out_],
                 **({'people': WORDS['loss_people'].format(people='This person' if len(people) == 1 else f'The {len(people)} people', get='gets' if len(people) == 1 else 'get',
-                                                          names=', '.join(names[e] for e in people))} if people else {}),
-                'button': WORDS['rest_out'].format(them=them)})
+                                                          names=', '.join(names[e] for e in people), their='their set' if len(people) == 1 else f'their {len(people)} sets')} if people else {}),
+                'button': chat[1]['label']})   # design/213 review: the words pressed are the words recorded, the same on the page and in the chat
         line = {'text': '\n'.join(x for x in (
                     WORDS['rest_text'].format(k=_n(len([r for r in rows.values() if r.get('set')]), 'set'), r=f"{len(waiting)} more {'are' if many else 'is'}", names=', '.join(names[e] for e in waiting)), said_people) if x),   # design/212: no money is named here
                 **({'cost': WORDS['rest_cost'].format(them=them, things='; '.join(lose)) if lose else WORDS['rest_cost_none'].format(them=them)} if out_ else {}),
@@ -1251,6 +1257,10 @@ def _round_v2(ctx, every, step):
         def run_(choice, quote, words):
             if choice == 'rest':
                 return ref_sets.round_rest(conn, store, user, run, outputs, quote)
+            s = V.session_of(store, run, outputs)   # design/213 review: all or nothing: refused before anything is left out
+            V.need(not any(V._set_rows(s, e, r.get('set')) and not V._answered(s, kinds, e, r) for e, r in s['round']['elements'].items() if e in kinds and not r.get('ignored')), WORDS['rest_first'])
+            spent, cap, one = V._set_budget(run, s, V.visuals_spend(conn, run))
+            V.need(not people or spent + one * len(people) <= cap + 1e-9, ref_sets.LIMIT_PLAIN)
             for eid in out_:
                 V.set_aside(store, user, run, outputs, eid, words or quote)
             return {'aside': out_, **(ref_sets.round_rest(conn, store, user, run, outputs, quote) if people else {})}   # the people are made on the same word; the limit refuses it in its plain sentence

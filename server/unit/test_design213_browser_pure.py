@@ -23,6 +23,7 @@ JUDGE = [l for l in SETS if l['case'] == 'judge']
 WAITING = [l for l in SETS if l['key'] in REST['covers']]
 KEPT = [l for l in COUNTED if l.get('kept')]
 MAKE, OUT = REST['buttons'][0], next(b for b in REST['buttons'] if b.get('loss'))
+CHAT_REST = [{'label': OUT['loss']['button']}]   # the words of the button that leaves some out: the server gives the chat's own label (asserted in test_design213_layout_pure)
 COST = re.compile(r'\b(price|priced|paid|free|limit|cost|costs)\b|₹', re.I)
 
 
@@ -351,6 +352,11 @@ def test_the_waiting_sets_are_made_or_left_out_together(browser):
     assert pg.locator('#tmain table.loss tbody tr').first.locator('td').all_text_contents() == [str(c) for c in loss['rows'][0]]
     assert pg.locator('#tpeople').text_content() == loss['people'] and pg.locator('#trestout').text_content() == loss['button']
     assert pg.evaluate('document.activeElement.id') == 'tclose' and pg.locator('#tclose').text_content() == 'Cancel' and REST['line'] not in answers(pg)
+    # design/213 review: the button says all it does (the people's sets are made with it), and waits for the judged sets as "Make them" does
+    assert loss['button'] == next(b['label'] for b in CHAT_REST) and 'and make the other' in loss['button'] and 'made' in loss['people']
+    assert pg.locator('#trestout').is_disabled() and pg.locator('#trestoutwhy').text_content() == REST['why']
+    pg.locator('#trestout').click(force=True)
+    assert REST['line'] not in answers(pg)
     shot(pg, 'leave-some-out')
     clean(pg)
     pg.locator('#tclose').click()
@@ -374,6 +380,7 @@ def test_the_waiting_sets_are_made_or_left_out_together(browser):
     saved(pg, last['line'], btn(last, 'approve')['choice'])
     # leaving some out
     pg.locator(f'#trail [data-rest="{OUT["choice"]}"]').click()
+    assert pg.locator('#trestout').is_enabled() and pg.locator('#trestoutwhy').count() == 0
     pg.locator('#trestout').click()
     saved(pg, REST['line'], OUT['choice'])
     assert pg.locator('#trail .tprop p').first.text_content() == OUT['say']
@@ -501,7 +508,7 @@ def test_step_1_asks_the_permission_of_a_person_the_footage_shows_and_says_the_w
     pg.locator('#tfix').fill('He agreed on site.')
     pg.locator('#tfixsend').click()
     assert saved(pg, mason['line'], 'permit')['notes'] == 'He agreed on site.'
-    assert pg.locator('#tanswer p').text_content() == 'Your answer: ' + permit['say'].replace('{words}', 'He agreed on site.')
+    assert pg.locator('#tanswer p').text_content() == 'Your answer: ' + permit['say'].replace('{words}', 'He agreed on site.').replace('{pictures}', '1 ticked picture')   # design/213 review: which pictures go
     pg.locator('#tundo').click()
     gone(pg, mason['line'])
     pg.locator('#tmain [data-act="standin"]').click()

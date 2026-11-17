@@ -949,7 +949,7 @@ def page_record(conn, store, user, run, outputs, answers):
     with it are dropped (every gap is written again from the new Direction). An answer to an item that is no longer open, or whose text changed,
     is named as stale and changes nothing. A refusal is kept for its line and the other answers are still recorded."""
     answers = [a for a in answers or [] if isinstance(a, dict)]
-    answers.sort(key=lambda a: {'motion': 0, 'direction': 1, 'shared': 1, 'refs:proposals': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps
+    answers.sort(key=lambda a: 3 if a.get('key') == 'sets:rest' and a.get('choice') == 'rest_out' else {'motion': 0, 'direction': 1, 'shared': 1, 'refs:proposals': 1}.get(a.get('key'), 2))   # the motion style, then the Direction (or the plan's shared rules), then the gaps; design/213 review: "leave some out" after the sets judged in the same visit (it is refused while one is unjudged)
     recorded, stale, refused, dropped, tell = [], [], [], [], ''
     kept = []   # design/210: the answers of the reference round that are kept and not recorded yet
     said_then = ''   # design/211: the server's own "what next" of a v2 round (the first go, the second go, a thing ordered)
@@ -960,7 +960,7 @@ def page_record(conn, store, user, run, outputs, answers):
         was_draw, was_round = was == 'draw', was in ('refs', 'sets')   # design/210: this "done" was said on the reference drawings, or on the reference round
         if _at_plan(first) and _spec_lines(first):
             relies = {v['key'] for v in CF._spec_views(first) if v['spec'].get('confirmed')}
-            answers.sort(key=lambda a: str(a.get('choice') or '') == 'yes')   # the corrections first: a yes may rest on a size corrected in the same visit
+            answers.sort(key=lambda a: 2 if a.get('key') == 'sets:rest' and a.get('choice') == 'rest_out' else int(str(a.get('choice') or '') == 'yes'))   # the corrections first: a yes may rest on a size corrected in the same visit; design/213 review: "leave some out" stays last
     except Problem:
         pass
     for n, a in enumerate(answers):

@@ -119,7 +119,8 @@ def test_vw24s_stored_round_shows_in_the_new_layout_as_it_is(monkeypatch):
     assert rest['head'] == '17 more sets wait for your word' and rest['show'] == 'Show the 17' and len(rest['covers']) == 17 and labels(rest) == ['Make them', 'Leave some out']
     assert rest['buttons'][0]['big'] == 'Make the other 17' and rest['buttons'][0]['say'] == 'The other 17 sets will be made.'
     loss = rest['buttons'][1]['loss']
-    assert len(loss['rows']) == 11 and loss['head'] == 'If you leave these 11 out' and loss['button'] == 'Leave these 11 out' and loss['people'].startswith('The 6 people always get a set: ')
+    assert len(loss['rows']) == 11 and loss['head'] == 'If you leave these 11 out' and loss['button'] == 'Leave these 11 out and make the other 6' == chat(film, 'sets:rest')['buttons'][1]['label'] and loss['people'].startswith('The 6 people always get a set: ') \
+        and loss['people'].endswith('Leaving the others out also has their 6 sets made, on the same word, when you say done in the chat.')
     assert rest['buttons'][1]['say'] == '6 sets will be made. 11 are left out.' and 'waits' not in rest
     assert len([l for l in lines if l.get('wait_note') == W['wait_person']]) == 6 and len([l for l in lines if l.get('out')]) == 11
     assert all(l['case'] == 'settled' and l['pics'] and l['head'] == W['settled_footage'] for l in lines if l['group'] == G[3])
@@ -252,10 +253,14 @@ def test_the_waiting_sets_make_them_and_leave_some_out(monkeypatch):
     assert rest['buttons'][1]['say'] == '2 are left out. No other set waits.' and len(rest['buttons'][1]['loss']['rows']) == 2
     item = chat(film, 'sets:rest')
     assert [(b['label'], b['choice']) for b in item['buttons']] == [('Make the other 2 sets', 'rest'), ('Leave these 2 out', 'rest_out')]
+    assert rest['buttons'][1]['loss']['button'] == 'Leave these 2 out'                                              # no person waits: the same words on the page and in the chat
     film.record(ans(rest, 'rest'))
     assert len(film.called('round_rest')) == 1 and not aside
-    film.record(ans(rest, 'rest_out'))
-    assert aside == ['BRICK', 'TILE'] and len(film.called('round_rest')) == 1                                       # no person waits: nothing more is ordered
+    out = film.record(ans(rest, 'rest_out'))                                                                       # the server refuses it while a first set is unjudged: the page is not the only door
+    assert out['refused'][0]['message'] == W['rest_first'] and not aside
+    lines = film.lines()
+    out = film.record(ans(rest, 'rest_out'), ans(lines['set:MASON'], 'yes'), ans(lines['set:STREET'], 'use:s-street-1'), ans(lines['set:T_LAY'], 'no'))   # judged in the same visit: taken after them
+    assert out['refused'] == [] and aside == ['BRICK', 'TILE'] and len(film.called('round_rest')) == 1              # no person waits: nothing more is ordered
 
 
 def test_leave_some_out_makes_the_people_who_always_get_a_set_on_the_same_word(monkeypatch):
@@ -263,9 +268,14 @@ def test_leave_some_out_makes_the_people_who_always_get_a_set_on_the_same_word(m
     aside = []
     monkeypatch.setattr(VS, 'set_aside', lambda store, user, run, outputs, eid, words='', back=False: aside.append(eid) or {'element_id': eid})
     assert chat(film, 'sets:rest')['buttons'][1]['label'] == 'Leave these 11 out and make the other 6'
-    film.record(ans(film.lines()['sets:rest'], 'rest_out'))
-    assert len(aside) == 11 and len(film.called('round_rest')) == 1
-
+    lines = film.lines()
+    judged = [ans(lines['set:MASON'], 'yes'), ans(lines['set:SITE_DECK'], next(x['choice'] for x in lines['set:SITE_DECK']['pics'] if x.get('choice')))]
+    monkeypatch.setattr(VS, '_set_budget', lambda run, s, spend: (F.CAP, F.CAP, F.SET_PRICE))                      # the limit has no room for the people's sets
+    out = film.record(ans(lines['sets:rest'], 'rest_out'), *judged)
+    assert out['refused'][0]['message'] == ref_sets.LIMIT_PLAIN and not aside and not film.called('round_rest')    # all or nothing: nothing is left out when the others cannot be made
+    monkeypatch.setattr(VS, '_set_budget', lambda run, s, spend: (F.SPENT, F.CAP, F.SET_PRICE))
+    out = film.record(ans(film.lines()['sets:rest'], 'rest_out'))
+    assert out['refused'] == [] and len(aside) == 11 and len(film.called('round_rest')) == 1
 
 # ---------- the limit, with no amount ----------
 
@@ -329,6 +339,27 @@ def test_a_person_whose_footage_shows_the_face_is_asked_for_the_permission_only(
     assert said == [('MASON', 'He agreed on site, on camera.', False)]
     kept = film.session()['chat_round']['MASON']
     assert kept['verdict'] == 'approve' and kept['pics'] == {}                                                     # the kept frames go to the set
+
+
+def test_the_permission_covers_only_the_ticked_pictures(monkeypatch):
+    """The review of design/213: three kept frames (the face; a weak one that starts unticked; a side one the operator unticked): one goes to the set."""
+    film, said = person_film(monkeypatch)
+
+    def more(s):
+        for fid, verdict in (('f-mason-weak', 'weak'), ('f-mason-side', 'pass')):
+            s['references'][fid] = {**s['references']['f-mason-face'], 'id': fid, 'key': f"{RUN['id']}/visuals/references/{fid}.png", 'weak': verdict == 'weak',
+                                    'look': {**s['references']['f-mason-face']['look'], 'verdict': verdict, 'face': False}}
+        s['round']['elements']['MASON']['frames'] = ['f-mason-face', 'f-mason-weak', 'f-mason-side']
+    film.change(more)
+    m = film.lines()['ref:MASON']
+    assert [bool(x.get('on')) for x in m['pics']] == [True, False, True] and m['tick'] == {'permit': W['tick_set']} and '{pictures}' in m['buttons'][0]['say']
+    out = film.record(ans(m, 'permit', 'He agreed.', pics={'f-mason-side': 'not', 'f-mason-face': 'off', 'f-mason-weak': 'off'}))
+    assert out['refused'][0]['message'] == W['tick_set'] and not said                                              # no picture ticked: nothing to make the set from, nothing recorded
+    assert film.record(ans(m, 'permit', 'He agreed.', pics={'f-mason-side': 'not'}))['refused'] == []
+    assert said == [('MASON', 'He agreed.', False)] and film.called('not_this') == [('MASON', 'f-mason-side', 'I have their permission')]
+    kept = film.session()['chat_round']['MASON']
+    assert kept['verdict'] == 'approve' and kept['words'] == '' and kept['pics'] == {'f-mason-side': 'not', 'f-mason-weak': 'off'}   # only the face frame feeds the likeness
+    assert kept['quote'] == 'I have their permission'
 
 
 def test_a_stand_in_uses_nothing_of_the_footage_person(monkeypatch):

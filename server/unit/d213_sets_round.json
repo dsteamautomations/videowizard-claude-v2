@@ -107,8 +107,8 @@
         "shot 20 of gap 1"
        ]
       ],
-      "people": "The 6 people always get a set: Thing Helper, Thing Tilemaker, Thing Mother, Thing Father, Thing Child, Thing Neighbour.",
-      "button": "Leave these 11 out"
+      "people": "The 6 people always get a set: Thing Helper, Thing Tilemaker, Thing Mother, Thing Father, Thing Child, Thing Neighbour. Leaving the others out also has their 6 sets made, on the same word, when you say done in the chat.",
+      "button": "Leave these 11 out and make the other 6"
      }
     }
    ],

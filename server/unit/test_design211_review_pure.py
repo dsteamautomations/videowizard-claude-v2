@@ -203,11 +203,13 @@ def test_C5_leave_these_out_never_covers_a_person_and_names_the_shots_that_lose_
     assert film.session()['round']['rest'] == ['MASON', 'TILE']
     line = film.lines()['sets:rest']
     said = chat(film, 'sets:rest')   # design/213: the page line has its parts and short labels; the chat says the same as one text
-    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make them', 'Leave some out'] and line['buttons'][1]['loss']['button'] == 'Leave it out'
+    assert [b['choice'] for b in line['buttons']] == ['rest', 'rest_out'] and [b['label'] for b in line['buttons']] == ['Make them', 'Leave some out'] and line['buttons'][1]['loss']['button'] == 'Leave it out and make the other 1'   # design/213 review: the words pressed say all the click does
     assert [b['label'] for b in said['buttons']] == ['Make the other 2 sets', 'Leave it out and make the other 1']
-    assert 'The mason: a person shown in a made picture always gets a set' in said['text'] and line['buttons'][1]['loss']['people'] == 'This person always gets a set: The mason.'
+    assert 'The mason: a person shown in a made picture always gets a set' in said['text'] and line['buttons'][1]['loss']['people'] == 'This person always gets a set: The mason. Leaving the others out also has their set made, on the same word, when you say done in the chat.'
     assert line['cost'] == 'If you leave it out, these shots are made with no reference: Roof tile: shot 2 of gap 3.'
-    film.record(ans(line, 'rest_out'))
+    assert film.record(ans(line, 'rest_out'))['refused'][0]['message'] == CF.WORDS['rest_first'] and not film.row('TILE').get('ignored')   # design/213 review: not while a first set is unjudged
+    judged = [ans(l, next((p['choice'] for p in l['pics'] if p.get('choice')), 'yes')) for l in film.lines().values() if l.get('case') == 'judge']
+    assert film.record(ans(line, 'rest_out'), *judged)['refused'] == []                                                                  # judged in the same visit: taken after them
     assert film.row('TILE')['ignored'] and not film.row('MASON').get('ignored')
     # design/213: the person, who always gets a set, is made on the same word (before: the line stayed, with "Make the other set" alone)
     assert film.ordered()[-1] == 'MASON' and film.session()['round']['rest'] == [] and 'sets:rest' not in film.lines()

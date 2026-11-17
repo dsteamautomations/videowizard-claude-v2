@@ -58,6 +58,13 @@ One flow, two front ends: the group, the order, the case, the buttons and every 
 7. **A replacement of a failed first set** is not ordered after a limit refusal, nor when no first set could be ordered (an outage leaves the rest waiting).
 8. **The answers kept on the page** ("Kept from before: …"), the panels' words and the keys are the page's own fixed words, as on step 1.
 
+## 4a. The review of 17 Nov 2026 (one fix round)
+
+1. **The permission covers only the ticked pictures.** "I have their permission" keeps the ticks exactly as "Make a set" does: an unticked picture is not used, a picture the operator unticked is "not this picture"; with no picture ticked it is refused ("Tick at least one picture first: the set is made from it."). The answer says which pictures go ("… from the 1 ticked picture of this person").
+2. **"Leave these N out and make the other M"** is the one label of the button, on the page and in the chat, and the word recorded; the panel says before the click that the people's sets are made with it. The button waits for the first sets to be judged, as "Make them" does, and the server refuses it too while one is unjudged (`chat_flow.WORDS['rest_first']`); an answer given in the same visit as the judgements is taken after them.
+3. **All or nothing at the limit:** the limit is checked before anything is left out.
+4. **The command file** (`plugin/commands/vw.md`) says the new answers of step 2; the retired sentence "the one every shot starts from" is in no text the assistant reads.
+
 ## 5. Older ways (rows 119 to 127 of `design/35-decision-log.md`)
 
 The groups and the labels of step 2 before; three pictures for a place; a person with footage frames made from words; the film's pictures above the writer's words; "a real face" on every person's set and "same as picture 1"; the notes joined and shown raw; the limit refusals with amounts; "Leave these out" leaving the people for a second click; a failed first set not replaced.

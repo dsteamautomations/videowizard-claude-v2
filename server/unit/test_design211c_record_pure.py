@@ -155,7 +155,8 @@ def test_make_the_rest_goes_to_part_b_with_the_buttons_label_as_the_operators_wo
 
 def test_leave_the_rest_out_sets_each_thing_aside_and_pays_nothing(monkeypatch):
     film = Film(monkeypatch, '2')
-    out = film.record(ans(film.lines()['sets:rest'], 'rest_out'))
+    lines = film.lines()   # design/213 review: taken once the first sets are judged (here in the same visit); refused before
+    out = film.record(ans(lines['sets:rest'], 'rest_out'), ans(lines['set:MASON'], 'yes'), ans(lines['set:STREET'], 'use:s-street-1'), ans(lines['set:T_LAY'], 'no'))
     s = film.session()['round']['elements']
     assert s['BRICK']['ignored'] and s['TILE']['ignored'] and film.called('round_rest') == [] and 'sets:rest' not in [l['key'] for l in out['page']['lines']]
 

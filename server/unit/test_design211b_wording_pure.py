@@ -72,7 +72,8 @@ def test_the_replaced_sentences_are_retired_and_gone_from_what_the_assistant_rea
     st, prompt, parts = applied()
     now = prompt + ''.join(p['text'] for p in parts)
     before = st['prompt'] + ''.join(p['text'] for p in st['parts'])
-    cmd_before = REVIEW.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8'))
+    import d213_wording_v3 as D213   # design/213 review: the command file's sentence on step 2 was reworded by that script
+    cmd_before = REVIEW.before_commands(D213.before_commands((ROOT / 'plugin' / 'commands' / 'vw.md').read_text(encoding='utf-8')))
     cmd = commands(cmd_before)
     agents = ''.join(p.read_text(encoding='utf-8') for p in (ROOT / 'plugin' / 'agents').glob('*.md'))
     listed = json.loads((ROOT / 'server' / 'retired-sentences.json').read_text(encoding='utf-8'))['sentences']
