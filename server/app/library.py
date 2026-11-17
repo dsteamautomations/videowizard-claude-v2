@@ -233,7 +233,7 @@ def check_quoted(prompt, entries):
             raise ValueError(f'The quoted words {words!r} are not an exact-text entry: anything to be read in the picture goes in exact_text with its place and size.')
 
 
-def check_prompt(prompt, fix=False):
+def check_prompt(prompt, fix=False, placed=True):
     """design/71 F2: the library's lint rules 3 and 8 as the server's own refusals, on every prompt. A logo is refused unless the sentence
     says no to it (the standing line "do not add unrelated logos" stays); a model name, a pixel size or a resolution is refused with the word."""
     text = str(prompt or '')
@@ -249,12 +249,14 @@ def check_prompt(prompt, fix=False):
     m = re.search(r'\b(720p|1080p|2160p)\b', text, re.I)
     if m:
         raise ValueError(f'The prompt names a resolution ({m.group(0)!r}): the server sets it; describe the picture only.')
-    for sentence in re.split(r'(?<=[.;:!?\n])\s+', text):   # design/110 F2: a place is a landmark and a measured distance, never 'the centre' alone
+    # defect 54 (VW-24, 17 Nov 2026): the two rules below are for a shot's own prompt, where a picture is composed. A reference set's request is
+    # written by the server from the plan's approved words (`placed=False`): 'a mat in the middle of the floor' describes the thing, it places no shot.
+    for sentence in re.split(r'(?<=[.;:!?\n])\s+', text) if placed else ():   # design/110 F2: a place is a landmark and a measured distance, never 'the centre' alone
         m = re.search(r'\b(centre|center|middle|nearby|closer|further)\b', sentence, re.I)
         if m and not re.search(r'\d|\b(one|two|three|four|five|six|half|bricks?|paces?|body-lengths?|arm-lengths?|hands?|doorways?|courses?|metres?|meters?)\b', sentence, re.I):
             raise ValueError(f'The prompt places something at {m.group(1)!r} with no landmark and measured distance ({sentence.strip()[:80]!r}): say the landmark and how far from it, '
                              'in a unit the picture shows (bricks, paces, a hand, a doorway).')
-    m = re.search(r'\b(as before|facing each other|sit as before|the parents as before)\b', text, re.I)   # design/111 F7: a look is a target, a head turn and a mouth
+    m = placed and re.search(r'\b(as before|facing each other|sit as before|the parents as before)\b', text, re.I)   # design/111 F7: a look is a target, a head turn and a mouth
     if m:
         raise ValueError(f'{m.group(0)!r} says nothing a picture can show: write where each person\'s eyes are (a landmark or a named person), the head turn and the mouth.')
     m = None if fix else re.search(r'Change only:(.*?)(?:\n\s*(?:Keep|Constraints|Render only)\b|$)', text, re.S | re.I)   # design/86 K5, design/124 A4: an edit makes one change

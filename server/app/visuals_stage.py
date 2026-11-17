@@ -3957,7 +3957,7 @@ def generate_image(conn, store, user, run, outputs, body, round_set=False):
                             "(`end_prompt`, `end_answer`, `end_region` on `vw visuals image`); the server makes the end once the operator approves the start.")
         need(all(p and (p['status'] == 'approved' or (p['status'] == 'candidate' and p['id'] == body.get('fix_of')))   # W4: a fix starts from its candidate, whatever its kind
                  for p in parents), 'Parents must be approved references of this run.')
-    library.check_prompt(body['prompt'], fix=bool(body.get('fix_of')))   # design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
+    library.check_prompt(body['prompt'], fix=bool(body.get('fix_of')), placed=not (body.get('set') and round_v2(session)))   # defect 54: a v2 set's request is the plan's own words, placed by the server; design/124: a fix's one change is the server's failed line; design/71 F2: no logo, no model name, no size, no resolution in a prompt (a ValueError; the API wraps this call in guarded())
     if body['kind'] == 'keyframe':   # design/67 D: an end keyframe is edited from the start keyframe and the start's own references, so identity is held by its sources
         starts = [p for p in parents if p['kind'] == 'keyframe']
         need(not starts or re.search(r'\bimage 1\b', body['prompt'], re.I),
