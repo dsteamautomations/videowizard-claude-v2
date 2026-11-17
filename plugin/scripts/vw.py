@@ -1985,7 +1985,9 @@ def _round_one(a, base):
         emit(out, 0, f"Answer stored for {eid}: {ans.get('verdict')}" + (f", starting picture {ans['golden']}" if ans.get('golden') else '') + (' ("%s")' % ans['words'] if ans.get('words') else '')
              + '. It is not recorded yet: `vw visuals round --sets <file>` records it (a stored answer stands for an element the file leaves out).')
     if what == 'make':
-        out = write(base + '/round/make', {'element_id': eid})
+        out = write(base + '/round/make', {'element_id': eid, **({'quote': a.quote} if getattr(a, 'quote', None) else {})})   # design/211: in a v2 round the server needs the operator's words (paid) and refuses without
+        if 'then' in out:
+            emit(out, 0, out['then'])
         emit(out, 0, (out.get('next') or f'{eid}: its set is being made.')
              + (f" (about ₹{out.get('cost_inr') or 0:,.0f}; paid: tell the operator.) Then `vw visuals status --wait 900`." if out.get('queued') else ''))
     out = write(base + '/round/aside', {'element_id': eid, 'words': words if what == 'aside' else '', 'back': what == 'back'})
@@ -2536,8 +2538,28 @@ def cmd_visuals(a):
         out = write(base + '/not-this', {'element_id': a.element})
         emit(out, 0, (out.get('next') or '') + ' ' + '; '.join(out.get('lines') or []))
     if a.what == 'round':   # design/79: every element at once; the operator answers on the page in two passes
-        if getattr(a, 'rest', False) or getattr(a, 'rewrite', None) or getattr(a, 'looks', None):   # design/211 part B: the second go, the rewrite, the looks at the sets (step 0: the flags only)
-            emit({'action': 'refused', 'message': '`vw visuals round --rest`, `--rewrite` and `--looks` are not built yet (design/211, part B); nothing was sent.'}, 2)
+        if getattr(a, 'looks', None) is True:   # design/211 part B: the made sets Claude looks at before the operator does, with their pictures; the server's `then` is the only sentence
+            out = call('GET', base + '/round/looks')
+            for s in out.get('sets') or []:
+                folder = 'work/visuals/sets/' + re.sub(r'[^A-Za-z0-9._-]', '-', str(s.get('element_id')))
+                for name, pics in (('input', s.get('inputs') or []), ('picture', s.get('pictures') or [])):
+                    for n, pic in enumerate(pics, 1):
+                        if pic.get('key'):
+                            pic['file'] = f"{folder}/{name}-{pic.get('n') or n}{'.png' if pic['key'].endswith('.png') else '.jpg'}"
+                            _download(m, pic['key'], pic['file'])
+            (ws / 'work' / 'visuals' / 'sets').mkdir(parents=True, exist_ok=True)
+            (ws / 'work' / 'visuals' / 'sets' / 'looks.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+            emit({'file': 'work/visuals/sets/looks.json', 'sets': [s.get('element_id') for s in out.get('sets') or []], 'then': out.get('then')}, 0, out.get('then'))
+        if getattr(a, 'looks', None):   # the looks recorded: {by, sets} from a helper, or the list of sets alone
+            sent = _json_file(m, a.looks)
+            out = write(base + '/round/looks', {'by': (sent.get('by') if isinstance(sent, dict) else None) or 'assistant', 'sets': sent.get('sets') if isinstance(sent, dict) else sent})
+            emit(out, 0, out.get('then'))
+        if getattr(a, 'rest', False):   # the second go, on the operator's words; without them the server refuses (paid)
+            out = write(base + '/round/rest', {'quote': a.quote or ''})
+            emit(out, 0, out.get('then'))
+        if getattr(a, 'rewrite', None):   # the requests the operator sent back, rewritten: the sets are made then
+            out = write(base + '/round/rewrite', {'rows': _rows(m, a.rewrite, ('element_id', 'prompt'))})
+            emit(out, 0, out.get('then'))
         if any(getattr(a, k, None) for k in ROUND_ONE + ('verdict', 'golden', 'words')):
             _round_one(a, base)
         if getattr(a, 'undo', False):   # design/110 rule 0: Done undone until the next step used it
@@ -2545,6 +2567,8 @@ def cmd_visuals(a):
             emit(out, 0, out.get('next') or f"The round is at pass {out.get('pass')} again.")
         if a.verdicts:
             out = write(base + '/round/done', {'verdicts': _json_file(m, a.verdicts), 'quote': a.quote})   # design/121 change 6: approve, search (searched first) or ignore per element; Done runs no search
+            if 'then' in out:   # design/211: an answer of a v2 round carries what comes next; the tool adds no sentence of its own
+                emit(out, 0, out['then'])
             if 'queued' in out:   # design/151: a kept round: the frames approved, every set queued silently
                 errs = out.get('errors') or {}
                 emit(out, 0, f"Step 1 recorded: {len(out.get('queued') or [])} set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."
@@ -2553,6 +2577,8 @@ def cmd_visuals(a):
             emit(out, 0, f"Pass 1 recorded: {len(out.get('searched') or [])} searched thing(s) go to pass 2; the round is at pass {out.get('pass')}.")
         if a.sets:   # design/151: the one-shot verdicts from chat: {element: {verdict: yes|no|correct, words, golden}}
             out = write(base + '/round/sets', {'verdicts': _json_file(m, a.sets), 'quote': a.quote})
+            if 'then' in out:   # design/211: a v2 round
+                emit(out, 0, out['then'])
             errs = out.get('errors') or {}
             emit(out, 0, f"Sets recorded: {len(out.get('approved') or [])} approved, {len(out.get('queued') or [])} being made again; the round is {out.get('pass')}."
                  + (' Not made: ' + '; '.join(f'{k}: {v}' for k, v in errs.items()) if errs else '')
@@ -2564,6 +2590,8 @@ def cmd_visuals(a):
             emit(out, 0, f"Pass 2 recorded: {len(out.get('references') or [])} web reference(s); the round is complete. Now one sheet per element from its frames and picks (a person's from words, no picture parents).")   # design/124 decision 5
         rows = _rows(m, a.file or 'out/reference-round.json', ('element_id',))   # design/151: a kept round's rows carry `prompt`; an older film's `keywords`
         out = write(base + '/round', {'elements': rows})
+        if 'then' in out:   # design/211: a v2 round (a row is a proposal: element_id, rec, reason; `prompt` only for what the plan does not say)
+            emit(out, 0, out['then'])
         if out.get('merged'):   # hotfix 4 Nov 2026: a re-post after Done makes only the missing sets; the round and its sets stay
             errs = out.get('errors') or {}
             emit(out, 0, f"Round kept: {len(out.get('queued') or [])} missing set(s) being made (about ₹{out.get('cost_inr') or 0:,.0f}); the round is at {out.get('pass')}."

@@ -1837,14 +1837,62 @@ def visuals_round_answer(run_id: UUID, body: RoundAnswer, user=User, conn=DB):  
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_answer(storage(), user, run, outputs, body.element_id, body.verdict, body.golden, body.words))
 
 
+class RoundMake(Write):   # design/211: `vw visuals round --make E --quote "<their words>"`: in a v2 round making a set needs the operator's words
+    element_id: str
+    quote: str = ''
+
+
 @app.post('/api/runs/{run_id}/visuals/round/make')
-def visuals_round_make(run_id: UUID, body: NotThis, user=User, conn=DB):   # design/177: `vw visuals round --make` (the body is one element id)
-    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_make(conn, storage(), user, run, outputs, body.element_id))
+def visuals_round_make(run_id: UUID, body: RoundMake, user=User, conn=DB):   # design/177: `vw visuals round --make` (one element id; design/211: and the operator's words)
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_make(conn, storage(), user, run, outputs, body.element_id, quote=body.quote))
 
 
 @app.post('/api/runs/{run_id}/visuals/round/aside')
 def visuals_round_aside(run_id: UUID, body: RoundAside, user=User, conn=DB):   # design/177: `vw visuals round --aside` and `--back`
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.set_aside(storage(), user, run, outputs, body.element_id, body.words, body.back))
+
+
+# ---------- design/211 part B: the looks at the made sets, the second go, the rewrite (a v2 round) ----------
+
+from . import ref_sets   # here, not in the import line at the top: the block of part B stands alone
+
+
+class RoundLooks(Write):   # `vw visuals round --looks <file>`
+    by: str = 'assistant'
+    sets: list[dict[str, Any]] = Field(min_length=1, max_length=80)
+
+
+class RoundRest(Write):   # `vw visuals round --rest --quote "<their words>"`
+    quote: str = ''
+
+
+class RoundRewrite(Write):   # `vw visuals round --rewrite out/round-rewrites.json`
+    rows: list[dict[str, Any]] = Field(min_length=1, max_length=80)
+
+
+@app.get('/api/runs/{run_id}/visuals/round/looks')
+def visuals_round_looks_due(run_id: UUID, user=User, conn=DB):
+    """The made sets Claude looks at before the operator does. It makes the large copies of their pictures, so it takes the run's lock."""
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: ref_sets.looks_due(storage(), run, outputs)))
+
+
+@app.post('/api/runs/{run_id}/visuals/round/looks')
+def visuals_round_looks(run_id: UUID, body: RoundLooks, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_looks(storage(), user, run, outputs, body.sets, body.by))
+
+
+@app.post('/api/runs/{run_id}/visuals/round/rest')
+def visuals_round_rest(run_id: UUID, body: RoundRest, user=User, conn=DB):
+    def rest(run, outputs):   # the chat tool's door: paid, so the operator's words are required here (the page's click is its own word: page_flow calls ref_sets.round_rest itself)
+        visuals_stage.need(body.quote.strip(), ref_sets.MAKE_NO_QUOTE.format(eid='The other sets'))
+        return ref_sets.round_rest(conn, storage(), user, run, outputs, body.quote)
+    return _visuals_call(conn, user, run_id, body, rest)
+
+
+@app.post('/api/runs/{run_id}/visuals/round/rewrite')
+def visuals_round_rewrite(run_id: UUID, body: RoundRewrite, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_rewrite(conn, storage(), user, run, outputs, body.rows))
 
 
 @app.post('/api/runs/{run_id}/visuals/own', status_code=201)

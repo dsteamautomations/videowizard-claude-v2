@@ -309,7 +309,8 @@ def test_the_finished_set_becomes_sibling_candidate_rows_in_the_session(monkeypa
     due = VW.finalize_image(conn, {'id': 'j1', 'run_id': 'run-1', 'request': {'reference': {'id': 'S1'}}}, 'retained', result, None, {'provider': 'gemini', 'pictures': 3}, None)
     s = json.loads(store.files['run-1/visuals/session.json'])
     assert due is True and s['references']['S1']['status'] == 'candidate' and s['references']['S1']['notes'] == 'the notes' and s['references']['S1']['sources'][0]['url'] == 'u'
-    assert s['references']['S1-2'] == {**{k: v for k, v in s['references']['S1'].items() if k not in ('check_pending',)}, 'id': 'S1-2', 'name': 'kiln-set-2', 'set_n': 2, 'sha256': 'b', 'bytes': 11, 'key': 'run-1/visuals/references/S1-2.png'}
+    assert s['references']['S1-2'] == {**s['references']['S1'], 'id': 'S1-2', 'name': 'kiln-set-2', 'set_n': 2, 'sha256': 'b', 'bytes': 11, 'key': 'run-1/visuals/references/S1-2.png'}   # design/211: every picture of a set waits for its own check
+    assert all(s['references'][r]['check_pending'] is True for r in ('S1', 'S1-2', 'S1-3'))
     assert s['references']['S1-3']['set_n'] == 3 and s['references']['S1-3']['set'] == 'S1' and recorded == ['run-1/visuals/references/S1.png', 'run-1/visuals/references/S1-2.png', 'run-1/visuals/references/S1-3.png']
 
 
