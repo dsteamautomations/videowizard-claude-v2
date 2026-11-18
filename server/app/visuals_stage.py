@@ -2736,7 +2736,9 @@ def waiting(session, plan, code, take_rows, budget=None):
             continue
         elif r.get('kind') in ('frame', 'supplied', 'web', 'isolated', 'sheet'):
             eid, row = r.get('element_id'), (rd.get('elements') or {}).get(r.get('element_id'))
-            if eid not in kinds or (row and rd_pass in (2, 'making')):   # no card answers it: a thing the plan lacks, or a kept round past step 1 (its cards judge the sets)
+            # hotfix (VW-24, 18 Nov 2026): in a round of today the operator answered every footage picture at step 1 (a picture not kept is not used), so a candidate
+            # left over is never asked again: not while the sets are looked at or rewritten, and not after the round is complete (it came up as a step-6 question in the chat)
+            if eid not in kinds or (row and (rd_pass in (2, 'making') or (round_v2(session) and rd_pass in ('looking', 'rewrite', 'complete')))):   # no card answers it: a thing the plan lacks, or a kept round past step 1 (its cards judge the sets)
                 continue
             add(-1, f"Reference sheet · {eid}" if r['kind'] == 'sheet' else f"Picture to answer · {eid} · {r['kind']}", 'references', eid, r['id'], 'sheet to approve' if r['kind'] == 'sheet' else 'picture to answer')
         elif sh and route_of(sh) == 'still':

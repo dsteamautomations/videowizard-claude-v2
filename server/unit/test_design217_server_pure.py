@@ -192,6 +192,20 @@ def test_c3_waiting_lists_a_still_only_with_its_look(held, monkeypatch):
     assert [w['item'] for w in V.waiting(s, p, 'VW-99', [])] == ['k1']
 
 
+def test_hotfix_a_footage_picture_not_kept_at_step_1_is_never_asked_once_the_round_is_past_it():
+    left = ref('f1', kind='frame', shot_id=None, look={'verdict': 'pass'})
+    left['element_id'] = 'ROOF'
+    p = plan(shot('S1'))
+    p['elements'] = list(p.get('elements') or []) + [{'id': 'ROOF', 'kind': 'place', 'name': 'The roof'}]
+    for at in ('looking', 'rewrite', 'complete'):
+        s = session(left)
+        s['round'].update({'pass': at, 'elements': {'ROOF': {'ignored': True}}})
+        assert V.waiting(s, p, 'VW-99', []) == [], at
+    s = session(left, v=1)   # a round of before keeps its way
+    s['round'].update({'pass': 'complete', 'elements': {'ROOF': {'ignored': True}}})
+    assert [w['item'] for w in V.waiting(s, p, 'VW-99', [])] == ['f1']
+
+
 # ---------- F1, D2: the check from the look and the program's lines ----------
 
 def test_f1_the_check_is_claudes_look_with_the_program_lines_as_advice():
@@ -418,7 +432,7 @@ def test_the_step_is_pictures_once_the_v2_round_is_complete_and_an_item_waits(mo
     monkeypatch.setattr(PF, '_pictures_lines', lambda c: [{'key': 'pic:x', 'name': 'X', 'details': []}])
     assert PF._plan_step(ctx)[0] == 'pictures'
     monkeypatch.setattr(PF, '_pictures_lines', lambda c: [])
-    assert PF._plan_step(ctx)[0] == 'plan'
+    assert PF._plan_step(ctx) == ('pictures', ([], []))   # hotfix (VW-24): step 6 from the moment the round is complete, also with nothing made yet
     s['round']['v'] = 1
     monkeypatch.setattr(PF, '_pictures_lines', lambda c: pytest.fail('an older round is asked in the chat'))
     assert PF._plan_step(ctx)[0] == 'plan'

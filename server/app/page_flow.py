@@ -932,9 +932,9 @@ def _plan_step(ctx):
     rd = ctx['session'].get('round') or {}
     at = V._round_pass(ctx['session'], rd) if quiet and rd.get('kept') else None
     if at == 'complete' and V.round_v2(ctx['session']):   # design/217: step 6 once the round is complete; a round of before keeps the chat
-        lines, rows = _pictures_lines(ctx), P.coming(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run']))
-        if lines or rows:
-            return 'pictures', (lines, rows)
+        # hotfix (VW-24, 18 Nov 2026): the page is step 6 from the moment the round is complete, also while nothing of it is made yet: an empty step 6 sent the
+        # page back to a finished earlier step, and the assistant to the chat
+        return 'pictures', (_pictures_lines(ctx), P.coming(ctx['session'], ctx['plan'], V.take_jobs(ctx['conn'], ctx['run'])))
     return ('refs', []) if at == 1 else ('sets', []) if at in (2, 'making', 'looking', 'rewrite') else ('spec', specs) if specs else ('plan', [])
 
 
