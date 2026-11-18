@@ -741,6 +741,9 @@ WORDS = {
     'place_waits': 'It will be made{again} after the {sets} of {names} {are} approved, so that it shows the real {what}.',   # design/216 (the critic's point 2): before, "answer that first"
     'held': 'Waits for {names}: it is made when their sets are approved.',
     'tag_held': 'Waits',
+    'things_due_line': "Waits for Claude to name the film's things shown in this place; then it is made.",   # design/216b
+    'things_head': "The film's things shown in this place",
+    'things_none': 'none',
     'rest_now': '{sets} {are} made now.',
     'rest_held': '{places} {wait} for {names}: made when their sets are approved.',
     # design/216 (B1, B2): what the assistant posts with the page's link, and before the pictures are prepared; it adds nothing to them
@@ -1188,7 +1191,7 @@ def _round_v2(ctx, every, step):
                                  lambda choice, quote, words, eid=eid: ref_sets.round_reopen(conn, store, user, run, outputs, eid, 'approve' if choice == 'words' else choice, words, quote),
                                  chat, line, _key=f'set:{eid}', _eid=eid, _person=person))
             continue
-        if row.get('ignored') or row.get('from_footage') or row.get('rewrite_due') or row.get('held') or eid in waiting:   # design/216: a held place is a line with nothing to answer
+        if row.get('ignored') or row.get('from_footage') or row.get('rewrite_due') or row.get('held') or row.get('things_due') or eid in waiting:   # design/216: a held place is a line with nothing to answer
             continue
         live = V._set_rows(session, eid, row.get('set'))
         if live:

@@ -17,6 +17,7 @@ import d212_wording_v3 as LATER   # noqa: E402  (design/212: a later script stil
 import d211d_wording_v3 as REVIEW   # noqa: E402  (design/211, the review: a later script that changes sentences of this one; these tests read the text as it was before it)
 import d213_wording_v3 as D213   # noqa: E402  (design/213: a later script still; it changes sentences of this one; these tests read the text as it was before it)
 import d215_wording_v3 as D215   # noqa: E402  (design/215: a later script still: the references fix set)
+import d216b_wording_v3 as D216B   # noqa: E402  (design/216b: a later script still: a place's things)
 import d214_wording_v3 as D214   # noqa: E402  (design/214: a later script still: the check of a set is the look's)
 
 OTHERS = ('`vw visuals elements` shows where each is seen', 'A clip frame is free and exact', 'never a blurred one for identity', 'The operator answers both steps on the page',
@@ -24,7 +25,7 @@ OTHERS = ('`vw visuals elements` shows where each is seen', 'A clip frame is fre
 
 
 def stage():
-    return REVIEW.before(LATER.before(D213.before(D214.before(D215.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals'))))))
+    return REVIEW.before(LATER.before(D213.before(D214.before(D215.before(D216B.before(next(s for s in json.loads((ROOT / 'server' / 'procedures' / 'v3.json').read_text(encoding='utf-8'))['stages'] if s['name'] == 'visuals')))))))   # design/216b changes a sentence of this script
 
 
 def applied():

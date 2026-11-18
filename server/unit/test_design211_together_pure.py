@@ -241,7 +241,8 @@ def round_file(film, **change):
     rows = []
     for e in F.THINGS:
         rec, reason, _, first, prompt = F.ROWS[e]
-        rows.append({'element_id': e, 'rec': rec, 'reason': reason, **({'first': True} if first else {}), **({'prompt': prompt} if prompt else {}), **change.get(e, {})})
+        rows.append({'element_id': e, 'rec': rec, 'reason': reason, **({'first': True} if first else {}), **({'prompt': prompt} if prompt else {}),
+                     **({'things': list(F.PLACE_THINGS[e][0]), 'things_reason': F.PLACE_THINGS[e][1]} if e in F.PLACE_THINGS else {}), **change.get(e, {})})   # design/216b: a place's things, with its proposal
     return rows
 
 

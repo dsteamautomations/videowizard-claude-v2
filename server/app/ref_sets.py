@@ -174,6 +174,16 @@ THING_IN_PLACE = "Image {k} is the approved reference of {name}, one of the film
 THINGS_IN_WORDS = "The film's own things in this place, from their descriptions: {things}."
 THINGS_CHECK = ("the film's own things in it match their references", "each of the film's own things in it looks as its reference picture shows it: {names}")
 PLACE_THINGS = ('object', 'material')   # what stands in a place: a person, a place and a way of working do not
+# design/216b (SK, 18 Nov 2026): which things belong to a place is read by Claude, never guessed from shared shots; the server enforces the list
+THINGS_DUE = ("Name the film's own things shown in {n} place(s) before {it} {is} made: {places}. Run `vw visuals round --things`: it lists each place's description, "
+              "its shots and the plan's objects and materials. Write work/visuals/things.json, rows {{element_id, things: [ids, most important first], reason}}: "
+              "the objects and materials that are fixed parts of the place or always stand in it in the film; never a tool or a prop that only passes through a shot, "
+              "never a person; [] when there are none; `reason`, one plain line. Then `vw visuals round --things work/visuals/things.json`: the places are ordered then.")
+THINGS_NOT_THING = "{eid}: {word} is not one of the film's objects or materials in the plan: name only those (never a person, a place or a way of working)."
+THINGS_NOT_PLACE = '{eid} is not a place of this round: only a place names the things shown in it.'
+THINGS_SHAPE = '{eid}: `things` is a list of ids, most important first; [] when there are none.'
+THINGS_REASON = '{eid}: give one plain line of why these things belong to the place (`reason`), at most {max} characters.'
+THINGS_RECORDED = '{n} place(s) have their things.'
 OPERATOR_LINE = "The operator's words: {words}"
 # design/215 (change 5): the operator's corrections of a thing, kept per thing in the session (`thing_corrections`), never in the plan: carried into every later
 # request of the thing with the operator's rank; the later one wins where two disagree
@@ -477,16 +487,74 @@ def _kind_lines(kind):
 
 
 def place_things(plan, session, element):
-    """design/216 (B4): the film's own things that stand in a place: the objects and materials its shots name beside it, most shared first
-    (the plan's order between equals). Returns [(element, the id of its approved reference or None)]: the golden picture, else an approved
-    picture of its set, else an approved drawing, else an approved footage picture; None for a thing with none yet, or one the operator said
-    needs no reference."""
+    """design/216b: the film's own things shown in a place, as Claude named them (the round row's `things`), in Claude's order, each still an
+    object or a material of the plan (one a revision removed is dropped). Returns [(element, the id of its approved reference or None)]: the
+    golden picture, else an approved picture of its set, else an approved drawing, else an approved footage picture; None for a thing with
+    none yet, or one the operator said needs no reference. [] with no list. The older way, the things its shots share, is retired."""
     pid = element['id']
-    shots = [sh for gap in plan.get('gaps') or [] for sc in all_scenes(gap) for sh in sc.get('shots') or [] if pid in (sh.get('element_ids') or [])]
-    order = [e for e in plan.get('elements') or [] if e.get('kind') in PLACE_THINGS and e['id'] != pid]
-    counts = {e['id']: sum(e['id'] in (sh.get('element_ids') or []) for sh in shots) for e in order}
-    things = sorted([e for e in order if counts[e['id']]], key=lambda e: -counts[e['id']])
-    return [(e, thing_ref(session, e['id'])) for e in things]
+    ids = ((((session.get('round') or {}).get('elements') or {}).get(pid) or {}).get('things') or {}).get('ids') or []
+    by = {e['id']: e for e in plan.get('elements') or [] if e.get('kind') in PLACE_THINGS and e['id'] != pid}
+    return [(by[i], thing_ref(session, i)) for i in dict.fromkeys(ids) if i in by]
+
+
+def things_fault(plan, eid, things, reason):
+    """design/216b: a place's list of things checked; None when right, else the plain sentence of its first fault."""
+    kinds = {e['id']: e.get('kind') for e in plan.get('elements') or []}
+    if kinds.get(eid) != 'place':
+        return THINGS_NOT_PLACE.format(eid=eid)
+    if not isinstance(things, list) or not all(isinstance(t, str) for t in things):
+        return THINGS_SHAPE.format(eid=eid)
+    bad = next((t for t in things if kinds.get(t) not in PLACE_THINGS or t == eid), None)
+    if bad is not None:
+        return THINGS_NOT_THING.format(eid=eid, word=bad)
+    words = _one(reason)
+    if not words or len(words) > REASON_CHARS:
+        return THINGS_REASON.format(eid=eid, max=REASON_CHARS)
+    return None
+
+
+def things_due_words(session):
+    """design/216b: the "what next" while a place waits for Claude's list of its things: '' when none waits."""
+    due = sorted(eid for eid, r in (((session.get('round') or {}).get('elements')) or {}).items() if r.get('things_due') and not r.get('ignored'))
+    return THINGS_DUE.format(n=len(due), it='it' if len(due) == 1 else 'they', places=', '.join(due), **{'is': 'is' if len(due) == 1 else 'are'}) if due else ''
+
+
+def things_asked(store, run, outputs):
+    """`GET /round/things`: what Claude reads to name the things of the places that wait for it (or, with none waiting, of every place of
+    the round): each place's description, the words of its shots, and the plan's objects and materials with a one-line description."""
+    session = V.session_of(store, run, outputs)
+    rd = session.get('round') or {}
+    plan = V.guarded(lambda: V.current_plan(store, session))
+    places = [e for e in plan['elements'] if e.get('kind') == 'place' and e['id'] in (rd.get('elements') or {})]
+    due = [e for e in places if rd['elements'][e['id']].get('things_due')] or places
+    line = lambda text: ' '.join(str(text or '').split())[:200]
+    shots = lambda pid: [line(sh.get('message') or sh.get('action') or sh.get('description')) for gap in plan.get('gaps') or [] for sc in all_scenes(gap)
+                         for sh in sc.get('shots') or [] if pid in (sh.get('element_ids') or [])]
+    return {'places': [{'element_id': e['id'], 'name': e.get('name') or e['id'], 'description': line(e.get('description')), 'shots': [s for s in shots(e['id']) if s],
+                        'things': ((rd['elements'][e['id']].get('things')) or {}).get('ids')} for e in due],
+            'candidates': [{'id': e['id'], 'name': e.get('name') or e['id'], 'kind': e['kind'], 'description': line(e.get('description'))} for e in plan['elements'] if e.get('kind') in PLACE_THINGS]}
+
+
+def round_things(conn, store, user, run, outputs, rows):
+    """`POST /round/things`: Claude's list of the things shown in each place, rows [{element_id, things, reason}]. Every faulty row is named
+    and nothing is stored. A place that waited for its list is ordered now (it may still wait for its things' sets: `held`)."""
+    session = V.session_of(store, run, outputs)
+    rd = session.get('round') or {}
+    V.need(V.round_v2(session), 'No reference round of today is open.')
+    plan = V.guarded(lambda: V.current_plan(store, session))
+    faults = [f for r in rows or [] for f in [things_fault(plan, (r or {}).get('element_id'), (r or {}).get('things'), (r or {}).get('reason'))] if f]
+    faults += [THINGS_NOT_PLACE.format(eid=(r or {}).get('element_id')) for r in rows or [] if (r or {}).get('element_id') not in (rd.get('elements') or {})]
+    V.need(rows and not faults, '\n'.join(dict.fromkeys(faults)) or 'Give the rows {element_id, things, reason}.')
+    due = []
+    for r in rows:
+        row = rd['elements'][r['element_id']]
+        row['things'] = {'ids': list(dict.fromkeys(r['things'])), 'reason': _one(r['reason']), 'by': user['id'], 'at': _now()}
+        if row.pop('things_due', None):
+            due.append(r['element_id'])
+    V.save_session(store, run, session)
+    session, queued, errors = _order(conn, store, user, run, outputs, due) if due else (session, [], {})
+    return {'recorded': [r['element_id'] for r in rows], 'queued': queued, 'errors': errors, 'pass': V._round_pass(session, session['round']),
+            'then': ' '.join(x for x in (THINGS_RECORDED.format(n=len(rows)), ALL_MAKING.format(k=len(queued)) if queued else '', things_due_words(session), then_of(session) or '') if x)}
 
 
 def thing_ref(session, eid):
@@ -532,9 +600,15 @@ def release(conn, store, user, run, outputs):
     session = V.session_of(store, run, outputs)
     rd = session.get('round') or {}
     if not V.round_v2(session) or not any(r.get('held') for r in (rd.get('elements') or {}).values()):
-        return []
+        return []   # (a place waiting for Claude's list is ordered by round_things)
     plan = V.guarded(lambda: V.current_plan(store, session))
+    for r in rd['elements'].values():   # design/216b: a hold of 0.113.0 rests on the shared-shots guess: the place waits for Claude's list instead, never ordered on the guess
+        if r.get('held') and 'things' not in r:
+            r.pop('held')
+            r['things_due'] = True
     free = [eid for eid, r in rd['elements'].items() if r.get('held') and not r.get('ignored') and not pending_things(plan, session, eid)]
+    if not free:
+        V.save_session(store, run, session)
     for eid in free:
         rd['elements'][eid].pop('held')
     if not free:
@@ -810,6 +884,8 @@ def state(session, rd):
 def then_of(session):
     """The "what next" of a v2 round past step 1, by its state; None while sets are made, at step 1 and when it is complete."""
     rd = session['round']
+    if things_due_words(session):   # design/216b
+        return things_due_words(session)
     at = state(session, rd)
     if at == 'looking':
         return SETS_LOOK
@@ -863,7 +939,14 @@ def _row_faults(session, plan, kinds, made, row, conn_budget):
                  or (found.get('result') == 'none' and found.get('closest')) or found.get('result') == 'not_searched'
                  or (element.get('identity') == 'exact' and rec not in ('footage', 'clean'))
                  or (rec in ('set', 'clean') and V.set_cause(session, plan, eid, conn_budget)))
-    return {'frames': frames, 'prompt': ' '.join(str((row or {}).get('prompt') or '').split()), 'rec': rec, 'reason': reason, 'doubt': doubt, 'first': bool((row or {}).get('first'))}, faults
+    listed = {}
+    if 'things' in (row or {}):   # design/216b: a place's things, given with its proposal
+        bad = things_fault(plan, eid, row.get('things'), row.get('things_reason'))
+        if bad:
+            faults.append(bad)
+        else:
+            listed = {'things': {'ids': list(dict.fromkeys(row['things'])), 'reason': _one(row.get('things_reason')), 'at': _now()}}
+    return {'frames': frames, 'prompt': ' '.join(str((row or {}).get('prompt') or '').split()), 'rec': rec, 'reason': reason, 'doubt': doubt, 'first': bool((row or {}).get('first')), **listed}, faults
 
 
 def _made_ids(plan):
@@ -1137,7 +1220,7 @@ def round_rest(conn, store, user, run, outputs, quote):
     V.save_session(store, run, session)
     session, queued, errors = _order(conn, store, user, run, outputs, rest)
     return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors,   # design/215: no amount in an answer of these steps
-            'then': SAID_REST.format(n=f'{len(queued)} sets are' if len(queued) != 1 else 'set is', m=MAKES_MAX) + ' ' + ALL_MAKING.format(k=len(queued))}
+            'then': SAID_REST.format(n=f'{len(queued)} sets are' if len(queued) != 1 else 'set is', m=MAKES_MAX) + ' ' + ALL_MAKING.format(k=len(queued)) + (' ' + things_due_words(session) if things_due_words(session) else '')}
 
 
 def round_rewrite(conn, store, user, run, outputs, rows):
@@ -1169,7 +1252,7 @@ def round_rewrite(conn, store, user, run, outputs, rows):
         row.update(prompt=prompt, error=None)
     V.save_session(store, run, session)
     session, queued, errors = _order(conn, store, user, run, outputs, list(new))
-    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'then': REWRITE_MAKING.format(n=len(queued))}
+    return {'pass': V._round_pass(session, session['round']), 'queued': queued, 'errors': errors, 'then': ' '.join(x for x in (REWRITE_MAKING.format(n=len(queued)) if queued else '', things_due_words(session)) if x) or REWRITE_MAKING.format(n=0)}
 
 
 def round_reopen(conn, store, user, run, outputs, eid, verdict, words, quote):

@@ -117,6 +117,15 @@ def test_b3_a_set_held_by_a_retired_rule_says_the_plain_sentence_and_offers_make
 
 # ---------- B4: a place's own things ----------
 
+LIST, REASON = ['TILE', 'TROWEL', 'FAN', 'BRICK'], 'The roof tiles, the trowel left on the wall, the fan and the bricks of the street.'
+
+
+def listed(s, ids=None, reason=REASON):
+    """design/216b: Claude's list of the street's things on the round's row."""
+    s['round']['elements']['STREET']['things'] = {'ids': list(LIST if ids is None else ids), 'reason': reason, 'at': F.NOW}
+    return s
+
+
 def street_plan():
     plan = F.plan()
     shots = plan['gaps'][0]['scenes'][0]['shots']
@@ -126,16 +135,16 @@ def street_plan():
 
 
 def test_b4_a_places_things_most_shared_first_with_their_approved_references():
-    plan, s = street_plan(), ready('making', street_plan())
+    plan, s = street_plan(), listed(ready('making', street_plan()))
     things = RS.place_things(plan, s, el('STREET', plan))
-    assert [t['id'] for t, _ in things] == ['TILE', 'TROWEL', 'FAN', 'BRICK']   # objects and materials only (no person, no animal), most shared first, then the plan's order
+    assert [t['id'] for t, _ in things] == LIST   # design/216b: Claude's list, in Claude's order (before: the things its shots share, most shared first)
     refs = dict((t['id'], r) for t, r in things)
     assert refs['TROWEL'] == 'f-trowel-side'                                     # its golden picture
     assert all(r is None or s['references'][r]['status'] == 'approved' for r in refs.values())
 
 
 def test_b4_the_request_gives_the_references_as_input_pictures_and_the_rest_in_words(monkeypatch):
-    plan, s = street_plan(), ready('making', street_plan())
+    plan, s = street_plan(), listed(ready('making', street_plan()))
     things = RS.place_things(plan, s, el('STREET', plan))
     with_ref = [t for t, r in things if r]
     req = RS.set_request(plan, RUN, s, el('STREET', plan), s['round']['elements']['STREET'])
@@ -151,7 +160,7 @@ def test_b4_the_request_gives_the_references_as_input_pictures_and_the_rest_in_w
 
 
 def test_b4_the_limit_is_kept_before_the_call(monkeypatch):
-    plan, s = street_plan(), ready('making', street_plan())
+    plan, s = street_plan(), listed(ready('making', street_plan()))
     monkeypatch.setattr(VS, 'GEMINI_KIND_CAPS', {**VS.GEMINI_KIND_CAPS, 'object': 1})   # room for one picture only
     monkeypatch.setattr(RS, 'inputs_of', lambda session, element: ([], set()))
     req = RS.set_request(plan, RUN, s, el('STREET', plan), s['round']['elements']['STREET'])
@@ -163,7 +172,7 @@ def test_b4_the_limit_is_kept_before_the_call(monkeypatch):
 
 
 def test_b4_a_thing_with_no_reference_or_no_reference_needed_is_in_words_and_the_place_says_it_waits():
-    plan, s = street_plan(), ready('making', street_plan())
+    plan, s = street_plan(), listed(ready('making', street_plan()))
     s['round']['elements']['FAN'] = {**s['round']['elements'].get('FAN', {}), 'ignored': True}
     for r in list(s['references'].values()):
         if r.get('element_id') == 'TILE':
@@ -211,9 +220,9 @@ def test_b6_no_left_out_in_the_sentences_and_labels_and_the_flag():
 def held_film(fail=()):
     """The fixture's round on a plan where the street shows the roof tile and the brick (both made in the round), the trowel (taken from its
     footage at step 1) and the fan (no reference needed)."""
-    from test_design211b_round_pure import back, done, film, look, post
+    from test_design211b_round_pure import back, done, film, look, post, rows
     store, conn = film(plan=street_plan())
-    post(store, conn)
+    post(store, conn, rows(STREET={'things': LIST, 'things_reason': REASON}))   # Claude's list, with the street's proposal
     done(store, conn)
     back(store, fail=fail)
     look(store)
@@ -264,13 +273,13 @@ def test_point1_a_thing_set_aside_releases_the_place_with_that_thing_in_words():
 
 def test_point1_make_it_on_a_held_place_answers_that_it_waits(monkeypatch):
     plan = street_plan()
-    s = ready('2', plan)
+    s = listed(ready('2', plan))
     words = RS.place_waiting(plan, s, 'STREET', again=False)
     assert words.startswith('It will be made after the sets of ') and words.endswith('approved, so that it shows the real things.') or words.startswith('It will be made after the set of ')
 
 
 def test_point2_the_line_says_when_it_is_made_again_and_never_answer_that_first():
-    plan, s = street_plan(), ready('making', street_plan())
+    plan, s = street_plan(), listed(ready('making', street_plan()))
     s['round']['elements']['BRICK']['ignored'] = True
     for r in s['references'].values():
         if r.get('element_id') == 'TILE':
@@ -308,3 +317,106 @@ def test_point3_the_message_lists_one_name_per_line():
     lines = [line('sets:rest', covers=['a'] * 17), line('set:DECK', name='The representative filler slab roof, from above'), line('set:R', name='Revathi')]
     assert P.sets_say(lines) == '2 things need your answer:\n- The representative filler slab roof, from above\n- Revathi\nThen choose whether the other 17 sets are made. Then say done here.'
     assert not hasattr(CF, 'the')
+
+
+# ---------- design/216b: Claude names a place's things; the server enforces the list ----------
+
+def no_list_film():
+    """The fixture's round, the street's proposal sent with no list of its things."""
+    from test_design211b_round_pure import done, film, post, rows
+    store, conn = film(plan=street_plan())
+    post(store, conn, [{k: v for k, v in r.items() if k not in ('things', 'things_reason')} for r in rows()])
+    done(store, conn)
+    return store, conn
+
+
+def test_216b_a_place_with_no_list_is_not_ordered_and_claude_is_asked():
+    from test_design211b_older_pure import saved
+    from test_design211b_round_pure import jobs
+    store, conn = no_list_film()
+    row = saved(store)['round']['elements']['STREET']
+    assert row.get('things_due') is True and 'STREET' not in jobs(conn) and 'held' not in row       # never ordered on a guess
+    said = RS.things_due_words(saved(store))
+    assert said.startswith("Name the film's own things shown in 1 place(s) before it is made: STREET.") and '`vw visuals round --things`' in said
+    assert RS.then_of(saved(store)) == said
+    asked = RS.things_asked(store, RUN, [])
+    street = asked['places'][0]
+    assert street['element_id'] == 'STREET' and street['description'] and street['shots'] and street['things'] is None
+    assert {c['id'] for c in asked['candidates']} == {e['id'] for e in street_plan()['elements'] if e['kind'] in ('object', 'material')}   # what Claude reads
+    out = VS.guarded(lambda: RS.round_things(conn, store, {'id': 'u1'}, RUN, [], [{'element_id': 'STREET', 'things': [], 'reason': 'Nothing of the film stays in the street.'}]))
+    assert out['recorded'] == ['STREET'] and out['queued'] == ['STREET'] and 'STREET' in jobs(conn)                    # an empty list: made at once, nothing named
+    assert "The film's own things in this place" not in jobs(conn)['STREET']['prompt'] and not saved(store)['round']['elements']['STREET'].get('things_due')
+
+
+@pytest.mark.parametrize('things,word', [(['MASON'], 'MASON'), (['NOPE'], 'NOPE'), (['STREET'], 'STREET'), (['T_LAY'], 'T_LAY'), (['DOG'], 'DOG')])
+def test_216b_a_person_an_unknown_id_or_not_a_thing_is_refused_by_name(things, word):
+    from test_design211b_older_pure import saved
+    store, conn = no_list_film()
+    with pytest.raises(VS.Problem) as e:
+        VS.guarded(lambda: RS.round_things(conn, store, {'id': 'u1'}, RUN, [], [{'element_id': 'STREET', 'things': things, 'reason': 'Why.'}]))
+    assert e.value.message == RS.THINGS_NOT_THING.format(eid='STREET', word=word) and 'things' not in saved(store)['round']['elements']['STREET']   # nothing stored
+    assert RS.things_fault(street_plan(), 'TILE', [], 'Why.') == RS.THINGS_NOT_PLACE.format(eid='TILE')
+    assert RS.things_fault(street_plan(), 'STREET', ['TILE'], '') == RS.THINGS_REASON.format(eid='STREET', max=RS.REASON_CHARS)
+    assert RS.things_fault(street_plan(), 'STREET', 'TILE', 'Why.') == RS.THINGS_SHAPE.format(eid='STREET')
+
+
+def test_216b_the_list_given_with_the_proposal_is_kept_and_checked():
+    from test_design211b_older_pure import saved
+    from test_design211b_round_pure import film, post, refused, rows
+    store, conn = film(plan=street_plan())
+    post(store, conn, rows(STREET={'things': ['TILE', 'BRICK'], 'things_reason': 'The roof tiles and the bricks.'}))
+    assert saved(store)['round']['elements']['STREET']['things']['ids'] == ['TILE', 'BRICK']
+    store, conn = film(plan=street_plan())
+    assert RS.THINGS_NOT_THING.format(eid='STREET', word='MASON') in refused(lambda: VS.round_start(store, {'id': 'u1'}, RUN, [], rows(STREET={'things': ['MASON'], 'things_reason': 'x'}), conn=conn))
+
+
+def test_216b_no_reference_needed_a_removed_thing_two_places_and_a_new_list():
+    plan, s = street_plan(), listed(ready('making', street_plan()), ['TILE', 'BRICK', 'FAN'])
+    s['round']['elements']['FAN']['ignored'] = True                                                         # "No reference needed": named in words, holds nothing
+    for r in s['references'].values():
+        if r.get('element_id') == 'TILE':
+            r['status'] = 'candidate'
+    s['drawings'] = {}
+    assert [t['id'] for t in RS.pending_things(plan, s, 'STREET')] == ['TILE', 'BRICK']
+    req = RS.set_request(plan, RUN, s, el('STREET', plan), s['round']['elements']['STREET'])
+    assert 'Wall fan regulator' in req['prompt'].split('from their descriptions: ')[1]
+    gone = copy.deepcopy(plan)
+    gone['elements'] = [e for e in gone['elements'] if e['id'] != 'TILE']                                  # a plan revision removed the tile: dropped, not blocking
+    assert [t['id'] for t in RS.pending_things(gone, s, 'STREET')] == ['BRICK']
+    two = copy.deepcopy(plan)
+    two['elements'].append({**el('STREET', plan), 'id': 'YARD', 'name': 'The yard'})                       # two places listing the same thing
+    s['round']['elements']['YARD'] = {**s['round']['elements']['STREET'], 'things': {'ids': ['TILE'], 'reason': 'Its tiled shed.', 'at': F.NOW}}
+    assert [t['id'] for t in RS.pending_things(two, s, 'YARD')] == ['TILE'] and 'TILE' in [t['id'] for t in RS.pending_things(two, s, 'STREET')]
+    listed(s, ['BRICK'])                                                                                     # the list changed between two makes: the next make uses it
+    assert [t['id'] for t, _ in RS.place_things(plan, s, el('STREET', plan))] == ['BRICK']
+    req = RS.set_request(plan, RUN, s, el('STREET', plan), s['round']['elements']['STREET'])
+    assert 'Roof tile' not in req['prompt'].split('from their descriptions: ')[-1]
+
+
+def test_216b_a_hold_of_0113_waits_for_claudes_list_and_a_made_place_is_untouched():
+    from test_design211b_older_pure import saved
+    from test_design211b_round_pure import jobs, put
+    store, conn = no_list_film()
+    s = saved(store)
+    row = s['round']['elements']['STREET']
+    row.pop('things_due')
+    row['held'] = ['SHUTTER_OIL', 'BRICK']                                                                   # as 0.113.0 left it: held on the shared-shots guess
+    put(store, s)
+    before = json.dumps({k: v for k, v in saved(store)['round']['elements'].items() if k != 'STREET'}, sort_keys=True)
+    assert RS.release(conn, store, {'id': 'u1'}, RUN, []) == [] and 'STREET' not in jobs(conn)             # not ordered on the guess
+    row = saved(store)['round']['elements']['STREET']
+    assert 'held' not in row and row['things_due'] is True                                                  # it waits for Claude's list instead
+    assert json.dumps({k: v for k, v in saved(store)['round']['elements'].items() if k != 'STREET'}, sort_keys=True) == before   # a place made or ordered is left alone
+    VS.guarded(lambda: RS.round_things(conn, store, {'id': 'u1'}, RUN, [], [{'element_id': 'STREET', 'things': [], 'reason': 'Nothing stays.'}]))
+    from test_design211b_round_pure import req
+    assert [req(p)['reference']['element_id'] for p in conn.inserted].count('STREET') == 1   # ordered once
+    assert RS.release(conn, store, {'id': 'u1'}, RUN, []) == []                                              # never twice
+
+
+def test_216b_the_place_line_shows_claudes_list_under_details(monkeypatch):
+    film = Film(monkeypatch, '2')
+    film.change(lambda s: listed(s, ['TILE'], 'The tiled roof over the street.'))
+    street = film.lines()['set:STREET']
+    assert ["The film's things shown in this place", ['Roof tile.', 'The tiled roof over the street.']] in street['details']
+    film.change(lambda s: listed(s, [], 'Nothing of the film stays in the street.'))
+    assert ["The film's things shown in this place", ['none.', 'Nothing of the film stays in the street.']] in film.lines()['set:STREET']['details']

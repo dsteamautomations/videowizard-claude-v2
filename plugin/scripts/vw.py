@@ -2010,7 +2010,7 @@ VISUALS_FLAGS = {
     'digest': set(), 'trial': {'file', 'element', 'clip', 'at'}, 'look': {'file'},   # design/211 part A: the digest of the footage, trial frames, the looks
     'prepare': set(), 'budget': set(), 'cap': {'inr', 'quote'}, 'elements': set(), 'feedback': set(), 'check': {'file'}, 'propose': {'file'}, 'plan': set(), 'treatment': {'file', 'quote', 'accept', 'send_back', 'notes'}, 'plan-join': {'base', 'gaps', 'rebuild'},
     'select': {'gap', 'choice', 'job', 'notes', 'timing', 'quote', 'in_s'}, 'accept': {'gaps', 'quote'}, 'next': {'one'}, 'decide': {'item', 'choice', 'quote', 'notes', 'one'}, 'card': {'file', 'one'}, 'page': {'url', 'record', 'uploaded', 'pictures_again'}, 'revise': {'gap', 'notes', 'quote'}, 'record': {'gap', 'gaps', 'quote'},
-    'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back', 'rest', 'rewrite', 'looks'},   # design/177: the page's step-2 actions; design/211 part B: the second go, the rewrite, the looks at the sets
+    'round': {'file', 'verdicts', 'picks', 'sets', 'quote', 'undo', 'answer', 'verdict', 'golden', 'words', 'make', 'aside', 'back', 'rest', 'rewrite', 'looks', 'things'},   # design/177: the page's step-2 actions; design/211 part B: the second go, the rewrite, the looks at the sets
     'search': {'element', 'keywords', 'quote', 'source'}, 'ask': {'item', 'question', 'choices', 'cost'}, 'answer': {'item', 'answer'}, 'not-this': {'element'}, 'pick': {'search', 'n', 'note', 'quote'}, 'nothing-fits': {'search', 'reason'},
     'frame': _PLACE, 'supply': _PLACE, 'web': _PLACE, 'own': {'element', 'file', 'url', 'name'},   # design/177
     'image': {'file', 'element', 'name', 'kind', 'prompt', 'parents', 'size', 'quality', 'answer', 'variants', 'end_answer', 'shot', 'subject', 'role', 'golden', 'region', 'end_region'},   # design/111 F11
@@ -2571,6 +2571,16 @@ def cmd_visuals(a):
             emit(out, 0, out.get('then'))
         if getattr(a, 'rest', False):   # the second go, on the operator's words; without them the server refuses (paid)
             out = write(base + '/round/rest', {'quote': a.quote or ''})
+            emit(out, 0, out.get('then'))
+        if getattr(a, 'things', None) is True:   # design/216b: what Claude reads to name the things shown in each place
+            out = call('GET', base + '/round/things')
+            (ws / 'work' / 'visuals').mkdir(parents=True, exist_ok=True)
+            (ws / 'work' / 'visuals' / 'things-asked.json').write_text(json.dumps(out, indent=1, ensure_ascii=False) + '\n', encoding='utf-8')
+            emit({'file': 'work/visuals/things-asked.json', 'places': [p.get('element_id') for p in out.get('places') or []]}, 0,
+                 'Read work/visuals/things-asked.json: each place, its shots and the candidates. Write work/visuals/things.json, rows {element_id, things, reason}, '
+                 'then `vw visuals round --things work/visuals/things.json`.')
+        if getattr(a, 'things', None):   # design/216b: Claude's list of the things shown in each place; a place that waited for it is ordered then
+            out = write(base + '/round/things', {'rows': _rows(m, a.things, ('element_id', 'things', 'reason'))})
             emit(out, 0, out.get('then'))
         if getattr(a, 'rewrite', None):   # the requests the operator sent back, rewritten: the sets are made then
             out = write(base + '/round/rewrite', {'rows': _rows(m, a.rewrite, ('element_id', 'prompt'))})
@@ -3800,6 +3810,7 @@ def build_parser():
     s.add_argument('--looks', nargs='?', const=True, default=None, help='round: alone, list the sets to look at and fetch their pictures; with a file, record the looks (design/211)')
     s.add_argument('--stand-in', dest='stand_in', action='store_true', help='likeness: the person is a stand-in again, made from the description (design/207)')
     s.add_argument('--record', action='store_true', help='page: record the answers the operator gave on the artifact page (design/204)')
+    s.add_argument('--things', nargs='?', const=True, default=None, help="round: with no file, what to read to name the things shown in each place; with a file, rows {element_id, things, reason} (design/216b)")
     s.add_argument('--fetch', action='store_true', help='page: fetch the pictures now, after saying the sentence `preparing` (design/216)')
     s.add_argument('--every-picture', dest='every_picture', action='store_true', help='round --answer with --verdict correct: the words apply to every picture of this thing (design/216; the page\'s tick)')
     s.add_argument('--pictures-again', dest='pictures_again', action='store_true', help='page: offer every picture of the round again, under new document names: for a batch that failed or a picture that stays grey on the page (design/210)')

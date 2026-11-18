@@ -133,10 +133,14 @@ ROWS = {   # the round file's own fields per thing: rec, reason, doubt, first, p
     'TILE': ('set', 'It has approved drawings; the footage shows only its underside.', False, False, '')}
 
 
+PLACE_THINGS = {'STREET': ([], 'Nothing of the film stands in the street for good.')}   # design/216b: Claude's list of the things shown in each place
+
+
 def _row(eid, frames=()):
     rec, reason, doubt, first, prompt = ROWS[eid]
     return {'frames': list(frames), 'keywords': '', 'verdict': None, 'search_id': None, 'error': None, 'prompt': prompt, 'corrections': [], 'set': None, 'round': 0,
-            'rec': rec, 'reason': reason, 'doubt': doubt, 'first': first, 'operator_words': [], 'history': []}
+            'rec': rec, 'reason': reason, 'doubt': doubt, 'first': first, 'operator_words': [], 'history': [],
+            **({'things': {'ids': list(PLACE_THINGS[eid][0]), 'reason': PLACE_THINGS[eid][1], 'at': NOW}} if eid in PLACE_THINGS else {})}
 
 
 def _check(failed=()):
@@ -263,6 +267,7 @@ def older_session():
     for eid, row in rd['elements'].items():
         for k in ('rec', 'reason', 'doubt', 'first', 'operator_words', 'history'):
             row.pop(k)
+        row.pop('things', None)   # design/216b: an older round has no list of a place's things
         row['prompt'] = row['prompt'] or f'The subject block of {eid}.'
     for fid in ('f-trowel-side', 'f-trowel-use', 'f-tile-under'):
         for k in ('view', 'look', 'weak', 'trial'):

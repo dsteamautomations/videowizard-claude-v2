@@ -144,6 +144,8 @@ if __name__ == '__main__':
         prompt = d215(prompt, parts)
         from d216_wording_v3 import apply as d216   # design/216: the page's `say` posted unchanged with the link, and `preparing` said before `vw visuals page --fetch`
         prompt = d216(prompt, parts)
+        from d216b_wording_v3 import apply as d216b   # design/216b: Claude names the things shown in each place (`things` with the proposal, `vw visuals round --things`)
+        prompt = d216b(prompt, parts)
         from d132_wording_v3 import apply_steps as d132   # design/132: the editor's package before the assembly
         later = {s['name']: s for s in old['stages'] if s['name'] in ('assembly', 'delivery')}
         d132(list(later.values()))

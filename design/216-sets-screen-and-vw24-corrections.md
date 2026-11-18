@@ -14,9 +14,29 @@
 - B5: "These two people read alike, A and B: add what tells them apart."
 - B6: MERGE_NONE, BACK_ASKED and the older rounds' "Leave it out" reworded; `vw visuals round --answer E --verdict correct --every-picture`.
 
+## design/216b (18 Nov 2026, after the deploy of 0.113.0): Claude names a place's things
+
+Server 0.114.0, plugin 0.98.0 (minimum 0.98.0). Which things belong to a place is a reading job: Claude gives, for each place, `things` (ids of the
+film's objects and materials that are fixed parts of it or always stand in it; never a tool or a prop that only passes through, never a person;
+[] when none) with `things_reason`, with its step-4 proposal, or later with `vw visuals round --things` (no file: what to read, written to
+work/visuals/things-asked.json: each place's description, its shots' words, the plan's objects and materials; with a file: the rows). The server
+checks each id (an object or a material of the plan, not the place; else refused naming the word) and stores the list on the place's row. A
+place with no list is never ordered: `_queue_sets` marks it `things_due` and every "what next" asks Claude for the list
+(`ref_sets.things_due_words`); `round_things` stores it and orders the place (which may still be held for its things' sets, as before). The
+list drives the hold, the input pictures (Claude's order; over Gemini's limits the rest in words), the check line and the line's sentence; the
+place's Details show "The film's things shown in this place: A, B. <reason>". A thing removed from the plan is dropped; one answered "No
+reference needed" is named in words and holds nothing. On deploy, a place still held on the 0.113.0 guess drops that hold and waits for
+Claude's list (in `ref_sets.release`, run on every page and chat call); a place already ordered or made is untouched.
+
+VW-24 after the deploy: SITE_DECK, ROOM, SITE_BELOW and LANE have no list. Whichever of them is held (the deck after its correction or remake
+answer; ROOM after "Make it"; SITE_BELOW and LANE after "Make the other 17") becomes "waits for Claude's list" at the first page or chat call;
+the next "what next" asks Claude for the four places' things; once sent, each is ordered, or held until the things named (the tile for the
+deck, if Claude names it) have approved sets, then ordered by itself. A place ordered on 0.113.0 before the deploy (its things approved in
+between) is left alone and is not ordered again.
+
 ## Older ways
 
-Decision log rows 143 to 152 (`design/35-decision-log.md`). The older-round page digests (test_design211_together, test_design211c_lines) were taken again for B1 and B6 only.
+Decision log rows 143 to 153 (`design/35-decision-log.md`). The older-round page digests (test_design211_together, test_design211c_lines) were taken again for B1 and B6 only.
 
 The page check of step 1 for a person the footage shows and the writer's words, lost with the old sets screen's checks, is restored (`server/unit/test_design216_step1_browser_pure.py`).
 

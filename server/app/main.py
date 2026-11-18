@@ -1898,6 +1898,21 @@ def visuals_round_rest(run_id: UUID, body: RoundRest, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, rest)
 
 
+class RoundThings(Write):   # design/216b: `vw visuals round --things work/visuals/things.json`
+    rows: list[dict[str, Any]] = Field(min_length=1, max_length=80)
+
+
+@app.get('/api/runs/{run_id}/visuals/round/things')
+def visuals_round_things_asked(run_id: UUID, user=User, conn=DB):
+    run, outputs = _visuals_run(conn, user, run_id)
+    return Response(visuals_stage.guarded(lambda: ref_sets.things_asked(storage(), run, outputs)))
+
+
+@app.post('/api/runs/{run_id}/visuals/round/things')
+def visuals_round_things(run_id: UUID, body: RoundThings, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_things(conn, storage(), user, run, outputs, body.rows))
+
+
 @app.post('/api/runs/{run_id}/visuals/round/rewrite')
 def visuals_round_rewrite(run_id: UUID, body: RoundRewrite, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: ref_sets.round_rewrite(conn, storage(), user, run, outputs, body.rows))

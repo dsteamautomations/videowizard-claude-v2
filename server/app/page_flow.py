@@ -511,6 +511,16 @@ def _details(line):
     return [r for r in rows if r[1]]
 
 
+def _things_row(ctx, eid):
+    """design/216b: under Details, the things Claude named for a place, with its reason; nothing for anything else or with no list yet."""
+    listed = (((ctx['session'].get('round') or {}).get('elements') or {}).get(eid) or {}).get('things')
+    if not listed:
+        return []
+    from . import ref_sets
+    names = [t.get('name') or t['id'] for t, _ in ref_sets.place_things(ctx['plan'], ctx['session'], next(e for e in ctx['plan']['elements'] if e['id'] == eid))]
+    return [[CF.WORDS['things_head'], [(CF._and(names) if names else CF.WORDS['things_none']) + '.', listed.get('reason') or '']]]
+
+
 def _v2_line(ctx, item, paid):
     """design/211: a line of a v2 round, from the chat's own item. Its fields are built once, in `chat_flow._round_v2`, so the page and the
     chat say the same; here a picture gets its code, and the line its key, its title, "Use my own picture" and the answer kept so far."""
@@ -523,7 +533,7 @@ def _v2_line(ctx, item, paid):
     if (eid and (item['id'].startswith('round1:') or line.get('case'))) or item['_key'] == 'sets:rest':
         out.pop('text', None)   # the page shows its parts (`desc`, `used`, `search`); the chat says them as one text. Left out so that 60 things stay one document
     if eid and line.get('case') and not item['id'].startswith('round1:'):   # design/213: a line of step 2 in the new layout
-        out.update(_named(ctx['plan'], eid), details=_details(out))
+        out.update(_named(ctx['plan'], eid), details=_details(out) + _things_row(ctx, eid))
         out.pop('cost', None)
     if eid and item['id'].startswith('round1:'):   # design/212: the name and the kind apart, for the list and the heading of the thing
         out.update(_named(ctx['plan'], eid))
@@ -576,10 +586,12 @@ def _sets_lines_v2(ctx):
             mine = rest.get(f'set:{eid}') or {}   # design/213: one of the sets that wait for the operator's word: what the list of them says of it
             wait.append({**head, 'state': 'making', 'group': CF.STEP2_GROUPS[2], 'case': 'wait', 'note': words[said[0]], 'head': words['wait_head'] if mine else words[said[0]],
                          'tag': words[said[1]] if said[1] else words['tag_making'], **({'wait_note': mine['note'], **({'out': True} if mine['out'] else {})} if mine else {})})
+            if row.get('things_due'):   # design/216b: waits for Claude's list of its things
+                wait[-1].update(note=words['things_due_line'], head=words['things_due_line'], tag=words['tag_held'])
             if row.get('held'):   # design/216 (the critic's point 1): held until its things' sets are approved, then made by itself
                 names = CF._and(next((e.get('name') or e['id'] for e in plan['elements'] if e['id'] == t), t) for t in row['held'])
                 wait[-1].update(note=words['held'].format(names=names), head=words['held'].format(names=names), tag=words['tag_held'])
-            wait[-1]['details'] = _details(wait[-1])
+            wait[-1]['details'] = _details(wait[-1]) + _things_row(ctx, eid)
     return [_v2_line(ctx, i, paid) for i in items] + wait + done
 
 
@@ -708,7 +720,7 @@ def _round_page(ctx, base, step):
     if v2:   # design/211: step 2; while Claude looks at the sets, or writes a request again, the page says so
         from . import ref_sets
         state = V._round_pass(session, session['round'])
-        then = (ref_sets.SETS_LOOK if state == 'looking' else ref_sets.rewrite_due(session) if state == 'rewrite'
+        then = (ref_sets.things_due_words(session) if ref_sets.things_due_words(session) else ref_sets.SETS_LOOK if state == 'looking' else ref_sets.rewrite_due(session) if state == 'rewrite'
                 else ref_sets.SETS_MAKING if state == 'making' and not left else '')   # design/211 review, N4: wait, then look: the operator sees no set before its look
         note = (f'This list is long: {held} more sets appear here after you answer these and say done in the chat.' if held else
                 'Look at each set, answer each line, then say done in the chat.' if left else

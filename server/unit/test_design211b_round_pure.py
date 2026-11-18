@@ -16,7 +16,8 @@ import d211_fixture as F
 from test_design211b_sets_pure import RUN, SHEET, el, finder, ready, saved, store_of   # noqa: F401 (finder is the stand-in for part A, on every test)
 from test_visuals_stage_pure import FakeConn, USER
 
-FILE = [{'element_id': e, 'rec': F.ROWS[e][0], 'reason': F.ROWS[e][1], **({'first': True} if F.ROWS[e][3] else {}), **({'prompt': F.ROWS[e][4]} if F.ROWS[e][4] else {})} for e in F.THINGS]
+FILE = [{'element_id': e, 'rec': F.ROWS[e][0], 'reason': F.ROWS[e][1], **({'first': True} if F.ROWS[e][3] else {}), **({'prompt': F.ROWS[e][4]} if F.ROWS[e][4] else {}),
+         **({'things': list(F.PLACE_THINGS[e][0]), 'things_reason': F.PLACE_THINGS[e][1]} if e in F.PLACE_THINGS else {})} for e in F.THINGS]   # design/216b: a place's things, with its proposal
 STEP1 = {'MASON': {'verdict': 'approve'}, 'TROWEL': {'verdict': 'approve'}, 'FAN': {'verdict': 'ignore'}, 'BRICK': {'verdict': 'approve'},
          'STREET': {'verdict': 'approve', 'words': 'The street is wider than it looks.'}, 'T_LAY': {'verdict': 'approve'}, 'TILE': {'verdict': 'approve'}}
 SET_INR = '35'      # one set of three on Gemini at the test's prices, to the rupee
@@ -284,7 +285,7 @@ def test_things_of_one_kind_are_filled_in_the_plans_order_up_to_three():
     s = ready('1', plan)
     s.pop('round')
     store, conn = film(s, plan)
-    post(store, conn, [dict(r, first=False) for r in rows(FAN={'rec': 'set'})])
+    post(store, conn, [{k: v for k, v in dict(r, first=False).items() if k not in ('things', 'things_reason')} for r in rows(FAN={'rec': 'set'})])   # design/216b: STREET is an object here: no list
     out = done(store, conn, FAN={'verdict': 'approve'})
     assert out['queued'] == ['MASON', 'FAN', 'BRICK'] and out['rest'] == ['STREET', 'T_LAY', 'TILE'] and out['from_footage'] == ['TROWEL']   # a person, an object, then the next object: no third kind
 
