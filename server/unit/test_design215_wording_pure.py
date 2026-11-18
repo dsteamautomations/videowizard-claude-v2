@@ -77,5 +77,5 @@ def test_the_command_file_the_helper_and_the_operators_rules_say_the_same():
 
 
 def test_the_versions_of_this_release():
-    assert Settings.model_fields['SERVER_VERSION'].default == '0.112.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.96.0'
-    assert json.loads((ROOT / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.96.0'
+    assert Settings.model_fields['SERVER_VERSION'].default == '0.113.0' and Settings.model_fields['PLUGIN_MIN_VERSION'].default == '0.97.0'
+    assert json.loads((ROOT / 'plugin' / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))['version'] == '0.97.0'

@@ -336,7 +336,8 @@ def test_the_instructions_send_the_drawings_and_materials_to_the_page_and_the_ch
     sys.path.insert(0, str(root / 'scripts'))
     import d209_wording_v3 as W
     import d215_wording_v3 as D215   # design/215: a later script that changes sentences of this one (the step's new name): the text as it was before it
-    was = D215.before(st)
+    import d216_wording_v3 as D216   # design/216: a later script that adds a sentence after one of this script's
+    was = D215.before(D216.before(st))
     parts = copy.deepcopy(was['parts'])
     assert W.apply(was['prompt'], parts) == was['prompt'] and parts == was['parts'], 'applying twice changes nothing'
     src = Path(V.__file__).read_text(encoding='utf-8')   # the tool's own lines point to the page first
