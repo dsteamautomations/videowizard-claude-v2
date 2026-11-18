@@ -346,6 +346,28 @@ table.loss td:nth-child(1){width:36%;color:var(--fg)} table.loss td:nth-child(3)
 .sfoot b{color:var(--fg)}
 @media (max-width:1000px){ .sstage{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;flex:none} .sside{overflow:visible} .sbigrow{flex:none} .sbigb img{position:static;height:auto;max-height:60vh} .sbigf{display:block} }
 @media (max-width:860px){ #sets{overflow:auto;display:block} .sapp{grid-template-columns:minmax(0,1fr)} .srail{border-right:0;border-bottom:1px solid var(--line)} .smain{padding:16px;overflow:visible} .sbigrow.two{grid-template-columns:minmax(0,1fr)} }
+/* design/217 (SK, 18 Nov 2026): step 6, "Pictures and drawn graphics", in the sets screen's frame: the media large on the left (it gives way first, to
+   about 200 px), beside it where it sits in the film, the check as one coloured line, the question and the buttons; captions wrap, never cut. */
+.sstage.pstage{grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr);gap:20px} .sstage.pstage.wide{grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr)}
+.pmedia{min-height:200px} .pmedia.psteps{min-height:170px;flex:0 1 auto}
+.psteps{grid-template-rows:minmax(0,auto) auto auto auto;align-content:start;column-gap:10px;row-gap:0} #sets .psteps .sbigb{height:auto;aspect-ratio:16/9;max-height:100%} .psteps .sbigf{grid-row:span 4;grid-template-rows:subgrid}   /* the steps shrink together: one picture height, their captions under them */
+.sbigf figcaption{overflow-wrap:anywhere;line-height:1.35}
+.pfaults{font-size:12px;line-height:1.35;color:var(--chg);margin-top:2px;overflow-wrap:anywhere} .pfaults ul{margin:0;padding-left:16px}
+.pvbox{position:relative;width:100%;height:100%;min-height:0;border-radius:10px;overflow:hidden;background:#000}
+.pvbox video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.pcap{margin:4px 0 2px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:12px;color:var(--muted)}
+#sets .pth{width:120px} .pthl{display:block;font-size:12px;line-height:1.3;color:var(--muted);padding:2px 3px 0;overflow-wrap:anywhere} .sth.on .pthl{color:var(--accent);font-weight:600}
+.pctx{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 12px;margin-bottom:10px}
+.pwhere{font-size:12px;color:var(--muted)} .pwords{margin:1px 0 0;line-height:1.4}
+.pby{font-size:12px;color:var(--muted);margin-top:2px}
+.sverdict ul{margin:3px 0 0;padding-left:18px} .sverdict li{margin:1px 0}
+.pfrom{color:var(--muted);font-size:13px;margin:0 0 8px} .pask{margin:0 0 10px;max-width:70ch}
+#sets .sbtn.pq{display:block;width:100%;text-align:left} .pq small{display:block;font-weight:400;font-size:12px;opacity:.85}
+.pqbar{display:grid;gap:8px;max-width:560px;margin:4px 0 6px}
+.pkw{display:block;font-size:12px;color:var(--muted)} #sets .sfold[data-fold="coming"]{gap:8px}
+.pagt{color:var(--chg);font-weight:600}
+.pcoming{list-style:none;margin:0 0 14px;padding:0} .pcoming li{padding:5px 10px 5px 20px;color:var(--muted);font-size:13px;line-height:1.35} .pcoming small{display:block;font-size:12px}
+.pnone{font-size:12px;color:var(--muted)}
 </style>
 
 <div class="wrap" id="wrap">
@@ -699,7 +721,7 @@ function heading(name,g,shut){   // design/211: the heading of a group of lines;
 function draw(force){
   const list=$('list');
   if(!ready){return;}
-  const kind=round&&round.layout&&round.layout.kind, things=kind==='things', sets=kind==='sets';   // design/212: step 1 of the references has its own layout; design/216: step 2, the sets, the trial SK corrected
+  const kind=round&&round.layout&&round.layout.kind, things=kind==='things', sets=kind==='sets'||kind==='pictures';   // design/212: step 1 of the references has its own layout; design/216: step 2, the sets, the trial SK corrected; design/217: step 6 in the sets screen's frame
   $('things').hidden=!things; $('sets').hidden=!sets; $('wrap').hidden=things||sets;
   if(things){ tDraw(); return; }
   if(sets){ sDraw(); return; }
@@ -965,8 +987,9 @@ const tFold=(btn,target)=>btn.addEventListener('click',()=>{ target.hidden=!targ
 // The list holds only what needs an answer, numbered, then "The other N sets"; one set at a time: its large picture, its small pictures below, and
 // beside it one answer for the whole set. Every word is the server's: the line's own (its heading, its buttons, what each answer will do) and the
 // screen's (`layout.words.sets`). Answers are written as every line's answer is written (`write`, `ref`); nothing is recorded before "done".
-const S={round:'',cur:null,panel:null,msg:'',timer:0,help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{}};
-const SW=()=>W().sets||{};
+const S={round:'',cur:null,panel:null,msg:'',timer:0,help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{}};
+const PIC=()=>!!round&&(round.layout||{}).kind==='pictures';   // design/217: step 6 uses this frame with its own lines and words (`layout.words.pictures`)
+const SW=()=>(PIC()?W().pictures:W().sets)||{};
 const sLines=()=>(round.lines||[]).filter(l=>l.key!=='sets:rest');
 const sRest=()=>(round.lines||[]).find(l=>l.key==='sets:rest'&&l.state==='open')||null;
 const sMade=l=>(l.pics||[]).filter(p=>!p.ref_only);
@@ -977,7 +1000,7 @@ const sWaiting=()=>{ const r=sRest(); return r?sLines().filter(l=>(r.covers||[])
 const sItems=()=>sLines().filter(l=>l.state==='open').concat(sRest()&&sWaiting().length?[sRest()]:[]);   // what needs an answer, then the other sets (A10)
 const sJudged=()=>sLines().every(l=>l.case!=='judge'||sDone(l));
 const sBtn=(l,a)=>a.choice==='own'?{act:'own',label:(l.own||{}).label,say:(l.own||{}).say}:(l.buttons||[]).find(b=>b.choice===a.choice||(b.all&&b.all.choice===a.choice))||((l.pics||[]).some(p=>p.choice===a.choice)&&(l.buttons||[]).find(b=>b.act==='approve'))||{};
-const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
+const sAgainst=l=>{ const a=sAns(l), b=a&&sBtn(l,a); if(PIC()) return !!(b&&b.sure); return !!(b&&l.rec&&((l.rec.do==='remake'&&b.act==='approve')||(l.rec.do==='use'&&b.act==='again'))); };   // A6: marked in the list; undone with the answer
 function sMain(l){ const m=sMade(l), a=sAns(l), c=S.pick[l.line]; return m.find(p=>c?p.code===c:!!a&&!!p.choice&&p.choice===a.choice)||m[0]; }   // A7: A, unless another is made the main picture
 function sSays(l){   // the answer as it stands, in the server's words: the main picture's sentence, else the button's
   const a=sAns(l), w=SW(); if(!a) return l.kept?[w.kept,l.kept]:['',''];
@@ -1080,6 +1103,86 @@ function sThing(l){
   setTimeout(check,0);
   return kids;
 }
+// ---------- design/217 (SK, 18 Nov 2026): step 6, "Pictures and drawn graphics" (`round.layout.kind==='pictures'`), as on the trial SK corrected ----------
+// A question of Claude, the style sheet, a still, a graphic in steps, a drawn graphic: the media large, the footage only ever beside it, where it sits in
+// the film, the check as one coloured line, the question and the buttons. Every word is the round's (the line's own and `layout.words.pictures`).
+const PV={};   // a drawn graphic's video element per code, kept so that drawing the line again does not start it over
+function pVideo(l,onBad){   // the video page copy, on a loop with no sound; no link of the file store, or it does not play: the frame sheet takes its place
+  const code=(l.video||{}).code; if(!code||S.vbad[code]) return null;
+  let v=PV[code]; if(!v){ v=PV[code]=mk('video',{id:'pvideo','aria-label':l.video.label||'',loop:'',muted:'',autoplay:'',playsinline:'',controls:'',preload:'auto'}); v.muted=true; v.defaultMuted=true;
+    v.addEventListener('error',()=>{ S.vbad[code]=true; onBad(); });
+    picDoc('zoom',code,'url').then(u=>{ if(!/^\/_blob\/[0-9a-f]{32}$/.test(u)){ S.vbad[code]=true; onBad(); return; } v.src=u; const p=v.play(); if(p&&p.catch) p.catch(()=>{}); }); }
+  return mk('div',{class:'pvbox'},v); }
+function pCheck(l){   // the check as one coloured line: its first fault in the head, the others behind "See all n" (a drawn graphic's open rules all in view)
+  const c=l.check, w=SW(); if(!c) return null; const f=c.faults||[], all=c.show==='all', rest=all?f:f.slice(1), o=!!S.open.why;
+  return mk('div',{class:'sverdict'+(c.state==='fail'?' bad':c.state==='pass'?'':' doubt'),id:'pcheck','data-state':c.state},mk('div',{},mk('b',{},c.head),
+    rest.length&&(all||o)?mk('ul',{},rest.map(x=>mk('li',{},x))):null,
+    !all&&rest.length?mk('button',{class:'slink',id:'pmore',type:'button',on:{click:()=>{ S.open.why=!o; sMainDraw(); }}},o?w.fewer:String(w.more||'').replace('{n}',f.length)):null,
+    c.by?mk('p',{class:'pby'},c.by):null)); }
+function pPanel(l){   // what opens under the buttons: "asks once" before an answer against the check, or the words box (with Claude's failed lines when the round gives them)
+  const w=SW(), i=+String(S.panel).slice(1), b=(l.buttons||[])[i]||{}, cancel=mk('button',{class:'sbtn',id:'scancel',type:'button',on:{click:()=>sOpen(null)}},w.cancel);
+  if(b.sure) return [mk('label',{},b.sure.ask),mk('div',{class:'sacts'},mk('button',{class:'sbtn',id:'ssure',type:'button',on:{click:()=>sAnswer(l,b.choice,'')}},b.sure.go),
+    mk('button',{class:'sbtn primary',id:'sback',type:'button',on:{click:()=>sOpen(null)}},b.sure.back))];
+  const k=l.line+'|'+b.choice, ta=mk('textarea',{id:'sfix',maxlength:String(MAX)}); ta.value=k in S.words?S.words[k]:(b.prefill||''); ta.addEventListener('input',()=>{ S.words[k]=ta.value; });
+  return [b.act==='select'&&l.held?mk('p',{class:'pfrom',id:'pheld'},l.held):null,mk('label',{for:'sfix'},b.hint||''),ta,
+    mk('div',{class:'sacts'},mk('button',{class:'sbtn primary',id:'sfixsend',type:'button',on:{click:()=>{ const t=ta.value.trim().slice(0,MAX); if(!t){ sRefuse(b.need||w.words_need); ta.focus(); return; } sAnswer(l,b.choice,t); }}},b.go||b.label),cancel)]; }
+function pThing(l){
+  const w=SW(), a=sAns(l), pics=l.pics||[], of=r=>pics.filter(p=>p.role===r), main=of('main')[0], steps=of('step'), sheet=of('sheet')[0];
+  const foot=pics.filter(p=>p.role==='before'||p.role==='after'||p.role==='earlier'), other=foot.find(p=>p.code===S.cmp[l.line]), gate=[], gmsg=mk('p',{class:'sgate',id:'sgate',hidden:true});
+  const check=()=>{ if(!gate.length) return; const bad=pics.filter(p=>p.missing||picSeen[p.code]==='bad').map(p=>p.label), wait=pics.filter(p=>!p.missing&&picSeen[p.code]!=='ok').length;   // as on every line with pictures (design/210)
+    gate.forEach(b=>{ b.disabled=!!(bad.length||wait); }); gmsg.textContent=bad.length?String(w.gate_bad||'').replace('{pics}',bad.join(', ')):wait?w.gate_wait:''; gmsg.hidden=!gmsg.textContent; };
+  const faults=p=>(p.faults||[]).length?mk('div',{class:'pfaults'},p.check_head&&mk('b',{},p.check_head),mk('ul',{},p.faults.map(x=>mk('li',{},x)))):null;
+  const fig=(p,cap,more)=>mk('figure',{class:'sbigf','data-code':p.code,'data-role':p.role},sBig(p,pics,check),cap?mk('figcaption',{},cap):null,more||null);
+  const beside=p=>fig(p,p.cmp_cap||p.label,p.why?mk('figcaption',{class:'pwhy'},p.why):null);
+  const kids=[mk('h2',{class:'sname'},l.name),mk('p',{class:'skind'},l.kind_words||'')], side=[];
+  let media=null, cap=null;
+  if(l.kind==='steps'){   // every step side by side, one answer; footage or an earlier try clicked joins the row in film order
+    const row=steps.map(p=>fig(p,p.caption||p.label,faults(p)));
+    if(other){ if(other.role==='before') row.unshift(beside(other)); else row.push(beside(other)); }
+    media=mk('div',{class:'sbigrow pmedia psteps',id:'sbig',style:'grid-template-columns:repeat('+row.length+',minmax(0,1fr))'},row);
+    cap=mk('p',{class:'pcap',id:'pcap'},mk('span',{},l.strip_head||''),mk('span',{class:'sgrow'}),other?mk('button',{class:'slink',id:'scompare',type:'button',on:{click:()=>{ delete S.cmp[l.line]; sMainDraw(); }}},w.stop):null);
+  } else if(l.kind==='drawn'){   // the video first; its frames one click away; without the video, the frames with the round's sentence
+    const v=S.view[l.line]==='sheet'?null:pVideo(l,()=>{ if(S.cur===l.line) sMainDraw(); }), why=!(l.video||{}).code?l.video&&l.video.none:S.vbad[(l.video||{}).code]?w.video_bad:'';
+    const first=v?mk('figure',{class:'sbigf','data-role':'video'},v,other?mk('figcaption',{},l.video.label||''):null):sheet?fig(sheet,other?sheet.label:''):null;   // one thing large: its name is in the row of small pictures
+    media=mk('div',{class:'sbigrow pmedia'+(other?' two':''),id:'sbig'},first,other&&beside(other));
+    const canPlay=!!(l.video||{}).code&&!S.vbad[l.video.code];
+    cap=mk('p',{class:'pcap',id:'pcap'},!v&&why?mk('span',{class:'pnone',id:'pnone'},why):null,l.finish?mk('span',{id:'pfinish'},l.finish):null,mk('span',{class:'sgrow'}),
+      canPlay&&sheet?mk('button',{class:'slink',id:'pframes',type:'button',on:{click:()=>{ S.view[l.line]=v?'sheet':''; sMainDraw(); }}},v?w.frames:w.video):null,
+      other?mk('button',{class:'slink',id:'scompare',type:'button',on:{click:()=>{ delete S.cmp[l.line]; sMainDraw(); }}},w.stop):null);
+  } else if(main){   // a still, the style sheet, the picture a question is about
+    media=mk('div',{class:'sbigrow pmedia'+(other?' two':''),id:'sbig'},fig(main,other?main.label:''),other&&beside(other));   // its own failed lines are the check's, beside it
+    cap=(l.try||other)?mk('p',{class:'pcap',id:'pcap'},l.try?mk('span',{class:'spill',id:'ptry'},l.try):null,mk('span',{class:'sgrow'}),other?mk('button',{class:'slink',id:'scompare',type:'button',on:{click:()=>{ delete S.cmp[l.line]; sMainDraw(); }}},w.stop):null):null;
+  }
+  const strip=pics.filter(p=>p.role!=='step'&&(p.role!=='main'||foot.length)&&(l.kind==='drawn'||p.role!=='sheet'));   // film order: before, the picture (or the frames), after, the earlier tries
+  const thumb=p=>{ const isFoot=foot.indexOf(p)>=0, on=isFoot?p===other:p.role==='sheet'?S.view[l.line]==='sheet'||!pVideoOk(l):!other;
+    return mk('button',{class:'sth pth'+(on?' on':''),type:'button','aria-pressed':String(on),'aria-label':p.cmp_cap||p.label,'data-code':p.code,'data-role':p.role,on:{click:()=>{
+        if(isFoot){ if(p===other) delete S.cmp[l.line]; else S.cmp[l.line]=p.code; } else if(p.role==='sheet') S.view[l.line]=S.view[l.line]==='sheet'?'':'sheet'; else delete S.cmp[l.line]; sMainDraw(); }}},
+      mk('span',{class:'ph'},p.missing?w.missing:w.loading),mk('span',{class:'pthl'},p.cmp_cap||p.label)); };
+  const thumbs=strip.length&&(foot.length||l.kind==='drawn')?mk('div',{class:'sstrip'},mk('div',{class:'sgrp'},mk('h4',{},l.foot_head||''),mk('div',{class:'sths',id:'sfootage'},strip.map(thumb)))):null;
+  if(thumbs) Array.prototype.forEach.call(thumbs.querySelectorAll('.sth'),btn=>{ const p=pics.find(x=>x.code===btn.getAttribute('data-code')); if(p&&!p.missing) loadThumb(p,btn,check,0); });
+  if(l.sub) side.push(mk('div',{class:'pctx',id:'pctx'},mk('p',{class:'pwords'},l.sub)));
+  if(l.where||l.words) side.push(mk('div',{class:'pctx',id:'pctx'},l.where&&mk('p',{class:'pwhere'},l.where),l.words&&mk('p',{class:'pwords'},mk('span',{class:'pwhere'},(l.words_head||'')+' '),l.words)));
+  if(l.from) side.push(mk('p',{class:'pfrom',id:'pfromq'},l.from));
+  side.push(pCheck(l));
+  side.push(mk('h3',{class:'sansh'+(l.kind==='question'?' pask':''),id:'sansh'},l.ask||''));
+  const yes=l.check&&l.check.state==='pass';
+  const bar=(l.buttons||[]).map((b,i)=>mk('button',{class:'sbtn'+(l.kind==='question'?' pq':'')+(yes&&(b.act==='approve'||b.act==='select')?' primary':'')+(b.act==='reject'?' danger':''),type:'button','data-act':b.act,'data-choice':b.choice,
+    'aria-expanded':b.sure||b.needs_words?String(S.panel==='b'+i):null,on:{click:()=>{ if(b.sure||b.needs_words) return sOpen(S.panel==='b'+i?null:'b'+i); sAnswer(l,b.choice,''); }}},
+    b.label,l.kind==='question'&&b.say?mk('small',{},b.say):null));
+  if(pics.length) bar.forEach(b=>gate.push(b));
+  side.push(mk('div',{class:l.kind==='question'?'pqbar':'sbar',id:'pbar',role:'group','aria-label':l.ask||''},bar));
+  if(S.panel) side.push(mk('div',{class:'spanel',id:'spanel'},pPanel(l)));
+  side.push(gmsg);
+  if(l.refused) side.push(mk('p',{class:'smsg',id:'srefused'},l.refused));   // the server's refusal of the last "done", kept on its line
+  side.push(mk('p',{class:'smsg',id:'smsg',role:'status',hidden:!S.msg},S.msg));
+  if(a){ const ag=sAgainst(l); side.push(mk('div',{class:'sanswer'+(ag?' against':''),id:'sanswer'},mk('p',{},sSays(l)[1],ag?[' ',mk('span',{class:'pagt'},'('+w.against+')')]:null),mk('button',{class:'sbtn',id:'sundo',type:'button',on:{click:()=>sUndo(l)}},w.undo))); }
+  const c=l.check||{};
+  side.push(sDetails({details:[[c.passed_head,c.passed||[]],[c.advice_head,c.advice||[]]].filter(d=>d[0]&&d[1].length).concat(l.details||[])}));
+  const sideBox=mk('div',{class:'sside'},...side.flat(6).filter(Boolean));
+  if(media) kids.push(mk('div',{class:'sstage pstage'+(l.kind==='steps'?' wide':'')},mk('div',{class:'sviewer'},l.kind==='steps'?[cap,media]:[media,cap],thumbs),sideBox)); else kids.push(mk('div',{style:'max-width:760px'},sideBox));
+  setTimeout(check,0);
+  return kids; }
+const pVideoOk=l=>!!(l.video||{}).code&&!S.vbad[l.video.code];
 function sRestView(r){   // "The other N sets": made together, or only some of them (A12), once the first sets are answered
   const w=SW(), a=sAns(r), make=(r.buttons||[])[0]||{}, out=(r.buttons||[]).find(b=>b.loss), ready=sJudged(), L=out&&out.loss, waiting=sWaiting();
   const kids=[mk('h2',{class:'sname'},r.name||r.title),mk('p',{class:'skind'},w.rest_kind),
@@ -1094,13 +1197,19 @@ function sRestView(r){   // "The other N sets": made together, or only some of t
   return kids; }
 function sEnd(){   // A13: what will happen, thing by thing, before the operator says done
   const w=SW(), it=sItems(), left=it.filter(l=>!sDone(l));
+  if(PIC()&&!it.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.nothing),round.note&&mk('p',{},round.note))];   // design/217: nothing to answer now
+  if(PIC()&&!left.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>mk('li',{},mk('b',{},l.name+': '),sSays(l)[1],sAgainst(l)?' ('+w.against+')':''))),mk('p',{class:'sempty'},w.end_foot))];
   if(left.length) return [mk('div',{class:'scard',id:'send'},mk('h2',{},left.length===1?w.left_one:String(w.left_many||'').replace('{n}',left.length)),mk('p',{},w.left_note))];
   return [mk('div',{class:'scard',id:'send'},mk('h2',{},w.end_head),mk('p',{},w.end_note),mk('ul',{},it.map(l=>mk('li',{},mk('b',{},(l.name||l.title)+': '),sSays(l)[1]))),mk('p',{class:'sempty'},w.end_foot))]; }
 function sRail(){
   const w=SW(), it=sItems(), kids=[mk('h2',{},w.todo)];
   kids.push(mk('ul',{},it.map((l,i)=>{ const d=sDone(l), ag=l.key!=='sets:rest'&&sAgainst(l), a=sAns(l), b=a&&sBtn(l,a);
     return mk('li',{},mk('button',{class:'srow'+(d?(ag?' against':' done'):''),type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},
-      mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
+      mk('i',{class:'sdot'},d?(ag?'!':'✓'):String(i+1)),mk('span',{class:'snm'},l.name||l.title,PIC()&&l.kind_words&&mk('small',{class:'pkw'},l.kind_words)),d&&mk('span',{class:'sst'},ag?w.against:b?((w.done||{})[b.act]||b.label||''):l.kept))); })));
+  const coming=PIC()&&(round.layout||{}).coming||[];   // design/217: what is being made or waits for Claude's check, nothing to answer: one folded row
+  if(coming.length){ const o=!!S.fold.coming;
+    kids.push(mk('button',{class:'sfold',type:'button','aria-expanded':String(o),'data-fold':'coming',on:{click:()=>{ S.fold.coming=!o; sRail(); }}},mk('span',{},w.coming),String(coming.length)));
+    if(o) kids.push(mk('ul',{class:'pcoming',id:'pcoming'},coming.map(c=>mk('li',{'data-state':c.state},c.name,mk('small',{},[c.kind_words,c.note].filter(Boolean).join(' · ')))))); }
   const covered=(sRest()||{}).covers||[];
   [['settled',w.settled,sLines().filter(l=>l.case==='settled')],['busy',w.busy,sLines().filter(l=>l.state!=='open'&&l.case!=='settled'&&covered.indexOf(l.key)<0)]].forEach(([g,title,rows])=>{
     if(!rows.length) return; const o=!!S.fold[g];
@@ -1108,16 +1217,17 @@ function sRail(){
     if(o) kids.push(mk('ul',{class:'squiet'},rows.map(l=>mk('li',{},mk('button',{class:'srow',type:'button','aria-current':S.cur===l.line?'true':null,'data-line':l.line,on:{click:()=>sGo(l.line)}},mk('span',{class:'snm'},l.name||l.title)))))); });
   $('srail').replaceChildren(...kids); }
 function sCount(){ const w=SW(), it=sItems(), n=it.filter(sDone).length;   // A11: the one count
+  if(PIC()&&!it.length) return $('sfoot').replaceChildren(mk('span',{},w.nothing));
   $('sfoot').replaceChildren(mk('b',{},String(w.foot||'').replace('{n}',n).replace('{m}',it.length)),mk('span',{},n===it.length?w.foot_done:w.foot_wait)); }
 function sMainDraw(){
   const l=(round.lines||[]).find(x=>x.line===S.cur), w=SW(), main=$('smain'), top=main.scrollTop;
   const body=S.help?[mk('h2',{class:'sname'},w.help),[].concat((round.layout||{}).help||[]).map(x=>mk('p',{style:'max-width:65ch;margin-top:8px'},x)),mk('p',{style:'max-width:65ch;margin:8px 0 12px'},w.keys),
       mk('button',{class:'sbtn',id:'shelpclose',type:'button',on:{click:()=>{ S.help=false; sDraw(); }}},w.close)]
-    :l&&l.key==='sets:rest'?sRestView(l):l?sThing(l):sEnd();
+    :l&&l.key==='sets:rest'?sRestView(l):l?(PIC()?pThing(l):sThing(l)):sEnd();
   main.replaceChildren(mk('div',{class:'swrap'},...[].concat(body).flat(6).filter(Boolean))); main.scrollTop=top; }
 function sDraw(){
   if(S.round!==round.round){ const f=sItems().find(l=>!sDone(l));   // a new round: the first thing that needs an answer
-    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{}}); }
+    Object.assign(S,{round:round.round,cur:f?f.line:null,panel:null,msg:'',help:false,fold:{},open:{},view:{},cmp:{},cmpOn:{},pick:{},words:{},vbad:{}}); }
   $('sstep').textContent=round.step||''; $('shelp').textContent=SW().help||''; $('shelp').setAttribute('aria-expanded',String(S.help));
   sRail(); sMainDraw(); sCount(); }
 $('shelp').addEventListener('click',()=>{ S.help=!S.help; sDraw(); });
