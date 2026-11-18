@@ -51,8 +51,8 @@ REWRITE_WORDS, REWRITE_NO_WORDS = '{eid} ("{words}")', '{eid} (no words: from th
 REWRITE_MAKING = '{n} set(s) are being made again. Wait: `vw visuals status --wait 900`.'
 MERGE_ASK = 'The round is past step 1: nothing was made. {n} thing(s) are back with the operator as open lines. Run `vw visuals page`.'
 MERGE_NONE = ('The round is past step 1: nothing was made and nothing came back. Only a thing that is new in the plan, or whose entry in the plan changed, comes back by a round '
-              'file sent again; a thing the operator left out stays left out until they ask for it by name (`vw visuals round --back <element>`).')
-BACK_ASKED = '{eid} is back with the operator as an open line: nothing was made. Run `vw visuals page`.'
+              'file sent again; a thing the operator said needs no reference keeps that answer until they ask for it by name (`vw visuals round --back <element>`).')   # design/216 (B6): was "left out"
+BACK_ASKED = '{eid} is back with the operator as an open line, to be answered again: nothing was made. Run `vw visuals page`.'   # design/216 (B6)
 STEP1_NO_SET = 'Step 1 is recorded. No set was ordered.'
 STEP1_WAIT = " {r} more wait for the operator's word."
 NOT_ORDERED = ' Not ordered: {things}. Each is on the page with its reason (`vw visuals page`).'
@@ -169,6 +169,11 @@ FRAME_WEAK_LINE = ("Image {k} is the film's own picture of {name} ({view}); it i
 FRAME_DRAWN_LINE = "Image {k} is the film's own picture of {name} ({view}): take its look, colour, material and wear from it; its shape and size come from the approved drawing."
 SHEET_LINE = 'Image {k} is an approved drawing of {name} ({view}).'
 ADDED_LINE = "Added by the film's writer: {words}"
+# design/216 (B4, approved 17 Nov 2026): a place's request names the film's own things that stand in it, with their approved references as input pictures
+THING_IN_PLACE = "Image {k} is the approved reference of {name}, one of the film's own things in this place: show it exactly as that picture shows it."
+THINGS_IN_WORDS = "The film's own things in this place, from their descriptions: {things}."
+THINGS_CHECK = ("the film's own things in it match their references", "each of the film's own things in it looks as its reference picture shows it: {names}")
+PLACE_THINGS = ('object', 'material')   # what stands in a place: a person, a place and a way of working do not
 OPERATOR_LINE = "The operator's words: {words}"
 # design/215 (change 5): the operator's corrections of a thing, kept per thing in the session (`thing_corrections`), never in the plan: carried into every later
 # request of the thing with the operator's rank; the later one wins where two disagree
@@ -471,6 +476,46 @@ def _kind_lines(kind):
     return out
 
 
+def place_things(plan, session, element):
+    """design/216 (B4): the film's own things that stand in a place: the objects and materials its shots name beside it, most shared first
+    (the plan's order between equals). Returns [(element, the id of its approved reference or None)]: the golden picture, else an approved
+    picture of its set, else an approved drawing, else an approved footage picture; None for a thing with none yet, or one the operator said
+    needs no reference."""
+    pid = element['id']
+    shots = [sh for gap in plan.get('gaps') or [] for sc in all_scenes(gap) for sh in sc.get('shots') or [] if pid in (sh.get('element_ids') or [])]
+    order = [e for e in plan.get('elements') or [] if e.get('kind') in PLACE_THINGS and e['id'] != pid]
+    counts = {e['id']: sum(e['id'] in (sh.get('element_ids') or []) for sh in shots) for e in order}
+    things = sorted([e for e in order if counts[e['id']]], key=lambda e: -counts[e['id']])
+    return [(e, thing_ref(session, e['id'])) for e in things]
+
+
+def thing_ref(session, eid):
+    """The approved reference of a thing (design/216, B4), or None."""
+    refs, rows = session.get('references') or {}, ((session.get('round') or {}).get('elements') or {})
+    if (rows.get(eid) or {}).get('ignored'):
+        return None
+    ok = lambda rid: (refs.get(rid) or {}).get('status') == 'approved'
+    gold = V.golden_of(session, eid)
+    if gold and ok(gold):
+        return gold
+    mine = lambda kind: sorted([r for r in refs.values() if r.get('element_id') == eid and r.get('kind') == kind and r.get('status') == 'approved'], key=lambda r: int(r.get('set_n') or 1))
+    from . import drawings
+    sheet = mine('sheet') or [r for r in ({'id': s['id']} for s in drawings.approved_sheets(session, eid)) if ok(r['id'])] or mine('frame')
+    return sheet[0]['id'] if sheet else None
+
+
+def place_waiting(plan, session, eid):
+    """design/216 (B4): what a place's line says while one of its things is to be made and has no approved reference yet: '' when none."""
+    element = _element(plan, eid)
+    if not element or element.get('kind') != 'place':
+        return ''
+    from .chat_flow import WORDS, _and, the
+    rows = (session.get('round') or {}).get('elements') or {}
+    names = [the(t.get('name') or t['id']) for t, ref in place_things(plan, session, element) if not ref and t['id'] in rows and not rows[t['id']].get('ignored')]
+    one = len(names) == 1
+    return WORDS['place_waits'].format(names=_and(names), sets='set is' if one else 'sets are', that='that' if one else 'those') if names else ''
+
+
 def set_request(plan, run, session, element, row):
     """The whole request of one set of a v2 round (design/211 section 3.6), by kind: {'prompt', 'views': [{'name', 'ask'}], 'inputs':
     [{'ref', 'role': 'footage'|'drawing'|'photo', 'view'}], 'search': bool, 'lines': [{'check', 'weight', 'pass_when'}], 'parts': {'kind',
@@ -522,6 +567,13 @@ def set_request(plan, run, session, element, row):
         if sheets:
             pictures += [row.get('drawn_how') or '\n'.join(SHEET_LINE.format(k=k, name=name, view=i['view']) for k, i in enumerate(sheets, len(footage) + 1)), V.KEPT_DRAWN_LINE]
             pictures += ['What must be true:\n' + '\n'.join(f'- {f}' for f in drawn)] if drawn else []
+        if kind == 'place':   # design/216 (B4): most shared first; Gemini's limits are kept here, before the call (all of a place's pictures count as objects)
+            room = max(0, min(V.GEMINI_MAX_INPUTS, V.GEMINI_KIND_CAPS['object']) - len(inputs))
+            ins = [(t, ref) for t, ref in place_things(plan, session, element) if ref][:room]
+            said = [t for t, ref in place_things(plan, session, element) if (t, ref) not in ins]
+            pictures += [THING_IN_PLACE.format(k=k, name=t.get('name') or t['id']) for k, (t, ref) in enumerate(ins, len(inputs) + 1)]
+            pictures += [THINGS_IN_WORDS.format(things='; '.join(f"{t.get('name') or t['id']} ({_plain_words(t, str(t.get('description') or '').strip().rstrip('.')) or 'as the plan names it'})" for t in said))] if said else []
+            inputs = inputs + [{'ref': ref, 'role': 'thing', 'view': t.get('name') or t['id']} for t, ref in ins]
         setting = (f"Setting: the place itself, as described, in its own light and time{': ' + facts['scene']['place'] if (facts['scene'] or {}).get('place') else ''}." if kind == 'place' else
                    f"Setting: {place or NO_PLACE}{', as a soft hint at the edges' if kind in ('object', 'material') else ''}; the light of that place and time.")
         subject = [f'The subject: {name}, {KIND_WORDS.get(kind, "a thing")} in this film.',
@@ -534,6 +586,9 @@ def set_request(plan, run, session, element, row):
         prompt, source = '\n\n'.join(text), 'footage' if footage else 'web'
     prompt = re.sub(r'(?<!\.)\.\.(?!\.)', '.', prompt).replace('.;', ';')   # a sentence of the plan that ends in a full stop gets no second one
     lines = _lines(element, facts, inputs, added, '; '.join(w.rstrip('.') for w in kept + [operator] if w), len(views), doc)
+    things = [i['view'] for i in inputs if i['role'] == 'thing']
+    if things:   # design/216 (B4): the check list says the same as the request
+        lines.append({'check': THINGS_CHECK[0], 'weight': 'must', 'pass_when': THINGS_CHECK[1].format(names='; '.join(things))})
     if drawn or sheets:   # the facts of the drawing set are checked on the picture, and it must be a photograph
         lines += [{'check': 'drawn fact: ' + f, 'weight': 'must', 'pass_when': f'the picture shows it as the approved drawings do: {f}'} for f in drawn] + [V.DRAWN_LOOK_LINE]
     parts = {'kind': kind, 'subject': name, 'description': facts['description'], 'requirements': facts['requirements'], 'sizes': sizes, 'material': material, 'signs': signs,
@@ -1026,8 +1081,13 @@ def round_looks(store, user, run, outputs, sets, by):
 # ---------- the second go, the rewrite, a thing back after a second send ----------
 
 def _order(conn, store, user, run, outputs, eids):
-    """The sets ordered through visuals_stage._queue_sets (its gates, the limit, the log); the round is 'making' when one was."""
-    queued, errors = V._queue_sets(conn, store, user, run, outputs, eids)
+    """The sets ordered through visuals_stage._queue_sets (its gates, the limit, the log); the round is 'making' when one was.
+    design/216 (B4): the things before the places, the plan's order otherwise: a place's request takes the references its things have then."""
+    try:
+        kinds = {e['id']: e.get('kind') for e in V.guarded(lambda: V.current_plan(store, V.session_of(store, run, outputs)))['elements']}
+    except (Problem, ValueError, KeyError, TypeError):
+        kinds = {}
+    queued, errors = V._queue_sets(conn, store, user, run, outputs, sorted(eids, key=lambda e: kinds.get(e) == 'place'))
     session = V.session_of(store, run, outputs)
     if queued:
         session['round']['pass'] = 'making'
