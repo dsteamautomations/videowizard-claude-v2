@@ -1194,16 +1194,42 @@ def get_film(run_id: UUID, user=User, conn=DB):
     run = core.load_run(conn, user, run_id)
     media = next((o for o in core.current_outputs(conn, run['id']) if o['stage'] == 'media' and o['unit'] is None), None)
     outputs = core.current_outputs(conn, run['id'])
-    scripts = _film_scripts(outputs)
-    last = conn.execute("select film->'font'->>'value' as font from vw2_runs where client_id=%s and id<>%s and film->'font'->>'value' is not null order by created_at desc limit 1",
-                        (run.get('client_id'), run['id'])).fetchone() if run.get('client_id') else None
-    order, st = film.recommend_styles(film.category(run)), film.styles()
-    offer = film.fonts_for(film.motion(run) or order[0], scripts, (last or {}).get('font'))
+    scripts, order, offer = _font_offer(conn, run, outputs)
+    st = film.styles()
     return Response({'film': film.choices(run), 'older': film.older(run), 'recommendation': film.recommend((media or {}).get('summary', {}).get('clips') or []) if media else None,
                      'categories': list(library.CATEGORIES), 'fonts': [f['name'] for f in offer],
                      'motion_styles': [{'name': n, 'title': st[n]['title'], 'for': st[n]['for'], 'recommended': i == 0} for i, n in enumerate(order)],   # design/179 S3: the first is the one to recommend
                      'font_offer': offer, 'written_in': sorted(film.SCRIPT_NAMES[s] for s in scripts | {'latin'}),
                      'font_note': "Recommend the first font: the client's last font when they have one, else the first that fits the film's motion style. One font for the whole film."})
+
+
+def _font_offer(conn, run, outputs):
+    """design/179 S7: the film's scripts, the styles in the order to recommend, and the fonts offered (the client's last font first)."""
+    scripts = _film_scripts(outputs)
+    last = conn.execute("select film->'font'->>'value' as font from vw2_runs where client_id=%s and id<>%s and film->'font'->>'value' is not null order by created_at desc limit 1",
+                        (run.get('client_id'), run['id'])).fetchone() if run.get('client_id') else None
+    order = film.recommend_styles(film.category(run))
+    return scripts, order, film.fonts_for(film.motion(run) or order[0], scripts, (last or {}).get('font'))
+
+
+@app.get('/api/runs/{run_id}/film/font-sample')
+def get_font_sample(run_id: UUID, user=User, conn=DB):
+    """design/218: one picture of the offered fonts, drawn with the server's font files on this film's labels and colours (Chromium, no AI), for
+    the assistant to show before the font question; 'available': false with one line when it cannot be made (the question is never blocked)."""
+    import base64
+    from . import font_sample
+    run = core.load_run(conn, user, run_id)
+    outputs = core.current_outputs(conn, run['id'])
+    scripts, _, offer = _font_offer(conn, run, outputs)
+    try:
+        plan = visuals_stage.current_plan(storage(), visuals_stage.session_of(storage(), run, outputs))
+    except Exception:   # no visuals stage or no plan yet: no drawn graphic to ask the font for
+        plan = None
+    out = font_sample.sample(offer, scripts, plan, film.colours(run))
+    png = out.pop('png', None)
+    if png:
+        out.update(file='font-sample.png', base64=base64.b64encode(png).decode('ascii'))
+    return Response({**out, 'fonts': [f['name'] for f in offer]})
 
 
 @app.post('/api/runs/{run_id}/film')
@@ -1452,6 +1478,20 @@ def visuals_motion_verdict(run_id: UUID, body: MotionVerdict, user=User, conn=DB
 @app.post('/api/runs/{run_id}/visuals/motion/rule')
 def visuals_motion_rule(run_id: UUID, body: SubjectRule, user=User, conn=DB):
     return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_subject_rule(storage(), user, run, body.subject, body.rule, body.quote))
+
+
+class MotionColour(Write):   # design/218 A: a colour the palette names none for, added beside the plan
+    thing: str = Field(min_length=1, max_length=80)
+    colour: str = Field(min_length=7, max_length=7)
+    words: str = Field(min_length=1, max_length=80)
+    reason: str = Field(min_length=1, max_length=200)
+    shots: list[str] = Field(min_length=1, max_length=60)
+    quote: str = Field(default='', max_length=2000)
+
+
+@app.post('/api/runs/{run_id}/visuals/motion/colour')
+def visuals_motion_colour(run_id: UUID, body: MotionColour, user=User, conn=DB):
+    return _visuals_call(conn, user, run_id, body, lambda run, outputs: visuals_stage.add_colour(storage(), user, run, outputs, body_dict(body)))
 
 
 @app.post('/api/runs/{run_id}/visuals/motion/upload')

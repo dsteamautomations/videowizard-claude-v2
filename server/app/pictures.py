@@ -696,6 +696,12 @@ def finish_listed(fin):
     return _and(parts) if parts else ''
 
 
+def colour_notes(session, shot_id):
+    """design/218 A: the colours added for a thing this drawing shows, said without asking (by Claude, or with the operator's words)."""
+    return [f"Added {'by Claude' if r['by'] == 'claude' else 'with your words'}: {r['words']} for the {r['thing']}, because {r['reason']}."
+            for r in (session.get('added_colours') or {}).values() if shot_id in r['shots']]
+
+
 def drawn_line(store, session, plan, job, check, fin, motion_take):
     """Kind `drawn` (contract 3.7): the video (its page copy) with the frame sheet one click away, the fact check with every open rule in full,
     select (with the operator's reason when it is held, F3), reject, and "Take the effect away" when it has a finish (no confirmation, D8)."""
@@ -721,7 +727,7 @@ def drawn_line(store, session, plan, job, check, fin, motion_take):
             'video': {'_key': res.get('key') or '', '_mark': str(res.get('sha256') or ''), 'code': '', 'label': W['video'], 'none': W['video_none']},
             'finish': W['finish'].format(finish=listed) if listed else '', 'held': held, 'pics': pics, 'check': view, 'buttons': buttons,
             'details': [['How it was made', ['Built as a web animation by Claude helpers on the laptop, rendered to video by the server. No picture AI.' if motion_take else 'Drawn by the server from the scene file.']
-                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]]}
+                         + ([f'Length: {float(secs):.2f} s.'] if secs else [])]] + ([['Colours', colour_notes(session, shot_id)]] if colour_notes(session, shot_id) else [])}   # design/218 A
 
 
 def question_line(session, plan, item, q, ref):

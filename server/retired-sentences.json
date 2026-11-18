@@ -128,6 +128,7 @@
     "Use my own picture, on the thing's line",
     "a fix is made only on request: `vw visuals fix --ref R`",
     "approved on the Pictures step like any picture",
-    "made first as a style sheet (`vw visuals image --element _STYLE --kind style"
+    "made first as a style sheet (`vw visuals image --element _STYLE --kind style",
+    "A graphic sequence is reviewed as its states, in the chat"
   ]
 }

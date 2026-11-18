@@ -5764,8 +5764,10 @@ def film_font_files(run):
 def need_font(run, session=None):
     """design/139 R13: the drawing font is asked once, before the first drawing, with Noto Sans as the reference; a brand font given with
     `vw visuals font --file` answers it too."""
-    need(film.font(run) or (session or {}).get('font'), "Ask the operator the film's font once: `vw font` lists the fonts that fit this film's motion style and hold its language, the first is the "
-                                                         'one to recommend. Record it: `vw font <name> --quote "<their words>"`.')
+    need(film.font(run) or (session or {}).get('font'), "Ask the operator the film's font once, in the chat: `vw font` lists the fonts that fit this film's motion style and hold its language, the first is the "
+                                                         'one to recommend. First run `vw font --sample` and show its picture (each offered font drawn on this film\'s labels; "Other" is not in it), '
+                                                         'then ask the question with the fonts and "Other" as before; if it says "The font sample is not available.", say that line and ask as before. '
+                                                         'Record it: `vw font <name> --quote "<their words>"`.')   # design/218
 
 
 def _motion_fonts(store, session, run=None):
@@ -5957,6 +5959,58 @@ def _subject_rules(store, stem):
     return seed + added
 
 
+NEUTRAL_MAX_CHROMA = 0.10   # design/218: a colour whose brightest and darkest channel differ by at most this share is a neutral (a grey, an off-white, a near-black)
+
+
+def chroma(colour):
+    """(max - min) of the channels of #RRGGBB, from 0 (a grey) to 1."""
+    c = [int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return round(max(c) - min(c), 3)
+
+
+def added_colour(session, plan, user, thing, colour, words, reason, shots, quote=''):
+    """design/218 A: a colour for a thing the palette names none for, kept in the session beside the plan (never in the accepted plan): Claude's
+    when it is a neutral; a hue, or a second colour for the same thing, only with the operator's words. The same colour again adds its shots."""
+    from .font_sample import drawn_shots
+    key = ' '.join(str(thing or '').lower().split())
+    need(key and len(key) <= 80, 'Name the thing the colour is for (--thing, at most 80 characters).')
+    colour = str(colour or '').strip().upper()
+    need(re.fullmatch(r'#[0-9A-F]{6}', colour), 'Give the colour as #RRGGBB (--colour).')
+    need(str(words or '').strip() and str(reason or '').strip(), 'Give the colour in plain words (--words "dark warm grey") and one plain reason (--reason "the palette named none").')
+    drawn = {s['id'] for s in drawn_shots(plan)}
+    need(shots and all(s in drawn for s in shots), f"Name the drawn shots that show it (--shot): {', '.join(s for s in shots if s not in drawn) or 'none given'} "
+                                                   f"is not a drawn shot of the plan ({', '.join(sorted(drawn)) or 'none'}).")
+    quote = str(quote or '').strip()
+    need(quote or chroma(colour) <= NEUTRAL_MAX_CHROMA, f'{colour} is not a neutral (its chroma {chroma(colour):.2f} is above {NEUTRAL_MAX_CHROMA:.2f}): a real hue is the '
+                                                       "operator's choice: ask the operator, then give their words with --quote.")
+    rows = session.setdefault('added_colours', {})
+    have = rows.get(key)
+    need(not have or have['colour'] == colour or quote, f"The {have and have['thing']} already have {have and have['colour']} ({have and have['words']}), added for every drawing: "
+                                                        "it stands; a change needs the operator's words (--quote)." if have else '')
+    if have and have['colour'] == colour:
+        have['shots'] += [s for s in shots if s not in have['shots']]
+        return have
+    rows[key] = {'thing': ' '.join(str(thing).split()), 'colour': colour, 'words': str(words).strip(), 'reason': str(reason).strip().rstrip('.'), 'shots': list(dict.fromkeys(shots)),
+                 'by': 'operator' if quote else 'claude', 'quote': quote, 'user': user['id'], 'at': datetime.now(timezone.utc).isoformat()}
+    return rows[key]
+
+
+def add_colour(store, user, run, outputs, body):
+    session = session_of(store, run, outputs)
+    plan = current_plan(store, session)
+    row = added_colour(session, plan, user, body['thing'], body['colour'], body['words'], body['reason'], body['shots'], body.get('quote'))
+    save_session(store, run, session)
+    return {'colour': row, 'next': f"Added for every drawing of this film: {row['thing']} {row['colour']} ({row['words']}). The next briefs carry it (`vw motion brief`); "
+                                   'the operator sees it under Details on the drawing, nothing is asked.'}
+
+
+def palette_line(plan, session):
+    """design/218: the brief's palette: the plan's, then the colours added since (design/218 A), so every drawing agrees."""
+    base = ((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or 'the approved style picture'
+    added = '; '.join(f"{r['thing']} {r['colour']} ({r['words']})" for r in (session.get('added_colours') or {}).values())
+    return f"Palette: {base.rstrip('.')}." + (f' Added for every drawing of this film: {added}.' if added else '')
+
+
 def add_subject_rule(store, user, run, subject, rule, quote):
     """design/130 §4 step 8: a correction kept as a rule of its subject for every later film, only with the operator's words."""
     stem = re.sub(r'[^a-z0-9-]', '', str(subject or '').lower())
@@ -6052,7 +6106,7 @@ def motion_brief(store, run, outputs, shot_id):
              f"Each word's start, seconds from the shot's start: {timed}.",
              f"Shows: {shot.get('depicts') or shot.get('purpose')}. Message: {shot.get('message') or '-'}. Progression: {shot.get('information_progression') or '-'}.",
              f"Framing: {shot.get('framing')}. Appearance: {shot.get('appearance') or (plan.get('foundation') or {}).get('appearance') or '-'}.",
-             f"Palette: {((plan.get('foundation') or {}).get('graphic_style') or {}).get('palette') or 'the approved style picture'}.",
+             palette_line(plan, session),   # design/218: the plan's palette and the colours added since, the same for every drawing
              f"Claims (each must be plainly true in the picture): {'; '.join(shot.get('claims') or []) or 'none'}."]
     if spec:
         lines += [f"Drawing spec, view {spec.get('view') or '-'}: parts {', '.join(spec.get('parts') or []) or '-'}; sizes {dims or '-'}; relationships {'; '.join(spec.get('relationships') or []) or '-'}; "

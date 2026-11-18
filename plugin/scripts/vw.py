@@ -938,6 +938,13 @@ def cmd_motion(a):
             emit({'action': 'refused', 'message': 'Give the subject, the rule and the operator\'s words: `vw motion rule --subject rat-trap-bond --add "…" --quote "<their yes>"`.'}, 2)
         out = write(base + '/motion/rule', {'subject': a.subject, 'rule': a.add, 'quote': a.quote})
         emit(out, 0, out.get('next'))
+    if a.what == 'colour':   # design/218 A: a neutral colour the palette names none for, chosen by Claude and recorded once for every drawing
+        if not (a.shot and a.thing and a.colour and a.words and a.reason):
+            emit({'action': 'refused', 'message': 'Give the drawn shots, the thing, the colour, its words and one reason: `vw motion colour --shot D1,D2 --thing walls --colour "#5A524C" '
+                                                  '--words "dark warm grey" --reason "the palette named none"` (a real hue only with `--quote "<their words>"`).'}, 2)
+        out = write(base + '/motion/colour', {'thing': a.thing, 'colour': a.colour, 'words': a.words, 'reason': a.reason,
+                                              'shots': [s.strip() for s in a.shot.split(',') if s.strip()], 'quote': a.quote or ''})
+        emit(out, 0, out.get('next'))
     if not a.shot:
         emit({'action': 'refused', 'message': f'Give the drawn shot: `vw motion {a.what} --shot S`.'}, 2)
     folder = ws / 'work' / 'motion' / a.shot
@@ -3706,6 +3713,16 @@ def cmd_film(a):
     """design/137, design/139: the film's category, shape, colours and font, each recorded with the operator's words. With no value, show what is recorded,
     the clip count with the shape and rate recommendation, and the choices."""
     m = active()
+    if getattr(a, 'sample', False):   # design/218: the picture of the offered fonts, shown before the font question; never blocks it
+        out = call('GET', f"/api/runs/{m['run_id']}/film/font-sample", wait=120)
+        if not out.get('base64'):
+            emit({k: v for k, v in out.items() if k != 'reason'}, 0, out.get('message') + (' Say this line to the operator, then ask the font question as before.' if out.get('asked') else ''))
+        import base64 as _b64
+        path = workspace(m['code']) / 'work' / 'chat' / 'font-sample.png'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(_b64.b64decode(out.pop('base64')))
+        emit({**out, 'show_files': [str(path)]}, 0, f"File to show: {path}. Show it to the operator first, then ask the font question as before: the fonts "
+                                                   f"({', '.join(out.get('fonts') or [])}) and Other, the first to recommend.")
     if not a.value:
         emit(call('GET', f"/api/runs/{m['run_id']}/film"))
         return
@@ -3846,8 +3863,8 @@ def build_parser():
     s.add_argument('--gaps', nargs='*'); s.add_argument('--refs', nargs='*'); s.add_argument('--shots', nargs='*'); s.add_argument('--note', nargs='*', help='pick: N="note" per picked picture (design/73)'); s.add_argument('--wait', type=int, default=0)
     s.add_argument('--selector', action='append')
     s.add_argument('--subject', '--subject-rec', dest='subject', action='append'); s.set_defaults(fn=cmd_visuals)   # ticket 10: one definition, repeatable
-    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish'])   # design/130; design/186: finish
-    for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote'):
+    s = sub.add_parser('motion'); s.add_argument('what', choices=['brief', 'upload', 'check', 'snapshot', 'verdict', 'render', 'status', 'rule', 'finish', 'colour'])   # design/130; design/186: finish
+    for flag in ('--shot', '--dir', '--sha', '--at', '--zoom', '--job', '--file', '--subject', '--add', '--quote', '--thing', '--colour', '--words', '--reason'):   # design/218: the last four for colour
         s.add_argument(flag)
     s.add_argument('--crop', action='append', help='snapshot: a close-up left,top,width,height as fractions of the frame; repeatable')
     s.add_argument('--off', action='store_true', help="finish: take the drawing's finish away (design/186)"); s.add_argument('--on', action='store_true', help='finish: put it back')
@@ -3897,6 +3914,8 @@ def build_parser():
         s = sub.add_parser(key, help=helptext); s.add_argument('value', nargs='*'); s.add_argument('--quote')
         if key == 'shape':
             s.add_argument('--video', choices=['horizontal', 'vertical']); s.add_argument('--fps', type=int)
+        if key == 'font':   # design/218
+            s.add_argument('--sample', action='store_true', help='save the picture of the offered fonts to show before the question')
         s.set_defaults(fn=cmd_film, key='motion' if key == 'motion-style' else key)
     return p
 

@@ -20,7 +20,7 @@ def test_set_aside_clips_carry_name_and_reason():
 def test_design186_the_motion_command_takes_a_finish_off_or_on_and_the_skill_and_guide_say_how():
     root = Path(__file__).resolve().parents[1]
     src = (root / 'scripts' / 'vw.py').read_text(encoding='utf-8')
-    assert "'finish']" in src and "base + '/motion/finish'" in src and "a.off == a.on" in src
+    assert "'finish', 'colour']" in src and "base + '/motion/finish'" in src and "a.off == a.on" in src
     skill = (root / 'skills' / 'motion' / 'SKILL.md').read_text(encoding='utf-8')
     assert 'finish.json' in skill and 'data-hf-motion-blur' in skill and 'complete and right without the finish' in skill
     assert 'vw motion finish --shot S --off' in (root / 'commands' / 'vw.md').read_text(encoding='utf-8')

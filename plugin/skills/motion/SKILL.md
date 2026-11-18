@@ -22,6 +22,7 @@ The server places these at check and render; refer to them, never create them:
 - Every text on screen is one of the brief's labels, word for word, and nothing else. Put each label in an element with a stable `id`.
 - What appears when follows the narration: an element named by a word appears at that word's second (the brief lists each word's start). The plan's cues (`#id` at a word) are checked by the server against the render.
 - The claims and the drawing spec are facts: draw the parts, sizes, relationships and proportions as the spec says, and only those. A real object is drawn as it is built (a wall shows its bond; an opening has a lintel); when unsure, draw less, never something false.
+- Colours are the brief's palette, with the colours it lists as added for every drawing. A thing the palette gives no colour: choose a neutral (a grey, an off-white or a near-black) that keeps it apart from what touches it and name it in `REVIEW.md` under "Colours added" (the thing, #RRGGBB, its words, one reason); never stop to ask. A real hue is the operator's: name it in `REVIEW.md` as a question.
 - Silent: no audio, no music.
 
 ## Contract (HyperFrames)

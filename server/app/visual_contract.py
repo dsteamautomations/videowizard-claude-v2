@@ -1218,6 +1218,7 @@ def _validate_plan(document, source_gaps, fps=None, film_frames=None, frozen_lim
                                                           'build the graphics, or say why this film needs them still'})
     warnings.extend(course_warnings(plan, fps, drawn_in_run))   # design/103; design/126 TR1b
     warnings.extend(script_people_warnings(plan))   # design/151 Q4
+    warnings.extend(palette_warnings(plan))   # design/218 B
     result = plan.model_dump()
     answer_warnings(result, warnings)   # design/124 Change 7
     for key in ('sequence_overview', 'sequence_rules', 'visual_facts'):
@@ -1340,6 +1341,31 @@ def script_people_warnings(plan):
     return out
 
 
+def palette_warnings(plan):
+    """design/218 B: a part that the drawing specs of two or more drawn shots show, with no colour in the palette, named so the assistant adds it
+    to the palette before the operator approves the plan (a warning, never a refusal). Read from the specs: before them the plan does not say
+    what a drawn shot shows. ponytail: a part is its last word without a plural s, matched as a word of the palette text."""
+    style = plan.foundation.graphic_style
+    if style is None:
+        return []
+    word = lambda w: w[:-1] if len(w) > 3 and w.endswith('s') else w
+    named = {word(w) for w in re.findall(r'[a-z]+', style.palette.lower())}
+    seen = {}   # key: (the first name given, [shot ids])
+    for gap in plan.gaps:
+        for scene in list(gap.scenes) + [sc for c in gap.choices for sc in c.scenes]:
+            for shot in scene.shots:
+                if shot.visual_type != 'drawn' or shot.drawing_spec is None:
+                    continue
+                for part in shot.drawing_spec.parts:
+                    words = re.findall(r'[a-z]+', part.lower())
+                    if words:
+                        row = seen.setdefault(word(words[-1]), (part, []))
+                        row[1].append(shot.id) if shot.id not in row[1] else None
+    return [{'kind': 'palette_missing', 'message': f"{name} is shown by drawn shots {', '.join(ids)} and the palette (foundation.graphic_style.palette) gives it no colour: "
+                                                   'add its colour to the palette now, so every drawing agrees and nobody is asked during the build'}
+            for key, (name, ids) in seen.items() if len(ids) > 1 and key not in named]
+
+
 def course_warnings(plan, fps, drawn_in_run=True):
     """design/103: the course's planning rules (A1, A3, A4, A5) and design/93 G1, G2, on the counted scenes; warnings only in this release."""
     out = []
@@ -1435,7 +1461,7 @@ WARNING_TECHNICAL = ('activity_missing', 'ambient_missing', 'camera_reason_missi
                      'technique_unnamed', 'container_unnamed', 'script_person_missing',   # design/149 B5, B9; design/151 Q4
                      'size_open', 'size_repeat', 'size_close_first', 'look_alike', 'look_only',   # design/207 (SK, 16 Nov 2026): moved from the operator's list; look_only and passer_by are no longer raised, kept so old answers load
                      'material_bare', 'compare_not_person', 'view_missing', 'look_wide', 'extra_repeated', 'animals_many', 'same_setup',
-                     'people_alike')   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
+                     'people_alike', 'palette_missing')   # raised by the visuals stage: every pair of people whose descriptions read alike, before the reference round refuses them
 
 
 def answer_warnings(plan, warnings):
